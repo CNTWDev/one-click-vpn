@@ -190,6 +190,7 @@ export default function Home() {
         <header className="topbar">
           <div className="crumb"><span>CONTROL PLANE</span><b>/</b><strong>{activeNav.toUpperCase()}</strong></div>
           <div className="top-actions">
+            <span className="system-theme" title="Theme follows your operating system"><i /> System</span>
             <button className="icon-button" aria-label="Notifications">⌁<span /></button>
             <button className="terminal-shortcut" onClick={() => openTerminal(nodes[0])}>⌘ Terminal</button>
             <button className="primary-button" onClick={() => setShowDeploy(true)}><i>+</i> Add node</button>

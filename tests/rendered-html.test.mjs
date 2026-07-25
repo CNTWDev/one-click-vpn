@@ -31,9 +31,10 @@ test("server-renders the Northstar control plane", async () => {
 });
 
 test("keeps the management surface focused on secure node operations", async () => {
-  const [page, layout, packageJson, socialCard] = await Promise.all([
+  const [page, layout, css, packageJson, socialCard] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../public/og.png", import.meta.url)),
   ]);
@@ -42,6 +43,8 @@ test("keeps the management surface focused on secure node operations", async () 
   assert.match(page, /Temporary SSH password/);
   assert.match(page, /Agent tunnel/);
   assert.match(page, /Emergency SSH fallback/);
+  assert.match(page, /Theme follows your operating system/);
+  assert.match(css, /prefers-color-scheme:\s*dark/);
   assert.match(layout, /Northstar Control Plane/);
   assert.match(layout, /og\.png/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
