@@ -26,9 +26,9 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-if [ -n "$(git status --porcelain)" ]; then
-  echo "Working tree is not clean. Commit or stash local changes before automatic update:" >&2
-  git status --short >&2
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "Tracked working tree changes detected. Commit or stash them before automatic update:" >&2
+  git status --short --untracked-files=no >&2
   exit 1
 fi
 

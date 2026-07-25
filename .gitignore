@@ -45,6 +45,7 @@ next-env.d.ts
 
 # local controller state
 /data/
+/backups/
 .env
 .env.*
 !.env.example
