@@ -207,6 +207,7 @@ export default function Home() {
   const [nodeDiagnostics, setNodeDiagnostics] = useState<NodeDiagnostics | null>(null);
   const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
   const [deploying, setDeploying] = useState(false);
+  const [deployError, setDeployError] = useState("");
   const [selectedNode, setSelectedNode] = useState<Node>(initialNodes[0]);
   const [notice, setNotice] = useState("All systems nominal");
   const [form, setForm] = useState({ name: "", ip: "", user: "root", secret: "", regionId: "tokyo-jp", hostFingerprint: "" });
@@ -320,8 +321,11 @@ export default function Home() {
 
   async function deployNode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setDeployError("");
     if (!form.name || !form.ip || !form.secret) {
-      setNotice("Complete the node name, public IP, and temporary SSH credential.");
+      const message = "Complete the node name, public IP, and SSH credential.";
+      setDeployError(message);
+      setNotice(message);
       return;
     }
 
@@ -333,11 +337,14 @@ export default function Home() {
     const payload = await response.json().catch(() => ({})) as { error?: string; node?: Node };
     setDeploying(false);
     if (!response.ok || !payload.node) {
-      setNotice(payload.error || "Unable to create node");
+      const message = payload.error || "Unable to create node";
+      setDeployError(message);
+      setNotice(message);
       return;
     }
     setNodes((current) => [payload.node!, ...current]);
     setShowDeploy(false);
+    setDeployError("");
     setForm({ name: "", ip: "", user: "root", secret: "", regionId: regions[0]?.id || "", hostFingerprint: "" });
     setNotice(`${payload.node.name} is queued for secure bootstrap. The credential is encrypted server-side.`);
   }
@@ -533,18 +540,19 @@ export default function Home() {
       {showDeploy && (
         <div className="modal-layer" role="presentation" onMouseDown={() => !deploying && setShowDeploy(false)}>
           <section className="modal deploy-modal" role="dialog" aria-modal="true" aria-labelledby="deploy-title" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><p>SECURE BOOTSTRAP</p><h2 id="deploy-title">Add a managed node</h2></div><button onClick={() => setShowDeploy(false)} aria-label="Close add node">×</button></div>
+            <div className="modal-head"><div><p>SECURE BOOTSTRAP</p><h2 id="deploy-title">Add a managed node</h2></div><button type="button" onClick={() => setShowDeploy(false)} aria-label="Close add node">×</button></div>
             <div className="stepper"><span className="complete">01 <b>Connection</b></span><i /><span>02 <b>Verify</b></span><i /><span>03 <b>Deploy</b></span></div>
             <form onSubmit={deployNode}>
               <label>Node name<input autoFocus placeholder="e.g. Singapore Edge" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
           <div className="field-pair"><label>Public IP<input placeholder="203.0.113.10" value={form.ip} onChange={(event) => setForm({ ...form, ip: event.target.value })} /></label><label>Region<select required value={form.regionId} onChange={(event) => setForm({ ...form, regionId: event.target.value })}>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} · {region.country}</option>)}</select></label></div>
-              <div className="field-pair"><label>SSH user<input value={form.user} onChange={(event) => setForm({ ...form, user: event.target.value })} /></label><label>SSH password or private key<input type="password" placeholder="Encrypted on the controller" value={form.secret} onChange={(event) => setForm({ ...form, secret: event.target.value })} /></label></div>
+              <div className="field-pair"><label>SSH user<input autoComplete="username" value={form.user} onChange={(event) => setForm({ ...form, user: event.target.value })} /></label><label>SSH password or private key<input type="password" autoComplete="current-password" placeholder="Encrypted on the controller" value={form.secret} onChange={(event) => setForm({ ...form, secret: event.target.value })} /></label></div>
               <div className="fingerprint-field">
                 <div className="fingerprint-label"><label htmlFor="host-fingerprint">SSH host fingerprint</label><button type="button" className="help-toggle" onClick={() => setShowFingerprintGuide((current) => !current)} aria-expanded={showFingerprintGuide}>{showFingerprintGuide ? "收起" : "如何获取？"}</button></div>
                 <input id="host-fingerprint" placeholder="SHA256:… (required in production)" value={form.hostFingerprint} onChange={(event) => setForm({ ...form, hostFingerprint: event.target.value })} />
                 {showFingerprintGuide && <aside className="fingerprint-guide"><b>在目标 VPN 节点上获取</b><p>请先通过云厂商控制台或已确认安全的 SSH 会话登录目标服务器，然后执行：</p><div className="fingerprint-command"><code>{fingerprintCommand}</code><button type="button" onClick={() => void copyFingerprintCommand()}>{fingerprintCommandCopied ? "已复制" : "复制命令"}</button></div><p>复制输出中以 <strong>SHA256:</strong> 开头的值，粘贴到上面的输入框。如果没有 ed25519 主机密钥，可改用 <code>/etc/ssh/ssh_host_rsa_key.pub</code>。</p><small>不要直接把本次首次连接得到的指纹自动当作可信值；请通过云控制台或其他可信渠道核对。</small></aside>}
               </div>
               <p className="form-note"><span>⌑</span> The controller verifies the host key and encrypts this credential with the server master key. It is never returned to the browser.</p>
+              {deployError && <p className="form-error" role="alert">{deployError}</p>}
               <div className="modal-actions"><button type="button" className="cancel" onClick={() => setShowDeploy(false)}>Cancel</button><button className="primary-button" type="submit" disabled={deploying}>{deploying ? "Creating signed task…" : "Verify & deploy"}<span>→</span></button></div>
             </form>
           </section>

@@ -27,7 +27,9 @@ export async function POST(request: Request) {
     const secret = typeof body.secret === "string" ? body.secret : "";
     const credentialType = body.credentialType === "private_key" ? "private_key" : "password";
     const hostFingerprint = cleanText(body.hostFingerprint, 256) || null;
-    if (!name || !isValidIp(ip) || !secret) return jsonError("Name, IPv4 address, and SSH credential are required");
+    if (!name) return jsonError("Node name is required");
+    if (!isValidIp(ip)) return jsonError("Public IP must be a valid IPv4 address, for example 203.0.113.10");
+    if (!secret) return jsonError("SSH password or private key is required");
     if (!region) return jsonError("A valid region is required");
     if (credentialType === "private_key" && !secret.includes("BEGIN")) return jsonError("Private key is not valid PEM text");
     const encrypted = encryptSecret(secret);
