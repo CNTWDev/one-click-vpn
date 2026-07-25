@@ -247,6 +247,12 @@ docker compose exec northstar node /app/scripts/migrate.mjs
 ./scripts/backup.sh ./backups
 ```
 
+If logs show SQLite `disk I/O error`, an older Docker data volume may have ownership or write permissions that do not match the non-root `node` runtime user. The deployment script repairs `/app/data` before starting the new container. If the old container is restarting and a backup cannot run, use the recovery command below; it preserves the `northstar-data` volume and only skips the backup for this run:
+
+```bash
+sudo ./one-click-rebuild.sh --yes --skip-backup
+```
+
 Keep `.env` and backup files outside source control. Production data is stored in the `northstar-data` Docker volume. Rotate `NORTHSTAR_MASTER_KEY` only with a planned credential re-encryption migration; changing it blindly makes existing encrypted credentials unreadable.
 
 ## Verification

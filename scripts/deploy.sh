@@ -48,6 +48,10 @@ if [ "$no_cache" = "yes" ]; then
 else
   compose build northstar
 fi
+
+# A named volume can outlive images from older deployments. Repair its
+# ownership before the non-root runtime starts SQLite and enables WAL mode.
+"$SCRIPT_DIR/repair-data-volume.sh"
 compose up -d --force-recreate --remove-orphans
 
 container_id=$(compose ps -q northstar)
