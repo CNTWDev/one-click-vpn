@@ -20,7 +20,12 @@ function fingerprintForms(key: Buffer): { standard: string; hex: string } {
 }
 
 function normalizeFingerprint(value: string): string {
-  return value.trim().replace(/^sha256:/i, "").replace(/=+$/, "").toLowerCase();
+  const input = value.trim();
+  const sha256 = input.match(/SHA256:([A-Za-z0-9+/]+={0,2})/i);
+  if (sha256) return sha256[1].replace(/=+$/, "").toLowerCase();
+  const hex = input.match(/(?:^|\s)([a-f0-9]{64})(?:\s|$)/i);
+  if (hex) return hex[1].toLowerCase();
+  return input.replace(/^sha256:/i, "").replace(/=+$/, "").toLowerCase();
 }
 
 function agentSource(): string {
@@ -32,6 +37,7 @@ function connectAndExec(config: ConnectConfig, command: string, expectedFingerpr
     const client = new Client();
     let output = "";
     let fingerprint = "";
+    const expected = expectedFingerprint ? normalizeFingerprint(expectedFingerprint) : "";
     client.on("ready", () => {
       client.exec(command, (error, stream) => {
         if (error) {
@@ -48,11 +54,19 @@ function connectAndExec(config: ConnectConfig, command: string, expectedFingerpr
         });
       });
     });
-    client.on("error", reject);
+    client.on("error", (error) => {
+      if (expected && fingerprint) {
+        const received = normalizeFingerprint(fingerprint);
+        if (expected !== received) {
+          reject(new Error(`SSH host fingerprint mismatch. Expected ${expectedFingerprint}; received ${fingerprint}. Verify the node fingerprint from a trusted console.`));
+          return;
+        }
+      }
+      reject(error);
+    });
     const verifier = ((key: Buffer) => {
       const forms = fingerprintForms(key);
       fingerprint = `SHA256:${forms.standard}`;
-      const expected = expectedFingerprint ? normalizeFingerprint(expectedFingerprint) : "";
       return !expected || expected === forms.standard || expected === forms.hex;
     }) as NonNullable<ConnectConfig["hostVerifier"]>;
     client.connect({
