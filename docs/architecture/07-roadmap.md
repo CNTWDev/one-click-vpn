@@ -10,7 +10,7 @@
 - 加密 SSH 凭据；
 - SSH bootstrap；
 - Agent HTTPS 心跳；
-- Docker/Caddy 部署。
+- Docker + 宿主机 Nginx 部署。
 
 ## Phase 1：WireGuard 数据面（Server 已完成第一版）
 

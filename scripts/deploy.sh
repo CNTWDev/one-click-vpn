@@ -57,24 +57,19 @@ if [ -z "$healthy" ]; then
   exit 1
 fi
 
-origin=$(env_value NORTHSTAR_PUBLIC_ORIGIN)
 if command -v curl >/dev/null 2>&1; then
-  public_ok=""
-  i=0
-  while [ "$i" -lt 10 ]; do
-    if curl --fail --silent --show-error --max-time 10 "$origin/api/health" >/dev/null 2>&1; then
-      public_ok="yes"
-      break
-    fi
-    i=$((i + 1))
-    sleep 2
-  done
-  if [ -z "$public_ok" ]; then
-    echo "Warning: internal health is ready, but $origin/api/health is not reachable yet." >&2
-    echo "Check DNS, cloud firewall ports 80/443, and Caddy logs with: ./scripts/deploy.sh logs" >&2
+  local_ok=""
+  if curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
+    local_ok="yes"
+  fi
+  if [ -z "$local_ok" ]; then
+    echo "Warning: the container health check passed, but the host-local controller check failed." >&2
+    echo "Check the Northstar logs with: ./scripts/deploy.sh logs" >&2
   fi
 fi
 
 compose ps
 echo "Northstar deployment is healthy."
+echo "Controller: http://127.0.0.1:3000"
+echo "Configure host Nginx to proxy your HTTPS domain to 127.0.0.1:3000."
 echo "Logs: ./scripts/deploy.sh logs"

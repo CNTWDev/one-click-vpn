@@ -4,7 +4,7 @@
 
 ```text
 Cloud VM
-  ├── Caddy / HTTPS
+  ├── Host Nginx / HTTPS
   ├── Northstar Controller
   ├── SQLite/PostgreSQL
   └── Backup worker
@@ -21,7 +21,8 @@ Controller 可以部署在阿里云 ECS、腾讯云 CVM、GCP Compute Engine 或
 
 Controller：
 
-- TCP 443：Web、API、Agent Gateway；
+- TCP 443：由宿主机 Nginx 提供 Web、API、Agent Gateway；
+- TCP 3000：Northstar 容器，仅绑定到 Controller 主机的 `127.0.0.1`；
 - TCP 22：仅 bootstrap/recovery，尽量限制源地址。
 
 Edge Node：
@@ -67,7 +68,8 @@ interface NodeProviderAdapter {
 
 - 应用容器不暴露宿主机 Docker socket；
 - Agent/协议服务只有必要的 Linux capabilities；
-- Controller 端口不直接暴露 3000；
+- Controller 端口不直接暴露 3000；宿主机只绑定 `127.0.0.1:3000`，公网 HTTPS 由 Nginx 转发；
+- 证书由宿主机 Nginx 手动管理，Docker Compose 不申请 ACME 证书；
 - 数据目录和备份不进 Git；
 - 构建、迁移、部署、回滚分开；
 - 升级前先备份数据库和配置版本。
@@ -93,4 +95,4 @@ git pull --ff-only
 - Docker Compose 配置必须可解析；
 - Controller 容器必须通过 /api/health 健康检查。
 
-公有云安全组只开放 TCP 22/80/443。Edge Node 的 WireGuard/OpenVPN/IKEv2 数据面端口按节点能力单独开放，不能因为 Controller 使用了 Caddy 就把这些端口混到 Controller 的 Compose 文件里。
+公有云安全组只开放 TCP 22/80/443。Edge Node 的 WireGuard/OpenVPN/IKEv2 数据面端口按节点能力单独开放，不能把这些端口混到 Controller 的 Compose 文件里。

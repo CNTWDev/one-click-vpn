@@ -1,0 +1,38 @@
+# Copy this file to /etc/nginx/sites-available/northstar.conf on the ECS host.
+# Replace the hostname and certificate paths before enabling it.
+
+upstream northstar_controller {
+    server 127.0.0.1:3000;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name vpn.example.com;
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name vpn.example.com;
+
+    ssl_certificate     /etc/nginx/ssl/vpn.example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/vpn.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://northstar_controller;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Connection "";
+        proxy_read_timeout 60s;
+    }
+}

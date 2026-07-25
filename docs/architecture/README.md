@@ -28,7 +28,7 @@ Controller 不在 VPN 数据包路径中。VPN 数据流量直接在用户设备
 - 节点 bootstrap；
 - 出站 Agent HTTPS 心跳和 token 认证；
 - 受限的节点操作与审计；
-- Docker、Caddy、健康检查和备份脚本。
+- Docker、宿主机 Nginx、健康检查和备份脚本。
 - `/api/v1` Bearer 会话、设备、节点能力和 Connection Profile 接口；
 - Protocol Adapter 注册表、WireGuard Desired State、IP Lease 和结构化 Agent reconcile 任务；
 - Agent 任务拉取、结果回报和 WireGuard 固定操作入口。

@@ -7,31 +7,15 @@ services:
       NORTHSTAR_DATABASE_PATH: /app/data/northstar.sqlite
     volumes:
       - northstar-data:/app/data
-    expose:
-      - "3000"
+    # HTTPS and the public hostname are managed by the host's Nginx.
+    # Keep the controller reachable only from this ECS host.
+    ports:
+      - "127.0.0.1:3000:3000"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r => { if (!r.ok) process.exit(1) })"]
       interval: 30s
       timeout: 5s
       retries: 5
 
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    depends_on:
-      northstar:
-        condition: service_healthy
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-
 volumes:
   northstar-data:
-  caddy-data:
-  caddy-config:

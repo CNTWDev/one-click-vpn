@@ -19,7 +19,7 @@ The admin password is requested interactively when --admin-password is omitted.
 Existing .env is reused. Pass --yes to back it up and regenerate it from arguments.
 
 Options:
-  --domain HOST              Public DNS name used by Caddy
+  --domain HOST              Public DNS name served by host Nginx
   --admin-email EMAIL        Initial owner email
   --admin-password PASSWORD  Initial owner password (prefer interactive prompt)
   --yes                      Back up and replace an existing .env

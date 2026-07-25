@@ -11,7 +11,7 @@ The current implementation includes:
 - AES-256-GCM encryption for SSH recovery credentials;
 - audited node creation, bootstrap attempts, agent heartbeats, and node actions;
 - SSH host-key verification, password/private-key bootstrap, and a least-privilege systemd agent;
-- Docker Compose, Caddy HTTPS, health checks, backups, and a repeatable deployment script.
+- Docker Compose, host-managed Nginx HTTPS, health checks, backups, and a repeatable deployment script.
 - versioned `/api/v1` authentication, device, node capability, Connection Profile, and Agent reconcile endpoints;
 - protocol Adapter registry, WireGuard desired-state generation, IP leases, revisions, and structured Agent tasks.
 
@@ -46,10 +46,12 @@ Controller 使用同一套 Docker Compose 部署，不依赖云厂商 SDK。推�
 
 - 推荐至少 2 vCPU、4 GB 内存和持久盘；
 - 将域名（例如 `vpn.example.com`）的 A/AAAA 记录指向主机公网地址；
+- 在宿主机安装 Nginx，并让 Nginx 管理域名、HTTPS 和手动上传的证书；
 - 安全组允许入站 TCP `80` 和 `443`；
 - TCP `22` 仅允许可信管理地址访问；
 - 不要对公网开放 Controller 的 `3000` 端口；
-- 部署前确认 DNS 已生效，否则 Caddy 无法申请 HTTPS 证书。
+- 将 Nginx 的 HTTPS 反向代理指向 `127.0.0.1:3000`；
+- 部署前准备好域名证书。Docker 本身不会申请或续期证书。
 
 WireGuard/OpenVPN/IKEv2 属于 Edge Node 数据面，其端口应在对应 Edge Node 的安全组中单独开放，不属于 Controller 的 Compose 入口。
 
@@ -76,9 +78,9 @@ sudo ./scripts/one-click-deploy.sh --domain vpn.example.com --admin-email owner@
 - 生成 32 字节 `NORTHSTAR_MASTER_KEY`；
 - 创建权限为 `0600` 的生产 `.env`；
 - 校验域名、HTTPS Origin、管理员账号、密码、主密钥和 Compose 配置；
-- 构建并启动 Northstar 与 Caddy；
+- 构建并启动 Northstar；
 - 执行数据库迁移并等待 Controller 通过健康检查；
-- 检查公网 `https://域名/api/health`。
+- 检查宿主机上的 `http://127.0.0.1:3000/api/health`。
 
 如果 `.env` 已存在，脚本默认复用原配置。只有明确需要重新生成配置时才使用 `--yes`；脚本会先创建带时间戳的 `.env.backup.*`。已有 Docker/Compose 且不希望脚本安装依赖时，可增加 `--skip-docker-install`。
 
@@ -86,14 +88,35 @@ sudo ./scripts/one-click-deploy.sh --domain vpn.example.com --admin-email owner@
 
 ### 4. 验证部署
 
+完成下一节的 Nginx 配置后再执行公网检查：
+
 ```bash
 sudo ./scripts/deploy.sh ps
 curl --fail https://vpn.example.com/api/health
 ```
 
-健康接口应返回 `status: ok`。Caddy 会自动申请和续期 HTTPS 证书。若容器内部已经健康但公网检查失败，优先检查 DNS、云安全组的 80/443 端口以及 Caddy 日志。
+健康接口应返回 `status: ok`。公网访问由 Nginx 提供；如果失败，检查 Nginx 配置、证书、DNS、云安全组和 Nginx 日志。即使尚未配置 Nginx，部署脚本也会先通过宿主机本地地址检查 Controller。
 
-### 5. 手动部署
+### 5. 宿主机 Nginx 和手动证书
+
+项目提供了 [Nginx 配置模板](deploy/nginx/northstar.conf.example)。在 ECS 上安装 Nginx，并将阿里云下载的证书放到 Nginx 可读目录，例如：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y nginx
+sudo mkdir -p /etc/nginx/ssl/vpn.example.com
+sudo cp fullchain.pem /etc/nginx/ssl/vpn.example.com/fullchain.pem
+sudo cp privkey.pem /etc/nginx/ssl/vpn.example.com/privkey.pem
+sudo chmod 600 /etc/nginx/ssl/vpn.example.com/privkey.pem
+sudo cp deploy/nginx/northstar.conf.example /etc/nginx/sites-available/northstar.conf
+sudo ln -s /etc/nginx/sites-available/northstar.conf /etc/nginx/sites-enabled/northstar.conf
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+编辑配置中的 `server_name` 和证书路径。Nginx 的上游必须是 `http://127.0.0.1:3000`。应用的 `.env` 仍然保留真实的 `APP_DOMAIN` 和 `NORTHSTAR_PUBLIC_ORIGIN`，用于生成正确的公网 URL 和 Agent 回连地址；Docker 容器本身不监听公网 80/443。
+
+### 6. 手动部署
 
 需要逐项控制配置时，可以不用一键初始化。先自行安装 Docker Engine 与 Docker Compose，然后执行：
 
@@ -121,7 +144,7 @@ NORTHSTAR_MASTER_KEY=the-generated-32-byte-base64-value
 sudo ./scripts/deploy.sh
 ```
 
-### 6. 升级和备份
+### 7. 升级和备份
 
 数据库保存在 Docker 命名卷 `northstar-data` 中。升级前先导出 SQLite 一致性备份，再拉取代码和重新部署：
 
@@ -133,12 +156,12 @@ sudo ./scripts/deploy.sh
 
 不要在没有凭据重加密迁移的情况下替换 `NORTHSTAR_MASTER_KEY`，否则已有加密 SSH 凭据将无法解密。
 
-### 7. 运维与故障检查
+### 8. 运维与故障检查
 
 ```bash
 sudo ./scripts/deploy.sh ps
 sudo ./scripts/deploy.sh logs
-sudo docker compose logs -f caddy
+sudo journalctl -u nginx -f
 sudo docker compose restart northstar
 sudo ./scripts/backup.sh ./backups
 ```
