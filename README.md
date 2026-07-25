@@ -168,6 +168,20 @@ sudo ./one-click-update.sh --no-cache
 
 升级脚本不会删除 `.env` 或 `northstar-data` 数据卷；不要使用 `docker compose down -v`。`deploy.sh` 默认使用正常缓存，但每次都会强制重新创建 Controller 容器；仅在排查缓存问题时使用 `--no-cache`。
 
+如果服务器上的容器、镜像或构建状态已经混乱，可以使用清理重建脚本。脚本默认先备份数据库，并要求输入 `REBUILD` 确认；它只删除本项目的 Northstar 容器和服务镜像，不删除 `.env` 或 `northstar-data` 数据卷：
+
+```bash
+sudo ./one-click-rebuild.sh
+```
+
+如果当前容器已经完全无法启动、无法完成备份，才使用：
+
+```bash
+sudo ./one-click-rebuild.sh --yes --skip-backup
+```
+
+该脚本不会清理其他项目的 Docker 容器、镜像或卷。
+
 不要在没有凭据重加密迁移的情况下替换 `NORTHSTAR_MASTER_KEY`，否则已有加密 SSH 凭据将无法解密。
 
 ### 8. 运维与故障检查
