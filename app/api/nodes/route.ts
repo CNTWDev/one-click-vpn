@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
-import { addAudit, findRegion, findRegionByLabel, insertNode, listNodes } from "../../../server/db";
+import { addAudit, findRegion, findRegionByLabel, insertNode, listNodes, publicNode } from "../../../server/db";
 import { currentUser } from "../../../server/auth";
 import { encryptSecret } from "../../../server/crypto";
 import { cleanText, isValidIp, isValidPort, jsonError, readJson } from "../../../server/http";
 import { queueNodeBootstrap } from "../../../server/bootstrap";
 
 export const runtime = "nodejs";
-
-function publicNode(node: ReturnType<typeof listNodes>[number]) {
-  const hidden = new Set(["credential_ciphertext", "credential_iv", "credential_tag", "agent_token_hash"]);
-  return Object.fromEntries(Object.entries(node).filter(([key]) => !hidden.has(key)));
-}
 
 export async function GET() {
   const user = await currentUser();

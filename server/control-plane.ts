@@ -127,7 +127,7 @@ export function issueConnectionProfile(input: {
     clientAddress,
     transport,
     dns: ["1.1.1.1"],
-    allowedIps: ["0.0.0.0/0", "::/0"],
+    allowedIps: adapter.capability.ipv6 ? ["0.0.0.0/0", "::/0"] : ["0.0.0.0/0"],
   });
   const saved = createConnectionProfile({
     deviceId: input.deviceId,

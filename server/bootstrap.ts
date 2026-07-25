@@ -102,6 +102,26 @@ if ! command -v wg >/dev/null 2>&1; then
     exit 1
   fi
 fi
+if ! command -v iptables >/dev/null 2>&1; then
+  if command -v apt-get >/dev/null 2>&1; then
+    DEBIAN_FRONTEND=noninteractive apt-get install -y iptables
+  elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y iptables
+  elif command -v yum >/dev/null 2>&1; then
+    yum install -y iptables
+  elif command -v apk >/dev/null 2>&1; then
+    apk add iptables
+  else
+    echo "iptables is not installed and no supported package manager was found" >&2
+    exit 1
+  fi
+fi
+if command -v sysctl >/dev/null 2>&1; then
+  cat > /etc/sysctl.d/99-northstar-wireguard.conf <<'NORTHSTAR_SYSCTL'
+net.ipv4.ip_forward=1
+NORTHSTAR_SYSCTL
+  sysctl --system >/dev/null
+fi
 install -d -m 700 /opt/northstar-agent
 echo ${shellQuote(source)} | base64 -d > /opt/northstar-agent/agent.py
 cat > /opt/northstar-agent/config.env <<'NORTHSTAR_CONFIG'
@@ -147,9 +167,9 @@ systemctl --no-pager --full status northstar-agent
     };
     const result = await connectAndExec(config, command, expectedFingerprint);
     updateNode(nodeId, {
-      status: "online",
-      version: "agent 1.0.0",
-      last_seen: "now",
+      status: "provisioning",
+      version: "agent installed",
+      last_seen: "awaiting heartbeat",
       latency: "connected",
       host_fingerprint: node.host_fingerprint || result.fingerprint,
       agent_token_hash: hashToken(agentToken),
@@ -168,19 +188,30 @@ systemctl --no-pager --full status northstar-agent
 export async function runNodeAction(nodeId: string, action: "restart-agent" | "status-agent", actorUserId?: string): Promise<string> {
   const node = findNode(nodeId);
   if (!node) throw new Error("Node not found");
-  const secret = decryptSecret({ ciphertext: node.credential_ciphertext, iv: node.credential_iv, tag: node.credential_tag });
-  const command = action === "restart-agent"
-    ? "systemctl restart northstar-agent && systemctl --no-pager --full status northstar-agent"
-    : "systemctl --no-pager --full status northstar-agent";
-  const config: ConnectConfig = {
-    host: node.ip,
-    port: node.ssh_port,
-    username: node.ssh_user,
-    readyTimeout: 15_000,
-    ...(node.credential_type === "private_key" ? { privateKey: secret } : { password: secret }),
-  };
-  const result = await connectAndExec(config, command, node.host_fingerprint);
-  addAudit({ actorUserId, action: `node.${action}.succeeded`, targetType: "node", targetId: nodeId });
-  updateNode(nodeId, { status: "online", last_seen: "now", latency: "connected" });
-  return result.output.slice(-12000);
+  const actionId = addNodeAction(nodeId, action);
+  try {
+    const secret = decryptSecret({ ciphertext: node.credential_ciphertext, iv: node.credential_iv, tag: node.credential_tag });
+    const command = action === "restart-agent"
+      ? "systemctl restart northstar-agent && systemctl --no-pager --full status northstar-agent"
+      : "systemctl --no-pager --full status northstar-agent";
+    const config: ConnectConfig = {
+      host: node.ip,
+      port: node.ssh_port,
+      username: node.ssh_user,
+      readyTimeout: 15_000,
+      ...(node.credential_type === "private_key" ? { privateKey: secret } : { password: secret }),
+    };
+    const result = await connectAndExec(config, command, node.host_fingerprint);
+    const output = result.output.slice(-12000);
+    finishNodeAction(actionId, "succeeded", output);
+    addAudit({ actorUserId, action: `node.${action}.succeeded`, targetType: "node", targetId: nodeId });
+    updateNode(nodeId, { status: "online", last_seen: "now", latency: "connected" });
+    return output;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    finishNodeAction(actionId, "failed", "", message.slice(-4000));
+    addAudit({ actorUserId, action: `node.${action}.failed`, targetType: "node", targetId: nodeId, metadata: { error: message } });
+    updateNode(nodeId, { status: "attention", last_seen: "failed", latency: "error" });
+    throw error;
+  }
 }

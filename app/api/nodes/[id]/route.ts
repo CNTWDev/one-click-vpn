@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { addAudit, findNode, updateNode } from "../../../../server/db";
+import { addAudit, findNode, listNodeActions, publicNode, updateNode } from "../../../../server/db";
 import { currentUser } from "../../../../server/auth";
 import { jsonError } from "../../../../server/http";
 import { queueNodeBootstrap } from "../../../../server/bootstrap";
+import { getNodeReconcileStatus } from "../../../../server/control-db";
 
 export const runtime = "nodejs";
 
@@ -12,9 +13,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   const node = findNode(id);
   if (!node) return jsonError("Node not found", 404);
-  const hidden = new Set(["credential_ciphertext", "credential_iv", "credential_tag", "agent_token_hash"]);
-  const safe = Object.fromEntries(Object.entries(node).filter(([key]) => !hidden.has(key)));
-  return NextResponse.json({ node: safe });
+  return NextResponse.json({ node: publicNode(node), actions: listNodeActions(id), reconcile: getNodeReconcileStatus(id) });
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {

@@ -26,6 +26,7 @@ export type DbNode = {
   traffic: string;
   version: string;
   last_seen: string;
+  last_heartbeat_at?: string | null;
   credential_type: string;
   credential_ciphertext: string;
   credential_iv: string;
@@ -77,6 +78,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   traffic TEXT NOT NULL DEFAULT '—',
   version TEXT NOT NULL DEFAULT 'bootstrap pending',
   last_seen TEXT NOT NULL DEFAULT 'never',
+  last_heartbeat_at TEXT,
   credential_type TEXT NOT NULL,
   credential_ciphertext TEXT NOT NULL,
   credential_iv TEXT NOT NULL,
@@ -132,6 +134,7 @@ export function getDb(): DatabaseSync {
   for (const statement of [
     "ALTER TABLE nodes ADD COLUMN agent_token_hash TEXT",
     "ALTER TABLE nodes ADD COLUMN region_id TEXT",
+    "ALTER TABLE nodes ADD COLUMN last_heartbeat_at TEXT",
   ]) {
     try { instance.exec(statement); } catch { /* column already exists */ }
   }
@@ -199,6 +202,16 @@ export function listNodes(): DbNode[] {
   return getDb().prepare("SELECT * FROM nodes ORDER BY created_at DESC").all() as unknown as DbNode[];
 }
 
+export function publicNode(node: DbNode): Record<string, unknown> {
+  const hidden = new Set(["credential_ciphertext", "credential_iv", "credential_tag", "agent_token_hash"]);
+  const heartbeatAt = node.last_heartbeat_at || (node.status === "online" ? node.updated_at : null);
+  const stale = node.status === "online" && heartbeatAt && Date.now() - new Date(heartbeatAt).getTime() > 90_000;
+  return {
+    ...Object.fromEntries(Object.entries(node).filter(([key]) => !hidden.has(key))),
+    ...(stale ? { status: "attention", latency: "no heartbeat", last_seen: "heartbeat expired" } : {}),
+  };
+}
+
 export function listRegions(): DbRegion[] {
   return getDb().prepare("SELECT * FROM regions ORDER BY name, country").all() as unknown as DbRegion[];
 }
@@ -255,7 +268,7 @@ export function insertNode(input: Omit<DbNode, "id" | "created_at" | "updated_at
 }
 
 export function updateNode(id: string, values: Record<string, string | number | null>): DbNode | undefined {
-  const allowed = new Set(["status", "latency", "users", "traffic", "version", "last_seen", "host_fingerprint", "agent_token_hash"]);
+  const allowed = new Set(["status", "latency", "users", "traffic", "version", "last_seen", "last_heartbeat_at", "host_fingerprint", "agent_token_hash"]);
   const entries = Object.entries(values).filter(([key]) => allowed.has(key));
   if (entries.length) {
     const assignments = entries.map(([key]) => `${key} = ?`).join(", ");
@@ -290,4 +303,21 @@ export function addNodeAction(nodeId: string, action: string): string {
 
 export function finishNodeAction(id: string, status: string, output = "", error = ""): void {
   getDb().prepare("UPDATE node_actions SET status = ?, output = ?, error = ?, finished_at = ? WHERE id = ?").run(status, output, error, now(), id);
+}
+
+export type DbNodeAction = {
+  id: string;
+  node_id: string;
+  action: string;
+  status: string;
+  output: string;
+  error: string;
+  created_at: string;
+  finished_at: string | null;
+};
+
+export function listNodeActions(nodeId: string, limit = 20): DbNodeAction[] {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 50);
+  return getDb().prepare(`SELECT id, node_id, action, status, output, error, created_at, finished_at
+    FROM node_actions WHERE node_id = ? ORDER BY created_at DESC LIMIT ?`).all(nodeId, safeLimit) as unknown as DbNodeAction[];
 }

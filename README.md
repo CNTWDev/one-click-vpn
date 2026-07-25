@@ -230,6 +230,10 @@ Copy the value beginning with `SHA256:` into the node form. The controller check
 
 The controller stores the credential only as an AES-256-GCM ciphertext. It then uses SSH to install `/opt/northstar-agent/agent.py` and a `northstar-agent.service`. The agent only sends outbound health heartbeats to the controller and does not accept inbound commands.
 
+The current production data-plane path is WireGuard over IPv4. Bootstrap installs `wireguard-tools` and `iptables`, enables IPv4 forwarding, and the Agent applies a WireGuard interface with outbound masquerading. Open UDP `51820` in the Edge Node's cloud security group/firewall; the controller cannot change a provider firewall without a provider-specific integration. OpenVPN and IKEv2 are registered as planned adapters and are not deployable yet.
+
+Each node's **Logs** view shows the audited bootstrap output, Agent status/restart output, and recent WireGuard reconcile errors. The console refreshes node state and diagnostics periodically, so a failed SSH bootstrap or a lost Agent heartbeat appears as `Needs attention` with the recorded error instead of remaining silently online.
+
 The restart action is explicitly allow-listed and audited. Arbitrary shell commands and an interactive browser terminal are not enabled by default because they would turn the control plane into an unrestricted remote-execution service.
 
 ## Operations

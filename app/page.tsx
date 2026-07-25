@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import worldMap from "@svg-maps/world";
 
 type NodeStatus = "online" | "provisioning" | "attention";
@@ -24,6 +24,37 @@ type Region = {
   name: string;
   country: string;
   code: string;
+};
+
+type NodeAction = {
+  id: string;
+  action: string;
+  status: string;
+  output: string;
+  error: string;
+  created_at: string;
+  finished_at: string | null;
+};
+
+type ReconcileTask = {
+  id: string;
+  protocol: string;
+  taskType: string;
+  desiredRevision: number;
+  status: string;
+  attempts: number;
+  lastError: string;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt?: string | null;
+};
+
+type NodeDiagnostics = {
+  actions: NodeAction[];
+  reconcile: {
+    observed: Array<{ protocol: string; appliedRevision: number; status: string; lastError: string; updatedAt: string }>;
+    tasks: ReconcileTask[];
+  };
 };
 
 const initialNodes: Node[] = [
@@ -155,7 +186,7 @@ function NodeFleet({
             <div className={node.status === "attention" ? "node-value danger" : "node-value"}>{node.latency}<small>last seen {node.lastSeen}</small></div>
             <div className="node-value">{node.users}<small>authorized</small></div>
             <div className="node-value">{node.traffic}<small>{node.version}</small></div>
-            <div className="row-actions"><button type="button" onClick={() => onOpenTerminal(node)}>Terminal</button><button type="button" aria-label={`Node actions for ${node.name}`} onClick={() => onSelectNode(node)}>•••</button></div>
+            <div className="row-actions"><button type="button" onClick={() => onOpenTerminal(node)}>Logs</button><button type="button" aria-label={`Node actions for ${node.name}`} onClick={() => onSelectNode(node)}>•••</button></div>
           </article>
         ))}
       </div>
@@ -173,7 +204,8 @@ export default function Home() {
   const [activeNav, setActiveNav] = useState("Overview");
   const [showDeploy, setShowDeploy] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
-  const [terminalStarted, setTerminalStarted] = useState(false);
+  const [nodeDiagnostics, setNodeDiagnostics] = useState<NodeDiagnostics | null>(null);
+  const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node>(initialNodes[0]);
   const [notice, setNotice] = useState("All systems nominal");
@@ -184,7 +216,7 @@ export default function Home() {
   const [showFingerprintGuide, setShowFingerprintGuide] = useState(false);
   const [fingerprintCommandCopied, setFingerprintCommandCopied] = useState(false);
 
-  async function loadNodes() {
+  const loadNodes = useCallback(async () => {
     const response = await fetch("/api/nodes", { cache: "no-store" });
     if (response.status === 401) {
       setAuthStatus("signed-out");
@@ -204,15 +236,27 @@ export default function Home() {
       version: String(node.version || "unknown"),
       lastSeen: String(node.last_seen || "never"),
     })));
-  }
+  }, []);
 
-  async function loadRegions() {
+  const loadRegions = useCallback(async () => {
     const response = await fetch("/api/regions", { cache: "no-store" });
     if (!response.ok) return;
     const payload = await response.json() as { regions: Region[] };
     setRegions(payload.regions);
     setForm((current) => ({ ...current, regionId: payload.regions.some((region) => region.id === current.regionId) ? current.regionId : payload.regions[0]?.id || "" }));
-  }
+  }, []);
+
+  const loadNodeDiagnostics = useCallback(async (nodeId: string) => {
+    setDiagnosticsBusy(true);
+    try {
+      const response = await fetch(`/api/nodes/${nodeId}`, { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = await response.json() as { actions?: NodeAction[]; reconcile?: NodeDiagnostics["reconcile"] };
+      setNodeDiagnostics({ actions: payload.actions || [], reconcile: payload.reconcile || { observed: [], tasks: [] } });
+    } finally {
+      setDiagnosticsBusy(false);
+    }
+  }, []);
 
   useEffect(() => {
     void fetch("/api/auth/me", { cache: "no-store" }).then(async (response) => {
@@ -225,7 +269,19 @@ export default function Home() {
       setAuthStatus("signed-in");
       await Promise.all([loadNodes(), loadRegions()]);
     }).catch(() => setAuthStatus("signed-out"));
-  }, []);
+  }, [loadNodes, loadRegions]);
+
+  useEffect(() => {
+    if (authStatus !== "signed-in") return undefined;
+    const timer = window.setInterval(() => { void loadNodes(); }, 5000);
+    return () => window.clearInterval(timer);
+  }, [authStatus, loadNodes]);
+
+  useEffect(() => {
+    if (!showTerminal || !selectedNode) return undefined;
+    const timer = window.setInterval(() => { void loadNodeDiagnostics(selectedNode.id); }, 5000);
+    return () => window.clearInterval(timer);
+  }, [loadNodeDiagnostics, selectedNode, showTerminal]);
 
   const totalUsers = useMemo(() => nodes.reduce((sum, node) => sum + node.users, 0), [nodes]);
   const healthyNodes = nodes.filter((node) => node.status === "online").length;
@@ -233,8 +289,9 @@ export default function Home() {
 
   function openTerminal(node: Node) {
     setSelectedNode(node);
-    setTerminalStarted(false);
+    setNodeDiagnostics(null);
     setShowTerminal(true);
+    void loadNodeDiagnostics(node.id);
   }
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
@@ -337,12 +394,12 @@ export default function Home() {
   async function requestAction(label: string, action?: "restart-agent" | "status-agent") {
     if (action) {
       const response = await fetch(`/api/nodes/${selectedNode.id}/actions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
-      const payload = await response.json().catch(() => ({})) as { error?: string };
+      const payload = await response.json().catch(() => ({})) as { error?: string; output?: string };
       setNotice(response.ok ? `${label} completed for ${selectedNode.name}.` : (payload.error || `${label} failed.`));
+      await loadNodeDiagnostics(selectedNode.id);
     } else {
-      setNotice(`${label} is available only through the encrypted, audited SSH path.`);
+      setNotice(`${label} is not enabled in this release.`);
     }
-    setShowTerminal(false);
   }
 
   if (authStatus === "loading") {
@@ -399,7 +456,7 @@ export default function Home() {
           <div className="top-actions">
             <span className="system-theme" title="Theme follows your operating system"><i /> System</span>
             <button className="icon-button" type="button" aria-label="Notifications">⌁<span /></button>
-            <button className="terminal-shortcut" type="button" disabled={nodes.length === 0} onClick={() => nodes[0] && openTerminal(nodes[0])}>⌘ Terminal</button>
+            <button className="terminal-shortcut" type="button" disabled={nodes.length === 0} onClick={() => nodes[0] && openTerminal(nodes[0])}>⌘ Logs</button>
             <button className="primary-button" type="button" onClick={() => setShowDeploy(true)}><i>+</i> Add node</button>
           </div>
         </header>
@@ -497,17 +554,21 @@ export default function Home() {
       {showTerminal && (
         <div className="modal-layer" role="presentation" onMouseDown={() => setShowTerminal(false)}>
           <section className="modal terminal-modal" role="dialog" aria-modal="true" aria-labelledby="terminal-title" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><p>TIME-BOUND SESSION</p><h2 id="terminal-title">{selectedNode.name}</h2></div><button onClick={() => setShowTerminal(false)} aria-label="Close terminal">×</button></div>
-            <div className="terminal-meta"><span><i className="pulse" /> Agent tunnel</span><span>TLS + token verified</span><span>15 min maximum</span></div>
+            <div className="modal-head"><div><p>NODE DIAGNOSTICS</p><h2 id="terminal-title">{selectedNode.name}</h2></div><button type="button" onClick={() => setShowTerminal(false)} aria-label="Close diagnostics">×</button></div>
+            <div className="terminal-meta"><span><i className="pulse" /> Deployment log</span><span>Bootstrap + Agent reconcile</span><span>Auto-refresh 5s</span></div>
             <div className="terminal-window">
-              <div className="terminal-bar"><span><i /><i /><i /></span><small>vpnops@{selectedNode.id}: ~</small><b>SSH certificate · expires 14:59</b></div>
-              {terminalStarted ? <pre><span>vpnops@{selectedNode.id}:~$</span> sudo systemctl status vpn-agent
-<b>● vpn-agent.service - Northstar node agent</b>
-   Active: <em>active (running)</em> since today
-   Secure transport: outbound HTTPS / connected
-<span>vpnops@{selectedNode.id}:~$</span> <i className="cursor" /></pre> : <div className="terminal-ready"><div className="terminal-orbit">⌁</div><b>Ready to open a signed SSH session</b><p>Your password is not used. This route travels through the node’s existing outbound Agent channel.</p><button className="primary-button" onClick={() => setTerminalStarted(true)}>Start secure session <span>→</span></button></div>}
+              <div className="terminal-bar"><span><i /><i /><i /></span><small>northstar/{selectedNode.id}</small><b>{diagnosticsBusy ? "Refreshing…" : `${nodeDiagnostics?.actions.length || 0} recorded events`}</b></div>
+              {diagnosticsBusy && !nodeDiagnostics ? <div className="terminal-ready"><div className="terminal-orbit">⌁</div><b>Loading deployment diagnostics…</b><p>Reading the controller’s audited bootstrap and Agent reconcile records.</p></div> : nodeDiagnostics && <div className="diagnostics-body">
+                <div className="diagnostics-grid"><div><span>NODE STATUS</span><b className={`diagnostic-${selectedNode.status}`}>{selectedNode.status}</b></div><div><span>LAST SEEN</span><b>{selectedNode.lastSeen}</b></div><div><span>AGENT VERSION</span><b>{selectedNode.version}</b></div></div>
+                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Recent deployment events</b><button type="button" onClick={() => void loadNodeDiagnostics(selectedNode.id)}>Refresh</button></div>
+                  {nodeDiagnostics.actions.length ? nodeDiagnostics.actions.map((action) => <article className="diagnostic-event" key={action.id}><div><b>{action.action}</b><span>{action.status} · {action.finished_at || action.created_at}</span></div>{action.error && <pre className="diagnostic-error">{action.error}</pre>}{action.output && <pre>{action.output}</pre>}</article>) : <p className="diagnostics-empty">No deployment events recorded yet.</p>}
+                </div>
+                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>WireGuard reconcile</b></div>
+                  {nodeDiagnostics.reconcile.tasks.length ? nodeDiagnostics.reconcile.tasks.slice(0, 5).map((task) => <article className="diagnostic-task" key={task.id}><span>{task.protocol} · {task.taskType}</span><b className={`diagnostic-${task.status}`}>{task.status}</b>{task.lastError && <pre className="diagnostic-error">{task.lastError}</pre>}</article>) : <p className="diagnostics-empty">No protocol tasks have been queued.</p>}
+                </div>
+              </div>}
             </div>
-            <div className="terminal-footer"><span>Actions are recorded to the encrypted audit log.</span><div><button onClick={() => void requestAction("Restart agent", "restart-agent")}>Restart agent</button><button className="danger-button" onClick={() => void requestAction("Emergency SSH fallback")}>Use emergency SSH</button></div></div>
+            <div className="terminal-footer"><span>Output is recorded to the encrypted audit log.</span><div><button type="button" onClick={() => void requestAction("Agent status", "status-agent")}>Check agent</button><button type="button" onClick={() => void requestAction("Restart agent", "restart-agent")}>Restart agent</button></div></div>
           </section>
         </div>
       )}

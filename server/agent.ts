@@ -27,6 +27,7 @@ export function recordAgentHeartbeat(input: {
   updateNode(input.nodeId, {
     status: "online",
     last_seen: "now",
+    last_heartbeat_at: new Date().toISOString(),
     latency: "connected",
     version: input.version || "unknown",
   });

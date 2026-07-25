@@ -66,6 +66,16 @@ def validate_key(value):
     return isinstance(value, str) and bool(KEY_PATTERN.fullmatch(value))
 
 
+def default_interface():
+    if shutil.which("ip") is None:
+        raise RuntimeError("iproute2 is not installed")
+    result = run_fixed(["ip", "-4", "route", "show", "default"])
+    match = re.search(r"(?:^|\s)dev\s+(\S+)", result.stdout)
+    if not match:
+        raise RuntimeError("default network interface was not found")
+    return match.group(1)
+
+
 def ensure_wireguard_key():
     WIREGUARD_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     if not WIREGUARD_KEY.exists():
@@ -91,6 +101,7 @@ def wireguard_sync_config(desired):
     peers = desired.get("peers", [])
     if not isinstance(peers, list) or len(peers) > 4096:
         raise ValueError("invalid WireGuard peer list")
+    egress_interface = default_interface()
 
     full_lines = [
         "[Interface]",
@@ -98,6 +109,8 @@ def wireguard_sync_config(desired):
         "Address = 10.70.0.1/24",
         f"ListenPort = {listen_port}",
         "SaveConfig = false",
+        "PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -A POSTROUTING -o " + egress_interface + " -j MASQUERADE",
+        "PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -D POSTROUTING -o " + egress_interface + " -j MASQUERADE",
         "",
     ]
     sync_lines = [

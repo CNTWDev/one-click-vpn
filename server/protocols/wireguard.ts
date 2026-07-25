@@ -5,7 +5,7 @@ const baseCapability: ProtocolCapability = {
   transports: ["udp"],
   platforms: ["macos", "ios", "android"],
   routing: ["full", "split"],
-  ipv6: true,
+  ipv6: false,
   minClientVersion: "0.1.0",
   configSchemaVersion: 1,
   status: "enabled" as const,
