@@ -6,27 +6,46 @@ APP_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 . "$SCRIPT_DIR/common.sh"
 
 cd "$APP_DIR"
-case "${1:-deploy}" in
+mode="deploy"
+no_cache="no"
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    deploy) mode="deploy"; shift ;;
+    logs) mode="logs"; shift ;;
+    ps|status) mode="ps"; shift ;;
+    --no-cache) no_cache="yes"; shift ;;
+    -h|--help)
+      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--no-cache]"
+      exit 0
+      ;;
+    *)
+      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--no-cache]" >&2
+      exit 2
+      ;;
+  esac
+done
+
+case "$mode" in
   logs)
     compose logs -f
     exit 0
     ;;
-  ps|status)
+  ps)
     compose ps
     exit 0
-    ;;
-  deploy)
-    ;;
-  *)
-    echo "Usage: ./scripts/deploy.sh [deploy|logs|ps]" >&2
-    exit 2
     ;;
 esac
 
 "$SCRIPT_DIR/check-env.sh"
 
 echo "Building and starting Northstar..."
-compose up -d --build --remove-orphans
+if [ "$no_cache" = "yes" ]; then
+  echo "Docker build cache disabled."
+  compose build --no-cache northstar
+else
+  compose build northstar
+fi
+compose up -d --force-recreate --remove-orphans
 
 container_id=$(compose ps -q northstar)
 if [ -z "$container_id" ]; then

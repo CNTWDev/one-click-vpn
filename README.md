@@ -154,6 +154,20 @@ git pull --ff-only
 sudo ./scripts/deploy.sh
 ```
 
+也可以使用仓库根目录的一键升级脚本。它会先备份 SQLite 数据库，确认工作区没有本地改动，拉取上游代码，然后强制重建并健康检查 Controller：
+
+```bash
+sudo ./one-click-update.sh
+```
+
+如果怀疑 Docker 使用了旧的构建缓存，使用：
+
+```bash
+sudo ./one-click-update.sh --no-cache
+```
+
+升级脚本不会删除 `.env` 或 `northstar-data` 数据卷；不要使用 `docker compose down -v`。`deploy.sh` 默认使用正常缓存，但每次都会强制重新创建 Controller 容器；仅在排查缓存问题时使用 `--no-cache`。
+
 不要在没有凭据重加密迁移的情况下替换 `NORTHSTAR_MASTER_KEY`，否则已有加密 SSH 凭据将无法解密。
 
 ### 8. 运维与故障检查
