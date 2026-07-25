@@ -2,7 +2,15 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-APP_DIR="$SCRIPT_DIR"
+if [ -f "$SCRIPT_DIR/docker-compose.yml" ] && [ -d "$SCRIPT_DIR/scripts" ]; then
+  APP_DIR="$SCRIPT_DIR"
+elif [ -f "$(pwd)/docker-compose.yml" ] && [ -d "$(pwd)/scripts" ]; then
+  APP_DIR=$(pwd)
+else
+  echo "Cannot locate the one-click-vpn project directory." >&2
+  echo "Run this script from the repository root or place it in the repository root." >&2
+  exit 1
+fi
 . "$APP_DIR/scripts/common.sh"
 
 backup="yes"
