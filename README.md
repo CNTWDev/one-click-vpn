@@ -168,9 +168,37 @@ sudo ./scripts/backup.sh ./backups
 
 部署脚本会在应用未通过健康检查时输出最近 120 行 Controller 日志。阿里云使用 ECS 安全组和云盘，腾讯云使用 CVM 安全组和 CBS，GCP 使用 VPC 防火墙和 Persistent Disk；应用配置无需因云厂商而改变。
 
+### 9. Docker Compose 版本故障
+
+项目要求 Docker Compose v2。若日志出现 `KeyError: 'ContainerConfig'`，通常是服务器仍在使用旧的 `docker-compose 1.29.2`。先安装 Compose v2：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y docker-compose-plugin
+docker compose version
+```
+
+如果 `docker-compose-plugin` 不在当前 apt 源中，请按 Docker 官方文档配置 Docker 软件源后再安装，不要继续使用 Compose v1。
+
+升级 Compose 后，只删除旧的 Controller 容器再重建；不要删除 `northstar-data` 数据卷：
+
+```bash
+sudo docker rm -f one-click-vpn_northstar_1 2>/dev/null || true
+sudo docker rm -f one-click-vpn_caddy_1 2>/dev/null || true
+sudo docker compose up -d --build --remove-orphans
+```
+
 ## Node bootstrap
 
-In the console, add a node with its public IPv4 address, SSH user, credential, and the SSH `sha256:` host fingerprint. In production, the fingerprint is required; trust-on-first-use is only allowed in local development when `NORTHSTAR_ALLOW_TOFU_HOST_KEYS=true`.
+In the console, add a node with its public IPv4 address, SSH user, credential, and the SSH `SHA256:` host fingerprint. In production, the fingerprint is required; trust-on-first-use is only allowed in local development when `NORTHSTAR_ALLOW_TOFU_HOST_KEYS=true`.
+
+To obtain the fingerprint from the node itself (prefer an out-of-band console or an already trusted session), run:
+
+```bash
+sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256
+```
+
+Copy the value beginning with `SHA256:` into the node form. The controller checks this value during every SSH connection, so a changed or intercepted host key is rejected instead of silently trusted. `ssh-keyscan` can be used only after independently verifying that the returned key belongs to the intended server.
 
 The controller stores the credential only as an AES-256-GCM ciphertext. It then uses SSH to install `/opt/northstar-agent/agent.py` and a `northstar-agent.service`. The agent only sends outbound health heartbeats to the controller and does not accept inbound commands.
 

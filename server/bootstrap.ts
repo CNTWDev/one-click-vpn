@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { Client, type ConnectConfig } from "ssh2";
 import { allowTofuHostKeys, publicOrigin } from "./config";
 import { decryptSecret, hashToken } from "./crypto";
@@ -9,6 +9,18 @@ import { ensureDefaultNodeProtocols } from "./control-plane";
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function fingerprintForms(key: Buffer): { standard: string; hex: string } {
+  const digest = createHash("sha256").update(key).digest();
+  return {
+    standard: digest.toString("base64").replace(/=+$/, "").toLowerCase(),
+    hex: digest.toString("hex").toLowerCase(),
+  };
+}
+
+function normalizeFingerprint(value: string): string {
+  return value.trim().replace(/^sha256:/i, "").replace(/=+$/, "").toLowerCase();
 }
 
 function agentSource(): string {
@@ -37,13 +49,14 @@ function connectAndExec(config: ConnectConfig, command: string, expectedFingerpr
       });
     });
     client.on("error", reject);
-    const verifier = ((keyHash: string) => {
-      fingerprint = keyHash;
-      return !expectedFingerprint || keyHash === expectedFingerprint;
+    const verifier = ((key: Buffer) => {
+      const forms = fingerprintForms(key);
+      fingerprint = `SHA256:${forms.standard}`;
+      const expected = expectedFingerprint ? normalizeFingerprint(expectedFingerprint) : "";
+      return !expected || expected === forms.standard || expected === forms.hex;
     }) as NonNullable<ConnectConfig["hostVerifier"]>;
     client.connect({
       ...config,
-      hostHash: "sha256",
       hostVerifier: verifier,
     });
   });

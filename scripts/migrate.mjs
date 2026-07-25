@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS nodes (
   credential_iv TEXT NOT NULL, credential_tag TEXT NOT NULL,
   host_fingerprint TEXT, agent_token_hash TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS regions (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, country TEXT NOT NULL, code TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE (name, country), UNIQUE (code)
+);
 CREATE TABLE IF NOT EXISTS audit_logs (
   id TEXT PRIMARY KEY, actor_user_id TEXT, action TEXT NOT NULL,
   target_type TEXT, target_id TEXT, metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL
@@ -108,6 +113,8 @@ CREATE INDEX IF NOT EXISTS device_sessions_access_idx ON device_sessions(access_
 CREATE INDEX IF NOT EXISTS device_sessions_refresh_idx ON device_sessions(refresh_token_hash, revoked_at);
 `);
 try { db.exec("ALTER TABLE nodes ADD COLUMN agent_token_hash TEXT"); } catch { /* already migrated */ }
+try { db.exec("ALTER TABLE nodes ADD COLUMN region_id TEXT"); } catch { /* already migrated */ }
+db.exec("CREATE INDEX IF NOT EXISTS nodes_region_idx ON nodes(region_id)");
 for (const statement of [
   "ALTER TABLE nodes ADD COLUMN provider TEXT NOT NULL DEFAULT 'unknown'",
   "ALTER TABLE nodes ADD COLUMN region TEXT NOT NULL DEFAULT ''",
@@ -117,5 +124,17 @@ for (const statement of [
 ]) {
   try { db.exec(statement); } catch { /* column already migrated */ }
 }
+const timestamp = new Date().toISOString();
+const regions = [
+  ["tokyo-jp", "Tokyo", "Japan", "JP"],
+  ["singapore-sg", "Singapore", "Singapore", "SG"],
+  ["frankfurt-de", "Frankfurt", "Germany", "DE"],
+  ["los-angeles-us", "Los Angeles", "USA", "US"],
+];
+const regionInsert = db.prepare("INSERT OR IGNORE INTO regions (id, name, country, code, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)");
+for (const [id, name, country, code] of regions) regionInsert.run(id, name, country, code, timestamp, timestamp);
+db.exec(`UPDATE nodes SET region_id = (
+  SELECT regions.id FROM regions WHERE nodes.place = regions.name || ' · ' || regions.country
+) WHERE region_id IS NULL`);
 db.close();
 console.log(`Northstar database ready: ${file}`);

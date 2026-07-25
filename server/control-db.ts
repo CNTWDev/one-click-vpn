@@ -367,6 +367,10 @@ export function updateNodeControlMetadata(nodeId: string, input: {
   db().prepare(`UPDATE nodes SET ${assignments}, updated_at = ? WHERE id = ?`).run(...values.map(([, value]) => value), now(), nodeId);
 }
 
+export function updateControlRegion(regionId: string, label: string): void {
+  db().prepare("UPDATE nodes SET region = ?, updated_at = ? WHERE region_id = ?").run(label, now(), regionId);
+}
+
 export function upsertNodeProtocol(input: {
   nodeId: string;
   protocol: Protocol;

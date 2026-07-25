@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import worldMap from "@svg-maps/world";
 
 type NodeStatus = "online" | "provisioning" | "attention";
 
@@ -15,6 +16,13 @@ type Node = {
   traffic: string;
   version: string;
   lastSeen: string;
+};
+
+type Region = {
+  id: string;
+  name: string;
+  country: string;
+  code: string;
 };
 
 const initialNodes: Node[] = [
@@ -59,10 +67,13 @@ const initialNodes: Node[] = [
 const navItems = [
   ["Overview", "⌘"],
   ["Nodes", "◉"],
+  ["Regions", "⌖"],
   ["Access", "⌁"],
   ["Sessions", "▣"],
   ["Audit", "◌"],
 ];
+
+const fingerprintCommand = "sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256";
 
 function StatusPill({ status }: { status: NodeStatus }) {
   const labels = {
@@ -79,27 +90,41 @@ function StatusPill({ status }: { status: NodeStatus }) {
   );
 }
 
-function WorldMap({ count }: { count: number }) {
+const mapPins = [
+  { match: "frankfurt", x: 529, y: 281 },
+  { match: "tokyo", x: 899, y: 332 },
+  { match: "los angeles", x: 174, y: 338 },
+  { match: "singapore", x: 798, y: 455 },
+];
+const worldLocations = worldMap.locations as Array<{ id: string; name: string; path: string }>;
+
+function pinForNode(node: Node) {
+  const place = `${node.name} ${node.place}`.toLowerCase();
+  return mapPins.find((pin) => place.includes(pin.match)) || null;
+}
+
+function WorldMap({ nodes }: { nodes: Node[] }) {
+  const pins = nodes.map((node) => ({ node, pin: pinForNode(node) })).filter((item): item is { node: Node; pin: { match: string; x: number; y: number } } => Boolean(item.pin));
+
   return (
-    <div className="world-map" aria-label="Global node coverage map">
-      <div className="map-grid" />
-      <div className="map-arc map-arc-one" />
-      <div className="map-arc map-arc-two" />
-      <div className="continent continent-one" />
-      <div className="continent continent-two" />
-      <div className="continent continent-three" />
-      <div className="continent continent-four" />
-      <span className="map-node map-node-fra"><b />Frankfurt</span>
-      <span className="map-node map-node-tyo"><b />Tokyo</span>
-      <span className="map-node map-node-lax"><b />Los Angeles</span>
-      <span className="map-node map-node-ctl"><b />Control</span>
-      <div className="map-caption">{count} edge nodes · one control plane</div>
+    <div className="world-map">
+      <svg className="map-svg" viewBox={worldMap.viewBox} role="img" aria-label="World map showing Northstar edge nodes">
+        <rect className="map-ocean" x="0" y="0" width="1010" height="666" />
+        <g className="map-graticule"><path d="M0 333H1010M505 0V666" /><ellipse cx="505" cy="333" rx="337" ry="222" /></g>
+        <g className="map-land">{worldLocations.map((location) => <path key={location.id} d={location.path} aria-label={location.name}><title>{location.name}</title></path>)}</g>
+        <g className="map-routes">{pins.map(({ node, pin }) => <path key={`route-${node.id}`} d={`M520 235 Q ${(520 + pin.x) / 2} ${(235 + pin.y) / 2 - 45} ${pin.x} ${pin.y}`} />)}</g>
+        <g className="map-control" transform="translate(520 235)"><circle r="9" /><circle className="map-marker-core" r="3" /><text x="13" y="4">CONTROL</text></g>
+        <g className="map-markers">{pins.map(({ node, pin }) => <g key={node.id} className={`map-marker map-marker-${node.status}`} transform={`translate(${pin.x} ${pin.y})`}><title>{`${node.name} · ${node.place}`}</title><circle className="map-marker-halo" r="11" /><circle className="map-marker-core" r="4" /><text x="12" y="4">{node.name}</text></g>)}</g>
+      </svg>
+      <div className="map-caption">{nodes.length} edge nodes · {pins.length} shown on map</div>
+      <div className="map-attribution">Map data: <a href="https://github.com/VictorCazanave/svg-maps" target="_blank" rel="noreferrer">@svg-maps/world</a> · CC BY 4.0</div>
     </div>
   );
 }
 
 export default function Home() {
   const [nodes, setNodes] = useState<Node[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
   const [authStatus, setAuthStatus] = useState<"loading" | "signed-out" | "signed-in">("loading");
   const [user, setUser] = useState<{ displayName: string; email: string } | null>(null);
   const [login, setLogin] = useState({ email: "", password: "" });
@@ -111,7 +136,12 @@ export default function Home() {
   const [deploying, setDeploying] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node>(initialNodes[0]);
   const [notice, setNotice] = useState("All systems nominal");
-  const [form, setForm] = useState({ name: "", ip: "", user: "root", secret: "", region: "Tokyo · Japan", hostFingerprint: "" });
+  const [form, setForm] = useState({ name: "", ip: "", user: "root", secret: "", regionId: "tokyo-jp", hostFingerprint: "" });
+  const [regionForm, setRegionForm] = useState({ name: "", country: "", code: "" });
+  const [editingRegionId, setEditingRegionId] = useState<string | null>(null);
+  const [regionBusy, setRegionBusy] = useState(false);
+  const [showFingerprintGuide, setShowFingerprintGuide] = useState(false);
+  const [fingerprintCommandCopied, setFingerprintCommandCopied] = useState(false);
 
   async function loadNodes() {
     const response = await fetch("/api/nodes", { cache: "no-store" });
@@ -134,6 +164,14 @@ export default function Home() {
     })));
   }
 
+  async function loadRegions() {
+    const response = await fetch("/api/regions", { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json() as { regions: Region[] };
+    setRegions(payload.regions);
+    setForm((current) => ({ ...current, regionId: payload.regions.some((region) => region.id === current.regionId) ? current.regionId : payload.regions[0]?.id || "" }));
+  }
+
   useEffect(() => {
     void fetch("/api/auth/me", { cache: "no-store" }).then(async (response) => {
       if (!response.ok) {
@@ -143,7 +181,7 @@ export default function Home() {
       const payload = await response.json() as { user: { displayName: string; email: string } };
       setUser(payload.user);
       setAuthStatus("signed-in");
-      await loadNodes();
+      await Promise.all([loadNodes(), loadRegions()]);
     }).catch(() => setAuthStatus("signed-out"));
   }, []);
 
@@ -170,7 +208,7 @@ export default function Home() {
     setAuthStatus("signed-in");
     setLogin({ email: "", password: "" });
     setLoginBusy(false);
-    await loadNodes();
+    await Promise.all([loadNodes(), loadRegions()]);
   }
 
   async function signOut() {
@@ -190,7 +228,7 @@ export default function Home() {
     setDeploying(true);
     setNotice("Verifying SSH host key and preparing a signed deployment task…");
     const response = await fetch("/api/nodes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-      name: form.name, ip: form.ip, place: form.region, sshUser: form.user, secret: form.secret, hostFingerprint: form.hostFingerprint,
+      name: form.name, ip: form.ip, regionId: form.regionId, sshUser: form.user, secret: form.secret, hostFingerprint: form.hostFingerprint,
     }) });
     const payload = await response.json().catch(() => ({})) as { error?: string; node?: Node };
     setDeploying(false);
@@ -200,8 +238,57 @@ export default function Home() {
     }
     setNodes((current) => [payload.node!, ...current]);
     setShowDeploy(false);
-    setForm({ name: "", ip: "", user: "root", secret: "", region: "Tokyo · Japan", hostFingerprint: "" });
+    setForm({ name: "", ip: "", user: "root", secret: "", regionId: regions[0]?.id || "", hostFingerprint: "" });
     setNotice(`${payload.node.name} is queued for secure bootstrap. The credential is encrypted server-side.`);
+  }
+
+  async function copyFingerprintCommand() {
+    try {
+      await navigator.clipboard.writeText(fingerprintCommand);
+      setFingerprintCommandCopied(true);
+      window.setTimeout(() => setFingerprintCommandCopied(false), 1800);
+    } catch {
+      setNotice("Clipboard access is unavailable; please copy the command manually.");
+    }
+  }
+
+  async function saveRegion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setRegionBusy(true);
+    const editing = Boolean(editingRegionId);
+    const response = await fetch(editing ? `/api/regions/${editingRegionId}` : "/api/regions", {
+      method: editing ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(regionForm),
+    });
+    const payload = await response.json().catch(() => ({})) as { error?: string; region?: Region };
+    setRegionBusy(false);
+    if (!response.ok || !payload.region) {
+      setNotice(payload.error || "Unable to save region");
+      return;
+    }
+    setRegions((current) => editing ? current.map((region) => region.id === payload.region!.id ? payload.region! : region) : [...current, payload.region!]);
+    setRegionForm({ name: "", country: "", code: "" });
+    setEditingRegionId(null);
+    setNotice(`${payload.region.name} region saved.`);
+    await loadNodes();
+  }
+
+  function editRegion(region: Region) {
+    setEditingRegionId(region.id);
+    setRegionForm({ name: region.name, country: region.country, code: region.code });
+  }
+
+  async function removeRegion(region: Region) {
+    const response = await fetch(`/api/regions/${region.id}`, { method: "DELETE" });
+    const payload = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) {
+      setNotice(payload.error || "Unable to delete region");
+      return;
+    }
+    setRegions((current) => current.filter((item) => item.id !== region.id));
+    setForm((current) => current.regionId === region.id ? { ...current, regionId: regions.find((item) => item.id !== region.id)?.id || "" } : current);
+    setNotice(`${region.name} region deleted.`);
   }
 
   async function requestAction(label: string, action?: "restart-agent" | "status-agent") {
@@ -273,6 +360,28 @@ export default function Home() {
           </div>
         </header>
 
+        {activeNav !== "Overview" && (
+          <section className="route-panel card">
+            <div className="section-title route-title"><div><p>CONTROL PLANE</p><h2>{activeNav}</h2></div><span className="route-status">{activeNav === "Regions" ? `${regions.length} configured` : "Module ready"}</span></div>
+            {activeNav === "Regions" ? (
+              <div className="regions-workspace">
+                <div className="regions-copy">Manage the locations available when provisioning VPN nodes. Changes are reflected on existing nodes assigned to that region.</div>
+                <form className="region-form" onSubmit={saveRegion}>
+                  <label>Name<input required placeholder="e.g. Singapore" value={regionForm.name} onChange={(event) => setRegionForm({ ...regionForm, name: event.target.value })} /></label>
+                  <label>Country<input required placeholder="e.g. Singapore" value={regionForm.country} onChange={(event) => setRegionForm({ ...regionForm, country: event.target.value })} /></label>
+                  <label>Code<input required maxLength={8} placeholder="SG" value={regionForm.code} onChange={(event) => setRegionForm({ ...regionForm, code: event.target.value.toUpperCase() })} /></label>
+                  <div className="region-form-actions"><button className="primary-button" type="submit" disabled={regionBusy}>{regionBusy ? "Saving…" : editingRegionId ? "Save changes" : "Add region"}</button>{editingRegionId && <button className="cancel" type="button" onClick={() => { setEditingRegionId(null); setRegionForm({ name: "", country: "", code: "" }); }}>Cancel</button>}</div>
+                </form>
+                <div className="region-list">
+                  {regions.map((region) => <div className="region-row" key={region.id}><span className="flag">{region.code}</span><div><b>{region.name}</b><small>{region.country} · {region.id}</small></div><div className="region-actions"><button onClick={() => editRegion(region)}>Edit</button><button onClick={() => void removeRegion(region)}>Delete</button></div></div>)}
+                </div>
+              </div>
+            ) : (
+              <div className="module-placeholder"><b>{activeNav} is connected to the control plane.</b><span>This workspace is ready for the next operational module. Use Overview, Nodes, and Regions for the currently available controls.</span></div>
+            )}
+          </section>
+        )}
+
         <section className="hero">
           <div>
             <p className="eyebrow"><span /> LIVE NETWORK</p>
@@ -295,7 +404,7 @@ export default function Home() {
         <section className="network-grid">
           <article className="coverage-card card">
             <div className="section-title"><div><p>GLOBAL FABRIC</p><h2>Edge coverage</h2></div><button className="plain-action">View topology <span>↗</span></button></div>
-            <WorldMap count={nodes.length} />
+            <WorldMap nodes={nodes} />
             <div className="coverage-footer"><span><i className="legend online" /> Online <b>2</b></span><span><i className="legend warning" /> Attention <b>1</b></span><span><i className="legend queued" /> Deploying <b>{nodes.filter((node) => node.status === "provisioning").length}</b></span></div>
           </article>
 
@@ -335,9 +444,13 @@ export default function Home() {
             <div className="stepper"><span className="complete">01 <b>Connection</b></span><i /><span>02 <b>Verify</b></span><i /><span>03 <b>Deploy</b></span></div>
             <form onSubmit={deployNode}>
               <label>Node name<input autoFocus placeholder="e.g. Singapore Edge" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-              <div className="field-pair"><label>Public IP<input placeholder="203.0.113.10" value={form.ip} onChange={(event) => setForm({ ...form, ip: event.target.value })} /></label><label>Region<select value={form.region} onChange={(event) => setForm({ ...form, region: event.target.value })}><option>Tokyo · Japan</option><option>Singapore · Singapore</option><option>Frankfurt · Germany</option><option>Los Angeles · USA</option></select></label></div>
+          <div className="field-pair"><label>Public IP<input placeholder="203.0.113.10" value={form.ip} onChange={(event) => setForm({ ...form, ip: event.target.value })} /></label><label>Region<select required value={form.regionId} onChange={(event) => setForm({ ...form, regionId: event.target.value })}>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} · {region.country}</option>)}</select></label></div>
               <div className="field-pair"><label>SSH user<input value={form.user} onChange={(event) => setForm({ ...form, user: event.target.value })} /></label><label>SSH password or private key<input type="password" placeholder="Encrypted on the controller" value={form.secret} onChange={(event) => setForm({ ...form, secret: event.target.value })} /></label></div>
-              <label>SSH host fingerprint <input placeholder="sha256:… (required in production)" value={form.hostFingerprint} onChange={(event) => setForm({ ...form, hostFingerprint: event.target.value })} /></label>
+              <div className="fingerprint-field">
+                <div className="fingerprint-label"><label htmlFor="host-fingerprint">SSH host fingerprint</label><button type="button" className="help-toggle" onClick={() => setShowFingerprintGuide((current) => !current)} aria-expanded={showFingerprintGuide}>{showFingerprintGuide ? "收起" : "如何获取？"}</button></div>
+                <input id="host-fingerprint" placeholder="SHA256:… (required in production)" value={form.hostFingerprint} onChange={(event) => setForm({ ...form, hostFingerprint: event.target.value })} />
+                {showFingerprintGuide && <aside className="fingerprint-guide"><b>在目标 VPN 节点上获取</b><p>请先通过云厂商控制台或已确认安全的 SSH 会话登录目标服务器，然后执行：</p><div className="fingerprint-command"><code>{fingerprintCommand}</code><button type="button" onClick={() => void copyFingerprintCommand()}>{fingerprintCommandCopied ? "已复制" : "复制命令"}</button></div><p>复制输出中以 <strong>SHA256:</strong> 开头的值，粘贴到上面的输入框。如果没有 ed25519 主机密钥，可改用 <code>/etc/ssh/ssh_host_rsa_key.pub</code>。</p><small>不要直接把本次首次连接得到的指纹自动当作可信值；请通过云控制台或其他可信渠道核对。</small></aside>}
+              </div>
               <p className="form-note"><span>⌑</span> The controller verifies the host key and encrypts this credential with the server master key. It is never returned to the browser.</p>
               <div className="modal-actions"><button type="button" className="cancel" onClick={() => setShowDeploy(false)}>Cancel</button><button className="primary-button" type="submit" disabled={deploying}>{deploying ? "Creating signed task…" : "Verify & deploy"}<span>→</span></button></div>
             </form>

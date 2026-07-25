@@ -16,6 +16,7 @@ export type DbNode = {
   id: string;
   name: string;
   place: string;
+  region_id: string | null;
   ip: string;
   ssh_user: string;
   ssh_port: number;
@@ -31,6 +32,15 @@ export type DbNode = {
   credential_tag: string;
   host_fingerprint: string | null;
   agent_token_hash: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DbRegion = {
+  id: string;
+  name: string;
+  country: string;
+  code: string;
   created_at: string;
   updated_at: string;
 };
@@ -57,6 +67,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   place TEXT NOT NULL,
+  region_id TEXT,
   ip TEXT NOT NULL,
   ssh_user TEXT NOT NULL,
   ssh_port INTEGER NOT NULL DEFAULT 22,
@@ -74,6 +85,16 @@ CREATE TABLE IF NOT EXISTS nodes (
   agent_token_hash TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS regions (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  country TEXT NOT NULL,
+  code TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (name, country),
+  UNIQUE (code)
 );
 CREATE TABLE IF NOT EXISTS audit_logs (
   id TEXT PRIMARY KEY,
@@ -110,11 +131,33 @@ export function getDb(): DatabaseSync {
   instance.exec(schema);
   for (const statement of [
     "ALTER TABLE nodes ADD COLUMN agent_token_hash TEXT",
+    "ALTER TABLE nodes ADD COLUMN region_id TEXT",
   ]) {
     try { instance.exec(statement); } catch { /* column already exists */ }
   }
+  instance.exec("CREATE INDEX IF NOT EXISTS nodes_region_idx ON nodes(region_id)");
+  seedRegions(instance);
   seedAdmin(instance);
   return instance;
+}
+
+function seedRegions(db: DatabaseSync): void {
+  const timestamp = now();
+  const defaults = [
+    ["tokyo-jp", "Tokyo", "Japan", "JP"],
+    ["singapore-sg", "Singapore", "Singapore", "SG"],
+    ["frankfurt-de", "Frankfurt", "Germany", "DE"],
+    ["los-angeles-us", "Los Angeles", "USA", "US"],
+  ];
+  const statement = db.prepare(`INSERT OR IGNORE INTO regions
+    (id, name, country, code, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`);
+  for (const [id, name, country, code] of defaults) {
+    statement.run(id, name, country, code, timestamp, timestamp);
+  }
+  db.exec(`UPDATE nodes SET region_id = (
+    SELECT regions.id FROM regions
+    WHERE nodes.place = regions.name || ' · ' || regions.country
+  ) WHERE region_id IS NULL`);
 }
 
 function seedAdmin(db: DatabaseSync): void {
@@ -156,6 +199,42 @@ export function listNodes(): DbNode[] {
   return getDb().prepare("SELECT * FROM nodes ORDER BY created_at DESC").all() as unknown as DbNode[];
 }
 
+export function listRegions(): DbRegion[] {
+  return getDb().prepare("SELECT * FROM regions ORDER BY name, country").all() as unknown as DbRegion[];
+}
+
+export function findRegion(id: string): DbRegion | undefined {
+  return getDb().prepare("SELECT * FROM regions WHERE id = ?").get(id) as DbRegion | undefined;
+}
+
+export function findRegionByLabel(label: string): DbRegion | undefined {
+  return getDb().prepare("SELECT * FROM regions WHERE name || ' · ' || country = ?").get(label) as DbRegion | undefined;
+}
+
+export function insertRegion(input: Pick<DbRegion, "id" | "name" | "country" | "code">): DbRegion {
+  const timestamp = now();
+  getDb().prepare(`INSERT INTO regions (id, name, country, code, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)`).run(input.id, input.name, input.country, input.code, timestamp, timestamp);
+  return findRegion(input.id)!;
+}
+
+export function updateRegion(id: string, values: Pick<DbRegion, "name" | "country" | "code">): DbRegion | undefined {
+  const timestamp = now();
+  const database = getDb();
+  database.prepare("UPDATE regions SET name = ?, country = ?, code = ?, updated_at = ? WHERE id = ?")
+    .run(values.name, values.country, values.code, timestamp, id);
+  database.prepare("UPDATE nodes SET place = ?, updated_at = ? WHERE region_id = ?")
+    .run(`${values.name} · ${values.country}`, timestamp, id);
+  return findRegion(id);
+}
+
+export function deleteRegion(id: string): boolean {
+  const database = getDb();
+  const usage = database.prepare("SELECT COUNT(*) AS count FROM nodes WHERE region_id = ?").get(id) as { count: number };
+  if (Number(usage.count) > 0) return false;
+  return Number(database.prepare("DELETE FROM regions WHERE id = ?").run(id).changes || 0) === 1;
+}
+
 export function findNode(id: string): DbNode | undefined {
   return getDb().prepare("SELECT * FROM nodes WHERE id = ?").get(id) as DbNode | undefined;
 }
@@ -164,10 +243,10 @@ export function insertNode(input: Omit<DbNode, "id" | "created_at" | "updated_at
   const id = randomUUID();
   const timestamp = now();
   getDb().prepare(`INSERT INTO nodes
-    (id, name, place, ip, ssh_user, ssh_port, status, latency, users, traffic, version, last_seen,
+    (id, name, place, region_id, ip, ssh_user, ssh_port, status, latency, users, traffic, version, last_seen,
      credential_type, credential_ciphertext, credential_iv, credential_tag, host_fingerprint, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    id, input.name, input.place, input.ip, input.ssh_user, input.ssh_port, input.status, input.latency,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    id, input.name, input.place, input.region_id, input.ip, input.ssh_user, input.ssh_port, input.status, input.latency,
     input.users, input.traffic, input.version, input.last_seen, input.credential_type,
     input.credential_ciphertext, input.credential_iv, input.credential_tag, input.host_fingerprint,
     timestamp, timestamp,

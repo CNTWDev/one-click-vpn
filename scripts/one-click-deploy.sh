@@ -44,7 +44,11 @@ compose_available="no"
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   compose_available="yes"
 elif command -v docker-compose >/dev/null 2>&1; then
-  compose_available="yes"
+  legacy_version=$(docker-compose version --short 2>/dev/null || true)
+  case "$legacy_version" in
+    1.*) ;;
+    *) compose_available="yes" ;;
+  esac
 fi
 
 if [ "$(id -u)" -ne 0 ] && [ "$skip_docker_install" = "no" ] && [ "$compose_available" = "no" ]; then
@@ -54,6 +58,11 @@ fi
 
 if [ "$compose_available" = "no" ] && [ "$skip_docker_install" = "no" ]; then
   "$SCRIPT_DIR/install-ubuntu.sh"
+fi
+
+if [ "$compose_available" = "no" ] && [ "$skip_docker_install" = "yes" ]; then
+  echo "Docker Compose v2 is required. Install the docker-compose-plugin or omit --skip-docker-install." >&2
+  exit 1
 fi
 
 if [ -f "$APP_DIR/.env" ] && [ "$force_env" != "yes" ]; then
