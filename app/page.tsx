@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 type NodeStatus = "online" | "provisioning" | "attention";
 
@@ -79,7 +79,7 @@ function StatusPill({ status }: { status: NodeStatus }) {
   );
 }
 
-function WorldMap() {
+function WorldMap({ count }: { count: number }) {
   return (
     <div className="world-map" aria-label="Global node coverage map">
       <div className="map-grid" />
@@ -93,13 +93,17 @@ function WorldMap() {
       <span className="map-node map-node-tyo"><b />Tokyo</span>
       <span className="map-node map-node-lax"><b />Los Angeles</span>
       <span className="map-node map-node-ctl"><b />Control</span>
-      <div className="map-caption">3 edge nodes · one control plane</div>
+      <div className="map-caption">{count} edge nodes · one control plane</div>
     </div>
   );
 }
 
 export default function Home() {
-  const [nodes, setNodes] = useState(initialNodes);
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [authStatus, setAuthStatus] = useState<"loading" | "signed-out" | "signed-in">("loading");
+  const [user, setUser] = useState<{ displayName: string; email: string } | null>(null);
+  const [login, setLogin] = useState({ email: "", password: "" });
+  const [loginBusy, setLoginBusy] = useState(false);
   const [activeNav, setActiveNav] = useState("Overview");
   const [showDeploy, setShowDeploy] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
@@ -107,7 +111,41 @@ export default function Home() {
   const [deploying, setDeploying] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node>(initialNodes[0]);
   const [notice, setNotice] = useState("All systems nominal");
-  const [form, setForm] = useState({ name: "", ip: "", user: "root", secret: "", region: "Tokyo · Japan" });
+  const [form, setForm] = useState({ name: "", ip: "", user: "root", secret: "", region: "Tokyo · Japan", hostFingerprint: "" });
+
+  async function loadNodes() {
+    const response = await fetch("/api/nodes", { cache: "no-store" });
+    if (response.status === 401) {
+      setAuthStatus("signed-out");
+      return;
+    }
+    const payload = await response.json() as { nodes: Array<Record<string, unknown>> };
+    setNodes(payload.nodes.map((node) => ({
+      id: String(node.id),
+      name: String(node.name),
+      place: String(node.place),
+      ip: String(node.ip),
+      status: node.status === "online" ? "online" : node.status === "provisioning" ? "provisioning" : "attention",
+      latency: String(node.latency),
+      users: Number(node.users || 0),
+      traffic: String(node.traffic || "—"),
+      version: String(node.version || "unknown"),
+      lastSeen: String(node.last_seen || "never"),
+    })));
+  }
+
+  useEffect(() => {
+    void fetch("/api/auth/me", { cache: "no-store" }).then(async (response) => {
+      if (!response.ok) {
+        setAuthStatus("signed-out");
+        return;
+      }
+      const payload = await response.json() as { user: { displayName: string; email: string } };
+      setUser(payload.user);
+      setAuthStatus("signed-in");
+      await loadNodes();
+    }).catch(() => setAuthStatus("signed-out"));
+  }, []);
 
   const totalUsers = useMemo(() => nodes.reduce((sum, node) => sum + node.users, 0), [nodes]);
   const healthyNodes = nodes.filter((node) => node.status === "online").length;
@@ -118,7 +156,31 @@ export default function Home() {
     setShowTerminal(true);
   }
 
-  function deployNode(event: FormEvent<HTMLFormElement>) {
+  async function signIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoginBusy(true);
+    const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(login) });
+    const payload = await response.json().catch(() => ({})) as { error?: string; user?: { displayName: string; email: string } };
+    if (!response.ok || !payload.user) {
+      setNotice(payload.error || "Unable to sign in");
+      setLoginBusy(false);
+      return;
+    }
+    setUser(payload.user);
+    setAuthStatus("signed-in");
+    setLogin({ email: "", password: "" });
+    setLoginBusy(false);
+    await loadNodes();
+  }
+
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setUser(null);
+    setNodes([]);
+    setAuthStatus("signed-out");
+  }
+
+  async function deployNode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form.name || !form.ip || !form.secret) {
       setNotice("Complete the node name, public IP, and temporary SSH credential.");
@@ -127,30 +189,44 @@ export default function Home() {
 
     setDeploying(true);
     setNotice("Verifying SSH host key and preparing a signed deployment task…");
-    window.setTimeout(() => {
-      const newNode: Node = {
-        id: `node-${nodes.length + 1}`,
-        name: form.name,
-        place: form.region,
-        ip: form.ip,
-        status: "provisioning",
-        latency: "checking",
-        users: 0,
-        traffic: "—",
-        version: "bootstrap pending",
-        lastSeen: "just added",
-      };
-      setNodes((current) => [newNode, ...current]);
-      setDeploying(false);
-      setShowDeploy(false);
-      setForm({ name: "", ip: "", user: "root", secret: "", region: "Tokyo · Japan" });
-      setNotice(`${newNode.name} is queued for secure bootstrap. The temporary SSH credential is sealed for recovery use.`);
-    }, 900);
+    const response = await fetch("/api/nodes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      name: form.name, ip: form.ip, place: form.region, sshUser: form.user, secret: form.secret, hostFingerprint: form.hostFingerprint,
+    }) });
+    const payload = await response.json().catch(() => ({})) as { error?: string; node?: Node };
+    setDeploying(false);
+    if (!response.ok || !payload.node) {
+      setNotice(payload.error || "Unable to create node");
+      return;
+    }
+    setNodes((current) => [payload.node!, ...current]);
+    setShowDeploy(false);
+    setForm({ name: "", ip: "", user: "root", secret: "", region: "Tokyo · Japan", hostFingerprint: "" });
+    setNotice(`${payload.node.name} is queued for secure bootstrap. The credential is encrypted server-side.`);
   }
 
-  function requestAction(label: string) {
-    setNotice(`${label} request created for ${selectedNode.name}. The node agent will acknowledge it through its outbound secure channel.`);
+  async function requestAction(label: string, action?: "restart-agent" | "status-agent") {
+    if (action) {
+      const response = await fetch(`/api/nodes/${selectedNode.id}/actions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      setNotice(response.ok ? `${label} completed for ${selectedNode.name}.` : (payload.error || `${label} failed.`));
+    } else {
+      setNotice(`${label} is available only through the encrypted, audited SSH path.`);
+    }
     setShowTerminal(false);
+  }
+
+  if (authStatus === "loading") {
+    return <main className="auth-screen"><div className="auth-card"><span className="brand-mark"><i /><i /><i /></span><p className="eyebrow"><span /> NORTHSTAR</p><h1>Loading control plane…</h1></div></main>;
+  }
+
+  if (authStatus === "signed-out") {
+    return <main className="auth-screen"><form className="auth-card" onSubmit={signIn}>
+      <span className="brand-mark"><i /><i /><i /></span><p className="eyebrow"><span /> SECURE CONTROL PLANE</p><h1>Sign in to Northstar.</h1><p className="auth-copy">Use the owner account configured on the controller host.</p>
+      <label>Email<input type="email" autoComplete="username" required value={login.email} onChange={(event) => setLogin({ ...login, email: event.target.value })} /></label>
+      <label>Password<input type="password" autoComplete="current-password" required value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>
+      <button className="primary-button" type="submit" disabled={loginBusy}>{loginBusy ? "Signing in…" : "Sign in"}<span>→</span></button>
+      {notice !== "All systems nominal" && <p className="auth-error">{notice}</p>}
+    </form></main>;
   }
 
   return (
@@ -182,7 +258,7 @@ export default function Home() {
             <span className="pulse" />
             <div><small>CONTROL STATUS</small><b>Secured · 12ms</b></div>
           </div>
-          <button className="profile"><span>TW</span><div><b>Tuan Wei</b><small>Owner</small></div><em>⌄</em></button>
+          <button className="profile" onClick={() => void signOut()}><span>{(user?.displayName || "OW").slice(0, 2).toUpperCase()}</span><div><b>{user?.displayName || "Owner"}</b><small>{user?.email || "Owner"}</small></div><em>↪</em></button>
         </div>
       </aside>
 
@@ -205,7 +281,7 @@ export default function Home() {
           </div>
           <div className="hero-trust">
             <span className="ring"><i /></span>
-            <div><b>Zero inbound management</b><small>Every managed node calls home over mTLS</small></div>
+            <div><b>Zero inbound management</b><small>Every managed node calls home over authenticated HTTPS</small></div>
           </div>
         </section>
 
@@ -219,7 +295,7 @@ export default function Home() {
         <section className="network-grid">
           <article className="coverage-card card">
             <div className="section-title"><div><p>GLOBAL FABRIC</p><h2>Edge coverage</h2></div><button className="plain-action">View topology <span>↗</span></button></div>
-            <WorldMap />
+            <WorldMap count={nodes.length} />
             <div className="coverage-footer"><span><i className="legend online" /> Online <b>2</b></span><span><i className="legend warning" /> Attention <b>1</b></span><span><i className="legend queued" /> Deploying <b>{nodes.filter((node) => node.status === "provisioning").length}</b></span></div>
           </article>
 
@@ -260,8 +336,9 @@ export default function Home() {
             <form onSubmit={deployNode}>
               <label>Node name<input autoFocus placeholder="e.g. Singapore Edge" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
               <div className="field-pair"><label>Public IP<input placeholder="203.0.113.10" value={form.ip} onChange={(event) => setForm({ ...form, ip: event.target.value })} /></label><label>Region<select value={form.region} onChange={(event) => setForm({ ...form, region: event.target.value })}><option>Tokyo · Japan</option><option>Singapore · Singapore</option><option>Frankfurt · Germany</option><option>Los Angeles · USA</option></select></label></div>
-              <div className="field-pair"><label>SSH user<input value={form.user} onChange={(event) => setForm({ ...form, user: event.target.value })} /></label><label>Temporary SSH password<input type="password" placeholder="Stored encrypted for recovery" value={form.secret} onChange={(event) => setForm({ ...form, secret: event.target.value })} /></label></div>
-              <p className="form-note"><span>⌑</span> The controller validates the host key before deployment. This credential is encrypted server-side and is never returned to the browser.</p>
+              <div className="field-pair"><label>SSH user<input value={form.user} onChange={(event) => setForm({ ...form, user: event.target.value })} /></label><label>SSH password or private key<input type="password" placeholder="Encrypted on the controller" value={form.secret} onChange={(event) => setForm({ ...form, secret: event.target.value })} /></label></div>
+              <label>SSH host fingerprint <input placeholder="sha256:… (required in production)" value={form.hostFingerprint} onChange={(event) => setForm({ ...form, hostFingerprint: event.target.value })} /></label>
+              <p className="form-note"><span>⌑</span> The controller verifies the host key and encrypts this credential with the server master key. It is never returned to the browser.</p>
               <div className="modal-actions"><button type="button" className="cancel" onClick={() => setShowDeploy(false)}>Cancel</button><button className="primary-button" type="submit" disabled={deploying}>{deploying ? "Creating signed task…" : "Verify & deploy"}<span>→</span></button></div>
             </form>
           </section>
@@ -272,16 +349,16 @@ export default function Home() {
         <div className="modal-layer" role="presentation" onMouseDown={() => setShowTerminal(false)}>
           <section className="modal terminal-modal" role="dialog" aria-modal="true" aria-labelledby="terminal-title" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head"><div><p>TIME-BOUND SESSION</p><h2 id="terminal-title">{selectedNode.name}</h2></div><button onClick={() => setShowTerminal(false)} aria-label="Close terminal">×</button></div>
-            <div className="terminal-meta"><span><i className="pulse" /> Agent tunnel</span><span>mTLS verified</span><span>15 min maximum</span></div>
+            <div className="terminal-meta"><span><i className="pulse" /> Agent tunnel</span><span>TLS + token verified</span><span>15 min maximum</span></div>
             <div className="terminal-window">
               <div className="terminal-bar"><span><i /><i /><i /></span><small>vpnops@{selectedNode.id}: ~</small><b>SSH certificate · expires 14:59</b></div>
               {terminalStarted ? <pre><span>vpnops@{selectedNode.id}:~$</span> sudo systemctl status vpn-agent
 <b>● vpn-agent.service - Northstar node agent</b>
    Active: <em>active (running)</em> since today
-   Secure transport: mTLS outbound / connected
+   Secure transport: outbound HTTPS / connected
 <span>vpnops@{selectedNode.id}:~$</span> <i className="cursor" /></pre> : <div className="terminal-ready"><div className="terminal-orbit">⌁</div><b>Ready to open a signed SSH session</b><p>Your password is not used. This route travels through the node’s existing outbound Agent channel.</p><button className="primary-button" onClick={() => setTerminalStarted(true)}>Start secure session <span>→</span></button></div>}
             </div>
-            <div className="terminal-footer"><span>Session will be recorded to the encrypted audit log.</span><div><button onClick={() => requestAction("Restart agent")}>Restart agent</button><button className="danger-button" onClick={() => requestAction("Emergency SSH fallback")}>Use emergency SSH</button></div></div>
+            <div className="terminal-footer"><span>Actions are recorded to the encrypted audit log.</span><div><button onClick={() => void requestAction("Restart agent", "restart-agent")}>Restart agent</button><button className="danger-button" onClick={() => void requestAction("Emergency SSH fallback")}>Use emergency SSH</button></div></div>
           </section>
         </div>
       )}
