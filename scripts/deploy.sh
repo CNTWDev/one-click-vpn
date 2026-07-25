@@ -72,6 +72,8 @@ done
 if [ -z "$healthy" ]; then
   echo "Northstar did not become healthy." >&2
   compose ps
+  echo "Runtime binding environment:" >&2
+  docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container_id" 2>/dev/null | awk '/^(HOSTNAME|PORT)=/' >&2 || true
   echo "Health-check output:" >&2
   docker inspect --format '{{range .State.Health.Log}}{{println .ExitCode .Output}}{{end}}' "$container_id" >&2 || true
   compose logs --tail=120 northstar >&2 || true

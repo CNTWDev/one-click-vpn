@@ -1,6 +1,11 @@
 #!/bin/sh
 set -eu
-node /app/scripts/migrate.mjs
+
+# Docker supplies HOSTNAME as the container id by default. Next standalone
+# uses HOSTNAME as its bind address, so set it before any Node process starts.
 HOSTNAME=0.0.0.0
-export HOSTNAME
+PORT=3000
+export HOSTNAME PORT
+
+node /app/scripts/migrate.mjs
 exec node /app/server.js

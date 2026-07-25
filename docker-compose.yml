@@ -6,6 +6,7 @@ services:
     environment:
       NORTHSTAR_DATABASE_PATH: /app/data/northstar.sqlite
       HOSTNAME: 0.0.0.0
+      PORT: 3000
     volumes:
       - northstar-data:/app/data
     # HTTPS and the public hostname are managed by the host's Nginx.
