@@ -409,6 +409,17 @@ export default function Home() {
     }
   }
 
+  async function retryBootstrap() {
+    const response = await fetch(`/api/nodes/${selectedNode.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "bootstrap" }),
+    });
+    const payload = await response.json().catch(() => ({})) as { error?: string };
+    setNotice(response.ok ? `${selectedNode.name} bootstrap queued again.` : (payload.error || "Unable to retry bootstrap"));
+    await Promise.all([loadNodes(), loadNodeDiagnostics(selectedNode.id)]);
+  }
+
   if (authStatus === "loading") {
     return <main className="auth-screen"><div className="auth-card"><span className="brand-mark"><i /><i /><i /></span><p className="eyebrow"><span /> NORTHSTAR</p><h1>Loading control plane…</h1></div></main>;
   }
@@ -576,7 +587,7 @@ export default function Home() {
                 </div>
               </div>}
             </div>
-            <div className="terminal-footer"><span>Output is recorded to the encrypted audit log.</span><div><button type="button" onClick={() => void requestAction("Agent status", "status-agent")}>Check agent</button><button type="button" onClick={() => void requestAction("Restart agent", "restart-agent")}>Restart agent</button></div></div>
+            <div className="terminal-footer"><span>Output is recorded to the encrypted audit log.</span><div><button type="button" onClick={() => void retryBootstrap()}>Retry bootstrap</button><button type="button" onClick={() => void requestAction("Agent status", "status-agent")}>Check agent</button><button type="button" onClick={() => void requestAction("Restart agent", "restart-agent")}>Restart agent</button></div></div>
           </section>
         </div>
       )}
