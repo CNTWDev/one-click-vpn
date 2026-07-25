@@ -11,7 +11,11 @@ else
   echo "Run this script from the repository root or place it in the repository root." >&2
   exit 1
 fi
-. "$APP_DIR/scripts/common.sh"
+PROJECT_DIR="$APP_DIR"
+. "$PROJECT_DIR/scripts/common.sh"
+# common.sh derives its own helper paths from $0 when sourced. Restore the
+# project path determined above because this script lives at the repo root.
+APP_DIR="$PROJECT_DIR"
 
 backup="yes"
 assume_yes="no"
