@@ -1,10 +1,14 @@
 services:
   northstar:
-    build: .
+    build:
+      context: .
+      args:
+        NORTHSTAR_BUILD_REV: ${NORTHSTAR_BUILD_REV:-unknown}
     restart: unless-stopped
     env_file: .env
     environment:
       NORTHSTAR_DATABASE_PATH: /app/data/northstar.sqlite
+      NORTHSTAR_BUILD_REV: ${NORTHSTAR_BUILD_REV:-unknown}
       HOSTNAME: 0.0.0.0
       PORT: 3000
     volumes:

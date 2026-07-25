@@ -38,6 +38,9 @@ esac
 
 "$SCRIPT_DIR/check-env.sh"
 
+export NORTHSTAR_BUILD_REV=$(git rev-parse --short HEAD)
+echo "Deploying build $NORTHSTAR_BUILD_REV"
+
 echo "Building and starting Northstar..."
 if [ "$no_cache" = "yes" ]; then
   echo "Docker build cache disabled."

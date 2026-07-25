@@ -1,5 +1,7 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
+ARG NORTHSTAR_BUILD_REV=unknown
+ENV NORTHSTAR_BUILD_REV=$NORTHSTAR_BUILD_REV
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
@@ -7,6 +9,8 @@ RUN npm run build
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
+ARG NORTHSTAR_BUILD_REV=unknown
+ENV NORTHSTAR_BUILD_REV=$NORTHSTAR_BUILD_REV
 WORKDIR /app
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
