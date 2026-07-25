@@ -2,6 +2,7 @@
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import worldMap from "@svg-maps/world";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 type NodeStatus = "online" | "provisioning" | "attention";
 
@@ -57,6 +58,17 @@ type NodeDiagnostics = {
     observed: Array<{ protocol: string; appliedRevision: number; status: string; lastError: string; updatedAt: string }>;
     tasks: ReconcileTask[];
   };
+};
+
+type NodeOperation = "status-agent" | "restart-agent" | "bootstrap" | "delete";
+
+type PendingNodeConfirmation = {
+  node: Node;
+  action: Exclude<NodeOperation, "status-agent">;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  tone: "warning" | "danger";
 };
 
 const initialNodes: Node[] = [
@@ -165,12 +177,16 @@ function NodeFleet({
   onRefresh,
   onOpenTerminal,
   onEditNode,
+  onNodeAction,
+  busyNodeAction,
 }: {
   nodes: Node[];
   regions: Region[];
   onRefresh: () => void;
   onOpenTerminal: (node: Node) => void;
   onEditNode: (node: Node) => void;
+  onNodeAction: (node: Node, action: NodeOperation) => void;
+  busyNodeAction: string | null;
 }) {
   const [regionId, setRegionId] = useState("all");
   const visibleNodes = regionId === "all" ? nodes : nodes.filter((node) => node.regionId === regionId);
@@ -188,7 +204,20 @@ function NodeFleet({
             <div className={node.status === "attention" ? "node-value danger" : "node-value"}>{node.latency}<small>last seen {node.lastSeen}</small></div>
             <div className="node-value">{node.users}<small>authorized</small></div>
             <div className="node-value">{node.traffic}<small>{node.version}</small></div>
-            <div className="row-actions"><button type="button" onClick={() => onOpenTerminal(node)}>Logs</button><button type="button" aria-label={`Edit ${node.name}`} onClick={() => onEditNode(node)}>Edit</button></div>
+            <div className="row-actions">
+              <button className="quick-action" type="button" disabled={busyNodeAction === `${node.id}:status-agent`} onClick={() => onNodeAction(node, "status-agent")}>{busyNodeAction === `${node.id}:status-agent` ? "Checking…" : "Check"}</button>
+              <details className="node-action-menu">
+                <summary>Actions</summary>
+                <div className="node-action-popover">
+                  <button type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onNodeAction(node, "status-agent"); }}>Check agent</button>
+                  <button type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onNodeAction(node, "restart-agent"); }}>Restart agent</button>
+                  <button type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onNodeAction(node, "bootstrap"); }}>Reinstall agent</button>
+                  <button type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onOpenTerminal(node); }}>View logs</button>
+                  <button type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onEditNode(node); }}>Edit configuration</button>
+                  <button className="menu-danger" type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onNodeAction(node, "delete"); }}>Delete node</button>
+                </div>
+              </details>
+            </div>
           </article>
         ))}
       </div>
@@ -211,7 +240,8 @@ export default function Home() {
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState("");
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [nodeActionBusy, setNodeActionBusy] = useState<string | null>(null);
+  const [pendingNodeConfirmation, setPendingNodeConfirmation] = useState<PendingNodeConfirmation | null>(null);
   const [selectedNode, setSelectedNode] = useState<Node>(initialNodes[0]);
   const [notice, setNotice] = useState("All systems nominal");
   const [form, setForm] = useState({ name: "", ip: "", user: "root", secret: "", regionId: "tokyo-jp", hostFingerprint: "" });
@@ -421,44 +451,79 @@ export default function Home() {
     setNotice(`${region.name} region deleted.`);
   }
 
-  async function requestAction(label: string, action?: "restart-agent" | "status-agent") {
-    if (action) {
-      const response = await fetch(`/api/nodes/${selectedNode.id}/actions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
-      const payload = await response.json().catch(() => ({})) as { error?: string; output?: string };
-      setNotice(response.ok ? `${label} completed for ${selectedNode.name}.` : (payload.error || `${label} failed.`));
-      await loadNodeDiagnostics(selectedNode.id);
-    } else {
-      setNotice(`${label} is not enabled in this release.`);
+  async function executeNodeAction(node: Node, action: NodeOperation) {
+    if (nodeActionBusy) return;
+    setNodeActionBusy(`${node.id}:${action}`);
+    try {
+      let response: Response;
+      if (action === "delete") {
+        response = await fetch(`/api/nodes/${node.id}`, { method: "DELETE" });
+      } else if (action === "bootstrap") {
+        response = await fetch(`/api/nodes/${node.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "bootstrap" }) });
+      } else {
+        response = await fetch(`/api/nodes/${node.id}/actions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      }
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) {
+        setNotice(payload.error || `${action} failed.`);
+        return;
+      }
+      if (action === "delete") {
+        setNodes((current) => current.filter((item) => item.id !== node.id));
+        if (selectedNode.id === node.id) {
+          setNodeDiagnostics(null);
+          setShowTerminal(false);
+        }
+        setNotice(`${node.name} deleted from the controller.`);
+        return;
+      }
+      const labels: Record<Exclude<NodeOperation, "delete">, string> = {
+        "status-agent": "Agent check completed",
+        "restart-agent": "Agent restart completed",
+        bootstrap: "Agent reinstall queued",
+      };
+      setNotice(`${labels[action]} for ${node.name}.`);
+      await loadNodes();
+      if (showTerminal && selectedNode.id === node.id) await loadNodeDiagnostics(node.id);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Node operation failed.");
+    } finally {
+      setNodeActionBusy(null);
     }
   }
 
-  async function retryBootstrap() {
-    const response = await fetch(`/api/nodes/${selectedNode.id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "bootstrap" }),
-    });
-    const payload = await response.json().catch(() => ({})) as { error?: string };
-    setNotice(response.ok ? `${selectedNode.name} bootstrap queued again.` : (payload.error || "Unable to retry bootstrap"));
-    await Promise.all([loadNodes(), loadNodeDiagnostics(selectedNode.id)]);
-  }
-
-  async function removeNode() {
-    if (deleteBusy) return;
-    const confirmed = window.confirm(`Delete ${selectedNode.name} from Northstar? This removes the controller record but does not uninstall the remote Agent.`);
-    if (!confirmed) return;
-    setDeleteBusy(true);
-    const response = await fetch(`/api/nodes/${selectedNode.id}`, { method: "DELETE" });
-    const payload = await response.json().catch(() => ({})) as { error?: string };
-    setDeleteBusy(false);
-    if (!response.ok) {
-      setNotice(payload.error || "Unable to delete node");
+  function requestNodeAction(node: Node, action: NodeOperation) {
+    if (action === "status-agent") {
+      void executeNodeAction(node, action);
       return;
     }
-    setNodes((current) => current.filter((node) => node.id !== selectedNode.id));
-    setNodeDiagnostics(null);
-    setShowTerminal(false);
-    setNotice(`${selectedNode.name} deleted from the controller.`);
+    const confirmations: Record<Exclude<NodeOperation, "status-agent">, Omit<PendingNodeConfirmation, "node" | "action">> = {
+      "restart-agent": {
+        title: `Restart ${node.name}'s agent?`,
+        description: "The remote Agent service will restart. Active VPN sessions may be interrupted briefly while the node reconnects.",
+        confirmLabel: "Restart agent",
+        tone: "warning",
+      },
+      bootstrap: {
+        title: `Reinstall ${node.name}'s agent?`,
+        description: "This will reconnect over SSH, overwrite the remote Agent files, and restart the node service. Existing VPN configuration is not intentionally deleted.",
+        confirmLabel: "Reinstall agent",
+        tone: "warning",
+      },
+      delete: {
+        title: `Delete ${node.name}?`,
+        description: "This removes the node from the controller. It does not uninstall the remote Agent or close the cloud firewall, so the node must be cleaned up separately.",
+        confirmLabel: "Delete node",
+        tone: "danger",
+      },
+    };
+    setPendingNodeConfirmation({ node, action, ...confirmations[action] });
+  }
+
+  async function confirmNodeAction() {
+    if (!pendingNodeConfirmation) return;
+    await executeNodeAction(pendingNodeConfirmation.node, pendingNodeConfirmation.action);
+    setPendingNodeConfirmation(null);
   }
 
   if (authStatus === "loading") {
@@ -556,12 +621,12 @@ export default function Home() {
             </article>
           </section>
 
-          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Fleet view refreshed just now.")} onOpenTerminal={openTerminal} onEditNode={openEditNode} />
+          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Fleet view refreshed just now.")} onOpenTerminal={openTerminal} onEditNode={openEditNode} onNodeAction={requestNodeAction} busyNodeAction={nodeActionBusy} />
         </>}
 
         {activeNav === "Nodes" && <section className="module-view">
           <div className="module-heading"><div><p>OPERATIONS</p><h1>Node fleet</h1><span>Provision, monitor, and operate managed VPN nodes.</span></div><strong>{nodes.length} managed</strong></div>
-          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Node fleet refreshed just now.")} onOpenTerminal={openTerminal} onEditNode={openEditNode} />
+          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Node fleet refreshed just now.")} onOpenTerminal={openTerminal} onEditNode={openEditNode} onNodeAction={requestNodeAction} busyNodeAction={nodeActionBusy} />
         </section>}
 
         {activeNav === "Regions" && <section className="module-view card">
@@ -628,10 +693,21 @@ export default function Home() {
                 </div>
               </div>}
             </div>
-            <div className="terminal-footer"><span>Output is recorded to the encrypted audit log.</span><div><button type="button" onClick={() => void retryBootstrap()}>Retry bootstrap</button><button type="button" onClick={() => void requestAction("Agent status", "status-agent")}>Check agent</button><button type="button" onClick={() => void requestAction("Restart agent", "restart-agent")}>Restart agent</button><button type="button" className="danger-button" disabled={deleteBusy} onClick={() => void removeNode()}>{deleteBusy ? "Deleting…" : "Delete node"}</button></div></div>
+            <div className="terminal-footer"><span>Output is recorded to the encrypted audit log.</span><div><button type="button" onClick={() => requestNodeAction(selectedNode, "bootstrap")}>Retry bootstrap</button><button type="button" onClick={() => requestNodeAction(selectedNode, "status-agent")}>Check agent</button><button type="button" onClick={() => requestNodeAction(selectedNode, "restart-agent")}>Restart agent</button><button type="button" className="danger-button" disabled={Boolean(nodeActionBusy)} onClick={() => requestNodeAction(selectedNode, "delete")}>{nodeActionBusy === `${selectedNode.id}:delete` ? "Deleting…" : "Delete node"}</button></div></div>
           </section>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingNodeConfirmation)}
+        title={pendingNodeConfirmation?.title || "Confirm action"}
+        description={pendingNodeConfirmation?.description || "Confirm this node operation."}
+        confirmLabel={pendingNodeConfirmation?.confirmLabel || "Confirm"}
+        tone={pendingNodeConfirmation?.tone || "warning"}
+        busy={Boolean(nodeActionBusy)}
+        onCancel={() => setPendingNodeConfirmation(null)}
+        onConfirm={() => void confirmNodeAction()}
+      />
     </main>
   );
 }

@@ -4,7 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { Client, type ConnectConfig } from "ssh2";
 import { allowTofuHostKeys, publicOrigin } from "./config";
 import { decryptSecret, hashToken } from "./crypto";
-import { addAudit, addNodeAction, findNode, finishNodeAction, updateNode } from "./db";
+import { addAudit, addNodeAction, countRunningNodeActions, findNode, finishNodeAction, updateNode } from "./db";
 import { ensureDefaultNodeProtocols } from "./control-plane";
 
 function shellQuote(value: string): string {
@@ -237,6 +237,7 @@ systemctl --no-pager --full status northstar-agent
 export async function runNodeAction(nodeId: string, action: "restart-agent" | "status-agent", actorUserId?: string): Promise<string> {
   const node = findNode(nodeId);
   if (!node) throw new Error("Node not found");
+  if (countRunningNodeActions(nodeId) > 0) throw new Error("This node already has a running action. Wait for it to finish.");
   const actionId = addNodeAction(nodeId, action);
   try {
     const secret = decryptSecret({ ciphertext: node.credential_ciphertext, iv: node.credential_iv, tag: node.credential_tag });

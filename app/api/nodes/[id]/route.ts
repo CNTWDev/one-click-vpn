@@ -26,6 +26,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
   const action = typeof body.action === "string" ? body.action : "";
   if (action !== "bootstrap") return jsonError("Only bootstrap is available from this endpoint");
+  if (countRunningNodeActions(id) > 0) return jsonError("This node already has a running action. Wait for it to finish.", 409);
   updateNode(id, { status: "provisioning", version: "bootstrap queued" });
   addAudit({ actorUserId: user.id, action: "node.bootstrap.queued", targetType: "node", targetId: id });
   queueNodeBootstrap(id, user.id);
