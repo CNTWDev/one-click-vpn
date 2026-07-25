@@ -101,12 +101,34 @@ export async function bootstrapNode(nodeId: string, actorUserId?: string): Promi
     const expectedFingerprint = node.host_fingerprint;
     const source = Buffer.from(agentSource(), "utf8").toString("base64");
     const command = `set -eu
-if ! command -v wg >/dev/null 2>&1; then
+install_wireguard_tools() {
+  if command -v wg >/dev/null 2>&1 && command -v wg-quick >/dev/null 2>&1; then
+    return 0
+  fi
+
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update -y
     DEBIAN_FRONTEND=noninteractive apt-get install -y wireguard-tools
   elif command -v dnf >/dev/null 2>&1; then
-    dnf install -y wireguard-tools
+    if ! dnf install -y wireguard-tools; then
+      echo "wireguard-tools is not in the currently enabled DNF repositories; trying compatible repositories" >&2
+
+      . /etc/os-release 2>/dev/null || true
+      dnf install -y dnf-plugins-core >/dev/null 2>&1 || true
+      dnf config-manager --set-enabled crb >/dev/null 2>&1 || true
+      dnf config-manager --set-enabled powertools >/dev/null 2>&1 || true
+      dnf install -y wireguard-tools && return 0
+
+      # RHEL/CentOS 7/8 commonly obtain WireGuard from EPEL + ELRepo.
+      case "\${ID:-}:\${ID_LIKE:-}" in
+        *rhel*|*centos*|*rocky*|*almalinux*|*oracle*|*ol*|*anolis*)
+          dnf install -y epel-release >/dev/null 2>&1 || true
+          dnf install -y wireguard-tools && return 0
+          dnf install -y elrepo-release >/dev/null 2>&1 || true
+          dnf install -y kmod-wireguard wireguard-tools && return 0
+          ;;
+      esac
+    fi
   elif command -v yum >/dev/null 2>&1; then
     yum install -y wireguard-tools
   elif command -v apk >/dev/null 2>&1; then
@@ -115,7 +137,20 @@ if ! command -v wg >/dev/null 2>&1; then
     echo "wireguard-tools is not installed and no supported package manager was found" >&2
     exit 1
   fi
-fi
+
+  if ! command -v wg >/dev/null 2>&1 || ! command -v wg-quick >/dev/null 2>&1; then
+    echo "Unable to install wireguard-tools or wg-quick" >&2
+    echo "Operating system:" >&2
+    cat /etc/os-release >&2 2>/dev/null || true
+    if command -v dnf >/dev/null 2>&1; then
+      echo "Enabled DNF repositories:" >&2
+      dnf repolist >&2 || true
+    fi
+    echo "Enable the repository that provides wireguard-tools, or use a distribution with native WireGuard packages." >&2
+    exit 1
+  fi
+}
+install_wireguard_tools
 if ! command -v iptables >/dev/null 2>&1; then
   if command -v apt-get >/dev/null 2>&1; then
     DEBIAN_FRONTEND=noninteractive apt-get install -y iptables
