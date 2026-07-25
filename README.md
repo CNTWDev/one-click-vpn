@@ -42,3 +42,4 @@ vpn-control (one process)
 ```
 
 Nodes use a small outbound Agent. The Agent becomes the normal management and terminal route; direct SSH with a sealed emergency credential is a controlled fallback when the Agent is unreachable.
+# one-click-vpn
