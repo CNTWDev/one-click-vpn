@@ -17,6 +17,8 @@ type Node = {
   traffic: string;
   version: string;
   lastSeen: string;
+  hostFingerprint?: string | null;
+  sshUser?: string;
 };
 
 type Region = {
@@ -162,13 +164,13 @@ function NodeFleet({
   regions,
   onRefresh,
   onOpenTerminal,
-  onSelectNode,
+  onEditNode,
 }: {
   nodes: Node[];
   regions: Region[];
   onRefresh: () => void;
   onOpenTerminal: (node: Node) => void;
-  onSelectNode: (node: Node) => void;
+  onEditNode: (node: Node) => void;
 }) {
   const [regionId, setRegionId] = useState("all");
   const visibleNodes = regionId === "all" ? nodes : nodes.filter((node) => node.regionId === regionId);
@@ -186,7 +188,7 @@ function NodeFleet({
             <div className={node.status === "attention" ? "node-value danger" : "node-value"}>{node.latency}<small>last seen {node.lastSeen}</small></div>
             <div className="node-value">{node.users}<small>authorized</small></div>
             <div className="node-value">{node.traffic}<small>{node.version}</small></div>
-            <div className="row-actions"><button type="button" onClick={() => onOpenTerminal(node)}>Logs</button><button type="button" aria-label={`Node actions for ${node.name}`} onClick={() => onSelectNode(node)}>•••</button></div>
+            <div className="row-actions"><button type="button" onClick={() => onOpenTerminal(node)}>Logs</button><button type="button" aria-label={`Edit ${node.name}`} onClick={() => onEditNode(node)}>Edit</button></div>
           </article>
         ))}
       </div>
@@ -208,6 +210,8 @@ export default function Home() {
   const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState("");
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node>(initialNodes[0]);
   const [notice, setNotice] = useState("All systems nominal");
   const [form, setForm] = useState({ name: "", ip: "", user: "root", secret: "", regionId: "tokyo-jp", hostFingerprint: "" });
@@ -236,6 +240,8 @@ export default function Home() {
       traffic: String(node.traffic || "—"),
       version: String(node.version || "unknown"),
       lastSeen: String(node.last_seen || "never"),
+      hostFingerprint: typeof node.host_fingerprint === "string" ? node.host_fingerprint : null,
+      sshUser: String(node.ssh_user || "root"),
     })));
   }, []);
 
@@ -295,6 +301,20 @@ export default function Home() {
     void loadNodeDiagnostics(node.id);
   }
 
+  function openAddNode() {
+    setEditingNodeId(null);
+    setDeployError("");
+    setForm({ name: "", ip: "", user: "root", secret: "", regionId: regions[0]?.id || "", hostFingerprint: "" });
+    setShowDeploy(true);
+  }
+
+  function openEditNode(node: Node) {
+    setEditingNodeId(node.id);
+    setDeployError("");
+    setForm({ name: node.name, ip: node.ip, user: node.sshUser || "root", secret: "", regionId: node.regionId, hostFingerprint: node.hostFingerprint || "" });
+    setShowDeploy(true);
+  }
+
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoginBusy(true);
@@ -322,31 +342,34 @@ export default function Home() {
   async function deployNode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setDeployError("");
-    if (!form.name || !form.ip || !form.secret) {
-      const message = "Complete the node name, public IP, and SSH credential.";
+    const editing = Boolean(editingNodeId);
+    if (!form.name || !form.ip || (!editing && !form.secret)) {
+      const message = editing ? "Complete the node name and public IP." : "Complete the node name, public IP, and SSH credential.";
       setDeployError(message);
       setNotice(message);
       return;
     }
 
     setDeploying(true);
-    setNotice("Verifying SSH host key and preparing a signed deployment task…");
-    const response = await fetch("/api/nodes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+    setNotice(editing ? "Saving node configuration…" : "Verifying SSH host key and preparing a signed deployment task…");
+    const response = await fetch(editing ? `/api/nodes/${editingNodeId}` : "/api/nodes", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
       name: form.name, ip: form.ip, regionId: form.regionId, sshUser: form.user, secret: form.secret, hostFingerprint: form.hostFingerprint,
     }) });
     const payload = await response.json().catch(() => ({})) as { error?: string; node?: Node };
     setDeploying(false);
     if (!response.ok || !payload.node) {
-      const message = payload.error || "Unable to create node";
+      const message = payload.error || (editing ? "Unable to update node" : "Unable to create node");
       setDeployError(message);
       setNotice(message);
       return;
     }
-    setNodes((current) => [payload.node!, ...current]);
+    setNodes((current) => editing ? current.map((node) => node.id === payload.node!.id ? payload.node! : node) : [payload.node!, ...current]);
+    if (editing && selectedNode.id === payload.node.id) setSelectedNode(payload.node);
     setShowDeploy(false);
+    setEditingNodeId(null);
     setDeployError("");
     setForm({ name: "", ip: "", user: "root", secret: "", regionId: regions[0]?.id || "", hostFingerprint: "" });
-    setNotice(`${payload.node.name} is queued for secure bootstrap. The credential is encrypted server-side.`);
+    setNotice(editing ? `${payload.node.name} configuration saved.` : `${payload.node.name} is queued for secure bootstrap. The credential is encrypted server-side.`);
   }
 
   async function copyFingerprintCommand() {
@@ -420,6 +443,24 @@ export default function Home() {
     await Promise.all([loadNodes(), loadNodeDiagnostics(selectedNode.id)]);
   }
 
+  async function removeNode() {
+    if (deleteBusy) return;
+    const confirmed = window.confirm(`Delete ${selectedNode.name} from Northstar? This removes the controller record but does not uninstall the remote Agent.`);
+    if (!confirmed) return;
+    setDeleteBusy(true);
+    const response = await fetch(`/api/nodes/${selectedNode.id}`, { method: "DELETE" });
+    const payload = await response.json().catch(() => ({})) as { error?: string };
+    setDeleteBusy(false);
+    if (!response.ok) {
+      setNotice(payload.error || "Unable to delete node");
+      return;
+    }
+    setNodes((current) => current.filter((node) => node.id !== selectedNode.id));
+    setNodeDiagnostics(null);
+    setShowTerminal(false);
+    setNotice(`${selectedNode.name} deleted from the controller.`);
+  }
+
   if (authStatus === "loading") {
     return <main className="auth-screen"><div className="auth-card"><span className="brand-mark"><i /><i /><i /></span><p className="eyebrow"><span /> NORTHSTAR</p><h1>Loading control plane…</h1></div></main>;
   }
@@ -475,7 +516,7 @@ export default function Home() {
             <span className="system-theme" title="Theme follows your operating system"><i /> System</span>
             <button className="icon-button" type="button" aria-label="Notifications">⌁<span /></button>
             <button className="terminal-shortcut" type="button" disabled={nodes.length === 0} onClick={() => nodes[0] && openTerminal(nodes[0])}>⌘ Logs</button>
-            <button className="primary-button" type="button" onClick={() => setShowDeploy(true)}><i>+</i> Add node</button>
+            <button className="primary-button" type="button" onClick={openAddNode}><i>+</i> Add node</button>
           </div>
         </header>
 
@@ -515,12 +556,12 @@ export default function Home() {
             </article>
           </section>
 
-          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Fleet view refreshed just now.")} onOpenTerminal={openTerminal} onSelectNode={(node) => { setSelectedNode(node); setNotice(`${node.name} selected for an administrative action.`); }} />
+          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Fleet view refreshed just now.")} onOpenTerminal={openTerminal} onEditNode={openEditNode} />
         </>}
 
         {activeNav === "Nodes" && <section className="module-view">
           <div className="module-heading"><div><p>OPERATIONS</p><h1>Node fleet</h1><span>Provision, monitor, and operate managed VPN nodes.</span></div><strong>{nodes.length} managed</strong></div>
-          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Node fleet refreshed just now.")} onOpenTerminal={openTerminal} onSelectNode={(node) => { setSelectedNode(node); setNotice(`${node.name} selected for an administrative action.`); }} />
+          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Node fleet refreshed just now.")} onOpenTerminal={openTerminal} onEditNode={openEditNode} />
         </section>}
 
         {activeNav === "Regions" && <section className="module-view card">
@@ -551,12 +592,12 @@ export default function Home() {
       {showDeploy && (
         <div className="modal-layer" role="presentation" onMouseDown={() => !deploying && setShowDeploy(false)}>
           <section className="modal deploy-modal" role="dialog" aria-modal="true" aria-labelledby="deploy-title" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><p>SECURE BOOTSTRAP</p><h2 id="deploy-title">Add a managed node</h2></div><button type="button" onClick={() => setShowDeploy(false)} aria-label="Close add node">×</button></div>
-            <div className="stepper"><span className="complete">01 <b>Connection</b></span><i /><span>02 <b>Verify</b></span><i /><span>03 <b>Deploy</b></span></div>
+            <div className="modal-head"><div><p>{editingNodeId ? "NODE CONFIGURATION" : "SECURE BOOTSTRAP"}</p><h2 id="deploy-title">{editingNodeId ? "Edit managed node" : "Add a managed node"}</h2></div><button type="button" onClick={() => setShowDeploy(false)} aria-label="Close node form">×</button></div>
+            {!editingNodeId && <div className="stepper"><span className="complete">01 <b>Connection</b></span><i /><span>02 <b>Verify</b></span><i /><span>03 <b>Deploy</b></span></div>}
             <form onSubmit={deployNode}>
               <label>Node name<input autoFocus placeholder="e.g. Singapore Edge" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
           <div className="field-pair"><label>Public IP<input placeholder="203.0.113.10" value={form.ip} onChange={(event) => setForm({ ...form, ip: event.target.value })} /></label><label>Region<select required value={form.regionId} onChange={(event) => setForm({ ...form, regionId: event.target.value })}>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} · {region.country}</option>)}</select></label></div>
-              <div className="field-pair"><label>SSH user<input autoComplete="username" value={form.user} onChange={(event) => setForm({ ...form, user: event.target.value })} /></label><label>SSH password or private key<input type="password" autoComplete="current-password" placeholder="Encrypted on the controller" value={form.secret} onChange={(event) => setForm({ ...form, secret: event.target.value })} /></label></div>
+              <div className="field-pair"><label>SSH user<input autoComplete="username" value={form.user} onChange={(event) => setForm({ ...form, user: event.target.value })} /></label><label>SSH password or private key<input type="password" autoComplete="current-password" placeholder={editingNodeId ? "Leave blank to keep existing credential" : "Encrypted on the controller"} value={form.secret} onChange={(event) => setForm({ ...form, secret: event.target.value })} /></label></div>
               <div className="fingerprint-field">
                 <div className="fingerprint-label"><label htmlFor="host-fingerprint">SSH host fingerprint</label><button type="button" className="help-toggle" onClick={() => setShowFingerprintGuide((current) => !current)} aria-expanded={showFingerprintGuide}>{showFingerprintGuide ? "收起" : "如何获取？"}</button></div>
                 <input id="host-fingerprint" placeholder="SHA256:… (required in production)" value={form.hostFingerprint} onChange={(event) => setForm({ ...form, hostFingerprint: event.target.value })} />
@@ -564,7 +605,7 @@ export default function Home() {
               </div>
               <p className="form-note"><span>⌑</span> The controller verifies the host key and encrypts this credential with the server master key. It is never returned to the browser.</p>
               {deployError && <p className="form-error" role="alert">{deployError}</p>}
-              <div className="modal-actions"><button type="button" className="cancel" onClick={() => setShowDeploy(false)}>Cancel</button><button className="primary-button" type="submit" disabled={deploying}>{deploying ? "Creating signed task…" : "Verify & deploy"}<span>→</span></button></div>
+              <div className="modal-actions"><button type="button" className="cancel" onClick={() => setShowDeploy(false)}>Cancel</button><button className="primary-button" type="submit" disabled={deploying}>{deploying ? (editingNodeId ? "Saving…" : "Creating signed task…") : (editingNodeId ? "Save changes" : "Verify & deploy")}<span>→</span></button></div>
             </form>
           </section>
         </div>
@@ -587,7 +628,7 @@ export default function Home() {
                 </div>
               </div>}
             </div>
-            <div className="terminal-footer"><span>Output is recorded to the encrypted audit log.</span><div><button type="button" onClick={() => void retryBootstrap()}>Retry bootstrap</button><button type="button" onClick={() => void requestAction("Agent status", "status-agent")}>Check agent</button><button type="button" onClick={() => void requestAction("Restart agent", "restart-agent")}>Restart agent</button></div></div>
+            <div className="terminal-footer"><span>Output is recorded to the encrypted audit log.</span><div><button type="button" onClick={() => void retryBootstrap()}>Retry bootstrap</button><button type="button" onClick={() => void requestAction("Agent status", "status-agent")}>Check agent</button><button type="button" onClick={() => void requestAction("Restart agent", "restart-agent")}>Restart agent</button><button type="button" className="danger-button" disabled={deleteBusy} onClick={() => void removeNode()}>{deleteBusy ? "Deleting…" : "Delete node"}</button></div></div>
           </section>
         </div>
       )}

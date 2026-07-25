@@ -279,6 +279,39 @@ export function updateNode(id: string, values: Record<string, string | number | 
   return findNode(id);
 }
 
+export function updateNodeConfig(id: string, values: {
+  name: string;
+  place: string;
+  regionId: string;
+  ip: string;
+  sshUser: string;
+  sshPort: number;
+  hostFingerprint: string | null;
+  credential?: { type: string; ciphertext: string; iv: string; tag: string };
+}): DbNode | undefined {
+  const database = getDb();
+  if (values.credential) {
+    database.prepare(`UPDATE nodes SET name = ?, place = ?, region_id = ?, ip = ?, ssh_user = ?, ssh_port = ?,
+      host_fingerprint = ?, credential_type = ?, credential_ciphertext = ?, credential_iv = ?, credential_tag = ?, updated_at = ? WHERE id = ?`)
+      .run(values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.hostFingerprint,
+        values.credential.type, values.credential.ciphertext, values.credential.iv, values.credential.tag, now(), id);
+  } else {
+    database.prepare(`UPDATE nodes SET name = ?, place = ?, region_id = ?, ip = ?, ssh_user = ?, ssh_port = ?,
+      host_fingerprint = ?, updated_at = ? WHERE id = ?`)
+      .run(values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.hostFingerprint, now(), id);
+  }
+  return findNode(id);
+}
+
+export function countRunningNodeActions(nodeId: string): number {
+  const row = getDb().prepare("SELECT COUNT(*) AS count FROM node_actions WHERE node_id = ? AND status = 'running'").get(nodeId) as { count: number };
+  return Number(row.count || 0);
+}
+
+export function deleteNode(id: string): boolean {
+  return Number(getDb().prepare("DELETE FROM nodes WHERE id = ?").run(id).changes || 0) === 1;
+}
+
 export function addAudit(input: {
   actorUserId?: string | null;
   action: string;

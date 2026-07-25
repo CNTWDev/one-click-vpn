@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { addAudit, findNode, listNodeActions, publicNode, updateNode } from "../../../../server/db";
+import { addAudit, countRunningNodeActions, deleteNode, findNode, findRegion, listNodeActions, publicNode, updateNode, updateNodeConfig } from "../../../../server/db";
 import { currentUser } from "../../../../server/auth";
-import { jsonError } from "../../../../server/http";
+import { cleanText, isValidIp, isValidPort, jsonError, readJson } from "../../../../server/http";
 import { queueNodeBootstrap } from "../../../../server/bootstrap";
 import { getNodeReconcileStatus } from "../../../../server/control-db";
+import { encryptSecret } from "../../../../server/crypto";
 
 export const runtime = "nodejs";
 
@@ -28,5 +29,53 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   updateNode(id, { status: "provisioning", version: "bootstrap queued" });
   addAudit({ actorUserId: user.id, action: "node.bootstrap.queued", targetType: "node", targetId: id });
   queueNodeBootstrap(id, user.id);
+  return NextResponse.json({ ok: true });
+}
+
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  const user = await currentUser();
+  if (!user) return jsonError("Authentication required", 401);
+  const { id } = await context.params;
+  const node = findNode(id);
+  if (!node) return jsonError("Node not found", 404);
+  try {
+    const body = await readJson(request);
+    const name = cleanText(body.name, 120);
+    const ip = cleanText(body.ip, 64);
+    const sshUser = cleanText(body.sshUser || body.user, 64) || node.ssh_user;
+    const hostFingerprint = cleanText(body.hostFingerprint, 256) || null;
+    const regionId = cleanText(body.regionId, 80);
+    const region = findRegion(regionId);
+    const secret = typeof body.secret === "string" ? body.secret : "";
+    if (!name) return jsonError("Node name is required");
+    if (!isValidIp(ip)) return jsonError("Public IP must be a valid IPv4 address, for example 203.0.113.10");
+    if (!region) return jsonError("A valid region is required");
+    const encrypted = secret ? encryptSecret(secret) : undefined;
+    const updated = updateNodeConfig(id, {
+      name,
+      place: `${region.name} · ${region.country}`,
+      regionId: region.id,
+      ip,
+      sshUser,
+      sshPort: isValidPort(body.sshPort || node.ssh_port),
+      hostFingerprint,
+      ...(encrypted ? { credential: { type: body.credentialType === "private_key" ? "private_key" : "password", ...encrypted } } : {}),
+    });
+    addAudit({ actorUserId: user.id, action: "node.updated", targetType: "node", targetId: id, metadata: { credentialChanged: Boolean(encrypted) } });
+    return NextResponse.json({ node: publicNode(updated!) });
+  } catch (error) {
+    return jsonError(error instanceof Error ? error.message : "Unable to update node");
+  }
+}
+
+export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const user = await currentUser();
+  if (!user) return jsonError("Authentication required", 401);
+  const { id } = await context.params;
+  const node = findNode(id);
+  if (!node) return jsonError("Node not found", 404);
+  if (countRunningNodeActions(id) > 0) return jsonError("Node has a running action. Wait for it to finish before deleting.", 409);
+  if (!deleteNode(id)) return jsonError("Node could not be deleted", 409);
+  addAudit({ actorUserId: user.id, action: "node.deleted", targetType: "node", targetId: id, metadata: { name: node.name, ip: node.ip } });
   return NextResponse.json({ ok: true });
 }
