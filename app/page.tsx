@@ -9,6 +9,7 @@ type Node = {
   id: string;
   name: string;
   place: string;
+  regionId: string;
   ip: string;
   status: NodeStatus;
   latency: string;
@@ -30,6 +31,7 @@ const initialNodes: Node[] = [
     id: "fra-01",
     name: "Frankfurt Edge",
     place: "Frankfurt · Germany",
+    regionId: "frankfurt-de",
     ip: "89.46.92.18",
     status: "online",
     latency: "112 ms",
@@ -42,6 +44,7 @@ const initialNodes: Node[] = [
     id: "tyo-01",
     name: "Tokyo Edge",
     place: "Tokyo · Japan",
+    regionId: "tokyo-jp",
     ip: "160.16.74.201",
     status: "online",
     latency: "46 ms",
@@ -54,6 +57,7 @@ const initialNodes: Node[] = [
     id: "lax-01",
     name: "Los Angeles Edge",
     place: "Los Angeles · USA",
+    regionId: "los-angeles-us",
     ip: "104.248.61.60",
     status: "attention",
     latency: "178 ms",
@@ -122,6 +126,43 @@ function WorldMap({ nodes }: { nodes: Node[] }) {
   );
 }
 
+function NodeFleet({
+  nodes,
+  regions,
+  onRefresh,
+  onOpenTerminal,
+  onSelectNode,
+}: {
+  nodes: Node[];
+  regions: Region[];
+  onRefresh: () => void;
+  onOpenTerminal: (node: Node) => void;
+  onSelectNode: (node: Node) => void;
+}) {
+  const [regionId, setRegionId] = useState("all");
+  const visibleNodes = regionId === "all" ? nodes : nodes.filter((node) => node.regionId === regionId);
+  const selectedRegion = regions.find((region) => region.id === regionId);
+
+  return (
+    <section className="nodes-section">
+      <div className="section-title nodes-title"><div><p>EDGE NODES</p><h2>Fleet status</h2></div><div className="node-toolbar"><select className="filter-button" aria-label="Filter nodes by region" value={regionId} onChange={(event) => setRegionId(event.target.value)}><option value="all">All regions</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><button className="plain-action" type="button" onClick={onRefresh}>Refresh <span>↻</span></button></div></div>
+      <div className="node-list">
+        <div className="node-head"><span>NODE</span><span>STATUS</span><span>LATENCY</span><span>DEVICES</span><span>TRAFFIC</span><span /></div>
+        {visibleNodes.length === 0 ? <div className="empty-state"><b>{nodes.length === 0 ? "No managed nodes yet" : `No nodes in ${selectedRegion?.name || "this region"}`}</b><span>{nodes.length === 0 ? "Add a VPN node to start monitoring the fleet." : "Choose another region or add a node to this region."}</span></div> : visibleNodes.map((node) => (
+          <article className="node-row" key={node.id}>
+            <div className="node-name"><span className="flag">{node.place.includes("Germany") ? "DE" : node.place.includes("Japan") ? "JP" : node.place.includes("USA") ? "US" : "●"}</span><div><b>{node.name}</b><small>{node.place} · {node.ip}</small></div></div>
+            <StatusPill status={node.status} />
+            <div className={node.status === "attention" ? "node-value danger" : "node-value"}>{node.latency}<small>last seen {node.lastSeen}</small></div>
+            <div className="node-value">{node.users}<small>authorized</small></div>
+            <div className="node-value">{node.traffic}<small>{node.version}</small></div>
+            <div className="row-actions"><button type="button" onClick={() => onOpenTerminal(node)}>Terminal</button><button type="button" aria-label={`Node actions for ${node.name}`} onClick={() => onSelectNode(node)}>•••</button></div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
@@ -156,6 +197,7 @@ export default function Home() {
       place: String(node.place),
       ip: String(node.ip),
       status: node.status === "online" ? "online" : node.status === "provisioning" ? "provisioning" : "attention",
+      regionId: String(node.region_id || ""),
       latency: String(node.latency),
       users: Number(node.users || 0),
       traffic: String(node.traffic || "—"),
@@ -187,6 +229,7 @@ export default function Home() {
 
   const totalUsers = useMemo(() => nodes.reduce((sum, node) => sum + node.users, 0), [nodes]);
   const healthyNodes = nodes.filter((node) => node.status === "online").length;
+  const attentionNodes = nodes.filter((node) => node.status === "attention").length;
 
   function openTerminal(node: Node) {
     setSelectedNode(node);
@@ -330,6 +373,7 @@ export default function Home() {
           <p>CONTROL PLANE</p>
           {navItems.map(([item, symbol]) => (
             <button
+              type="button"
               className={activeNav === item ? "nav-item selected" : "nav-item"}
               key={item}
               onClick={() => setActiveNav(item)}
@@ -345,7 +389,7 @@ export default function Home() {
             <span className="pulse" />
             <div><small>CONTROL STATUS</small><b>Secured · 12ms</b></div>
           </div>
-          <button className="profile" onClick={() => void signOut()}><span>{(user?.displayName || "OW").slice(0, 2).toUpperCase()}</span><div><b>{user?.displayName || "Owner"}</b><small>{user?.email || "Owner"}</small></div><em>↪</em></button>
+          <button className="profile" type="button" onClick={() => void signOut()}><span>{(user?.displayName || "OW").slice(0, 2).toUpperCase()}</span><div><b>{user?.displayName || "Owner"}</b><small>{user?.email || "Owner"}</small></div><em>↪</em></button>
         </div>
       </aside>
 
@@ -354,87 +398,79 @@ export default function Home() {
           <div className="crumb"><span>CONTROL PLANE</span><b>/</b><strong>{activeNav.toUpperCase()}</strong></div>
           <div className="top-actions">
             <span className="system-theme" title="Theme follows your operating system"><i /> System</span>
-            <button className="icon-button" aria-label="Notifications">⌁<span /></button>
-            <button className="terminal-shortcut" onClick={() => openTerminal(nodes[0])}>⌘ Terminal</button>
-            <button className="primary-button" onClick={() => setShowDeploy(true)}><i>+</i> Add node</button>
+            <button className="icon-button" type="button" aria-label="Notifications">⌁<span /></button>
+            <button className="terminal-shortcut" type="button" disabled={nodes.length === 0} onClick={() => nodes[0] && openTerminal(nodes[0])}>⌘ Terminal</button>
+            <button className="primary-button" type="button" onClick={() => setShowDeploy(true)}><i>+</i> Add node</button>
           </div>
         </header>
 
-        {activeNav !== "Overview" && (
-          <section className="route-panel card">
-            <div className="section-title route-title"><div><p>CONTROL PLANE</p><h2>{activeNav}</h2></div><span className="route-status">{activeNav === "Regions" ? `${regions.length} configured` : "Module ready"}</span></div>
-            {activeNav === "Regions" ? (
-              <div className="regions-workspace">
-                <div className="regions-copy">Manage the locations available when provisioning VPN nodes. Changes are reflected on existing nodes assigned to that region.</div>
-                <form className="region-form" onSubmit={saveRegion}>
-                  <label>Name<input required placeholder="e.g. Singapore" value={regionForm.name} onChange={(event) => setRegionForm({ ...regionForm, name: event.target.value })} /></label>
-                  <label>Country<input required placeholder="e.g. Singapore" value={regionForm.country} onChange={(event) => setRegionForm({ ...regionForm, country: event.target.value })} /></label>
-                  <label>Code<input required maxLength={8} placeholder="SG" value={regionForm.code} onChange={(event) => setRegionForm({ ...regionForm, code: event.target.value.toUpperCase() })} /></label>
-                  <div className="region-form-actions"><button className="primary-button" type="submit" disabled={regionBusy}>{regionBusy ? "Saving…" : editingRegionId ? "Save changes" : "Add region"}</button>{editingRegionId && <button className="cancel" type="button" onClick={() => { setEditingRegionId(null); setRegionForm({ name: "", country: "", code: "" }); }}>Cancel</button>}</div>
-                </form>
-                <div className="region-list">
-                  {regions.map((region) => <div className="region-row" key={region.id}><span className="flag">{region.code}</span><div><b>{region.name}</b><small>{region.country} · {region.id}</small></div><div className="region-actions"><button onClick={() => editRegion(region)}>Edit</button><button onClick={() => void removeRegion(region)}>Delete</button></div></div>)}
-                </div>
-              </div>
-            ) : (
-              <div className="module-placeholder"><b>{activeNav} is connected to the control plane.</b><span>This workspace is ready for the next operational module. Use Overview, Nodes, and Regions for the currently available controls.</span></div>
-            )}
+        {activeNav === "Overview" && <>
+          <section className="hero">
+            <div>
+              <p className="eyebrow"><span /> LIVE NETWORK</p>
+              <h1>Operate the edge.<br /><em>Not the overhead.</em></h1>
+              <p className="hero-copy">A single control plane for secure node bootstrap, encrypted recovery access, and agent-first operations.</p>
+            </div>
+            <div className="hero-trust">
+              <span className="ring"><i /></span>
+              <div><b>Zero inbound management</b><small>Every managed node calls home over authenticated HTTPS</small></div>
+            </div>
           </section>
-        )}
 
-        <section className="hero">
-          <div>
-            <p className="eyebrow"><span /> LIVE NETWORK</p>
-            <h1>Operate the edge.<br /><em>Not the overhead.</em></h1>
-            <p className="hero-copy">A single control plane for secure node bootstrap, encrypted recovery access, and agent-first operations.</p>
+          <section className="metrics" aria-label="Network metrics">
+            <article><span className="metric-label">MANAGED NODES</span><strong>{nodes.length.toString().padStart(2, "0")}</strong><small><i className="up">↗</i> {healthyNodes} healthy now</small></article>
+            <article><span className="metric-label">ACTIVE DEVICES</span><strong>{totalUsers}</strong><small><i className="up">↗</i> 14% this week</small></article>
+            <article><span className="metric-label">EDGE TRAFFIC</span><strong>4.8 <em>TB</em></strong><small><i className="up">↗</i> last 30 days</small></article>
+            <article className="security-metric"><span className="metric-label">RECOVERY VAULT</span><strong>100<em>%</em></strong><small><span className="tiny-lock">⌑</span> credentials sealed</small></article>
+          </section>
+
+          <section className="network-grid">
+            <article className="coverage-card card">
+              <div className="section-title"><div><p>GLOBAL FABRIC</p><h2>Edge coverage</h2></div><button className="plain-action" type="button" onClick={() => setNotice("Topology view is available from the live map.")}>View topology <span>↗</span></button></div>
+              <WorldMap nodes={nodes} />
+              <div className="coverage-footer"><span><i className="legend online" /> Online <b>{healthyNodes}</b></span><span><i className="legend warning" /> Attention <b>{attentionNodes}</b></span><span><i className="legend queued" /> Deploying <b>{nodes.filter((node) => node.status === "provisioning").length}</b></span></div>
+            </article>
+
+            <article className="security-card card">
+              <div className="section-title"><div><p>SECURITY POSTURE</p><h2>Recovery, without exposure.</h2></div><button className="kebab" type="button" aria-label="More security options">•••</button></div>
+              <div className="security-seal"><div className="seal"><div>⌁</div></div><span>SEALED</span></div>
+              <p className="security-copy">Emergency SSH credentials are encrypted per node and never exposed in the browser.</p>
+              <div className="security-facts"><div><span>SSH fingerprints</span><b>Verified at bootstrap</b></div><div><span>Latest backup</span><b>Controller managed</b></div></div>
+              <button className="secondary-button" type="button" onClick={() => setNotice("Recovery vault opened in read-only audit mode.")}>Open recovery vault <span>→</span></button>
+            </article>
+          </section>
+
+          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Fleet view refreshed just now.")} onOpenTerminal={openTerminal} onSelectNode={(node) => { setSelectedNode(node); setNotice(`${node.name} selected for an administrative action.`); }} />
+        </>}
+
+        {activeNav === "Nodes" && <section className="module-view">
+          <div className="module-heading"><div><p>OPERATIONS</p><h1>Node fleet</h1><span>Provision, monitor, and operate managed VPN nodes.</span></div><strong>{nodes.length} managed</strong></div>
+          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Node fleet refreshed just now.")} onOpenTerminal={openTerminal} onSelectNode={(node) => { setSelectedNode(node); setNotice(`${node.name} selected for an administrative action.`); }} />
+        </section>}
+
+        {activeNav === "Regions" && <section className="module-view card">
+          <div className="section-title route-title"><div><p>CONTROL PLANE</p><h1>Regions</h1></div><span className="route-status">{regions.length} configured</span></div>
+          <div className="regions-workspace">
+            <div className="regions-copy">Manage the locations available when provisioning VPN nodes. Changes are reflected on existing nodes assigned to that region.</div>
+            <form className="region-form" onSubmit={saveRegion}>
+              <label>Name<input required placeholder="e.g. Singapore" value={regionForm.name} onChange={(event) => setRegionForm({ ...regionForm, name: event.target.value })} /></label>
+              <label>Country<input required placeholder="e.g. Singapore" value={regionForm.country} onChange={(event) => setRegionForm({ ...regionForm, country: event.target.value })} /></label>
+              <label>Code<input required maxLength={8} placeholder="SG" value={regionForm.code} onChange={(event) => setRegionForm({ ...regionForm, code: event.target.value.toUpperCase() })} /></label>
+              <div className="region-form-actions"><button className="primary-button" type="submit" disabled={regionBusy}>{regionBusy ? "Saving…" : editingRegionId ? "Save changes" : "Add region"}</button>{editingRegionId && <button className="cancel" type="button" onClick={() => { setEditingRegionId(null); setRegionForm({ name: "", country: "", code: "" }); }}>Cancel</button>}</div>
+            </form>
+            <div className="region-list">
+              {regions.map((region) => <div className="region-row" key={region.id}><span className="flag">{region.code}</span><div><b>{region.name}</b><small>{region.country} · {region.id}</small></div><div className="region-actions"><button type="button" onClick={() => editRegion(region)}>Edit</button><button type="button" onClick={() => void removeRegion(region)}>Delete</button></div></div>)}
+            </div>
           </div>
-          <div className="hero-trust">
-            <span className="ring"><i /></span>
-            <div><b>Zero inbound management</b><small>Every managed node calls home over authenticated HTTPS</small></div>
-          </div>
-        </section>
+        </section>}
 
-        <section className="metrics" aria-label="Network metrics">
-          <article><span className="metric-label">MANAGED NODES</span><strong>{nodes.length.toString().padStart(2, "0")}</strong><small><i className="up">↗</i> {healthyNodes} healthy now</small></article>
-          <article><span className="metric-label">ACTIVE DEVICES</span><strong>{totalUsers}</strong><small><i className="up">↗</i> 14% this week</small></article>
-          <article><span className="metric-label">EDGE TRAFFIC</span><strong>4.8 <em>TB</em></strong><small><i className="up">↗</i> last 30 days</small></article>
-          <article className="security-metric"><span className="metric-label">RECOVERY VAULT</span><strong>100<em>%</em></strong><small><span className="tiny-lock">⌑</span> credentials sealed</small></article>
-        </section>
+        {(activeNav === "Access" || activeNav === "Sessions" || activeNav === "Audit") && <section className="module-view card module-placeholder">
+          <p>CONTROL PLANE</p><h1>{activeNav}</h1>
+          <b>{activeNav} is not enabled in this release.</b>
+          <span>Only Overview, Nodes, Regions, and secure node bootstrap are currently available for production operations.</span>
+        </section>}
 
-        <section className="network-grid">
-          <article className="coverage-card card">
-            <div className="section-title"><div><p>GLOBAL FABRIC</p><h2>Edge coverage</h2></div><button className="plain-action">View topology <span>↗</span></button></div>
-            <WorldMap nodes={nodes} />
-            <div className="coverage-footer"><span><i className="legend online" /> Online <b>2</b></span><span><i className="legend warning" /> Attention <b>1</b></span><span><i className="legend queued" /> Deploying <b>{nodes.filter((node) => node.status === "provisioning").length}</b></span></div>
-          </article>
-
-          <article className="security-card card">
-            <div className="section-title"><div><p>SECURITY POSTURE</p><h2>Recovery, without exposure.</h2></div><button className="kebab" aria-label="More security options">•••</button></div>
-            <div className="security-seal"><div className="seal"><div>⌁</div></div><span>SEALED</span></div>
-            <p className="security-copy">Emergency SSH credentials are encrypted per node and never exposed in the browser.</p>
-            <div className="security-facts"><div><span>SSH fingerprints</span><b>3 verified</b></div><div><span>Latest backup</span><b>18 min ago</b></div></div>
-            <button className="secondary-button" onClick={() => setNotice("Recovery vault opened in read-only audit mode.")}>Open recovery vault <span>→</span></button>
-          </article>
-        </section>
-
-        <section className="nodes-section">
-          <div className="section-title nodes-title"><div><p>EDGE NODES</p><h2>Fleet status</h2></div><div className="node-toolbar"><button className="filter-button">All regions <span>⌄</span></button><button className="plain-action" onClick={() => setNotice("Fleet view refreshed just now.")}>Refresh <span>↻</span></button></div></div>
-          <div className="node-list">
-            <div className="node-head"><span>NODE</span><span>STATUS</span><span>LATENCY</span><span>DEVICES</span><span>TRAFFIC</span><span /></div>
-            {nodes.map((node) => (
-              <article className="node-row" key={node.id}>
-                <div className="node-name"><span className="flag">{node.place.includes("Germany") ? "DE" : node.place.includes("Japan") ? "JP" : node.place.includes("USA") ? "US" : "●"}</span><div><b>{node.name}</b><small>{node.place} · {node.ip}</small></div></div>
-                <StatusPill status={node.status} />
-                <div className={node.status === "attention" ? "node-value danger" : "node-value"}>{node.latency}<small>last seen {node.lastSeen}</small></div>
-                <div className="node-value">{node.users}<small>authorized</small></div>
-                <div className="node-value">{node.traffic}<small>{node.version}</small></div>
-                <div className="row-actions"><button onClick={() => openTerminal(node)}>Terminal</button><button aria-label={`Node actions for ${node.name}`} onClick={() => { setSelectedNode(node); setNotice(`${node.name} selected for an administrative action.`); }}>•••</button></div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <footer className="notice"><span>✦</span>{notice}<button onClick={() => setNotice("All systems nominal")}>Dismiss</button></footer>
+        <footer className="notice"><span>✦</span>{notice}<button type="button" onClick={() => setNotice("All systems nominal")}>Dismiss</button></footer>
       </section>
 
       {showDeploy && (
