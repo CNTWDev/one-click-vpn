@@ -258,7 +258,7 @@ export function insertNode(input: Omit<DbNode, "id" | "created_at" | "updated_at
   getDb().prepare(`INSERT INTO nodes
     (id, name, place, region_id, ip, ssh_user, ssh_port, status, latency, users, traffic, version, last_seen,
      credential_type, credential_ciphertext, credential_iv, credential_tag, host_fingerprint, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     id, input.name, input.place, input.region_id, input.ip, input.ssh_user, input.ssh_port, input.status, input.latency,
     input.users, input.traffic, input.version, input.last_seen, input.credential_type,
     input.credential_ciphertext, input.credential_iv, input.credential_tag, input.host_fingerprint,
