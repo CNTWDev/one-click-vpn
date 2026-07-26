@@ -189,6 +189,8 @@ The script removes this Compose project's containers, local images, data volumes
 `.env`, and local backups. It creates a recovery package beside the project by
 default and prints the exact reinstall command when finished. Use `--no-backup`
 only when the old database, secrets, and configuration must be unrecoverable.
+Run `sudo ./one-click-uninstall.sh --check` first to verify the resolved project
+path and Compose configuration without removing anything.
 
 After upgrading Controller code, use the Admin node action **Reinstall agent** to
 upgrade an Edge Agent. Existing VPN configuration is retained.

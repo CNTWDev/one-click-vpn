@@ -1,16 +1,21 @@
 #!/usr/bin/env sh
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-APP_DIR="$SCRIPT_DIR"
-. "$APP_DIR/scripts/common.sh"
+PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$PROJECT_DIR/scripts/common.sh"
+# common.sh is normally sourced by files inside scripts/ and therefore derives
+# its APP_DIR one level up. This entrypoint lives at the repository root, so
+# restore the resolved project path after loading the shared Compose helper.
+SCRIPT_DIR="$PROJECT_DIR"
+APP_DIR="$PROJECT_DIR"
 
 assume_yes="no"
 create_backup="yes"
+check_only="no"
 
 usage() {
   cat <<'USAGE'
-Usage: sudo ./one-click-uninstall.sh [--yes] [--no-backup]
+Usage: sudo ./one-click-uninstall.sh [--check] [--yes] [--no-backup]
 
 Permanently removes this Northstar installation's containers, local images,
 PostgreSQL/MinIO/Loki volumes, .env, environment backups, and local DB backups.
@@ -19,6 +24,7 @@ The source tree, host Nginx configuration, TLS certificates, and DNS are kept.
 By default a recovery package is written beside the project directory first.
 
 Options:
+  --check      Validate the resolved project and Compose config; remove nothing
   --yes        Skip the typed confirmation (backup is still created by default)
   --no-backup  Do not create a recovery package; deleted data cannot be restored
   -h, --help   Show this help
@@ -27,6 +33,7 @@ USAGE
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --check) check_only="yes"; shift ;;
     --yes) assume_yes="yes"; shift ;;
     --no-backup) create_backup="no"; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -46,6 +53,15 @@ if [ ! -f "$APP_DIR/.env" ]; then
 fi
 
 cd "$APP_DIR"
+
+if [ "$check_only" = "yes" ]; then
+  compose config --quiet
+  echo "Northstar uninstall preflight passed."
+  echo "Project: $APP_DIR"
+  echo "Environment: $APP_DIR/.env"
+  echo "No data was removed."
+  exit 0
+fi
 
 portal_domain=$(env_value NORTHSTAR_PORTAL_DOMAIN)
 admin_domain=$(env_value NORTHSTAR_ADMIN_DOMAIN)
