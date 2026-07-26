@@ -49,6 +49,7 @@ services:
       dockerfile: Dockerfile.frontend
       args:
         FRONTEND: portal
+        DIST_DIR: portal-web
         PORT: 3100
     restart: unless-stopped
     depends_on:
@@ -70,6 +71,7 @@ services:
       dockerfile: Dockerfile.frontend
       args:
         FRONTEND: admin-web
+        DIST_DIR: admin-web
         PORT: 3200
     restart: unless-stopped
     depends_on:
