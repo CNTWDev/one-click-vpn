@@ -32,7 +32,7 @@ WIREGUARD_CONFIG = WIREGUARD_DIR / "northstar.conf"
 OPENVPN_DIR = STATE_DIR / "openvpn"
 OPENVPN_CONFIG = OPENVPN_DIR / "server.conf"
 OPENVPN_REVOKED_DIR = OPENVPN_DIR / "revoked"
-KEY_PATTERN = re.compile(r"^[A-Za-z0-9+/]{42}={0,2}$")
+KEY_PATTERN = re.compile(r"^[A-Za-z0-9+/]{43}=$")
 VPN_PORTS = {
     "wireguard": {"transport": "udp", "port": 51820, "comment": "northstar-wireguard"},
     "openvpn": {"transport": "udp", "port": 1194, "comment": "northstar-openvpn"},
@@ -118,6 +118,17 @@ def run_fixed(command, *, input_text=None):
 
 def run_optional(command):
     return subprocess.run(command, text=True, capture_output=True, check=False, timeout=30)
+
+
+def command_failure_detail(error):
+    if not isinstance(error, subprocess.CalledProcessError):
+        return str(error)
+    parts = [f"command {' '.join(str(item) for item in error.cmd)} exited with code {error.returncode}"]
+    if error.stderr and error.stderr.strip():
+        parts.append("stderr: " + error.stderr.strip())
+    if error.stdout and error.stdout.strip():
+        parts.append("stdout: " + error.stdout.strip())
+    return " | ".join(parts)[-4000:]
 
 
 def wireguard_public_key():
@@ -215,7 +226,10 @@ def wireguard_sync_config(desired):
         run_fixed(["wg", "show", "northstar"])
         run_fixed(["wg", "syncconf", "northstar", "/dev/stdin"], input_text="\n".join(sync_lines))
     except subprocess.CalledProcessError:
-        run_fixed(["wg-quick", "up", str(WIREGUARD_CONFIG)])
+        try:
+            run_fixed(["wg-quick", "up", str(WIREGUARD_CONFIG)])
+        except subprocess.CalledProcessError as error:
+            raise RuntimeError("WireGuard activation failed: " + command_failure_detail(error)) from error
     digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
     return {"observedHash": digest, "observedStatus": "applied", "serverPublicKey": wireguard_public_key()}
 
@@ -279,8 +293,11 @@ def openvpn_sync_config(desired):
             run_fixed(check)
         except subprocess.CalledProcessError:
             add = check.copy()
-            add[1] = operation
-            run_fixed(add)
+            add[add.index("-C")] = operation
+            try:
+                run_fixed(add)
+            except subprocess.CalledProcessError as error:
+                raise RuntimeError("OpenVPN firewall configuration failed: " + command_failure_detail(error)) from error
     for name, value in {
         "ca.crt": bundle["caCertificate"], "server.crt": bundle["serverCertificate"],
         "server.key": bundle["serverPrivateKey"], "tls-crypt.key": bundle["tlsCryptKey"],
@@ -553,7 +570,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.4.0",
+        "version": "agent 2.4.1",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
@@ -575,12 +592,13 @@ def poll_tasks():
                 "observedStatus": result.get("observedStatus", "applied"),
             })
         except Exception as error:
+            detail = command_failure_detail(error)
             request_json("/api/v1/agent/reconcile-result", {
                 "nodeId": NODE_ID,
                 "token": TOKEN,
                 "taskId": task.get("id", ""),
                 "status": "failed",
-                "error": str(error)[-4000:],
+                "error": detail[-4000:],
             })
 
 

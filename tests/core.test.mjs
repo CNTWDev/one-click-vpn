@@ -24,7 +24,9 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(migration, /CREATE TABLE IF NOT EXISTS policy_rollouts/);
   assert.match(agent, /DisableWireGuard/);
   assert.match(agent, /DisableOpenVpn/);
-  assert.match(agent, /agent 2\.4\.0/);
+  assert.match(agent, /add\[add\.index\("-C"\)\] = operation/);
+  assert.doesNotMatch(agent, /add\[1\] = operation/);
+  assert.match(agent, /agent 2\.4\.1/);
 });
 
 async function waitForServer() {
