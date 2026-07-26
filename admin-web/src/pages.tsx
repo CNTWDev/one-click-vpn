@@ -144,6 +144,7 @@ type NodeForm = {
 };
 
 const blankNodeForm: NodeForm = { name: "", ip: "", regionId: "", sshUser: "root", sshPort: "22", secret: "", credentialType: "password", hostFingerprint: "", deploymentTemplate: "standard" };
+const localFingerprintCommand = "sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256";
 
 export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; regions: Region[]; onRefresh: () => Promise<void> }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -156,15 +157,32 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
   const [diagnosticNode, setDiagnosticNode] = useState<NodeRecord | null>(null);
   const [diagnostics, setDiagnostics] = useState<NodeDiagnostics | null>(null);
   const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
+  const [showFingerprintGuide, setShowFingerprintGuide] = useState(true);
+  const [copiedFingerprintCommand, setCopiedFingerprintCommand] = useState<"local" | "remote" | "">("");
 
   function openCreate() {
-    setEditing(null); setForm({ ...blankNodeForm, regionId: regions[0]?.id || "" }); setShowForm(true);
+    setEditing(null); setForm({ ...blankNodeForm, regionId: regions[0]?.id || "" }); setShowFingerprintGuide(true); setCopiedFingerprintCommand(""); setShowForm(true);
   }
 
   function openEdit(node: NodeRecord) {
     setEditing(node);
     setForm({ name: node.name, ip: node.ip, regionId: node.region_id || "", sshUser: node.ssh_user || "root", sshPort: String(node.ssh_port || 22), secret: "", credentialType: "password", hostFingerprint: node.host_fingerprint || "", deploymentTemplate: node.deployment_policy || "standard" });
-    setShowForm(true);
+    setShowFingerprintGuide(false); setCopiedFingerprintCommand(""); setShowForm(true);
+  }
+
+  const safeFingerprintHost = /^[A-Za-z0-9.-]+$/.test(form.ip.trim()) ? form.ip.trim() : "";
+  const safeFingerprintPort = /^\d{1,5}$/.test(form.sshPort) && Number(form.sshPort) >= 1 && Number(form.sshPort) <= 65535 ? form.sshPort : "22";
+  const remoteFingerprintCommand = safeFingerprintHost ? `ssh-keyscan -p ${safeFingerprintPort} -t ed25519 ${safeFingerprintHost} 2>/dev/null | ssh-keygen -lf - -E sha256` : "";
+
+  async function copyFingerprintCommand(kind: "local" | "remote", command: string) {
+    if (!command) return;
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopiedFingerprintCommand(kind);
+      window.setTimeout(() => setCopiedFingerprintCommand(""), 1_800);
+    } catch {
+      setNotice({ tone: "error", message: "浏览器无法访问剪贴板，请手动选中命令复制。" });
+    }
   }
 
   async function saveNode(event: FormEvent) {
@@ -266,7 +284,7 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
         {!editing && <label>部署模板<select value={form.deploymentTemplate} onChange={(event) => setForm({ ...form, deploymentTemplate: event.target.value })}><option value="standard">Standard（推荐）</option><option value="wireguard">仅 WireGuard</option><option value="openvpn">仅 OpenVPN</option><option value="agent-only">仅 Agent</option></select></label>}
         <label>凭据类型<select value={form.credentialType} onChange={(event) => setForm({ ...form, credentialType: event.target.value as NodeForm["credentialType"] })}><option value="password">SSH 密码</option><option value="private_key">私钥 PEM</option></select></label>
         <label className="span-2">{editing ? "新凭据（可留空）" : "SSH 凭据"}<textarea required={!editing} rows={form.credentialType === "private_key" ? 6 : 2} value={form.secret} onChange={(event) => setForm({ ...form, secret: event.target.value })} autoComplete="new-password" /></label>
-        <label className="span-2">SSH 主机指纹（推荐）<input value={form.hostFingerprint} onChange={(event) => setForm({ ...form, hostFingerprint: event.target.value })} placeholder="SHA256:…" /><small>可在云厂商控制台运行 ssh-keyscan 后核对；配置后可防止连到错误主机。</small></label>
+        <div className="fingerprint-field span-2"><div className="fingerprint-label"><label htmlFor="host-fingerprint">SSH 主机指纹（生产环境必填）</label><button type="button" className="help-toggle" onClick={() => setShowFingerprintGuide((current) => !current)} aria-expanded={showFingerprintGuide}>{showFingerprintGuide ? "收起说明" : "如何获取？"}</button></div><input id="host-fingerprint" value={form.hostFingerprint} onChange={(event) => setForm({ ...form, hostFingerprint: event.target.value })} placeholder="SHA256:…" />{showFingerprintGuide && <aside className="fingerprint-guide"><b>推荐：在目标节点的可信控制台获取</b><p>通过云厂商控制台登录目标 VPN 节点，执行下面的命令：</p><div className="fingerprint-command"><code>{localFingerprintCommand}</code><button type="button" onClick={() => void copyFingerprintCommand("local", localFingerprintCommand)}>{copiedFingerprintCommand === "local" ? "已复制" : "复制命令"}</button></div><p>可以把整行输出直接粘贴到上面的输入框，系统会自动提取其中的 <strong>SHA256:</strong> 指纹。</p><b>快捷读取：从 Controller 或自己的终端执行</b>{remoteFingerprintCommand ? <div className="fingerprint-command"><code>{remoteFingerprintCommand}</code><button type="button" onClick={() => void copyFingerprintCommand("remote", remoteFingerprintCommand)}>{copiedFingerprintCommand === "remote" ? "已复制" : "复制命令"}</button></div> : <p>填写公网 IPv4 后，这里会自动生成带 IP 和 SSH 端口的命令。</p>}<small><code>ssh-keyscan</code> 只能读取指纹，不能证明主机身份。首次添加节点时，请与云厂商控制台里的本机指纹核对。如果没有 Ed25519 主机密钥，可将文件名改为 <code>/etc/ssh/ssh_host_rsa_key.pub</code>。</small></aside>}</div>
         <div className="form-actions span-2"><button type="button" className="button ghost" onClick={() => setShowForm(false)}>取消</button><button className="button primary" disabled={busy === "save-node"}>{busy === "save-node" ? "保存中…" : editing ? "保存配置" : "添加并部署"}</button></div>
       </form>
     </Modal>}

@@ -212,6 +212,16 @@ In Admin, create a node with its public address, SSH credential, and verified
 `SHA256:` host fingerprint. Then choose a deployment template and run Bootstrap.
 The Controller installs the Agent and waits for a real heartbeat.
 
+Get the trusted fingerprint from the Edge Node's cloud console:
+
+```bash
+sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256
+```
+
+The Admin node form includes this command, a copy button, and a remote
+`ssh-keyscan` command generated from the entered IP and SSH port. Always compare
+remote scan output with the trusted console value before the first deployment.
+
 On the Edge Node:
 
 ```bash
