@@ -63,8 +63,8 @@ export async function POST(request: Request) {
     });
     await ensureDefaultNodeProtocols(node.id);
     await addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { credentialType } });
-    queueNodeBootstrap(node.id, user.id);
-    return NextResponse.json({ node: { id: node.id, name: node.name, place: node.place, ip: node.ip, status: node.status, version: node.version } }, { status: 201 });
+    const actionId = await queueNodeBootstrap(node.id, user.id);
+    return NextResponse.json({ node: { id: node.id, name: node.name, place: node.place, ip: node.ip, status: node.status, version: node.version }, actionId }, { status: 201 });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to create node");
   }

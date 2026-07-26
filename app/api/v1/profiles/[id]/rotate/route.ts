@@ -15,7 +15,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     if (!oldProfile) return jsonError("Profile not found", 404);
     const device = await findDevice(oldProfile.device_id);
     if (!device || device.user_id !== user.id) return jsonError("Device not found", 404);
-    const next = await issueConnectionProfile({ actorUserId: user.id, deviceId: oldProfile.device_id, nodeId: oldProfile.node_id, protocol: oldProfile.protocol, transport: oldProfile.transport });
+    const next = await issueConnectionProfile({ actorUserId: user.id, deviceId: oldProfile.device_id, nodeId: oldProfile.node_id, protocol: oldProfile.protocol, transport: oldProfile.transport, rotateCredential: oldProfile.protocol === "openvpn" });
     const activated = oldProfile.status === "active" ? await activateProfile(next.id, user.id) : next;
     await expireConnectionProfile(oldProfile.id);
     return NextResponse.json({ profile: publicProfile(activated) });

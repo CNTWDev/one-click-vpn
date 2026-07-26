@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "../../../../server/auth";
-import { addAudit, findNode } from "../../../../server/db";
+import { addAudit, countRunningNodeActions, findNode } from "../../../../server/db";
 import { queueNodeAction, queueNodeBootstrap } from "../../../../server/bootstrap";
 import { cleanText, jsonError, readJson } from "../../../../server/http";
 
@@ -21,12 +21,12 @@ export async function POST(request: Request) {
     const accepted: string[] = [];
     const skipped: string[] = [];
     for (const nodeId of nodeIds) {
-      if (!(await findNode(nodeId))) {
+      if (!(await findNode(nodeId)) || await countRunningNodeActions(nodeId) > 0) {
         skipped.push(nodeId);
         continue;
       }
-      if (action === "bootstrap") queueNodeBootstrap(nodeId, user.id);
-      else queueNodeAction(nodeId, action as "status-agent" | "restart-agent", user.id);
+      if (action === "bootstrap") await queueNodeBootstrap(nodeId, user.id);
+      else await queueNodeAction(nodeId, action as "status-agent" | "restart-agent", user.id);
       accepted.push(nodeId);
     }
     await addAudit({ actorUserId: user.id, action: `nodes.batch.${action}.queued`, targetType: "node_fleet", metadata: { accepted, skipped } });

@@ -27,6 +27,9 @@ STATE_DIR = Path(os.environ.get("NORTHSTAR_AGENT_STATE_DIR", "/opt/northstar-age
 WIREGUARD_DIR = STATE_DIR / "wireguard"
 WIREGUARD_KEY = WIREGUARD_DIR / "server.key"
 WIREGUARD_CONFIG = WIREGUARD_DIR / "northstar.conf"
+OPENVPN_DIR = STATE_DIR / "openvpn"
+OPENVPN_CONFIG = OPENVPN_DIR / "server.conf"
+OPENVPN_REVOKED_DIR = OPENVPN_DIR / "revoked"
 KEY_PATTERN = re.compile(r"^[A-Za-z0-9+/]{42}={0,2}$")
 last_cpu_sample = None
 last_network_sample = None
@@ -60,6 +63,16 @@ def request_json(path, payload):
     with urllib.request.urlopen(request, timeout=15) as response:
         raw = response.read()
         return json.loads(raw.decode() or "{}")
+
+
+def request_node_secret(secret_id):
+    if not isinstance(secret_id, str) or not re.fullmatch(r"secret_[A-Za-z0-9-]{8,}", secret_id):
+        raise ValueError("invalid node secret reference")
+    response = request_json("/api/v1/agent/secrets/pull", {"nodeId": NODE_ID, "token": TOKEN, "secretId": secret_id})
+    value = response.get("value")
+    if not isinstance(value, str) or not value:
+        raise RuntimeError("node secret response was empty")
+    return value
 
 
 def run_fixed(command, *, input_text=None):
@@ -171,11 +184,109 @@ def wireguard_sync_config(desired):
     return {"observedHash": digest, "observedStatus": "applied", "serverPublicKey": wireguard_public_key()}
 
 
+def safe_revocation_serial(value):
+    if not isinstance(value, str) or not re.fullmatch(r"[A-F0-9]{1,128}", value):
+        raise ValueError("invalid OpenVPN revoked certificate serial")
+    return value
+
+
+def openvpn_sync_config(desired):
+    bundle_raw = request_node_secret(desired.get("serverBundleSecretId"))
+    try:
+        bundle = json.loads(bundle_raw)
+    except json.JSONDecodeError as error:
+        raise ValueError("OpenVPN server bundle is invalid") from error
+    required = ("caCertificate", "serverCertificate", "serverPrivateKey", "tlsCryptKey")
+    if not all(isinstance(bundle.get(key), str) and bundle[key] for key in required):
+        raise ValueError("OpenVPN server bundle is incomplete")
+    if shutil.which("openvpn") is None:
+        raise RuntimeError("openvpn is not installed")
+    transport = desired.get("transport", "udp")
+    if transport not in ("udp", "tcp"):
+        raise ValueError("invalid OpenVPN transport")
+    listen_port = int(desired.get("listenPort", 1194))
+    if listen_port < 1 or listen_port > 65535:
+        raise ValueError("invalid OpenVPN listen port")
+    if desired.get("subnet", "10.71.0.0/24") != "10.71.0.0/24":
+        raise ValueError("unsupported OpenVPN subnet")
+    dns = desired.get("dns", ["1.1.1.1"])
+    if not isinstance(dns, list) or any(not isinstance(item, str) or len(item) > 64 for item in dns):
+        raise ValueError("invalid OpenVPN DNS configuration")
+    revoked = desired.get("revokedSerials", [])
+    if not isinstance(revoked, list) or len(revoked) > 100000:
+        raise ValueError("invalid OpenVPN revocation list")
+    serials = {safe_revocation_serial(item) for item in revoked}
+    egress_interface = default_interface()
+    OPENVPN_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    OPENVPN_REVOKED_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for item in OPENVPN_REVOKED_DIR.iterdir():
+        if item.is_file() and re.fullmatch(r"[A-F0-9]{1,128}", item.name) and item.name not in serials:
+            item.unlink()
+    for serial in serials:
+        (OPENVPN_REVOKED_DIR / serial).touch(mode=0o600, exist_ok=True)
+    firewall_rules = [
+        ["iptables", "-C", "FORWARD", "-s", "10.71.0.0/24", "-j", "ACCEPT"],
+        ["iptables", "-C", "FORWARD", "-d", "10.71.0.0/24", "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"],
+        ["iptables", "-t", "nat", "-C", "POSTROUTING", "-s", "10.71.0.0/24", "-o", egress_interface, "-j", "MASQUERADE"],
+    ]
+    for check in firewall_rules:
+        try:
+            run_fixed(check)
+        except subprocess.CalledProcessError:
+            add = check.copy()
+            add[1] = "-A"
+            run_fixed(add)
+    for name, value in {
+        "ca.crt": bundle["caCertificate"], "server.crt": bundle["serverCertificate"],
+        "server.key": bundle["serverPrivateKey"], "tls-crypt.key": bundle["tlsCryptKey"],
+    }.items():
+        target = OPENVPN_DIR / name
+        target.write_text(value if value.endswith("\n") else value + "\n")
+        os.chmod(target, 0o600)
+    proto = "tcp-server" if transport == "tcp" else "udp"
+    push_lines = ["push \"redirect-gateway def1 bypass-dhcp\""] + [f"push \"dhcp-option DNS {item}\"" for item in dns]
+    config_lines = [
+        f"port {listen_port}", f"proto {proto}", "dev tun", "topology subnet", "server 10.71.0.0 255.255.255.0",
+        f"ca {OPENVPN_DIR / 'ca.crt'}", f"cert {OPENVPN_DIR / 'server.crt'}", f"key {OPENVPN_DIR / 'server.key'}",
+        f"crl-verify {OPENVPN_REVOKED_DIR} dir", f"tls-crypt {OPENVPN_DIR / 'tls-crypt.key'}", "dh none", "ecdh-curve prime256v1",
+        "auth SHA256", "data-ciphers AES-256-GCM:CHACHA20-POLY1305", "data-ciphers-fallback AES-256-GCM", "keepalive 10 120",
+        "persist-key", "persist-tun", "explicit-exit-notify 1", "verb 3", *push_lines, "",
+    ]
+    OPENVPN_CONFIG.write_text("\n".join(config_lines))
+    os.chmod(OPENVPN_CONFIG, 0o600)
+    openvpn_path = shutil.which("openvpn")
+    unit = f"""[Unit]
+Description=Northstar managed OpenVPN server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart={openvpn_path} --config /opt/northstar-agent/state/openvpn/server.conf
+Restart=always
+RestartSec=5
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+"""
+    Path("/etc/systemd/system/northstar-openvpn.service").write_text(unit)
+    run_fixed(["systemctl", "daemon-reload"])
+    run_fixed(["systemctl", "enable", "--now", "northstar-openvpn"])
+    run_fixed(["systemctl", "is-active", "--quiet", "northstar-openvpn"])
+    digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
+    return {"observedHash": digest, "observedStatus": "applied"}
+
+
 def apply_task(task):
     task_type = task.get("taskType")
     payload = task.get("payload") or {}
     if task_type == "ApplyWireGuardPeers":
         return wireguard_sync_config(payload)
+    if task_type == "ApplyOpenVpnServer":
+        return openvpn_sync_config(payload)
     raise ValueError(f"unsupported structured task: {task_type}")
 
 
@@ -185,12 +296,16 @@ def capabilities():
     if shutil.which("wg") is not None and shutil.which("wg-quick") is not None:
         protocols.append("wireguard")
         transports["wireguard"] = ["udp"]
+    if shutil.which("openvpn") is not None:
+        protocols.append("openvpn")
+        transports["openvpn"] = ["udp", "tcp"]
     return {
         "protocols": protocols,
         "transports": transports,
         "routing": ["full", "split"],
         "runtime": {
             "wireguardTools": "wireguard" in protocols,
+            "openvpn": "openvpn" in protocols,
             "python": os.sys.version.split()[0],
         },
     }
@@ -274,7 +389,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.1.0",
+        "version": "agent 2.2.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
@@ -314,10 +429,19 @@ def restore_wireguard():
         run_fixed(["wg-quick", "up", str(WIREGUARD_CONFIG)])
 
 
+def restore_openvpn():
+    if OPENVPN_CONFIG.exists() and shutil.which("openvpn") is not None:
+        run_fixed(["systemctl", "start", "northstar-openvpn"])
+
+
 def main():
     STATE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     try:
         restore_wireguard()
+    except Exception:
+        pass
+    try:
+        restore_openvpn()
     except Exception:
         pass
     last_heartbeat = 0

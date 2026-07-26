@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addAudit, countRunningNodeActions, deleteNode, findNode, findRegion, listNodeActions, publicNode, updateNode, updateNodeConfig } from "../../../../server/db";
+import { addAudit, countRunningNodeActions, deleteNode, findNode, findRegion, listNodeActionEvents, listNodeActions, publicNode, updateNode, updateNodeConfig } from "../../../../server/db";
 import { currentUser } from "../../../../server/auth";
 import { cleanText, isValidIp, isValidPort, jsonError, readJson } from "../../../../server/http";
 import { queueNodeBootstrap } from "../../../../server/bootstrap";
@@ -14,7 +14,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   const node = await findNode(id);
   if (!node) return jsonError("Node not found", 404);
-  return NextResponse.json({ node: publicNode(node), actions: await listNodeActions(id), reconcile: await getNodeReconcileStatus(id) });
+  return NextResponse.json({ node: publicNode(node), actions: await listNodeActions(id), actionEvents: await listNodeActionEvents(id), reconcile: await getNodeReconcileStatus(id) });
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -26,11 +26,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
   const action = typeof body.action === "string" ? body.action : "";
   if (action !== "bootstrap") return jsonError("Only bootstrap is available from this endpoint");
-  if (await countRunningNodeActions(id) > 0) return jsonError("This node already has a running action. Wait for it to finish.", 409);
+  if (await countRunningNodeActions(id) > 0) return jsonError("This node already has a queued or running action. Wait for it to finish.", 409);
   await updateNode(id, { status: "provisioning", version: "bootstrap queued" });
   await addAudit({ actorUserId: user.id, action: "node.bootstrap.queued", targetType: "node", targetId: id });
-  queueNodeBootstrap(id, user.id);
-  return NextResponse.json({ ok: true });
+  const actionId = await queueNodeBootstrap(id, user.id);
+  return NextResponse.json({ ok: true, actionId, status: "queued" }, { status: 202 });
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -75,7 +75,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   const { id } = await context.params;
   const node = await findNode(id);
   if (!node) return jsonError("Node not found", 404);
-  if (await countRunningNodeActions(id) > 0) return jsonError("Node has a running action. Wait for it to finish before deleting.", 409);
+  if (await countRunningNodeActions(id) > 0) return jsonError("Node has a queued or running action. Wait for it to finish before deleting.", 409);
   if (!(await deleteNode(id))) return jsonError("Node could not be deleted", 409);
   await addAudit({ actorUserId: user.id, action: "node.deleted", targetType: "node", targetId: id, metadata: { name: node.name, ip: node.ip } });
   return NextResponse.json({ ok: true });

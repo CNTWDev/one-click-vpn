@@ -12,6 +12,8 @@ ENV NODE_ENV=production
 ARG NORTHSTAR_BUILD_REV=unknown
 ENV NORTHSTAR_BUILD_REV=$NORTHSTAR_BUILD_REV
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public

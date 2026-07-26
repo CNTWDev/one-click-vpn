@@ -49,8 +49,18 @@ CREATE INDEX IF NOT EXISTS audit_created_idx ON audit_logs(created_at);
 CREATE TABLE IF NOT EXISTS node_actions (
   id TEXT PRIMARY KEY, node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   action TEXT NOT NULL, status TEXT NOT NULL, output TEXT NOT NULL DEFAULT '',
-  error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, finished_at TEXT
+  error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, started_at TEXT, finished_at TEXT,
+  current_phase TEXT NOT NULL DEFAULT 'queued', progress INTEGER NOT NULL DEFAULT 0
 );
+ALTER TABLE node_actions ADD COLUMN IF NOT EXISTS started_at TEXT;
+ALTER TABLE node_actions ADD COLUMN IF NOT EXISTS current_phase TEXT NOT NULL DEFAULT 'queued';
+ALTER TABLE node_actions ADD COLUMN IF NOT EXISTS progress INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS node_action_events (
+  id TEXT PRIMARY KEY, action_id TEXT NOT NULL REFERENCES node_actions(id) ON DELETE CASCADE,
+  sequence INTEGER NOT NULL, level TEXT NOT NULL DEFAULT 'info', phase TEXT NOT NULL DEFAULT 'execution',
+  message TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(action_id, sequence)
+);
+CREATE INDEX IF NOT EXISTS node_action_events_action_idx ON node_action_events(action_id, sequence);
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   display_name TEXT NOT NULL, platform TEXT NOT NULL, app_version TEXT NOT NULL,
@@ -74,6 +84,34 @@ CREATE TABLE IF NOT EXISTS protocol_credentials (
   revoked_at TEXT, metadata_json TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS protocol_credentials_device_idx ON protocol_credentials(device_id, protocol);
+CREATE TABLE IF NOT EXISTS secret_materials (
+  id TEXT PRIMARY KEY, kind TEXT NOT NULL, owner_node_id TEXT REFERENCES nodes(id) ON DELETE CASCADE,
+  ciphertext TEXT NOT NULL, iv TEXT NOT NULL, tag TEXT NOT NULL,
+  fingerprint TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS secret_materials_node_idx ON secret_materials(owner_node_id, kind);
+CREATE TABLE IF NOT EXISTS credential_authorities (
+  id TEXT PRIMARY KEY, realm TEXT NOT NULL, protocol TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active', certificate_pem TEXT NOT NULL,
+  private_key_secret_id TEXT NOT NULL REFERENCES secret_materials(id),
+  tls_crypt_secret_id TEXT REFERENCES secret_materials(id),
+  not_before TEXT NOT NULL, not_after TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+ALTER TABLE credential_authorities DROP CONSTRAINT IF EXISTS credential_authorities_realm_protocol_status_key;
+CREATE UNIQUE INDEX IF NOT EXISTS credential_authorities_one_active_idx
+  ON credential_authorities(realm, protocol) WHERE status = 'active';
+CREATE TABLE IF NOT EXISTS certificate_issuances (
+  id TEXT PRIMARY KEY, authority_id TEXT NOT NULL REFERENCES credential_authorities(id) ON DELETE CASCADE,
+  node_id TEXT REFERENCES nodes(id) ON DELETE CASCADE, device_id TEXT REFERENCES devices(id) ON DELETE CASCADE,
+  purpose TEXT NOT NULL, serial TEXT NOT NULL, subject TEXT NOT NULL,
+  certificate_pem TEXT NOT NULL, private_key_secret_id TEXT REFERENCES secret_materials(id),
+  status TEXT NOT NULL DEFAULT 'active', not_before TEXT NOT NULL, not_after TEXT NOT NULL,
+  revoked_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE (authority_id, serial)
+);
+CREATE INDEX IF NOT EXISTS certificate_issuances_node_idx ON certificate_issuances(node_id, purpose, status);
+CREATE INDEX IF NOT EXISTS certificate_issuances_device_idx ON certificate_issuances(device_id, purpose, status);
 CREATE TABLE IF NOT EXISTS ip_leases (
   id TEXT PRIMARY KEY, node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   protocol TEXT NOT NULL, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,

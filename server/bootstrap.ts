@@ -4,7 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { Client, type ConnectConfig } from "ssh2";
 import { allowTofuHostKeys, publicOrigin } from "./config";
 import { decryptSecret, hashToken } from "./crypto";
-import { addAudit, addNodeAction, countRunningNodeActions, findNode, finishNodeAction, updateNode } from "./db";
+import { addAudit, addNodeAction, appendNodeActionEvent, countRunningNodeActions, findNode, finishNodeAction, startNodeAction, updateNode, updateNodeActionProgress } from "./db";
 import { ensureDefaultNodeProtocols } from "./control-plane";
 
 const maximumConcurrentRemoteActions = 3;
@@ -27,6 +27,21 @@ function processRemoteActionQueue(): void {
 function enqueueRemoteAction(action: () => Promise<void>): void {
   remoteActionQueue.push(action);
   processRemoteActionQueue();
+}
+
+function pause(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function waitForAgentHeartbeat(nodeId: string, notBefore: number, timeoutMilliseconds: number = 25_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMilliseconds;
+  while (Date.now() < deadline) {
+    const node = await findNode(nodeId);
+    const heartbeatAt = node?.last_heartbeat_at ? new Date(node.last_heartbeat_at).getTime() : 0;
+    if (heartbeatAt >= notBefore) return true;
+    await pause(1_000);
+  }
+  return false;
 }
 
 function shellQuote(value: string): string {
@@ -54,7 +69,7 @@ function agentSource(): string {
   return readFileSync(path.join(process.cwd(), "agent", "agent.py"), "utf8");
 }
 
-function connectAndExec(config: ConnectConfig, command: string, expectedFingerprint: string | null): Promise<{ output: string; fingerprint: string }> {
+function connectAndExec(config: ConnectConfig, command: string, expectedFingerprint: string | null, onOutput?: (chunk: string) => void): Promise<{ output: string; fingerprint: string }> {
   return new Promise((resolve, reject) => {
     const client = new Client();
     let output = "";
@@ -67,8 +82,8 @@ function connectAndExec(config: ConnectConfig, command: string, expectedFingerpr
           reject(error);
           return;
         }
-        stream.on("data", (chunk: Buffer) => { output += chunk.toString(); });
-        stream.stderr.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+        stream.on("data", (chunk: Buffer) => { const text = chunk.toString(); output += text; onOutput?.(text); });
+        stream.stderr.on("data", (chunk: Buffer) => { const text = chunk.toString(); output += text; onOutput?.(text); });
         stream.on("close", (code: number) => {
           client.end();
           if (code === 0) resolve({ output, fingerprint });
@@ -98,21 +113,64 @@ function connectAndExec(config: ConnectConfig, command: string, expectedFingerpr
   });
 }
 
-export function queueNodeBootstrap(nodeId: string, actorUserId?: string): void {
-  enqueueRemoteAction(() => bootstrapNode(nodeId, actorUserId));
+class ActionOutputRecorder {
+  private remainder = "";
+  private writes: Promise<void> = Promise.resolve();
+
+  constructor(private readonly actionId: string) {}
+
+  write(chunk: string): void {
+    const lines = (this.remainder + chunk).replaceAll("\r", "").split("\n");
+    this.remainder = lines.pop() || "";
+    for (const line of lines) this.record(line);
+  }
+
+  private record(line: string): void {
+    const message = line.trim();
+    if (!message) return;
+    const marker = message.match(/^NORTHSTAR_PROGRESS\|([^|]+)\|([^|]+)\|(.*)$/);
+    this.writes = this.writes.then(async () => {
+      if (marker) {
+        await updateNodeActionProgress(this.actionId, { phase: marker[1], progress: Number(marker[2]) || 0, message: marker[3] });
+      } else {
+        await appendNodeActionEvent(this.actionId, { phase: "output", message, level: /error|failed|unable|denied/i.test(message) ? "warning" : "info" });
+      }
+    }).catch(() => undefined);
+  }
+
+  async flush(): Promise<void> {
+    if (this.remainder.trim()) this.record(this.remainder);
+    await this.writes;
+  }
 }
 
-export function queueNodeAction(nodeId: string, action: "restart-agent" | "status-agent", actorUserId?: string): void {
+export async function queueNodeBootstrap(nodeId: string, actorUserId?: string): Promise<string> {
+  const actionId = await addNodeAction(nodeId, "bootstrap");
+  enqueueRemoteAction(() => bootstrapNode(nodeId, actorUserId, actionId));
+  return actionId;
+}
+
+export async function queueNodeAction(nodeId: string, action: "restart-agent" | "status-agent", actorUserId?: string): Promise<string> {
+  const actionId = await addNodeAction(nodeId, action);
   enqueueRemoteAction(async () => {
-    await runNodeAction(nodeId, action, actorUserId);
+    try {
+      await runNodeAction(nodeId, action, actorUserId, actionId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await appendNodeActionEvent(actionId, { level: "error", phase: "failed", message: message.slice(-4000) });
+      await finishNodeAction(actionId, "failed", "", message.slice(-4000));
+    }
   });
+  return actionId;
 }
 
-export async function bootstrapNode(nodeId: string, actorUserId?: string): Promise<void> {
+export async function bootstrapNode(nodeId: string, actorUserId?: string, queuedActionId?: string): Promise<void> {
   const node = await findNode(nodeId);
   if (!node) return;
-  const actionId = await addNodeAction(nodeId, "bootstrap");
+  const actionId = queuedActionId || await addNodeAction(nodeId, "bootstrap", "running");
+  await startNodeAction(actionId);
   await updateNode(nodeId, { status: "provisioning", version: "bootstrap running", last_seen: "connecting" });
+  let recorder: ActionOutputRecorder | undefined;
 
   try {
     if (!node.host_fingerprint && !allowTofuHostKeys()) {
@@ -126,7 +184,10 @@ export async function bootstrapNode(nodeId: string, actorUserId?: string): Promi
     const agentToken = randomBytes(32).toString("base64url");
     const expectedFingerprint = node.host_fingerprint;
     const source = Buffer.from(agentSource(), "utf8").toString("base64");
+    const controllerOrigin = shellQuote(publicOrigin());
     const command = `set -eu
+progress() { printf 'NORTHSTAR_PROGRESS|%s|%s|%s\\n' "$1" "$2" "$3"; }
+progress connection 15 'SSH session established; checking node prerequisites'
 install_wireguard_tools() {
   if command -v wg >/dev/null 2>&1 && command -v wg-quick >/dev/null 2>&1; then
     return 0
@@ -161,7 +222,7 @@ install_wireguard_tools() {
     apk add wireguard-tools
   else
     echo "wireguard-tools is not installed and no supported package manager was found" >&2
-    exit 1
+    return 1
   fi
 
   if ! command -v wg >/dev/null 2>&1 || ! command -v wg-quick >/dev/null 2>&1; then
@@ -173,10 +234,34 @@ install_wireguard_tools() {
       dnf repolist >&2 || true
     fi
     echo "Enable the repository that provides wireguard-tools, or use a distribution with native WireGuard packages." >&2
-    exit 1
+    return 1
   fi
 }
-install_wireguard_tools
+progress packages 30 'Installing supported VPN runtime packages'
+if ! install_wireguard_tools; then
+  echo "WireGuard is unavailable on this host; continuing with OpenVPN support only" >&2
+fi
+install_openvpn() {
+  if command -v openvpn >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y openvpn
+  elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y openvpn
+  elif command -v yum >/dev/null 2>&1; then
+    yum install -y openvpn
+  elif command -v apk >/dev/null 2>&1; then
+    apk add openvpn
+  else
+    echo "openvpn is not installed and no supported package manager was found" >&2
+    exit 1
+  fi
+  command -v openvpn >/dev/null 2>&1 || { echo "Unable to install openvpn" >&2; exit 1; }
+}
+install_openvpn
+progress networking 50 'Configuring packet forwarding and firewall prerequisites'
 if ! command -v iptables >/dev/null 2>&1; then
   if command -v apt-get >/dev/null 2>&1; then
     DEBIAN_FRONTEND=noninteractive apt-get install -y iptables
@@ -213,11 +298,25 @@ if ! command -v python3 >/dev/null 2>&1; then
     exit 1
   fi
 fi
+progress controller-check 65 'Verifying outbound access to the Controller'
 python_path=$(command -v python3 || true)
 if [ -z "$python_path" ] || [ ! -x "$python_path" ]; then
   echo "Unable to locate an executable python3 after installation" >&2
   exit 1
 fi
+NORTHSTAR_PREFLIGHT_ORIGIN=${controllerOrigin} "$python_path" - <<'NORTHSTAR_PREFLIGHT'
+import os
+import urllib.request
+
+origin = os.environ["NORTHSTAR_PREFLIGHT_ORIGIN"].rstrip("/")
+try:
+    with urllib.request.urlopen(origin + "/api/v1/health", timeout=15) as response:
+        if response.status != 200:
+            raise RuntimeError(f"unexpected HTTP status {response.status}")
+except Exception as error:
+    raise SystemExit(f"Controller health preflight failed for {origin}: {error}")
+NORTHSTAR_PREFLIGHT
+progress agent-files 78 'Writing the managed Agent and service definition'
 install -d -m 700 /opt/northstar-agent
 echo ${shellQuote(source)} | base64 -d > /opt/northstar-agent/agent.py
 if command -v wg >/dev/null 2>&1; then
@@ -252,14 +351,22 @@ ProtectSystem=strict
 ProtectHome=true
 CapabilityBoundingSet=CAP_NET_ADMIN
 AmbientCapabilities=CAP_NET_ADMIN
-ReadWritePaths=/opt/northstar-agent /etc/wireguard
+ReadWritePaths=/opt/northstar-agent /etc/wireguard /etc/systemd/system
 
 [Install]
 WantedBy=multi-user.target
 NORTHSTAR_SERVICE
 systemctl daemon-reload
 systemctl enable --now northstar-agent
+progress agent-start 92 'Agent service started; waiting for Controller heartbeat'
+sleep 2
+if ! systemctl is-active --quiet northstar-agent; then
+  systemctl --no-pager --full status northstar-agent || true
+  journalctl -u northstar-agent -n 100 --no-pager || true
+  exit 1
+fi
 systemctl --no-pager --full status northstar-agent
+progress complete 100 'Node Agent installation completed'
 `;
     const config: ConnectConfig = {
       host: node.ip,
@@ -268,7 +375,11 @@ systemctl --no-pager --full status northstar-agent
       readyTimeout: 15_000,
       ...(node.credential_type === "private_key" ? { privateKey: secret } : { password: secret }),
     };
-    const result = await connectAndExec(config, command, expectedFingerprint);
+    const outputRecorder = new ActionOutputRecorder(actionId);
+    recorder = outputRecorder;
+    const result = await connectAndExec(config, command, expectedFingerprint, (chunk) => outputRecorder.write(chunk));
+    await outputRecorder.flush();
+    const heartbeatNotBefore = Date.now();
     await updateNode(nodeId, {
       status: "provisioning",
       version: "agent installed",
@@ -277,27 +388,47 @@ systemctl --no-pager --full status northstar-agent
       host_fingerprint: node.host_fingerprint || result.fingerprint,
       agent_token_hash: hashToken(agentToken),
     });
+    if (!(await waitForAgentHeartbeat(nodeId, heartbeatNotBefore))) {
+      let runtimeDiagnostics = "";
+      try {
+        await updateNodeActionProgress(actionId, { phase: "heartbeat", progress: 96, message: "Heartbeat did not arrive; collecting remote service diagnostics", level: "warning" });
+        const diagnostics = await connectAndExec(config, "printf 'NORTHSTAR_PROGRESS|diagnostics|97|Collecting systemd status and recent Agent journal\\n'; systemctl --no-pager --full status northstar-agent || true; journalctl -u northstar-agent -n 100 --no-pager || true", expectedFingerprint, (chunk) => outputRecorder.write(chunk));
+        runtimeDiagnostics = diagnostics.output.slice(-12_000);
+      } catch (diagnosticError) {
+        runtimeDiagnostics = `Unable to collect Agent diagnostics: ${diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError)}`;
+      }
+      const message = "Agent service installed but the Controller did not receive a heartbeat within 25 seconds. Verify DNS, TLS, firewall access, and the controller public origin.";
+      await updateNode(nodeId, { status: "attention", version: "agent heartbeat failed", last_seen: "heartbeat not received", latency: "error" });
+      await outputRecorder.flush();
+      await finishNodeAction(actionId, "failed", `${result.output.slice(-6000)}\n\n${message}\n\n${runtimeDiagnostics}`.slice(-12_000), message);
+      await addAudit({ actorUserId, action: "node.bootstrap.heartbeat_failed", targetType: "node", targetId: nodeId });
+      return;
+    }
     await ensureDefaultNodeProtocols(nodeId);
     await finishNodeAction(actionId, "succeeded", result.output.slice(-12000));
     await addAudit({ actorUserId, action: "node.bootstrap.succeeded", targetType: "node", targetId: nodeId });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    await recorder?.flush();
     await updateNode(nodeId, { status: "attention", version: "bootstrap failed", last_seen: "failed" });
+    await appendNodeActionEvent(actionId, { level: "error", phase: "failed", message: message.slice(-4000) });
     await finishNodeAction(actionId, "failed", "", message.slice(-4000));
     await addAudit({ actorUserId, action: "node.bootstrap.failed", targetType: "node", targetId: nodeId, metadata: { error: message } });
   }
 }
 
-export async function runNodeAction(nodeId: string, action: "restart-agent" | "status-agent", actorUserId?: string): Promise<string> {
+export async function runNodeAction(nodeId: string, action: "restart-agent" | "status-agent", actorUserId?: string, queuedActionId?: string): Promise<string> {
   const node = await findNode(nodeId);
   if (!node) throw new Error("Node not found");
-  if (await countRunningNodeActions(nodeId) > 0) throw new Error("This node already has a running action. Wait for it to finish.");
-  const actionId = await addNodeAction(nodeId, action);
+  const actionId = queuedActionId || await addNodeAction(nodeId, action, "running");
+  if (await countRunningNodeActions(nodeId, actionId) > 0) throw new Error("This node already has a queued or running action. Wait for it to finish.");
+  await startNodeAction(actionId);
+  let recorder: ActionOutputRecorder | undefined;
   try {
     const secret = decryptSecret({ ciphertext: node.credential_ciphertext, iv: node.credential_iv, tag: node.credential_tag });
     const command = action === "restart-agent"
-      ? "systemctl restart northstar-agent && systemctl --no-pager --full status northstar-agent"
-      : "systemctl --no-pager --full status northstar-agent";
+      ? "printf 'NORTHSTAR_PROGRESS|restart|30|Requesting a managed Agent restart\\n'; systemctl restart northstar-agent; printf 'NORTHSTAR_PROGRESS|verify|75|Checking service status after restart\\n'; systemctl --no-pager --full status northstar-agent; printf 'NORTHSTAR_PROGRESS|complete|100|Agent restart completed\\n'"
+      : "printf 'NORTHSTAR_PROGRESS|check|25|Reading Agent service state\\n'; systemctl is-active --quiet northstar-agent; service_status=$?; systemctl --no-pager --full status northstar-agent || true; printf 'NORTHSTAR_PROGRESS|journal|60|Collecting the latest Agent journal entries\\n'; journalctl -u northstar-agent -n 80 --no-pager || true; if [ $service_status -ne 0 ]; then printf 'NORTHSTAR_PROGRESS|failed|100|Agent service is not active\\n'; exit $service_status; fi; printf 'NORTHSTAR_PROGRESS|complete|100|Agent check completed\\n'";
     const config: ConnectConfig = {
       host: node.ip,
       port: node.ssh_port,
@@ -305,7 +436,10 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
       readyTimeout: 15_000,
       ...(node.credential_type === "private_key" ? { privateKey: secret } : { password: secret }),
     };
-    const result = await connectAndExec(config, command, node.host_fingerprint);
+    const outputRecorder = new ActionOutputRecorder(actionId);
+    recorder = outputRecorder;
+    const result = await connectAndExec(config, command, node.host_fingerprint, (chunk) => outputRecorder.write(chunk));
+    await outputRecorder.flush();
     const output = result.output.slice(-12000);
     await finishNodeAction(actionId, "succeeded", output);
     await addAudit({ actorUserId, action: `node.${action}.succeeded`, targetType: "node", targetId: nodeId });
@@ -313,9 +447,11 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
     return output;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    await recorder?.flush();
+    await appendNodeActionEvent(actionId, { level: "error", phase: "failed", message: message.slice(-4000) });
     await finishNodeAction(actionId, "failed", "", message.slice(-4000));
     await addAudit({ actorUserId, action: `node.${action}.failed`, targetType: "node", targetId: nodeId, metadata: { error: message } });
     await updateNode(nodeId, { status: "attention", last_seen: "failed", latency: "error" });
-    throw error;
+    return "";
   }
 }

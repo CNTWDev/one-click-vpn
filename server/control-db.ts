@@ -83,6 +83,38 @@ export type ApiSession = {
   refreshExpiresAt: string;
 };
 
+export type CredentialAuthority = {
+  id: string;
+  realm: string;
+  protocol: Protocol;
+  status: "active" | "retired" | "revoked";
+  certificate_pem: string;
+  private_key_secret_id: string;
+  tls_crypt_secret_id: string | null;
+  not_before: string;
+  not_after: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CertificateIssuance = {
+  id: string;
+  authority_id: string;
+  node_id: string | null;
+  device_id: string | null;
+  purpose: "server" | "client";
+  serial: string;
+  subject: string;
+  certificate_pem: string;
+  private_key_secret_id: string | null;
+  status: "active" | "revoked" | "expired";
+  not_before: string;
+  not_after: string;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -93,6 +125,59 @@ function parseJson<T>(value: string, fallback: T): T {
 
 export async function ensureControlPlaneSchema(): Promise<void> {
   await dbQuery("SELECT 1");
+}
+
+export async function findActiveCredentialAuthority(realm: string, protocol: Protocol): Promise<CredentialAuthority | undefined> {
+  return (await dbQuery<CredentialAuthority>(`SELECT * FROM credential_authorities
+    WHERE realm = $1 AND protocol = $2 AND status = 'active' ORDER BY created_at DESC LIMIT 1`, [realm, protocol]))[0];
+}
+
+export async function createCredentialAuthority(input: Omit<CredentialAuthority, "id" | "created_at" | "updated_at" | "status"> & { status?: CredentialAuthority["status"] }): Promise<CredentialAuthority> {
+  const id = `authority_${randomUUID()}`;
+  const timestamp = now();
+  await dbExec(`INSERT INTO credential_authorities
+    (id, realm, protocol, status, certificate_pem, private_key_secret_id, tls_crypt_secret_id, not_before, not_after, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`, [
+    id, input.realm, input.protocol, input.status || "active", input.certificate_pem,
+    input.private_key_secret_id, input.tls_crypt_secret_id, input.not_before, input.not_after, timestamp,
+  ]);
+  return (await dbQuery<CredentialAuthority>("SELECT * FROM credential_authorities WHERE id = $1", [id]))[0]!;
+}
+
+export async function findActiveCertificateIssuance(input: { authorityId: string; nodeId?: string; deviceId?: string; purpose: CertificateIssuance["purpose"] }): Promise<CertificateIssuance | undefined> {
+  const field = input.nodeId ? "node_id" : "device_id";
+  const owner = input.nodeId || input.deviceId;
+  if (!owner) return undefined;
+  return (await dbQuery<CertificateIssuance>(`SELECT * FROM certificate_issuances
+    WHERE authority_id = $1 AND ${field} = $2 AND purpose = $3 AND status = 'active'
+    ORDER BY created_at DESC LIMIT 1`, [input.authorityId, owner, input.purpose]))[0];
+}
+
+export async function createCertificateIssuance(input: Omit<CertificateIssuance, "id" | "created_at" | "updated_at" | "status" | "revoked_at"> & { status?: CertificateIssuance["status"] }): Promise<CertificateIssuance> {
+  const id = `cert_${randomUUID()}`;
+  const timestamp = now();
+  await dbExec(`INSERT INTO certificate_issuances
+    (id, authority_id, node_id, device_id, purpose, serial, subject, certificate_pem, private_key_secret_id, status, not_before, not_after, revoked_at, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NULL, $13, $13)`, [
+    id, input.authority_id, input.node_id, input.device_id, input.purpose, input.serial, input.subject,
+    input.certificate_pem, input.private_key_secret_id, input.status || "active", input.not_before, input.not_after, timestamp,
+  ]);
+  return (await dbQuery<CertificateIssuance>("SELECT * FROM certificate_issuances WHERE id = $1", [id]))[0]!;
+}
+
+export async function listRevokedCertificateSerials(authorityId: string): Promise<string[]> {
+  const rows = await dbQuery<{ serial: string }>("SELECT serial FROM certificate_issuances WHERE authority_id = $1 AND status = 'revoked' ORDER BY revoked_at", [authorityId]);
+  return rows.map((row) => row.serial);
+}
+
+export async function revokeCertificateIssuancesForDevice(deviceId: string): Promise<void> {
+  await dbExec(`UPDATE certificate_issuances SET status = 'revoked', revoked_at = $1, updated_at = $1
+    WHERE device_id = $2 AND status = 'active'`, [now(), deviceId]);
+}
+
+export async function revokeCertificateIssuance(id: string): Promise<void> {
+  await dbExec(`UPDATE certificate_issuances SET status = 'revoked', revoked_at = $1, updated_at = $1
+    WHERE id = $2 AND status = 'active'`, [now(), id]);
 }
 
 export async function createDevice(input: {
@@ -253,8 +338,9 @@ export async function allocateIpLease(nodeId: string, protocol: Protocol, device
   if (existing) return existing.address;
   const used = new Set((await dbQuery<{ address: string }>("SELECT address FROM ip_leases WHERE node_id = $1 AND protocol = $2 AND status = 'active'", [nodeId, protocol])).map((row) => row.address));
   let address = "";
+  const network = protocol === "openvpn" ? "10.71.0" : "10.70.0";
   for (let index = 2; index < 255; index += 1) {
-    const candidate = `10.70.0.${index}/32`;
+    const candidate = `${network}.${index}/32`;
     if (!used.has(candidate)) { address = candidate; break; }
   }
   if (!address) throw new Error("No VPN addresses available for this node and protocol");

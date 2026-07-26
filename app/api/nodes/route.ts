@@ -54,8 +54,8 @@ export async function POST(request: Request) {
       agent_token_hash: null,
     });
     await addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { credentialType } });
-    queueNodeBootstrap(node.id, user.id);
-    return NextResponse.json({ node: publicNode(node) }, { status: 201 });
+    const actionId = await queueNodeBootstrap(node.id, user.id);
+    return NextResponse.json({ node: publicNode(node), actionId }, { status: 201 });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to create node");
   }

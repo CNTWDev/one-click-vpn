@@ -13,11 +13,11 @@ The current implementation includes:
 - SSH host-key verification, password/private-key bootstrap, and a least-privilege systemd agent;
 - Docker Compose, host-managed Nginx HTTPS, health checks, backups, and a repeatable deployment script.
 - versioned `/api/v1` authentication, device, node capability, Connection Profile, and Agent reconcile endpoints;
-- protocol Adapter registry, WireGuard desired-state generation, IP leases, revisions, and structured Agent tasks.
-- a browser-based Access workflow that generates a local WireGuard key, activates a profile, and downloads a client configuration for macOS or iPhone;
+- protocol Adapter registry, WireGuard and OpenVPN desired-state generation, IP leases, revisions, and structured Agent tasks;
+- a browser-based Access workflow that generates a local WireGuard key or a managed OpenVPN profile for macOS;
 - lightweight Agent resource telemetry for CPU, load, memory, disk, network counters, and collection time.
 
-The agent uses outbound HTTPS plus a per-node token and can pull structured WireGuard reconcile tasks. A node must have `wireguard-tools` installed before it can apply a real WireGuard configuration. OpenVPN/IKEv2 data-plane adapters, the Agent mTLS CA lifecycle, and native clients remain separate follow-up work.
+The agent uses outbound HTTPS plus a per-node token and pulls structured reconcile tasks. It installs WireGuard when the operating system provides it and installs OpenVPN independently, so an OpenVPN-only node remains usable on distributions without a compatible WireGuard package.
 
 ## Local development
 
@@ -56,7 +56,7 @@ The Controller uses the same Docker Compose deployment on every provider and doe
 - Configure Nginx to proxy HTTPS requests to `127.0.0.1:3000`;
 - Prepare the domain certificate before deployment. Docker does not request or renew certificates.
 
-WireGuard, OpenVPN, and IKEv2 are Edge Node data-plane services. Open their ports in each Edge Node security group separately; they are not Controller Compose entry points.
+WireGuard, OpenVPN, and IKEv2 are Edge Node data-plane services. Open their ports in each Edge Node security group separately; they are not Controller Compose entry points. For the current protocols, allow UDP `51820` for WireGuard and UDP `1194` for OpenVPN on the selected Edge Nodes.
 
 ### 2. Get the source code
 
@@ -235,11 +235,11 @@ Copy the value beginning with `SHA256:` into the node form. The controller check
 
 The controller stores the credential only as an AES-256-GCM ciphertext. It then uses SSH to install `/opt/northstar-agent/agent.py` and a `northstar-agent.service`. The agent only sends outbound health heartbeats to the controller and does not accept inbound commands.
 
-The current production data-plane path is WireGuard over IPv4. Bootstrap installs `wireguard-tools` and `iptables`, enables IPv4 forwarding, and the Agent applies a WireGuard interface with outbound masquerading. On DNF-based systems it first uses the enabled repositories, then tries the common CRB/PowerTools and EPEL/ELRepo paths. If the distribution vendor does not publish `wireguard-tools`, the failed bootstrap log includes `/etc/os-release` and `dnf repolist` so the missing repository can be identified. Open UDP `51820` in the Edge Node's cloud security group/firewall; the controller cannot change a provider firewall without a provider-specific integration. OpenVPN and IKEv2 are registered as planned adapters and are not deployable yet.
+The current production data-plane paths are WireGuard over IPv4 and managed OpenVPN over IPv4. Bootstrap installs `iptables`, enables IPv4 forwarding, and installs OpenVPN independently from WireGuard. On DNF-based systems it first uses the enabled repositories, then tries the common CRB/PowerTools and EPEL/ELRepo paths for WireGuard. If the distribution vendor does not publish `wireguard-tools`, bootstrap continues as OpenVPN-only and records the repository diagnostics. Open UDP `51820` for WireGuard and UDP `1194` for OpenVPN in the Edge Node cloud security group/firewall; the controller cannot change a provider firewall without a provider-specific integration. IKEv2 remains planned.
 
 Each node's **Logs** view shows the audited bootstrap output, Agent status/restart output, recent WireGuard reconcile errors, and lightweight resource telemetry. The Agent sends telemetry with its existing 30-second heartbeat; no separate metrics daemon or time-series service is required. CPU, memory, disk, and network values are visible in the node diagnostics panel.
 
-The **Access** view is the first end-user connection workflow. It creates a macOS device identity in the browser, generates the private key locally, activates a WireGuard Connection Profile, and downloads a `.conf` file. Import that file into the official WireGuard macOS or iOS application. The private key is never sent to the Controller. The Edge Agent generates its WireGuard server key before its first heartbeat and reports only the public key; profile issuance is blocked until that key is available. Registered devices can be revoked from the Access view, which revokes the profile and reconciles the Edge configuration. Protocol selection remains behind the Connection Profile abstraction so future IKEv2 and OpenVPN adapters can use the same user flow.
+The **Access** view creates a macOS device profile. For WireGuard, the private key is generated locally in the browser and the resulting `.conf` file is imported into the official WireGuard application. For OpenVPN, the Controller creates a managed issuer CA on first use, encrypts its private material with `NORTHSTAR_MASTER_KEY`, issues a per-device certificate, and exports a no-store `.ovpn` profile for OpenVPN Connect. The Edge Agent receives its server private material only through an authenticated node-secret endpoint; task payloads contain references rather than private keys. Revoking a device revokes its OpenVPN certificate and reconciles the Edge Node's OpenVPN serial-directory CRL. A future external/offline issuer can replace the managed issuer without changing the device or profile model.
 
 The restart action is explicitly allow-listed and audited. Arbitrary shell commands and an interactive browser terminal are not enabled by default because they would turn the control plane into an unrestricted remote-execution service.
 
@@ -325,11 +325,16 @@ Use the node row's `Actions` menu in the console:
 
 For fleet operations, select nodes in the table (optionally after filtering by
 region) and choose `Check agents`, `Restart agents`, or `Reinstall agents`.
-Checks run immediately. Restart and reinstall require a confirmation and are
-queued by the Controller, which processes at most three remote actions at once;
-they continue after the browser page is closed.
+All remote operations are queued by the Controller, which processes at most
+three remote actions at once; they continue after the browser page is closed.
+The Node Diagnostics view opens automatically for a single-node operation and
+shows the queued/running phase, progress, a timestamped event timeline, raw
+output history, and a remediation hint for common failures. Timestamps use the
+browser time zone by default and can be switched to UTC or a selected region.
 
 For a node that failed during bootstrap, first update the Controller code and redeploy it, then select `Actions` → `Reinstall agent`. The bootstrap script installs `python3` when needed and does not require an optional NetworkManager directory to exist. NetworkManager manages its own connection files through its daemon.
+
+Bootstrap verifies that the Edge Node can reach `NORTHSTAR_PUBLIC_ORIGIN/api/v1/health`, starts the Agent, and waits up to 25 seconds for a real Controller heartbeat. A missing heartbeat marks the action failed and appends the remote systemd and Agent journal output to the node diagnostics, so DNS, TLS, firewall, or Agent authentication failures are visible in the console.
 
 On the Edge Node, use these diagnostics:
 

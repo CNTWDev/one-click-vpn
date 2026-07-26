@@ -20,9 +20,9 @@ export async function POST(request: Request) {
     const body = await readJson(request);
     const displayName = cleanText(body.displayName, 120);
     const platform = cleanText(body.platform, 20);
-    const publicKey = cleanText(body.publicKey, 128);
-    if (!displayName || platform !== "macos" || !publicKey) return jsonError("A display name and macOS public key are required");
-    const device = await createDevice({ userId: user.id, displayName, platform, appVersion: "wireguard-import", publicKey });
+    const publicKey = cleanText(body.publicKey, 128) || "openvpn-managed";
+    if (!displayName || platform !== "macos") return jsonError("A display name and macOS platform are required");
+    const device = await createDevice({ userId: user.id, displayName, platform, appVersion: publicKey === "openvpn-managed" ? "openvpn-import" : "wireguard-import", publicKey });
     await addAudit({ actorUserId: user.id, action: "access.device.created", targetType: "device", targetId: device.id, metadata: { platform } });
     return NextResponse.json({ device: publicDevice(device) }, { status: 201 });
   } catch (error) {

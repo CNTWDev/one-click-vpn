@@ -266,8 +266,9 @@ export async function updateNodeConfig(id: string, values: {
   return findNode(id);
 }
 
-export async function countRunningNodeActions(nodeId: string): Promise<number> {
-  const rows = await dbQuery<{ count: string }>("SELECT COUNT(*)::text AS count FROM node_actions WHERE node_id = $1 AND status = 'running'", [nodeId]);
+export async function countRunningNodeActions(nodeId: string, excludeActionId?: string): Promise<number> {
+  const rows = await dbQuery<{ count: string }>(`SELECT COUNT(*)::text AS count FROM node_actions
+    WHERE node_id = $1 AND status IN ('queued', 'running')${excludeActionId ? " AND id <> $2" : ""}`, excludeActionId ? [nodeId, excludeActionId] : [nodeId]);
   return Number(rows[0]?.count || 0);
 }
 
@@ -289,14 +290,31 @@ export async function addAudit(input: {
   ]);
 }
 
-export async function addNodeAction(nodeId: string, action: string): Promise<string> {
+export async function addNodeAction(nodeId: string, action: string, status: "queued" | "running" = "queued"): Promise<string> {
   const id = randomUUID();
-  await dbExec("INSERT INTO node_actions (id, node_id, action, status, created_at) VALUES ($1, $2, $3, 'running', $4)", [id, nodeId, action, now()]);
+  const timestamp = now();
+  await dbExec(`INSERT INTO node_actions (id, node_id, action, status, created_at, started_at, current_phase, progress)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, [id, nodeId, action, status, timestamp, status === "running" ? timestamp : null, status === "running" ? "connecting" : "queued", status === "running" ? 5 : 0]);
+  await appendNodeActionEvent(id, { phase: status === "running" ? "connecting" : "queued", message: status === "running" ? "Controller started the remote operation" : "Operation queued by the Controller" });
   return id;
 }
 
+export async function startNodeAction(id: string): Promise<void> {
+  const timestamp = now();
+  await dbExec("UPDATE node_actions SET status = 'running', started_at = $1, current_phase = 'connecting', progress = 5 WHERE id = $2 AND status = 'queued'", [timestamp, id]);
+  await appendNodeActionEvent(id, { phase: "connecting", message: "Worker accepted the operation and is connecting to the node" });
+}
+
+export async function updateNodeActionProgress(id: string, input: { phase: string; progress?: number; message?: string; level?: "info" | "warning" | "error" }): Promise<void> {
+  const progress = Math.min(Math.max(Math.trunc(input.progress ?? 0), 0), 100);
+  await dbExec("UPDATE node_actions SET current_phase = $1, progress = GREATEST(progress, $2) WHERE id = $3", [input.phase.slice(0, 64), progress, id]);
+  if (input.message) await appendNodeActionEvent(id, { phase: input.phase, message: input.message, level: input.level });
+}
+
 export async function finishNodeAction(id: string, status: string, output = "", error = ""): Promise<void> {
-  await dbExec("UPDATE node_actions SET status = $1, output = $2, error = $3, finished_at = $4 WHERE id = $5", [status, output, error, now(), id]);
+  const succeeded = status === "succeeded";
+  await dbExec("UPDATE node_actions SET status = $1, output = $2, error = $3, current_phase = $4, progress = $5, finished_at = $6 WHERE id = $7", [status, output, error, succeeded ? "complete" : "failed", succeeded ? 100 : 100, now(), id]);
+  await appendNodeActionEvent(id, { level: succeeded ? "info" : "error", phase: succeeded ? "complete" : "failed", message: succeeded ? "Operation completed successfully" : (error || "Operation failed") });
 }
 
 export type DbNodeAction = {
@@ -307,11 +325,37 @@ export type DbNodeAction = {
   output: string;
   error: string;
   created_at: string;
+  started_at: string | null;
   finished_at: string | null;
+  current_phase: string;
+  progress: number;
 };
+
+export type DbNodeActionEvent = {
+  id: string;
+  action_id: string;
+  sequence: number;
+  level: "info" | "warning" | "error";
+  phase: string;
+  message: string;
+  created_at: string;
+};
+
+export async function appendNodeActionEvent(actionId: string, input: { phase: string; message: string; level?: "info" | "warning" | "error" }): Promise<void> {
+  const sequence = Number((await dbQuery<{ next: string }>("SELECT COALESCE(MAX(sequence), 0) + 1 AS next FROM node_action_events WHERE action_id = $1", [actionId]))[0]?.next || 1);
+  await dbExec(`INSERT INTO node_action_events (id, action_id, sequence, level, phase, message, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)`, [randomUUID(), actionId, sequence, input.level || "info", input.phase.slice(0, 64), input.message.slice(0, 4000), now()]);
+}
+
+export async function listNodeActionEvents(nodeId: string, limit = 250): Promise<DbNodeActionEvent[]> {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 500);
+  return dbQuery<DbNodeActionEvent>(`SELECT e.* FROM node_action_events e
+    INNER JOIN node_actions a ON a.id = e.action_id WHERE a.node_id = $1
+    ORDER BY e.created_at DESC, e.sequence DESC LIMIT $2`, [nodeId, safeLimit]);
+}
 
 export async function listNodeActions(nodeId: string, limit = 20): Promise<DbNodeAction[]> {
   const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 50);
-  return dbQuery<DbNodeAction>(`SELECT id, node_id, action, status, output, error, created_at, finished_at
+  return dbQuery<DbNodeAction>(`SELECT id, node_id, action, status, output, error, created_at, started_at, finished_at, current_phase, progress
     FROM node_actions WHERE node_id = $1 ORDER BY created_at DESC LIMIT $2`, [nodeId, safeLimit]);
 }

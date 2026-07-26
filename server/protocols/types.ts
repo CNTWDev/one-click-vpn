@@ -21,6 +21,12 @@ export type ProfileBuildInput = {
   transport: string;
   dns: string[];
   allowedIps: string[];
+  openvpn?: {
+    clientCertificate: string;
+    clientKeySecretId: string;
+    caCertificate: string;
+    tlsCryptSecretId: string;
+  };
 };
 
 export type PeerState = {
@@ -34,6 +40,14 @@ export type DesiredStateInput = {
   serverPublicKey?: string | null;
   listenPort?: number;
   peers: PeerState[];
+  openvpn?: {
+    serverBundleSecretId: string;
+    revokedSerials: string[];
+    transport: string;
+    subnet: string;
+    listenPort: number;
+    dns: string[];
+  };
 };
 
 export type ProtocolAdapter = {
@@ -47,4 +61,3 @@ export type ProtocolAdapter = {
   };
   buildDesiredState(input: DesiredStateInput): Record<string, unknown>;
 };
-

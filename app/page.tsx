@@ -41,6 +41,7 @@ type AccessProfile = {
   clientAddress: string | null;
   dns: string[];
   allowedIps: string[];
+  protocol: "wireguard" | "openvpn";
   protocolPayload: { serverPublicKey?: string };
 };
 
@@ -58,7 +59,20 @@ type NodeAction = {
   output: string;
   error: string;
   created_at: string;
+  started_at: string | null;
   finished_at: string | null;
+  current_phase: string;
+  progress: number;
+};
+
+type NodeActionEvent = {
+  id: string;
+  action_id: string;
+  sequence: number;
+  level: "info" | "warning" | "error";
+  phase: string;
+  message: string;
+  created_at: string;
 };
 
 type ReconcileTask = {
@@ -76,11 +90,34 @@ type ReconcileTask = {
 
 type NodeDiagnostics = {
   actions: NodeAction[];
+  actionEvents: NodeActionEvent[];
   reconcile: {
     observed: Array<{ protocol: string; appliedRevision: number; status: string; lastError: string; updatedAt: string }>;
     tasks: ReconcileTask[];
   };
 };
+
+function formatTime(value: string | null | undefined, timeZone: string): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  try {
+    return new Intl.DateTimeFormat(undefined, { timeZone, year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(date);
+  } catch {
+    return date.toLocaleString();
+  }
+}
+
+function actionAdvice(action?: NodeAction): string | null {
+  if (!action || action.status !== "failed") return null;
+  const text = `${action.error}\n${action.output}`.toLowerCase();
+  if (text.includes("fingerprint")) return "Verify the SSH host fingerprint from the provider console, then update the node configuration and retry.";
+  if (text.includes("heartbeat") || text.includes("controller health preflight")) return "The node could not reach the public Controller URL. Check DNS, HTTPS certificate, outbound firewall, and NORTHSTAR_PUBLIC_ORIGIN.";
+  if (text.includes("permission denied") || text.includes("authentication failed")) return "Check the SSH username and credential in the node configuration, then retry the operation.";
+  if (text.includes("wireguard-tools") || text.includes("openvpn")) return "Review the package-manager output below. This distribution may need a supported repository or an Ubuntu/Debian image.";
+  if (text.includes("namespace") || text.includes("systemd")) return "Use Reinstall Agent to replace the managed service unit, then inspect the new service check event.";
+  return "Open the failed event details below. The final error and remote output are retained for diagnosis and safe retry.";
+}
 
 type NodeOperation = "status-agent" | "restart-agent" | "bootstrap" | "delete";
 type FleetNodeOperation = Exclude<NodeOperation, "delete">;
@@ -191,7 +228,7 @@ function buildWireGuardConfig(profile: AccessProfile, privateKey: string): strin
   return `[Interface]\nPrivateKey = ${privateKey}\nAddress = ${profile.clientAddress}/32\nDNS = ${profile.dns.join(", ")}\n\n[Peer]\nPublicKey = ${serverPublicKey}\nEndpoint = ${profile.endpoint.host}:${profile.endpoint.port}\nAllowedIPs = ${profile.allowedIps.join(", ")}\nPersistentKeepalive = 25\n`;
 }
 
-function ResourceMetrics({ metrics }: { metrics?: NodeMetrics | null }) {
+function ResourceMetrics({ metrics, timeZone = "UTC" }: { metrics?: NodeMetrics | null; timeZone?: string }) {
   if (!metrics) return <p className="diagnostics-empty">Resource metrics are waiting for the first Agent heartbeat.</p>;
   const metricClass = (value: number) => value >= 90 ? "metric-danger" : value >= 75 ? "metric-warning" : "";
   return <>
@@ -201,7 +238,7 @@ function ResourceMetrics({ metrics }: { metrics?: NodeMetrics | null }) {
       <div className={metricClass(metrics.disk.percent)}><span>DISK</span><b>{metrics.disk.percent.toFixed(1)}%</b><small>{formatBytes(metrics.disk.usedBytes)} / {formatBytes(metrics.disk.totalBytes)}</small></div>
       <div><span>NETWORK</span><b>↓ {formatBytes(metrics.network.rxBytesPerSecond)}/s</b><small>↑ {formatBytes(metrics.network.txBytesPerSecond)}/s</small></div>
     </div>
-    <p className="metrics-fresh">Last collected {metrics.collectedAt} · Agent heartbeat</p>
+    <p className="metrics-fresh">Last collected {formatTime(metrics.collectedAt, timeZone)} · Agent heartbeat</p>
   </>;
 }
 
@@ -335,12 +372,14 @@ export default function Home() {
   const [fingerprintCommandCopied, setFingerprintCommandCopied] = useState(false);
   const [accessDevices, setAccessDevices] = useState<AccessDevice[]>([]);
   const [accessNodeId, setAccessNodeId] = useState("");
+  const [accessProtocol, setAccessProtocol] = useState<"wireguard" | "openvpn">("wireguard");
   const [accessDeviceName, setAccessDeviceName] = useState("My Mac");
   const [accessDeviceBusy, setAccessDeviceBusy] = useState<string | null>(null);
   const [pendingDeviceRevocation, setPendingDeviceRevocation] = useState<AccessDevice | null>(null);
   const [accessBusy, setAccessBusy] = useState(false);
   const [accessError, setAccessError] = useState("");
   const [accessConfig, setAccessConfig] = useState<{ name: string; config: string } | null>(null);
+  const [timeZone, setTimeZone] = useState("UTC");
 
   const loadNodes = useCallback(async () => {
     const response = await fetch("/api/nodes", { cache: "no-store" });
@@ -388,9 +427,9 @@ export default function Home() {
     try {
       const response = await fetch(`/api/nodes/${nodeId}`, { cache: "no-store" });
       if (!response.ok) return;
-      const payload = await response.json() as { node?: Partial<Node>; actions?: NodeAction[]; reconcile?: NodeDiagnostics["reconcile"] };
+      const payload = await response.json() as { node?: Partial<Node>; actions?: NodeAction[]; actionEvents?: NodeActionEvent[]; reconcile?: NodeDiagnostics["reconcile"] };
       if (payload.node) setSelectedNode((current) => ({ ...current, ...payload.node }));
-      setNodeDiagnostics({ actions: payload.actions || [], reconcile: payload.reconcile || { observed: [], tasks: [] } });
+      setNodeDiagnostics({ actions: payload.actions || [], actionEvents: payload.actionEvents || [], reconcile: payload.reconcile || { observed: [], tasks: [] } });
     } finally {
       setDiagnosticsBusy(false);
     }
@@ -414,6 +453,11 @@ export default function Home() {
     const timer = window.setInterval(() => { void loadNodes(); }, 5000);
     return () => window.clearInterval(timer);
   }, [authStatus, loadNodes]);
+
+  useEffect(() => {
+    const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (browserTimeZone) setTimeZone(browserTimeZone);
+  }, []);
 
   useEffect(() => {
     if (authStatus !== "signed-in" || activeNav !== "Access") return undefined;
@@ -482,7 +526,7 @@ export default function Home() {
       setAccessError("Add and bootstrap at least one healthy node first.");
       return;
     }
-    if (!node.serverPublicKey) {
+    if (accessProtocol === "wireguard" && !node.serverPublicKey) {
       setAccessError("This node has not reported a WireGuard server key yet. Reinstall or restart its Agent, then wait for the next heartbeat.");
       return;
     }
@@ -490,9 +534,9 @@ export default function Home() {
     setAccessError("");
     setAccessConfig(null);
     try {
-      const privateBytes = x25519.utils.randomSecretKey();
-      const privateKey = base64(privateBytes);
-      const publicKey = base64(x25519.getPublicKey(privateBytes));
+      const privateBytes = accessProtocol === "wireguard" ? x25519.utils.randomSecretKey() : null;
+      const privateKey = privateBytes ? base64(privateBytes) : "";
+      const publicKey = privateBytes ? base64(x25519.getPublicKey(privateBytes)) : "openvpn-managed";
       const deviceResponse = await fetch("/api/access/devices", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ displayName: accessDeviceName.trim() || "My Mac", platform: "macos", publicKey }),
@@ -502,15 +546,23 @@ export default function Home() {
       setAccessDevices((current) => [devicePayload.device!, ...current]);
       const profileResponse = await fetch("/api/access/profiles", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deviceId: devicePayload.device.id, nodeId: node.id }),
+        body: JSON.stringify({ deviceId: devicePayload.device.id, nodeId: node.id, protocol: accessProtocol }),
       });
       const profilePayload = await profileResponse.json().catch(() => ({})) as { profile?: AccessProfile; error?: string };
       if (!profileResponse.ok || !profilePayload.profile) throw new Error(profilePayload.error || "Unable to create a connection profile");
       const activateResponse = await fetch(`/api/access/profiles/${profilePayload.profile.id}/activate`, { method: "POST" });
       const activatePayload = await activateResponse.json().catch(() => ({})) as { profile?: AccessProfile; error?: string };
       if (!activateResponse.ok || !activatePayload.profile) throw new Error(activatePayload.error || "Unable to activate the connection profile");
-      setAccessConfig({ name: `${node.name.replaceAll(/[^A-Za-z0-9_-]+/g, "-")}.conf`, config: buildWireGuardConfig(activatePayload.profile, privateKey) });
-      setNotice(`${node.name} connection profile is ready. Download it and import it into WireGuard.`);
+      if (accessProtocol === "wireguard") {
+        setAccessConfig({ name: `${node.name.replaceAll(/[^A-Za-z0-9_-]+/g, "-")}.conf`, config: buildWireGuardConfig(activatePayload.profile, privateKey) });
+        setNotice(`${node.name} WireGuard profile is ready. Download it and import it into WireGuard.`);
+      } else {
+        const downloadResponse = await fetch(`/api/access/profiles/${activatePayload.profile.id}/download`, { cache: "no-store" });
+        const config = await downloadResponse.text();
+        if (!downloadResponse.ok) throw new Error(config || "Unable to export OpenVPN profile");
+        setAccessConfig({ name: `${node.name.replaceAll(/[^A-Za-z0-9_-]+/g, "-")}.ovpn`, config });
+        setNotice(`${node.name} OpenVPN profile is ready. Download it and import it into OpenVPN Connect.`);
+      }
     } catch (error) {
       setAccessError(error instanceof Error ? error.message : "Unable to prepare the Mac connection");
     } finally {
@@ -638,7 +690,7 @@ export default function Home() {
       } else {
         response = await fetch(`/api/nodes/${node.id}/actions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
       }
-      const payload = await response.json().catch(() => ({})) as { error?: string };
+      const payload = await response.json().catch(() => ({})) as { error?: string; actionId?: string; status?: string };
       if (!response.ok) {
         setNotice(payload.error || `${action} failed.`);
         return;
@@ -653,13 +705,14 @@ export default function Home() {
         return;
       }
       const labels: Record<Exclude<NodeOperation, "delete">, string> = {
-        "status-agent": "Agent check completed",
-        "restart-agent": "Agent restart completed",
+        "status-agent": "Agent check queued",
+        "restart-agent": "Agent restart queued",
         bootstrap: "Agent reinstall queued",
       };
-      setNotice(`${labels[action]} for ${node.name}.`);
+      setNotice(`${labels[action]} for ${node.name}. The live job view will refresh automatically.`);
+      openTerminal(node);
       await loadNodes();
-      if (showTerminal && selectedNode.id === node.id) await loadNodeDiagnostics(node.id);
+      await loadNodeDiagnostics(node.id);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Node operation failed.");
     } finally {
@@ -866,15 +919,16 @@ export default function Home() {
         </section>}
 
         {activeNav === "Access" && <section className="module-view card access-workspace">
-          <div className="section-title route-title"><div><p>USER ACCESS</p><h1>Connect a device</h1></div><span className="route-status">WireGuard · Auto-ready</span></div>
-          <div className="access-copy">Choose a healthy node and create a local WireGuard profile. The private key is generated in this browser and is never sent to the Controller.</div>
+          <div className="section-title route-title"><div><p>USER ACCESS</p><h1>Connect a device</h1></div><span className="route-status">WireGuard · OpenVPN</span></div>
+          <div className="access-copy">Choose a healthy node and generate an import-ready macOS profile. WireGuard keys are created locally; OpenVPN credentials are issued by the managed controller CA.</div>
           <div className="access-form">
             <label>Edge node<select value={accessNodeId || nodes.find((node) => node.status === "online")?.id || ""} onChange={(event) => setAccessNodeId(event.target.value)}>{nodes.length === 0 && <option value="">No nodes available</option>}{nodes.map((node) => <option key={node.id} value={node.id} disabled={node.status !== "online"}>{node.name} · {node.place} · {node.status}</option>)}</select></label>
+            <label>Protocol<select value={accessProtocol} onChange={(event) => setAccessProtocol(event.target.value as "wireguard" | "openvpn")}><option value="wireguard">WireGuard</option><option value="openvpn">OpenVPN</option></select></label>
             <label>Device name<input value={accessDeviceName} maxLength={120} onChange={(event) => setAccessDeviceName(event.target.value)} placeholder="My Mac" /></label>
             <button className="primary-button" type="button" disabled={accessBusy || nodes.every((node) => node.status !== "online")} onClick={() => void createMacAccessProfile()}>{accessBusy ? "Preparing profile…" : "Prepare Mac profile"}<span>→</span></button>
           </div>
           {accessError && <p className="form-error" role="alert">{accessError}</p>}
-          {accessConfig && <div className="access-result"><div><p className="eyebrow"><span /> PROFILE READY</p><h2>Import this profile into WireGuard.</h2><p>Download the file, open WireGuard on macOS, choose <b>Import tunnel(s) from file</b>, then activate the tunnel. Keep the downloaded file private.</p></div><button className="secondary-button access-download" type="button" onClick={downloadAccessConfig}>Download {accessConfig.name} <span>↓</span></button><details><summary>Show configuration</summary><pre>{accessConfig.config}</pre></details></div>}
+          {accessConfig && <div className="access-result"><div><p className="eyebrow"><span /> PROFILE READY</p><h2>Import this profile into {accessProtocol === "openvpn" ? "OpenVPN Connect" : "WireGuard"}.</h2><p>Download the file, import it in the matching macOS app, then activate the connection. Keep the downloaded file private.</p></div><button className="secondary-button access-download" type="button" onClick={downloadAccessConfig}>Download {accessConfig.name} <span>↓</span></button><details><summary>Show configuration</summary><pre>{accessConfig.config}</pre></details></div>}
           <div className="access-devices"><div className="diagnostics-section-head"><b>Registered devices</b><span>{accessDevices.length}</span></div>{accessDevices.length ? accessDevices.map((device) => <div className="access-device" key={device.id}><span className="flag">MAC</span><div><b>{device.displayName}</b><small>{device.status} · {device.publicKey.slice(0, 16)}…</small></div>{device.status === "active" && <button className="access-device-revoke" type="button" disabled={accessDeviceBusy === device.id} onClick={() => setPendingDeviceRevocation(device)}>{accessDeviceBusy === device.id ? "Revoking…" : "Revoke"}</button>}</div>) : <p className="diagnostics-empty">No devices have been registered yet.</p>}</div>
         </section>}
 
@@ -915,16 +969,19 @@ export default function Home() {
             <div className="modal-head"><div><p>NODE DIAGNOSTICS</p><h2 id="terminal-title">{selectedNode.name}</h2></div><button type="button" onClick={() => setShowTerminal(false)} aria-label="Close diagnostics">×</button></div>
             <div className="terminal-meta"><span><i className="pulse" /> Deployment log</span><span>Bootstrap + Agent reconcile</span><span>Auto-refresh 5s</span></div>
             <div className="terminal-window">
-              <div className="terminal-bar"><span><i /><i /><i /></span><small>northstar/{selectedNode.id}</small><b>{diagnosticsBusy ? "Refreshing…" : `${nodeDiagnostics?.actions.length || 0} recorded events`}</b></div>
+              <div className="terminal-bar"><span><i /><i /><i /></span><small>northstar/{selectedNode.id}</small><label className="timezone-select">Time zone<select value={timeZone} onChange={(event) => setTimeZone(event.target.value)}><option value={Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}>Browser · {Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}</option><option value="UTC">UTC</option><option value="Asia/Shanghai">Asia/Shanghai</option><option value="America/Los_Angeles">America/Los_Angeles</option><option value="Europe/Frankfurt">Europe/Frankfurt</option></select></label><b>{diagnosticsBusy ? "Refreshing…" : `${nodeDiagnostics?.actionEvents.length || 0} live events`}</b></div>
               {diagnosticsBusy && !nodeDiagnostics ? <div className="terminal-ready"><div className="terminal-orbit">⌁</div><b>Loading deployment diagnostics…</b><p>Reading the controller’s audited bootstrap and Agent reconcile records.</p></div> : nodeDiagnostics && <div className="diagnostics-body">
                 <div className="diagnostics-grid"><div><span>NODE STATUS</span><b className={`diagnostic-${selectedNode.status}`}>{selectedNode.status}</b></div><div><span>LAST SEEN</span><b>{selectedNode.lastSeen}</b></div><div><span>AGENT VERSION</span><b>{selectedNode.version}</b></div></div>
-                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Resource health</b></div><ResourceMetrics metrics={selectedNode.metrics} /></div>
-                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Recent deployment events</b><button type="button" onClick={() => void loadNodeDiagnostics(selectedNode.id)}>Refresh</button></div>
-                  {nodeDiagnostics.actions.length ? nodeDiagnostics.actions.map((action) => <article className="diagnostic-event" key={action.id}><div><b>{action.action}</b><span>{action.status} · {action.finished_at || action.created_at}</span></div>{action.error && <pre className="diagnostic-error">{action.error}</pre>}{action.output && <pre>{action.output}</pre>}</article>) : <p className="diagnostics-empty">No deployment events recorded yet.</p>}
+                {nodeDiagnostics.actions[0] && <div className="job-overview"><div><span>CURRENT / LATEST JOB</span><b>{nodeDiagnostics.actions[0].action.replaceAll("-", " ")}</b><small>{nodeDiagnostics.actions[0].current_phase.replaceAll("-", " ")} · {nodeDiagnostics.actions[0].status}</small></div><div className="job-progress"><i style={{ width: `${nodeDiagnostics.actions[0].progress}%` }} /><span>{nodeDiagnostics.actions[0].progress}%</span></div><time>{formatTime(nodeDiagnostics.actions[0].finished_at || nodeDiagnostics.actions[0].started_at || nodeDiagnostics.actions[0].created_at, timeZone)}</time></div>}
+                {actionAdvice(nodeDiagnostics.actions[0]) && <aside className="diagnostic-advice"><b>Suggested next step</b><p>{actionAdvice(nodeDiagnostics.actions[0])}</p></aside>}
+                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Resource health</b></div><ResourceMetrics metrics={selectedNode.metrics} timeZone={timeZone} /></div>
+                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Operation timeline</b><button type="button" onClick={() => void loadNodeDiagnostics(selectedNode.id)}>Refresh now</button></div>
+                  {nodeDiagnostics.actionEvents.length ? [...nodeDiagnostics.actionEvents].reverse().map((event) => <article className={`diagnostic-event event-${event.level}`} key={event.id}><time>{formatTime(event.created_at, timeZone)}</time><span>{event.phase.replaceAll("-", " ")}</span><p>{event.message}</p></article>) : <p className="diagnostics-empty">No operation events recorded yet.</p>}
                 </div>
-                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>WireGuard reconcile</b></div>
+                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Protocol reconcile</b></div>
                   {nodeDiagnostics.reconcile.tasks.length ? nodeDiagnostics.reconcile.tasks.slice(0, 5).map((task) => <article className="diagnostic-task" key={task.id}><span>{task.protocol} · {task.taskType}</span><b className={`diagnostic-${task.status}`}>{task.status}</b>{task.lastError && <pre className="diagnostic-error">{task.lastError}</pre>}</article>) : <p className="diagnostics-empty">No protocol tasks have been queued.</p>}
                 </div>
+                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Operation history</b></div>{nodeDiagnostics.actions.map((action) => <details className="operation-history" key={action.id}><summary><span>{action.action.replaceAll("-", " ")}</span><b className={`diagnostic-${action.status}`}>{action.status}</b><time>{formatTime(action.finished_at || action.created_at, timeZone)}</time></summary>{action.error && <pre className="diagnostic-error">{action.error}</pre>}{action.output && <pre>{action.output}</pre>}</details>)}</div>
               </div>}
             </div>
             <div className="terminal-footer"><span>Output is recorded to the encrypted audit log.</span><div><button type="button" onClick={() => requestNodeAction(selectedNode, "bootstrap")}>Retry bootstrap</button><button type="button" onClick={() => requestNodeAction(selectedNode, "status-agent")}>Check agent</button><button type="button" onClick={() => requestNodeAction(selectedNode, "restart-agent")}>Restart agent</button><button type="button" className="danger-button" disabled={Boolean(nodeActionBusy)} onClick={() => requestNodeAction(selectedNode, "delete")}>{nodeActionBusy === `${selectedNode.id}:delete` ? "Deleting…" : "Delete node"}</button></div></div>
