@@ -47,9 +47,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      target: portal-runtime
       args:
-        FRONTEND: portal
-        DIST_DIR: portal-web
         PORT: 3100
     restart: unless-stopped
     depends_on:
@@ -69,9 +68,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      target: admin-runtime
       args:
-        FRONTEND: admin-web
-        DIST_DIR: admin-web
         PORT: 3200
     restart: unless-stopped
     depends_on:

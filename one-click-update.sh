@@ -4,16 +4,18 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP_DIR="$SCRIPT_DIR"
 no_cache="no"
+service="all"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --no-cache) no_cache="yes"; shift ;;
+    --service) service=${2:-}; shift 2 ;;
     -h|--help)
-      echo "Usage: sudo ./one-click-update.sh [--no-cache]"
+      echo "Usage: sudo ./one-click-update.sh [--service all|northstar|portal-web|admin-web] [--no-cache]"
       exit 0
       ;;
     *)
-      echo "Usage: sudo ./one-click-update.sh [--no-cache]" >&2
+      echo "Usage: sudo ./one-click-update.sh [--service all|northstar|portal-web|admin-web] [--no-cache]" >&2
       exit 2
       ;;
   esac
@@ -34,8 +36,19 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   exit 1
 fi
 
-echo "Creating a database backup before pulling new code..."
-./scripts/backup.sh ./backups
+case "$service" in
+  all|northstar|controller)
+    echo "Creating a database backup before pulling new code..."
+    ./scripts/backup.sh ./backups
+    ;;
+  portal|portal-web|admin|admin-web)
+    echo "Frontend-only update selected; skipping database backup."
+    ;;
+  *)
+    echo "Unknown service: $service. Use all, northstar, portal-web, or admin-web." >&2
+    exit 2
+    ;;
+esac
 
 before=$(git rev-parse HEAD)
 echo "Fetching latest code..."
@@ -52,7 +65,7 @@ else
 fi
 
 if [ "$no_cache" = "yes" ]; then
-  ./scripts/deploy.sh --no-cache
+  ./scripts/deploy.sh --service "$service" --no-cache
 else
-  ./scripts/deploy.sh
+  ./scripts/deploy.sh --service "$service"
 fi

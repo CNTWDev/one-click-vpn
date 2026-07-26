@@ -7,23 +7,55 @@ APP_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 
 cd "$APP_DIR"
 mode="deploy"
+service="all"
+service_explicit="no"
 no_cache="no"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     deploy) mode="deploy"; shift ;;
     logs) mode="logs"; shift ;;
     ps|status) mode="ps"; shift ;;
+    --service) service=${2:-}; service_explicit="yes"; shift 2 ;;
     --no-cache) no_cache="yes"; shift ;;
     -h|--help)
-      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--no-cache]"
+      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|northstar|portal-web|admin-web] [--no-cache]"
       exit 0
       ;;
     *)
-      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--no-cache]" >&2
+      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|northstar|portal-web|admin-web] [--no-cache]" >&2
       exit 2
       ;;
   esac
 done
+
+case "$service" in
+  all) ;;
+  controller|northstar) service="northstar" ;;
+  portal) service="portal-web" ;;
+  admin) service="admin-web" ;;
+  portal-web|admin-web) ;;
+  *) echo "Unknown service: $service. Use all, northstar, portal-web, or admin-web." >&2; exit 2 ;;
+esac
+
+if [ "$mode" = "deploy" ] && [ "$service_explicit" = "no" ] && [ -t 0 ] && [ -t 1 ]; then
+  echo ""
+  echo "Northstar deployment wizard"
+  echo "Choose what you want to update:"
+  echo "  1) all         Controller + Portal + Admin (recommended for releases)"
+  echo "  2) northstar   Controller/API only"
+  echo "  3) portal-web  Portal only"
+  echo "  4) admin-web   Admin only"
+  printf "Select [1]: "
+  read -r choice
+  case "${choice:-1}" in
+    1) service="all" ;;
+    2) service="northstar" ;;
+    3) service="portal-web" ;;
+    4) service="admin-web" ;;
+    *) echo "Invalid selection: $choice" >&2; exit 2 ;;
+  esac
+  echo "Selected service: $service"
+fi
 
 case "$mode" in
   logs)
@@ -31,7 +63,7 @@ case "$mode" in
     exit 0
     ;;
   ps)
-    compose ps
+    compose ps --all
     exit 0
     ;;
 esac
@@ -40,55 +72,49 @@ esac
 "$SCRIPT_DIR/check-env.sh"
 
 export NORTHSTAR_BUILD_REV=$(git rev-parse --short HEAD)
-echo "Deploying build $NORTHSTAR_BUILD_REV"
-
-echo "Building Northstar image..."
-if [ "$no_cache" = "yes" ]; then
-  echo "Docker build cache disabled."
-  compose build --no-cache northstar portal-web admin-web
-else
-  compose build northstar portal-web admin-web
-fi
+echo "Deploying build $NORTHSTAR_BUILD_REV (service: $service)"
 
 echo "Starting PostgreSQL and waiting for it to become healthy..."
 compose up -d db
 
-db_container_id=$(compose ps -q db)
-if [ -z "$db_container_id" ]; then
-  echo "PostgreSQL container was not created." >&2
-  compose ps >&2
-  compose logs --tail=120 db >&2 || true
-  exit 1
-fi
-
-db_healthy=""
-i=0
-while [ "$i" -lt 60 ]; do
-  db_status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$db_container_id" 2>/dev/null || true)
-  if [ "$db_status" = "healthy" ]; then
-    db_healthy="yes"
-    break
+wait_for_healthy() {
+  service_name=$1
+  container_id=$(compose ps -q "$service_name")
+  if [ -z "$container_id" ]; then
+    echo "$service_name container was not created." >&2
+    compose ps --all >&2
+    compose logs --tail=120 "$service_name" >&2 || true
+    exit 1
   fi
-  if [ "$db_status" = "unhealthy" ] || [ "$db_status" = "exited" ]; then
-    break
+
+  healthy=""
+  i=0
+  while [ "$i" -lt 60 ]; do
+    status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)
+    if [ "$status" = "healthy" ]; then
+      healthy="yes"
+      break
+    fi
+    if [ "$status" = "unhealthy" ] || [ "$status" = "exited" ]; then
+      break
+    fi
+    i=$((i + 1))
+    sleep 2
+  done
+
+  if [ -z "$healthy" ]; then
+    echo "$service_name did not become healthy." >&2
+    compose ps --all >&2
+    docker inspect --format '{{range .State.Health.Log}}{{println .ExitCode .Output}}{{end}}' "$container_id" >&2 || true
+    compose logs --tail=120 "$service_name" >&2 || true
+    exit 1
   fi
-  i=$((i + 1))
-  sleep 2
-done
+}
 
-if [ -z "$db_healthy" ]; then
-  echo "PostgreSQL did not become healthy." >&2
-  compose ps >&2
-  docker inspect --format '{{range .State.Health.Log}}{{println .ExitCode .Output}}{{end}}' "$db_container_id" >&2 || true
-  compose logs --tail=120 db >&2 || true
-  exit 1
-fi
-
+wait_for_healthy db
 echo "PostgreSQL is healthy. Preparing internal operational-log storage..."
 compose up -d minio minio-init
 
-# minio-init is intentionally a short-lived one-shot container. It can finish
-# before this command runs, so include stopped containers when resolving it.
 minio_init_id=$(compose ps --all --quiet minio-init)
 if [ -z "$minio_init_id" ]; then
   echo "MinIO initialization container was not created." >&2
@@ -119,67 +145,67 @@ if [ -z "$minio_initialized" ]; then
   exit 1
 fi
 
-echo "Operational-log storage is ready. Starting Loki, Controller, Portal, and Admin..."
 compose up -d loki
-compose up -d --force-recreate --remove-orphans northstar portal-web admin-web
 
-container_id=$(compose ps -q northstar)
-if [ -z "$container_id" ]; then
-  echo "Northstar container was not created." >&2
-  compose ps
-  exit 1
+if [ "$service" = "all" ]; then
+  build_targets="northstar portal-web admin-web"
+  up_targets="northstar portal-web admin-web"
+else
+  build_targets="$service"
+  up_targets="$service"
+  if [ "$service" != "northstar" ]; then
+    # A frontend needs a healthy Controller, but does not recreate it.
+    compose up -d northstar
+    wait_for_healthy northstar
+  fi
 fi
 
-healthy=""
-i=0
-while [ "$i" -lt 60 ]; do
-  status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)
-  if [ "$status" = "healthy" ]; then
-    healthy="yes"
-    break
-  fi
-  if [ "$status" = "unhealthy" ] || [ "$status" = "exited" ]; then
-    break
-  fi
-  i=$((i + 1))
-  sleep 2
-done
+echo "Building: $build_targets"
+if [ "$no_cache" = "yes" ]; then
+  compose build --no-cache $build_targets
+else
+  compose build $build_targets
+fi
 
-if [ -z "$healthy" ]; then
-  echo "Northstar did not become healthy." >&2
-  compose ps
-  echo "Runtime binding environment:" >&2
-  docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container_id" 2>/dev/null | awk '/^(HOSTNAME|PORT)=/' >&2 || true
-  echo "Health-check output:" >&2
-  docker inspect --format '{{range .State.Health.Log}}{{println .ExitCode .Output}}{{end}}' "$container_id" >&2 || true
-  compose logs --tail=120 db northstar >&2 || true
-  exit 1
+echo "Starting: $up_targets"
+if [ "$service" = "all" ]; then
+  compose up -d --force-recreate --remove-orphans --no-deps $up_targets
+else
+  compose up -d --force-recreate --no-deps $up_targets
+fi
+
+if [ "$service" = "all" ]; then
+  wait_for_healthy northstar
+  wait_for_healthy portal-web
+  wait_for_healthy admin-web
+else
+  wait_for_healthy "$service"
 fi
 
 if command -v curl >/dev/null 2>&1; then
-  local_ok=""
-  if curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
-    local_ok="yes"
-  fi
-  if [ -z "$local_ok" ]; then
-    echo "Warning: the container health check passed, but the host-local controller check failed." >&2
-    echo "Check the Northstar logs with: ./scripts/deploy.sh logs" >&2
-  fi
-  for frontend_port in 3100 3200; do
-    frontend_ok=""
-    if curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$frontend_port/health" >/dev/null 2>&1; then
-      frontend_ok="yes"
+  check_endpoint() {
+    service_name=$1
+    port=$2
+    path=$3
+    if ! curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$port$path" >/dev/null 2>&1; then
+      echo "Warning: $service_name failed its local health check at 127.0.0.1:$port$path." >&2
     fi
-    if [ -z "$frontend_ok" ]; then
-      echo "Warning: frontend on 127.0.0.1:$frontend_port did not answer its health endpoint." >&2
-    fi
-  done
+  }
+  case "$service" in
+    all)
+      check_endpoint northstar 3000 /api/health
+      check_endpoint portal-web 3100 /health
+      check_endpoint admin-web 3200 /health
+      ;;
+    northstar) check_endpoint northstar 3000 /api/health ;;
+    portal-web) check_endpoint portal-web 3100 /health ;;
+    admin-web) check_endpoint admin-web 3200 /health ;;
+  esac
 fi
 
 compose ps
-echo "Northstar deployment is healthy."
+echo "Northstar deployment is healthy (service: $service)."
 echo "Controller: http://127.0.0.1:3000"
 echo "Portal: http://127.0.0.1:3100"
 echo "Admin: http://127.0.0.1:3200"
-echo "Configure host Nginx to proxy app, console, and api domains to these ports."
 echo "Logs: ./scripts/deploy.sh logs"

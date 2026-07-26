@@ -115,6 +115,27 @@ Recommended upgrade, including a PostgreSQL backup:
 sudo ./one-click-update.sh
 ```
 
+You can also run the deployment script directly. In an interactive terminal it
+opens a guided menu for `all`, `northstar`, `portal-web`, or `admin-web`:
+
+```bash
+sudo ./scripts/deploy.sh
+```
+
+When called by automation or with an explicit `--service`, it stays non-interactive.
+
+For a small, isolated change, update only the affected service:
+
+```bash
+sudo ./one-click-update.sh --service northstar    # Controller/API
+sudo ./one-click-update.sh --service portal-web   # Portal
+sudo ./one-click-update.sh --service admin-web    # Admin
+```
+
+`northstar` and `all` create a database backup. Frontend-only updates skip the
+database backup and do not restart the Controller. Use the full update when a
+change touches dependencies, migrations, Compose configuration, or shared code.
+
 Manual upgrade:
 
 ```bash
@@ -126,7 +147,7 @@ sudo ./scripts/deploy.sh
 Database migrations run during Controller deployment. `.env`, certificates, and
 Docker volumes are preserved. Never use `docker compose down -v` in production.
 
-To rebuild only the frontends:
+To rebuild only the frontends without pulling code:
 
 ```bash
 docker compose build portal-web admin-web
@@ -192,13 +213,8 @@ sudo ./scripts/deploy.sh logs
 sudo ./scripts/backup.sh ./backups
 ```
 
-If a frontend build reports `dist/admin-web-web`, update to the current
-`Dockerfile.frontend` and `docker-compose.yml`, which pass `DIST_DIR` explicitly:
-
-```bash
-docker compose build portal-web admin-web
-docker compose up -d --no-deps portal-web admin-web
-```
+The frontend Docker targets copy only their own source directory. Backend changes
+therefore keep the Portal/Admin dependency and build layers cached.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) and
 [docs/architecture](docs/architecture/README.md) for detailed design notes.
