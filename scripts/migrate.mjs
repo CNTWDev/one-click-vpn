@@ -32,10 +32,12 @@ CREATE TABLE IF NOT EXISTS nodes (
   credential_iv TEXT NOT NULL, credential_tag TEXT NOT NULL, host_fingerprint TEXT,
   agent_token_hash TEXT, provider TEXT NOT NULL DEFAULT 'unknown', region TEXT NOT NULL DEFAULT '',
   public_endpoint TEXT, server_public_key TEXT, agent_capabilities_json TEXT NOT NULL DEFAULT '{}',
-  metrics_json TEXT,
+  metrics_json TEXT, deployment_policy TEXT NOT NULL DEFAULT 'standard', policy_version INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 ALTER TABLE nodes ADD COLUMN IF NOT EXISTS metrics_json TEXT;
+ALTER TABLE nodes ADD COLUMN IF NOT EXISTS deployment_policy TEXT NOT NULL DEFAULT 'standard';
+ALTER TABLE nodes ADD COLUMN IF NOT EXISTS policy_version INTEGER NOT NULL DEFAULT 1;
 CREATE INDEX IF NOT EXISTS nodes_region_idx ON nodes(region_id);
 CREATE TABLE IF NOT EXISTS regions (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, country TEXT NOT NULL, code TEXT NOT NULL,
@@ -81,6 +83,32 @@ CREATE TABLE IF NOT EXISTS node_protocols (
   min_client_version TEXT, config_schema_version INTEGER NOT NULL DEFAULT 1,
   status TEXT NOT NULL DEFAULT 'enabled', updated_at TEXT NOT NULL,
   PRIMARY KEY (node_id, protocol)
+);
+CREATE TABLE IF NOT EXISTS vpn_services (
+  node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  protocol TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1,
+  transport TEXT NOT NULL DEFAULT 'udp', listen_port INTEGER NOT NULL,
+  subnet TEXT NOT NULL, dns_json TEXT NOT NULL DEFAULT '["1.1.1.1"]',
+  status TEXT NOT NULL DEFAULT 'pending', last_error TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY (node_id, protocol)
+);
+CREATE INDEX IF NOT EXISTS vpn_services_status_idx ON vpn_services(enabled, status, protocol);
+CREATE TABLE IF NOT EXISTS policy_rollouts (
+  id TEXT PRIMARY KEY, from_version INTEGER NOT NULL, to_version INTEGER NOT NULL,
+  mode TEXT NOT NULL, status TEXT NOT NULL, protocols_json TEXT NOT NULL DEFAULT '[]',
+  total_targets INTEGER NOT NULL DEFAULT 0, queued_targets INTEGER NOT NULL DEFAULT 0,
+  succeeded_targets INTEGER NOT NULL DEFAULT 0, blocked_targets INTEGER NOT NULL DEFAULT 0,
+  failed_targets INTEGER NOT NULL DEFAULT 0, created_by TEXT REFERENCES users(id),
+  created_at TEXT NOT NULL, started_at TEXT, finished_at TEXT
+);
+ALTER TABLE policy_rollouts ADD COLUMN IF NOT EXISTS succeeded_targets INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE policy_rollouts ADD COLUMN IF NOT EXISTS blocked_targets INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS policy_rollout_targets (
+  rollout_id TEXT NOT NULL REFERENCES policy_rollouts(id) ON DELETE CASCADE,
+  node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  status TEXT NOT NULL, error TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL,
+  PRIMARY KEY (rollout_id, node_id)
 );
 CREATE TABLE IF NOT EXISTS protocol_credentials (
   id TEXT PRIMARY KEY, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
@@ -185,6 +213,14 @@ try {
   }
   await pool.query(`UPDATE nodes SET region_id = regions.id
     FROM regions WHERE nodes.region_id IS NULL AND nodes.place = regions.name || ' · ' || regions.country`);
+  await pool.query(`INSERT INTO vpn_services
+    (node_id, protocol, enabled, transport, listen_port, subnet, dns_json, status, created_at, updated_at)
+    SELECT id, 'wireguard', 1, 'udp', 51820, '10.70.0.0/24', '["1.1.1.1"]', 'pending', $1, $1 FROM nodes
+    ON CONFLICT (node_id, protocol) DO NOTHING`, [timestamp]);
+  await pool.query(`INSERT INTO vpn_services
+    (node_id, protocol, enabled, transport, listen_port, subnet, dns_json, status, created_at, updated_at)
+    SELECT id, 'openvpn', 1, 'udp', 1194, '10.71.0.0/24', '["1.1.1.1"]', 'pending', $1, $1 FROM nodes
+    ON CONFLICT (node_id, protocol) DO NOTHING`, [timestamp]);
   const email = process.env.NORTHSTAR_ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.NORTHSTAR_ADMIN_PASSWORD;
   if (email && password) {

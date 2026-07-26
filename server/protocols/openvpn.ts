@@ -12,6 +12,11 @@ export const openvpnAdapter: ProtocolAdapter = {
     configSchemaVersion: 1,
     status: "enabled",
   },
+  service: {
+    standard: true, defaultTransport: "udp", defaultListenPort: 1194,
+    defaultSubnet: "10.71.0.0/24", defaultDns: ["1.1.1.1"],
+    applyTask: "ApplyOpenVpnServer", disableTask: "DisableOpenVpn",
+  },
   buildProfile(input) {
     if (!input.clientAddress) throw new Error("OpenVPN client address is not allocated");
     if (!input.openvpn) throw new Error("OpenVPN client credentials are not available");

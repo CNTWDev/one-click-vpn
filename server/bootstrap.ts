@@ -6,6 +6,7 @@ import { allowTofuHostKeys, publicOrigin } from "./config";
 import { decryptSecret, hashToken } from "./crypto";
 import { addAudit, addNodeAction, appendNodeActionEvent, countRunningNodeActions, findNode, finishNodeAction, startNodeAction, updateNode, updateNodeActionProgress } from "./db";
 import { ensureDefaultNodeProtocols } from "./control-plane";
+import { reconcileEnabledVpnServices } from "./vpn-services";
 import { writeOperationalLog } from "./operational-logs";
 
 const maximumConcurrentRemoteActions = 3;
@@ -421,6 +422,7 @@ printf 'NORTHSTAR_PROGRESS|heartbeat|96|Agent is active; waiting for its first C
       return;
     }
     await ensureDefaultNodeProtocols(nodeId);
+    await reconcileEnabledVpnServices(nodeId);
     await finishNodeAction(actionId, "succeeded", combinedOutput.slice(-12000));
     await addAudit({ actorUserId, action: "node.bootstrap.succeeded", targetType: "node", targetId: nodeId });
   } catch (error) {

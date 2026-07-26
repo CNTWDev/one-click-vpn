@@ -1,4 +1,4 @@
-import { getNodeReconcileStatus, listControlNodes } from "./control-db";
+import { getNodeReconcileStatus, listControlNodes, listVpnServices, type Protocol, type VpnService } from "./control-db";
 
 export type ConnectivityState = "healthy" | "attention" | "provisioning" | "unavailable" | "not_configured" | "unknown";
 
@@ -6,6 +6,7 @@ type ProtocolObservation = {
   installed?: boolean;
   interfaceActive?: boolean;
   serviceActive?: boolean;
+  runtimeActive?: boolean;
   listening?: boolean | null;
   port?: number;
   transport?: string;
@@ -15,24 +16,28 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function protocolAssessment(protocol: "wireguard" | "openvpn", raw: unknown, intent: { configured: boolean; taskStatus?: string; lastError?: string }) {
+function protocolAssessment(protocol: Protocol, raw: unknown, service: VpnService, intent: { taskStatus?: string; lastError?: string }) {
   const rawObserved = record(raw);
   const observed = rawObserved as ProtocolObservation;
-  const runtimeActive = protocol === "wireguard" ? observed.interfaceActive : observed.serviceActive;
-  const state: ConnectivityState = !Object.keys(rawObserved).length ? "unknown"
+  const runtimeActive = observed.runtimeActive ?? observed.interfaceActive ?? observed.serviceActive;
+  const configured = service.enabled;
+  const state: ConnectivityState = service.status === "deploying" || service.status === "pending" ? "provisioning"
+    : !configured ? "not_configured"
+    : service.status === "unsupported" ? "unavailable"
+    : service.status === "attention" ? "attention"
+    : !Object.keys(rawObserved).length ? "unknown"
     : !observed.installed ? "unavailable"
     : observed.listening === true && runtimeActive ? "healthy"
       : runtimeActive ? "attention"
-        : intent.taskStatus === "pending" || intent.taskStatus === "running" ? "provisioning"
-          : intent.configured ? "attention" : "not_configured";
+        : intent.taskStatus === "pending" || intent.taskStatus === "running" ? "provisioning" : "attention";
   return {
     protocol,
     state,
-    configured: intent.configured,
+    configured,
     taskStatus: intent.taskStatus || null,
     lastError: intent.lastError || "",
-    transport: observed.transport || "udp",
-    port: Number.isFinite(observed.port) ? observed.port : protocol === "wireguard" ? 51820 : 1194,
+    transport: observed.transport || service.transport,
+    port: Number.isFinite(observed.port) ? observed.port : service.listen_port,
     installed: Boolean(observed.installed),
     runtimeActive: Boolean(runtimeActive),
     listening: observed.listening === true,
@@ -48,14 +53,15 @@ export async function getNodeConnectivity(nodeId: string) {
   const managedRules = record(firewall.managedRules);
   const protocols = record(snapshot.protocols);
   const reconcile = await getNodeReconcileStatus(nodeId);
-  const assessed = (["wireguard", "openvpn"] as const).map((protocol) => {
+  const services = await listVpnServices(nodeId);
+  const assessed = services.map((service) => {
+    const protocol = service.protocol;
     const latestTask = reconcile.tasks.find((task) => task.protocol === protocol);
     const observed = reconcile.observed.find((item) => item.protocol === protocol);
-    return protocolAssessment(protocol, protocols[protocol], {
-      configured: reconcile.desired.some((desired) => desired.protocol === protocol),
+    return protocolAssessment(protocol, protocols[protocol], service, {
       taskStatus: typeof latestTask?.status === "string" ? latestTask.status : undefined,
-      lastError: typeof latestTask?.lastError === "string" && latestTask.lastError
-        ? latestTask.lastError : typeof observed?.lastError === "string" ? observed.lastError : undefined,
+      lastError: service?.last_error || (typeof latestTask?.lastError === "string" && latestTask.lastError
+        ? latestTask.lastError : typeof observed?.lastError === "string" ? observed.lastError : undefined),
     });
   }).map((item) => ({
     ...item,

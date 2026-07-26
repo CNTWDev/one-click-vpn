@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import { promisify } from "node:util";
 import test, { after, before } from "node:test";
 
@@ -14,6 +15,17 @@ const integrationOptions = databaseUrl
   ? {}
   : { skip: "Set NORTHSTAR_TEST_DATABASE_URL to a disposable PostgreSQL database to run integration tests." };
 const execFileAsync = promisify(execFile);
+
+test("VPN service lifecycle is represented in schema and Agent tasks", () => {
+  const migration = readFileSync(path.join(root, "scripts/migrate.mjs"), "utf8");
+  const agent = readFileSync(path.join(root, "agent/agent.py"), "utf8");
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS vpn_services/);
+  assert.match(migration, /deployment_policy TEXT NOT NULL DEFAULT 'standard'/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS policy_rollouts/);
+  assert.match(agent, /DisableWireGuard/);
+  assert.match(agent, /DisableOpenVpn/);
+  assert.match(agent, /agent 2\.4\.0/);
+});
 
 async function waitForServer() {
   const deadline = Date.now() + 30_000;

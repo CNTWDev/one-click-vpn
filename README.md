@@ -14,7 +14,9 @@ The current implementation includes:
 - Docker Compose, host-managed Nginx HTTPS, health checks, backups, and a repeatable deployment script.
 - versioned `/api/v1` authentication, device, node capability, Connection Profile, and Agent reconcile endpoints;
 - protocol Adapter registry, WireGuard and OpenVPN desired-state generation, IP leases, revisions, and structured Agent tasks;
-- a browser-based Access workflow that issues exportable WireGuard and OpenVPN profiles for macOS;
+- explicit VPN Service lifecycle management, independent from users and Connection Profiles;
+- versioned Standard fleet policy with capability-gated canary and batch rollouts for existing nodes;
+- a browser-based Users & Devices workflow that automatically assigns a healthy service and issues exportable WireGuard and OpenVPN profiles for macOS;
 - lightweight Agent resource telemetry for CPU, load, memory, disk, network counters, and collection time.
 - an internal Loki + MinIO operational log service with separate retention and audited purge controls.
 
@@ -251,13 +253,59 @@ sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256
 
 Copy the value beginning with `SHA256:` into the node form. The controller checks this value during every SSH connection, so a changed or intercepted host key is rejected instead of silently trusted. `ssh-keyscan` can be used only after independently verifying that the returned key belongs to the intended server.
 
+Choose a deployment template when adding the node:
+
+- **Standard edge** installs and enables both WireGuard and OpenVPN;
+- **WireGuard only** or **OpenVPN only** enables one listener;
+- **Agent only** installs monitoring and the control channel without exposing a VPN listener.
+
+After the first authenticated heartbeat, the Controller sends structured service reconcile tasks automatically. Creating a user profile is not required to start a VPN server.
+
 The controller stores the credential only as an AES-256-GCM ciphertext. It then uses SSH to install `/opt/northstar-agent/agent.py` and a `northstar-agent.service`. The agent only sends outbound health heartbeats to the controller and does not accept inbound commands.
 
-An Agent journal entry containing `HTTP 401: Unauthorized` means network and TLS connectivity succeeded, but the token in `/opt/northstar-agent/config.env` no longer matches the hash stored by the Controller. This can happen after restoring an older Controller database or interrupting identity rotation. Use **Reinstall / repair agent** from the node action menu to rotate and synchronize the credential over fingerprint-verified SSH. Do not copy or edit the token manually. Agent 2.3.2 rate-limits repeated errors and applies exponential request backoff during Controller outages so upgrades do not cause a retry storm.
+An Agent journal entry containing `HTTP 401: Unauthorized` means network and TLS connectivity succeeded, but the token in `/opt/northstar-agent/config.env` no longer matches the hash stored by the Controller. This can happen after restoring an older Controller database or interrupting identity rotation. Use **Reinstall / repair agent** from the node action menu to rotate and synchronize the credential over fingerprint-verified SSH. Do not copy or edit the token manually. Agent 2.4.0 rate-limits repeated errors and applies exponential request backoff during Controller outages so upgrades do not cause a retry storm.
 
 The current production data-plane paths are WireGuard over IPv4 and managed OpenVPN over IPv4. Bootstrap installs `iptables`, enables IPv4 forwarding, and installs OpenVPN independently from WireGuard. On DNF-based systems it first uses the enabled repositories, then tries the common CRB/PowerTools and EPEL/ELRepo paths for WireGuard. If the distribution vendor does not publish `wireguard-tools`, bootstrap continues as OpenVPN-only and records the repository diagnostics. Open UDP `51820` for WireGuard and UDP `1194` for OpenVPN in the Edge Node cloud security group/firewall; the controller cannot change a provider firewall without a provider-specific integration. IKEv2 remains planned.
 
 Each node's diagnostics retains compact job summaries, warnings, errors, Agent status/restart output, and lightweight resource telemetry. Full operational output is available from the system **Logs** view. The Agent sends telemetry with its existing 30-second heartbeat; no separate metrics daemon or time-series service is required. CPU, memory, disk, and network values are visible in the node diagnostics panel.
+
+## Operating model
+
+Northstar separates infrastructure from end-user access:
+
+1. **Nodes** are Linux hosts with an outbound Agent channel. SSH is used only for bootstrap and repair.
+2. **VPN Services** are protocol listeners deployed on nodes. Enable, disable, or redeploy them from the VPN Services page. Disabling a service stops its listener and disconnects clients using it.
+3. **Users & Devices** owns client identity and Connection Profiles. A user selects a protocol and optionally a region; the Controller assigns a fresh, healthy service with the lowest current node load.
+
+The normal first-use sequence is therefore:
+
+```text
+Add node -> Agent heartbeat -> VPN service healthy -> Register device -> Export profile -> Import into client
+```
+
+Adding another node does not require creating a client profile. It immediately becomes eligible for automatic assignment after its selected VPN services are healthy. A profile exported on one computer can technically be copied to another, but that shares one device identity and is not recommended. Register each physical device separately so it can be audited, rotated, and revoked independently.
+
+Common service operations are available in **VPN Services**:
+
+- **Enable** creates or restores the protocol listener with the configured port;
+- **Redeploy** reapplies the complete desired state, certificates, peers, firewall rules, and listener configuration;
+- **Disable** stops the listener and removes Northstar-managed host firewall rules after confirmation.
+
+The same page also shows the active **Standard policy** version. Standard nodes continuously follow that version; custom and agent-only nodes are never changed by a Standard rollout. Before a rollout, Northstar requires a fresh authenticated heartbeat and verifies that the Agent advertises every protocol runtime in the target manifest. Ineligible nodes remain visible as blocked with an actionable reason.
+
+Use **Canary one node** first. After its protocol services become healthy, use **Roll out next batch** to reconcile up to 25 more eligible nodes. Rollout targets automatically move through reconciling, succeeded, and blocked states based on the final VPN Service results. Existing healthy protocol services are left untouched, and a failure in one new service does not stop another protocol.
+
+To promote a future protocol into Standard:
+
+1. implement and enable its protocol Adapter, credential/profile renderer, client export path, and structured Agent apply/disable handlers;
+2. mark the Adapter service as `standard: true`;
+3. increment `STANDARD_POLICY_VERSION` in `server/deployment-policy.ts`;
+4. deploy the Controller and repair or upgrade Agents until the new capability is advertised;
+5. run a canary, verify client connectivity, and then continue batch rollouts.
+
+Manually enabling or disabling a service changes the node to the custom policy so a future Standard rollout cannot silently undo that choice. Enabling exactly the complete current Standard protocol set returns the node to Standard automatically.
+
+The current automatic scheduler accepts an optional `regionId`; omit it for automatic placement. Direct `nodeId` selection is intentionally absent from the user-facing profile creation API. The assigned node is recorded in the resulting profile for audit and export.
 
 The **Access** view creates a macOS device profile and maintains a separate Connection profiles list with an **Export config** action. For WireGuard, the browser generates the key pair, sends the private key once over the authenticated HTTPS session, and the Controller stores it only as AES-256-GCM encrypted secret material so the `.conf` file can be exported again. For OpenVPN, the Controller creates a managed issuer CA on first use, encrypts its private material with `NORTHSTAR_MASTER_KEY`, issues a per-device certificate, and exports a no-store `.ovpn` profile for OpenVPN Connect. The Edge Agent receives its server private material only through an authenticated node-secret endpoint; task payloads contain references rather than private keys. Revoking a device revokes its OpenVPN certificate, removes its retained WireGuard private material, and reconciles the Edge Node. A future external/offline issuer can replace the managed issuer without changing the device or profile model.
 

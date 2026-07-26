@@ -18,3 +18,6 @@ export function listProtocolCapabilities() {
   return Object.values(adapters).map((adapter) => adapter.capability);
 }
 
+export function listProtocolAdapters(): ProtocolAdapter[] {
+  return Object.values(adapters);
+}

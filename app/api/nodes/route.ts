@@ -4,6 +4,8 @@ import { currentUser } from "../../../server/auth";
 import { encryptSecret } from "../../../server/crypto";
 import { cleanText, isValidIp, isValidPort, jsonError, readJson } from "../../../server/http";
 import { queueNodeBootstrap } from "../../../server/bootstrap";
+import { initializeVpnServices, type DeploymentTemplate } from "../../../server/vpn-services";
+import { STANDARD_POLICY_VERSION } from "../../../server/deployment-policy";
 
 export const runtime = "nodejs";
 
@@ -27,6 +29,8 @@ export async function POST(request: Request) {
     const secret = typeof body.secret === "string" ? body.secret : "";
     const credentialType = body.credentialType === "private_key" ? "private_key" : "password";
     const hostFingerprint = cleanText(body.hostFingerprint, 256) || null;
+    const deploymentTemplate = cleanText(body.deploymentTemplate, 32) as DeploymentTemplate || "standard";
+    if (!["standard", "wireguard", "openvpn", "agent-only"].includes(deploymentTemplate)) return jsonError("Invalid deployment template");
     if (!name) return jsonError("Node name is required");
     if (!isValidIp(ip)) return jsonError("Public IP must be a valid IPv4 address, for example 203.0.113.10");
     if (!secret) return jsonError("SSH password or private key is required");
@@ -52,8 +56,11 @@ export async function POST(request: Request) {
       credential_tag: encrypted.tag,
       host_fingerprint: hostFingerprint,
       agent_token_hash: null,
+      deployment_policy: deploymentTemplate === "standard" ? "standard" : deploymentTemplate === "agent-only" ? "agent-only" : "custom",
+      policy_version: deploymentTemplate === "standard" ? STANDARD_POLICY_VERSION : 0,
     });
     await addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { credentialType } });
+    await initializeVpnServices(node.id, deploymentTemplate);
     const actionId = await queueNodeBootstrap(node.id, user.id);
     return NextResponse.json({ node: publicNode(node), actionId }, { status: 201 });
   } catch (error) {

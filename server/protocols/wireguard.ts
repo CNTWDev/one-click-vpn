@@ -14,6 +14,11 @@ const baseCapability: ProtocolCapability = {
 export const wireguardAdapter: ProtocolAdapter = {
   id: "wireguard",
   capability: baseCapability,
+  service: {
+    standard: true, defaultTransport: "udp", defaultListenPort: 51820,
+    defaultSubnet: "10.70.0.0/24", defaultDns: ["1.1.1.1"],
+    applyTask: "ApplyWireGuardPeers", disableTask: "DisableWireGuard",
+  },
   buildProfile(input) {
     if (!input.serverPublicKey) throw new Error("WireGuard server public key is not available");
     if (!input.clientAddress) throw new Error("WireGuard client address is not allocated");

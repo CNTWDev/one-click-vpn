@@ -2,7 +2,7 @@
 
 ## ADR-0001：Controller 与 VPN 数据面分离
 
-状态：Accepted  
+状态：Accepted
 日期：2026-07-25
 
 Controller 不转发用户 VPN 流量，只负责配置、身份、策略、审计和编排。这样可以减少控制器带宽压力，也能让 Edge Node 跨云部署。
@@ -48,3 +48,21 @@ PostgreSQL + Docker Compose 是当前单 Controller 的部署基线；后续出�
 日期：2026-07-25
 
 Agent mTLS、Web session、Device identity 和 VPN protocol credential 必须分离。当前代码仍使用 Agent HTTPS token，后续按 [07-roadmap.md](07-roadmap.md) 升级为短期 mTLS。
+
+## ADR-0008：Node、VPN Service 与 Connection Profile 分层
+
+状态：Accepted
+日期：2026-07-26
+
+Node 只表示安装 Agent 的受管 Linux 主机；VPN Service 表示某个 Node 上启用的协议监听器及其期望状态；Connection Profile 表示分配给具体 Device 的客户端身份和连接配置。创建 Profile 不再负责首次启动服务。
+
+新增 Node 时通过部署模板创建 VPN Service，Agent 首次认证心跳后自动收敛服务状态。终端用户只选择协议和可选 Region，由 Controller 在心跳新鲜、运行时健康且监听正常的服务中自动分配 Node。这样扩容、服务重装和用户发放可以分别管理，也避免把基础设施细节暴露给终端用户。
+
+## ADR-0009：Standard 是版本化持续策略
+
+状态：Accepted
+日期：2026-07-26
+
+Standard 不再只是新增 Node 时复制的一组静态服务，而是持久化在 Node 上的版本化部署策略。协议 Adapter 提供默认监听参数和结构化 apply/disable 任务名；进入 Standard 的 Adapter 必须显式标记并提升策略版本。
+
+老节点升级采用 capability preflight、单节点 Canary 和有限批次 rollout。无新鲜心跳或未上报目标协议能力的节点保持 blocked，不修改其现有服务。Custom 和 Agent-only 节点不参加 Standard rollout；管理员手动启停服务会将节点切换为 Custom，防止未来 rollout 覆盖明确的人为选择。

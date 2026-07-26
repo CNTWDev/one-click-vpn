@@ -53,6 +53,15 @@ export type DesiredStateInput = {
 export type ProtocolAdapter = {
   id: Protocol;
   capability: ProtocolCapability;
+  service: {
+    standard: boolean;
+    defaultTransport: string;
+    defaultListenPort: number;
+    defaultSubnet: string;
+    defaultDns: string[];
+    applyTask: string;
+    disableTask: string;
+  };
   buildProfile(input: ProfileBuildInput): {
     transport: string;
     dns: string[];

@@ -3,11 +3,12 @@ import { cleanText, jsonError, readJson } from "../../../../../server/http";
 import { authenticateAgent, recordAgentHeartbeat } from "../../../../../server/agent";
 import { ensureDefaultNodeProtocols } from "../../../../../server/control-plane";
 import { listNodeProtocols, upsertNodeProtocol, type Platform, type Protocol } from "../../../../../server/control-db";
-import { getProtocolAdapter } from "../../../../../server/protocols/registry";
+import { getProtocolAdapter, listProtocolAdapters } from "../../../../../server/protocols/registry";
+import { reconcileEnabledVpnServices } from "../../../../../server/vpn-services";
 
 export const runtime = "nodejs";
 
-const supportedProtocols = new Set<Protocol>(["wireguard", "openvpn", "ikev2"]);
+const supportedProtocols = new Set<Protocol>(listProtocolAdapters().map((adapter) => adapter.id));
 const supportedPlatforms: Platform[] = ["macos", "ios", "android"];
 
 export async function POST(request: Request) {
@@ -63,6 +64,7 @@ export async function POST(request: Request) {
         });
       }
     }
+    await reconcileEnabledVpnServices(nodeId);
     return NextResponse.json({ ok: true, nextPollSeconds: 5 });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Invalid heartbeat");

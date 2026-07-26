@@ -36,6 +36,8 @@ export type DbNode = {
   created_at: string;
   updated_at: string;
   metrics_json?: string | null;
+  deployment_policy?: "standard" | "custom" | "agent-only";
+  policy_version?: number;
 };
 
 export type NodeMetrics = {
@@ -261,11 +263,12 @@ export async function insertNode(input: Omit<DbNode, "id" | "created_at" | "upda
   const timestamp = now();
   await dbExec(`INSERT INTO nodes
     (id, name, place, region_id, ip, ssh_user, ssh_port, status, latency, users, traffic, version, last_seen,
-     credential_type, credential_ciphertext, credential_iv, credential_tag, host_fingerprint, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`, [
+     credential_type, credential_ciphertext, credential_iv, credential_tag, host_fingerprint, deployment_policy, policy_version, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`, [
     id, input.name, input.place, input.region_id, input.ip, input.ssh_user, input.ssh_port, input.status, input.latency,
     input.users, input.traffic, input.version, input.last_seen, input.credential_type,
-    input.credential_ciphertext, input.credential_iv, input.credential_tag, input.host_fingerprint, timestamp, timestamp,
+    input.credential_ciphertext, input.credential_iv, input.credential_tag, input.host_fingerprint,
+    input.deployment_policy || "standard", input.policy_version ?? 1, timestamp, timestamp,
   ]);
   return (await findNode(id))!;
 }

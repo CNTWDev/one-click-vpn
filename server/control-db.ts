@@ -33,6 +33,22 @@ export type NodeProtocol = {
   updated_at: string;
 };
 
+export type VpnServiceStatus = "pending" | "deploying" | "healthy" | "attention" | "disabled" | "unsupported";
+
+export type VpnService = {
+  node_id: string;
+  protocol: Protocol;
+  enabled: boolean;
+  transport: string;
+  listen_port: number;
+  subnet: string;
+  dns: string[];
+  status: VpnServiceStatus;
+  last_error: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ConnectionProfile = {
   id: string;
   device_id: string;
@@ -333,6 +349,51 @@ export async function listNodeProtocols(nodeId?: string): Promise<NodeProtocol[]
   }));
 }
 
+function vpnServiceFromRow(row: Record<string, unknown>): VpnService {
+  return {
+    node_id: String(row.node_id), protocol: row.protocol as Protocol, enabled: Boolean(row.enabled),
+    transport: String(row.transport), listen_port: Number(row.listen_port), subnet: String(row.subnet),
+    dns: parseJson(String(row.dns_json), ["1.1.1.1"]), status: row.status as VpnServiceStatus,
+    last_error: String(row.last_error || ""), created_at: String(row.created_at), updated_at: String(row.updated_at),
+  };
+}
+
+export async function listVpnServices(nodeId?: string): Promise<VpnService[]> {
+  const rows = nodeId
+    ? await dbQuery<Record<string, unknown>>("SELECT * FROM vpn_services WHERE node_id = $1 ORDER BY protocol", [nodeId])
+    : await dbQuery<Record<string, unknown>>("SELECT * FROM vpn_services ORDER BY node_id, protocol");
+  return rows.map(vpnServiceFromRow);
+}
+
+export async function findVpnService(nodeId: string, protocol: Protocol): Promise<VpnService | undefined> {
+  return (await listVpnServices(nodeId)).find((item) => item.protocol === protocol);
+}
+
+export async function upsertVpnService(input: {
+  nodeId: string; protocol: Protocol; enabled: boolean; transport?: string; listenPort?: number;
+  subnet?: string; dns?: string[]; status?: VpnServiceStatus; lastError?: string;
+}): Promise<VpnService> {
+  const timestamp = now();
+  const defaults = input.protocol === "wireguard"
+    ? { port: 51820, subnet: "10.70.0.0/24" }
+    : { port: 1194, subnet: "10.71.0.0/24" };
+  await dbExec(`INSERT INTO vpn_services
+    (node_id, protocol, enabled, transport, listen_port, subnet, dns_json, status, last_error, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+    ON CONFLICT(node_id, protocol) DO UPDATE SET enabled = excluded.enabled, transport = excluded.transport,
+      listen_port = excluded.listen_port, subnet = excluded.subnet, dns_json = excluded.dns_json,
+      status = excluded.status, last_error = excluded.last_error, updated_at = excluded.updated_at`, [
+    input.nodeId, input.protocol, input.enabled ? 1 : 0, input.transport || "udp", input.listenPort || defaults.port,
+    input.subnet || defaults.subnet, JSON.stringify(input.dns || ["1.1.1.1"]),
+    input.status || (input.enabled ? "pending" : "disabled"), input.lastError || "", timestamp,
+  ]);
+  return (await findVpnService(input.nodeId, input.protocol))!;
+}
+
+export async function updateVpnServiceState(nodeId: string, protocol: Protocol, input: { status: VpnServiceStatus; lastError?: string }): Promise<void> {
+  await dbExec("UPDATE vpn_services SET status = $1, last_error = $2, updated_at = $3 WHERE node_id = $4 AND protocol = $5", [input.status, input.lastError || "", now(), nodeId, protocol]);
+}
+
 export async function allocateIpLease(nodeId: string, protocol: Protocol, deviceId: string): Promise<string> {
   // A released row remains in the table for auditability, so treating only
   // active rows as occupied would try to insert the same unique address again.
@@ -351,7 +412,10 @@ export async function allocateIpLease(nodeId: string, protocol: Protocol, device
   if (released[0]) return released[0].address;
 
   const occupied = new Set((await dbQuery<{ address: string }>("SELECT address FROM ip_leases WHERE node_id = $1 AND protocol = $2", [nodeId, protocol])).map((row) => row.address));
-  const network = protocol === "openvpn" ? "10.71.0" : "10.70.0";
+  const service = await findVpnService(nodeId, protocol);
+  const subnetMatch = service?.subnet.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d+\/24$/);
+  if (!subnetMatch) throw new Error("This protocol service requires a supported IPv4 /24 address pool");
+  const network = subnetMatch[1];
   for (let index = 2; index < 255; index += 1) {
     const address = `${network}.${index}/32`;
     if (occupied.has(address)) continue;
@@ -507,6 +571,15 @@ export async function finishReconcileTask(input: {
 }): Promise<void> {
   const timestamp = now();
   await dbExec("UPDATE reconcile_tasks SET status = $1, last_error = $2, finished_at = $3 WHERE id = $4 AND node_id = $5", [input.status, input.error || "", timestamp, input.taskId, input.nodeId]);
+  const completedTask = (await dbQuery<{ protocol: Protocol; task_type: string }>("SELECT protocol, task_type FROM reconcile_tasks WHERE id = $1 AND node_id = $2", [input.taskId, input.nodeId]))[0];
+  if (completedTask) {
+    const currentService = await findVpnService(input.nodeId, completedTask.protocol);
+    const disablesService = completedTask.task_type.startsWith("Disable");
+    if (currentService && disablesService === !currentService.enabled) {
+      const serviceStatus: VpnServiceStatus = input.status === "failed" ? "attention" : disablesService ? "disabled" : "healthy";
+      await updateVpnServiceState(input.nodeId, completedTask.protocol, { status: serviceStatus, lastError: input.error });
+    }
+  }
   if (input.observedRevision !== undefined && input.observedHash !== undefined) {
     await dbExec(`INSERT INTO observed_configs (node_id, protocol, applied_revision, observed_hash, status, last_error, updated_at)
       SELECT node_id, protocol, $1, $2, $3, $4, $5 FROM reconcile_tasks WHERE id = $6

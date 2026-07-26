@@ -7,10 +7,12 @@ import {
   findConnectionProfile,
   findDesiredConfig,
   findDevice,
+  findVpnService,
   listActivePeers,
   listConnectionProfiles,
   listControlNodes,
   listNodeProtocols,
+  listVpnServices,
   revokeCertificateIssuancesForDevice,
   revokeDevice,
   upsertDesiredConfig,
@@ -19,7 +21,7 @@ import {
   type Platform,
   type Protocol,
 } from "./control-db";
-import { getProtocolAdapter } from "./protocols/registry";
+import { getProtocolAdapter, listProtocolAdapters } from "./protocols/registry";
 import { ensureOpenVpnClientCredential, ensureOpenVpnServerBundle, openVpnRevokedSerials } from "./openvpn-pki";
 import { createSecretMaterial, deleteSecretMaterialsByKind, readSecretMaterial } from "./secret-materials";
 
@@ -69,8 +71,8 @@ async function findNode(nodeId: string) {
 
 export async function ensureDefaultNodeProtocols(nodeId: string): Promise<void> {
   if ((await listNodeProtocols(nodeId)).length) return;
-  for (const protocol of ["wireguard", "openvpn"] as const) {
-    const adapter = getProtocolAdapter(protocol);
+  for (const adapter of listProtocolAdapters()) {
+    const protocol = adapter.id;
     await upsertNodeProtocol({
       nodeId, protocol, transports: adapter.capability.transports, platforms: [...adapter.capability.platforms],
       routing: adapter.capability.routing, ipv6: adapter.capability.ipv6,
@@ -80,38 +82,63 @@ export async function ensureDefaultNodeProtocols(nodeId: string): Promise<void> 
   }
 }
 
-export async function rebuildDesiredState(nodeId: string, protocol: Protocol) {
+export async function rebuildDesiredState(nodeId: string, protocol: Protocol, options: { force?: boolean } = {}) {
   const node = await findNode(nodeId);
   if (!node) throw new Error("Node not found");
   const adapter = getProtocolAdapter(protocol);
   if (adapter.capability.status !== "enabled") throw new Error(`${protocol} adapter is not enabled`);
+  const service = await findVpnService(nodeId, protocol);
+  if (!service?.enabled) throw new Error(`${protocol} service is not enabled on this node`);
   const openvpn = protocol === "openvpn" ? await (async () => {
     const bundle = await ensureOpenVpnServerBundle(nodeId, node.name);
     return {
       serverBundleSecretId: bundle.bundleSecretId,
       revokedSerials: await openVpnRevokedSerials(),
-      transport: "udp", subnet: "10.71.0.0/24", listenPort: 1194, dns: ["1.1.1.1"],
+      transport: service.transport, subnet: service.subnet, listenPort: service.listen_port, dns: service.dns,
     };
   })() : undefined;
   const desiredPayload = adapter.buildDesiredState({
     nodeId,
     serverPublicKey: node.server_public_key,
-    listenPort: protocol === "wireguard" ? 51820 : undefined,
+    listenPort: protocol === "wireguard" ? service.listen_port : undefined,
     peers: await listActivePeers(nodeId, protocol),
     openvpn,
   });
   const previous = await findDesiredConfig(nodeId, protocol);
   const desired = await upsertDesiredConfig({ nodeId, protocol, payload: desiredPayload });
-  if (!previous || previous.config_hash !== desired.config_hash) {
+  if (options.force || !previous || previous.config_hash !== desired.config_hash) {
     await enqueueReconcileTask({
       nodeId,
       protocol,
-      taskType: protocol === "wireguard" ? "ApplyWireGuardPeers" : "ApplyOpenVpnServer",
+      taskType: adapter.service.applyTask,
       desiredRevision: desired.revision,
       payload: desiredPayload,
     });
   }
   return desired;
+}
+
+export async function selectVpnService(input: { protocol: Protocol; regionId?: string }) {
+  const services = (await listVpnServices()).filter((service) => service.protocol === input.protocol && service.enabled && service.status === "healthy");
+  const nodes = await listControlNodes();
+  const candidates = nodes.filter((node) => {
+    if (!services.some((service) => service.node_id === node.id)) return false;
+    if (input.regionId && node.region_id !== input.regionId) return false;
+    if (node.status !== "online" || !node.last_heartbeat_at) return false;
+    if (Date.now() - new Date(node.last_heartbeat_at).getTime() >= 90_000) return false;
+    const connectivity = node.capabilities.connectivity as { protocols?: Record<string, { runtimeActive?: boolean; interfaceActive?: boolean; serviceActive?: boolean; listening?: boolean }> } | undefined;
+    const observed = connectivity?.protocols?.[input.protocol];
+    const active = observed?.runtimeActive ?? observed?.interfaceActive ?? observed?.serviceActive;
+    return active === true && observed?.listening === true;
+  }).sort((left, right) => left.users - right.users || left.name.localeCompare(right.name));
+  const node = candidates[0];
+  if (!node) throw new Error(input.regionId ? "No healthy VPN service is available in this region" : "No healthy VPN service is available");
+  return { node, service: services.find((item) => item.node_id === node.id)! };
+}
+
+export async function issueScheduledConnectionProfile(input: Omit<Parameters<typeof issueConnectionProfile>[0], "nodeId"> & { regionId?: string }): Promise<ConnectionProfile> {
+  const selected = await selectVpnService({ protocol: input.protocol, regionId: input.regionId });
+  return issueConnectionProfile({ ...input, nodeId: selected.node.id });
 }
 
 export async function issueConnectionProfile(input: {
@@ -132,6 +159,8 @@ export async function issueConnectionProfile(input: {
   if (adapter.capability.status !== "enabled") throw new Error(`${input.protocol} adapter is not enabled`);
   const capability = (await listNodeProtocols(input.nodeId)).find((item) => item.protocol === input.protocol);
   if (!capability || capability.status !== "enabled") throw new Error("Node does not advertise this protocol");
+  const service = await findVpnService(input.nodeId, input.protocol);
+  if (!service?.enabled || service.status !== "healthy") throw new Error("VPN service is not ready on this node");
   if (input.protocol === "wireguard" && !node.server_public_key) {
     throw new Error("This node is online but has not reported its WireGuard server key. Reinstall or restart the Agent, then wait for a heartbeat.");
   }
@@ -145,11 +174,11 @@ export async function issueConnectionProfile(input: {
     deviceId: device.id,
     devicePublicKey: device.public_key,
     nodeId: node.id,
-    endpoint: { host: node.public_endpoint || node.ip, port: input.protocol === "wireguard" ? 51820 : 1194 },
+    endpoint: { host: node.public_endpoint || node.ip, port: service.listen_port },
     serverPublicKey: node.server_public_key,
     clientAddress,
-    transport,
-    dns: ["1.1.1.1"],
+    transport: service.transport || transport,
+    dns: service.dns,
     allowedIps: adapter.capability.ipv6 ? ["0.0.0.0/0", "::/0"] : ["0.0.0.0/0"],
     openvpn: openvpnCredential ? {
       clientCertificate: openvpnCredential.issuance.certificate_pem,
@@ -168,7 +197,7 @@ export async function issueConnectionProfile(input: {
     nodeId: input.nodeId,
     protocol: input.protocol,
     transport: profile.transport,
-    endpoint: { host: node.public_endpoint || node.ip, port: input.protocol === "wireguard" ? 51820 : 1194 },
+    endpoint: { host: node.public_endpoint || node.ip, port: service.listen_port },
     clientAddress,
     dns: profile.dns,
     allowedIps: profile.allowedIps,

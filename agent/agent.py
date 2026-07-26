@@ -3,7 +3,8 @@
 
 The agent accepts only structured reconcile tasks. It never executes a command
 received from the controller and it never sends a private key to the controller.
-The first enabled data-plane task is ApplyWireGuardPeers.
+Supported data-plane tasks apply or disable a known VPN protocol. Arbitrary
+remote command execution is deliberately not part of this channel.
 """
 
 import base64
@@ -115,6 +116,10 @@ def run_fixed(command, *, input_text=None):
     )
 
 
+def run_optional(command):
+    return subprocess.run(command, text=True, capture_output=True, check=False, timeout=30)
+
+
 def wireguard_public_key():
     if shutil.which("wg") is None:
         return ""
@@ -215,6 +220,13 @@ def wireguard_sync_config(desired):
     return {"observedHash": digest, "observedStatus": "applied", "serverPublicKey": wireguard_public_key()}
 
 
+def disable_wireguard():
+    if WIREGUARD_CONFIG.exists() and shutil.which("wg-quick") is not None:
+        run_optional(["wg-quick", "down", str(WIREGUARD_CONFIG)])
+    WIREGUARD_CONFIG.unlink(missing_ok=True)
+    return {"observedHash": hashlib.sha256(b"wireguard-disabled").hexdigest(), "observedStatus": "disabled"}
+
+
 def safe_revocation_serial(value):
     if not isinstance(value, str) or not re.fullmatch(r"[A-F0-9]{1,128}", value):
         raise ValueError("invalid OpenVPN revoked certificate serial")
@@ -313,6 +325,28 @@ WantedBy=multi-user.target
     return {"observedHash": digest, "observedStatus": "applied"}
 
 
+def disable_openvpn():
+    transport, listen_port = configured_listener(OPENVPN_CONFIG, 1194, "udp")
+    try:
+        egress_interface = default_interface()
+    except Exception:
+        egress_interface = ""
+    run_optional(["systemctl", "disable", "--now", "northstar-openvpn"])
+    rules = [
+        ["iptables", "-D", "INPUT", "-p", transport, "--dport", str(listen_port), "-m", "comment", "--comment", "northstar-openvpn", "-j", "ACCEPT"],
+        ["iptables", "-D", "FORWARD", "-s", "10.71.0.0/24", "-j", "ACCEPT"],
+        ["iptables", "-D", "FORWARD", "-d", "10.71.0.0/24", "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"],
+    ]
+    if egress_interface:
+        rules.append(["iptables", "-t", "nat", "-D", "POSTROUTING", "-s", "10.71.0.0/24", "-o", egress_interface, "-j", "MASQUERADE"])
+    if shutil.which("iptables") is not None:
+        for rule in rules:
+            while run_optional(rule).returncode == 0:
+                pass
+    OPENVPN_CONFIG.unlink(missing_ok=True)
+    return {"observedHash": hashlib.sha256(b"openvpn-disabled").hexdigest(), "observedStatus": "disabled"}
+
+
 def apply_task(task):
     task_type = task.get("taskType")
     payload = task.get("payload") or {}
@@ -320,6 +354,10 @@ def apply_task(task):
         return wireguard_sync_config(payload)
     if task_type == "ApplyOpenVpnServer":
         return openvpn_sync_config(payload)
+    if task_type == "DisableWireGuard":
+        return disable_wireguard()
+    if task_type == "DisableOpenVpn":
+        return disable_openvpn()
     raise ValueError(f"unsupported structured task: {task_type}")
 
 
@@ -420,6 +458,7 @@ def connectivity_snapshot():
             "wireguard": {
                 "installed": wireguard_ready,
                 "interfaceActive": command_succeeds(["wg", "show", "northstar"]) if wireguard_ready else False,
+                "runtimeActive": command_succeeds(["wg", "show", "northstar"]) if wireguard_ready else False,
                 "listening": socket_listening(wireguard_transport, wireguard_port),
                 "port": wireguard_port,
                 "transport": wireguard_transport,
@@ -427,6 +466,7 @@ def connectivity_snapshot():
             "openvpn": {
                 "installed": openvpn_ready,
                 "serviceActive": command_succeeds(["systemctl", "is-active", "--quiet", "northstar-openvpn"]) if openvpn_ready else False,
+                "runtimeActive": command_succeeds(["systemctl", "is-active", "--quiet", "northstar-openvpn"]) if openvpn_ready else False,
                 "listening": socket_listening(openvpn_transport, openvpn_port),
                 "port": openvpn_port,
                 "transport": openvpn_transport,
@@ -513,7 +553,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.3.2",
+        "version": "agent 2.4.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),

@@ -35,6 +35,16 @@ type NodeMetrics = {
 };
 
 type AccessDevice = { id: string; displayName: string; platform: string; publicKey: string; status: string };
+type VpnService = {
+  node_id: string; protocol: string; enabled: boolean; transport: string;
+  listen_port: number; subnet: string; dns: string[]; status: string; last_error: string; updated_at: string;
+};
+type DeploymentPolicyOverview = {
+  standard: { version: number; protocols: Array<{ protocol: string; transport: string; listenPort: number; configSchemaVersion: number }> };
+  counts: { totalNodes: number; standardNodes: number; customNodes: number; agentOnlyNodes: number; driftedNodes: number; eligibleNodes: number; blockedNodes: number };
+  driftedNodes: Array<{ id: string; name: string; currentVersion: number; status: string; missingProtocols: string[]; eligible: boolean; reason: string }>;
+  rollouts: Array<{ id: string; fromVersion: number; toVersion: number; mode: string; status: string; totalTargets: number; queuedTargets: number; failedTargets: number; createdAt: string }>;
+};
 type AccessProfile = {
   id: string;
   deviceId: string;
@@ -169,6 +179,8 @@ type PendingFleetConfirmation = {
   confirmLabel: string;
 };
 
+type PendingServiceConfirmation = { service: VpnService; action: "enable" | "disable" | "redeploy" };
+
 const initialNodes: Node[] = [
   {
     id: "fra-01",
@@ -215,8 +227,9 @@ const navItems = [
   ["Overview", "⌘"],
   ["Controller", "◈"],
   ["Nodes", "◉"],
+  ["VPN Services", "◇"],
   ["Regions", "⌖"],
-  ["Access", "⌁"],
+  ["Users & Devices", "⌁"],
   ["Logs", "≡"],
   ["Sessions", "▣"],
   ["Audit", "◌"],
@@ -401,7 +414,7 @@ export default function Home() {
   const [pendingFleetConfirmation, setPendingFleetConfirmation] = useState<PendingFleetConfirmation | null>(null);
   const [selectedNode, setSelectedNode] = useState<Node>(initialNodes[0]);
   const [notice, setNotice] = useState("All systems nominal");
-  const [form, setForm] = useState({ name: "", ip: "", user: "root", secret: "", regionId: "tokyo-jp", hostFingerprint: "" });
+  const [form, setForm] = useState({ name: "", ip: "", user: "root", secret: "", regionId: "tokyo-jp", hostFingerprint: "", deploymentTemplate: "standard" });
   const [regionForm, setRegionForm] = useState({ name: "", country: "", code: "" });
   const [editingRegionId, setEditingRegionId] = useState<string | null>(null);
   const [regionBusy, setRegionBusy] = useState(false);
@@ -409,7 +422,7 @@ export default function Home() {
   const [fingerprintCommandCopied, setFingerprintCommandCopied] = useState(false);
   const [accessDevices, setAccessDevices] = useState<AccessDevice[]>([]);
   const [accessProfiles, setAccessProfiles] = useState<AccessProfile[]>([]);
-  const [accessNodeId, setAccessNodeId] = useState("");
+  const [accessRegionId, setAccessRegionId] = useState("");
   const [accessProtocol, setAccessProtocol] = useState<"wireguard" | "openvpn">("wireguard");
   const [accessDeviceName, setAccessDeviceName] = useState("My Mac");
   const [accessDeviceBusy, setAccessDeviceBusy] = useState<string | null>(null);
@@ -427,6 +440,12 @@ export default function Home() {
   const [showLogPurge, setShowLogPurge] = useState(false);
   const [logPurgeNodeId, setLogPurgeNodeId] = useState<string | null>(null);
   const [logPurgeConfirmation, setLogPurgeConfirmation] = useState("");
+  const [vpnServices, setVpnServices] = useState<VpnService[]>([]);
+  const [serviceBusy, setServiceBusy] = useState("");
+  const [pendingServiceConfirmation, setPendingServiceConfirmation] = useState<PendingServiceConfirmation | null>(null);
+  const [deploymentPolicy, setDeploymentPolicy] = useState<DeploymentPolicyOverview | null>(null);
+  const [policyRolloutBusy, setPolicyRolloutBusy] = useState(false);
+  const [pendingPolicyRollout, setPendingPolicyRollout] = useState<"canary" | "batch" | null>(null);
 
   const loadNodes = useCallback(async () => {
     const response = await fetch("/api/nodes", { cache: "no-store" });
@@ -489,6 +508,19 @@ export default function Home() {
     setAccessProfiles(payload.profiles || []);
   }, []);
 
+  const loadVpnServices = useCallback(async () => {
+    const response = await fetch("/api/vpn-services", { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json() as { services?: VpnService[] };
+    setVpnServices(payload.services || []);
+  }, []);
+
+  const loadDeploymentPolicy = useCallback(async () => {
+    const response = await fetch("/api/deployment-policy", { cache: "no-store" });
+    if (!response.ok) return;
+    setDeploymentPolicy(await response.json() as DeploymentPolicyOverview);
+  }, []);
+
   const loadOperationalLogs = useCallback(async () => {
     setLogsBusy(true);
     try {
@@ -537,21 +569,32 @@ export default function Home() {
   }, [authStatus, loadNodes]);
 
   useEffect(() => {
-    const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (browserTimeZone) setTimeZone(browserTimeZone);
+    const timer = window.setTimeout(() => {
+      const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (browserTimeZone) setTimeZone(browserTimeZone);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    if (authStatus !== "signed-in" || activeNav !== "Access") return undefined;
-    const timer = window.setTimeout(() => { void Promise.all([loadAccessDevices(), loadAccessProfiles()]); }, 0);
+    if (authStatus !== "signed-in" || activeNav !== "Users & Devices") return undefined;
+    const timer = window.setTimeout(() => { void Promise.all([loadAccessDevices(), loadAccessProfiles(), loadVpnServices()]); }, 0);
     return () => window.clearTimeout(timer);
-  }, [activeNav, authStatus, loadAccessDevices, loadAccessProfiles]);
+  }, [activeNav, authStatus, loadAccessDevices, loadAccessProfiles, loadVpnServices]);
+
+  useEffect(() => {
+    if (authStatus !== "signed-in" || activeNav !== "VPN Services") return undefined;
+    const refresh = () => { void Promise.all([loadVpnServices(), loadDeploymentPolicy()]); };
+    const initial = window.setTimeout(refresh, 0);
+    const timer = window.setInterval(refresh, 5000);
+    return () => { window.clearTimeout(initial); window.clearInterval(timer); };
+  }, [activeNav, authStatus, loadDeploymentPolicy, loadVpnServices]);
 
   useEffect(() => {
     if (authStatus !== "signed-in" || activeNav !== "Logs") return undefined;
-    void loadOperationalLogs();
+    const initial = window.setTimeout(() => { void loadOperationalLogs(); }, 0);
     const timer = window.setInterval(() => { void loadOperationalLogs(); }, 10_000);
-    return () => window.clearInterval(timer);
+    return () => { window.clearTimeout(initial); window.clearInterval(timer); };
   }, [activeNav, authStatus, loadOperationalLogs]);
 
   useEffect(() => {
@@ -574,14 +617,14 @@ export default function Home() {
   function openAddNode() {
     setEditingNodeId(null);
     setDeployError("");
-    setForm({ name: "", ip: "", user: "root", secret: "", regionId: regions[0]?.id || "", hostFingerprint: "" });
+    setForm({ name: "", ip: "", user: "root", secret: "", regionId: regions[0]?.id || "", hostFingerprint: "", deploymentTemplate: "standard" });
     setShowDeploy(true);
   }
 
   function openEditNode(node: Node) {
     setEditingNodeId(node.id);
     setDeployError("");
-    setForm({ name: node.name, ip: node.ip, user: node.sshUser || "root", secret: "", regionId: node.regionId, hostFingerprint: node.hostFingerprint || "" });
+    setForm({ name: node.name, ip: node.ip, user: node.sshUser || "root", secret: "", regionId: node.regionId, hostFingerprint: node.hostFingerprint || "", deploymentTemplate: "standard" });
     setShowDeploy(true);
   }
 
@@ -606,19 +649,11 @@ export default function Home() {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
     setNodes([]);
+    setVpnServices([]);
     setAuthStatus("signed-out");
   }
 
   async function createMacAccessProfile() {
-    const node = nodes.find((item) => item.id === accessNodeId && item.status === "online") || nodes.find((item) => item.status === "online");
-    if (!node) {
-      setAccessError("Add and bootstrap at least one healthy node first.");
-      return;
-    }
-    if (accessProtocol === "wireguard" && !node.serverPublicKey) {
-      setAccessError("This node has not reported a WireGuard server key yet. Reinstall or restart its Agent, then wait for the next heartbeat.");
-      return;
-    }
     setAccessBusy(true);
     setAccessError("");
     setAccessConfig(null);
@@ -635,7 +670,7 @@ export default function Home() {
       setAccessDevices((current) => [devicePayload.device!, ...current]);
       const profileResponse = await fetch("/api/access/profiles", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deviceId: devicePayload.device.id, nodeId: node.id, protocol: accessProtocol, clientPrivateKey: privateKey || undefined }),
+        body: JSON.stringify({ deviceId: devicePayload.device.id, regionId: accessRegionId || undefined, protocol: accessProtocol, clientPrivateKey: privateKey || undefined }),
       });
       const profilePayload = await profileResponse.json().catch(() => ({})) as { profile?: AccessProfile; error?: string };
       if (!profileResponse.ok || !profilePayload.profile) throw new Error(profilePayload.error || "Unable to create a connection profile");
@@ -645,8 +680,10 @@ export default function Home() {
       const downloadResponse = await fetch(`/api/access/profiles/${activatePayload.profile.id}/download`, { cache: "no-store" });
       const config = await downloadResponse.text();
       if (!downloadResponse.ok) throw new Error(config || "Unable to export the connection profile");
-      setAccessConfig({ name: `${node.name.replaceAll(/[^A-Za-z0-9_-]+/g, "-")}.${accessProtocol === "openvpn" ? "ovpn" : "conf"}`, config });
-      setNotice(`${node.name} ${accessProtocol === "openvpn" ? "OpenVPN" : "WireGuard"} profile is ready. Download it and import it into the matching client.`);
+      const assignedNode = nodes.find((item) => item.id === activatePayload.profile!.nodeId);
+      const assignedName = assignedNode?.name || "northstar";
+      setAccessConfig({ name: `${assignedName.replaceAll(/[^A-Za-z0-9_-]+/g, "-")}.${accessProtocol === "openvpn" ? "ovpn" : "conf"}`, config });
+      setNotice(`${assignedName} ${accessProtocol === "openvpn" ? "OpenVPN" : "WireGuard"} profile is ready. Download it and import it into the matching client.`);
       await loadAccessProfiles();
     } catch (error) {
       setAccessError(error instanceof Error ? error.message : "Unable to prepare the Mac connection");
@@ -700,6 +737,48 @@ export default function Home() {
     }
   }
 
+  async function executeVpnServiceAction() {
+    if (!pendingServiceConfirmation) return;
+    const { service, action } = pendingServiceConfirmation;
+    const key = `${service.node_id}:${service.protocol}`;
+    setServiceBusy(key);
+    try {
+      const response = await fetch(`/api/nodes/${service.node_id}/services`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ protocol: service.protocol, action }),
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Unable to update VPN service");
+      setNotice(`${service.protocol} ${action} was queued for ${nodes.find((node) => node.id === service.node_id)?.name || "the node"}.`);
+      await loadVpnServices();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to update VPN service");
+    } finally {
+      setServiceBusy("");
+      setPendingServiceConfirmation(null);
+    }
+  }
+
+  async function executePolicyRollout() {
+    if (!pendingPolicyRollout) return;
+    setPolicyRolloutBusy(true);
+    try {
+      const response = await fetch("/api/deployment-policy", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: pendingPolicyRollout, limit: pendingPolicyRollout === "canary" ? 1 : 25 }),
+      });
+      const payload = await response.json().catch(() => ({})) as { rollout?: { totalTargets: number; queuedTargets: number; failedTargets: number }; error?: string };
+      if (!response.ok || !payload.rollout) throw new Error(payload.error || "Unable to start policy rollout");
+      setNotice(`Standard policy rollout queued ${payload.rollout.queuedTargets} of ${payload.rollout.totalTargets} eligible nodes${payload.rollout.failedTargets ? `; ${payload.rollout.failedTargets} failed` : ""}.`);
+      await Promise.all([loadDeploymentPolicy(), loadVpnServices()]);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to start policy rollout");
+    } finally {
+      setPolicyRolloutBusy(false);
+      setPendingPolicyRollout(null);
+    }
+  }
+
   async function deployNode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setDeployError("");
@@ -714,7 +793,7 @@ export default function Home() {
     setDeploying(true);
     setNotice(editing ? "Saving node configuration…" : "Verifying SSH host key and preparing a signed deployment task…");
     const response = await fetch(editing ? `/api/nodes/${editingNodeId}` : "/api/nodes", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-      name: form.name, ip: form.ip, regionId: form.regionId, sshUser: form.user, secret: form.secret, hostFingerprint: form.hostFingerprint,
+      name: form.name, ip: form.ip, regionId: form.regionId, sshUser: form.user, secret: form.secret, hostFingerprint: form.hostFingerprint, deploymentTemplate: form.deploymentTemplate,
     }) });
     const payload = await response.json().catch(() => ({})) as { error?: string; node?: Node };
     setDeploying(false);
@@ -729,7 +808,7 @@ export default function Home() {
     setShowDeploy(false);
     setEditingNodeId(null);
     setDeployError("");
-    setForm({ name: "", ip: "", user: "root", secret: "", regionId: regions[0]?.id || "", hostFingerprint: "" });
+    setForm({ name: "", ip: "", user: "root", secret: "", regionId: regions[0]?.id || "", hostFingerprint: "", deploymentTemplate: "standard" });
     setNotice(editing ? `${payload.node.name} configuration saved.` : `${payload.node.name} is queued for secure bootstrap. The credential is encrypted server-side.`);
   }
 
@@ -1049,6 +1128,13 @@ export default function Home() {
           <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Node fleet refreshed just now.")} onOpenTerminal={openTerminal} onEditNode={openEditNode} onNodeAction={requestNodeAction} onBulkAction={requestBulkNodeAction} busyNodeAction={nodeActionBusy} />
         </section>}
 
+        {activeNav === "VPN Services" && <section className="module-view card services-workspace">
+          <div className="section-title route-title"><div><p>DATA PLANE</p><h1>VPN services</h1></div><span className="route-status">{vpnServices.filter((service) => service.status === "healthy").length} healthy</span></div>
+          {deploymentPolicy && <section className="policy-card"><div><p>FLEET POLICY</p><h2>Standard v{deploymentPolicy.standard.version}</h2><span>{deploymentPolicy.standard.protocols.map((item) => `${item.protocol} · ${item.transport.toUpperCase()} ${item.listenPort}`).join("  /  ")}</span>{deploymentPolicy.rollouts[0] && <small>Last rollout: {deploymentPolicy.rollouts[0].status.replaceAll("_", " ")} · {deploymentPolicy.rollouts[0].queuedTargets} reconciling</small>}</div><div className="policy-counts"><span><b>{deploymentPolicy.counts.standardNodes}</b> standard</span><span><b>{deploymentPolicy.counts.customNodes}</b> custom</span><span><b>{deploymentPolicy.counts.driftedNodes}</b> need rollout</span><span className={deploymentPolicy.counts.blockedNodes ? "policy-blocked" : ""}><b>{deploymentPolicy.counts.blockedNodes}</b> blocked</span></div><div className="policy-actions"><button type="button" disabled={policyRolloutBusy || deploymentPolicy.counts.eligibleNodes < 1} onClick={() => setPendingPolicyRollout("canary")}>Canary one node</button><button type="button" className="primary-button" disabled={policyRolloutBusy || deploymentPolicy.counts.eligibleNodes < 1} onClick={() => setPendingPolicyRollout("batch")}>Roll out next batch</button></div>{deploymentPolicy.driftedNodes.length > 0 && <details><summary>Review {deploymentPolicy.driftedNodes.length} nodes requiring policy reconciliation</summary><div className="policy-drift-list">{deploymentPolicy.driftedNodes.map((item) => <div key={item.id}><b>{item.name}</b><span>v{item.currentVersion} → v{deploymentPolicy.standard.version}{item.missingProtocols.length ? ` · reconcile ${item.missingProtocols.join(", ")}` : ""}</span><em className={item.eligible ? "" : "blocked"}>{item.eligible ? "eligible" : item.reason}</em></div>)}</div></details>}</section>}
+          <div className="services-copy">A node is the managed host; a VPN service is one managed protocol listener running on it. Services are deployed independently of user profiles, so new devices never control server lifecycle.</div>
+          <div className="services-list">{vpnServices.length ? vpnServices.map((service) => { const node = nodes.find((item) => item.id === service.node_id); const key = `${service.node_id}:${service.protocol}`; const mark = service.protocol.split(/[^a-z0-9]+/i).map((part) => part[0]).join("").slice(0, 3).toUpperCase(); return <article className="service-row" key={key}><span className={`service-mark service-${service.status}`}>{mark}</span><div><b>{node?.name || service.node_id}</b><small>{node?.place || "Unknown region"} · {service.protocol}</small></div><div><span>Listener</span><b>{service.transport.toUpperCase()} {service.listen_port}</b></div><div><span>Desired state</span><b>{service.enabled ? "Enabled" : "Disabled"}</b></div><div><span>Runtime</span><b className={`service-state service-${service.status}`}>{service.status}</b>{service.last_error && <small title={service.last_error}>{service.last_error}</small>}</div><div className="service-actions">{service.enabled ? <><button type="button" disabled={serviceBusy === key || node?.status !== "online"} onClick={() => setPendingServiceConfirmation({ service, action: "redeploy" })}>Redeploy</button><button className="danger-button" type="button" disabled={serviceBusy === key || node?.status !== "online"} onClick={() => setPendingServiceConfirmation({ service, action: "disable" })}>Disable</button></> : <button type="button" disabled={serviceBusy === key || node?.status !== "online"} onClick={() => setPendingServiceConfirmation({ service, action: "enable" })}>Enable</button>}</div></article>; }) : <p className="diagnostics-empty">No VPN services exist yet. Add a node and choose a deployment template.</p>}</div>
+        </section>}
+
         {activeNav === "Regions" && <section className="module-view card">
           <div className="section-title route-title"><div><p>CONTROL PLANE</p><h1>Regions</h1></div><span className="route-status">{regions.length} configured</span></div>
           <div className="regions-workspace">
@@ -1074,14 +1160,14 @@ export default function Home() {
           </div>
         </section>}
 
-        {activeNav === "Access" && <section className="module-view card access-workspace">
-          <div className="section-title route-title"><div><p>USER ACCESS</p><h1>Connect a device</h1></div><span className="route-status">WireGuard · OpenVPN</span></div>
-          <div className="access-copy">Choose a healthy node and generate an import-ready macOS profile. Both WireGuard and OpenVPN configurations can be downloaded again from the profile list; private material is encrypted by the Controller and is never returned through a list API.</div>
+        {activeNav === "Users & Devices" && <section className="module-view card access-workspace">
+          <div className="section-title route-title"><div><p>USER ACCESS</p><h1>Users &amp; devices</h1></div><span className="route-status">WireGuard · OpenVPN</span></div>
+          <div className="access-copy">Register a device, optionally choose a location, and download an import-ready profile. Northstar automatically assigns a healthy VPN service; users do not need to understand or select infrastructure nodes.</div>
           <div className="access-form">
-            <label>Edge node<select value={accessNodeId || nodes.find((node) => node.status === "online")?.id || ""} onChange={(event) => setAccessNodeId(event.target.value)}>{nodes.length === 0 && <option value="">No nodes available</option>}{nodes.map((node) => <option key={node.id} value={node.id} disabled={node.status !== "online"}>{node.name} · {node.place} · {node.status}</option>)}</select></label>
+            <label>Location<select value={accessRegionId} onChange={(event) => setAccessRegionId(event.target.value)}><option value="">Automatic · best healthy service</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} · {region.country}</option>)}</select></label>
             <label>Protocol<select value={accessProtocol} onChange={(event) => setAccessProtocol(event.target.value as "wireguard" | "openvpn")}><option value="wireguard">WireGuard</option><option value="openvpn">OpenVPN</option></select></label>
             <label>Device name<input value={accessDeviceName} maxLength={120} onChange={(event) => setAccessDeviceName(event.target.value)} placeholder="My Mac" /></label>
-            <button className="primary-button" type="button" disabled={accessBusy || nodes.every((node) => node.status !== "online")} onClick={() => void createMacAccessProfile()}>{accessBusy ? "Preparing profile…" : "Prepare Mac profile"}<span>→</span></button>
+            <button className="primary-button" type="button" disabled={accessBusy || !vpnServices.some((service) => service.protocol === accessProtocol && service.enabled && service.status === "healthy" && (!accessRegionId || nodes.find((node) => node.id === service.node_id)?.regionId === accessRegionId))} onClick={() => void createMacAccessProfile()}>{accessBusy ? "Preparing profile…" : "Prepare Mac profile"}<span>→</span></button>
           </div>
           {accessError && <p className="form-error" role="alert">{accessError}</p>}
           {accessConfig && <div className="access-result"><div><p className="eyebrow"><span /> PROFILE READY</p><h2>Import this profile into {accessProtocol === "openvpn" ? "OpenVPN Connect" : "WireGuard"}.</h2><p>Download the file, import it in the matching macOS app, then activate the connection. Keep the downloaded file private.</p></div><button className="secondary-button access-download" type="button" onClick={downloadAccessConfig}>Download {accessConfig.name} <span>↓</span></button><details><summary>Show configuration</summary><pre>{accessConfig.config}</pre></details></div>}
@@ -1114,6 +1200,7 @@ export default function Home() {
             <form onSubmit={deployNode}>
               <label>Node name<input autoFocus placeholder="e.g. Singapore Edge" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
           <div className="field-pair"><label>Public IP<input placeholder="203.0.113.10" value={form.ip} onChange={(event) => setForm({ ...form, ip: event.target.value })} /></label><label>Region<select required value={form.regionId} onChange={(event) => setForm({ ...form, regionId: event.target.value })}>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} · {region.country}</option>)}</select></label></div>
+              {!editingNodeId && <label>Deployment template<select value={form.deploymentTemplate} onChange={(event) => setForm({ ...form, deploymentTemplate: event.target.value })}><option value="standard">Standard edge · managed protocol set</option><option value="wireguard">WireGuard only</option><option value="openvpn">OpenVPN only</option><option value="agent-only">Agent only · no VPN listener</option></select></label>}
               <div className="field-pair"><label>SSH user<input autoComplete="username" value={form.user} onChange={(event) => setForm({ ...form, user: event.target.value })} /></label><label>SSH password or private key<input type="password" autoComplete="current-password" placeholder={editingNodeId ? "Leave blank to keep existing credential" : "Encrypted on the controller"} value={form.secret} onChange={(event) => setForm({ ...form, secret: event.target.value })} /></label></div>
               <div className="fingerprint-field">
                 <div className="fingerprint-label"><label htmlFor="host-fingerprint">SSH host fingerprint</label><button type="button" className="help-toggle" onClick={() => setShowFingerprintGuide((current) => !current)} aria-expanded={showFingerprintGuide}>{showFingerprintGuide ? "收起" : "如何获取？"}</button></div>
@@ -1141,7 +1228,7 @@ export default function Home() {
                 {actionAdvice(nodeDiagnostics.actions[0]) && <aside className="diagnostic-advice"><b>Suggested next step</b><p>{actionAdvice(nodeDiagnostics.actions[0])}</p></aside>}
                 {!actionAdvice(nodeDiagnostics.actions[0]) && selectedNode.status !== "online" && hasAgentCredentialFailure(nodeDiagnostics.actionEvents) && <aside className="diagnostic-advice"><b>Agent identity rejected</b><p>The node reached the Controller, but its saved credential is no longer accepted. Repairing the Agent rotates and synchronizes that credential over verified SSH without deleting VPN configuration.</p><button type="button" disabled={Boolean(nodeActionBusy)} onClick={() => requestNodeAction(selectedNode, "bootstrap")}>Reinstall / repair agent</button></aside>}
                 <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Resource health</b></div><ResourceMetrics metrics={selectedNode.metrics} timeZone={timeZone} /></div>
-                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Connectivity</b><span>{nodeDiagnostics.connectivity?.status.replaceAll("_", " ") || "awaiting Agent report"}</span></div>{nodeDiagnostics.connectivity ? <><div className="connectivity-summary"><span>Agent channel: <b>{nodeDiagnostics.connectivity.agentChannel}</b></span><span>Last authenticated heartbeat: <b>{formatTime(nodeDiagnostics.connectivity.lastAuthenticatedHeartbeat, timeZone)}</b></span><span>Host firewall: <b>{nodeDiagnostics.connectivity.firewall.manager} · {nodeDiagnostics.connectivity.firewall.inputPolicy}</b></span><span>Cloud firewall: <b>unverified</b></span></div>{nodeDiagnostics.connectivity.status === "not_configured" && <aside className="protocol-setup"><div><b>No VPN protocol has been activated on this node.</b><p>Northstar starts a protocol on demand when its first Connection Profile is created and activated.</p></div><button type="button" onClick={() => { setAccessNodeId(selectedNode.id); setActiveNav("Access"); setShowTerminal(false); }}>Create first connection profile</button></aside>}{nodeDiagnostics.connectivity.protocols.map((protocol) => <article className={`connectivity-row connectivity-${protocol.state}`} key={protocol.protocol}><b>{protocol.protocol}</b><span>{protocol.state.replaceAll("_", " ")}</span><span>{protocol.transport.toUpperCase()} {protocol.port}</span><span>runtime {protocol.runtimeActive ? "active" : "inactive"}</span><span>listener {protocol.listening ? "ready" : "missing"}</span><span>host {protocol.hostFirewall}</span><span>cloud {protocol.cloudFirewall}</span>{protocol.lastError && <small>{protocol.lastError}</small>}</article>)}<p className="diagnostics-empty">{nodeDiagnostics.connectivity.note}</p></> : <p className="diagnostics-empty">Reinstall the Agent once after upgrading, then wait for its next heartbeat to collect VPN listener and host-firewall status.</p>}</div>
+                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Connectivity</b><span>{nodeDiagnostics.connectivity?.status.replaceAll("_", " ") || "awaiting Agent report"}</span></div>{nodeDiagnostics.connectivity ? <><div className="connectivity-summary"><span>Agent channel: <b>{nodeDiagnostics.connectivity.agentChannel}</b></span><span>Last authenticated heartbeat: <b>{formatTime(nodeDiagnostics.connectivity.lastAuthenticatedHeartbeat, timeZone)}</b></span><span>Host firewall: <b>{nodeDiagnostics.connectivity.firewall.manager} · {nodeDiagnostics.connectivity.firewall.inputPolicy}</b></span><span>Cloud firewall: <b>unverified</b></span></div>{nodeDiagnostics.connectivity.status === "not_configured" && <aside className="protocol-setup"><div><b>No VPN service has been deployed on this node.</b><p>Enable WireGuard or OpenVPN from VPN Services. User profiles no longer start server listeners.</p></div><button type="button" onClick={() => { setActiveNav("VPN Services"); setShowTerminal(false); }}>Manage VPN services</button></aside>}{nodeDiagnostics.connectivity.protocols.map((protocol) => <article className={`connectivity-row connectivity-${protocol.state}`} key={protocol.protocol}><b>{protocol.protocol}</b><span>{protocol.state.replaceAll("_", " ")}</span><span>{protocol.transport.toUpperCase()} {protocol.port}</span><span>runtime {protocol.runtimeActive ? "active" : "inactive"}</span><span>listener {protocol.listening ? "ready" : "missing"}</span><span>host {protocol.hostFirewall}</span><span>cloud {protocol.cloudFirewall}</span>{protocol.lastError && <small>{protocol.lastError}</small>}</article>)}<p className="diagnostics-empty">{nodeDiagnostics.connectivity.note}</p></> : <p className="diagnostics-empty">Reinstall the Agent once after upgrading, then wait for its next heartbeat to collect VPN listener and host-firewall status.</p>}</div>
                 <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Operation timeline</b><span>Controller collection time · node time retained in message</span><button type="button" onClick={() => void loadNodeDiagnostics(selectedNode.id)}>Refresh now</button></div>
                   {nodeDiagnostics.actionEvents.length ? [...nodeDiagnostics.actionEvents].reverse().map((event) => <article className={`diagnostic-event event-${event.level}`} key={event.id}><time>{formatTime(event.created_at, timeZone)}</time><span>{event.phase.replaceAll("-", " ")}</span><p>{event.message}</p></article>) : <p className="diagnostics-empty">No operation events recorded yet.</p>}
                 </div>
@@ -1189,6 +1276,28 @@ export default function Home() {
         busy={Boolean(accessDeviceBusy)}
         onCancel={() => setPendingDeviceRevocation(null)}
         onConfirm={() => pendingDeviceRevocation && void revokeAccessDevice(pendingDeviceRevocation)}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingServiceConfirmation)}
+        eyebrow="VPN SERVICE LIFECYCLE"
+        title={`${pendingServiceConfirmation?.action || "Update"} ${pendingServiceConfirmation?.service.protocol || "VPN service"}?`}
+        description={pendingServiceConfirmation?.action === "disable" ? "This stops the listener and disconnects active clients using this service. Profiles remain in the audit history but cannot connect until the service is enabled again." : "The Controller will send a structured reconcile task through the Agent channel. Progress and errors will remain visible in node diagnostics."}
+        confirmLabel={pendingServiceConfirmation?.action === "disable" ? "Disable service" : pendingServiceConfirmation?.action === "redeploy" ? "Redeploy service" : "Enable service"}
+        tone={pendingServiceConfirmation?.action === "disable" ? "danger" : "warning"}
+        busy={Boolean(serviceBusy)}
+        onCancel={() => setPendingServiceConfirmation(null)}
+        onConfirm={() => void executeVpnServiceAction()}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingPolicyRollout)}
+        eyebrow="FLEET POLICY ROLLOUT"
+        title={pendingPolicyRollout === "canary" ? "Apply Standard policy to one canary node?" : "Apply Standard policy to the next batch?"}
+        description={pendingPolicyRollout === "canary" ? "Only one eligible Standard node will receive missing protocol services. Existing healthy services remain untouched." : "Up to 25 eligible Standard nodes will receive the current protocol manifest. Blocked or custom nodes are skipped, and each protocol is reconciled independently."}
+        confirmLabel={pendingPolicyRollout === "canary" ? "Start canary" : "Start batch rollout"}
+        tone="warning"
+        busy={policyRolloutBusy}
+        onCancel={() => setPendingPolicyRollout(null)}
+        onConfirm={() => void executePolicyRollout()}
       />
     </main>
   );
