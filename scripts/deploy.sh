@@ -195,11 +195,19 @@ if command -v curl >/dev/null 2>&1; then
     all)
       check_endpoint northstar 3000 /api/health
       check_endpoint portal-web 3100 /health
+      check_endpoint portal-web 3100 /api/health
       check_endpoint admin-web 3200 /health
+      check_endpoint admin-web 3200 /api/health
       ;;
     northstar) check_endpoint northstar 3000 /api/health ;;
-    portal-web) check_endpoint portal-web 3100 /health ;;
-    admin-web) check_endpoint admin-web 3200 /health ;;
+    portal-web)
+      check_endpoint portal-web 3100 /health
+      check_endpoint portal-web 3100 /api/health
+      ;;
+    admin-web)
+      check_endpoint admin-web 3200 /health
+      check_endpoint admin-web 3200 /api/health
+      ;;
   esac
 fi
 

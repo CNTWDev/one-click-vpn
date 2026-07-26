@@ -29,6 +29,8 @@ Controller/API：
 - TCP 3200：Admin Web，仅绑定到 Controller 主机的 `127.0.0.1`；
 - TCP 22：仅 bootstrap/recovery，尽量限制源地址。Agent 正常运行后只需要向 API/Agent 域名出站 TCP 443，不需要给节点开放 Controller 入站端口。
 
+Portal/Admin 不通过公网域名回调 Controller。两个前端容器统一使用 Docker DNS 地址 `http://northstar:3000` 转发 `/api`。宿主机 Nginx 只负责 TLS 和站点入口；独立 API 域名仅供原生客户端与远程 Agent 使用。
+
 Edge Node：
 
 - WireGuard UDP 监听端口；

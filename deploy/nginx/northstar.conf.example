@@ -23,10 +23,7 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 10m;
 
-    location /api/ {
-        proxy_pass http://northstar_controller;
-        include /etc/nginx/snippets/northstar-proxy.conf;
-    }
+    # Portal proxies /api to http://northstar:3000 over the Docker network.
     location / { proxy_pass http://northstar_portal; include /etc/nginx/snippets/northstar-proxy.conf; }
 }
 
@@ -40,10 +37,7 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 10m;
 
-    location /api/ {
-        proxy_pass http://northstar_controller;
-        include /etc/nginx/snippets/northstar-proxy.conf;
-    }
+    # Admin proxies /api to http://northstar:3000 over the Docker network.
     location / { proxy_pass http://northstar_admin; include /etc/nginx/snippets/northstar-proxy.conf; }
 }
 

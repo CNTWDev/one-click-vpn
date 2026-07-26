@@ -27,13 +27,13 @@ admin-web       :3200 -> 管理后台 Web
 controller      :3000 -> API + 控制面
 
 app.example.com          -> portal-web:3100
-app.example.com/api/v1   -> controller:3000/api/v1
+portal-web/api           -> http://northstar:3000（Docker 内网）
 console.example.com      -> admin-web:3200
-console.example.com/api  -> controller:3000/api
+admin-web/api            -> http://northstar:3000（Docker 内网）
 api.example.com          -> controller:3000/api/v1（给原生客户端）
 ```
 
-反向代理负责把 `/api/v1` 转发到 Controller。浏览器仍然从 `app.example.com` 访问 API，不需要开放跨域 Cookie，也不需要把 Controller 端口直接暴露给用户。
+浏览器仍然同源访问 `/api`，但请求到达 Portal/Admin 后，由前端容器通过 Docker 服务名 `northstar` 转发到 Controller。宿主机 Nginx 不参与站点 API 路由，也不需要开放跨域 Cookie。原生客户端和远程 Agent 才使用独立 API 域名。
 
 当前仓库已经增加独立的 `portal-web/` 和 `admin-web/` 应用及 Docker 服务；它们只调用 API，不直接访问 PostgreSQL。后续拆成独立代码仓库不会改变 API 和客户端。
 
@@ -42,9 +42,9 @@ api.example.com          -> controller:3000/api/v1（给原生客户端）
 ```text
 Internet
   ├── app.example.com     -> Nginx -> portal-web:3100
-  │                              └── /api/v1 -> controller:3000
+  │                              └── /api -> northstar:3000（Docker 内网）
   ├── console.example.com -> Nginx -> admin-web:3200
-  │                              └── /api -> controller:3000
+  │                              └── /api -> northstar:3000（Docker 内网）
   └── api.example.com      -> Nginx -> controller:3000
 ```
 

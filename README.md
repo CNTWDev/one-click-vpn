@@ -9,16 +9,16 @@ Node Agent. The current data plane supports WireGuard and OpenVPN.
 ```text
 Browser:  app.example.com       -> Portal  :3100
           console.example.com   -> Admin   :3200
-          /api/*                 -> API     :3000
+          Portal/Admin /api/*    -> northstar:3000 (Docker network)
 
 Native:   api.example.com       -> API     :3000
 Agent:    outbound HTTPS        -> api.example.com/api/v1/agent/*
 ```
 
 The Controller, Portal, and Admin run as independent Docker services. Host Nginx
-terminates HTTPS and reverse-proxies to loopback ports. The Agent does not need an
-inbound port; it uses HTTPS with a per-node Bearer token. SSH is used only for
-bootstrap and repair.
+terminates HTTPS and forwards each site to its loopback port. Portal/Admin proxy
+`/api` internally to `http://northstar:3000`; only native clients and remote Agents
+use the public API hostname. SSH is used only for node bootstrap and repair.
 
 ## Requirements
 
@@ -89,6 +89,10 @@ sudo systemctl reload nginx
 
 Docker binds only to `127.0.0.1`; do not expose ports `3000`, `3100`, or `3200`
 directly to the Internet.
+
+Nginx sends all `app.example.com` traffic to Portal and all `console.example.com`
+traffic to Admin. Their `/api` requests stay on the Docker network. The separate
+`api.example.com` host is only for native clients and remote Edge Agents.
 
 ## Services and ports
 

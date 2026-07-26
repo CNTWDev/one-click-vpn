@@ -59,4 +59,4 @@ createServer((request, response) => {
   if (!existsSync(file)) { response.writeHead(404); response.end("Not found"); return; }
   response.writeHead(200, { "Content-Type": types[extname(file)] || "application/octet-stream", "Cache-Control": extname(file) === ".html" ? "no-cache" : "public, max-age=31536000, immutable" });
   createReadStream(file).pipe(response);
-}).listen(port, "0.0.0.0", () => console.log(`Northstar frontend listening on ${port}`));
+}).listen(port, "0.0.0.0", () => console.log(`Northstar frontend listening on ${port}; API proxy ${apiUpstream || "disabled"}`));
