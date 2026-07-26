@@ -1,24 +1,118 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { api } from "./api";
+import {
+  ControllerPage, LogsPage, NodesPage, OverviewPage, RegionsPage, ServicesPage, UsersPage,
+} from "./pages";
+import type { AdminUser, NodeRecord, Region } from "./types";
 import "./styles.css";
 
-type User = { id: string; email: string; displayName: string; role: string; status: string; rejectionReason?: string | null; createdAt?: string };
-type Node = { id: string; name: string; place: string; status: string; latency: string; version: string; lastSeen: string };
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, { ...init, credentials: "include", headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
-  const contentType = response.headers.get("content-type") || "";
-  const text = await response.text();
-  if (!contentType.includes("application/json")) {
-    throw new Error(`API 返回了非 JSON 响应（HTTP ${response.status}），请检查 Console 的 /api/ 反向代理。`);
-  }
-  const body = text ? JSON.parse(text) as Record<string, unknown> : {};
-  if (!response.ok) throw new Error(typeof body.error === "string" ? body.error : `请求失败（HTTP ${response.status}）`);
-  return body as T;
+type PageId = "overview" | "users" | "nodes" | "services" | "regions" | "controller" | "logs";
+const navigation: Array<{ id: PageId; icon: string; label: string; description: string }> = [
+  { id: "overview", icon: "⌂", label: "运维总览", description: "状态与待处理" },
+  { id: "users", icon: "U", label: "账号管理", description: "审核与访问控制" },
+  { id: "nodes", icon: "N", label: "节点运维", description: "部署、修复与诊断" },
+  { id: "services", icon: "V", label: "VPN 服务", description: "协议与部署策略" },
+  { id: "regions", icon: "R", label: "区域管理", description: "节点区域目录" },
+  { id: "controller", icon: "C", label: "Controller", description: "控制面设置" },
+  { id: "logs", icon: "L", label: "运行日志", description: "故障定位" },
+];
+
+function Brand() {
+  return <div className="brand"><span className="mark"><i /><i /><i /></span><span>NORTHSTAR <em>CONSOLE</em></span></div>;
 }
-function Brand() { return <div className="brand"><span className="mark"><i /><i /><i /></span><span>NORTHSTAR <em>CONSOLE</em></span></div>; }
-function Login({ onUser }: { onUser: (user: User) => void }) { const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [error, setError] = useState(""); const [busy, setBusy] = useState(false); async function submit(event: React.FormEvent) { event.preventDefault(); setBusy(true); setError(""); try { const result = await api<{ user: User }>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }); if (!result.user?.id) throw new Error("登录接口返回异常，请检查 Console 的 /api/ 反向代理。"); onUser(result.user); } catch (err) { setError((err as Error).message); } finally { setBusy(false); } } return <main className="login"><Brand /><form onSubmit={submit}><p className="eyebrow">CONTROL PLANE</p><h1>管理后台</h1><p>审核用户、查看节点和控制 VPN 服务。</p><label>邮箱<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label><label>密码<input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label><button type="submit" disabled={busy}>{busy ? "登录中…" : "登录"} →</button>{error && <div className="error" role="alert">{error}</div>}</form></main>; }
-function App() { const [user, setUser] = useState<User | null>(null); const [loading, setLoading] = useState(true); const [pending, setPending] = useState<User[]>([]); const [allUsers, setAllUsers] = useState<User[]>([]); const [nodes, setNodes] = useState<Node[]>([]); const [error, setError] = useState(""); async function refresh() { const [pendingResult, usersResult, nodesResult] = await Promise.all([api<{ users: User[] }>("/api/v1/admin/users?status=pending"), api<{ users: User[] }>("/api/v1/admin/users"), api<{ nodes: Node[] }>("/api/v1/nodes")]); setPending(pendingResult.users); setAllUsers(usersResult.users); setNodes(nodesResult.nodes); } useEffect(() => { api<{ user: User }>("/api/auth/me").then((result) => setUser(result.user)).catch(() => undefined).finally(() => setLoading(false)); }, []); useEffect(() => { if (!user) return; void refresh().catch((err) => setError((err as Error).message)); }, [user]); async function update(id: string, status: string) { try { await api(`/api/v1/admin/users/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }); await refresh(); } catch (err) { setError((err as Error).message); } } async function logout() { await fetch("/api/auth/logout", { method: "POST" }); setUser(null); } if (loading) return <main className="loading"><Brand />加载中…</main>; if (!user) return <Login onUser={setUser} />; return <main className="shell"><header><Brand /><div className="top"><span>{user.displayName} · {user.role}</span><button onClick={() => void logout()}>退出</button></div></header><section className="hero"><div><p className="eyebrow">CONTROL PLANE / ADMIN</p><h1>把审核和节点<br /><em>保持清晰。</em></h1><p>用户 Web 和管理后台现在都通过独立 API 访问底层控制面。</p></div><div className="health"><i /> Controller API<br /><small>Authenticated</small></div></section><section className="metrics"><article><small>待审核用户</small><b>{pending.length}</b></article><article><small>全部用户</small><b>{allUsers.length}</b></article><article><small>节点</small><b>{nodes.length}</b></article><article><small>在线节点</small><b>{nodes.filter((node) => node.status === "online").length}</b></article></section>{error && <p className="error notice">{error}</p>}<div className="columns"><section className="card"><div className="card-head"><div><p className="eyebrow">ACCESS REVIEW</p><h2>待审核账号</h2></div><button className="refresh" onClick={() => void refresh()}>刷新</button></div>{pending.length ? pending.map((item) => <div className="user-row" key={item.id}><div className="avatar">{item.displayName.slice(0, 1)}</div><div className="user-main"><b>{item.displayName}</b><small>{item.email}</small><small>申请时间：{item.createdAt ? new Date(item.createdAt).toLocaleString() : "—"}</small></div><div className="actions"><button className="approve" onClick={() => void update(item.id, "active")}>通过</button><button className="reject" onClick={() => void update(item.id, "rejected")}>拒绝</button></div></div>) : <div className="empty">目前没有待审核账号。</div>}</section><section className="card"><div className="card-head"><div><p className="eyebrow">EDGE FLEET</p><h2>节点状态</h2></div><button className="refresh" onClick={() => void refresh()}>刷新</button></div>{nodes.length ? nodes.map((node) => <div className="node-row" key={node.id}><span className={`dot ${node.status}`} /><div><b>{node.name}</b><small>{node.place} · {node.latency}</small></div><span className="node-status">{node.status}</span></div>) : <div className="empty">还没有节点。</div>}</section></div><section className="card users"><div className="card-head"><div><p className="eyebrow">USERS</p><h2>账号总览</h2></div></div><div className="user-table">{allUsers.map((item) => <div key={item.id}><span>{item.displayName}</span><span>{item.email}</span><b className={`status ${item.status}`}>{item.status}</b><span>{item.role}</span>{item.status === "active" && item.role === "member" && <button onClick={() => void update(item.id, "suspended")}>停用</button>}{item.status === "suspended" && <button onClick={() => void update(item.id, "active")}>恢复</button>}</div>)}</div></section><footer>深度节点编排仍保留在 Controller 兼容控制台；本后台负责审核和运营入口。</footer></main>; }
-export default App;
+
+function Login({ onUser }: { onUser: (user: AdminUser) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setBusy(true); setError("");
+    try {
+      const result = await api<{ user: AdminUser }>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+      if (!result.user?.id) throw new Error("登录接口返回异常，请检查 Console 的 /api/ 反向代理。");
+      onUser(result.user);
+    } catch (reason) { setError((reason as Error).message); }
+    finally { setBusy(false); }
+  }
+  return <main className="login">
+    <Brand />
+    <form onSubmit={submit}>
+      <p className="eyebrow">CONTROL PLANE</p><h1>管理控制台</h1><p>账号审核、节点部署与修复、VPN 服务和运行诊断。</p>
+      <label>管理员邮箱<input type="email" required autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+      <label>密码<input type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+      <button type="submit" disabled={busy}>{busy ? "登录中…" : "登录 Console"} →</button>
+      {error && <div className="login-error" role="alert">{error}</div>}
+    </form>
+  </main>;
+}
+
+function App() {
+  const [user, setUser] = useState<AdminUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [nodes, setNodes] = useState<NodeRecord[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [page, setPage] = useState<PageId>("overview");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [error, setError] = useState("");
+
+  const refreshCore = useCallback(async () => {
+    setDataLoading(true); setError("");
+    try {
+      const [userResult, nodeResult, regionResult] = await Promise.all([
+        api<{ users: AdminUser[] }>("/api/v1/admin/users"),
+        api<{ nodes: NodeRecord[] }>("/api/nodes"),
+        api<{ regions: Region[] }>("/api/regions"),
+      ]);
+      setUsers(userResult.users || []); setNodes(nodeResult.nodes || []); setRegions(regionResult.regions || []);
+    } catch (reason) { setError((reason as Error).message); }
+    finally { setDataLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    api<{ user: AdminUser }>("/api/auth/me")
+      .then((result) => setUser(result.user))
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { if (user) void refreshCore(); }, [user, refreshCore]);
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => undefined);
+    setUser(null); setUsers([]); setNodes([]); setRegions([]); setPage("overview");
+  }
+  function navigate(next: string) { setPage(next as PageId); setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }
+
+  if (loading) return <main className="loading"><Brand /><span>正在连接控制面…</span></main>;
+  if (!user) return <Login onUser={setUser} />;
+
+  const current = navigation.find((item) => item.id === page)!;
+  return <main className="app-shell">
+    <aside className={menuOpen ? "open" : ""}>
+      <div className="aside-head"><Brand /><button className="icon-button mobile-only" onClick={() => setMenuOpen(false)}>×</button></div>
+      <nav aria-label="管理控制台导航">{navigation.map((item) => <button key={item.id} className={page === item.id ? "active" : ""} onClick={() => navigate(item.id)}><span className="nav-icon">{item.icon}</span><span><b>{item.label}</b><small>{item.description}</small></span>{item.id === "users" && users.some((account) => account.status === "pending") && <em>{users.filter((account) => account.status === "pending").length}</em>}</button>)}</nav>
+      <div className="aside-health"><span className="live-mark" /><span><b>Controller API</b><small>{error ? "连接异常" : dataLoading ? "同步数据中" : "已认证 · 运行中"}</small></span></div>
+      <div className="aside-user"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><span><b>{user.displayName}</b><small>{user.email}</small></span><button className="text-button" onClick={() => void logout()}>退出</button></div>
+    </aside>
+    {menuOpen && <button className="menu-scrim" aria-label="关闭菜单" onClick={() => setMenuOpen(false)} />}
+    <section className="workspace">
+      <header className="topbar"><button className="icon-button mobile-only" onClick={() => setMenuOpen(true)}>☰</button><div><small>Northstar Console</small><b>{current.label}</b></div><span>{dataLoading ? "正在同步…" : `${nodes.filter((node) => node.status === "online").length}/${nodes.length} 节点在线`}</span></header>
+      <div className="content">
+        {error && <div className="inline-notice error" role="alert">{error}<button className="text-button" onClick={() => void refreshCore()}>重试</button></div>}
+        {page === "overview" && <OverviewPage users={users} nodes={nodes} onNavigate={navigate} onRefresh={refreshCore} />}
+        {page === "users" && <UsersPage users={users} onRefresh={refreshCore} />}
+        {page === "nodes" && <NodesPage nodes={nodes} regions={regions} onRefresh={refreshCore} />}
+        {page === "services" && <ServicesPage nodes={nodes} />}
+        {page === "regions" && <RegionsPage regions={regions} nodes={nodes} onRefresh={refreshCore} />}
+        {page === "controller" && <ControllerPage />}
+        {page === "logs" && <LogsPage nodes={nodes} />}
+      </div>
+    </section>
+  </main>;
+}
 
 createRoot(document.getElementById("root")!).render(<App />);

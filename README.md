@@ -100,7 +100,7 @@ traffic to Admin. Their `/api` requests stay on the Docker network. The separate
 | --- | ---: | --- |
 | Controller/API | 3000 | API, Agent gateway, migrations |
 | Portal Web | 3100 | Registration, approval, devices, profiles, traffic |
-| Admin Web | 3200 | User approval, nodes, VPN services, logs |
+| Admin Web | 3200 | User access, node operations, VPN policy, diagnostics |
 | PostgreSQL | internal | Persistent application data |
 
 Useful local checks:
@@ -110,6 +110,21 @@ curl --fail http://127.0.0.1:3000/api/health
 curl --fail http://127.0.0.1:3100/health
 curl --fail http://127.0.0.1:3200/health
 ```
+
+## Admin console
+
+Open `console.example.com` with the owner/admin account. The Console includes:
+
+- user approval, rejection, suspension, and reactivation;
+- node creation/editing, Agent checks/restarts, reinstall/repair, deletion, and
+  fleet batch operations;
+- node connectivity, protocol, firewall, action-event, and reconcile diagnostics;
+- VPN service enable/disable/redeploy and Standard policy canary/batch rollout;
+- region and Controller settings, plus operational log query/purge.
+
+End-user devices, VPN profiles, and traffic remain in the customer Portal. Node
+repair uses the saved encrypted SSH credential; normal Agent communication uses
+outbound HTTPS to the Controller API.
 
 ## Upgrade
 
