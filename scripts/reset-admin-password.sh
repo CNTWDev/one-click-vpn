@@ -57,7 +57,7 @@ process.stdin.on("end", () => {
 ' | tr -d '\r\n')
 
 updated=$(compose exec -T db psql -v ON_ERROR_STOP=1 -U northstar -d northstar \
-  -v admin_email="$email" -v password_hash="$password_hash" -tA \
+  --set="admin_email=$email" --set="password_hash=$password_hash" -tA \
   -c "UPDATE users SET password_hash = :'password_hash', status = 'active', approved_at = COALESCE(approved_at, NOW()), updated_at = NOW() WHERE lower(email) = lower(:'admin_email') AND role IN ('owner', 'admin') RETURNING email;")
 
 if [ -z "$updated" ]; then
