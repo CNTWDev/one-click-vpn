@@ -10,8 +10,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const user = await requestUser(request);
   if (!user) return jsonError("Authentication required", 401);
   const { id } = await context.params;
-  const node = findNode(id);
+  const node = await findNode(id);
   if (!node) return jsonError("Node not found", 404);
-  return NextResponse.json({ nodeId: id, status: node.status, lastSeen: node.last_seen, reconcile: getNodeReconcileStatus(id) });
+  return NextResponse.json({ nodeId: id, status: node.status, lastSeen: node.last_seen, reconcile: await getNodeReconcileStatus(id) });
 }
-

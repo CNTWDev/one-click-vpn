@@ -6,13 +6,13 @@ import { sessionTtlSeconds } from "./config";
 export const SESSION_COOKIE = "northstar_session";
 
 export async function currentUser(): Promise<DbUser | null> {
-  cleanupSessions();
+  await cleanupSessions();
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
   if (!sessionId) return null;
-  const session = findSession(sessionId);
+  const session = await findSession(sessionId);
   if (!session || new Date(session.expires_at).getTime() <= Date.now()) return null;
-  return findUserById(session.user_id) || null;
+  return (await findUserById(session.user_id)) || null;
 }
 
 export async function requireUser(): Promise<DbUser> {
@@ -21,15 +21,15 @@ export async function requireUser(): Promise<DbUser> {
   return user;
 }
 
-export function createLoginSession(userId: string): { id: string; expires: Date } {
+export async function createLoginSession(userId: string): Promise<{ id: string; expires: Date }> {
   const id = randomBytes(32).toString("base64url");
   const expires = new Date(Date.now() + sessionTtlSeconds() * 1000);
-  createSession(userId, expires.toISOString(), id);
+  await createSession(userId, expires.toISOString(), id);
   return { id, expires };
 }
 
-export function expireLoginSession(id: string | undefined): void {
-  if (id) deleteSession(id);
+export async function expireLoginSession(id: string | undefined): Promise<void> {
+  if (id) await deleteSession(id);
 }
 
 export function sessionCookie(value: string, expires: Date): string {

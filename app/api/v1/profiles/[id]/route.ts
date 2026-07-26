@@ -10,7 +10,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const user = await requestUser(_request);
   if (!user) return jsonError("Authentication required", 401);
   const { id } = await context.params;
-  const profile = findConnectionProfile(id);
+  const profile = await findConnectionProfile(id);
   if (!profile) return jsonError("Profile not found", 404);
   return NextResponse.json({ profile: publicProfile(profile) });
 }

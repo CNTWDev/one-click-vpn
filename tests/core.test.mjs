@@ -1,16 +1,19 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import test, { after, before } from "node:test";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const port = 3187;
 const base = `http://127.0.0.1:${port}`;
-let dataDir;
 let server;
+const databaseUrl = process.env.NORTHSTAR_TEST_DATABASE_URL;
+const integrationOptions = databaseUrl
+  ? {}
+  : { skip: "Set NORTHSTAR_TEST_DATABASE_URL to a disposable PostgreSQL database to run integration tests." };
+const execFileAsync = promisify(execFile);
 
 async function waitForServer() {
   const deadline = Date.now() + 30_000;
@@ -27,18 +30,22 @@ async function waitForServer() {
 }
 
 before(async () => {
-  dataDir = await mkdtemp(path.join(tmpdir(), "northstar-test-"));
+  if (!databaseUrl) {
+    return;
+  }
+  const testEnv = {
+    ...process.env,
+    NODE_ENV: "production",
+    NORTHSTAR_DATABASE_URL: databaseUrl,
+    NORTHSTAR_MASTER_KEY: Buffer.alloc(32, 7).toString("base64"),
+    NORTHSTAR_ADMIN_EMAIL: "owner@example.com",
+    NORTHSTAR_ADMIN_PASSWORD: "test-password-123",
+    NORTHSTAR_PUBLIC_ORIGIN: base,
+  };
+  await execFileAsync(process.execPath, [path.join(root, "scripts/migrate.mjs")], { cwd: root, env: testEnv });
   server = spawn(process.execPath, [path.join(root, "node_modules/next/dist/bin/next"), "start", "--hostname", "127.0.0.1", "--port", String(port)], {
     cwd: root,
-    env: {
-      ...process.env,
-      NODE_ENV: "production",
-      NORTHSTAR_DATABASE_PATH: path.join(dataDir, "northstar.sqlite"),
-      NORTHSTAR_MASTER_KEY: Buffer.alloc(32, 7).toString("base64"),
-      NORTHSTAR_ADMIN_EMAIL: "owner@example.com",
-      NORTHSTAR_ADMIN_PASSWORD: "test-password-123",
-      NORTHSTAR_PUBLIC_ORIGIN: base,
-    },
+    env: testEnv,
     stdio: "ignore",
   });
   await waitForServer();
@@ -46,21 +53,20 @@ before(async () => {
 
 after(async () => {
   server?.kill("SIGTERM");
-  await rm(dataDir, { recursive: true, force: true });
 });
 
-test("health endpoint is public", async () => {
+test("health endpoint is public", integrationOptions, async () => {
   const response = await fetch(`${base}/api/health`);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json().then((body) => body.status), "ok");
 });
 
-test("node API requires an authenticated session", async () => {
+test("node API requires an authenticated session", integrationOptions, async () => {
   const response = await fetch(`${base}/api/nodes`);
   assert.equal(response.status, 401);
 });
 
-test("owner can sign in and read an empty fleet", async () => {
+test("owner can sign in and read an empty fleet", integrationOptions, async () => {
   const response = await fetch(`${base}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -79,7 +85,7 @@ test("owner can sign in and read an empty fleet", async () => {
   assert.deepEqual((await nodes.json()).nodes, []);
 });
 
-test("v1 bearer session can manage a device", async () => {
+test("v1 bearer session can manage a device", integrationOptions, async () => {
   const login = await fetch(`${base}/api/v1/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -128,7 +134,7 @@ test("v1 bearer session can manage a device", async () => {
   assert.ok((await refresh.json()).accessToken);
 });
 
-test("v1 agent tasks reject invalid credentials", async () => {
+test("v1 agent tasks reject invalid credentials", integrationOptions, async () => {
   const response = await fetch(`${base}/api/v1/agent/tasks/pull`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

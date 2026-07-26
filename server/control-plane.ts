@@ -20,7 +20,7 @@ import {
 } from "./control-db";
 import { getProtocolAdapter } from "./protocols/registry";
 
-export function publicDevice(device: ReturnType<typeof findDevice>) {
+export function publicDevice(device: Awaited<ReturnType<typeof findDevice>>) {
   if (!device) return null;
   return {
     id: device.id,
@@ -54,14 +54,14 @@ export function publicProfile(profile: ConnectionProfile) {
   };
 }
 
-function findNode(nodeId: string) {
-  return listControlNodes().find((node) => node.id === nodeId);
+async function findNode(nodeId: string) {
+  return (await listControlNodes()).find((node) => node.id === nodeId);
 }
 
-export function ensureDefaultNodeProtocols(nodeId: string): void {
-  if (listNodeProtocols(nodeId).length) return;
+export async function ensureDefaultNodeProtocols(nodeId: string): Promise<void> {
+  if ((await listNodeProtocols(nodeId)).length) return;
   const adapter = getProtocolAdapter("wireguard");
-  upsertNodeProtocol({
+  await upsertNodeProtocol({
     nodeId,
     protocol: "wireguard",
     transports: adapter.capability.transports,
@@ -74,8 +74,8 @@ export function ensureDefaultNodeProtocols(nodeId: string): void {
   });
 }
 
-export function rebuildDesiredState(nodeId: string, protocol: Protocol) {
-  const node = findNode(nodeId);
+export async function rebuildDesiredState(nodeId: string, protocol: Protocol) {
+  const node = await findNode(nodeId);
   if (!node) throw new Error("Node not found");
   const adapter = getProtocolAdapter(protocol);
   if (adapter.capability.status !== "enabled") throw new Error(`${protocol} adapter is not enabled`);
@@ -83,12 +83,12 @@ export function rebuildDesiredState(nodeId: string, protocol: Protocol) {
     nodeId,
     serverPublicKey: node.server_public_key,
     listenPort: protocol === "wireguard" ? 51820 : undefined,
-    peers: listActivePeers(nodeId, protocol),
+    peers: await listActivePeers(nodeId, protocol),
   });
-  const previous = findDesiredConfig(nodeId, protocol);
-  const desired = upsertDesiredConfig({ nodeId, protocol, payload: desiredPayload });
+  const previous = await findDesiredConfig(nodeId, protocol);
+  const desired = await upsertDesiredConfig({ nodeId, protocol, payload: desiredPayload });
   if (!previous || previous.config_hash !== desired.config_hash) {
-    enqueueReconcileTask({
+    await enqueueReconcileTask({
       nodeId,
       protocol,
       taskType: protocol === "wireguard" ? "ApplyWireGuardPeers" : "ApplyProtocolConfig",
@@ -99,25 +99,25 @@ export function rebuildDesiredState(nodeId: string, protocol: Protocol) {
   return desired;
 }
 
-export function issueConnectionProfile(input: {
+export async function issueConnectionProfile(input: {
   actorUserId?: string;
   deviceId: string;
   nodeId: string;
   protocol: Protocol;
   transport?: string;
   expiresInSeconds?: number;
-}): ConnectionProfile {
-  const device = findDevice(input.deviceId);
+}): Promise<ConnectionProfile> {
+  const device = await findDevice(input.deviceId);
   if (!device || device.status !== "active") throw new Error("Device is not active");
-  const node = findNode(input.nodeId);
+  const node = await findNode(input.nodeId);
   if (!node) throw new Error("Node not found");
   const adapter = getProtocolAdapter(input.protocol);
   if (adapter.capability.status !== "enabled") throw new Error(`${input.protocol} adapter is not enabled`);
-  const capability = listNodeProtocols(input.nodeId).find((item) => item.protocol === input.protocol);
+  const capability = (await listNodeProtocols(input.nodeId)).find((item) => item.protocol === input.protocol);
   if (!capability || capability.status !== "enabled") throw new Error("Node does not advertise this protocol");
   const transport = input.transport || adapter.capability.transports[0];
   if (!adapter.capability.transports.includes(transport)) throw new Error("Unsupported protocol transport");
-  const clientAddress = allocateIpLease(input.nodeId, input.protocol, input.deviceId);
+  const clientAddress = await allocateIpLease(input.nodeId, input.protocol, input.deviceId);
   const profile = adapter.buildProfile({
     deviceId: device.id,
     devicePublicKey: device.public_key,
@@ -129,7 +129,7 @@ export function issueConnectionProfile(input: {
     dns: ["1.1.1.1"],
     allowedIps: adapter.capability.ipv6 ? ["0.0.0.0/0", "::/0"] : ["0.0.0.0/0"],
   });
-  const saved = createConnectionProfile({
+  const saved = await createConnectionProfile({
     deviceId: input.deviceId,
     nodeId: input.nodeId,
     protocol: input.protocol,
@@ -141,29 +141,29 @@ export function issueConnectionProfile(input: {
     protocolPayload: profile.protocolPayload,
     expiresAt: new Date(Date.now() + (input.expiresInSeconds || 24 * 60 * 60) * 1000).toISOString(),
   });
-  addAudit({ actorUserId: input.actorUserId, action: "profile.issued", targetType: "profile", targetId: saved.id, metadata: { deviceId: input.deviceId, nodeId: input.nodeId, protocol: input.protocol } });
+  await addAudit({ actorUserId: input.actorUserId, action: "profile.issued", targetType: "profile", targetId: saved.id, metadata: { deviceId: input.deviceId, nodeId: input.nodeId, protocol: input.protocol } });
   return saved;
 }
 
-export function activateProfile(profileId: string, actorUserId?: string): ConnectionProfile {
-  const profile = findConnectionProfile(profileId);
+export async function activateProfile(profileId: string, actorUserId?: string): Promise<ConnectionProfile> {
+  const profile = await findConnectionProfile(profileId);
   if (!profile) throw new Error("Profile not found");
-  const activated = activateConnectionProfile(profileId);
+  const activated = await activateConnectionProfile(profileId);
   if (!activated) throw new Error("Profile could not be activated");
-  rebuildDesiredState(activated.node_id, activated.protocol);
-  addAudit({ actorUserId, action: "profile.activated", targetType: "profile", targetId: profileId });
+  await rebuildDesiredState(activated.node_id, activated.protocol);
+  await addAudit({ actorUserId, action: "profile.activated", targetType: "profile", targetId: profileId });
   return activated;
 }
 
-export function revokeDeviceAndReconcile(deviceId: string, actorUserId?: string): void {
-  const profiles = listConnectionProfiles({ deviceId });
-  revokeDevice(deviceId);
+export async function revokeDeviceAndReconcile(deviceId: string, actorUserId?: string): Promise<void> {
+  const profiles = await listConnectionProfiles({ deviceId });
+  await revokeDevice(deviceId);
   const affected = new Set(profiles.map((profile) => `${profile.node_id}:${profile.protocol}`));
   for (const key of affected) {
     const [nodeId, protocol] = key.split(":") as [string, Protocol];
-    try { rebuildDesiredState(nodeId, protocol); } catch { /* a disabled adapter needs no reconcile */ }
+    try { await rebuildDesiredState(nodeId, protocol); } catch { /* a disabled adapter needs no reconcile */ }
   }
-  addAudit({ actorUserId, action: "device.revoked", targetType: "device", targetId: deviceId });
+  await addAudit({ actorUserId, action: "device.revoked", targetType: "device", targetId: deviceId });
 }
 
 export function protocolForPlatform(platform: Platform, protocol: Protocol): boolean {

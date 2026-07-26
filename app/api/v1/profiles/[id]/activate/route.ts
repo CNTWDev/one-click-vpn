@@ -10,7 +10,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   if (!user) return jsonError("Authentication required", 401);
   const { id } = await context.params;
   try {
-    const profile = activateProfile(id, user.id);
+    const profile = await activateProfile(id, user.id);
     return NextResponse.json({ profile: {
       id: profile.id,
       deviceId: profile.device_id,

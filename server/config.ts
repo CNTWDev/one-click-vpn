@@ -1,15 +1,7 @@
-import path from "node:path";
-
-const root = process.cwd();
-
 function required(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
   return value;
-}
-
-export function databasePath(): string {
-  return process.env.NORTHSTAR_DATABASE_PATH?.trim() || path.join(root, "data", "northstar.sqlite");
 }
 
 export function sessionTtlSeconds(): number {

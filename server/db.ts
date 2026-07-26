@@ -1,8 +1,6 @@
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
-import { adminSeed, databasePath } from "./config";
+import { Pool, type QueryResultRow } from "pg";
+import { adminSeed } from "./config";
 import { hashPassword } from "./password";
 
 export type DbUser = {
@@ -46,160 +44,73 @@ export type DbRegion = {
   updated_at: string;
 };
 
-let instance: DatabaseSync | null = null;
-
-const schema = `
-CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE,
-  display_name TEXT NOT NULL,
-  password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'owner',
-  created_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS sessions (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  expires_at TEXT NOT NULL,
-  created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
-CREATE TABLE IF NOT EXISTS nodes (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  place TEXT NOT NULL,
-  region_id TEXT,
-  ip TEXT NOT NULL,
-  ssh_user TEXT NOT NULL,
-  ssh_port INTEGER NOT NULL DEFAULT 22,
-  status TEXT NOT NULL DEFAULT 'provisioning',
-  latency TEXT NOT NULL DEFAULT 'checking',
-  users INTEGER NOT NULL DEFAULT 0,
-  traffic TEXT NOT NULL DEFAULT '—',
-  version TEXT NOT NULL DEFAULT 'bootstrap pending',
-  last_seen TEXT NOT NULL DEFAULT 'never',
-  last_heartbeat_at TEXT,
-  credential_type TEXT NOT NULL,
-  credential_ciphertext TEXT NOT NULL,
-  credential_iv TEXT NOT NULL,
-  credential_tag TEXT NOT NULL,
-  host_fingerprint TEXT,
-  agent_token_hash TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS regions (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  country TEXT NOT NULL,
-  code TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  UNIQUE (name, country),
-  UNIQUE (code)
-);
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id TEXT PRIMARY KEY,
-  actor_user_id TEXT,
-  action TEXT NOT NULL,
-  target_type TEXT,
-  target_id TEXT,
-  metadata_json TEXT NOT NULL DEFAULT '{}',
-  created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS audit_created_idx ON audit_logs(created_at);
-CREATE TABLE IF NOT EXISTS node_actions (
-  id TEXT PRIMARY KEY,
-  node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-  action TEXT NOT NULL,
-  status TEXT NOT NULL,
-  output TEXT NOT NULL DEFAULT '',
-  error TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL,
-  finished_at TEXT
-);
-`;
+let pool: Pool | null = null;
+let readyPromise: Promise<void> | null = null;
 
 function now(): string {
   return new Date().toISOString();
 }
 
-export function getDb(): DatabaseSync {
-  if (instance) return instance;
-  const file = databasePath();
-  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  instance = new DatabaseSync(file);
-  instance.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
-  instance.exec(schema);
-  for (const statement of [
-    "ALTER TABLE nodes ADD COLUMN agent_token_hash TEXT",
-    "ALTER TABLE nodes ADD COLUMN region_id TEXT",
-    "ALTER TABLE nodes ADD COLUMN last_heartbeat_at TEXT",
-  ]) {
-    try { instance.exec(statement); } catch { /* column already exists */ }
+export function getDb(): Pool {
+  if (pool) return pool;
+  const connectionString = process.env.NORTHSTAR_DATABASE_URL?.trim();
+  if (!connectionString) throw new Error("NORTHSTAR_DATABASE_URL is required");
+  pool = new Pool({ connectionString, max: Number(process.env.NORTHSTAR_DB_POOL_MAX || 10), idleTimeoutMillis: 30_000 });
+  pool.on("error", (error) => console.error("Northstar PostgreSQL pool error", error));
+  return pool;
+}
+
+async function ensureReady(): Promise<void> {
+  if (!readyPromise) {
+    readyPromise = (async () => {
+      const database = getDb();
+      const timestamp = now();
+      const defaults = [
+        ["tokyo-jp", "Tokyo", "Japan", "JP"],
+        ["singapore-sg", "Singapore", "Singapore", "SG"],
+        ["frankfurt-de", "Frankfurt", "Germany", "DE"],
+        ["los-angeles-us", "Los Angeles", "USA", "US"],
+      ];
+      for (const [id, name, country, code] of defaults) {
+        await database.query(
+          "INSERT INTO regions (id, name, country, code, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $5) ON CONFLICT (id) DO NOTHING",
+          [id, name, country, code, timestamp],
+        );
+      }
+      await database.query(`UPDATE nodes SET region_id = regions.id
+        FROM regions
+        WHERE nodes.region_id IS NULL AND nodes.place = regions.name || ' · ' || regions.country`);
+      const seed = adminSeed();
+      if (seed) {
+        await database.query(
+          `INSERT INTO users (id, email, display_name, password_hash, role, created_at)
+           VALUES ($1, $2, $3, $4, 'owner', $5) ON CONFLICT (email) DO NOTHING`,
+          [randomUUID(), seed.email, seed.displayName, hashPassword(seed.password), timestamp],
+        );
+      }
+    })().catch((error) => {
+      readyPromise = null;
+      throw error;
+    });
   }
-  instance.exec("CREATE INDEX IF NOT EXISTS nodes_region_idx ON nodes(region_id)");
-  seedRegions(instance);
-  seedAdmin(instance);
-  return instance;
+  await readyPromise;
 }
 
-function seedRegions(db: DatabaseSync): void {
-  const timestamp = now();
-  const defaults = [
-    ["tokyo-jp", "Tokyo", "Japan", "JP"],
-    ["singapore-sg", "Singapore", "Singapore", "SG"],
-    ["frankfurt-de", "Frankfurt", "Germany", "DE"],
-    ["los-angeles-us", "Los Angeles", "USA", "US"],
-  ];
-  const statement = db.prepare(`INSERT OR IGNORE INTO regions
-    (id, name, country, code, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`);
-  for (const [id, name, country, code] of defaults) {
-    statement.run(id, name, country, code, timestamp, timestamp);
-  }
-  db.exec(`UPDATE nodes SET region_id = (
-    SELECT regions.id FROM regions
-    WHERE nodes.place = regions.name || ' · ' || regions.country
-  ) WHERE region_id IS NULL`);
+export async function dbQuery<T extends QueryResultRow>(text: string, values: unknown[] = []): Promise<T[]> {
+  await ensureReady();
+  return (await getDb().query<T>(text, values)).rows;
 }
 
-function seedAdmin(db: DatabaseSync): void {
-  const seed = adminSeed();
-  if (!seed) return;
-  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(seed.email) as { id: string } | undefined;
-  if (existing) return;
-  db.prepare(
-    "INSERT INTO users (id, email, display_name, password_hash, role, created_at) VALUES (?, ?, ?, ?, 'owner', ?)",
-  ).run(randomUUID(), seed.email, seed.displayName, hashPassword(seed.password), now());
+export async function dbExec(text: string, values: unknown[] = []): Promise<number> {
+  await ensureReady();
+  return (await getDb().query(text, values)).rowCount || 0;
 }
 
-export function findUserByEmail(email: string): (DbUser & { password_hash: string }) | undefined {
-  return getDb().prepare("SELECT id, email, display_name, role, password_hash FROM users WHERE email = ?").get(email.toLowerCase()) as (DbUser & { password_hash: string }) | undefined;
-}
-
-export function findUserById(id: string): DbUser | undefined {
-  return getDb().prepare("SELECT id, email, display_name, role FROM users WHERE id = ?").get(id) as DbUser | undefined;
-}
-
-export function createSession(userId: string, expiresAt: string, id: string = randomUUID()): string {
-  getDb().prepare("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)").run(id, userId, expiresAt, now());
-  return id;
-}
-
-export function findSession(id: string): { user_id: string; expires_at: string } | undefined {
-  return getDb().prepare("SELECT user_id, expires_at FROM sessions WHERE id = ?").get(id) as { user_id: string; expires_at: string } | undefined;
-}
-
-export function deleteSession(id: string): void {
-  getDb().prepare("DELETE FROM sessions WHERE id = ?").run(id);
-}
-
-export function cleanupSessions(): void {
-  getDb().prepare("DELETE FROM sessions WHERE expires_at <= ?").run(now());
-}
-
-export function listNodes(): DbNode[] {
-  return getDb().prepare("SELECT * FROM nodes ORDER BY created_at DESC").all() as unknown as DbNode[];
+export async function closeDb(): Promise<void> {
+  if (!pool) return;
+  await pool.end();
+  pool = null;
+  readyPromise = null;
 }
 
 export function publicNode(node: DbNode): Record<string, unknown> {
@@ -212,74 +123,103 @@ export function publicNode(node: DbNode): Record<string, unknown> {
   };
 }
 
-export function listRegions(): DbRegion[] {
-  return getDb().prepare("SELECT * FROM regions ORDER BY name, country").all() as unknown as DbRegion[];
+export async function findUserByEmail(email: string): Promise<(DbUser & { password_hash: string }) | undefined> {
+  const rows = await dbQuery<DbUser & { password_hash: string }>("SELECT id, email, display_name, role, password_hash FROM users WHERE email = $1", [email.toLowerCase()]);
+  return rows[0];
 }
 
-export function findRegion(id: string): DbRegion | undefined {
-  return getDb().prepare("SELECT * FROM regions WHERE id = ?").get(id) as DbRegion | undefined;
+export async function findUserById(id: string): Promise<DbUser | undefined> {
+  const rows = await dbQuery<DbUser>("SELECT id, email, display_name, role FROM users WHERE id = $1", [id]);
+  return rows[0];
 }
 
-export function findRegionByLabel(label: string): DbRegion | undefined {
-  return getDb().prepare("SELECT * FROM regions WHERE name || ' · ' || country = ?").get(label) as DbRegion | undefined;
+export async function createSession(userId: string, expiresAt: string, id: string = randomUUID()): Promise<string> {
+  await dbExec("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ($1, $2, $3, $4)", [id, userId, expiresAt, now()]);
+  return id;
 }
 
-export function insertRegion(input: Pick<DbRegion, "id" | "name" | "country" | "code">): DbRegion {
+export async function findSession(id: string): Promise<{ user_id: string; expires_at: string } | undefined> {
+  const rows = await dbQuery<{ user_id: string; expires_at: string }>("SELECT user_id, expires_at FROM sessions WHERE id = $1", [id]);
+  return rows[0];
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  await dbExec("DELETE FROM sessions WHERE id = $1", [id]);
+}
+
+export async function cleanupSessions(): Promise<void> {
+  await dbExec("DELETE FROM sessions WHERE expires_at <= $1", [now()]);
+}
+
+export async function listNodes(): Promise<DbNode[]> {
+  return dbQuery<DbNode>("SELECT * FROM nodes ORDER BY created_at DESC");
+}
+
+export async function listRegions(): Promise<DbRegion[]> {
+  return dbQuery<DbRegion>("SELECT * FROM regions ORDER BY name, country");
+}
+
+export async function findRegion(id: string): Promise<DbRegion | undefined> {
+  const rows = await dbQuery<DbRegion>("SELECT * FROM regions WHERE id = $1", [id]);
+  return rows[0];
+}
+
+export async function findRegionByLabel(label: string): Promise<DbRegion | undefined> {
+  const rows = await dbQuery<DbRegion>("SELECT * FROM regions WHERE name || ' · ' || country = $1", [label]);
+  return rows[0];
+}
+
+export async function insertRegion(input: Pick<DbRegion, "id" | "name" | "country" | "code">): Promise<DbRegion> {
   const timestamp = now();
-  getDb().prepare(`INSERT INTO regions (id, name, country, code, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?)`).run(input.id, input.name, input.country, input.code, timestamp, timestamp);
-  return findRegion(input.id)!;
+  await dbExec("INSERT INTO regions (id, name, country, code, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $5)", [input.id, input.name, input.country, input.code, timestamp]);
+  return (await findRegion(input.id))!;
 }
 
-export function updateRegion(id: string, values: Pick<DbRegion, "name" | "country" | "code">): DbRegion | undefined {
+export async function updateRegion(id: string, values: Pick<DbRegion, "name" | "country" | "code">): Promise<DbRegion | undefined> {
   const timestamp = now();
-  const database = getDb();
-  database.prepare("UPDATE regions SET name = ?, country = ?, code = ?, updated_at = ? WHERE id = ?")
-    .run(values.name, values.country, values.code, timestamp, id);
-  database.prepare("UPDATE nodes SET place = ?, updated_at = ? WHERE region_id = ?")
-    .run(`${values.name} · ${values.country}`, timestamp, id);
+  await dbExec("UPDATE regions SET name = $1, country = $2, code = $3, updated_at = $4 WHERE id = $5", [values.name, values.country, values.code, timestamp, id]);
+  await dbExec("UPDATE nodes SET place = $1, updated_at = $2 WHERE region_id = $3", [`${values.name} · ${values.country}`, timestamp, id]);
   return findRegion(id);
 }
 
-export function deleteRegion(id: string): boolean {
-  const database = getDb();
-  const usage = database.prepare("SELECT COUNT(*) AS count FROM nodes WHERE region_id = ?").get(id) as { count: number };
-  if (Number(usage.count) > 0) return false;
-  return Number(database.prepare("DELETE FROM regions WHERE id = ?").run(id).changes || 0) === 1;
+export async function deleteRegion(id: string): Promise<boolean> {
+  const rows = await dbQuery<{ count: string }>("SELECT COUNT(*)::text AS count FROM nodes WHERE region_id = $1", [id]);
+  if (Number(rows[0]?.count || 0) > 0) return false;
+  return (await dbExec("DELETE FROM regions WHERE id = $1", [id])) === 1;
 }
 
-export function findNode(id: string): DbNode | undefined {
-  return getDb().prepare("SELECT * FROM nodes WHERE id = ?").get(id) as DbNode | undefined;
+export async function findNode(id: string): Promise<DbNode | undefined> {
+  const rows = await dbQuery<DbNode>("SELECT * FROM nodes WHERE id = $1", [id]);
+  return rows[0];
 }
 
-export function insertNode(input: Omit<DbNode, "id" | "created_at" | "updated_at">): DbNode {
+export async function insertNode(input: Omit<DbNode, "id" | "created_at" | "updated_at">): Promise<DbNode> {
   const id = randomUUID();
   const timestamp = now();
-  getDb().prepare(`INSERT INTO nodes
+  await dbExec(`INSERT INTO nodes
     (id, name, place, region_id, ip, ssh_user, ssh_port, status, latency, users, traffic, version, last_seen,
      credential_type, credential_ciphertext, credential_iv, credential_tag, host_fingerprint, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`, [
     id, input.name, input.place, input.region_id, input.ip, input.ssh_user, input.ssh_port, input.status, input.latency,
     input.users, input.traffic, input.version, input.last_seen, input.credential_type,
-    input.credential_ciphertext, input.credential_iv, input.credential_tag, input.host_fingerprint,
-    timestamp, timestamp,
-  );
-  return findNode(id)!;
+    input.credential_ciphertext, input.credential_iv, input.credential_tag, input.host_fingerprint, timestamp, timestamp,
+  ]);
+  return (await findNode(id))!;
 }
 
-export function updateNode(id: string, values: Record<string, string | number | null>): DbNode | undefined {
+export async function updateNode(id: string, values: Record<string, string | number | null>): Promise<DbNode | undefined> {
   const allowed = new Set(["status", "latency", "users", "traffic", "version", "last_seen", "last_heartbeat_at", "host_fingerprint", "agent_token_hash"]);
   const entries = Object.entries(values).filter(([key]) => allowed.has(key));
   if (entries.length) {
-    const assignments = entries.map(([key]) => `${key} = ?`).join(", ");
-    getDb().prepare(`UPDATE nodes SET ${assignments}, updated_at = ? WHERE id = ?`).run(
-      ...entries.map(([, value]) => value), now(), id,
-    );
+    const assignments = entries.map(([key], index) => `${key} = $${index + 1}`).join(", ");
+    const valuesWithTimestamp = entries.map(([, value]) => value);
+    valuesWithTimestamp.push(now(), id);
+    await dbExec(`UPDATE nodes SET ${assignments}, updated_at = $${entries.length + 1} WHERE id = $${entries.length + 2}`, valuesWithTimestamp);
   }
   return findNode(id);
 }
 
-export function updateNodeConfig(id: string, values: {
+export async function updateNodeConfig(id: string, values: {
   name: string;
   place: string;
   regionId: string;
@@ -288,54 +228,51 @@ export function updateNodeConfig(id: string, values: {
   sshPort: number;
   hostFingerprint: string | null;
   credential?: { type: string; ciphertext: string; iv: string; tag: string };
-}): DbNode | undefined {
-  const database = getDb();
+}): Promise<DbNode | undefined> {
   if (values.credential) {
-    database.prepare(`UPDATE nodes SET name = ?, place = ?, region_id = ?, ip = ?, ssh_user = ?, ssh_port = ?,
-      host_fingerprint = ?, credential_type = ?, credential_ciphertext = ?, credential_iv = ?, credential_tag = ?, updated_at = ? WHERE id = ?`)
-      .run(values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.hostFingerprint,
-        values.credential.type, values.credential.ciphertext, values.credential.iv, values.credential.tag, now(), id);
+    await dbExec(`UPDATE nodes SET name = $1, place = $2, region_id = $3, ip = $4, ssh_user = $5, ssh_port = $6,
+      host_fingerprint = $7, credential_type = $8, credential_ciphertext = $9, credential_iv = $10, credential_tag = $11, updated_at = $12 WHERE id = $13`, [
+      values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.hostFingerprint,
+      values.credential.type, values.credential.ciphertext, values.credential.iv, values.credential.tag, now(), id,
+    ]);
   } else {
-    database.prepare(`UPDATE nodes SET name = ?, place = ?, region_id = ?, ip = ?, ssh_user = ?, ssh_port = ?,
-      host_fingerprint = ?, updated_at = ? WHERE id = ?`)
-      .run(values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.hostFingerprint, now(), id);
+    await dbExec(`UPDATE nodes SET name = $1, place = $2, region_id = $3, ip = $4, ssh_user = $5, ssh_port = $6,
+      host_fingerprint = $7, updated_at = $8 WHERE id = $9`, [values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.hostFingerprint, now(), id]);
   }
   return findNode(id);
 }
 
-export function countRunningNodeActions(nodeId: string): number {
-  const row = getDb().prepare("SELECT COUNT(*) AS count FROM node_actions WHERE node_id = ? AND status = 'running'").get(nodeId) as { count: number };
-  return Number(row.count || 0);
+export async function countRunningNodeActions(nodeId: string): Promise<number> {
+  const rows = await dbQuery<{ count: string }>("SELECT COUNT(*)::text AS count FROM node_actions WHERE node_id = $1 AND status = 'running'", [nodeId]);
+  return Number(rows[0]?.count || 0);
 }
 
-export function deleteNode(id: string): boolean {
-  return Number(getDb().prepare("DELETE FROM nodes WHERE id = ?").run(id).changes || 0) === 1;
+export async function deleteNode(id: string): Promise<boolean> {
+  return (await dbExec("DELETE FROM nodes WHERE id = $1", [id])) === 1;
 }
 
-export function addAudit(input: {
+export async function addAudit(input: {
   actorUserId?: string | null;
   action: string;
   targetType?: string;
   targetId?: string;
   metadata?: Record<string, unknown>;
-}): void {
-  getDb().prepare(`INSERT INTO audit_logs
-    (id, actor_user_id, action, target_type, target_id, metadata_json, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+}): Promise<void> {
+  await dbExec(`INSERT INTO audit_logs (id, actor_user_id, action, target_type, target_id, metadata_json, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)`, [
     randomUUID(), input.actorUserId || null, input.action, input.targetType || null,
     input.targetId || null, JSON.stringify(input.metadata || {}), now(),
-  );
+  ]);
 }
 
-export function addNodeAction(nodeId: string, action: string): string {
+export async function addNodeAction(nodeId: string, action: string): Promise<string> {
   const id = randomUUID();
-  getDb().prepare(`INSERT INTO node_actions (id, node_id, action, status, created_at)
-    VALUES (?, ?, ?, 'running', ?)`).run(id, nodeId, action, now());
+  await dbExec("INSERT INTO node_actions (id, node_id, action, status, created_at) VALUES ($1, $2, $3, 'running', $4)", [id, nodeId, action, now()]);
   return id;
 }
 
-export function finishNodeAction(id: string, status: string, output = "", error = ""): void {
-  getDb().prepare("UPDATE node_actions SET status = ?, output = ?, error = ?, finished_at = ? WHERE id = ?").run(status, output, error, now(), id);
+export async function finishNodeAction(id: string, status: string, output = "", error = ""): Promise<void> {
+  await dbExec("UPDATE node_actions SET status = $1, output = $2, error = $3, finished_at = $4 WHERE id = $5", [status, output, error, now(), id]);
 }
 
 export type DbNodeAction = {
@@ -349,8 +286,8 @@ export type DbNodeAction = {
   finished_at: string | null;
 };
 
-export function listNodeActions(nodeId: string, limit = 20): DbNodeAction[] {
+export async function listNodeActions(nodeId: string, limit = 20): Promise<DbNodeAction[]> {
   const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 50);
-  return getDb().prepare(`SELECT id, node_id, action, status, output, error, created_at, finished_at
-    FROM node_actions WHERE node_id = ? ORDER BY created_at DESC LIMIT ?`).all(nodeId, safeLimit) as unknown as DbNodeAction[];
+  return dbQuery<DbNodeAction>(`SELECT id, node_id, action, status, output, error, created_at, finished_at
+    FROM node_actions WHERE node_id = $1 ORDER BY created_at DESC LIMIT $2`, [nodeId, safeLimit]);
 }

@@ -21,6 +21,8 @@ done
 
 cd "$APP_DIR"
 
+./scripts/ensure-postgres-env.sh
+
 if [ "$(id -u)" -ne 0 ]; then
   echo "Run this script with sudo so backup and Docker commands use production permissions." >&2
   exit 1

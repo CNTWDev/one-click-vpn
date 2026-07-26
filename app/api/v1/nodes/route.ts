@@ -12,9 +12,10 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const user = await requestUser(request);
   if (!user) return jsonError("Authentication required", 401);
-  const nodes = listControlNodes().map((node) => {
-    ensureDefaultNodeProtocols(node.id);
-    return {
+  const nodes = [];
+  for (const node of await listControlNodes()) {
+    await ensureDefaultNodeProtocols(node.id);
+    nodes.push({
       id: node.id,
       name: node.name,
       place: node.place,
@@ -25,9 +26,9 @@ export async function GET(request: Request) {
       latency: node.latency,
       version: node.version,
       lastSeen: node.last_seen,
-      capabilities: listNodeProtocols(node.id),
-    };
-  });
+      capabilities: await listNodeProtocols(node.id),
+    });
+  }
   return NextResponse.json({ nodes });
 }
 
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
     const name = cleanText(body.name, 120);
     const ip = cleanText(body.ip, 64);
     const requestedPlace = cleanText(body.place || body.region, 120);
-    const region = (cleanText(body.regionId, 80) && findRegion(cleanText(body.regionId, 80))) || (requestedPlace && findRegionByLabel(requestedPlace));
+    const region = (cleanText(body.regionId, 80) && await findRegion(cleanText(body.regionId, 80))) || (requestedPlace && await findRegionByLabel(requestedPlace));
     const place = region ? `${region.name} · ${region.country}` : requestedPlace || "Unassigned";
     const sshUser = cleanText(body.sshUser || body.user, 64) || "root";
     const secret = typeof body.secret === "string" ? body.secret : "";
@@ -49,19 +50,19 @@ export async function POST(request: Request) {
     if (!region) return jsonError("A valid region is required");
     if (credentialType === "private_key" && !secret.includes("BEGIN")) return jsonError("Private key is not valid PEM text");
     const encrypted = encryptSecret(secret);
-    const node = insertNode({
+    const node = await insertNode({
       name, place, region_id: region.id, ip, ssh_user: sshUser, ssh_port: isValidPort(body.sshPort), status: "provisioning",
       latency: "checking", users: 0, traffic: "—", version: "bootstrap queued", last_seen: "just added",
       credential_type: credentialType, credential_ciphertext: encrypted.ciphertext, credential_iv: encrypted.iv,
       credential_tag: encrypted.tag, host_fingerprint: hostFingerprint, agent_token_hash: null,
     });
-    updateNodeControlMetadata(node.id, {
+    await updateNodeControlMetadata(node.id, {
       provider: cleanText(body.provider, 64) || "unknown",
       region: cleanText(body.region || body.place, 120) || "Unassigned",
       publicEndpoint: cleanText(body.publicEndpoint, 256) || ip,
     });
-    ensureDefaultNodeProtocols(node.id);
-    addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { credentialType } });
+    await ensureDefaultNodeProtocols(node.id);
+    await addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { credentialType } });
     queueNodeBootstrap(node.id, user.id);
     return NextResponse.json({ node: { id: node.id, name: node.name, place: node.place, ip: node.ip, status: node.status, version: node.version } }, { status: 201 });
   } catch (error) {

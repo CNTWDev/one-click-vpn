@@ -1,10 +1,14 @@
 #!/usr/bin/env sh
 set -eu
 
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+APP_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+. "$SCRIPT_DIR/common.sh"
+
+cd "$APP_DIR"
 backup_dir=${1:-./backups}
 mkdir -p "$backup_dir"
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
-docker compose exec -T northstar node -e "const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync('/app/data/northstar.sqlite'); db.exec(\"VACUUM INTO '/app/data/backup-$timestamp.sqlite'\"); db.close()"
-docker compose cp "northstar:/app/data/backup-$timestamp.sqlite" "$backup_dir/northstar-$timestamp.sqlite"
-docker compose exec -T northstar rm -f "/app/data/backup-$timestamp.sqlite"
-echo "Backup written to $backup_dir/northstar-$timestamp.sqlite"
+compose exec -T db pg_dump -U northstar -d northstar -Fc > "$backup_dir/northstar-$timestamp.dump"
+chmod 600 "$backup_dir/northstar-$timestamp.dump"
+echo "PostgreSQL backup written to $backup_dir/northstar-$timestamp.dump"

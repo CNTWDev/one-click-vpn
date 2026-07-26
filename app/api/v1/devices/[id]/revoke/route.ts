@@ -10,10 +10,10 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   const user = await requestUser(_request);
   if (!user) return jsonError("Authentication required", 401);
   const { id } = await context.params;
-  if (!findDevice(id)) return jsonError("Device not found", 404);
+  if (!(await findDevice(id))) return jsonError("Device not found", 404);
   try {
-    revokeDeviceAndReconcile(id, user.id);
-    return NextResponse.json({ device: publicDevice(findDevice(id)) });
+    await revokeDeviceAndReconcile(id, user.id);
+    return NextResponse.json({ device: publicDevice(await findDevice(id)) });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to revoke device");
   }

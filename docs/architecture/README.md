@@ -21,7 +21,7 @@ Controller 不在 VPN 数据包路径中。VPN 数据流量直接在用户设备
 ### 当前已经实现
 
 - Next.js Node.js 控制器；
-- SQLite/WAL 持久化；
+- PostgreSQL 持久化；
 - 管理员 Cookie 会话和 scrypt 密码哈希；
 - AES-256-GCM 加密 SSH 凭据；
 - SSH host fingerprint 校验；

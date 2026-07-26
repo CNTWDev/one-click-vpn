@@ -36,6 +36,7 @@ case "$mode" in
     ;;
 esac
 
+"$SCRIPT_DIR/ensure-postgres-env.sh"
 "$SCRIPT_DIR/check-env.sh"
 
 export NORTHSTAR_BUILD_REV=$(git rev-parse --short HEAD)
@@ -49,9 +50,6 @@ else
   compose build northstar
 fi
 
-# A named volume can outlive images from older deployments. Repair its
-# ownership before the non-root runtime starts SQLite and enables WAL mode.
-"$SCRIPT_DIR/repair-data-volume.sh"
 compose up -d --force-recreate --remove-orphans
 
 container_id=$(compose ps -q northstar)

@@ -15,12 +15,12 @@ export async function POST(request: Request) {
     const body = await readJson(request);
     const nodeId = cleanText(body.nodeId, 128);
     const token = cleanText(body.token, 512);
-    const node = authenticateAgent(nodeId, token);
+    const node = await authenticateAgent(nodeId, token);
     if (!node) return jsonError("Invalid agent credentials", 401);
     const capabilities = body.capabilities && typeof body.capabilities === "object" && !Array.isArray(body.capabilities)
       ? body.capabilities as Record<string, unknown>
       : {};
-    recordAgentHeartbeat({
+    await recordAgentHeartbeat({
       nodeId,
       version: cleanText(body.version, 64),
       hostname: cleanText(body.hostname, 256),
@@ -30,10 +30,10 @@ export async function POST(request: Request) {
     });
     const protocols = Array.isArray(capabilities.protocols) ? capabilities.protocols.filter((value): value is Protocol => typeof value === "string" && supportedProtocols.has(value as Protocol)) : [];
     if (!protocols.length) {
-      const knownProtocols = listNodeProtocols(nodeId);
-      if (!knownProtocols.length) ensureDefaultNodeProtocols(nodeId);
-      for (const current of listNodeProtocols(nodeId)) {
-        upsertNodeProtocol({
+      const knownProtocols = await listNodeProtocols(nodeId);
+      if (!knownProtocols.length) await ensureDefaultNodeProtocols(nodeId);
+      for (const current of await listNodeProtocols(nodeId)) {
+        await upsertNodeProtocol({
           nodeId,
           protocol: current.protocol,
           transports: current.transports,
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       for (const protocol of supportedProtocols) {
         const adapter = getProtocolAdapter(protocol);
         const available = protocols.includes(protocol);
-        upsertNodeProtocol({
+        await upsertNodeProtocol({
           nodeId,
           protocol,
           transports: adapter.capability.transports,

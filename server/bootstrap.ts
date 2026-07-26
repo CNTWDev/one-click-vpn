@@ -83,10 +83,10 @@ export function queueNodeBootstrap(nodeId: string, actorUserId?: string): void {
 }
 
 export async function bootstrapNode(nodeId: string, actorUserId?: string): Promise<void> {
-  const node = findNode(nodeId);
+  const node = await findNode(nodeId);
   if (!node) return;
-  const actionId = addNodeAction(nodeId, "bootstrap");
-  updateNode(nodeId, { status: "provisioning", version: "bootstrap running", last_seen: "connecting" });
+  const actionId = await addNodeAction(nodeId, "bootstrap");
+  await updateNode(nodeId, { status: "provisioning", version: "bootstrap running", last_seen: "connecting" });
 
   try {
     if (!node.host_fingerprint && !allowTofuHostKeys()) {
@@ -224,7 +224,7 @@ systemctl --no-pager --full status northstar-agent
       ...(node.credential_type === "private_key" ? { privateKey: secret } : { password: secret }),
     };
     const result = await connectAndExec(config, command, expectedFingerprint);
-    updateNode(nodeId, {
+    await updateNode(nodeId, {
       status: "provisioning",
       version: "agent installed",
       last_seen: "awaiting heartbeat",
@@ -232,22 +232,22 @@ systemctl --no-pager --full status northstar-agent
       host_fingerprint: node.host_fingerprint || result.fingerprint,
       agent_token_hash: hashToken(agentToken),
     });
-    ensureDefaultNodeProtocols(nodeId);
-    finishNodeAction(actionId, "succeeded", result.output.slice(-12000));
-    addAudit({ actorUserId, action: "node.bootstrap.succeeded", targetType: "node", targetId: nodeId });
+    await ensureDefaultNodeProtocols(nodeId);
+    await finishNodeAction(actionId, "succeeded", result.output.slice(-12000));
+    await addAudit({ actorUserId, action: "node.bootstrap.succeeded", targetType: "node", targetId: nodeId });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    updateNode(nodeId, { status: "attention", version: "bootstrap failed", last_seen: "failed" });
-    finishNodeAction(actionId, "failed", "", message.slice(-4000));
-    addAudit({ actorUserId, action: "node.bootstrap.failed", targetType: "node", targetId: nodeId, metadata: { error: message } });
+    await updateNode(nodeId, { status: "attention", version: "bootstrap failed", last_seen: "failed" });
+    await finishNodeAction(actionId, "failed", "", message.slice(-4000));
+    await addAudit({ actorUserId, action: "node.bootstrap.failed", targetType: "node", targetId: nodeId, metadata: { error: message } });
   }
 }
 
 export async function runNodeAction(nodeId: string, action: "restart-agent" | "status-agent", actorUserId?: string): Promise<string> {
-  const node = findNode(nodeId);
+  const node = await findNode(nodeId);
   if (!node) throw new Error("Node not found");
-  if (countRunningNodeActions(nodeId) > 0) throw new Error("This node already has a running action. Wait for it to finish.");
-  const actionId = addNodeAction(nodeId, action);
+  if (await countRunningNodeActions(nodeId) > 0) throw new Error("This node already has a running action. Wait for it to finish.");
+  const actionId = await addNodeAction(nodeId, action);
   try {
     const secret = decryptSecret({ ciphertext: node.credential_ciphertext, iv: node.credential_iv, tag: node.credential_tag });
     const command = action === "restart-agent"
@@ -262,15 +262,15 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
     };
     const result = await connectAndExec(config, command, node.host_fingerprint);
     const output = result.output.slice(-12000);
-    finishNodeAction(actionId, "succeeded", output);
-    addAudit({ actorUserId, action: `node.${action}.succeeded`, targetType: "node", targetId: nodeId });
-    updateNode(nodeId, { status: "online", last_seen: "now", latency: "connected" });
+    await finishNodeAction(actionId, "succeeded", output);
+    await addAudit({ actorUserId, action: `node.${action}.succeeded`, targetType: "node", targetId: nodeId });
+    await updateNode(nodeId, { status: "online", last_seen: "now", latency: "connected" });
     return output;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    finishNodeAction(actionId, "failed", "", message.slice(-4000));
-    addAudit({ actorUserId, action: `node.${action}.failed`, targetType: "node", targetId: nodeId, metadata: { error: message } });
-    updateNode(nodeId, { status: "attention", last_seen: "failed", latency: "error" });
+    await finishNodeAction(actionId, "failed", "", message.slice(-4000));
+    await addAudit({ actorUserId, action: `node.${action}.failed`, targetType: "node", targetId: nodeId, metadata: { error: message } });
+    await updateNode(nodeId, { status: "attention", last_seen: "failed", latency: "error" });
     throw error;
   }
 }

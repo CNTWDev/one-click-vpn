@@ -131,7 +131,7 @@ CollectStatus
 
 ## 6. 数据库演进
 
-当前 SQLite 适合单控制器部署，控制面表已经通过运行时 schema 和 `scripts/migrate.mjs` 初始化。未来出现以下需求时迁移 PostgreSQL：
+当前控制面使用 PostgreSQL，控制面表已经通过运行时 schema 和 `scripts/migrate.mjs` 初始化。未来出现以下需求时再补充：
 
 - 多个 Controller 实例；
 - 多区域 Controller；

@@ -6,7 +6,7 @@
 
 - Node.js Controller；
 - 管理员会话；
-- SQLite；
+- PostgreSQL；
 - 加密 SSH 凭据；
 - SSH bootstrap；
 - Agent HTTPS 心跳；

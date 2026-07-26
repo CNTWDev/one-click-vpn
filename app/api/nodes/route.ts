@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export async function GET() {
   const user = await currentUser();
   if (!user) return jsonError("Authentication required", 401);
-  return NextResponse.json({ nodes: listNodes().map(publicNode) });
+  return NextResponse.json({ nodes: (await listNodes()).map(publicNode) });
 }
 
 export async function POST(request: Request) {
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const name = cleanText(body.name, 120);
     const ip = cleanText(body.ip, 64);
     const requestedPlace = cleanText(body.place || body.region, 120);
-    const region = (cleanText(body.regionId, 80) && findRegion(cleanText(body.regionId, 80))) || (requestedPlace && findRegionByLabel(requestedPlace));
+    const region = (cleanText(body.regionId, 80) && await findRegion(cleanText(body.regionId, 80))) || (requestedPlace && await findRegionByLabel(requestedPlace));
     const place = region ? `${region.name} · ${region.country}` : requestedPlace || "Unassigned";
     const sshUser = cleanText(body.sshUser || body.user, 64) || "root";
     const secret = typeof body.secret === "string" ? body.secret : "";
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     if (!region) return jsonError("A valid region is required");
     if (credentialType === "private_key" && !secret.includes("BEGIN")) return jsonError("Private key is not valid PEM text");
     const encrypted = encryptSecret(secret);
-    const node = insertNode({
+    const node = await insertNode({
       name,
       place,
       region_id: region.id,
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       host_fingerprint: hostFingerprint,
       agent_token_hash: null,
     });
-    addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { credentialType } });
+    await addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { credentialType } });
     queueNodeBootstrap(node.id, user.id);
     return NextResponse.json({ node: publicNode(node) }, { status: 201 });
   } catch (error) {

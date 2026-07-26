@@ -10,7 +10,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const user = await requestUser(request);
   if (!user) return jsonError("Authentication required", 401);
   const { id } = await context.params;
-  const node = findNode(id);
+  const node = await findNode(id);
   if (!node) return jsonError("Node not found", 404);
   return NextResponse.json({ node: {
     id: node.id,
@@ -21,7 +21,6 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     latency: node.latency,
     version: node.version,
     lastSeen: node.last_seen,
-    capabilities: listNodeProtocols(id),
+    capabilities: await listNodeProtocols(id),
   } });
 }
-

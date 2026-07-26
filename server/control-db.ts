@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { findUserById, getDb, type DbNode, type DbUser } from "./db";
+import { dbExec, dbQuery, findUserById, type DbNode, type DbUser } from "./db";
 import { hashToken } from "./crypto";
 
 export type Platform = "macos" | "ios" | "android";
@@ -83,279 +83,116 @@ export type ApiSession = {
   refreshExpiresAt: string;
 };
 
-let schemaReady = false;
-
 function now(): string {
   return new Date().toISOString();
-}
-
-function db() {
-  const database = getDb();
-  if (!schemaReady) {
-    database.exec(`
-      CREATE TABLE IF NOT EXISTS devices (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        display_name TEXT NOT NULL,
-        platform TEXT NOT NULL,
-        app_version TEXT NOT NULL,
-        public_key TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
-        created_at TEXT NOT NULL,
-        last_seen_at TEXT,
-        updated_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS devices_user_idx ON devices(user_id, created_at);
-      CREATE INDEX IF NOT EXISTS devices_public_key_idx ON devices(public_key);
-
-      CREATE TABLE IF NOT EXISTS node_protocols (
-        node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-        protocol TEXT NOT NULL,
-        transports_json TEXT NOT NULL DEFAULT '[]',
-        platforms_json TEXT NOT NULL DEFAULT '[]',
-        routing_json TEXT NOT NULL DEFAULT '[]',
-        ipv6 INTEGER NOT NULL DEFAULT 0,
-        min_client_version TEXT,
-        config_schema_version INTEGER NOT NULL DEFAULT 1,
-        status TEXT NOT NULL DEFAULT 'enabled',
-        updated_at TEXT NOT NULL,
-        PRIMARY KEY (node_id, protocol)
-      );
-
-      CREATE TABLE IF NOT EXISTS protocol_credentials (
-        id TEXT PRIMARY KEY,
-        device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-        protocol TEXT NOT NULL,
-        public_key TEXT,
-        certificate_serial TEXT,
-        status TEXT NOT NULL DEFAULT 'active',
-        created_at TEXT NOT NULL,
-        expires_at TEXT,
-        revoked_at TEXT,
-        metadata_json TEXT NOT NULL DEFAULT '{}'
-      );
-      CREATE INDEX IF NOT EXISTS protocol_credentials_device_idx ON protocol_credentials(device_id, protocol);
-
-      CREATE TABLE IF NOT EXISTS ip_leases (
-        id TEXT PRIMARY KEY,
-        node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-        protocol TEXT NOT NULL,
-        device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-        address TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'active',
-        created_at TEXT NOT NULL,
-        released_at TEXT,
-        UNIQUE (node_id, protocol, address),
-        UNIQUE (node_id, protocol, device_id)
-      );
-
-      CREATE TABLE IF NOT EXISTS connection_profiles (
-        id TEXT PRIMARY KEY,
-        device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-        node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-        protocol TEXT NOT NULL,
-        transport TEXT NOT NULL,
-        revision INTEGER NOT NULL,
-        status TEXT NOT NULL DEFAULT 'issued',
-        endpoint_json TEXT NOT NULL,
-        client_address TEXT,
-        dns_json TEXT NOT NULL DEFAULT '[]',
-        allowed_ips_json TEXT NOT NULL DEFAULT '[]',
-        protocol_payload_json TEXT NOT NULL DEFAULT '{}',
-        issued_at TEXT NOT NULL,
-        expires_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS profiles_device_idx ON connection_profiles(device_id, updated_at);
-      CREATE INDEX IF NOT EXISTS profiles_node_idx ON connection_profiles(node_id, protocol, revision);
-
-      CREATE TABLE IF NOT EXISTS desired_configs (
-        id TEXT PRIMARY KEY,
-        node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-        protocol TEXT NOT NULL,
-        revision INTEGER NOT NULL,
-        config_hash TEXT NOT NULL,
-        payload_json TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        UNIQUE (node_id, protocol)
-      );
-
-      CREATE TABLE IF NOT EXISTS observed_configs (
-        node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-        protocol TEXT NOT NULL,
-        applied_revision INTEGER NOT NULL DEFAULT 0,
-        observed_hash TEXT,
-        status TEXT NOT NULL DEFAULT 'unknown',
-        last_handshake_at TEXT,
-        last_error TEXT NOT NULL DEFAULT '',
-        updated_at TEXT NOT NULL,
-        PRIMARY KEY (node_id, protocol)
-      );
-
-      CREATE TABLE IF NOT EXISTS reconcile_tasks (
-        id TEXT PRIMARY KEY,
-        node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-        protocol TEXT NOT NULL,
-        task_type TEXT NOT NULL,
-        desired_revision INTEGER NOT NULL,
-        payload_json TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
-        attempts INTEGER NOT NULL DEFAULT 0,
-        last_error TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL,
-        started_at TEXT,
-        finished_at TEXT
-      );
-      CREATE INDEX IF NOT EXISTS reconcile_tasks_node_idx ON reconcile_tasks(node_id, status, created_at);
-
-      CREATE TABLE IF NOT EXISTS agent_certificates (
-        id TEXT PRIMARY KEY,
-        node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-        serial TEXT NOT NULL,
-        fingerprint TEXT,
-        status TEXT NOT NULL DEFAULT 'active',
-        not_before TEXT NOT NULL,
-        not_after TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        revoked_at TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS device_sessions (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        access_token_hash TEXT NOT NULL UNIQUE,
-        refresh_token_hash TEXT NOT NULL UNIQUE,
-        access_expires_at TEXT NOT NULL,
-        refresh_expires_at TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        revoked_at TEXT
-      );
-      CREATE INDEX IF NOT EXISTS device_sessions_access_idx ON device_sessions(access_token_hash, revoked_at);
-      CREATE INDEX IF NOT EXISTS device_sessions_refresh_idx ON device_sessions(refresh_token_hash, revoked_at);
-    `);
-
-    for (const statement of [
-      "ALTER TABLE nodes ADD COLUMN provider TEXT NOT NULL DEFAULT 'unknown'",
-      "ALTER TABLE nodes ADD COLUMN region TEXT NOT NULL DEFAULT ''",
-      "ALTER TABLE nodes ADD COLUMN public_endpoint TEXT",
-      "ALTER TABLE nodes ADD COLUMN server_public_key TEXT",
-      "ALTER TABLE nodes ADD COLUMN agent_capabilities_json TEXT NOT NULL DEFAULT '{}'",
-    ]) {
-      try { database.exec(statement); } catch { /* column already exists */ }
-    }
-    schemaReady = true;
-  }
-  return database;
-}
-
-export function ensureControlPlaneSchema(): void {
-  db();
 }
 
 function parseJson<T>(value: string, fallback: T): T {
   try { return JSON.parse(value) as T; } catch { return fallback; }
 }
 
-export function createDevice(input: {
+export async function ensureControlPlaneSchema(): Promise<void> {
+  await dbQuery("SELECT 1");
+}
+
+export async function createDevice(input: {
   userId: string;
   displayName: string;
   platform: Platform;
   appVersion: string;
   publicKey: string;
-}): Device {
+}): Promise<Device> {
   const id = `dev_${randomUUID()}`;
   const timestamp = now();
-  db().prepare(`INSERT INTO devices
+  await dbExec(`INSERT INTO devices
     (id, user_id, display_name, platform, app_version, public_key, status, created_at, last_seen_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`)
-    .run(id, input.userId, input.displayName, input.platform, input.appVersion, input.publicKey, timestamp, timestamp, timestamp);
-  return findDevice(id)!;
+    VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $7, $7)`, [id, input.userId, input.displayName, input.platform, input.appVersion, input.publicKey, timestamp]);
+  return (await findDevice(id))!;
 }
 
-export function listDevices(userId?: string): Device[] {
-  const rows = userId
-    ? db().prepare("SELECT * FROM devices WHERE user_id = ? ORDER BY created_at DESC").all(userId)
-    : db().prepare("SELECT * FROM devices ORDER BY created_at DESC").all();
-  return rows as unknown as Device[];
+export async function listDevices(userId?: string): Promise<Device[]> {
+  return userId
+    ? dbQuery<Device>("SELECT * FROM devices WHERE user_id = $1 ORDER BY created_at DESC", [userId])
+    : dbQuery<Device>("SELECT * FROM devices ORDER BY created_at DESC");
 }
 
-export function findDevice(id: string): Device | undefined {
-  return db().prepare("SELECT * FROM devices WHERE id = ?").get(id) as Device | undefined;
+export async function findDevice(id: string): Promise<Device | undefined> {
+  const rows = await dbQuery<Device>("SELECT * FROM devices WHERE id = $1", [id]);
+  return rows[0];
 }
 
-export function revokeDevice(id: string): Device | undefined {
-  db().prepare("UPDATE devices SET status = 'revoked', updated_at = ? WHERE id = ?").run(now(), id);
-  db().prepare("UPDATE protocol_credentials SET status = 'revoked', revoked_at = ? WHERE device_id = ? AND status = 'active'").run(now(), id);
-  db().prepare("UPDATE ip_leases SET status = 'released', released_at = ? WHERE device_id = ? AND status = 'active'").run(now(), id);
-  db().prepare("UPDATE connection_profiles SET status = 'revoked', updated_at = ? WHERE device_id = ? AND status IN ('issued', 'active')").run(now(), id);
+export async function revokeDevice(id: string): Promise<Device | undefined> {
+  await dbExec("UPDATE devices SET status = 'revoked', updated_at = $1 WHERE id = $2", [now(), id]);
+  await dbExec("UPDATE protocol_credentials SET status = 'revoked', revoked_at = $1 WHERE device_id = $2 AND status = 'active'", [now(), id]);
+  await dbExec("UPDATE ip_leases SET status = 'released', released_at = $1 WHERE device_id = $2 AND status = 'active'", [now(), id]);
+  await dbExec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE device_id = $2 AND status IN ('issued', 'active')", [now(), id]);
   return findDevice(id);
 }
 
-export function touchDevice(id: string): void {
-  db().prepare("UPDATE devices SET last_seen_at = ?, updated_at = ? WHERE id = ?").run(now(), now(), id);
+export async function touchDevice(id: string): Promise<void> {
+  const timestamp = now();
+  await dbExec("UPDATE devices SET last_seen_at = $1, updated_at = $2 WHERE id = $3", [timestamp, timestamp, id]);
 }
 
-export function createApiSession(userId: string): ApiSession {
+export async function createApiSession(userId: string): Promise<ApiSession> {
   const accessToken = randomBytes(32).toString("base64url");
   const refreshToken = randomBytes(48).toString("base64url");
   const accessExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
   const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  db().prepare(`INSERT INTO device_sessions
+  await dbExec(`INSERT INTO device_sessions
     (id, user_id, access_token_hash, refresh_token_hash, access_expires_at, refresh_expires_at, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .run(`session_${randomUUID()}`, userId, hashToken(accessToken), hashToken(refreshToken), accessExpiresAt, refreshExpiresAt, now());
+    VALUES ($1, $2, $3, $4, $5, $6, $7)`, [
+    `session_${randomUUID()}`, userId, hashToken(accessToken), hashToken(refreshToken), accessExpiresAt, refreshExpiresAt, now(),
+  ]);
   return { accessToken, refreshToken, accessExpiresAt, refreshExpiresAt };
 }
 
-export function findApiUserByAccessToken(token: string): DbUser | undefined {
-  const row = db().prepare(`SELECT user_id, access_expires_at FROM device_sessions
-    WHERE access_token_hash = ? AND revoked_at IS NULL`).get(hashToken(token)) as { user_id: string; access_expires_at: string } | undefined;
+export async function findApiUserByAccessToken(token: string): Promise<DbUser | undefined> {
+  const rows = await dbQuery<{ user_id: string; access_expires_at: string }>(`SELECT user_id, access_expires_at FROM device_sessions
+    WHERE access_token_hash = $1 AND revoked_at IS NULL`, [hashToken(token)]);
+  const row = rows[0];
   if (!row || new Date(row.access_expires_at).getTime() <= Date.now()) return undefined;
   return findUserById(row.user_id);
 }
 
-export function rotateApiSession(refreshToken: string): { user: DbUser; session: ApiSession } | undefined {
-  const row = db().prepare(`SELECT id, user_id, refresh_expires_at FROM device_sessions
-    WHERE refresh_token_hash = ? AND revoked_at IS NULL`).get(hashToken(refreshToken)) as { id: string; user_id: string; refresh_expires_at: string } | undefined;
+export async function rotateApiSession(refreshToken: string): Promise<{ user: DbUser; session: ApiSession } | undefined> {
+  const rows = await dbQuery<{ id: string; user_id: string; refresh_expires_at: string }>(`SELECT id, user_id, refresh_expires_at FROM device_sessions
+    WHERE refresh_token_hash = $1 AND revoked_at IS NULL`, [hashToken(refreshToken)]);
+  const row = rows[0];
   if (!row || new Date(row.refresh_expires_at).getTime() <= Date.now()) return undefined;
-  db().prepare("UPDATE device_sessions SET revoked_at = ? WHERE id = ?").run(now(), row.id);
-  const user = findUserById(row.user_id);
-  return user ? { user, session: createApiSession(user.id) } : undefined;
+  await dbExec("UPDATE device_sessions SET revoked_at = $1 WHERE id = $2", [now(), row.id]);
+  const user = await findUserById(row.user_id);
+  return user ? { user, session: await createApiSession(user.id) } : undefined;
 }
 
-export function revokeApiSession(token: string): void {
-  db().prepare("UPDATE device_sessions SET revoked_at = ? WHERE access_token_hash = ? AND revoked_at IS NULL").run(now(), hashToken(token));
+export async function revokeApiSession(token: string): Promise<void> {
+  await dbExec("UPDATE device_sessions SET revoked_at = $1 WHERE access_token_hash = $2 AND revoked_at IS NULL", [now(), hashToken(token)]);
 }
 
-export function listControlNodes(): Array<DbNode & {
+export async function listControlNodes(): Promise<Array<DbNode & {
   provider: string;
   region: string;
   public_endpoint: string | null;
   server_public_key: string | null;
   capabilities: Record<string, unknown>;
-}> {
-  const rows = db().prepare("SELECT * FROM nodes ORDER BY created_at DESC").all() as Array<DbNode & {
+}>> {
+  const rows = await dbQuery<DbNode & {
     provider: string;
     region: string;
     public_endpoint: string | null;
     server_public_key: string | null;
     agent_capabilities_json: string;
-  }>;
-  return rows.map((row) => ({
-    ...row,
-    capabilities: parseJson(row.agent_capabilities_json, {}),
-  }));
+  }>("SELECT * FROM nodes ORDER BY created_at DESC");
+  return rows.map((row) => ({ ...row, capabilities: parseJson(row.agent_capabilities_json, {}) }));
 }
 
-export function updateNodeControlMetadata(nodeId: string, input: {
+export async function updateNodeControlMetadata(nodeId: string, input: {
   provider?: string;
   region?: string;
   publicEndpoint?: string;
   serverPublicKey?: string;
   capabilities?: Record<string, unknown>;
-}): void {
+}): Promise<void> {
   const values: Array<[string, string]> = [];
   if (input.provider !== undefined) values.push(["provider", input.provider]);
   if (input.region !== undefined) values.push(["region", input.region]);
@@ -363,97 +200,81 @@ export function updateNodeControlMetadata(nodeId: string, input: {
   if (input.serverPublicKey !== undefined) values.push(["server_public_key", input.serverPublicKey]);
   if (input.capabilities !== undefined) values.push(["agent_capabilities_json", JSON.stringify(input.capabilities)]);
   if (!values.length) return;
-  const assignments = values.map(([key]) => `${key} = ?`).join(", ");
-  db().prepare(`UPDATE nodes SET ${assignments}, updated_at = ? WHERE id = ?`).run(...values.map(([, value]) => value), now(), nodeId);
+  const assignments = values.map(([key], index) => `${key} = $${index + 1}`).join(", ");
+  const params: unknown[] = values.map(([, value]) => value);
+  params.push(now(), nodeId);
+  await dbExec(`UPDATE nodes SET ${assignments}, updated_at = $${values.length + 1} WHERE id = $${values.length + 2}`, params);
 }
 
-export function updateControlRegion(regionId: string, label: string): void {
-  db().prepare("UPDATE nodes SET region = ?, updated_at = ? WHERE region_id = ?").run(label, now(), regionId);
+export async function updateControlRegion(regionId: string, label: string): Promise<void> {
+  await dbExec("UPDATE nodes SET region = $1, updated_at = $2 WHERE region_id = $3", [label, now(), regionId]);
 }
 
-export function upsertNodeProtocol(input: {
+export async function upsertNodeProtocol(input: {
   nodeId: string;
   protocol: Protocol;
   transports: string[];
-  platforms: Platform[];
+  platforms: string[];
   routing: string[];
   ipv6: boolean;
   minClientVersion?: string | null;
   configSchemaVersion?: number;
   status?: string;
-}): NodeProtocol {
+}): Promise<NodeProtocol> {
   const timestamp = now();
-  db().prepare(`INSERT INTO node_protocols
+  await dbExec(`INSERT INTO node_protocols
     (node_id, protocol, transports_json, platforms_json, routing_json, ipv6, min_client_version, config_schema_version, status, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     ON CONFLICT(node_id, protocol) DO UPDATE SET
-      transports_json = excluded.transports_json,
-      platforms_json = excluded.platforms_json,
-      routing_json = excluded.routing_json,
-      ipv6 = excluded.ipv6,
-      min_client_version = excluded.min_client_version,
-      config_schema_version = excluded.config_schema_version,
-      status = excluded.status,
-      updated_at = excluded.updated_at`)
-    .run(input.nodeId, input.protocol, JSON.stringify(input.transports), JSON.stringify(input.platforms), JSON.stringify(input.routing), input.ipv6 ? 1 : 0, input.minClientVersion || null, input.configSchemaVersion || 1, input.status || "enabled", timestamp);
-  return listNodeProtocols(input.nodeId).find((item) => item.protocol === input.protocol)!;
+      transports_json = excluded.transports_json, platforms_json = excluded.platforms_json,
+      routing_json = excluded.routing_json, ipv6 = excluded.ipv6, min_client_version = excluded.min_client_version,
+      config_schema_version = excluded.config_schema_version, status = excluded.status, updated_at = excluded.updated_at`, [
+    input.nodeId, input.protocol, JSON.stringify(input.transports), JSON.stringify(input.platforms), JSON.stringify(input.routing), input.ipv6 ? 1 : 0,
+    input.minClientVersion || null, input.configSchemaVersion || 1, input.status || "enabled", timestamp,
+  ]);
+  return (await listNodeProtocols(input.nodeId)).find((item) => item.protocol === input.protocol)!;
 }
 
-export function listNodeProtocols(nodeId?: string): NodeProtocol[] {
+export async function listNodeProtocols(nodeId?: string): Promise<NodeProtocol[]> {
   const rows = nodeId
-    ? db().prepare("SELECT * FROM node_protocols WHERE node_id = ? ORDER BY protocol").all(nodeId)
-    : db().prepare("SELECT * FROM node_protocols ORDER BY node_id, protocol").all();
-  return (rows as Array<Record<string, unknown>>).map((row) => ({
-    node_id: String(row.node_id),
-    protocol: row.protocol as Protocol,
-    transports: parseJson(String(row.transports_json), []),
-    platforms: parseJson(String(row.platforms_json), []),
-    routing: parseJson(String(row.routing_json), []),
-    ipv6: Boolean(row.ipv6),
+    ? await dbQuery<Record<string, unknown>>("SELECT * FROM node_protocols WHERE node_id = $1 ORDER BY protocol", [nodeId])
+    : await dbQuery<Record<string, unknown>>("SELECT * FROM node_protocols ORDER BY node_id, protocol");
+  return rows.map((row) => ({
+    node_id: String(row.node_id), protocol: row.protocol as Protocol,
+    transports: parseJson(String(row.transports_json), []), platforms: parseJson(String(row.platforms_json), []),
+    routing: parseJson(String(row.routing_json), []), ipv6: Boolean(row.ipv6),
     min_client_version: row.min_client_version ? String(row.min_client_version) : null,
-    config_schema_version: Number(row.config_schema_version || 1),
-    status: String(row.status),
-    updated_at: String(row.updated_at),
+    config_schema_version: Number(row.config_schema_version || 1), status: String(row.status), updated_at: String(row.updated_at),
   }));
 }
 
-export function allocateIpLease(nodeId: string, protocol: Protocol, deviceId: string): string {
-  const existing = db().prepare("SELECT address FROM ip_leases WHERE node_id = ? AND protocol = ? AND device_id = ? AND status = 'active'").get(nodeId, protocol, deviceId) as { address: string } | undefined;
+export async function allocateIpLease(nodeId: string, protocol: Protocol, deviceId: string): Promise<string> {
+  const existing = (await dbQuery<{ address: string }>("SELECT address FROM ip_leases WHERE node_id = $1 AND protocol = $2 AND device_id = $3 AND status = 'active'", [nodeId, protocol, deviceId]))[0];
   if (existing) return existing.address;
-  const used = new Set((db().prepare("SELECT address FROM ip_leases WHERE node_id = ? AND protocol = ? AND status = 'active'").all(nodeId, protocol) as Array<{ address: string }>).map((row) => row.address));
+  const used = new Set((await dbQuery<{ address: string }>("SELECT address FROM ip_leases WHERE node_id = $1 AND protocol = $2 AND status = 'active'", [nodeId, protocol])).map((row) => row.address));
   let address = "";
   for (let index = 2; index < 255; index += 1) {
     const candidate = `10.70.0.${index}/32`;
     if (!used.has(candidate)) { address = candidate; break; }
   }
   if (!address) throw new Error("No VPN addresses available for this node and protocol");
-  db().prepare(`INSERT INTO ip_leases (id, node_id, protocol, device_id, address, status, created_at)
-    VALUES (?, ?, ?, ?, ?, 'active', ?)`)
-    .run(`lease_${randomUUID()}`, nodeId, protocol, deviceId, address, now());
+  await dbExec(`INSERT INTO ip_leases (id, node_id, protocol, device_id, address, status, created_at)
+    VALUES ($1, $2, $3, $4, $5, 'active', $6)`, [`lease_${randomUUID()}`, nodeId, protocol, deviceId, address, now()]);
   return address;
 }
 
 function profileFromRow(row: Record<string, unknown>): ConnectionProfile {
   return {
-    id: String(row.id),
-    device_id: String(row.device_id),
-    node_id: String(row.node_id),
-    protocol: row.protocol as Protocol,
-    transport: String(row.transport),
-    revision: Number(row.revision),
-    status: row.status as ProfileStatus,
-    endpoint: parseJson(String(row.endpoint_json), { host: "", port: 0 }),
-    client_address: row.client_address ? String(row.client_address) : null,
-    dns: parseJson(String(row.dns_json), []),
-    allowed_ips: parseJson(String(row.allowed_ips_json), []),
-    protocol_payload: parseJson(String(row.protocol_payload_json), {}),
-    issued_at: String(row.issued_at),
-    expires_at: String(row.expires_at),
-    updated_at: String(row.updated_at),
+    id: String(row.id), device_id: String(row.device_id), node_id: String(row.node_id), protocol: row.protocol as Protocol,
+    transport: String(row.transport), revision: Number(row.revision), status: row.status as ProfileStatus,
+    endpoint: parseJson(String(row.endpoint_json), { host: "", port: 0 }), client_address: row.client_address ? String(row.client_address) : null,
+    dns: parseJson(String(row.dns_json), []), allowed_ips: parseJson(String(row.allowed_ips_json), []),
+    protocol_payload: parseJson(String(row.protocol_payload_json), {}), issued_at: String(row.issued_at),
+    expires_at: String(row.expires_at), updated_at: String(row.updated_at),
   };
 }
 
-export function createConnectionProfile(input: {
+export async function createConnectionProfile(input: {
   deviceId: string;
   nodeId: string;
   protocol: Protocol;
@@ -464,95 +285,82 @@ export function createConnectionProfile(input: {
   allowedIps: string[];
   protocolPayload: Record<string, unknown>;
   expiresAt: string;
-}): ConnectionProfile {
-  const latest = db().prepare("SELECT MAX(revision) AS revision FROM connection_profiles WHERE device_id = ? AND node_id = ? AND protocol = ?").get(input.deviceId, input.nodeId, input.protocol) as { revision: number | null };
+}): Promise<ConnectionProfile> {
+  const latest = (await dbQuery<{ revision: number | null }>("SELECT MAX(revision) AS revision FROM connection_profiles WHERE device_id = $1 AND node_id = $2 AND protocol = $3", [input.deviceId, input.nodeId, input.protocol]))[0];
   const revision = Number(latest?.revision || 0) + 1;
   const timestamp = now();
   const id = `prof_${randomUUID()}`;
-  db().prepare(`INSERT INTO connection_profiles
+  await dbExec(`INSERT INTO connection_profiles
     (id, device_id, node_id, protocol, transport, revision, status, endpoint_json, client_address, dns_json, allowed_ips_json, protocol_payload_json, issued_at, expires_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, 'issued', ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, input.deviceId, input.nodeId, input.protocol, input.transport, revision, JSON.stringify(input.endpoint), input.clientAddress || null, JSON.stringify(input.dns), JSON.stringify(input.allowedIps), JSON.stringify(input.protocolPayload), timestamp, input.expiresAt, timestamp);
-  return findConnectionProfile(id)!;
+    VALUES ($1, $2, $3, $4, $5, $6, 'issued', $7, $8, $9, $10, $11, $12, $13, $14)`, [
+    id, input.deviceId, input.nodeId, input.protocol, input.transport, revision, JSON.stringify(input.endpoint), input.clientAddress || null,
+    JSON.stringify(input.dns), JSON.stringify(input.allowedIps), JSON.stringify(input.protocolPayload), timestamp, input.expiresAt, timestamp,
+  ]);
+  return (await findConnectionProfile(id))!;
 }
 
-export function expireDueConnectionProfiles(): number {
-  const result = db().prepare(`UPDATE connection_profiles
-    SET status = 'expired', updated_at = ?
-    WHERE status IN ('issued', 'active') AND expires_at <= ?`).run(now(), now());
-  return Number(result.changes || 0);
+export async function expireDueConnectionProfiles(): Promise<number> {
+  return dbExec(`UPDATE connection_profiles SET status = 'expired', updated_at = $1
+    WHERE status IN ('issued', 'active') AND expires_at <= $2`, [now(), now()]);
 }
 
-export function listConnectionProfiles(filters: { deviceId?: string; status?: ProfileStatus } = {}): ConnectionProfile[] {
-  expireDueConnectionProfiles();
+export async function listConnectionProfiles(filters: { deviceId?: string; status?: ProfileStatus } = {}): Promise<ConnectionProfile[]> {
+  await expireDueConnectionProfiles();
   const clauses: string[] = [];
   const values: string[] = [];
-  if (filters.deviceId) { clauses.push("device_id = ?"); values.push(filters.deviceId); }
-  if (filters.status) { clauses.push("status = ?"); values.push(filters.status); }
+  if (filters.deviceId) { clauses.push(`device_id = $${values.length + 1}`); values.push(filters.deviceId); }
+  if (filters.status) { clauses.push(`status = $${values.length + 1}`); values.push(filters.status); }
   const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "";
-  return (db().prepare(`SELECT * FROM connection_profiles${where} ORDER BY updated_at DESC`).all(...values) as Array<Record<string, unknown>>).map(profileFromRow);
+  return (await dbQuery<Record<string, unknown>>(`SELECT * FROM connection_profiles${where} ORDER BY updated_at DESC`, values)).map(profileFromRow);
 }
 
-export function findConnectionProfile(id: string): ConnectionProfile | undefined {
-  expireDueConnectionProfiles();
-  const row = db().prepare("SELECT * FROM connection_profiles WHERE id = ?").get(id) as Record<string, unknown> | undefined;
-  return row ? profileFromRow(row) : undefined;
+export async function findConnectionProfile(id: string): Promise<ConnectionProfile | undefined> {
+  await expireDueConnectionProfiles();
+  const rows = await dbQuery<Record<string, unknown>>("SELECT * FROM connection_profiles WHERE id = $1", [id]);
+  return rows[0] ? profileFromRow(rows[0]) : undefined;
 }
 
-export function activateConnectionProfile(id: string): ConnectionProfile | undefined {
+export async function activateConnectionProfile(id: string): Promise<ConnectionProfile | undefined> {
   const timestamp = now();
-  db().prepare("UPDATE connection_profiles SET status = 'active', updated_at = ? WHERE id = ? AND status = 'issued' AND expires_at > ?").run(timestamp, id, timestamp);
+  await dbExec("UPDATE connection_profiles SET status = 'active', updated_at = $1 WHERE id = $2 AND status = 'issued' AND expires_at > $1", [timestamp, id]);
   return findConnectionProfile(id);
 }
 
-export function expireConnectionProfile(id: string): void {
-  db().prepare("UPDATE connection_profiles SET status = 'expired', updated_at = ? WHERE id = ? AND status IN ('issued', 'active')").run(now(), id);
+export async function expireConnectionProfile(id: string): Promise<void> {
+  await dbExec("UPDATE connection_profiles SET status = 'expired', updated_at = $1 WHERE id = $2 AND status IN ('issued', 'active')", [now(), id]);
 }
 
-export function revokeConnectionProfilesForDevice(deviceId: string): void {
-  db().prepare("UPDATE connection_profiles SET status = 'revoked', updated_at = ? WHERE device_id = ? AND status IN ('issued', 'active')").run(now(), deviceId);
+export async function revokeConnectionProfilesForDevice(deviceId: string): Promise<void> {
+  await dbExec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE device_id = $2 AND status IN ('issued', 'active')", [now(), deviceId]);
 }
 
-export function upsertDesiredConfig(input: {
-  nodeId: string;
-  protocol: Protocol;
-  payload: Record<string, unknown>;
-}): DesiredConfig {
+export async function upsertDesiredConfig(input: { nodeId: string; protocol: Protocol; payload: Record<string, unknown> }): Promise<DesiredConfig> {
   const payloadJson = JSON.stringify(input.payload);
   const hash = createHash("sha256").update(payloadJson).digest("hex");
-  const current = db().prepare("SELECT revision, id, config_hash FROM desired_configs WHERE node_id = ? AND protocol = ?").get(input.nodeId, input.protocol) as { revision: number; id: string; config_hash: string } | undefined;
-  if (current?.config_hash === hash) {
-    return findDesiredConfig(input.nodeId, input.protocol)!;
-  }
+  const current = (await dbQuery<{ revision: number; id: string; config_hash: string }>("SELECT revision, id, config_hash FROM desired_configs WHERE node_id = $1 AND protocol = $2", [input.nodeId, input.protocol]))[0];
+  if (current?.config_hash === hash) return (await findDesiredConfig(input.nodeId, input.protocol))!;
   const revision = Number(current?.revision || 0) + 1;
   const timestamp = now();
   const id = current?.id || `desired_${randomUUID()}`;
-  db().prepare(`INSERT INTO desired_configs (id, node_id, protocol, revision, config_hash, payload_json, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-    ON CONFLICT(node_id, protocol) DO UPDATE SET revision = excluded.revision, config_hash = excluded.config_hash, payload_json = excluded.payload_json, status = 'pending', updated_at = excluded.updated_at`)
-    .run(id, input.nodeId, input.protocol, revision, hash, payloadJson, timestamp, timestamp);
-  const row = db().prepare("SELECT * FROM desired_configs WHERE node_id = ? AND protocol = ?").get(input.nodeId, input.protocol) as Record<string, unknown>;
-  return {
-    id: String(row.id), node_id: String(row.node_id), protocol: row.protocol as Protocol,
-    revision: Number(row.revision), config_hash: String(row.config_hash), payload: parseJson(String(row.payload_json), {}),
-    status: String(row.status), updated_at: String(row.updated_at),
-  };
+  await dbExec(`INSERT INTO desired_configs (id, node_id, protocol, revision, config_hash, payload_json, status, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8)
+    ON CONFLICT(node_id, protocol) DO UPDATE SET revision = excluded.revision, config_hash = excluded.config_hash, payload_json = excluded.payload_json, status = 'pending', updated_at = excluded.updated_at`, [
+    id, input.nodeId, input.protocol, revision, hash, payloadJson, timestamp, timestamp,
+  ]);
+  return (await findDesiredConfig(input.nodeId, input.protocol))!;
 }
 
-export function findDesiredConfig(nodeId: string, protocol: Protocol): DesiredConfig | undefined {
-  const row = db().prepare("SELECT * FROM desired_configs WHERE node_id = ? AND protocol = ?").get(nodeId, protocol) as Record<string, unknown> | undefined;
+export async function findDesiredConfig(nodeId: string, protocol: Protocol): Promise<DesiredConfig | undefined> {
+  const rows = await dbQuery<Record<string, unknown>>("SELECT * FROM desired_configs WHERE node_id = $1 AND protocol = $2", [nodeId, protocol]);
+  const row = rows[0];
   if (!row) return undefined;
-  return {
-    id: String(row.id), node_id: String(row.node_id), protocol: row.protocol as Protocol,
-    revision: Number(row.revision), config_hash: String(row.config_hash), payload: parseJson(String(row.payload_json), {}),
-    status: String(row.status), updated_at: String(row.updated_at),
-  };
+  return { id: String(row.id), node_id: String(row.node_id), protocol: row.protocol as Protocol, revision: Number(row.revision), config_hash: String(row.config_hash), payload: parseJson(String(row.payload_json), {}), status: String(row.status), updated_at: String(row.updated_at) };
 }
 
-export function getNodeReconcileStatus(nodeId: string) {
-  const desired = db().prepare("SELECT protocol, revision, config_hash, status, updated_at FROM desired_configs WHERE node_id = ? ORDER BY protocol").all(nodeId) as Array<Record<string, unknown>>;
-  const observed = db().prepare("SELECT protocol, applied_revision, observed_hash, status, last_error, updated_at FROM observed_configs WHERE node_id = ? ORDER BY protocol").all(nodeId) as Array<Record<string, unknown>>;
-  const tasks = db().prepare("SELECT id, protocol, task_type, desired_revision, status, attempts, last_error, created_at, started_at, finished_at FROM reconcile_tasks WHERE node_id = ? ORDER BY created_at DESC LIMIT 50").all(nodeId) as Array<Record<string, unknown>>;
+export async function getNodeReconcileStatus(nodeId: string) {
+  const desired = await dbQuery<Record<string, unknown>>("SELECT protocol, revision, config_hash, status, updated_at FROM desired_configs WHERE node_id = $1 ORDER BY protocol", [nodeId]);
+  const observed = await dbQuery<Record<string, unknown>>("SELECT protocol, applied_revision, observed_hash, status, last_error, updated_at FROM observed_configs WHERE node_id = $1 ORDER BY protocol", [nodeId]);
+  const tasks = await dbQuery<Record<string, unknown>>("SELECT id, protocol, task_type, desired_revision, status, attempts, last_error, created_at, started_at, finished_at FROM reconcile_tasks WHERE node_id = $1 ORDER BY created_at DESC LIMIT 50", [nodeId]);
   return {
     desired: desired.map((row) => ({ protocol: row.protocol, revision: Number(row.revision), configHash: row.config_hash, status: row.status, updatedAt: row.updated_at })),
     observed: observed.map((row) => ({ protocol: row.protocol, appliedRevision: Number(row.applied_revision), observedHash: row.observed_hash, status: row.status, lastError: row.last_error, updatedAt: row.updated_at })),
@@ -560,42 +368,29 @@ export function getNodeReconcileStatus(nodeId: string) {
   };
 }
 
-export function enqueueReconcileTask(input: {
-  nodeId: string;
-  protocol: Protocol;
-  taskType: string;
-  desiredRevision: number;
-  payload: Record<string, unknown>;
-}): string {
+export async function enqueueReconcileTask(input: { nodeId: string; protocol: Protocol; taskType: string; desiredRevision: number; payload: Record<string, unknown> }): Promise<string> {
   const id = `task_${randomUUID()}`;
-  db().prepare(`INSERT INTO reconcile_tasks
-    (id, node_id, protocol, task_type, desired_revision, payload_json, status, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`)
-    .run(id, input.nodeId, input.protocol, input.taskType, input.desiredRevision, JSON.stringify(input.payload), now());
+  await dbExec(`INSERT INTO reconcile_tasks (id, node_id, protocol, task_type, desired_revision, payload_json, status, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)`, [id, input.nodeId, input.protocol, input.taskType, input.desiredRevision, JSON.stringify(input.payload), now()]);
   return id;
 }
 
-export function pullReconcileTasks(nodeId: string, limit = 10): ReconcileTask[] {
+export async function pullReconcileTasks(nodeId: string, limit = 10): Promise<ReconcileTask[]> {
   const stale = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-  db().prepare("UPDATE reconcile_tasks SET status = 'pending', started_at = NULL WHERE node_id = ? AND status = 'running' AND started_at < ?").run(nodeId, stale);
+  await dbExec("UPDATE reconcile_tasks SET status = 'pending', started_at = NULL WHERE node_id = $1 AND status = 'running' AND started_at < $2", [nodeId, stale]);
   const retryAfter = new Date(Date.now() - 30 * 1000).toISOString();
-  db().prepare("UPDATE reconcile_tasks SET status = 'pending', started_at = NULL WHERE node_id = ? AND status = 'failed' AND attempts < 5 AND finished_at < ?").run(nodeId, retryAfter);
-  const rows = db().prepare("SELECT * FROM reconcile_tasks WHERE node_id = ? AND status = 'pending' ORDER BY created_at LIMIT ?").all(nodeId, limit) as Array<Record<string, unknown>>;
+  await dbExec("UPDATE reconcile_tasks SET status = 'pending', started_at = NULL WHERE node_id = $1 AND status = 'failed' AND attempts < 5 AND finished_at < $2", [nodeId, retryAfter]);
+  const rows = await dbQuery<Record<string, unknown>>("SELECT * FROM reconcile_tasks WHERE node_id = $1 AND status = 'pending' ORDER BY created_at LIMIT $2", [nodeId, Math.min(Math.max(limit, 1), 20)]);
   const tasks: ReconcileTask[] = [];
   for (const row of rows) {
-    const changed = db().prepare("UPDATE reconcile_tasks SET status = 'running', attempts = attempts + 1, started_at = ? WHERE id = ? AND status = 'pending'").run(now(), String(row.id));
-    if (Number(changed.changes || 0) !== 1) continue;
-    tasks.push({
-      id: String(row.id), node_id: String(row.node_id), protocol: row.protocol as Protocol,
-      task_type: String(row.task_type), desired_revision: Number(row.desired_revision),
-      payload: parseJson(String(row.payload_json), {}), status: "running", attempts: Number(row.attempts || 0) + 1,
-      last_error: String(row.last_error || ""), created_at: String(row.created_at), started_at: now(),
-    });
+    const startedAt = now();
+    if ((await dbExec("UPDATE reconcile_tasks SET status = 'running', attempts = attempts + 1, started_at = $1 WHERE id = $2 AND status = 'pending'", [startedAt, String(row.id)])) !== 1) continue;
+    tasks.push({ id: String(row.id), node_id: String(row.node_id), protocol: row.protocol as Protocol, task_type: String(row.task_type), desired_revision: Number(row.desired_revision), payload: parseJson(String(row.payload_json), {}), status: "running", attempts: Number(row.attempts || 0) + 1, last_error: String(row.last_error || ""), created_at: String(row.created_at), started_at: startedAt });
   }
   return tasks;
 }
 
-export function finishReconcileTask(input: {
+export async function finishReconcileTask(input: {
   taskId: string;
   nodeId: string;
   status: "succeeded" | "failed";
@@ -603,24 +398,24 @@ export function finishReconcileTask(input: {
   observedRevision?: number;
   observedHash?: string;
   observedStatus?: string;
-}): void {
+}): Promise<void> {
   const timestamp = now();
-  db().prepare("UPDATE reconcile_tasks SET status = ?, last_error = ?, finished_at = ? WHERE id = ? AND node_id = ?")
-    .run(input.status, input.error || "", timestamp, input.taskId, input.nodeId);
+  await dbExec("UPDATE reconcile_tasks SET status = $1, last_error = $2, finished_at = $3 WHERE id = $4 AND node_id = $5", [input.status, input.error || "", timestamp, input.taskId, input.nodeId]);
   if (input.observedRevision !== undefined && input.observedHash !== undefined) {
-    db().prepare(`INSERT INTO observed_configs (node_id, protocol, applied_revision, observed_hash, status, last_error, updated_at)
-      SELECT node_id, protocol, ?, ?, ?, ?, ? FROM reconcile_tasks WHERE id = ?
-      ON CONFLICT(node_id, protocol) DO UPDATE SET applied_revision = excluded.applied_revision, observed_hash = excluded.observed_hash, status = excluded.status, last_error = excluded.last_error, updated_at = excluded.updated_at`)
-      .run(input.observedRevision, input.observedHash, input.observedStatus || input.status, input.error || "", timestamp, input.taskId);
+    await dbExec(`INSERT INTO observed_configs (node_id, protocol, applied_revision, observed_hash, status, last_error, updated_at)
+      SELECT node_id, protocol, $1, $2, $3, $4, $5 FROM reconcile_tasks WHERE id = $6
+      ON CONFLICT(node_id, protocol) DO UPDATE SET applied_revision = excluded.applied_revision, observed_hash = excluded.observed_hash, status = excluded.status, last_error = excluded.last_error, updated_at = excluded.updated_at`, [
+      input.observedRevision, input.observedHash, input.observedStatus || input.status, input.error || "", timestamp, input.taskId,
+    ]);
   }
 }
 
-export function listActivePeers(nodeId: string, protocol: Protocol): Array<{ publicKey: string; allowedIps: string[]; persistentKeepaliveSeconds: number }> {
-  expireDueConnectionProfiles();
-  const rows = db().prepare(`SELECT d.public_key, l.address
+export async function listActivePeers(nodeId: string, protocol: Protocol): Promise<Array<{ publicKey: string; allowedIps: string[]; persistentKeepaliveSeconds: number }>> {
+  await expireDueConnectionProfiles();
+  const rows = await dbQuery<{ public_key: string; address: string }>(`SELECT d.public_key, l.address
     FROM devices d JOIN ip_leases l ON l.device_id = d.id
     JOIN connection_profiles p ON p.device_id = d.id AND p.node_id = l.node_id AND p.protocol = l.protocol
-    WHERE l.node_id = ? AND l.protocol = ? AND l.status = 'active' AND d.status = 'active' AND p.status = 'active'
-    GROUP BY d.id, l.address, d.public_key`).all(nodeId, protocol) as Array<{ public_key: string; address: string }>;
+    WHERE l.node_id = $1 AND l.protocol = $2 AND l.status = 'active' AND d.status = 'active' AND p.status = 'active'
+    GROUP BY d.id, l.address, d.public_key`, [nodeId, protocol]);
   return rows.map((row) => ({ publicKey: row.public_key, allowedIps: [row.address], persistentKeepaliveSeconds: 25 }));
 }

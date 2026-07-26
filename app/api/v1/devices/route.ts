@@ -12,7 +12,7 @@ const platforms = new Set<Platform>(["macos", "ios", "android"]);
 export async function GET(request: Request) {
   const user = await requestUser(request);
   if (!user) return jsonError("Authentication required", 401);
-  return NextResponse.json({ devices: listDevices().map(publicDevice) });
+  return NextResponse.json({ devices: (await listDevices()).map(publicDevice) });
 }
 
 export async function POST(request: Request) {
@@ -25,8 +25,8 @@ export async function POST(request: Request) {
     const appVersion = cleanText(body.appVersion, 64);
     const publicKey = cleanText(body.publicKey, 512);
     if (!displayName || !platforms.has(platform) || !appVersion || !publicKey) return jsonError("displayName, platform, appVersion, and publicKey are required");
-    const device = createDevice({ userId: user.id, displayName, platform, appVersion, publicKey });
-    addAudit({ actorUserId: user.id, action: "device.created", targetType: "device", targetId: device.id, metadata: { platform } });
+    const device = await createDevice({ userId: user.id, displayName, platform, appVersion, publicKey });
+    await addAudit({ actorUserId: user.id, action: "device.created", targetType: "device", targetId: device.id, metadata: { platform } });
     return NextResponse.json({ device: publicDevice(device) }, { status: 201 });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to create device");

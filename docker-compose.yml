@@ -1,4 +1,19 @@
 services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: northstar
+      POSTGRES_USER: northstar
+      POSTGRES_PASSWORD: ${NORTHSTAR_DB_PASSWORD:?NORTHSTAR_DB_PASSWORD is required}
+    volumes:
+      - northstar-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U northstar -d northstar"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   northstar:
     build:
       context: .
@@ -7,12 +22,10 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      NORTHSTAR_DATABASE_PATH: /app/data/northstar.sqlite
+      NORTHSTAR_DATABASE_URL: postgresql://northstar:${NORTHSTAR_DB_PASSWORD:?NORTHSTAR_DB_PASSWORD is required}@db:5432/northstar
       NORTHSTAR_BUILD_REV: ${NORTHSTAR_BUILD_REV:-unknown}
       HOSTNAME: 0.0.0.0
       PORT: 3000
-    volumes:
-      - northstar-data:/app/data
     # HTTPS and the public hostname are managed by the host's Nginx.
     # Keep the controller reachable only from this ECS host.
     ports:
@@ -25,4 +38,4 @@ services:
       retries: 5
 
 volumes:
-  northstar-data:
+  northstar-postgres:

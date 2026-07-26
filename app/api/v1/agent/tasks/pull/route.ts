@@ -10,9 +10,9 @@ export async function POST(request: Request) {
     const body = await readJson(request);
     const nodeId = cleanText(body.nodeId, 128);
     const token = cleanText(body.token, 512);
-    if (!authenticateAgent(nodeId, token)) return jsonError("Invalid agent credentials", 401);
+    if (!(await authenticateAgent(nodeId, token))) return jsonError("Invalid agent credentials", 401);
     const limit = Math.min(Math.max(Number(body.limit || 10), 1), 20);
-    const tasks = pullReconcileTasks(nodeId, limit);
+    const tasks = await pullReconcileTasks(nodeId, limit);
     return NextResponse.json({ tasks: tasks.map((task) => ({
       id: task.id,
       protocol: task.protocol,
@@ -24,4 +24,3 @@ export async function POST(request: Request) {
     return jsonError(error instanceof Error ? error.message : "Unable to pull tasks");
   }
 }
-

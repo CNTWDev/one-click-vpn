@@ -6,21 +6,20 @@ export function bearerToken(request: Request): string | null {
   return value.startsWith("Bearer ") ? value.slice(7).trim() : null;
 }
 
-export function apiUser(request: Request): DbUser | null {
+export async function apiUser(request: Request): Promise<DbUser | null> {
   const token = bearerToken(request);
-  return token ? findApiUserByAccessToken(token) || null : null;
+  return token ? (await findApiUserByAccessToken(token)) || null : null;
 }
 
-export function revokeBearerSession(request: Request): void {
+export async function revokeBearerSession(request: Request): Promise<void> {
   const token = bearerToken(request);
-  if (token) revokeApiSession(token);
+  if (token) await revokeApiSession(token);
 }
 
-export function refreshBearerSession(refreshToken: string): { user: DbUser; session: ApiSession } | null {
-  return rotateApiSession(refreshToken) || null;
+export async function refreshBearerSession(refreshToken: string): Promise<{ user: DbUser; session: ApiSession } | null> {
+  return (await rotateApiSession(refreshToken)) || null;
 }
 
 export function publicUser(user: DbUser) {
   return { id: user.id, email: user.email, displayName: user.display_name, role: user.role };
 }
-

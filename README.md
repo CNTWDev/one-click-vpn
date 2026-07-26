@@ -7,7 +7,7 @@ Northstar is a provider-neutral control plane for a small VPN edge fleet. The pr
 The current implementation includes:
 
 - a protected owner console with cookie sessions and scrypt password hashes;
-- SQLite persistence with WAL mode and automatic schema initialization;
+- PostgreSQL persistence with automatic schema initialization and a Compose health gate;
 - AES-256-GCM encryption for SSH recovery credentials;
 - audited node creation, bootstrap attempts, agent heartbeats, and node actions;
 - SSH host-key verification, password/private-key bootstrap, and a least-privilege systemd agent;
@@ -19,12 +19,13 @@ The agent uses outbound HTTPS plus a per-node token and can pull structured Wire
 
 ## Local development
 
-Node.js 22.13 or newer is required. Node 22+ provides the built-in SQLite runtime used by the controller.
+Node.js 22.13 or newer is required for local development. Production deployments run the controller and PostgreSQL in Docker Compose.
 
 ```bash
 cp .env.example .env
-# Set NORTHSTAR_ADMIN_EMAIL, NORTHSTAR_ADMIN_PASSWORD, NORTHSTAR_MASTER_KEY.
+# Set NORTHSTAR_ADMIN_EMAIL, NORTHSTAR_ADMIN_PASSWORD, NORTHSTAR_MASTER_KEY, and NORTHSTAR_DB_PASSWORD.
 npm ci
+# Start a PostgreSQL service, then set NORTHSTAR_DATABASE_URL to its URL.
 npm run db:migrate
 npm run dev
 ```
@@ -76,10 +77,11 @@ sudo ./scripts/one-click-deploy.sh --domain vpn.example.com --admin-email owner@
 
 - 在 Ubuntu/Debian 上安装 Docker Engine、Compose、Git、OpenSSL 等依赖；
 - 生成 32 字节 `NORTHSTAR_MASTER_KEY`；
+- 生成随机的 `NORTHSTAR_DB_PASSWORD`；
 - 创建权限为 `0600` 的生产 `.env`；
 - 校验域名、HTTPS Origin、管理员账号、密码、主密钥和 Compose 配置；
 - 构建并启动 Northstar；
-- 执行数据库迁移并等待 Controller 通过健康检查；
+- 自动创建或复用本项目的 PostgreSQL Docker 服务，执行数据库迁移并等待数据库和 Controller 通过健康检查；
 - 检查宿主机上的 `http://127.0.0.1:3000/api/health`。
 
 如果 `.env` 已存在，脚本默认复用原配置。只有明确需要重新生成配置时才使用 `--yes`；脚本会先创建带时间戳的 `.env.backup.*`。已有 Docker/Compose 且不希望脚本安装依赖时，可增加 `--skip-docker-install`。
@@ -126,7 +128,7 @@ chmod 600 .env
 openssl rand -base64 32
 ```
 
-将生成的主密钥和生产参数写入 `.env`，至少替换：
+将生成的主密钥、数据库密码和生产参数写入 `.env`，至少替换：
 
 ```dotenv
 NODE_ENV=production
@@ -135,6 +137,7 @@ NORTHSTAR_PUBLIC_ORIGIN=https://vpn.example.com
 NORTHSTAR_ADMIN_EMAIL=owner@your-domain.example
 NORTHSTAR_ADMIN_PASSWORD=use-a-long-random-password
 NORTHSTAR_MASTER_KEY=the-generated-32-byte-base64-value
+NORTHSTAR_DB_PASSWORD=use-a-long-random-database-password
 ```
 
 然后执行：
@@ -146,7 +149,7 @@ sudo ./scripts/deploy.sh
 
 ### 7. 升级和备份
 
-数据库保存在 Docker 命名卷 `northstar-data` 中。升级前先导出 SQLite 一致性备份，再拉取代码和重新部署：
+数据库运行在项目 Compose 的 `db` 服务中，数据保存在 Docker 命名卷 `northstar-postgres`。本次切换不迁移旧 SQLite 数据；开发阶段旧数据可以清空。以后升级前先导出 PostgreSQL 备份，再拉取代码和重新部署：
 
 ```bash
 sudo ./scripts/backup.sh ./backups
@@ -154,7 +157,7 @@ git pull --ff-only
 sudo ./scripts/deploy.sh
 ```
 
-也可以使用仓库根目录的一键升级脚本。它会先备份 SQLite 数据库，确认工作区没有本地改动，拉取上游代码，然后强制重建并健康检查 Controller：
+也可以使用仓库根目录的一键升级脚本。它会先备份 PostgreSQL 数据库，确认工作区没有本地改动，拉取上游代码，然后强制重建并健康检查 Controller：
 
 ```bash
 sudo ./one-click-update.sh
@@ -166,9 +169,9 @@ sudo ./one-click-update.sh
 sudo ./one-click-update.sh --no-cache
 ```
 
-升级脚本不会删除 `.env` 或 `northstar-data` 数据卷；不要使用 `docker compose down -v`。`deploy.sh` 默认使用正常缓存，但每次都会强制重新创建 Controller 容器；仅在排查缓存问题时使用 `--no-cache`。
+升级脚本不会删除 `.env` 或 `northstar-postgres` 数据卷；不要使用 `docker compose down -v`。`deploy.sh` 默认使用正常缓存，但每次都会强制重新创建服务容器；仅在排查缓存问题时使用 `--no-cache`。
 
-如果服务器上的容器、镜像或构建状态已经混乱，可以使用清理重建脚本。脚本默认先备份数据库，并要求输入 `REBUILD` 确认；它只删除本项目的 Northstar 容器和服务镜像，不删除 `.env` 或 `northstar-data` 数据卷：
+如果服务器上的容器、镜像或构建状态已经混乱，可以使用清理重建脚本。脚本默认先备份数据库，并要求输入 `REBUILD` 确认；它只删除本项目的 Northstar Controller 容器和服务镜像，不删除 `.env` 或 `northstar-postgres` 数据卷：
 
 ```bash
 sudo ./one-click-rebuild.sh
@@ -208,7 +211,7 @@ docker compose version
 
 如果 `docker-compose-plugin` 不在当前 apt 源中，请按 Docker 官方文档配置 Docker 软件源后再安装，不要继续使用 Compose v1。
 
-升级 Compose 后，只删除旧的 Controller 容器再重建；不要删除 `northstar-data` 数据卷：
+升级 Compose 后，只删除旧的 Controller 容器再重建；不要删除 `northstar-postgres` 数据卷：
 
 ```bash
 sudo docker rm -f one-click-vpn_northstar_1 2>/dev/null || true
@@ -243,17 +246,18 @@ The restart action is explicitly allow-listed and audited. Arbitrary shell comma
 ```bash
 docker compose logs -f northstar
 docker compose restart northstar
+docker compose logs -f db
 docker compose exec northstar node /app/scripts/migrate.mjs
 ./scripts/backup.sh ./backups
 ```
 
-If logs show SQLite `disk I/O error`, an older Docker data volume may have ownership or write permissions that do not match the non-root `node` runtime user. The deployment script repairs `/app/data` before starting the new container. If the old container is restarting and a backup cannot run, use the recovery command below; it preserves the `northstar-data` volume and only skips the backup for this run:
+如果 Controller 无法启动，先检查 PostgreSQL 服务和迁移日志：
 
 ```bash
 sudo ./one-click-rebuild.sh --yes --skip-backup
 ```
 
-Keep `.env` and backup files outside source control. Production data is stored in the `northstar-data` Docker volume. Rotate `NORTHSTAR_MASTER_KEY` only with a planned credential re-encryption migration; changing it blindly makes existing encrypted credentials unreadable.
+Keep `.env` and backup files outside source control. Production data is stored in the `northstar-postgres` Docker volume. Use `./scripts/restore-postgres.sh` only after a deliberate restore confirmation. Rotate `NORTHSTAR_MASTER_KEY` only with a planned credential re-encryption migration; changing it blindly makes existing encrypted credentials unreadable.
 
 ## Verification
 
@@ -262,7 +266,7 @@ npm run lint
 npm test
 ```
 
-`npm test` builds the production bundle and starts a temporary production server to verify health, authentication, session cookies, and the protected node API.
+`npm test` builds the production bundle. Integration tests additionally require `NORTHSTAR_TEST_DATABASE_URL` pointing to a disposable PostgreSQL database.
 
 ## Optional Cloudflare adapter
 

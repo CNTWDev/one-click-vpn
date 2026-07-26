@@ -104,7 +104,7 @@ else
     echo "NORTHSTAR_ADMIN_PASSWORD=$admin_password"
     echo "NORTHSTAR_MASTER_KEY=$master_key"
     echo "NORTHSTAR_PUBLIC_ORIGIN=https://$domain"
-    echo "NORTHSTAR_DATABASE_PATH=/app/data/northstar.sqlite"
+    echo "NORTHSTAR_DB_PASSWORD=$(openssl rand -hex 24)"
     echo "NORTHSTAR_ADMIN_NAME=Owner"
     echo "NORTHSTAR_SESSION_TTL_SECONDS=43200"
     echo "NORTHSTAR_ALLOW_TOFU_HOST_KEYS=false"
@@ -112,6 +112,8 @@ else
   chmod 600 "$APP_DIR/.env"
   echo "Created $APP_DIR/.env"
 fi
+
+"$SCRIPT_DIR/ensure-postgres-env.sh"
 
 cd "$APP_DIR"
 "$SCRIPT_DIR/deploy.sh"

@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export async function GET() {
   const user = await currentUser();
   if (!user) return jsonError("Authentication required", 401);
-  return NextResponse.json({ regions: listRegions() });
+  return NextResponse.json({ regions: await listRegions() });
 }
 
 export async function POST(request: Request) {
@@ -22,8 +22,8 @@ export async function POST(request: Request) {
     const id = (cleanText(body.id, 80) || `${name}-${country}`).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     if (!id || !name || !country || !code) return jsonError("Region name, country, and code are required");
     if (!/^[A-Z]{2,8}$/.test(code)) return jsonError("Region code must contain 2 to 8 letters");
-    const region = insertRegion({ id, name, country, code });
-    addAudit({ actorUserId: user.id, action: "region.created", targetType: "region", targetId: id });
+    const region = await insertRegion({ id, name, country, code });
+    await addAudit({ actorUserId: user.id, action: "region.created", targetType: "region", targetId: id });
     return NextResponse.json({ region }, { status: 201 });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to create region");

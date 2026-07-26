@@ -1,12 +1,18 @@
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { randomBytes, randomUUID, scryptSync } from "node:crypto";
+import { Pool } from "pg";
 
-const file = process.env.NORTHSTAR_DATABASE_PATH || path.join(process.cwd(), "data", "northstar.sqlite");
-mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-const db = new DatabaseSync(file);
-db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
-db.exec(`
+const connectionString = process.env.NORTHSTAR_DATABASE_URL;
+if (!connectionString) throw new Error("NORTHSTAR_DATABASE_URL is required");
+
+const pool = new Pool({ connectionString });
+
+function hashPassword(password) {
+  const salt = randomBytes(16);
+  const derived = scryptSync(password, salt, 64);
+  return `scrypt:${salt.toString("base64url")}:${derived.toString("base64url")}`;
+}
+
+const schema = `
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL,
   password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'owner', created_at TEXT NOT NULL
@@ -17,23 +23,25 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
 CREATE TABLE IF NOT EXISTS nodes (
-  id TEXT PRIMARY KEY, name TEXT NOT NULL, place TEXT NOT NULL, ip TEXT NOT NULL,
-  ssh_user TEXT NOT NULL, ssh_port INTEGER NOT NULL DEFAULT 22,
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, place TEXT NOT NULL, region_id TEXT,
+  ip TEXT NOT NULL, ssh_user TEXT NOT NULL, ssh_port INTEGER NOT NULL DEFAULT 22,
   status TEXT NOT NULL DEFAULT 'provisioning', latency TEXT NOT NULL DEFAULT 'checking',
   users INTEGER NOT NULL DEFAULT 0, traffic TEXT NOT NULL DEFAULT '—',
   version TEXT NOT NULL DEFAULT 'bootstrap pending', last_seen TEXT NOT NULL DEFAULT 'never',
-  credential_type TEXT NOT NULL, credential_ciphertext TEXT NOT NULL,
-  credential_iv TEXT NOT NULL, credential_tag TEXT NOT NULL,
-  host_fingerprint TEXT, agent_token_hash TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  last_heartbeat_at TEXT, credential_type TEXT NOT NULL, credential_ciphertext TEXT NOT NULL,
+  credential_iv TEXT NOT NULL, credential_tag TEXT NOT NULL, host_fingerprint TEXT,
+  agent_token_hash TEXT, provider TEXT NOT NULL DEFAULT 'unknown', region TEXT NOT NULL DEFAULT '',
+  public_endpoint TEXT, server_public_key TEXT, agent_capabilities_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS nodes_region_idx ON nodes(region_id);
 CREATE TABLE IF NOT EXISTS regions (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, country TEXT NOT NULL, code TEXT NOT NULL,
-  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
-  UNIQUE (name, country), UNIQUE (code)
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE (name, country), UNIQUE (code)
 );
 CREATE TABLE IF NOT EXISTS audit_logs (
-  id TEXT PRIMARY KEY, actor_user_id TEXT, action TEXT NOT NULL,
-  target_type TEXT, target_id TEXT, metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL
+  id TEXT PRIMARY KEY, actor_user_id TEXT, action TEXT NOT NULL, target_type TEXT,
+  target_id TEXT, metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS audit_created_idx ON audit_logs(created_at);
 CREATE TABLE IF NOT EXISTS node_actions (
@@ -107,34 +115,41 @@ CREATE TABLE IF NOT EXISTS agent_certificates (
 CREATE TABLE IF NOT EXISTS device_sessions (
   id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   access_token_hash TEXT NOT NULL UNIQUE, refresh_token_hash TEXT NOT NULL UNIQUE,
-  access_expires_at TEXT NOT NULL, refresh_expires_at TEXT NOT NULL, created_at TEXT NOT NULL, revoked_at TEXT
+  access_expires_at TEXT NOT NULL, refresh_expires_at TEXT NOT NULL, created_at TEXT NOT NULL,
+  revoked_at TEXT
 );
 CREATE INDEX IF NOT EXISTS device_sessions_access_idx ON device_sessions(access_token_hash, revoked_at);
 CREATE INDEX IF NOT EXISTS device_sessions_refresh_idx ON device_sessions(refresh_token_hash, revoked_at);
-`);
-try { db.exec("ALTER TABLE nodes ADD COLUMN agent_token_hash TEXT"); } catch { /* already migrated */ }
-try { db.exec("ALTER TABLE nodes ADD COLUMN region_id TEXT"); } catch { /* already migrated */ }
-db.exec("CREATE INDEX IF NOT EXISTS nodes_region_idx ON nodes(region_id)");
-for (const statement of [
-  "ALTER TABLE nodes ADD COLUMN provider TEXT NOT NULL DEFAULT 'unknown'",
-  "ALTER TABLE nodes ADD COLUMN region TEXT NOT NULL DEFAULT ''",
-  "ALTER TABLE nodes ADD COLUMN public_endpoint TEXT",
-  "ALTER TABLE nodes ADD COLUMN server_public_key TEXT",
-  "ALTER TABLE nodes ADD COLUMN agent_capabilities_json TEXT NOT NULL DEFAULT '{}'",
-]) {
-  try { db.exec(statement); } catch { /* column already migrated */ }
+`;
+
+try {
+  await pool.query("SELECT 1");
+  await pool.query(schema);
+  const timestamp = new Date().toISOString();
+  const regions = [
+    ["tokyo-jp", "Tokyo", "Japan", "JP"],
+    ["singapore-sg", "Singapore", "Singapore", "SG"],
+    ["frankfurt-de", "Frankfurt", "Germany", "DE"],
+    ["los-angeles-us", "Los Angeles", "USA", "US"],
+  ];
+  for (const [id, name, country, code] of regions) {
+    await pool.query(
+      "INSERT INTO regions (id, name, country, code, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $5) ON CONFLICT (id) DO NOTHING",
+      [id, name, country, code, timestamp],
+    );
+  }
+  await pool.query(`UPDATE nodes SET region_id = regions.id
+    FROM regions WHERE nodes.region_id IS NULL AND nodes.place = regions.name || ' · ' || regions.country`);
+  const email = process.env.NORTHSTAR_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.NORTHSTAR_ADMIN_PASSWORD;
+  if (email && password) {
+    await pool.query(
+      `INSERT INTO users (id, email, display_name, password_hash, role, created_at)
+       VALUES ($1, $2, $3, $4, 'owner', $5) ON CONFLICT (email) DO NOTHING`,
+      [randomUUID(), email, process.env.NORTHSTAR_ADMIN_NAME?.trim() || "Owner", hashPassword(password), timestamp],
+    );
+  }
+  console.log("Northstar PostgreSQL database ready");
+} finally {
+  await pool.end();
 }
-const timestamp = new Date().toISOString();
-const regions = [
-  ["tokyo-jp", "Tokyo", "Japan", "JP"],
-  ["singapore-sg", "Singapore", "Singapore", "SG"],
-  ["frankfurt-de", "Frankfurt", "Germany", "DE"],
-  ["los-angeles-us", "Los Angeles", "USA", "US"],
-];
-const regionInsert = db.prepare("INSERT OR IGNORE INTO regions (id, name, country, code, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)");
-for (const [id, name, country, code] of regions) regionInsert.run(id, name, country, code, timestamp, timestamp);
-db.exec(`UPDATE nodes SET region_id = (
-  SELECT regions.id FROM regions WHERE nodes.place = regions.name || ' · ' || regions.country
-) WHERE region_id IS NULL`);
-db.close();
-console.log(`Northstar database ready: ${file}`);

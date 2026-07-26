@@ -56,11 +56,12 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
+"$APP_DIR/scripts/ensure-postgres-env.sh"
 "$APP_DIR/scripts/check-env.sh"
 
 if [ "$assume_yes" != "yes" ]; then
   echo "This will remove the Northstar Compose containers and service image."
-  echo "It will NOT remove .env or the northstar-data volume."
+  echo "It will NOT remove .env or the northstar-postgres volume."
   printf 'Type REBUILD to continue: '
   read -r confirmation
   if [ "$confirmation" != "REBUILD" ]; then

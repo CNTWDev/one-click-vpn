@@ -10,10 +10,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const user = await requestUser(request);
   if (!user) return jsonError("Authentication required", 401);
   const { id } = await context.params;
-  if (!findNode(id)) return jsonError("Node not found", 404);
-  updateNode(id, { status: "provisioning", version: "bootstrap queued" });
-  addAudit({ actorUserId: user.id, action: "node.bootstrap.queued", targetType: "node", targetId: id });
+  if (!(await findNode(id))) return jsonError("Node not found", 404);
+  await updateNode(id, { status: "provisioning", version: "bootstrap queued" });
+  await addAudit({ actorUserId: user.id, action: "node.bootstrap.queued", targetType: "node", targetId: id });
   queueNodeBootstrap(id, user.id);
   return NextResponse.json({ ok: true });
 }
-

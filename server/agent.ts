@@ -10,28 +10,28 @@ function tokenMatches(provided: string, expectedHash: string | null): boolean {
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
-export function authenticateAgent(nodeId: string, token: string) {
-  const node = findNode(nodeId);
+export async function authenticateAgent(nodeId: string, token: string) {
+  const node = await findNode(nodeId);
   if (!node || !tokenMatches(token, node.agent_token_hash)) return null;
   return node;
 }
 
-export function recordAgentHeartbeat(input: {
+export async function recordAgentHeartbeat(input: {
   nodeId: string;
   version?: string;
   hostname?: string;
   publicEndpoint?: string;
   serverPublicKey?: string;
   capabilities?: Record<string, unknown>;
-}): void {
-  updateNode(input.nodeId, {
+}): Promise<void> {
+  await updateNode(input.nodeId, {
     status: "online",
     last_seen: "now",
     last_heartbeat_at: new Date().toISOString(),
     latency: "connected",
     version: input.version || "unknown",
   });
-  updateNodeControlMetadata(input.nodeId, {
+  await updateNodeControlMetadata(input.nodeId, {
     publicEndpoint: input.publicEndpoint,
     serverPublicKey: input.serverPublicKey,
     capabilities: {

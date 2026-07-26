@@ -6,7 +6,7 @@
 Cloud VM
   ├── Host Nginx / HTTPS
   ├── Northstar Controller
-  ├── SQLite/PostgreSQL
+  ├── PostgreSQL（Docker Compose db 服务）
   └── Backup worker
 
 Cloud VMs in regions
@@ -50,16 +50,15 @@ interface NodeProviderAdapter {
 
 ## 4. 数据持久化
 
-单机：
+当前与多实例：
 
-- SQLite WAL；
-- 独立持久盘；
+- PostgreSQL 独立服务和持久卷；
 - 定期备份；
 - Master key 独立保存。
 
-多实例：
+多实例扩展：
 
-- PostgreSQL；
+- 托管 PostgreSQL 或独立高可用 PostgreSQL；
 - 独立 Job Queue；
 - 对象存储保存配置快照和审计归档；
 - 多 Controller 通过租约或分布式锁执行 Reconcile。

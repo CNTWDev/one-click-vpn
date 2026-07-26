@@ -8,8 +8,8 @@ export const runtime = "nodejs";
 export async function POST() {
   const user = await currentUser();
   const cookieStore = await cookies();
-  expireLoginSession(cookieStore.get(SESSION_COOKIE)?.value);
-  if (user) addAudit({ actorUserId: user.id, action: "auth.logout" });
+  await expireLoginSession(cookieStore.get(SESSION_COOKIE)?.value);
+  if (user) await addAudit({ actorUserId: user.id, action: "auth.logout" });
   const response = NextResponse.json({ ok: true });
   response.headers.set("Set-Cookie", clearSessionCookie());
   return response;

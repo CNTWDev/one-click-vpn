@@ -40,7 +40,7 @@ Agent 只执行结构化、allow-listed 的操作。SSH 只负责 bootstrap 和�
 状态：Accepted  
 日期：2026-07-25
 
-SQLite + Docker 适合第一阶段单 Controller。只有出现多实例、高并发或多区域需求时，才迁移 PostgreSQL、队列和分布式锁。
+PostgreSQL + Docker Compose 是当前单 Controller 的部署基线；后续出现多实例、高并发或多区域需求时，再补充连接池治理、队列和分布式锁。
 
 ## ADR-0007：mTLS 是 Agent 身份，不是 VPN 用户身份
 
