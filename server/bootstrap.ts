@@ -317,6 +317,7 @@ except Exception as error:
     raise SystemExit(f"Controller health preflight failed for {origin}: {error}")
 NORTHSTAR_PREFLIGHT
 progress agent-files 78 'Writing the managed Agent and service definition'
+systemctl stop northstar-agent >/dev/null 2>&1 || true
 install -d -m 700 /opt/northstar-agent
 echo ${shellQuote(source)} | base64 -d > /opt/northstar-agent/agent.py
 if command -v wg >/dev/null 2>&1; then
@@ -356,17 +357,7 @@ ReadWritePaths=/opt/northstar-agent /etc/wireguard /etc/systemd/system
 [Install]
 WantedBy=multi-user.target
 NORTHSTAR_SERVICE
-systemctl daemon-reload
-systemctl enable --now northstar-agent
-progress agent-start 92 'Agent service started; waiting for Controller heartbeat'
-sleep 2
-if ! systemctl is-active --quiet northstar-agent; then
-  systemctl --no-pager --full status northstar-agent || true
-  journalctl -u northstar-agent -n 100 --no-pager || true
-  exit 1
-fi
-systemctl --no-pager --full status northstar-agent
-progress complete 100 'Node Agent installation completed'
+progress agent-staged 88 'Agent files are staged; registering its new identity with the Controller'
 `;
     const config: ConnectConfig = {
       host: node.ip,
@@ -379,7 +370,7 @@ progress complete 100 'Node Agent installation completed'
     recorder = outputRecorder;
     const result = await connectAndExec(config, command, expectedFingerprint, (chunk) => outputRecorder.write(chunk));
     await outputRecorder.flush();
-    const heartbeatNotBefore = Date.now();
+    await updateNodeActionProgress(actionId, { phase: "registration", progress: 90, message: "Controller registered the new Agent token; starting the service" });
     await updateNode(nodeId, {
       status: "provisioning",
       version: "agent installed",
@@ -388,6 +379,23 @@ progress complete 100 'Node Agent installation completed'
       host_fingerprint: node.host_fingerprint || result.fingerprint,
       agent_token_hash: hashToken(agentToken),
     });
+    const heartbeatNotBefore = Date.now();
+    const startCommand = `set -eu
+printf 'NORTHSTAR_PROGRESS|agent-start|93|Starting the registered Agent service\\n'
+systemctl daemon-reload
+systemctl enable --now northstar-agent
+sleep 2
+if ! systemctl is-active --quiet northstar-agent; then
+  systemctl --no-pager --full status northstar-agent || true
+  journalctl -u northstar-agent -n 100 --no-pager || true
+  exit 1
+fi
+systemctl --no-pager --full status northstar-agent
+printf 'NORTHSTAR_PROGRESS|heartbeat|96|Agent is active; waiting for its first Controller heartbeat\\n'
+`;
+    const startResult = await connectAndExec(config, startCommand, expectedFingerprint, (chunk) => outputRecorder.write(chunk));
+    await outputRecorder.flush();
+    const combinedOutput = `${result.output}\n${startResult.output}`;
     if (!(await waitForAgentHeartbeat(nodeId, heartbeatNotBefore))) {
       let runtimeDiagnostics = "";
       try {
@@ -400,12 +408,12 @@ progress complete 100 'Node Agent installation completed'
       const message = "Agent service installed but the Controller did not receive a heartbeat within 25 seconds. Verify DNS, TLS, firewall access, and the controller public origin.";
       await updateNode(nodeId, { status: "attention", version: "agent heartbeat failed", last_seen: "heartbeat not received", latency: "error" });
       await outputRecorder.flush();
-      await finishNodeAction(actionId, "failed", `${result.output.slice(-6000)}\n\n${message}\n\n${runtimeDiagnostics}`.slice(-12_000), message);
+      await finishNodeAction(actionId, "failed", `${combinedOutput.slice(-6000)}\n\n${message}\n\n${runtimeDiagnostics}`.slice(-12_000), message);
       await addAudit({ actorUserId, action: "node.bootstrap.heartbeat_failed", targetType: "node", targetId: nodeId });
       return;
     }
     await ensureDefaultNodeProtocols(nodeId);
-    await finishNodeAction(actionId, "succeeded", result.output.slice(-12000));
+    await finishNodeAction(actionId, "succeeded", combinedOutput.slice(-12000));
     await addAudit({ actorUserId, action: "node.bootstrap.succeeded", targetType: "node", targetId: nodeId });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
