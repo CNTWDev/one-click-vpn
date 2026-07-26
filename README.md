@@ -1,177 +1,121 @@
-# Northstar Control Plane
+# Northstar VPN Control Plane
 
-Northstar is a provider-neutral control plane for a small VPN edge fleet. The primary deployment target is one Linux cloud host running Docker. This works on Alibaba Cloud ECS, Tencent Cloud CVM, Google Compute Engine, and ordinary VPS providers without depending on a provider-specific runtime.
+Northstar is a lightweight VPN control plane for a small fleet of Linux Edge Nodes.
+It includes a customer Portal, an Admin console, a Controller/API, and an outbound
+Node Agent. The current data plane supports WireGuard and OpenVPN.
 
-The long-term architecture baseline is documented in [`ARCHITECTURE.md`](ARCHITECTURE.md) and [`docs/architecture/README.md`](docs/architecture/README.md). Use that baseline when changing the controller, VPN protocols, clients, or deployment model.
+## Architecture
 
-The current implementation includes:
+```text
+Browser:  app.example.com       -> Portal  :3100
+          console.example.com   -> Admin   :3200
+          /api/*                 -> API     :3000
 
-- independent customer Portal Web (`:3100`) and Admin Web (`:3200`) frontends, backed by a versioned Controller/API (`:3000`);
-- a protected owner console with cookie sessions and scrypt password hashes;
-- customer registration, manual approval, device/profile management, configuration export, and per-device traffic summaries;
-- PostgreSQL persistence with automatic schema initialization and a Compose health gate;
-- AES-256-GCM encryption for SSH recovery credentials;
-- audited node creation, bootstrap attempts, agent heartbeats, and node actions;
-- SSH host-key verification, password/private-key bootstrap, and a least-privilege systemd agent;
-- Docker Compose, host-managed Nginx HTTPS, health checks, backups, and a repeatable deployment script.
-- versioned `/api/v1` authentication, device, node capability, Connection Profile, and Agent reconcile endpoints;
-- protocol Adapter registry, WireGuard and OpenVPN desired-state generation, IP leases, revisions, and structured Agent tasks;
-- explicit VPN Service lifecycle management, independent from users and Connection Profiles;
-- versioned Standard fleet policy with capability-gated canary and batch rollouts for existing nodes;
-- a browser-based Users & Devices workflow that automatically assigns a healthy service and issues exportable WireGuard and OpenVPN profiles for macOS;
-- lightweight Agent resource telemetry for CPU, load, memory, disk, network counters, and collection time.
-- an internal Loki + MinIO operational log service with separate retention and audited purge controls.
-
-The agent uses outbound HTTPS plus a per-node token and pulls structured reconcile tasks. It installs WireGuard when the operating system provides it and installs OpenVPN independently, so an OpenVPN-only node remains usable on distributions without a compatible WireGuard package.
-
-Operational logs are not audit records. Bootstrap output, Agent errors, and reconcile events are sent to the internal Loki service and retained for 14 days by default. PostgreSQL retains only small job summaries, structured warnings/errors, and immutable audit events. The console can purge operational logs for one node or for the entire system after the `PURGE SYSTEM LOGS` confirmation phrase; this never deletes `audit_logs`. Loki makes a delete request unavailable to queries immediately and removes its underlying chunks asynchronously through the Compactor.
-
-The **Controller** page resolves the host in `NORTHSTAR_PUBLIC_ORIGIN` to show the active public endpoint and IP address. Geographic placement is explicit rather than inferred from third-party IP geolocation. Set a verified location in the Controller page, or seed it at deployment with optional `NORTHSTAR_CONTROLLER_LOCATION`, `NORTHSTAR_CONTROLLER_LATITUDE`, and `NORTHSTAR_CONTROLLER_LONGITUDE` environment variables. The map omits the Controller marker until both coordinates are known.
-
-## Local development
-
-Node.js 22.13 or newer is required for local development. Production deployments run the controller and PostgreSQL in Docker Compose.
-
-```bash
-cp .env.example .env
-# Set NORTHSTAR_ADMIN_EMAIL, NORTHSTAR_ADMIN_PASSWORD, NORTHSTAR_MASTER_KEY, and NORTHSTAR_DB_PASSWORD.
-npm ci
-# Start a PostgreSQL service, then set NORTHSTAR_DATABASE_URL to its URL.
-npm run db:migrate
-npm run dev
+Native:   api.example.com       -> API     :3000
+Agent:    outbound HTTPS        -> api.example.com/api/v1/agent/*
 ```
 
-Open `http://localhost:3000` and sign in with the owner credentials from `.env`.
+The Controller, Portal, and Admin run as independent Docker services. Host Nginx
+terminates HTTPS and reverse-proxies to loopback ports. The Agent does not need an
+inbound port; it uses HTTPS with a per-node Bearer token. SSH is used only for
+bootstrap and repair.
 
-For the separated frontends, run `npm run dev:portal` on `:3100` or `npm run dev:admin-web` on `:3200`. Both Vite dev servers proxy `/api` to the Controller on `:3000`.
+## Requirements
 
-For a production-like local process:
+- Ubuntu/Debian server for production;
+- Docker Engine with Docker Compose v2;
+- DNS records for Portal, Admin, and API;
+- HTTPS certificates covering all three hostnames;
+- TCP `80/443` to the Controller host;
+- Edge Nodes need outbound TCP `443` and their own VPN data-plane ports.
 
-```bash
-npm run build
-npm start
-```
+## First deployment
 
-## Server deployment (Alibaba Cloud / Tencent Cloud / GCP / generic VPS)
-
-The Controller uses the same Docker Compose deployment on every provider and does not depend on a provider SDK. Ubuntu or Debian is recommended. The application steps are the same on Alibaba Cloud ECS, Tencent Cloud CVM, GCP Compute Engine, and generic VPS hosts.
-
-### 1. Prepare the cloud host
-
-- Use at least 2 vCPUs, 4 GB RAM, and persistent storage;
-- Point the domain A/AAAA record, such as `vpn.example.com`, to the host public address;
-- Install Nginx on the host and let Nginx manage HTTPS and uploaded certificates;
-- Allow inbound TCP `80` and `443` in the cloud security group;
-- Restrict TCP `22` to trusted administration addresses;
-- Do not expose Controller port `3000` to the public Internet;
-- Configure Nginx to proxy HTTPS requests to `127.0.0.1:3000`;
-- Prepare the domain certificate before deployment. Docker does not request or renew certificates.
-
-WireGuard, OpenVPN, and IKEv2 are Edge Node data-plane services. Open their ports in each Edge Node security group separately; they are not Controller Compose entry points. For the current protocols, allow UDP `51820` for WireGuard and UDP `1194` for OpenVPN on the selected Edge Nodes.
-
-The Node Agent is the single lightweight host monitor. It maintains outbound HTTPS control-plane communication and reports protocol installation, service state, listening ports, NAT/forwarding prerequisites, and Northstar-managed host firewall rules in its heartbeat. The Controller evaluates and displays that data in the Node diagnostics view. The Agent can maintain host `iptables` INPUT rules for the active WireGuard and OpenVPN ports, but cloud security groups, network ACLs, and provider firewalls remain unverified until a provider integration with least-privilege credentials is configured. Agent communication requires only outbound TCP `443`; bootstrap and SSH-based recovery currently require Controller-to-Node TCP `22`.
-
-### 2. Get the source code
+Clone the project:
 
 ```bash
 sudo git clone YOUR_REPOSITORY_URL /opt/northstar
 cd /opt/northstar
 ```
 
-If the source was copied to the host by another method, enter the project directory directly.
-
-### 3. First deployment
-
-```bash
-sudo ./scripts/one-click-deploy.sh --domain example.com --admin-email owner@your-domain.example
-```
-
-By default this creates `app.example.com` for Portal, `console.example.com` for Admin, and `api.example.com` for native clients and Edge Agents. Pass `--portal-domain`, `--admin-domain`, and `--api-domain` when the hostnames do not follow this convention.
-
-The administrator password is requested interactively by default. Avoid `--admin-password` so the password does not remain in shell history. The password must be at least 16 characters.
-
-The script automatically:
-
-- installs Docker Engine, Compose, Git, and OpenSSL on Ubuntu/Debian;
-- generates a 32-byte `NORTHSTAR_MASTER_KEY`;
-- generates a random `NORTHSTAR_DB_PASSWORD`;
-- creates a production `.env` with mode `0600`;
-- validates the domain, HTTPS origin, administrator credentials, master key, and Compose configuration;
-- builds the Northstar image;
-- starts or reuses the project PostgreSQL service, waits for its health check, runs migrations, and then starts the Controller, Portal, and Admin services;
-- checks the Controller, Portal, and Admin health endpoints on the host.
-
-If `.env` already exists, the script reuses it by default. Use `--yes` only when you explicitly want to regenerate the configuration; the existing file is backed up to a timestamped `.env.backup.*` file first. Add `--skip-docker-install` when Docker and Compose are already installed.
-
-You may omit `sudo` when the current user has Docker permissions. If Docker was first installed by root, continue using `sudo`, or add the deployment user to the `docker` group and log in again.
-
-### 4. Verify the deployment
-
-After configuring Nginx in the next section, run the public check:
+Run the installer. It generates `.env`, secrets, database configuration, and the
+three application services:
 
 ```bash
-sudo ./scripts/deploy.sh ps
-curl --fail https://vpn.example.com/api/health
+sudo ./scripts/one-click-deploy.sh \
+  --domain example.com \
+  --admin-email owner@example.com
 ```
 
-The health endpoint should return `status: ok`. Public access is provided by Nginx. If it fails, check Nginx configuration, certificates, DNS, cloud security groups, and Nginx logs. The deployment script also checks the Controller locally before Nginx is configured.
+The default hostnames are:
 
-### 5. Host Nginx and manually managed certificates
+```text
+app.example.com       Portal
+console.example.com   Admin
+api.example.com       API and Edge Agent
+```
 
-The project provides an [Nginx configuration template](deploy/nginx/northstar.conf.example). Install Nginx on the cloud host and copy the provider-issued certificate to a directory readable by Nginx, for example:
+Use explicit hostnames when needed:
+
+```bash
+sudo ./scripts/one-click-deploy.sh \
+  --portal-domain app.example.com \
+  --admin-domain console.example.com \
+  --api-domain api.example.com \
+  --admin-email owner@example.com
+```
+
+The admin password is requested interactively. Existing `.env` is reused. Use
+`--yes` only when intentionally regenerating it; the old file is backed up first.
+
+## Nginx
+
+Point all three DNS records to the Controller host. Install Nginx and certificates,
+then edit the hostnames and certificate paths in the template:
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y nginx
-sudo mkdir -p /etc/nginx/ssl/vpn.example.com
-sudo cp fullchain.pem /etc/nginx/ssl/vpn.example.com/fullchain.pem
-sudo cp privkey.pem /etc/nginx/ssl/vpn.example.com/privkey.pem
-sudo chmod 600 /etc/nginx/ssl/vpn.example.com/privkey.pem
-sudo cp deploy/nginx/northstar.conf.example /etc/nginx/sites-available/northstar.conf
-sudo ln -s /etc/nginx/sites-available/northstar.conf /etc/nginx/sites-enabled/northstar.conf
+sudo mkdir -p /etc/nginx/snippets
+sudo cp deploy/nginx/snippets/northstar-proxy.conf \
+  /etc/nginx/snippets/northstar-proxy.conf
+sudo cp deploy/nginx/northstar.conf.example \
+  /etc/nginx/sites-available/northstar.conf
+sudo ln -s /etc/nginx/sites-available/northstar.conf \
+  /etc/nginx/sites-enabled/northstar.conf
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-Edit `server_name` and the certificate paths in the configuration. The Nginx upstreams are Controller `http://127.0.0.1:3000`, Portal `http://127.0.0.1:3100`, and Admin `http://127.0.0.1:3200`. Keep `NORTHSTAR_PUBLIC_ORIGIN` on the Portal hostname, and set `NORTHSTAR_API_ORIGIN` plus `NORTHSTAR_AGENT_ORIGIN` to the API hostname so native clients and Agents have a stable dedicated entry point. Docker itself does not listen on public ports `80` or `443`.
+Docker binds only to `127.0.0.1`; do not expose ports `3000`, `3100`, or `3200`
+directly to the Internet.
 
-### 6. Manual deployment
+## Services and ports
 
-For full control over each setting, install Docker Engine and Docker Compose yourself, then run:
+| Service | Port | Purpose |
+| --- | ---: | --- |
+| Controller/API | 3000 | API, Agent gateway, migrations |
+| Portal Web | 3100 | Registration, approval, devices, profiles, traffic |
+| Admin Web | 3200 | User approval, nodes, VPN services, logs |
+| PostgreSQL | internal | Persistent application data |
 
-```bash
-cp .env.example .env
-chmod 600 .env
-openssl rand -base64 32
-```
-
-Put the generated master key, database password, and production values in `.env`. At minimum, replace:
-
-```dotenv
-NODE_ENV=production
-APP_DOMAIN=app.example.com
-NORTHSTAR_PORTAL_DOMAIN=app.example.com
-NORTHSTAR_ADMIN_DOMAIN=console.example.com
-NORTHSTAR_API_DOMAIN=api.example.com
-NORTHSTAR_PUBLIC_ORIGIN=https://app.example.com
-NORTHSTAR_API_ORIGIN=https://api.example.com
-NORTHSTAR_AGENT_ORIGIN=https://api.example.com
-NORTHSTAR_ADMIN_EMAIL=owner@your-domain.example
-NORTHSTAR_ADMIN_PASSWORD=use-a-long-random-password
-NORTHSTAR_MASTER_KEY=the-generated-32-byte-base64-value
-NORTHSTAR_DB_PASSWORD=use-a-long-random-database-password
-```
-
-Then run:
+Useful local checks:
 
 ```bash
-./scripts/check-env.sh
-sudo ./scripts/deploy.sh
+curl --fail http://127.0.0.1:3000/api/health
+curl --fail http://127.0.0.1:3100/health
+curl --fail http://127.0.0.1:3200/health
 ```
 
-### 7. Upgrades and backups
+## Upgrade
 
-The database runs in the Compose `db` service and its data is stored in the Docker volume `northstar-postgres`. The SQLite-to-PostgreSQL switch intentionally does not migrate old SQLite data; this is acceptable while the project is still in development. Before future upgrades, export a PostgreSQL backup, pull the source, and redeploy:
+Recommended upgrade, including a PostgreSQL backup:
+
+```bash
+sudo ./one-click-update.sh
+```
+
+Manual upgrade:
 
 ```bash
 sudo ./scripts/backup.sh ./backups
@@ -179,296 +123,82 @@ git pull --ff-only
 sudo ./scripts/deploy.sh
 ```
 
-You can also use the root-level one-click update script. It backs up PostgreSQL, checks for tracked local changes, pulls the upstream source, rebuilds the service, and runs the health check:
+Database migrations run during Controller deployment. `.env`, certificates, and
+Docker volumes are preserved. Never use `docker compose down -v` in production.
+
+To rebuild only the frontends:
 
 ```bash
-sudo ./one-click-update.sh
+docker compose build portal-web admin-web
+docker compose up -d --no-deps portal-web admin-web
 ```
 
-If Docker may be using stale build cache, use:
+After upgrading Controller code, use the Admin node action **Reinstall agent** to
+upgrade an Edge Agent. Existing VPN configuration is retained.
+
+If the admin password is lost, reset an existing owner/admin account on the
+Controller host:
 
 ```bash
-sudo ./one-click-update.sh --no-cache
+sudo ./scripts/reset-admin-password.sh
 ```
 
-The update script does not delete `.env` or the `northstar-postgres` volume. Do not use `docker compose down -v`. `deploy.sh` uses the normal build cache by default and force-recreates the service containers; use `--no-cache` only when investigating a cache problem.
+## Edge Node bootstrap
 
-If the server has inconsistent containers, images, or build state, use the clean rebuild script. It creates a database backup by default and requires the `REBUILD` confirmation. It removes only this project's Northstar Controller containers and service images; it does not remove `.env` or the `northstar-postgres` volume:
+In Admin, create a node with its public address, SSH credential, and verified
+`SHA256:` host fingerprint. Then choose a deployment template and run Bootstrap.
+The Controller installs the Agent and waits for a real heartbeat.
+
+On the Edge Node:
 
 ```bash
-sudo ./one-click-rebuild.sh
+sudo systemctl status northstar-agent --no-pager
+sudo journalctl -u northstar-agent -n 100 --no-pager
+sudo grep -E '^(NORTHSTAR_CONTROLLER_URL|NORTHSTAR_NODE_ID)=' \
+  /opt/northstar-agent/config.env
 ```
 
-Use the following only when the current containers cannot start and a backup cannot be created:
+The Agent reports health, resource usage, VPN service state, and traffic counters.
+WireGuard normally uses UDP `51820`; OpenVPN normally uses UDP `1194`. Open those
+ports in the Edge Node firewall/security group separately from the Controller.
+
+## Local development
+
+Node.js 22 or newer is required. Start PostgreSQL, configure `.env`, then run:
 
 ```bash
-sudo ./one-click-rebuild.sh --yes --skip-backup
+npm ci
+npm run db:migrate
+npm run dev
 ```
 
-The script does not clean containers, images, or volumes belonging to other projects.
-
-Do not replace `NORTHSTAR_MASTER_KEY` without a credential re-encryption migration. Existing encrypted SSH credentials will otherwise become unreadable.
-
-### 8. Operations and troubleshooting
+The Controller runs on `http://localhost:3000`. For separated frontends:
 
 ```bash
-sudo ./scripts/deploy.sh ps
-sudo ./scripts/deploy.sh logs
-sudo journalctl -u nginx -f
-sudo docker compose restart northstar
-sudo ./scripts/backup.sh ./backups
+npm run dev:portal       # :3100
+npm run dev:admin-web    # :3200
 ```
 
-The deployment script prints the latest 120 lines from both PostgreSQL and Controller logs when a health check fails. Alibaba Cloud uses ECS security groups and disks, Tencent Cloud uses CVM security groups and CBS disks, and GCP uses VPC firewalls and Persistent Disk; the application configuration is provider-neutral.
+Both Vite servers proxy `/api` to the Controller.
 
-If Nginx returns `502 Bad Gateway` after an interrupted deployment, first inspect all containers, including completed one-shot jobs, and then rerun the idempotent deployment script:
-
-```bash
-sudo docker compose ps --all
-sudo docker compose logs --tail=160 minio minio-init loki northstar
-sudo ./scripts/deploy.sh
-curl --fail http://127.0.0.1:3000/api/health
-```
-
-The `minio-init` service is expected to exit with code `0` after creating the Loki bucket. It is not a long-running service and therefore appears only in `docker compose ps --all`.
-
-### 9. Docker Compose version problems
-
-The project requires Docker Compose v2. If logs show `KeyError: 'ContainerConfig'`, the server is usually still using the old `docker-compose 1.29.2`. Install Compose v2 first:
-
-```bash
-sudo apt-get update
-sudo apt-get install -y docker-compose-plugin
-docker compose version
-```
-
-If `docker-compose-plugin` is not available from the current apt sources, configure the Docker official repository and install it there. Do not continue using Compose v1.
-
-After upgrading Compose, remove only the old Controller containers and recreate them. Do not remove the `northstar-postgres` data volume:
-
-```bash
-sudo docker rm -f one-click-vpn_northstar_1 2>/dev/null || true
-sudo docker rm -f one-click-vpn_caddy_1 2>/dev/null || true
-sudo docker compose up -d --build --remove-orphans
-```
-
-## Node bootstrap
-
-In the console, add a node with its public IPv4 address, SSH user, credential, and the SSH `SHA256:` host fingerprint. In production, the fingerprint is required; trust-on-first-use is only allowed in local development when `NORTHSTAR_ALLOW_TOFU_HOST_KEYS=true`.
-
-To obtain the fingerprint from the node itself (prefer an out-of-band console or an already trusted session), run:
-
-```bash
-sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256
-```
-
-Copy the value beginning with `SHA256:` into the node form. The controller checks this value during every SSH connection, so a changed or intercepted host key is rejected instead of silently trusted. `ssh-keyscan` can be used only after independently verifying that the returned key belongs to the intended server.
-
-Choose a deployment template when adding the node:
-
-- **Standard edge** installs and enables both WireGuard and OpenVPN;
-- **WireGuard only** or **OpenVPN only** enables one listener;
-- **Agent only** installs monitoring and the control channel without exposing a VPN listener.
-
-After the first authenticated heartbeat, the Controller sends structured service reconcile tasks automatically. Creating a user profile is not required to start a VPN server.
-
-The controller stores the credential only as an AES-256-GCM ciphertext. It then uses SSH to install `/opt/northstar-agent/agent.py` and a `northstar-agent.service`. The agent only sends outbound health heartbeats to the controller and does not accept inbound commands.
-
-An Agent journal entry containing `HTTP 401: Unauthorized` means network and TLS connectivity succeeded, but the token in `/opt/northstar-agent/config.env` no longer matches the hash stored by the Controller. This can happen after restoring an older Controller database or interrupting identity rotation. Use **Reinstall / repair agent** from the node action menu to rotate and synchronize the credential over fingerprint-verified SSH. Do not copy or edit the token manually. Agent 2.4.2 rate-limits repeated errors, applies exponential request backoff during Controller outages, and returns bounded command stderr for failed structured tasks so upgrades do not cause a retry storm or opaque exit-code-only diagnostics. WireGuard private key material remains under `/opt/northstar-agent/state`, while its `wg-quick` runtime configuration is written to the conventional `/etc/wireguard/northstar.conf` path allowed by the managed systemd sandbox.
-
-The current production data-plane paths are WireGuard over IPv4 and managed OpenVPN over IPv4. Bootstrap installs `iptables`, enables IPv4 forwarding, and installs OpenVPN independently from WireGuard. On DNF-based systems it first uses the enabled repositories, then tries the common CRB/PowerTools and EPEL/ELRepo paths for WireGuard. If the distribution vendor does not publish `wireguard-tools`, bootstrap continues as OpenVPN-only and records the repository diagnostics. Open UDP `51820` for WireGuard and UDP `1194` for OpenVPN in the Edge Node cloud security group/firewall; the controller cannot change a provider firewall without a provider-specific integration. IKEv2 remains planned.
-
-Each node's diagnostics retains compact job summaries, warnings, errors, Agent status/restart output, and lightweight resource telemetry. Full operational output is available from the system **Logs** view. The Agent sends telemetry with its existing 30-second heartbeat; no separate metrics daemon or time-series service is required. CPU, memory, disk, and network values are visible in the node diagnostics panel.
-
-## Operating model
-
-Northstar separates infrastructure from end-user access:
-
-1. **Nodes** are Linux hosts with an outbound Agent channel. SSH is used only for bootstrap and repair.
-2. **VPN Services** are protocol listeners deployed on nodes. Enable, disable, or redeploy them from the VPN Services page. Disabling a service stops its listener and disconnects clients using it.
-3. **Users & Devices** owns client identity and Connection Profiles. A user selects a protocol and optionally a region; the Controller assigns a fresh, healthy service with the lowest current node load.
-
-The normal first-use sequence is therefore:
-
-```text
-Add node -> Agent heartbeat -> VPN service healthy -> Register device -> Export profile -> Import into client
-```
-
-Adding another node does not require creating a client profile. It immediately becomes eligible for automatic assignment after its selected VPN services are healthy. A profile exported on one computer can technically be copied to another, but that shares one device identity and is not recommended. Register each physical device separately so it can be audited, rotated, and revoked independently.
-
-Common service operations are available in **VPN Services**:
-
-- **Enable** creates or restores the protocol listener with the configured port;
-- **Redeploy** reapplies the complete desired state, certificates, peers, firewall rules, and listener configuration;
-- **Disable** stops the listener and removes Northstar-managed host firewall rules after confirmation.
-
-The same page also shows the active **Standard policy** version. Standard nodes continuously follow that version; custom and agent-only nodes are never changed by a Standard rollout. Before a rollout, Northstar requires a fresh authenticated heartbeat and verifies that the Agent advertises every protocol runtime in the target manifest. Ineligible nodes remain visible as blocked with an actionable reason.
-
-Use **Canary one node** first. After its protocol services become healthy, use **Roll out next batch** to reconcile up to 25 more eligible nodes. Rollout targets automatically move through reconciling, succeeded, and blocked states based on the final VPN Service results. Existing healthy protocol services are left untouched, and a failure in one new service does not stop another protocol.
-
-To promote a future protocol into Standard:
-
-1. implement and enable its protocol Adapter, credential/profile renderer, client export path, and structured Agent apply/disable handlers;
-2. mark the Adapter service as `standard: true`;
-3. increment `STANDARD_POLICY_VERSION` in `server/deployment-policy.ts`;
-4. deploy the Controller and repair or upgrade Agents until the new capability is advertised;
-5. run a canary, verify client connectivity, and then continue batch rollouts.
-
-Manually enabling or disabling a service changes the node to the custom policy so a future Standard rollout cannot silently undo that choice. Enabling exactly the complete current Standard protocol set returns the node to Standard automatically.
-
-The current automatic scheduler accepts an optional `regionId`; omit it for automatic placement. Direct `nodeId` selection is intentionally absent from the user-facing profile creation API. The assigned node is recorded in the resulting profile for audit and export.
-
-The **Access** view creates a macOS device profile and maintains a separate Connection profiles list with an **Export config** action. For WireGuard, the browser generates the key pair, sends the private key once over the authenticated HTTPS session, and the Controller stores it only as AES-256-GCM encrypted secret material so the `.conf` file can be exported again. For OpenVPN, the Controller creates a managed issuer CA on first use, encrypts its private material with `NORTHSTAR_MASTER_KEY`, issues a per-device certificate, and exports a no-store `.ovpn` profile for OpenVPN Connect. The Edge Agent receives its server private material only through an authenticated node-secret endpoint; task payloads contain references rather than private keys. Revoking a device revokes its OpenVPN certificate, removes its retained WireGuard private material, and reconciles the Edge Node. A future external/offline issuer can replace the managed issuer without changing the device or profile model.
-
-The restart action is explicitly allow-listed and audited. Arbitrary shell commands and an interactive browser terminal are not enabled by default because they would turn the control plane into an unrestricted remote-execution service.
-
-## Common operations
-
-The following commands cover the most common operations. Run them from the project root:
-
-```bash
-docker compose logs -f northstar
-docker compose restart northstar
-docker compose logs -f db
-docker compose exec northstar node /app/scripts/migrate.mjs
-./scripts/backup.sh ./backups
-```
-
-Check the database before investigating the Controller:
-
-```bash
-sudo docker compose ps
-sudo docker compose logs --tail=200 db
-sudo docker compose logs --tail=200 northstar
-df -h
-df -ih
-```
-
-If PostgreSQL is healthy but the Controller is restarting, restart only the Controller:
-
-```bash
-sudo docker compose restart northstar
-curl --fail http://127.0.0.1:3000/api/health
-```
-
-If the deployment fails because the database is not ready, rerun the staged deployment. The script starts PostgreSQL, waits for `healthy`, and only then starts Northstar:
-
-```bash
-sudo ./scripts/deploy.sh
-```
-
-If the PostgreSQL container is unhealthy, inspect its logs before changing or deleting any volume:
-
-```bash
-sudo docker compose up -d db
-sudo docker compose ps
-sudo docker compose logs --tail=200 db
-```
-
-If a build fails with `no space left on device`, inspect disk and inode usage, then remove Docker build cache and unused images. Do not remove volumes during this cleanup:
-
-```bash
-df -h
-df -ih
-sudo docker system df
-sudo docker builder prune -af
-sudo docker image prune -af
-```
-
-To remove old generated backups while retaining the newest five PostgreSQL dumps:
-
-```bash
-find backups -maxdepth 1 -type f -name 'northstar-*.dump' -printf '%T@ %p\n' \
-  | sort -nr | tail -n +6 | sed 's/^[^ ]* //' | xargs -r rm -f --
-```
-
-To back up and restore PostgreSQL explicitly:
-
-```bash
-sudo ./scripts/backup.sh ./backups
-sudo ./scripts/restore-postgres.sh ./backups/northstar-YYYYmmddTHHMMSSZ.dump
-```
-
-The restore script requires typing `RESTORE` and replaces the current database contents.
-
-### Node Agent operations
-
-Use the node row's `Actions` menu in the console:
-
-- `Check agent`: run a status check over SSH;
-- `Restart agent`: restart the allow-listed systemd service;
-- `Reinstall agent`: rerun the SSH bootstrap and repair the Agent installation;
-- `View logs`: inspect bootstrap output, Agent actions, and reconcile errors;
-- `Edit configuration`: update node address, region, credentials, or fingerprint;
-- `Delete node`: remove the node from the Controller after confirmation.
-
-For fleet operations, select nodes in the table (optionally after filtering by
-region) and choose `Check agents`, `Restart agents`, or `Reinstall agents`.
-All remote operations are queued by the Controller, which processes at most
-three remote actions at once; they continue after the browser page is closed.
-The Node Diagnostics view opens automatically for a single-node operation and
-shows the queued/running phase, progress, a timestamped event timeline, raw
-output history, and a remediation hint for common failures. Timestamps use the
-browser time zone by default and can be switched to UTC or a selected region.
-
-For a node that failed during bootstrap, first update the Controller code and redeploy it, then select `Actions` → `Reinstall agent`. The bootstrap script installs `python3` when needed and does not require an optional NetworkManager directory to exist. NetworkManager manages its own connection files through its daemon.
-
-Bootstrap verifies that the Edge Node can reach `NORTHSTAR_PUBLIC_ORIGIN/api/v1/health`, starts the Agent, and waits up to 25 seconds for a real Controller heartbeat. A missing heartbeat marks the action failed and appends the remote systemd and Agent journal output to the node diagnostics, so DNS, TLS, firewall, or Agent authentication failures are visible in the console.
-
-On the Edge Node, use these diagnostics:
-
-```bash
-sudo systemctl status northstar-agent --no-pager --full
-sudo journalctl -u northstar-agent -n 200 --no-pager
-sudo journalctl -u northstar-agent -f
-command -v python3
-```
-
-`attention` with `heartbeat expired` means the Controller has not received a
-successful Agent heartbeat for more than 90 seconds. `agent installed` only
-confirms that bootstrap created the service; it does not prove that the Agent
-can reach or authenticate to the Controller. Check the journal first, then
-verify the configured public Controller URL without printing the Agent token:
-
-```bash
-sudo grep -E '^(NORTHSTAR_CONTROLLER_URL|NORTHSTAR_NODE_ID)=' /opt/northstar-agent/config.env
-curl --fail --silent --show-error https://vpn.example.com/api/v1/health
-```
-
-The Agent records heartbeat and task-poll failures in the journal (rate-limited
-to one repeated message per minute). A URL, TLS, DNS, firewall, or credential
-failure is therefore visible directly on the Edge Node.
-
-If the service was generated by an older bootstrap, remove the obsolete optional path from the unit before restarting it:
-
-```bash
-sudo sed -i '\|^ReadWritePaths=/etc/NetworkManager/system-connections$|d' /etc/systemd/system/northstar-agent.service
-sudo systemctl daemon-reload
-sudo systemctl restart northstar-agent
-```
-
-Agent `2.4.3` keeps the system filesystem read-only except for its managed state,
-WireGuard configuration, and generated service units. It intentionally does not
-apply a systemd capability bounding set or `NoNewPrivileges` to the Agent
-process: the Agent is a structured root network reconciler and must run
-distribution-provided `ip`, `wg`, `wg-quick`, `iptables`, and `systemctl`
-binaries. Some cloud images attach file capabilities to those binaries, and an
-overly narrow systemd capability sandbox makes `execve` fail with `Operation not
-permitted`. The Controller still sends only allowlisted structured task types;
-the Agent does not expose a shell or accept arbitrary commands. Use `Reinstall
-agent` after updating the Controller to replace an older unit safely.
-
-Keep `.env` and backup files outside source control. Production data is stored in the `northstar-postgres` Docker volume. Use `./scripts/restore-postgres.sh` only after a deliberate restore confirmation. Rotate `NORTHSTAR_MASTER_KEY` only with a planned credential re-encryption migration; changing it blindly makes existing encrypted credentials unreadable.
-
-## Verification
+## Verification and operations
 
 ```bash
 npm run lint
 npm test
+
+sudo ./scripts/deploy.sh ps
+sudo ./scripts/deploy.sh logs
+sudo ./scripts/backup.sh ./backups
 ```
 
-`npm test` builds the production bundle. Integration tests additionally require `NORTHSTAR_TEST_DATABASE_URL` pointing to a disposable PostgreSQL database.
+If a frontend build reports `dist/admin-web-web`, update to the current
+`Dockerfile.frontend` and `docker-compose.yml`, which pass `DIST_DIR` explicitly:
 
-## Optional Cloudflare adapter
+```bash
+docker compose build portal-web admin-web
+docker compose up -d --no-deps portal-web admin-web
+```
 
-The original repository's Vinext/Cloudflare files remain as an optional adapter for the existing Sites project. They are not the primary deployment path because a Worker cannot safely act as the SSH control process for arbitrary cloud VMs. Use the Docker/Node deployment above for Alibaba Cloud, Tencent Cloud, GCP, and other host providers.
+See [ARCHITECTURE.md](ARCHITECTURE.md) and
+[docs/architecture](docs/architecture/README.md) for detailed design notes.
