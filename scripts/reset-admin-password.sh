@@ -56,23 +56,24 @@ process.stdin.on("end", async () => {
   const salt = randomBytes(16);
   const derived = scryptSync(password, salt, 64);
   const passwordHash = `scrypt:${salt.toString("base64url")}:${derived.toString("base64url")}`;
+  const timestamp = new Date().toISOString();
   const client = new Client({ connectionString: process.env.NORTHSTAR_DATABASE_URL });
   try {
     await client.connect();
     const result = await client.query(
       `UPDATE users
        SET password_hash = $1, status = $2,
-           approved_at = COALESCE(approved_at, NOW()), updated_at = NOW()
-       WHERE lower(email) = lower($3) AND role IN ($4, $5)
+           approved_at = COALESCE(approved_at, $3), updated_at = $3
+       WHERE lower(email) = lower($4) AND role IN ($5, $6)
        RETURNING email`,
-      [passwordHash, "active", process.env.NORTHSTAR_RESET_EMAIL, "owner", "admin"],
+      [passwordHash, "active", timestamp, process.env.NORTHSTAR_RESET_EMAIL, "owner", "admin"],
     );
     if (result.rows[0]?.email) process.stdout.write(result.rows[0].email);
   } finally {
     await client.end();
   }
 });
-' | tr -d '\r\n')
+')
 
 if [ -z "$updated" ]; then
   echo "No owner/admin account matched: $email" >&2
