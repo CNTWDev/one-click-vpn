@@ -27,6 +27,7 @@ export async function POST(request: Request) {
       publicEndpoint: cleanText(body.publicEndpoint, 256),
       serverPublicKey: cleanText(body.serverPublicKey, 512),
       capabilities,
+      metrics: body.metrics,
     });
     const protocols = Array.isArray(capabilities.protocols) ? capabilities.protocols.filter((value): value is Protocol => typeof value === "string" && supportedProtocols.has(value as Protocol)) : [];
     if (!protocols.length) {

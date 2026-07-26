@@ -2,6 +2,7 @@
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import worldMap from "@svg-maps/world";
+import { x25519 } from "@noble/curves/ed25519.js";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 type NodeStatus = "online" | "provisioning" | "attention";
@@ -20,6 +21,26 @@ type Node = {
   lastSeen: string;
   hostFingerprint?: string | null;
   sshUser?: string;
+  metrics?: NodeMetrics | null;
+};
+
+type NodeMetrics = {
+  collectedAt: string;
+  cpuPercent: number;
+  load1: number;
+  memory: { usedBytes: number; totalBytes: number; percent: number };
+  disk: { usedBytes: number; totalBytes: number; percent: number };
+  network: { rxBytes: number; txBytes: number; rxBytesPerSecond: number; txBytesPerSecond: number };
+};
+
+type AccessDevice = { id: string; displayName: string; platform: string; publicKey: string; status: string };
+type AccessProfile = {
+  id: string;
+  endpoint: { host: string; port: number };
+  clientAddress: string | null;
+  dns: string[];
+  allowedIps: string[];
+  protocolPayload: { serverPublicKey?: string };
 };
 
 type Region = {
@@ -139,6 +160,41 @@ function StatusPill({ status }: { status: NodeStatus }) {
   );
 }
 
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "—";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let amount = value;
+  let unit = 0;
+  while (amount >= 1024 && unit < units.length - 1) { amount /= 1024; unit += 1; }
+  return `${amount < 10 && unit > 0 ? amount.toFixed(1) : Math.round(amount)} ${units[unit]}`;
+}
+
+function base64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function buildWireGuardConfig(profile: AccessProfile, privateKey: string): string {
+  const serverPublicKey = profile.protocolPayload.serverPublicKey;
+  if (!serverPublicKey || !profile.clientAddress) throw new Error("The selected node has not reported its WireGuard server key yet.");
+  return `[Interface]\nPrivateKey = ${privateKey}\nAddress = ${profile.clientAddress}/32\nDNS = ${profile.dns.join(", ")}\n\n[Peer]\nPublicKey = ${serverPublicKey}\nEndpoint = ${profile.endpoint.host}:${profile.endpoint.port}\nAllowedIPs = ${profile.allowedIps.join(", ")}\nPersistentKeepalive = 25\n`;
+}
+
+function ResourceMetrics({ metrics }: { metrics?: NodeMetrics | null }) {
+  if (!metrics) return <p className="diagnostics-empty">Resource metrics are waiting for the first Agent heartbeat.</p>;
+  const metricClass = (value: number) => value >= 90 ? "metric-danger" : value >= 75 ? "metric-warning" : "";
+  return <>
+    <div className="resource-grid">
+      <div className={metricClass(metrics.cpuPercent)}><span>CPU</span><b>{metrics.cpuPercent.toFixed(1)}%</b><small>load {metrics.load1.toFixed(2)}</small></div>
+      <div className={metricClass(metrics.memory.percent)}><span>MEMORY</span><b>{metrics.memory.percent.toFixed(1)}%</b><small>{formatBytes(metrics.memory.usedBytes)} / {formatBytes(metrics.memory.totalBytes)}</small></div>
+      <div className={metricClass(metrics.disk.percent)}><span>DISK</span><b>{metrics.disk.percent.toFixed(1)}%</b><small>{formatBytes(metrics.disk.usedBytes)} / {formatBytes(metrics.disk.totalBytes)}</small></div>
+      <div><span>NETWORK</span><b>↓ {formatBytes(metrics.network.rxBytesPerSecond)}/s</b><small>↑ {formatBytes(metrics.network.txBytesPerSecond)}/s</small></div>
+    </div>
+    <p className="metrics-fresh">Last collected {metrics.collectedAt} · Agent heartbeat</p>
+  </>;
+}
+
 const mapPins = [
   { match: "frankfurt", x: 529, y: 281 },
   { match: "tokyo", x: 899, y: 332 },
@@ -201,7 +257,7 @@ function NodeFleet({
           <article className="node-row" key={node.id}>
             <div className="node-name"><span className="flag">{node.place.includes("Germany") ? "DE" : node.place.includes("Japan") ? "JP" : node.place.includes("USA") ? "US" : "●"}</span><div><b>{node.name}</b><small>{node.place} · {node.ip}</small></div></div>
             <StatusPill status={node.status} />
-            <div className={node.status === "attention" ? "node-value danger" : "node-value"}>{node.latency}<small>last seen {node.lastSeen}</small></div>
+            <div className={node.status === "attention" ? "node-value danger" : "node-value"}>{node.latency}<small>{node.metrics ? `CPU ${node.metrics.cpuPercent.toFixed(0)}% · RAM ${node.metrics.memory.percent.toFixed(0)}%` : `last seen ${node.lastSeen}`}</small></div>
             <div className="node-value">{node.users}<small>authorized</small></div>
             <div className="node-value">{node.traffic}<small>{node.version}</small></div>
             <div className="row-actions">
@@ -250,6 +306,11 @@ export default function Home() {
   const [regionBusy, setRegionBusy] = useState(false);
   const [showFingerprintGuide, setShowFingerprintGuide] = useState(false);
   const [fingerprintCommandCopied, setFingerprintCommandCopied] = useState(false);
+  const [accessDevices, setAccessDevices] = useState<AccessDevice[]>([]);
+  const [accessNodeId, setAccessNodeId] = useState("");
+  const [accessBusy, setAccessBusy] = useState(false);
+  const [accessError, setAccessError] = useState("");
+  const [accessConfig, setAccessConfig] = useState<{ name: string; config: string } | null>(null);
 
   const loadNodes = useCallback(async () => {
     const response = await fetch("/api/nodes", { cache: "no-store" });
@@ -272,6 +333,7 @@ export default function Home() {
       lastSeen: String(node.last_seen || "never"),
       hostFingerprint: typeof node.host_fingerprint === "string" ? node.host_fingerprint : null,
       sshUser: String(node.ssh_user || "root"),
+      metrics: node.metrics && typeof node.metrics === "object" ? node.metrics as NodeMetrics : null,
     })));
   }, []);
 
@@ -283,12 +345,20 @@ export default function Home() {
     setForm((current) => ({ ...current, regionId: payload.regions.some((region) => region.id === current.regionId) ? current.regionId : payload.regions[0]?.id || "" }));
   }, []);
 
+  const loadAccessDevices = useCallback(async () => {
+    const response = await fetch("/api/access/devices", { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json() as { devices?: AccessDevice[] };
+    setAccessDevices(payload.devices || []);
+  }, []);
+
   const loadNodeDiagnostics = useCallback(async (nodeId: string) => {
     setDiagnosticsBusy(true);
     try {
       const response = await fetch(`/api/nodes/${nodeId}`, { cache: "no-store" });
       if (!response.ok) return;
-      const payload = await response.json() as { actions?: NodeAction[]; reconcile?: NodeDiagnostics["reconcile"] };
+      const payload = await response.json() as { node?: Partial<Node>; actions?: NodeAction[]; reconcile?: NodeDiagnostics["reconcile"] };
+      if (payload.node) setSelectedNode((current) => ({ ...current, ...payload.node }));
       setNodeDiagnostics({ actions: payload.actions || [], reconcile: payload.reconcile || { observed: [], tasks: [] } });
     } finally {
       setDiagnosticsBusy(false);
@@ -313,6 +383,12 @@ export default function Home() {
     const timer = window.setInterval(() => { void loadNodes(); }, 5000);
     return () => window.clearInterval(timer);
   }, [authStatus, loadNodes]);
+
+  useEffect(() => {
+    if (authStatus !== "signed-in" || activeNav !== "Access") return undefined;
+    const timer = window.setTimeout(() => void loadAccessDevices(), 0);
+    return () => window.clearTimeout(timer);
+  }, [activeNav, authStatus, loadAccessDevices]);
 
   useEffect(() => {
     if (!showTerminal || !selectedNode) return undefined;
@@ -367,6 +443,54 @@ export default function Home() {
     setUser(null);
     setNodes([]);
     setAuthStatus("signed-out");
+  }
+
+  async function createMacAccessProfile() {
+    const node = nodes.find((item) => item.id === accessNodeId && item.status === "online") || nodes.find((item) => item.status === "online");
+    if (!node) {
+      setAccessError("Add and bootstrap at least one healthy node first.");
+      return;
+    }
+    setAccessBusy(true);
+    setAccessError("");
+    setAccessConfig(null);
+    try {
+      const privateBytes = x25519.utils.randomSecretKey();
+      const privateKey = base64(privateBytes);
+      const publicKey = base64(x25519.getPublicKey(privateBytes));
+      const deviceResponse = await fetch("/api/access/devices", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName: "My Mac", publicKey }),
+      });
+      const devicePayload = await deviceResponse.json().catch(() => ({})) as { device?: AccessDevice; error?: string };
+      if (!deviceResponse.ok || !devicePayload.device) throw new Error(devicePayload.error || "Unable to register this Mac");
+      setAccessDevices((current) => [devicePayload.device!, ...current]);
+      const profileResponse = await fetch("/api/access/profiles", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId: devicePayload.device.id, nodeId: node.id }),
+      });
+      const profilePayload = await profileResponse.json().catch(() => ({})) as { profile?: AccessProfile; error?: string };
+      if (!profileResponse.ok || !profilePayload.profile) throw new Error(profilePayload.error || "Unable to create a connection profile");
+      const activateResponse = await fetch(`/api/access/profiles/${profilePayload.profile.id}/activate`, { method: "POST" });
+      const activatePayload = await activateResponse.json().catch(() => ({})) as { profile?: AccessProfile; error?: string };
+      if (!activateResponse.ok || !activatePayload.profile) throw new Error(activatePayload.error || "Unable to activate the connection profile");
+      setAccessConfig({ name: `${node.name.replaceAll(/[^A-Za-z0-9_-]+/g, "-")}.conf`, config: buildWireGuardConfig(activatePayload.profile, privateKey) });
+      setNotice(`${node.name} connection profile is ready. Download it and import it into WireGuard.`);
+    } catch (error) {
+      setAccessError(error instanceof Error ? error.message : "Unable to prepare the Mac connection");
+    } finally {
+      setAccessBusy(false);
+    }
+  }
+
+  function downloadAccessConfig() {
+    if (!accessConfig) return;
+    const url = URL.createObjectURL(new Blob([accessConfig.config], { type: "text/plain" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = accessConfig.name;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   async function deployNode(event: FormEvent<HTMLFormElement>) {
@@ -645,7 +769,19 @@ export default function Home() {
           </div>
         </section>}
 
-        {(activeNav === "Access" || activeNav === "Sessions" || activeNav === "Audit") && <section className="module-view card module-placeholder">
+        {activeNav === "Access" && <section className="module-view card access-workspace">
+          <div className="section-title route-title"><div><p>USER ACCESS</p><h1>Connect a device</h1></div><span className="route-status">WireGuard · Auto-ready</span></div>
+          <div className="access-copy">Choose a healthy node and create a local WireGuard profile. The private key is generated in this browser and is never sent to the Controller.</div>
+          <div className="access-form">
+            <label>Edge node<select value={accessNodeId || nodes.find((node) => node.status === "online")?.id || ""} onChange={(event) => setAccessNodeId(event.target.value)}>{nodes.length === 0 && <option value="">No nodes available</option>}{nodes.map((node) => <option key={node.id} value={node.id} disabled={node.status !== "online"}>{node.name} · {node.place} · {node.status}</option>)}</select></label>
+            <button className="primary-button" type="button" disabled={accessBusy || nodes.every((node) => node.status !== "online")} onClick={() => void createMacAccessProfile()}>{accessBusy ? "Preparing profile…" : "Prepare Mac profile"}<span>→</span></button>
+          </div>
+          {accessError && <p className="form-error" role="alert">{accessError}</p>}
+          {accessConfig && <div className="access-result"><div><p className="eyebrow"><span /> PROFILE READY</p><h2>Import this profile into WireGuard.</h2><p>Download the file, open WireGuard on macOS, choose <b>Import tunnel(s) from file</b>, then activate the tunnel. Keep the downloaded file private.</p></div><button className="secondary-button access-download" type="button" onClick={downloadAccessConfig}>Download {accessConfig.name} <span>↓</span></button><details><summary>Show configuration</summary><pre>{accessConfig.config}</pre></details></div>}
+          <div className="access-devices"><div className="diagnostics-section-head"><b>Registered devices</b><span>{accessDevices.length}</span></div>{accessDevices.length ? accessDevices.map((device) => <div className="access-device" key={device.id}><span className="flag">MAC</span><div><b>{device.displayName}</b><small>{device.status} · {device.publicKey.slice(0, 16)}…</small></div></div>) : <p className="diagnostics-empty">No devices have been registered yet.</p>}</div>
+        </section>}
+
+        {(activeNav === "Sessions" || activeNav === "Audit") && <section className="module-view card module-placeholder">
           <p>CONTROL PLANE</p><h1>{activeNav}</h1>
           <b>{activeNav} is not enabled in this release.</b>
           <span>Only Overview, Nodes, Regions, and secure node bootstrap are currently available for production operations.</span>
@@ -685,6 +821,7 @@ export default function Home() {
               <div className="terminal-bar"><span><i /><i /><i /></span><small>northstar/{selectedNode.id}</small><b>{diagnosticsBusy ? "Refreshing…" : `${nodeDiagnostics?.actions.length || 0} recorded events`}</b></div>
               {diagnosticsBusy && !nodeDiagnostics ? <div className="terminal-ready"><div className="terminal-orbit">⌁</div><b>Loading deployment diagnostics…</b><p>Reading the controller’s audited bootstrap and Agent reconcile records.</p></div> : nodeDiagnostics && <div className="diagnostics-body">
                 <div className="diagnostics-grid"><div><span>NODE STATUS</span><b className={`diagnostic-${selectedNode.status}`}>{selectedNode.status}</b></div><div><span>LAST SEEN</span><b>{selectedNode.lastSeen}</b></div><div><span>AGENT VERSION</span><b>{selectedNode.version}</b></div></div>
+                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Resource health</b></div><ResourceMetrics metrics={selectedNode.metrics} /></div>
                 <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Recent deployment events</b><button type="button" onClick={() => void loadNodeDiagnostics(selectedNode.id)}>Refresh</button></div>
                   {nodeDiagnostics.actions.length ? nodeDiagnostics.actions.map((action) => <article className="diagnostic-event" key={action.id}><div><b>{action.action}</b><span>{action.status} · {action.finished_at || action.created_at}</span></div>{action.error && <pre className="diagnostic-error">{action.error}</pre>}{action.output && <pre>{action.output}</pre>}</article>) : <p className="diagnostics-empty">No deployment events recorded yet.</p>}
                 </div>

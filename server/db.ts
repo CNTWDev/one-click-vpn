@@ -33,6 +33,16 @@ export type DbNode = {
   agent_token_hash: string | null;
   created_at: string;
   updated_at: string;
+  metrics_json?: string | null;
+};
+
+export type NodeMetrics = {
+  collectedAt: string;
+  cpuPercent: number;
+  load1: number;
+  memory: { usedBytes: number; totalBytes: number; percent: number };
+  disk: { usedBytes: number; totalBytes: number; percent: number };
+  network: { rxBytes: number; txBytes: number; rxBytesPerSecond: number; txBytesPerSecond: number };
 };
 
 export type DbRegion = {
@@ -49,6 +59,17 @@ let readyPromise: Promise<void> | null = null;
 
 function now(): string {
   return new Date().toISOString();
+}
+
+function parseMetrics(value: string | null | undefined): NodeMetrics | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as NodeMetrics;
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 export function getDb(): Pool {
@@ -114,11 +135,13 @@ export async function closeDb(): Promise<void> {
 }
 
 export function publicNode(node: DbNode): Record<string, unknown> {
-  const hidden = new Set(["credential_ciphertext", "credential_iv", "credential_tag", "agent_token_hash"]);
+  const hidden = new Set(["credential_ciphertext", "credential_iv", "credential_tag", "agent_token_hash", "metrics_json"]);
   const heartbeatAt = node.last_heartbeat_at || (node.status === "online" ? node.updated_at : null);
   const stale = node.status === "online" && heartbeatAt && Date.now() - new Date(heartbeatAt).getTime() > 90_000;
   return {
     ...Object.fromEntries(Object.entries(node).filter(([key]) => !hidden.has(key))),
+    metrics: parseMetrics(node.metrics_json),
+    metricsCollectedAt: parseMetrics(node.metrics_json)?.collectedAt || null,
     ...(stale ? { status: "attention", latency: "no heartbeat", last_seen: "heartbeat expired" } : {}),
   };
 }
@@ -208,7 +231,7 @@ export async function insertNode(input: Omit<DbNode, "id" | "created_at" | "upda
 }
 
 export async function updateNode(id: string, values: Record<string, string | number | null>): Promise<DbNode | undefined> {
-  const allowed = new Set(["status", "latency", "users", "traffic", "version", "last_seen", "last_heartbeat_at", "host_fingerprint", "agent_token_hash"]);
+  const allowed = new Set(["status", "latency", "users", "traffic", "version", "last_seen", "last_heartbeat_at", "host_fingerprint", "agent_token_hash", "metrics_json"]);
   const entries = Object.entries(values).filter(([key]) => allowed.has(key));
   if (entries.length) {
     const assignments = entries.map(([key], index) => `${key} = $${index + 1}`).join(", ");

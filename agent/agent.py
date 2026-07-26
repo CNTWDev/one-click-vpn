@@ -27,6 +27,8 @@ WIREGUARD_DIR = STATE_DIR / "wireguard"
 WIREGUARD_KEY = WIREGUARD_DIR / "server.key"
 WIREGUARD_CONFIG = WIREGUARD_DIR / "northstar.conf"
 KEY_PATTERN = re.compile(r"^[A-Za-z0-9+/]{42}={0,2}$")
+last_cpu_sample = None
+last_network_sample = None
 
 
 def request_json(path, payload):
@@ -174,6 +176,79 @@ def capabilities():
     }
 
 
+def read_memory():
+    values = {}
+    try:
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            key, raw = line.split(":", 1)
+            values[key] = int(raw.strip().split()[0]) * 1024
+        total = values.get("MemTotal", 0)
+        available = values.get("MemAvailable", values.get("MemFree", 0))
+        used = max(total - available, 0)
+        return {"usedBytes": used, "totalBytes": total, "percent": round((used / total) * 100, 1) if total else 0}
+    except (OSError, ValueError):
+        return {"usedBytes": 0, "totalBytes": 0, "percent": 0}
+
+
+def read_cpu():
+    global last_cpu_sample
+    try:
+        fields = Path("/proc/stat").read_text().splitlines()[0].split()[1:]
+        values = [int(value) for value in fields]
+        idle = values[3] + (values[4] if len(values) > 4 else 0)
+        total = sum(values)
+        current = (total, idle)
+        if last_cpu_sample is None:
+            last_cpu_sample = current
+            return 0
+        previous_total, previous_idle = last_cpu_sample
+        last_cpu_sample = current
+        total_delta = total - previous_total
+        idle_delta = idle - previous_idle
+        return round(max(0, min(100, (1 - idle_delta / total_delta) * 100)), 1) if total_delta else 0
+    except (OSError, ValueError, IndexError):
+        return 0
+
+
+def read_network():
+    global last_network_sample
+    try:
+        received = sent = 0
+        for line in Path("/proc/net/dev").read_text().splitlines()[2:]:
+            interface, data = line.split(":", 1)
+            if interface.strip() == "lo":
+                continue
+            fields = data.split()
+            if len(fields) >= 9:
+                received += int(fields[0])
+                sent += int(fields[8])
+        now = time.time()
+        rx_rate = tx_rate = 0
+        if last_network_sample is not None:
+            previous_time, previous_received, previous_sent = last_network_sample
+            elapsed = max(now - previous_time, 0.001)
+            rx_rate = round(max(0, received - previous_received) / elapsed)
+            tx_rate = round(max(0, sent - previous_sent) / elapsed)
+        last_network_sample = (now, received, sent)
+        return {"rxBytes": received, "txBytes": sent, "rxBytesPerSecond": rx_rate, "txBytesPerSecond": tx_rate}
+    except (OSError, ValueError, IndexError):
+        return {"rxBytes": 0, "txBytes": 0, "rxBytesPerSecond": 0, "txBytesPerSecond": 0}
+
+
+def metrics():
+    disk = shutil.disk_usage("/")
+    used_disk = max(disk.total - disk.free, 0)
+    memory = read_memory()
+    return {
+        "collectedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "cpuPercent": read_cpu(),
+        "load1": round(os.getloadavg()[0], 2) if hasattr(os, "getloadavg") else 0,
+        "memory": memory,
+        "disk": {"usedBytes": used_disk, "totalBytes": disk.total, "percent": round((used_disk / disk.total) * 100, 1) if disk.total else 0},
+        "network": read_network(),
+    }
+
+
 def heartbeat():
     return request_json("/api/v1/agent/heartbeat", {
         "nodeId": NODE_ID,
@@ -182,6 +257,7 @@ def heartbeat():
         "version": "agent 2.0.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
+        "metrics": metrics(),
     })
 
 

@@ -14,6 +14,8 @@ The current implementation includes:
 - Docker Compose, host-managed Nginx HTTPS, health checks, backups, and a repeatable deployment script.
 - versioned `/api/v1` authentication, device, node capability, Connection Profile, and Agent reconcile endpoints;
 - protocol Adapter registry, WireGuard desired-state generation, IP leases, revisions, and structured Agent tasks.
+- a browser-based Access workflow that generates a local WireGuard key, activates a profile, and downloads a client configuration for macOS or iPhone;
+- lightweight Agent resource telemetry for CPU, load, memory, disk, network counters, and collection time.
 
 The agent uses outbound HTTPS plus a per-node token and can pull structured WireGuard reconcile tasks. A node must have `wireguard-tools` installed before it can apply a real WireGuard configuration. OpenVPN/IKEv2 data-plane adapters, the Agent mTLS CA lifecycle, and native clients remain separate follow-up work.
 
@@ -235,7 +237,9 @@ The controller stores the credential only as an AES-256-GCM ciphertext. It then 
 
 The current production data-plane path is WireGuard over IPv4. Bootstrap installs `wireguard-tools` and `iptables`, enables IPv4 forwarding, and the Agent applies a WireGuard interface with outbound masquerading. On DNF-based systems it first uses the enabled repositories, then tries the common CRB/PowerTools and EPEL/ELRepo paths. If the distribution vendor does not publish `wireguard-tools`, the failed bootstrap log includes `/etc/os-release` and `dnf repolist` so the missing repository can be identified. Open UDP `51820` in the Edge Node's cloud security group/firewall; the controller cannot change a provider firewall without a provider-specific integration. OpenVPN and IKEv2 are registered as planned adapters and are not deployable yet.
 
-Each node's **Logs** view shows the audited bootstrap output, Agent status/restart output, and recent WireGuard reconcile errors. The console refreshes node state and diagnostics periodically, so a failed SSH bootstrap or a lost Agent heartbeat appears as `Needs attention` with the recorded error instead of remaining silently online.
+Each node's **Logs** view shows the audited bootstrap output, Agent status/restart output, recent WireGuard reconcile errors, and lightweight resource telemetry. The Agent sends telemetry with its existing 30-second heartbeat; no separate metrics daemon or time-series service is required. CPU, memory, disk, and network values are visible in the node diagnostics panel.
+
+The **Access** view is the first end-user connection workflow. It creates a macOS device identity in the browser, generates the private key locally, activates a WireGuard Connection Profile, and downloads a `.conf` file. Import that file into the official WireGuard macOS or iOS application. The private key is never sent to the Controller. Protocol selection remains behind the Connection Profile abstraction so future IKEv2 and OpenVPN adapters can use the same user flow.
 
 The restart action is explicitly allow-listed and audited. Arbitrary shell commands and an interactive browser terminal are not enabled by default because they would turn the control plane into an unrestricted remote-execution service.
 

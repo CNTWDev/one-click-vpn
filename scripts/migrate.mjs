@@ -32,8 +32,10 @@ CREATE TABLE IF NOT EXISTS nodes (
   credential_iv TEXT NOT NULL, credential_tag TEXT NOT NULL, host_fingerprint TEXT,
   agent_token_hash TEXT, provider TEXT NOT NULL DEFAULT 'unknown', region TEXT NOT NULL DEFAULT '',
   public_endpoint TEXT, server_public_key TEXT, agent_capabilities_json TEXT NOT NULL DEFAULT '{}',
+  metrics_json TEXT,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+ALTER TABLE nodes ADD COLUMN IF NOT EXISTS metrics_json TEXT;
 CREATE INDEX IF NOT EXISTS nodes_region_idx ON nodes(region_id);
 CREATE TABLE IF NOT EXISTS regions (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, country TEXT NOT NULL, code TEXT NOT NULL,
