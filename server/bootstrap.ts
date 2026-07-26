@@ -179,7 +179,33 @@ net.ipv4.ip_forward=1
 NORTHSTAR_SYSCTL
   sysctl --system >/dev/null
 fi
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 is required by the Northstar Agent; installing it" >&2
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y python3-minimal
+  elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y python3
+  elif command -v yum >/dev/null 2>&1; then
+    yum install -y python3
+  elif command -v apk >/dev/null 2>&1; then
+    apk add python3
+  else
+    echo "python3 is not installed and no supported package manager was found" >&2
+    exit 1
+  fi
+fi
+python_path=$(command -v python3 || true)
+if [ -z "$python_path" ] || [ ! -x "$python_path" ]; then
+  echo "Unable to locate an executable python3 after installation" >&2
+  exit 1
+fi
 install -d -m 700 /opt/northstar-agent
+if command -v nmcli >/dev/null 2>&1; then
+  # systemd ReadWritePaths requires the target directory to exist when it
+  # creates the service namespace. Minimal Ubuntu images often omit it.
+  install -d -m 700 /etc/NetworkManager/system-connections
+fi
 echo ${shellQuote(source)} | base64 -d > /opt/northstar-agent/agent.py
 cat > /opt/northstar-agent/config.env <<'NORTHSTAR_CONFIG'
 NORTHSTAR_CONTROLLER_URL=${publicOrigin()}
@@ -188,7 +214,7 @@ NORTHSTAR_AGENT_TOKEN=${agentToken}
 NORTHSTAR_AGENT_STATE_DIR=/opt/northstar-agent/state
 NORTHSTAR_CONFIG
 chmod 600 /opt/northstar-agent/config.env
-cat > /etc/systemd/system/northstar-agent.service <<'NORTHSTAR_SERVICE'
+cat > /etc/systemd/system/northstar-agent.service <<NORTHSTAR_SERVICE
 [Unit]
 Description=Northstar outbound node agent
 After=network-online.target
@@ -197,7 +223,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=/opt/northstar-agent/config.env
-ExecStart=/usr/bin/python3 /opt/northstar-agent/agent.py
+ExecStart=$python_path /opt/northstar-agent/agent.py
 Restart=always
 RestartSec=5
 NoNewPrivileges=true
