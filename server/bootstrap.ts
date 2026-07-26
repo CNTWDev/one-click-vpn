@@ -201,11 +201,6 @@ if [ -z "$python_path" ] || [ ! -x "$python_path" ]; then
   exit 1
 fi
 install -d -m 700 /opt/northstar-agent
-if command -v nmcli >/dev/null 2>&1; then
-  # systemd ReadWritePaths requires the target directory to exist when it
-  # creates the service namespace. Minimal Ubuntu images often omit it.
-  install -d -m 700 /etc/NetworkManager/system-connections
-fi
 echo ${shellQuote(source)} | base64 -d > /opt/northstar-agent/agent.py
 cat > /opt/northstar-agent/config.env <<'NORTHSTAR_CONFIG'
 NORTHSTAR_CONTROLLER_URL=${publicOrigin()}
@@ -233,7 +228,6 @@ ProtectHome=true
 CapabilityBoundingSet=CAP_NET_ADMIN
 AmbientCapabilities=CAP_NET_ADMIN
 ReadWritePaths=/opt/northstar-agent /etc/wireguard
-ReadWritePaths=/etc/NetworkManager/system-connections
 
 [Install]
 WantedBy=multi-user.target

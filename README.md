@@ -2,7 +2,7 @@
 
 Northstar is a provider-neutral control plane for a small VPN edge fleet. The primary deployment target is one Linux cloud host running Docker. This works on Alibaba Cloud ECS, Tencent Cloud CVM, Google Compute Engine, and ordinary VPS providers without depending on a provider-specific runtime.
 
-完整的长期架构基线见 [`ARCHITECTURE.md`](ARCHITECTURE.md) 和 [`docs/architecture/README.md`](docs/architecture/README.md)。后续调整前后端、VPN 协议、客户端或部署方式时，先从架构基线恢复上下文。
+The long-term architecture baseline is documented in [`ARCHITECTURE.md`](ARCHITECTURE.md) and [`docs/architecture/README.md`](docs/architecture/README.md). Use that baseline when changing the controller, VPN protocols, clients, or deployment model.
 
 The current implementation includes:
 
@@ -39,69 +39,69 @@ npm run build
 npm start
 ```
 
-## 服务端部署（阿里云 / 腾讯云 / GCP / 普通 VPS）
+## Server deployment (Alibaba Cloud / Tencent Cloud / GCP / generic VPS)
 
-Controller 使用同一套 Docker Compose 部署，不依赖云厂商 SDK。推荐 Ubuntu/Debian；阿里云 ECS、腾讯云 CVM、GCP Compute Engine 和普通 VPS 的应用部署步骤相同。
+The Controller uses the same Docker Compose deployment on every provider and does not depend on a provider SDK. Ubuntu or Debian is recommended. The application steps are the same on Alibaba Cloud ECS, Tencent Cloud CVM, GCP Compute Engine, and generic VPS hosts.
 
-### 1. 准备云主机
+### 1. Prepare the cloud host
 
-- 推荐至少 2 vCPU、4 GB 内存和持久盘；
-- 将域名（例如 `vpn.example.com`）的 A/AAAA 记录指向主机公网地址；
-- 在宿主机安装 Nginx，并让 Nginx 管理域名、HTTPS 和手动上传的证书；
-- 安全组允许入站 TCP `80` 和 `443`；
-- TCP `22` 仅允许可信管理地址访问；
-- 不要对公网开放 Controller 的 `3000` 端口；
-- 将 Nginx 的 HTTPS 反向代理指向 `127.0.0.1:3000`；
-- 部署前准备好域名证书。Docker 本身不会申请或续期证书。
+- Use at least 2 vCPUs, 4 GB RAM, and persistent storage;
+- Point the domain A/AAAA record, such as `vpn.example.com`, to the host public address;
+- Install Nginx on the host and let Nginx manage HTTPS and uploaded certificates;
+- Allow inbound TCP `80` and `443` in the cloud security group;
+- Restrict TCP `22` to trusted administration addresses;
+- Do not expose Controller port `3000` to the public Internet;
+- Configure Nginx to proxy HTTPS requests to `127.0.0.1:3000`;
+- Prepare the domain certificate before deployment. Docker does not request or renew certificates.
 
-WireGuard/OpenVPN/IKEv2 属于 Edge Node 数据面，其端口应在对应 Edge Node 的安全组中单独开放，不属于 Controller 的 Compose 入口。
+WireGuard, OpenVPN, and IKEv2 are Edge Node data-plane services. Open their ports in each Edge Node security group separately; they are not Controller Compose entry points.
 
-### 2. 获取代码
+### 2. Get the source code
 
 ```bash
 sudo git clone YOUR_REPOSITORY_URL /opt/northstar
 cd /opt/northstar
 ```
 
-如果代码已经通过其他方式复制到主机，直接进入 `NorthStarVPNServer` 目录。
+If the source was copied to the host by another method, enter the project directory directly.
 
-### 3. 一键首次部署
+### 3. First deployment
 
 ```bash
 sudo ./scripts/one-click-deploy.sh --domain vpn.example.com --admin-email owner@your-domain.example
 ```
 
-管理员密码默认通过终端安全提示输入，不建议使用 `--admin-password` 参数，以免密码留在 shell 历史中。密码必须至少 16 个字符。
+The administrator password is requested interactively by default. Avoid `--admin-password` so the password does not remain in shell history. The password must be at least 16 characters.
 
-脚本会自动完成：
+The script automatically:
 
-- 在 Ubuntu/Debian 上安装 Docker Engine、Compose、Git、OpenSSL 等依赖；
-- 生成 32 字节 `NORTHSTAR_MASTER_KEY`；
-- 生成随机的 `NORTHSTAR_DB_PASSWORD`；
-- 创建权限为 `0600` 的生产 `.env`；
-- 校验域名、HTTPS Origin、管理员账号、密码、主密钥和 Compose 配置；
-- 构建并启动 Northstar；
-- 自动创建或复用本项目的 PostgreSQL Docker 服务，执行数据库迁移并等待数据库和 Controller 通过健康检查；
-- 检查宿主机上的 `http://127.0.0.1:3000/api/health`。
+- installs Docker Engine, Compose, Git, and OpenSSL on Ubuntu/Debian;
+- generates a 32-byte `NORTHSTAR_MASTER_KEY`;
+- generates a random `NORTHSTAR_DB_PASSWORD`;
+- creates a production `.env` with mode `0600`;
+- validates the domain, HTTPS origin, administrator credentials, master key, and Compose configuration;
+- builds the Northstar image;
+- starts or reuses the project PostgreSQL service, waits for its health check, runs migrations, and then starts the Controller;
+- checks `http://127.0.0.1:3000/api/health` on the host.
 
-如果 `.env` 已存在，脚本默认复用原配置。只有明确需要重新生成配置时才使用 `--yes`；脚本会先创建带时间戳的 `.env.backup.*`。已有 Docker/Compose 且不希望脚本安装依赖时，可增加 `--skip-docker-install`。
+If `.env` already exists, the script reuses it by default. Use `--yes` only when you explicitly want to regenerate the configuration; the existing file is backed up to a timestamped `.env.backup.*` file first. Add `--skip-docker-install` when Docker and Compose are already installed.
 
-当前用户拥有 Docker 权限时可以省略 `sudo`。如果首次部署由 root 安装 Docker，后续可以继续使用 `sudo`，或将部署用户加入 `docker` 组并重新登录。
+You may omit `sudo` when the current user has Docker permissions. If Docker was first installed by root, continue using `sudo`, or add the deployment user to the `docker` group and log in again.
 
-### 4. 验证部署
+### 4. Verify the deployment
 
-完成下一节的 Nginx 配置后再执行公网检查：
+After configuring Nginx in the next section, run the public check:
 
 ```bash
 sudo ./scripts/deploy.sh ps
 curl --fail https://vpn.example.com/api/health
 ```
 
-健康接口应返回 `status: ok`。公网访问由 Nginx 提供；如果失败，检查 Nginx 配置、证书、DNS、云安全组和 Nginx 日志。即使尚未配置 Nginx，部署脚本也会先通过宿主机本地地址检查 Controller。
+The health endpoint should return `status: ok`. Public access is provided by Nginx. If it fails, check Nginx configuration, certificates, DNS, cloud security groups, and Nginx logs. The deployment script also checks the Controller locally before Nginx is configured.
 
-### 5. 宿主机 Nginx 和手动证书
+### 5. Host Nginx and manually managed certificates
 
-项目提供了 [Nginx 配置模板](deploy/nginx/northstar.conf.example)。在 ECS 上安装 Nginx，并将阿里云下载的证书放到 Nginx 可读目录，例如：
+The project provides an [Nginx configuration template](deploy/nginx/northstar.conf.example). Install Nginx on the cloud host and copy the provider-issued certificate to a directory readable by Nginx, for example:
 
 ```bash
 sudo apt-get update
@@ -116,11 +116,11 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-编辑配置中的 `server_name` 和证书路径。Nginx 的上游必须是 `http://127.0.0.1:3000`。应用的 `.env` 仍然保留真实的 `APP_DOMAIN` 和 `NORTHSTAR_PUBLIC_ORIGIN`，用于生成正确的公网 URL 和 Agent 回连地址；Docker 容器本身不监听公网 80/443。
+Edit `server_name` and the certificate paths in the configuration. The Nginx upstream must be `http://127.0.0.1:3000`. Keep the real `APP_DOMAIN` and `NORTHSTAR_PUBLIC_ORIGIN` in `.env` so the application generates correct public URLs and Agent callback URLs. Docker itself does not listen on public ports `80` or `443`.
 
-### 6. 手动部署
+### 6. Manual deployment
 
-需要逐项控制配置时，可以不用一键初始化。先自行安装 Docker Engine 与 Docker Compose，然后执行：
+For full control over each setting, install Docker Engine and Docker Compose yourself, then run:
 
 ```bash
 cp .env.example .env
@@ -128,7 +128,7 @@ chmod 600 .env
 openssl rand -base64 32
 ```
 
-将生成的主密钥、数据库密码和生产参数写入 `.env`，至少替换：
+Put the generated master key, database password, and production values in `.env`. At minimum, replace:
 
 ```dotenv
 NODE_ENV=production
@@ -140,16 +140,16 @@ NORTHSTAR_MASTER_KEY=the-generated-32-byte-base64-value
 NORTHSTAR_DB_PASSWORD=use-a-long-random-database-password
 ```
 
-然后执行：
+Then run:
 
 ```bash
 ./scripts/check-env.sh
 sudo ./scripts/deploy.sh
 ```
 
-### 7. 升级和备份
+### 7. Upgrades and backups
 
-数据库运行在项目 Compose 的 `db` 服务中，数据保存在 Docker 命名卷 `northstar-postgres`。本次切换不迁移旧 SQLite 数据；开发阶段旧数据可以清空。以后升级前先导出 PostgreSQL 备份，再拉取代码和重新部署：
+The database runs in the Compose `db` service and its data is stored in the Docker volume `northstar-postgres`. The SQLite-to-PostgreSQL switch intentionally does not migrate old SQLite data; this is acceptable while the project is still in development. Before future upgrades, export a PostgreSQL backup, pull the source, and redeploy:
 
 ```bash
 sudo ./scripts/backup.sh ./backups
@@ -157,37 +157,37 @@ git pull --ff-only
 sudo ./scripts/deploy.sh
 ```
 
-也可以使用仓库根目录的一键升级脚本。它会先备份 PostgreSQL 数据库，确认工作区没有本地改动，拉取上游代码，然后强制重建并健康检查 Controller：
+You can also use the root-level one-click update script. It backs up PostgreSQL, checks for tracked local changes, pulls the upstream source, rebuilds the service, and runs the health check:
 
 ```bash
 sudo ./one-click-update.sh
 ```
 
-如果怀疑 Docker 使用了旧的构建缓存，使用：
+If Docker may be using stale build cache, use:
 
 ```bash
 sudo ./one-click-update.sh --no-cache
 ```
 
-升级脚本不会删除 `.env` 或 `northstar-postgres` 数据卷；不要使用 `docker compose down -v`。`deploy.sh` 默认使用正常缓存，但每次都会强制重新创建服务容器；仅在排查缓存问题时使用 `--no-cache`。
+The update script does not delete `.env` or the `northstar-postgres` volume. Do not use `docker compose down -v`. `deploy.sh` uses the normal build cache by default and force-recreates the service containers; use `--no-cache` only when investigating a cache problem.
 
-如果服务器上的容器、镜像或构建状态已经混乱，可以使用清理重建脚本。脚本默认先备份数据库，并要求输入 `REBUILD` 确认；它只删除本项目的 Northstar Controller 容器和服务镜像，不删除 `.env` 或 `northstar-postgres` 数据卷：
+If the server has inconsistent containers, images, or build state, use the clean rebuild script. It creates a database backup by default and requires the `REBUILD` confirmation. It removes only this project's Northstar Controller containers and service images; it does not remove `.env` or the `northstar-postgres` volume:
 
 ```bash
 sudo ./one-click-rebuild.sh
 ```
 
-如果当前容器已经完全无法启动、无法完成备份，才使用：
+Use the following only when the current containers cannot start and a backup cannot be created:
 
 ```bash
 sudo ./one-click-rebuild.sh --yes --skip-backup
 ```
 
-该脚本不会清理其他项目的 Docker 容器、镜像或卷。
+The script does not clean containers, images, or volumes belonging to other projects.
 
-不要在没有凭据重加密迁移的情况下替换 `NORTHSTAR_MASTER_KEY`，否则已有加密 SSH 凭据将无法解密。
+Do not replace `NORTHSTAR_MASTER_KEY` without a credential re-encryption migration. Existing encrypted SSH credentials will otherwise become unreadable.
 
-### 8. 运维与故障检查
+### 8. Operations and troubleshooting
 
 ```bash
 sudo ./scripts/deploy.sh ps
@@ -197,11 +197,11 @@ sudo docker compose restart northstar
 sudo ./scripts/backup.sh ./backups
 ```
 
-部署脚本会在应用未通过健康检查时输出最近 120 行 Controller 日志。阿里云使用 ECS 安全组和云盘，腾讯云使用 CVM 安全组和 CBS，GCP 使用 VPC 防火墙和 Persistent Disk；应用配置无需因云厂商而改变。
+The deployment script prints the latest 120 lines from both PostgreSQL and Controller logs when a health check fails. Alibaba Cloud uses ECS security groups and disks, Tencent Cloud uses CVM security groups and CBS disks, and GCP uses VPC firewalls and Persistent Disk; the application configuration is provider-neutral.
 
-### 9. Docker Compose 版本故障
+### 9. Docker Compose version problems
 
-项目要求 Docker Compose v2。若日志出现 `KeyError: 'ContainerConfig'`，通常是服务器仍在使用旧的 `docker-compose 1.29.2`。先安装 Compose v2：
+The project requires Docker Compose v2. If logs show `KeyError: 'ContainerConfig'`, the server is usually still using the old `docker-compose 1.29.2`. Install Compose v2 first:
 
 ```bash
 sudo apt-get update
@@ -209,9 +209,9 @@ sudo apt-get install -y docker-compose-plugin
 docker compose version
 ```
 
-如果 `docker-compose-plugin` 不在当前 apt 源中，请按 Docker 官方文档配置 Docker 软件源后再安装，不要继续使用 Compose v1。
+If `docker-compose-plugin` is not available from the current apt sources, configure the Docker official repository and install it there. Do not continue using Compose v1.
 
-升级 Compose 后，只删除旧的 Controller 容器再重建；不要删除 `northstar-postgres` 数据卷：
+After upgrading Compose, remove only the old Controller containers and recreate them. Do not remove the `northstar-postgres` data volume:
 
 ```bash
 sudo docker rm -f one-click-vpn_northstar_1 2>/dev/null || true
@@ -239,9 +239,9 @@ Each node's **Logs** view shows the audited bootstrap output, Agent status/resta
 
 The restart action is explicitly allow-listed and audited. Arbitrary shell commands and an interactive browser terminal are not enabled by default because they would turn the control plane into an unrestricted remote-execution service.
 
-## Operations
+## Common operations
 
-常用部署命令见上面的“运维与故障检查”。也可以直接使用 Docker Compose：
+The following commands cover the most common operations. Run them from the project root:
 
 ```bash
 docker compose logs -f northstar
@@ -251,10 +251,91 @@ docker compose exec northstar node /app/scripts/migrate.mjs
 ./scripts/backup.sh ./backups
 ```
 
-如果 Controller 无法启动，先检查 PostgreSQL 服务和迁移日志：
+Check the database before investigating the Controller:
 
 ```bash
-sudo ./one-click-rebuild.sh --yes --skip-backup
+sudo docker compose ps
+sudo docker compose logs --tail=200 db
+sudo docker compose logs --tail=200 northstar
+df -h
+df -ih
+```
+
+If PostgreSQL is healthy but the Controller is restarting, restart only the Controller:
+
+```bash
+sudo docker compose restart northstar
+curl --fail http://127.0.0.1:3000/api/health
+```
+
+If the deployment fails because the database is not ready, rerun the staged deployment. The script starts PostgreSQL, waits for `healthy`, and only then starts Northstar:
+
+```bash
+sudo ./scripts/deploy.sh
+```
+
+If the PostgreSQL container is unhealthy, inspect its logs before changing or deleting any volume:
+
+```bash
+sudo docker compose up -d db
+sudo docker compose ps
+sudo docker compose logs --tail=200 db
+```
+
+If a build fails with `no space left on device`, inspect disk and inode usage, then remove Docker build cache and unused images. Do not remove volumes during this cleanup:
+
+```bash
+df -h
+df -ih
+sudo docker system df
+sudo docker builder prune -af
+sudo docker image prune -af
+```
+
+To remove old generated backups while retaining the newest five PostgreSQL dumps:
+
+```bash
+find backups -maxdepth 1 -type f -name 'northstar-*.dump' -printf '%T@ %p\n' \
+  | sort -nr | tail -n +6 | sed 's/^[^ ]* //' | xargs -r rm -f --
+```
+
+To back up and restore PostgreSQL explicitly:
+
+```bash
+sudo ./scripts/backup.sh ./backups
+sudo ./scripts/restore-postgres.sh ./backups/northstar-YYYYmmddTHHMMSSZ.dump
+```
+
+The restore script requires typing `RESTORE` and replaces the current database contents.
+
+### Node Agent operations
+
+Use the node row's `Actions` menu in the console:
+
+- `Check agent`: run a status check over SSH;
+- `Restart agent`: restart the allow-listed systemd service;
+- `Reinstall agent`: rerun the SSH bootstrap and repair the Agent installation;
+- `View logs`: inspect bootstrap output, Agent actions, and reconcile errors;
+- `Edit configuration`: update node address, region, credentials, or fingerprint;
+- `Delete node`: remove the node from the Controller after confirmation.
+
+For a node that failed during bootstrap, first update the Controller code and redeploy it, then select `Actions` → `Reinstall agent`. The bootstrap script installs `python3` when needed and does not require an optional NetworkManager directory to exist. NetworkManager manages its own connection files through its daemon.
+
+On the Edge Node, use these diagnostics:
+
+```bash
+sudo systemctl status northstar-agent --no-pager --full
+sudo journalctl -u northstar-agent -n 200 --no-pager
+sudo journalctl -u northstar-agent -f
+command -v python3
+```
+
+If the service was generated by an older bootstrap, remove the obsolete optional path from the unit before restarting it:
+
+```bash
+sudo sed -i '\|^ReadWritePaths=/etc/NetworkManager/system-connections$|d' /etc/systemd/system/northstar-agent.service
+sudo systemctl daemon-reload
+sudo systemctl restart northstar-agent
 ```
 
 Keep `.env` and backup files outside source control. Production data is stored in the `northstar-postgres` Docker volume. Use `./scripts/restore-postgres.sh` only after a deliberate restore confirmation. Rotate `NORTHSTAR_MASTER_KEY` only with a planned credential re-encryption migration; changing it blindly makes existing encrypted credentials unreadable.
