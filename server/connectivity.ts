@@ -1,6 +1,6 @@
-import { listControlNodes } from "./control-db";
+import { getNodeReconcileStatus, listControlNodes } from "./control-db";
 
-export type ConnectivityState = "healthy" | "attention" | "unavailable" | "not_configured" | "unknown";
+export type ConnectivityState = "healthy" | "attention" | "provisioning" | "unavailable" | "not_configured" | "unknown";
 
 type ProtocolObservation = {
   installed?: boolean;
@@ -15,17 +15,22 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function protocolAssessment(protocol: "wireguard" | "openvpn", raw: unknown) {
+function protocolAssessment(protocol: "wireguard" | "openvpn", raw: unknown, intent: { configured: boolean; taskStatus?: string; lastError?: string }) {
   const rawObserved = record(raw);
   const observed = rawObserved as ProtocolObservation;
   const runtimeActive = protocol === "wireguard" ? observed.interfaceActive : observed.serviceActive;
   const state: ConnectivityState = !Object.keys(rawObserved).length ? "unknown"
     : !observed.installed ? "unavailable"
     : observed.listening === true && runtimeActive ? "healthy"
-      : runtimeActive ? "attention" : "not_configured";
+      : runtimeActive ? "attention"
+        : intent.taskStatus === "pending" || intent.taskStatus === "running" ? "provisioning"
+          : intent.configured ? "attention" : "not_configured";
   return {
     protocol,
     state,
+    configured: intent.configured,
+    taskStatus: intent.taskStatus || null,
+    lastError: intent.lastError || "",
     transport: observed.transport || "udp",
     port: Number.isFinite(observed.port) ? observed.port : protocol === "wireguard" ? 51820 : 1194,
     installed: Boolean(observed.installed),
@@ -42,10 +47,17 @@ export async function getNodeConnectivity(nodeId: string) {
   const firewall = record(snapshot.firewall);
   const managedRules = record(firewall.managedRules);
   const protocols = record(snapshot.protocols);
-  const assessed = [
-    protocolAssessment("wireguard", protocols.wireguard),
-    protocolAssessment("openvpn", protocols.openvpn),
-  ].map((item) => ({
+  const reconcile = await getNodeReconcileStatus(nodeId);
+  const assessed = (["wireguard", "openvpn"] as const).map((protocol) => {
+    const latestTask = reconcile.tasks.find((task) => task.protocol === protocol);
+    const observed = reconcile.observed.find((item) => item.protocol === protocol);
+    return protocolAssessment(protocol, protocols[protocol], {
+      configured: reconcile.desired.some((desired) => desired.protocol === protocol),
+      taskStatus: typeof latestTask?.status === "string" ? latestTask.status : undefined,
+      lastError: typeof latestTask?.lastError === "string" && latestTask.lastError
+        ? latestTask.lastError : typeof observed?.lastError === "string" ? observed.lastError : undefined,
+    });
+  }).map((item) => ({
     ...item,
     hostFirewall: managedRules[`${item.transport}/${item.port}`] === true ? "managed" : firewall.inputPolicy === "accept" ? "permissive" : "unknown",
     cloudFirewall: "unverified" as const,
@@ -53,11 +65,11 @@ export async function getNodeConnectivity(nodeId: string) {
   const heartbeatAt = node.last_heartbeat_at || null;
   const heartbeatTime = heartbeatAt ? new Date(heartbeatAt).getTime() : Number.NaN;
   const heartbeatFresh = Number.isFinite(heartbeatTime) && Date.now() - heartbeatTime <= 90_000;
-  const protocolStates = assessed.map((item) => item.state);
+  const configuredStates = assessed.filter((item) => item.configured).map((item) => item.state);
   const status: ConnectivityState = !heartbeatFresh ? "attention"
-    : protocolStates.includes("attention") ? "attention"
-      : protocolStates.includes("healthy") ? "healthy"
-        : protocolStates.every((state) => state === "unavailable") ? "unavailable" : "not_configured";
+    : configuredStates.includes("attention") || configuredStates.includes("unavailable") ? "attention"
+      : configuredStates.includes("provisioning") ? "provisioning"
+        : configuredStates.includes("healthy") ? "healthy" : "not_configured";
   return {
     status,
     agentChannel: heartbeatFresh ? "healthy" : "attention",
