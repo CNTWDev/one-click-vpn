@@ -43,22 +43,36 @@ if [ "$password" != "$password_again" ]; then
   exit 1
 fi
 
-echo "Generating password hash inside the Controller image..."
-password_hash=$(printf '%s' "$password" | compose run --rm --no-deps -T --entrypoint node northstar -e '
+echo "Resetting the password through the Controller database driver..."
+updated=$(printf '%s' "$password" | compose exec -T \
+  -e "NORTHSTAR_RESET_EMAIL=$email" northstar node -e '
 const { randomBytes, scryptSync } = require("node:crypto");
+const { Client } = require("pg");
+
 let password = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => { password += chunk; });
-process.stdin.on("end", () => {
+process.stdin.on("end", async () => {
   const salt = randomBytes(16);
   const derived = scryptSync(password, salt, 64);
-  process.stdout.write(`scrypt:${salt.toString("base64url")}:${derived.toString("base64url")}`);
+  const passwordHash = `scrypt:${salt.toString("base64url")}:${derived.toString("base64url")}`;
+  const client = new Client({ connectionString: process.env.NORTHSTAR_DATABASE_URL });
+  try {
+    await client.connect();
+    const result = await client.query(
+      `UPDATE users
+       SET password_hash = $1, status = $2,
+           approved_at = COALESCE(approved_at, NOW()), updated_at = NOW()
+       WHERE lower(email) = lower($3) AND role IN ($4, $5)
+       RETURNING email`,
+      [passwordHash, "active", process.env.NORTHSTAR_RESET_EMAIL, "owner", "admin"],
+    );
+    if (result.rows[0]?.email) process.stdout.write(result.rows[0].email);
+  } finally {
+    await client.end();
+  }
 });
 ' | tr -d '\r\n')
-
-updated=$(compose exec -T db psql -v ON_ERROR_STOP=1 -U northstar -d northstar \
-  --set="admin_email=$email" --set="password_hash=$password_hash" -tA \
-  -c "UPDATE users SET password_hash = :'password_hash', status = 'active', approved_at = COALESCE(approved_at, NOW()), updated_at = NOW() WHERE lower(email) = lower(:'admin_email') AND role IN ('owner', 'admin') RETURNING email;")
 
 if [ -z "$updated" ]; then
   echo "No owner/admin account matched: $email" >&2
