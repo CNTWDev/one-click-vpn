@@ -20,6 +20,9 @@ services:
       args:
         NORTHSTAR_BUILD_REV: ${NORTHSTAR_BUILD_REV:-unknown}
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     env_file: .env
     environment:
       NORTHSTAR_DATABASE_URL: postgresql://northstar:${NORTHSTAR_DB_PASSWORD:?NORTHSTAR_DB_PASSWORD is required}@db:5432/northstar

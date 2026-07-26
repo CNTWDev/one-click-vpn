@@ -42,7 +42,7 @@ esac
 export NORTHSTAR_BUILD_REV=$(git rev-parse --short HEAD)
 echo "Deploying build $NORTHSTAR_BUILD_REV"
 
-echo "Building and starting Northstar..."
+echo "Building Northstar image..."
 if [ "$no_cache" = "yes" ]; then
   echo "Docker build cache disabled."
   compose build --no-cache northstar
@@ -50,7 +50,42 @@ else
   compose build northstar
 fi
 
-compose up -d --force-recreate --remove-orphans
+echo "Starting PostgreSQL and waiting for it to become healthy..."
+compose up -d --force-recreate db
+
+db_container_id=$(compose ps -q db)
+if [ -z "$db_container_id" ]; then
+  echo "PostgreSQL container was not created." >&2
+  compose ps >&2
+  compose logs --tail=120 db >&2 || true
+  exit 1
+fi
+
+db_healthy=""
+i=0
+while [ "$i" -lt 60 ]; do
+  db_status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$db_container_id" 2>/dev/null || true)
+  if [ "$db_status" = "healthy" ]; then
+    db_healthy="yes"
+    break
+  fi
+  if [ "$db_status" = "unhealthy" ] || [ "$db_status" = "exited" ]; then
+    break
+  fi
+  i=$((i + 1))
+  sleep 2
+done
+
+if [ -z "$db_healthy" ]; then
+  echo "PostgreSQL did not become healthy." >&2
+  compose ps >&2
+  docker inspect --format '{{range .State.Health.Log}}{{println .ExitCode .Output}}{{end}}' "$db_container_id" >&2 || true
+  compose logs --tail=120 db >&2 || true
+  exit 1
+fi
+
+echo "PostgreSQL is healthy. Starting Northstar..."
+compose up -d --force-recreate --remove-orphans northstar
 
 container_id=$(compose ps -q northstar)
 if [ -z "$container_id" ]; then
@@ -81,7 +116,7 @@ if [ -z "$healthy" ]; then
   docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container_id" 2>/dev/null | awk '/^(HOSTNAME|PORT)=/' >&2 || true
   echo "Health-check output:" >&2
   docker inspect --format '{{range .State.Health.Log}}{{println .ExitCode .Output}}{{end}}' "$container_id" >&2 || true
-  compose logs --tail=120 northstar >&2 || true
+  compose logs --tail=120 db northstar >&2 || true
   exit 1
 fi
 
