@@ -323,6 +323,12 @@ Use the node row's `Actions` menu in the console:
 - `Edit configuration`: update node address, region, credentials, or fingerprint;
 - `Delete node`: remove the node from the Controller after confirmation.
 
+For fleet operations, select nodes in the table (optionally after filtering by
+region) and choose `Check agents`, `Restart agents`, or `Reinstall agents`.
+Checks run immediately. Restart and reinstall require a confirmation and are
+queued by the Controller, which processes at most three remote actions at once;
+they continue after the browser page is closed.
+
 For a node that failed during bootstrap, first update the Controller code and redeploy it, then select `Actions` → `Reinstall agent`. The bootstrap script installs `python3` when needed and does not require an optional NetworkManager directory to exist. NetworkManager manages its own connection files through its daemon.
 
 On the Edge Node, use these diagnostics:

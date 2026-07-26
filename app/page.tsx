@@ -83,6 +83,7 @@ type NodeDiagnostics = {
 };
 
 type NodeOperation = "status-agent" | "restart-agent" | "bootstrap" | "delete";
+type FleetNodeOperation = Exclude<NodeOperation, "delete">;
 
 type PendingNodeConfirmation = {
   node: Node;
@@ -91,6 +92,14 @@ type PendingNodeConfirmation = {
   description: string;
   confirmLabel: string;
   tone: "warning" | "danger";
+};
+
+type PendingFleetConfirmation = {
+  nodes: Node[];
+  action: Exclude<FleetNodeOperation, "status-agent">;
+  title: string;
+  description: string;
+  confirmLabel: string;
 };
 
 const initialNodes: Node[] = [
@@ -235,6 +244,7 @@ function NodeFleet({
   onOpenTerminal,
   onEditNode,
   onNodeAction,
+  onBulkAction,
   busyNodeAction,
 }: {
   nodes: Node[];
@@ -243,19 +253,34 @@ function NodeFleet({
   onOpenTerminal: (node: Node) => void;
   onEditNode: (node: Node) => void;
   onNodeAction: (node: Node, action: NodeOperation) => void;
+  onBulkAction: (nodes: Node[], action: FleetNodeOperation) => void;
   busyNodeAction: string | null;
 }) {
   const [regionId, setRegionId] = useState("all");
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const [fleetAction, setFleetAction] = useState<FleetNodeOperation>("status-agent");
   const visibleNodes = regionId === "all" ? nodes : nodes.filter((node) => node.regionId === regionId);
   const selectedRegion = regions.find((region) => region.id === regionId);
+  const selectedNodes = visibleNodes.filter((node) => selectedNodeIds.includes(node.id));
+
+  function toggleNode(nodeId: string) {
+    setSelectedNodeIds((current) => current.includes(nodeId) ? current.filter((id) => id !== nodeId) : [...current, nodeId]);
+  }
+
+  function toggleVisibleNodes() {
+    const visibleIds = visibleNodes.map((node) => node.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedNodeIds.includes(id));
+    setSelectedNodeIds((current) => allVisibleSelected ? current.filter((id) => !visibleIds.includes(id)) : [...new Set([...current, ...visibleIds])]);
+  }
 
   return (
     <section className="nodes-section">
-      <div className="section-title nodes-title"><div><p>EDGE NODES</p><h2>Fleet status</h2></div><div className="node-toolbar"><select className="filter-button" aria-label="Filter nodes by region" value={regionId} onChange={(event) => setRegionId(event.target.value)}><option value="all">All regions</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><button className="plain-action" type="button" onClick={onRefresh}>Refresh <span>↻</span></button></div></div>
+      <div className="section-title nodes-title"><div><p>EDGE NODES</p><h2>Fleet status</h2></div><div className="node-toolbar"><select className="filter-button" aria-label="Filter nodes by region" value={regionId} onChange={(event) => setRegionId(event.target.value)}><option value="all">All regions</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select>{selectedNodes.length > 0 && <><select className="filter-button fleet-action-select" aria-label="Choose an action for selected nodes" value={fleetAction} onChange={(event) => setFleetAction(event.target.value as FleetNodeOperation)}><option value="status-agent">Check agents</option><option value="restart-agent">Restart agents</option><option value="bootstrap">Reinstall agents</option></select><button className="fleet-action-button" type="button" disabled={Boolean(busyNodeAction)} onClick={() => onBulkAction(selectedNodes, fleetAction)}>{fleetAction === "bootstrap" ? "Reinstall" : fleetAction === "restart-agent" ? "Restart" : "Check"} {selectedNodes.length}</button></>}<button className="plain-action" type="button" onClick={onRefresh}>Refresh <span>↻</span></button></div></div>
       <div className="node-list">
-        <div className="node-head"><span>NODE</span><span>STATUS</span><span>LATENCY</span><span>DEVICES</span><span>TRAFFIC</span><span /></div>
+        <div className="node-head"><span><input type="checkbox" aria-label="Select all visible nodes" checked={visibleNodes.length > 0 && selectedNodes.length === visibleNodes.length} onChange={toggleVisibleNodes} /></span><span>NODE</span><span>STATUS</span><span>LATENCY</span><span>DEVICES</span><span>TRAFFIC</span><span /></div>
         {visibleNodes.length === 0 ? <div className="empty-state"><b>{nodes.length === 0 ? "No managed nodes yet" : `No nodes in ${selectedRegion?.name || "this region"}`}</b><span>{nodes.length === 0 ? "Add a VPN node to start monitoring the fleet." : "Choose another region or add a node to this region."}</span></div> : visibleNodes.map((node) => (
           <article className="node-row" key={node.id}>
+            <div className="node-select"><input type="checkbox" aria-label={`Select ${node.name}`} checked={selectedNodeIds.includes(node.id)} onChange={() => toggleNode(node.id)} /></div>
             <div className="node-name"><span className="flag">{node.place.includes("Germany") ? "DE" : node.place.includes("Japan") ? "JP" : node.place.includes("USA") ? "US" : "●"}</span><div><b>{node.name}</b><small>{node.place} · {node.ip}</small></div></div>
             <StatusPill status={node.status} />
             <div className={node.status === "attention" ? "node-value danger" : "node-value"}>{node.latency}<small>{node.metrics ? `CPU ${node.metrics.cpuPercent.toFixed(0)}% · RAM ${node.metrics.memory.percent.toFixed(0)}%` : `last seen ${node.lastSeen}`}</small></div>
@@ -299,6 +324,7 @@ export default function Home() {
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [nodeActionBusy, setNodeActionBusy] = useState<string | null>(null);
   const [pendingNodeConfirmation, setPendingNodeConfirmation] = useState<PendingNodeConfirmation | null>(null);
+  const [pendingFleetConfirmation, setPendingFleetConfirmation] = useState<PendingFleetConfirmation | null>(null);
   const [selectedNode, setSelectedNode] = useState<Node>(initialNodes[0]);
   const [notice, setNotice] = useState("All systems nominal");
   const [form, setForm] = useState({ name: "", ip: "", user: "root", secret: "", regionId: "tokyo-jp", hostFingerprint: "" });
@@ -641,6 +667,27 @@ export default function Home() {
     }
   }
 
+  async function executeBulkNodeAction(nodesToActOn: Node[], action: FleetNodeOperation) {
+    if (!nodesToActOn.length || nodeActionBusy) return;
+    setNodeActionBusy(`fleet:${action}`);
+    try {
+      const response = await fetch("/api/nodes/batch-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nodeIds: nodesToActOn.map((node) => node.id), action }),
+      });
+      const payload = await response.json().catch(() => ({})) as { queued?: number; skipped?: string[]; error?: string };
+      if (!response.ok) throw new Error(payload.error || "Unable to queue fleet operation");
+      const label = action === "bootstrap" ? "Agent reinstall" : action === "restart-agent" ? "Agent restart" : "Agent check";
+      setNotice(`${label} queued for ${payload.queued || 0} nodes${payload.skipped?.length ? `; ${payload.skipped.length} unavailable nodes skipped` : ""}. The controller continues in the background.`);
+      await loadNodes();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to queue fleet operation.");
+    } finally {
+      setNodeActionBusy(null);
+    }
+  }
+
   function requestNodeAction(node: Node, action: NodeOperation) {
     if (action === "status-agent") {
       void executeNodeAction(node, action);
@@ -669,10 +716,34 @@ export default function Home() {
     setPendingNodeConfirmation({ node, action, ...confirmations[action] });
   }
 
+  function requestBulkNodeAction(nodesToActOn: Node[], action: FleetNodeOperation) {
+    if (action === "status-agent") {
+      void executeBulkNodeAction(nodesToActOn, action);
+      return;
+    }
+    const label = action === "bootstrap" ? "Reinstall" : "Restart";
+    setPendingFleetConfirmation({
+      nodes: nodesToActOn,
+      action,
+      title: `${label} Agent on ${nodesToActOn.length} nodes?`,
+      description: action === "bootstrap"
+        ? "This reconnects over SSH to every selected node, overwrites the Agent files, and restarts the service. Existing VPN configuration is not intentionally deleted."
+        : "This restarts the Agent on every selected node. Active VPN sessions can be interrupted briefly while each node reconnects.",
+      confirmLabel: `${label} ${nodesToActOn.length} nodes`,
+    });
+  }
+
   async function confirmNodeAction() {
     if (!pendingNodeConfirmation) return;
     await executeNodeAction(pendingNodeConfirmation.node, pendingNodeConfirmation.action);
     setPendingNodeConfirmation(null);
+  }
+
+  async function confirmFleetAction() {
+    if (!pendingFleetConfirmation) return;
+    const confirmation = pendingFleetConfirmation;
+    setPendingFleetConfirmation(null);
+    await executeBulkNodeAction(confirmation.nodes, confirmation.action);
   }
 
   if (authStatus === "loading") {
@@ -770,12 +841,12 @@ export default function Home() {
             </article>
           </section>
 
-          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Fleet view refreshed just now.")} onOpenTerminal={openTerminal} onEditNode={openEditNode} onNodeAction={requestNodeAction} busyNodeAction={nodeActionBusy} />
+          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Fleet view refreshed just now.")} onOpenTerminal={openTerminal} onEditNode={openEditNode} onNodeAction={requestNodeAction} onBulkAction={requestBulkNodeAction} busyNodeAction={nodeActionBusy} />
         </>}
 
         {activeNav === "Nodes" && <section className="module-view">
           <div className="module-heading"><div><p>OPERATIONS</p><h1>Node fleet</h1><span>Provision, monitor, and operate managed VPN nodes.</span></div><strong>{nodes.length} managed</strong></div>
-          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Node fleet refreshed just now.")} onOpenTerminal={openTerminal} onEditNode={openEditNode} onNodeAction={requestNodeAction} busyNodeAction={nodeActionBusy} />
+          <NodeFleet nodes={nodes} regions={regions} onRefresh={() => setNotice("Node fleet refreshed just now.")} onOpenTerminal={openTerminal} onEditNode={openEditNode} onNodeAction={requestNodeAction} onBulkAction={requestBulkNodeAction} busyNodeAction={nodeActionBusy} />
         </section>}
 
         {activeNav === "Regions" && <section className="module-view card">
@@ -870,6 +941,17 @@ export default function Home() {
         busy={Boolean(nodeActionBusy)}
         onCancel={() => setPendingNodeConfirmation(null)}
         onConfirm={() => void confirmNodeAction()}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingFleetConfirmation)}
+        eyebrow="FLEET OPERATION"
+        title={pendingFleetConfirmation?.title || "Confirm fleet operation"}
+        description={pendingFleetConfirmation?.description || "Confirm this operation for the selected nodes."}
+        confirmLabel={pendingFleetConfirmation?.confirmLabel || "Confirm"}
+        tone="warning"
+        busy={Boolean(nodeActionBusy)}
+        onCancel={() => setPendingFleetConfirmation(null)}
+        onConfirm={() => void confirmFleetAction()}
       />
       <ConfirmDialog
         open={Boolean(pendingDeviceRevocation)}

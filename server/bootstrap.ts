@@ -7,6 +7,28 @@ import { decryptSecret, hashToken } from "./crypto";
 import { addAudit, addNodeAction, countRunningNodeActions, findNode, finishNodeAction, updateNode } from "./db";
 import { ensureDefaultNodeProtocols } from "./control-plane";
 
+const maximumConcurrentRemoteActions = 3;
+const remoteActionQueue: Array<() => Promise<void>> = [];
+let activeRemoteActions = 0;
+
+function processRemoteActionQueue(): void {
+  while (activeRemoteActions < maximumConcurrentRemoteActions && remoteActionQueue.length) {
+    const action = remoteActionQueue.shift()!;
+    activeRemoteActions += 1;
+    void action().catch((error) => {
+      console.error("Northstar queued node action failed", error);
+    }).finally(() => {
+      activeRemoteActions -= 1;
+      processRemoteActionQueue();
+    });
+  }
+}
+
+function enqueueRemoteAction(action: () => Promise<void>): void {
+  remoteActionQueue.push(action);
+  processRemoteActionQueue();
+}
+
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
@@ -77,8 +99,12 @@ function connectAndExec(config: ConnectConfig, command: string, expectedFingerpr
 }
 
 export function queueNodeBootstrap(nodeId: string, actorUserId?: string): void {
-  setImmediate(() => {
-    void bootstrapNode(nodeId, actorUserId);
+  enqueueRemoteAction(() => bootstrapNode(nodeId, actorUserId));
+}
+
+export function queueNodeAction(nodeId: string, action: "restart-agent" | "status-agent", actorUserId?: string): void {
+  enqueueRemoteAction(async () => {
+    await runNodeAction(nodeId, action, actorUserId);
   });
 }
 
