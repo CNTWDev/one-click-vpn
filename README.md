@@ -436,6 +436,17 @@ sudo systemctl daemon-reload
 sudo systemctl restart northstar-agent
 ```
 
+Agent `2.4.3` keeps the system filesystem read-only except for its managed state,
+WireGuard configuration, and generated service units. It intentionally does not
+apply a systemd capability bounding set or `NoNewPrivileges` to the Agent
+process: the Agent is a structured root network reconciler and must run
+distribution-provided `ip`, `wg`, `wg-quick`, `iptables`, and `systemctl`
+binaries. Some cloud images attach file capabilities to those binaries, and an
+overly narrow systemd capability sandbox makes `execve` fail with `Operation not
+permitted`. The Controller still sends only allowlisted structured task types;
+the Agent does not expose a shell or accept arbitrary commands. Use `Reinstall
+agent` after updating the Controller to replace an older unit safely.
+
 Keep `.env` and backup files outside source control. Production data is stored in the `northstar-postgres` Docker volume. Use `./scripts/restore-postgres.sh` only after a deliberate restore confirmation. Rotate `NORTHSTAR_MASTER_KEY` only with a planned credential re-encryption migration; changing it blindly makes existing encrypted credentials unreadable.
 
 ## Verification

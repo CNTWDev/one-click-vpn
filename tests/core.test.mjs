@@ -19,6 +19,7 @@ const execFileAsync = promisify(execFile);
 test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   const migration = readFileSync(path.join(root, "scripts/migrate.mjs"), "utf8");
   const agent = readFileSync(path.join(root, "agent/agent.py"), "utf8");
+  const bootstrap = readFileSync(path.join(root, "server/bootstrap.ts"), "utf8");
   assert.match(migration, /CREATE TABLE IF NOT EXISTS vpn_services/);
   assert.match(migration, /deployment_policy TEXT NOT NULL DEFAULT 'standard'/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS policy_rollouts/);
@@ -27,7 +28,11 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(agent, /add\[add\.index\("-C"\)\] = operation/);
   assert.doesNotMatch(agent, /add\[1\] = operation/);
   assert.match(agent, /\/etc\/wireguard\/northstar\.conf/);
-  assert.match(agent, /agent 2\.4\.2/);
+  assert.match(agent, /agent 2\.4\.3/);
+  assert.doesNotMatch(bootstrap, /CapabilityBoundingSet=CAP_NET_ADMIN/);
+  assert.doesNotMatch(bootstrap, /AmbientCapabilities=CAP_NET_ADMIN/);
+  assert.match(bootstrap, /ProtectSystem=strict/);
+  assert.match(bootstrap, /ReadWritePaths=\/opt\/northstar-agent \/etc\/wireguard \/etc\/systemd\/system/);
 });
 
 async function waitForServer() {

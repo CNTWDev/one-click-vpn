@@ -356,12 +356,9 @@ EnvironmentFile=/opt/northstar-agent/config.env
 ExecStart=$python_path /opt/northstar-agent/agent.py
 Restart=always
 RestartSec=5
-NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-CapabilityBoundingSet=CAP_NET_ADMIN
-AmbientCapabilities=CAP_NET_ADMIN
 ReadWritePaths=/opt/northstar-agent /etc/wireguard /etc/systemd/system
 
 [Install]
