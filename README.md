@@ -155,6 +155,10 @@ sudo ./one-click-update.sh --service admin-web    # Admin
 database backup and do not restart the Controller. Use the full update when a
 change touches dependencies, migrations, Compose configuration, or shared code.
 
+When upgrading a legacy single-domain installation, deployment opens a one-time
+domain migration prompt and rewrites only the seven Portal/Admin/API origin keys.
+It backs up `.env` first; passwords and application secrets are preserved.
+
 Manual upgrade:
 
 ```bash

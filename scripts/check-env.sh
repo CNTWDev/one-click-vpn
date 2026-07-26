@@ -59,8 +59,9 @@ if ! printf '%s' "$domain" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$
   exit 1
 fi
 
-if [ "$origin" != "https://$domain" ]; then
-  echo "NORTHSTAR_PUBLIC_ORIGIN must exactly be https://APP_DOMAIN in production." >&2
+if [ "$domain" != "$portal_domain" ] || [ "$origin" != "https://$portal_domain" ]; then
+  echo "APP_DOMAIN and NORTHSTAR_PUBLIC_ORIGIN must point to NORTHSTAR_PORTAL_DOMAIN." >&2
+  echo "Run ./scripts/ensure-service-origins.sh to migrate legacy single-domain configuration." >&2
   exit 1
 fi
 
@@ -70,6 +71,12 @@ for named_domain in "$portal_domain" "$admin_domain" "$api_domain"; do
     exit 1
   fi
 done
+
+if [ "$api_origin" != "https://$api_domain" ] || [ "$agent_origin" != "https://$api_domain" ]; then
+  echo "NORTHSTAR_API_ORIGIN and NORTHSTAR_AGENT_ORIGIN must point to https://NORTHSTAR_API_DOMAIN." >&2
+  echo "Run ./scripts/ensure-service-origins.sh to migrate legacy single-domain configuration." >&2
+  exit 1
+fi
 
 case "$api_origin" in
   https://*) : ;;

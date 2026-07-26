@@ -106,7 +106,7 @@ git pull --ff-only
 Controller、Portal、Admin 会随本次部署升级；Edge Agent 不会被 Docker 自动覆盖。需要升级 Agent 时，在 Admin 的节点操作中重新执行一次 Bootstrap，让 Controller 重新写入 Agent 文件并等待新的 heartbeat；Agent 升级失败不会影响已有 VPN 数据面配置。
 
 脚本会校验：
-- APP_DOMAIN 与 NORTHSTAR_PUBLIC_ORIGIN 必须匹配；新部署会额外写入 `NORTHSTAR_API_ORIGIN` 和 `NORTHSTAR_AGENT_ORIGIN`，两者默认指向 API 域名；旧 `.env` 缺少这两个变量时会兼容回退，不阻断升级；
+- APP_DOMAIN 与 NORTHSTAR_PUBLIC_ORIGIN 必须指向 Portal 域名；`NORTHSTAR_API_ORIGIN` 和 `NORTHSTAR_AGENT_ORIGIN` 必须指向 API 域名；旧单域名 `.env` 会在部署时经过一次交互式迁移并自动备份，避免把已废弃域名继续写入 Edge Agent；
 - 生产环境必须使用 HTTPS；
 - 管理员密码至少 16 个字符；
 - 主密钥必须解码为 32 字节；

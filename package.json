@@ -15,7 +15,7 @@
     "dev:admin-web": "vite --config admin-web/vite.config.ts",
     "start": "next start",
     "deploy": "./scripts/deploy.sh",
-    "test": "npm run build && node --test tests/core.test.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:migrate": "node scripts/migrate.mjs",
     "db:generate": "drizzle-kit generate"

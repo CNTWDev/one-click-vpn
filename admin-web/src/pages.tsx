@@ -13,6 +13,15 @@ export function formatTime(value?: string | null): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+function actionLabel(value: string): string {
+  return ({ bootstrap: "安装 / 修复 Agent", "status-agent": "检查 Agent", "restart-agent": "重启 Agent" } as Record<string, string>)[value] || value.replaceAll("-", " ");
+}
+
+function phaseLabel(value?: string): string {
+  if (!value) return "等待开始";
+  return value.replaceAll("-", " ").replaceAll("_", " ");
+}
+
 function formatBytes(value?: number): string {
   if (!value || value < 1) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -36,6 +45,13 @@ function Empty({ children }: { children: ReactNode }) {
 }
 
 function Modal({ title, description, onClose, children, wide = false }: { title: string; description?: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener("keydown", closeOnEscape); };
+  }, [onClose]);
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className={`modal ${wide ? "wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
       <div className="modal-head"><div><h2>{title}</h2>{description && <p>{description}</p>}</div><button className="icon-button" onClick={onClose} aria-label="关闭">×</button></div>
@@ -114,7 +130,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
     </section>
     <section className="panel">
       <div className="panel-head"><div><p className="eyebrow">USER DIRECTORY</p><h2>全部账号</h2></div><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">全部状态</option><option value="active">已启用</option><option value="pending">待审核</option><option value="suspended">已停用</option><option value="rejected">已拒绝</option></select></div>
-      <div className="table-wrap"><table><thead><tr><th>用户</th><th>角色</th><th>状态</th><th>注册时间</th><th className="align-right">操作</th></tr></thead><tbody>{visible.map((user) => <tr key={user.id}>
+      <div className="table-wrap"><table className="action-table"><thead><tr><th>用户</th><th>角色</th><th>状态</th><th>注册时间</th><th className="align-right">操作</th></tr></thead><tbody>{visible.map((user) => <tr key={user.id}>
         <td><b>{user.displayName}</b><small>{user.email}</small></td><td>{user.role}</td><td><Pill value={user.status} />{user.rejectionReason && <small>{user.rejectionReason}</small>}</td><td>{formatTime(user.createdAt)}</td><td className="align-right">{user.role !== "owner" && user.status === "active" && <button className="text-button danger-text" disabled={busy === user.id} onClick={() => void update(user, "suspended")}>停用</button>}{user.status === "suspended" && <button className="text-button" disabled={busy === user.id} onClick={() => void update(user, "active")}>恢复</button>}</td>
       </tr>)}</tbody></table></div>
     </section>
@@ -135,6 +151,7 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [operationNode, setOperationNode] = useState<NodeRecord | null>(null);
   const [diagnosticNode, setDiagnosticNode] = useState<NodeRecord | null>(null);
   const [diagnostics, setDiagnostics] = useState<NodeDiagnostics | null>(null);
   const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
@@ -164,10 +181,26 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
 
   async function loadDiagnostics(node: NodeRecord) {
     setDiagnosticNode(node); setDiagnostics(null); setDiagnosticsBusy(true);
-    try { setDiagnostics(await api<NodeDiagnostics>(`/api/nodes/${node.id}`)); }
+    try {
+      const result = await api<NodeDiagnostics>(`/api/nodes/${node.id}`);
+      setDiagnostics(result);
+      if (result.node) setDiagnosticNode(result.node);
+    }
     catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
     finally { setDiagnosticsBusy(false); }
   }
+
+  const diagnosticNodeId = diagnosticNode?.id;
+  useEffect(() => {
+    if (!diagnosticNodeId) return;
+    const timer = window.setInterval(() => {
+      void api<NodeDiagnostics>(`/api/nodes/${diagnosticNodeId}`).then((result) => {
+        setDiagnostics(result);
+        if (result.node) setDiagnosticNode(result.node);
+      }).catch(() => undefined);
+    }, 5_000);
+    return () => window.clearInterval(timer);
+  }, [diagnosticNodeId]);
 
   async function operate(node: NodeRecord, action: "status-agent" | "restart-agent" | "bootstrap" | "delete") {
     const descriptions = {
@@ -183,6 +216,7 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
       else if (action === "bootstrap") await api(`/api/nodes/${node.id}`, { method: "POST", body: JSON.stringify({ action }) });
       else await api(`/api/nodes/${node.id}/actions`, { method: "POST", body: JSON.stringify({ action }) });
       setNotice({ tone: "success", message: action === "delete" ? "节点已删除。" : "操作已加入队列，可在节点诊断中跟踪进度。" });
+      setOperationNode(null);
       await onRefresh();
       if (diagnosticNode?.id === node.id && action !== "delete") await loadDiagnostics(node);
     } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
@@ -209,14 +243,14 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
     <InlineNotice notice={notice} />
     {selected.size > 0 && <div className="batch-bar"><b>已选择 {selected.size} 个节点</b><span><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void batch("status-agent")}>检查 Agent</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void batch("restart-agent")}>重启 Agent</button><button className="button warning small" disabled={Boolean(busy)} onClick={() => void batch("bootstrap")}>批量修复</button></span></div>}
     <section className="panel flush">
-      <div className="table-wrap"><table className="node-table"><thead><tr><th className="check"><input type="checkbox" aria-label="选择全部节点" checked={allSelected} onChange={(event) => setSelected(event.target.checked ? new Set(nodes.map((node) => node.id)) : new Set())} /></th><th>节点</th><th>状态</th><th>Agent</th><th>负载</th><th>策略</th><th className="align-right">操作</th></tr></thead><tbody>{nodes.map((node) => <tr key={node.id}>
+      <div className="table-wrap"><table className="node-table action-table"><thead><tr><th className="check"><input type="checkbox" aria-label="选择全部节点" checked={allSelected} onChange={(event) => setSelected(event.target.checked ? new Set(nodes.map((node) => node.id)) : new Set())} /></th><th>节点</th><th>状态</th><th>Agent</th><th>负载</th><th>策略</th><th className="align-right">操作</th></tr></thead><tbody>{nodes.map((node) => <tr key={node.id}>
         <td className="check"><input type="checkbox" aria-label={`选择 ${node.name}`} checked={selected.has(node.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(node.id); else next.delete(node.id); return next; })} /></td>
-        <td><span className="node-name"><i className={`state-dot ${node.status}`} /><span><b>{node.name}</b><small>{node.ip} · {node.place}</small></span></span></td>
-        <td><Pill value={node.status} /><small>{node.latency} · {node.last_seen}</small></td>
+        <td><button className="node-detail-trigger" onClick={() => void loadDiagnostics(node)}><i className={`state-dot ${node.status}`} /><span><b>{node.name}</b><small>{node.ip} · {node.place}</small></span><em>查看详情</em></button></td>
+        <td><Pill value={node.status} /><small>{node.latency} · {node.last_seen}</small>{node.status === "provisioning" && <button className="progress-link" onClick={() => void loadDiagnostics(node)}>查看部署进度 →</button>}</td>
         <td><b>{node.version || "unknown"}</b><small>{node.ssh_user || "root"}:{node.ssh_port || 22}</small></td>
         <td>{node.metrics ? <><b>CPU {node.metrics.cpuPercent.toFixed(0)}%</b><small>内存 {node.metrics.memory.percent.toFixed(0)}% · 磁盘 {node.metrics.disk.percent.toFixed(0)}%</small></> : <span className="muted">暂无指标</span>}</td>
         <td><b>{node.deployment_policy || "standard"}</b><small>policy v{node.policy_version || 0}</small></td>
-        <td className="align-right"><div className="operation-buttons"><button className="text-button" onClick={() => void loadDiagnostics(node)}>诊断</button><button className="text-button" onClick={() => openEdit(node)}>配置</button><details><summary>更多</summary><div><button disabled={Boolean(busy)} onClick={() => void operate(node, "status-agent")}>检查 Agent</button><button disabled={Boolean(busy)} onClick={() => void operate(node, "restart-agent")}>重启 Agent</button><button disabled={Boolean(busy)} onClick={() => void operate(node, "bootstrap")}>重新安装 / 修复</button><button className="danger-text" disabled={Boolean(busy)} onClick={() => void operate(node, "delete")}>删除节点</button></div></details></div></td>
+        <td className="align-right"><div className="operation-buttons"><button className="text-button detail-button" onClick={() => void loadDiagnostics(node)}>详情 / 进度</button><button className="text-button" onClick={() => openEdit(node)}>配置</button><button className="more-button" onClick={() => setOperationNode(node)}>更多 <span>•••</span></button></div></td>
       </tr>)}</tbody></table></div>
       {!nodes.length && <Empty>尚未部署节点。创建区域后即可添加第一台服务器。</Empty>}
     </section>
@@ -236,15 +270,31 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
       </form>
     </Modal>}
 
-    {diagnosticNode && <Modal wide title={`${diagnosticNode.name} · 诊断`} description="Agent 连通性、协议状态、任务与最近执行事件。" onClose={() => { setDiagnosticNode(null); setDiagnostics(null); }}>
-      <div className="diagnostic-toolbar"><button className="button ghost small" disabled={diagnosticsBusy} onClick={() => void loadDiagnostics(diagnosticNode)}>刷新诊断</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "status-agent")}>检查 Agent</button><button className="button warning small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "bootstrap")}>重新安装 / 修复</button></div>
+    {operationNode && <Modal title="节点操作" description={`${operationNode.name} · ${operationNode.ip}`} onClose={() => setOperationNode(null)}>
+      <div className="node-operation-summary"><span className={`state-dot ${operationNode.status}`} /><span><b>{operationNode.name}</b><small>{operationNode.place} · {operationNode.version}</small></span><Pill value={operationNode.status} /></div>
+      <div className="operation-grid">
+        <button disabled={Boolean(busy)} onClick={() => void operate(operationNode, "status-agent")}><span className="operation-symbol">✓</span><span><b>检查 Agent</b><small>读取服务状态并记录诊断结果，不会重启服务。</small></span><em>安全</em></button>
+        <button disabled={Boolean(busy)} onClick={() => void operate(operationNode, "restart-agent")}><span className="operation-symbol">↻</span><span><b>重启 Agent</b><small>重启远端 Agent 服务，短时间内会中断状态上报。</small></span><em>需确认</em></button>
+        <button className="warning-operation" disabled={Boolean(busy)} onClick={() => void operate(operationNode, "bootstrap")}><span className="operation-symbol">⇧</span><span><b>重新安装 / 修复</b><small>通过已保存的 SSH 凭据重新部署并同步 Agent 身份。</small></span><em>需确认</em></button>
+        <button className="danger-operation" disabled={Boolean(busy)} onClick={() => void operate(operationNode, "delete")}><span className="operation-symbol">×</span><span><b>删除节点</b><small>从 Controller 移除节点，不会销毁对应的云服务器。</small></span><em>危险</em></button>
+      </div>
+      <div className="form-actions operation-footer"><button className="button ghost" onClick={() => setOperationNode(null)}>关闭</button></div>
+    </Modal>}
+
+    {diagnosticNode && <Modal wide title={`${diagnosticNode.name} · 节点详情`} description="部署进度、操作日志、Agent 连通性和 VPN 协议运行状态。" onClose={() => { setDiagnosticNode(null); setDiagnostics(null); }}>
+      <div className="diagnostic-toolbar"><span><i className="live-mark" /> 每 5 秒自动刷新</span><button className="button ghost small" disabled={diagnosticsBusy} onClick={() => void loadDiagnostics(diagnosticNode)}>立即刷新</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "status-agent")}>检查 Agent</button><button className="button warning small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "bootstrap")}>重新安装 / 修复</button></div>
       {diagnosticsBusy && !diagnostics ? <Empty>正在读取诊断信息…</Empty> : diagnostics && <div className="diagnostics">
+        {diagnostics.actions[0] ? <section className={`current-job ${diagnostics.actions[0].status}`}>
+          <div className="current-job-head"><div><p className="eyebrow">CURRENT / LATEST JOB</p><h3>{actionLabel(diagnostics.actions[0].action)}</h3><span>{phaseLabel(diagnostics.actions[0].current_phase)} · <Pill value={diagnostics.actions[0].status} /></span></div><time>{formatTime(diagnostics.actions[0].finished_at || diagnostics.actions[0].started_at || diagnostics.actions[0].created_at)}</time></div>
+          <div className="job-progress"><i style={{ width: `${Math.min(Math.max(diagnostics.actions[0].progress || 0, 0), 100)}%` }} /><span>{diagnostics.actions[0].progress || 0}%</span></div>
+          {diagnostics.actions[0].error && <pre className="job-error">{diagnostics.actions[0].error}</pre>}
+        </section> : <InlineNotice notice={{ tone: "info", message: "该节点还没有部署或运维任务记录。" }} />}
         <div className="diagnostic-cards"><article><small>节点</small><b><Pill value={diagnostics.connectivity?.status || diagnosticNode.status} /></b><span>{diagnosticNode.ip}</span></article><article><small>Agent 通道</small><b>{diagnostics.connectivity?.agentChannel || "unknown"}</b><span>{formatTime(diagnostics.connectivity?.lastAuthenticatedHeartbeat)}</span></article><article><small>防火墙</small><b>{diagnostics.connectivity?.firewall.manager || "unknown"}</b><span>{diagnostics.connectivity?.firewall.inputPolicy || "—"}</span></article><article><small>资源</small><b>{diagnosticNode.metrics ? `CPU ${diagnosticNode.metrics.cpuPercent.toFixed(0)}%` : "暂无指标"}</b><span>{diagnosticNode.metrics ? `内存 ${diagnosticNode.metrics.memory.percent.toFixed(0)}% · 网络 ↓ ${formatBytes(diagnosticNode.metrics.network.rxBytesPerSecond)}/s` : "等待心跳上报"}</span></article></div>
         {diagnostics.connectivity?.note && <div className="inline-notice info">{diagnostics.connectivity.note}</div>}
-        <section><h3>协议运行状态</h3>{diagnostics.connectivity?.protocols.length ? <div className="protocol-grid">{diagnostics.connectivity.protocols.map((protocol) => <article key={protocol.protocol}><div><b>{protocol.protocol}</b><Pill value={protocol.state} /></div><small>{protocol.transport}:{protocol.port} · {protocol.listening ? "正在监听" : "未监听"}</small><small>Host FW: {protocol.hostFirewall} · Cloud FW: {protocol.cloudFirewall}</small>{protocol.lastError && <p>{protocol.lastError}</p>}</article>)}</div> : <Empty>没有 Agent 协议状态。</Empty>}</section>
-        <section><h3>最近操作</h3>{diagnostics.actions.length ? <div className="action-list">{diagnostics.actions.slice(0, 12).map((action) => <article key={action.id}><div><b>{action.action}</b><Pill value={action.status} /></div><small>{formatTime(action.created_at)} · {action.current_phase || "queued"} · {action.progress || 0}%</small>{action.error && <p>{action.error}</p>}</article>)}</div> : <Empty>没有节点操作记录。</Empty>}</section>
-        <section><h3>执行事件</h3>{diagnostics.actionEvents.length ? <div className="event-list">{diagnostics.actionEvents.slice(0, 40).map((event) => <div key={event.id}><time>{formatTime(event.created_at)}</time><Pill value={event.level} /><span><b>{event.phase}</b>{event.message}</span></div>)}</div> : <Empty>没有执行事件。</Empty>}</section>
+        <section className="deployment-log"><div className="diagnostic-section-head"><div><h3>部署与操作日志</h3><p>Controller 记录的 Bootstrap、Agent 和修复任务事件，最新事件在最上方。</p></div><span>{diagnostics.actionEvents.length} 条事件</span></div>{diagnostics.actionEvents.length ? <div className="event-list">{diagnostics.actionEvents.slice(0, 100).map((event) => <div key={event.id}><time>{formatTime(event.created_at)}</time><Pill value={event.level} /><span><b>{phaseLabel(event.phase)}</b>{event.message}</span></div>)}</div> : <Empty>还没有部署或操作日志。</Empty>}</section>
+        <section><h3>VPN 协议运行状态</h3>{diagnostics.connectivity?.protocols.length ? <div className="protocol-grid">{diagnostics.connectivity.protocols.map((protocol) => <article key={protocol.protocol}><div><b>{protocol.protocol}</b><Pill value={protocol.state} /></div><small>{protocol.transport}:{protocol.port} · {protocol.listening ? "正在监听" : "未监听"} · runtime {protocol.runtimeActive ? "active" : "inactive"}</small><small>Host FW: {protocol.hostFirewall} · Cloud FW: {protocol.cloudFirewall}</small>{protocol.lastError && <p>{protocol.lastError}</p>}</article>)}</div> : <Empty>没有 Agent 协议状态。</Empty>}</section>
         <section><h3>配置同步任务</h3>{diagnostics.reconcile.tasks.length ? <div className="action-list">{diagnostics.reconcile.tasks.slice(0, 20).map((task) => <article key={task.id}><div><b>{task.protocol} · {task.taskType}</b><Pill value={task.status} /></div><small>revision {task.desiredRevision} · 尝试 {task.attempts} 次 · {formatTime(task.createdAt)}</small>{task.lastError && <p>{task.lastError}</p>}</article>)}</div> : <Empty>没有待处理的配置同步任务。</Empty>}</section>
+        <section><h3>任务历史与原始输出</h3>{diagnostics.actions.length ? <div className="operation-history-list">{diagnostics.actions.map((action) => <details key={action.id} defaultOpen={action.id === diagnostics.actions[0]?.id && action.status === "failed"}><summary><span><b>{actionLabel(action.action)}</b><small>{phaseLabel(action.current_phase)} · {action.progress || 0}%</small></span><Pill value={action.status} /><time>{formatTime(action.finished_at || action.started_at || action.created_at)}</time><i>⌄</i></summary><div>{action.error && <><b>错误</b><pre className="history-error">{action.error}</pre></>}{action.output && <><b>原始输出</b><pre>{action.output}</pre></>}{!action.error && !action.output && <p>该任务没有保存额外输出。</p>}</div></details>)}</div> : <Empty>没有历史任务。</Empty>}</section>
       </div>}
     </Modal>}
   </>;
@@ -299,7 +349,7 @@ export function ServicesPage({ nodes }: { nodes: NodeRecord[] }) {
     {policy && <section className="policy-banner"><div><p className="eyebrow">STANDARD POLICY V{policy.standard.version}</p><h2>标准部署策略</h2><p>{policy.standard.protocols.map((item) => `${item.protocol} ${item.transport}:${item.listenPort}`).join(" · ") || "当前没有启用的标准协议"}</p></div><div className="policy-counts"><span><b>{policy.counts.standardNodes}</b>标准节点</span><span><b>{policy.counts.driftedNodes}</b>策略漂移</span><span><b>{policy.counts.blockedNodes}</b>暂不可更新</span></div><div className="policy-actions"><button className="button ghost" disabled={Boolean(busy) || !policy.counts.eligibleNodes} onClick={() => void rollout("canary")}>灰度 1 台</button><button className="button primary" disabled={Boolean(busy) || !policy.counts.eligibleNodes} onClick={() => void rollout("batch")}>批量更新</button></div></section>}
     {policy?.driftedNodes.length ? <section className="panel"><div className="panel-head"><div><p className="eyebrow">POLICY DRIFT</p><h2>待同步节点</h2></div></div><div className="compact-list">{policy.driftedNodes.map((node) => <div key={node.id}><span className={`state-dot ${node.eligible ? "online" : "attention"}`} /><span><b>{node.name}</b><small>缺少：{node.missingProtocols.join(", ") || "策略版本"} · {node.reason}</small></span><Pill value={node.eligible ? "eligible" : "blocked"} /></div>)}</div></section> : null}
     <section className="panel flush">
-      <div className="table-wrap"><table><thead><tr><th>节点</th><th>协议</th><th>监听</th><th>服务状态</th><th>更新时间</th><th className="align-right">操作</th></tr></thead><tbody>{services.map((service) => <tr key={`${service.node_id}:${service.protocol}`}>
+      <div className="table-wrap"><table className="action-table"><thead><tr><th>节点</th><th>协议</th><th>监听</th><th>服务状态</th><th>更新时间</th><th className="align-right">操作</th></tr></thead><tbody>{services.map((service) => <tr key={`${service.node_id}:${service.protocol}`}>
         <td><b>{nodeMap.get(service.node_id)?.name || service.node_id}</b><small>{nodeMap.get(service.node_id)?.ip}</small></td><td><b>{service.protocol}</b><small>{service.subnet}</small></td><td>{service.transport}:{service.listen_port}<small>DNS {service.dns.join(", ")}</small></td><td><Pill value={!service.enabled ? "disabled" : service.status} />{service.last_error && <small className="error-text">{service.last_error}</small>}</td><td>{formatTime(service.updated_at)}</td><td className="align-right"><span className="row-actions">{service.enabled ? <button className="text-button danger-text" disabled={busy === `${service.node_id}:${service.protocol}`} onClick={() => void serviceAction(service, "disable")}>停用</button> : <button className="text-button" disabled={busy === `${service.node_id}:${service.protocol}`} onClick={() => void serviceAction(service, "enable")}>启用</button>}<button className="text-button" disabled={busy === `${service.node_id}:${service.protocol}`} onClick={() => void serviceAction(service, "redeploy")}>重新部署</button></span></td>
       </tr>)}</tbody></table></div>{!services.length && <Empty>还没有 VPN 服务。部署节点后，服务会在此出现。</Empty>}
     </section>

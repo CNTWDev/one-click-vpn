@@ -69,6 +69,7 @@ case "$mode" in
 esac
 
 "$SCRIPT_DIR/ensure-postgres-env.sh"
+"$SCRIPT_DIR/ensure-service-origins.sh"
 "$SCRIPT_DIR/check-env.sh"
 
 export NORTHSTAR_BUILD_REV=$(git rev-parse --short HEAD)
