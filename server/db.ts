@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool, type QueryResultRow } from "pg";
 import { adminSeed } from "./config";
 import { hashPassword } from "./password";
+import { writeOperationalLog } from "./operational-logs";
 
 export type DbUser = {
   id: string;
@@ -51,6 +52,17 @@ export type DbRegion = {
   name: string;
   country: string;
   code: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ControllerSettings = {
+  id: string;
+  display_name: string;
+  location_label: string;
+  latitude: number | null;
+  longitude: number | null;
+  location_source: "unset" | "environment" | "manual";
   created_at: string;
   updated_at: string;
 };
@@ -177,6 +189,33 @@ export async function cleanupSessions(): Promise<void> {
 
 export async function listNodes(): Promise<DbNode[]> {
   return dbQuery<DbNode>("SELECT * FROM nodes ORDER BY created_at DESC");
+}
+
+function configuredCoordinate(name: string, minimum: number, maximum: number): number | null {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value >= minimum && value <= maximum ? value : null;
+}
+
+export async function getControllerSettings(): Promise<ControllerSettings> {
+  const latitude = configuredCoordinate("NORTHSTAR_CONTROLLER_LATITUDE", -90, 90);
+  const longitude = configuredCoordinate("NORTHSTAR_CONTROLLER_LONGITUDE", -180, 180);
+  const locationLabel = process.env.NORTHSTAR_CONTROLLER_LOCATION?.trim() || "";
+  const source = latitude !== null && longitude !== null ? "environment" : "unset";
+  const timestamp = now();
+  await dbExec(`INSERT INTO controller_settings
+    (id, display_name, location_label, latitude, longitude, location_source, created_at, updated_at)
+    VALUES ('primary', 'Northstar Controller', $1, $2, $3, $4, $5, $5)
+    ON CONFLICT (id) DO NOTHING`, [locationLabel, latitude, longitude, source, timestamp]);
+  return (await dbQuery<ControllerSettings>("SELECT * FROM controller_settings WHERE id = 'primary'"))[0]!;
+}
+
+export async function updateControllerSettings(input: { displayName: string; locationLabel: string; latitude: number | null; longitude: number | null }): Promise<ControllerSettings> {
+  await getControllerSettings();
+  await dbExec(`UPDATE controller_settings SET display_name = $1, location_label = $2, latitude = $3,
+    longitude = $4, location_source = 'manual', updated_at = $5 WHERE id = 'primary'`, [
+    input.displayName, input.locationLabel, input.latitude, input.longitude, now(),
+  ]);
+  return getControllerSettings();
 }
 
 export async function listRegions(): Promise<DbRegion[]> {
@@ -313,7 +352,7 @@ export async function updateNodeActionProgress(id: string, input: { phase: strin
 
 export async function finishNodeAction(id: string, status: string, output = "", error = ""): Promise<void> {
   const succeeded = status === "succeeded";
-  await dbExec("UPDATE node_actions SET status = $1, output = $2, error = $3, current_phase = $4, progress = $5, finished_at = $6 WHERE id = $7", [status, output, error, succeeded ? "complete" : "failed", succeeded ? 100 : 100, now(), id]);
+  await dbExec("UPDATE node_actions SET status = $1, output = $2, error = $3, current_phase = $4, progress = $5, finished_at = $6 WHERE id = $7", [status, output ? "Full remote output is stored in operational logs." : "", error.slice(-4000), succeeded ? "complete" : "failed", 100, now(), id]);
   await appendNodeActionEvent(id, { level: succeeded ? "info" : "error", phase: succeeded ? "complete" : "failed", message: succeeded ? "Operation completed successfully" : (error || "Operation failed") });
 }
 
@@ -342,9 +381,27 @@ export type DbNodeActionEvent = {
 };
 
 export async function appendNodeActionEvent(actionId: string, input: { phase: string; message: string; level?: "info" | "warning" | "error" }): Promise<void> {
+  if (input.phase === "output" && (input.level || "info") === "info") {
+    void writeOperationalLog({ actionId, component: "controller", level: "info", message: input.message, fields: { phase: input.phase } });
+    return;
+  }
+  const action = (await dbQuery<{ node_id: string; action: string }>("SELECT node_id, action FROM node_actions WHERE id = $1", [actionId]))[0];
+  void writeOperationalLog({ nodeId: action?.node_id, actionId, component: "bootstrap", level: input.level || "info", message: input.message, fields: { phase: input.phase, action: action?.action } });
   const sequence = Number((await dbQuery<{ next: string }>("SELECT COALESCE(MAX(sequence), 0) + 1 AS next FROM node_action_events WHERE action_id = $1", [actionId]))[0]?.next || 1);
   await dbExec(`INSERT INTO node_action_events (id, action_id, sequence, level, phase, message, created_at)
     VALUES ($1, $2, $3, $4, $5, $6, $7)`, [randomUUID(), actionId, sequence, input.level || "info", input.phase.slice(0, 64), input.message.slice(0, 4000), now()]);
+}
+
+export async function purgeStoredOperationalLogs(nodeId?: string): Promise<void> {
+  if (nodeId) {
+    await dbExec("DELETE FROM node_action_events WHERE action_id IN (SELECT id FROM node_actions WHERE node_id = $1)", [nodeId]);
+    await dbExec("UPDATE node_actions SET output = '', error = '' WHERE node_id = $1", [nodeId]);
+    await dbExec("DELETE FROM reconcile_tasks WHERE node_id = $1 AND status IN ('succeeded', 'failed')", [nodeId]);
+    return;
+  }
+  await dbExec("DELETE FROM node_action_events");
+  await dbExec("UPDATE node_actions SET output = '', error = ''");
+  await dbExec("DELETE FROM reconcile_tasks WHERE status IN ('succeeded', 'failed')");
 }
 
 export async function listNodeActionEvents(nodeId: string, limit = 250): Promise<DbNodeActionEvent[]> {

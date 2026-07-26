@@ -334,19 +334,36 @@ export async function listNodeProtocols(nodeId?: string): Promise<NodeProtocol[]
 }
 
 export async function allocateIpLease(nodeId: string, protocol: Protocol, deviceId: string): Promise<string> {
-  const existing = (await dbQuery<{ address: string }>("SELECT address FROM ip_leases WHERE node_id = $1 AND protocol = $2 AND device_id = $3 AND status = 'active'", [nodeId, protocol, deviceId]))[0];
-  if (existing) return existing.address;
-  const used = new Set((await dbQuery<{ address: string }>("SELECT address FROM ip_leases WHERE node_id = $1 AND protocol = $2 AND status = 'active'", [nodeId, protocol])).map((row) => row.address));
-  let address = "";
+  // A released row remains in the table for auditability, so treating only
+  // active rows as occupied would try to insert the same unique address again.
+  const existing = (await dbQuery<{ id: string; address: string; status: string }>("SELECT id, address, status FROM ip_leases WHERE node_id = $1 AND protocol = $2 AND device_id = $3", [nodeId, protocol, deviceId]))[0];
+  if (existing) {
+    if (existing.status !== "active") await dbExec("UPDATE ip_leases SET status = 'active', released_at = NULL, created_at = $1 WHERE id = $2", [now(), existing.id]);
+    return existing.address;
+  }
+
+  // Reassign one released address atomically before consuming a new address.
+  const released = await dbQuery<{ address: string }>(`WITH reusable AS (
+      SELECT id FROM ip_leases WHERE node_id = $1 AND protocol = $2 AND status = 'released'
+      ORDER BY released_at NULLS FIRST, created_at LIMIT 1 FOR UPDATE SKIP LOCKED
+    ) UPDATE ip_leases SET device_id = $3, status = 'active', released_at = NULL, created_at = $4
+      FROM reusable WHERE ip_leases.id = reusable.id RETURNING ip_leases.address`, [nodeId, protocol, deviceId, now()]);
+  if (released[0]) return released[0].address;
+
+  const occupied = new Set((await dbQuery<{ address: string }>("SELECT address FROM ip_leases WHERE node_id = $1 AND protocol = $2", [nodeId, protocol])).map((row) => row.address));
   const network = protocol === "openvpn" ? "10.71.0" : "10.70.0";
   for (let index = 2; index < 255; index += 1) {
-    const candidate = `${network}.${index}/32`;
-    if (!used.has(candidate)) { address = candidate; break; }
+    const address = `${network}.${index}/32`;
+    if (occupied.has(address)) continue;
+    try {
+      await dbExec(`INSERT INTO ip_leases (id, node_id, protocol, device_id, address, status, created_at)
+        VALUES ($1, $2, $3, $4, $5, 'active', $6)`, [`lease_${randomUUID()}`, nodeId, protocol, deviceId, address, now()]);
+      return address;
+    } catch (error) {
+      if ((error as { code?: string }).code !== "23505") throw error;
+    }
   }
-  if (!address) throw new Error("No VPN addresses available for this node and protocol");
-  await dbExec(`INSERT INTO ip_leases (id, node_id, protocol, device_id, address, status, created_at)
-    VALUES ($1, $2, $3, $4, $5, 'active', $6)`, [`lease_${randomUUID()}`, nodeId, protocol, deviceId, address, now()]);
-  return address;
+  throw new Error("No VPN addresses available for this node and protocol");
 }
 
 function profileFromRow(row: Record<string, unknown>): ConnectionProfile {

@@ -37,12 +37,17 @@ type NodeMetrics = {
 type AccessDevice = { id: string; displayName: string; platform: string; publicKey: string; status: string };
 type AccessProfile = {
   id: string;
+  deviceId: string;
+  nodeId: string;
+  revision: number;
+  status: string;
   endpoint: { host: string; port: number };
   clientAddress: string | null;
   dns: string[];
   allowedIps: string[];
   protocol: "wireguard" | "openvpn";
   protocolPayload: { serverPublicKey?: string };
+  issuedAt: string;
 };
 
 type Region = {
@@ -95,6 +100,18 @@ type NodeDiagnostics = {
     observed: Array<{ protocol: string; appliedRevision: number; status: string; lastError: string; updatedAt: string }>;
     tasks: ReconcileTask[];
   };
+};
+
+type OperationalLogLine = { timestamp: string; labels: Record<string, string>; message: string; actionId?: string };
+
+type ControllerInfo = {
+  settings: { display_name: string; location_label: string; latitude: number | null; longitude: number | null; location_source: "unset" | "environment" | "manual" };
+  status: "healthy";
+  publicOrigin: string;
+  publicHost: string;
+  publicIp: string | null;
+  build: string;
+  runtime: { uptimeSeconds: number; nodeVersion: string; rssBytes: number; heapUsedBytes: number; load1: number; observedAt: string };
 };
 
 function formatTime(value: string | null | undefined, timeZone: string): string {
@@ -183,9 +200,11 @@ const initialNodes: Node[] = [
 
 const navItems = [
   ["Overview", "⌘"],
+  ["Controller", "◈"],
   ["Nodes", "◉"],
   ["Regions", "⌖"],
   ["Access", "⌁"],
+  ["Logs", "≡"],
   ["Sessions", "▣"],
   ["Audit", "◌"],
 ];
@@ -222,12 +241,6 @@ function base64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-function buildWireGuardConfig(profile: AccessProfile, privateKey: string): string {
-  const serverPublicKey = profile.protocolPayload.serverPublicKey;
-  if (!serverPublicKey || !profile.clientAddress) throw new Error("The selected node has not reported its WireGuard server key yet.");
-  return `[Interface]\nPrivateKey = ${privateKey}\nAddress = ${profile.clientAddress}/32\nDNS = ${profile.dns.join(", ")}\n\n[Peer]\nPublicKey = ${serverPublicKey}\nEndpoint = ${profile.endpoint.host}:${profile.endpoint.port}\nAllowedIPs = ${profile.allowedIps.join(", ")}\nPersistentKeepalive = 25\n`;
-}
-
 function ResourceMetrics({ metrics, timeZone = "UTC" }: { metrics?: NodeMetrics | null; timeZone?: string }) {
   if (!metrics) return <p className="diagnostics-empty">Resource metrics are waiting for the first Agent heartbeat.</p>;
   const metricClass = (value: number) => value >= 90 ? "metric-danger" : value >= 75 ? "metric-warning" : "";
@@ -243,20 +256,28 @@ function ResourceMetrics({ metrics, timeZone = "UTC" }: { metrics?: NodeMetrics 
 }
 
 const mapPins = [
-  { match: "frankfurt", x: 529, y: 281 },
-  { match: "tokyo", x: 899, y: 332 },
-  { match: "los angeles", x: 174, y: 338 },
-  { match: "singapore", x: 798, y: 455 },
+  { match: "frankfurt", latitude: 50.1109, longitude: 8.6821 },
+  { match: "tokyo", latitude: 35.6762, longitude: 139.6503 },
+  { match: "los angeles", latitude: 34.0522, longitude: -118.2437 },
+  { match: "singapore", latitude: 1.3521, longitude: 103.8198 },
 ];
 const worldLocations = worldMap.locations as Array<{ id: string; name: string; path: string }>;
 
-function pinForNode(node: Node) {
-  const place = `${node.name} ${node.place}`.toLowerCase();
-  return mapPins.find((pin) => place.includes(pin.match)) || null;
+function mapPoint(latitude: number, longitude: number) {
+  return { x: ((longitude + 180) / 360) * 1010, y: 333 - latitude * 1.3 };
 }
 
-function WorldMap({ nodes }: { nodes: Node[] }) {
-  const pins = nodes.map((node) => ({ node, pin: pinForNode(node) })).filter((item): item is { node: Node; pin: { match: string; x: number; y: number } } => Boolean(item.pin));
+function pinForNode(node: Node) {
+  const place = `${node.name} ${node.place}`.toLowerCase();
+  const pin = mapPins.find((item) => place.includes(item.match));
+  return pin ? mapPoint(pin.latitude, pin.longitude) : null;
+}
+
+function WorldMap({ nodes, controller }: { nodes: Node[]; controller: ControllerInfo | null }) {
+  const pins = nodes.map((node) => ({ node, pin: pinForNode(node) })).filter((item): item is { node: Node; pin: { x: number; y: number } } => Boolean(item.pin));
+  const controllerSettings = controller?.settings;
+  const controllerPoint = controllerSettings?.latitude !== null && controllerSettings?.latitude !== undefined && controllerSettings.longitude !== null && controllerSettings.longitude !== undefined
+    ? mapPoint(controllerSettings.latitude, controllerSettings.longitude) : null;
 
   return (
     <div className="world-map">
@@ -264,11 +285,11 @@ function WorldMap({ nodes }: { nodes: Node[] }) {
         <rect className="map-ocean" x="0" y="0" width="1010" height="666" />
         <g className="map-graticule"><path d="M0 333H1010M505 0V666" /><ellipse cx="505" cy="333" rx="337" ry="222" /></g>
         <g className="map-land">{worldLocations.map((location) => <path key={location.id} d={location.path} aria-label={location.name}><title>{location.name}</title></path>)}</g>
-        <g className="map-routes">{pins.map(({ node, pin }) => <path key={`route-${node.id}`} d={`M520 235 Q ${(520 + pin.x) / 2} ${(235 + pin.y) / 2 - 45} ${pin.x} ${pin.y}`} />)}</g>
-        <g className="map-control" transform="translate(520 235)"><circle r="9" /><circle className="map-marker-core" r="3" /><text x="13" y="4">CONTROL</text></g>
+        {controllerPoint && <g className="map-routes">{pins.map(({ node, pin }) => <path key={`route-${node.id}`} d={`M${controllerPoint.x} ${controllerPoint.y} Q ${(controllerPoint.x + pin.x) / 2} ${(controllerPoint.y + pin.y) / 2 - 45} ${pin.x} ${pin.y}`} />)}</g>}
+        {controllerPoint && <g className="map-control" transform={`translate(${controllerPoint.x} ${controllerPoint.y})`}><circle r="9" /><circle className="map-marker-core" r="3" /><text x="13" y="4">{controller?.settings.display_name || "CONTROL"}</text></g>}
         <g className="map-markers">{pins.map(({ node, pin }) => <g key={node.id} className={`map-marker map-marker-${node.status}`} transform={`translate(${pin.x} ${pin.y})`}><title>{`${node.name} · ${node.place}`}</title><circle className="map-marker-halo" r="11" /><circle className="map-marker-core" r="4" /><text x="12" y="4">{node.name}</text></g>)}</g>
       </svg>
-      <div className="map-caption">{nodes.length} edge nodes · {pins.length} shown on map</div>
+      <div className="map-caption">{nodes.length} edge nodes · {pins.length} shown on map · {controllerPoint ? "Controller location set" : "Set Controller location to show it"}</div>
       <div className="map-attribution">Map data: <a href="https://github.com/VictorCazanave/svg-maps" target="_blank" rel="noreferrer">@svg-maps/world</a> · CC BY 4.0</div>
     </div>
   );
@@ -347,6 +368,9 @@ function NodeFleet({
 export default function Home() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
+  const [controller, setController] = useState<ControllerInfo | null>(null);
+  const [controllerForm, setControllerForm] = useState({ displayName: "Northstar Controller", locationLabel: "", latitude: "", longitude: "" });
+  const [controllerBusy, setControllerBusy] = useState(false);
   const [authStatus, setAuthStatus] = useState<"loading" | "signed-out" | "signed-in">("loading");
   const [user, setUser] = useState<{ displayName: string; email: string } | null>(null);
   const [login, setLogin] = useState({ email: "", password: "" });
@@ -371,6 +395,7 @@ export default function Home() {
   const [showFingerprintGuide, setShowFingerprintGuide] = useState(false);
   const [fingerprintCommandCopied, setFingerprintCommandCopied] = useState(false);
   const [accessDevices, setAccessDevices] = useState<AccessDevice[]>([]);
+  const [accessProfiles, setAccessProfiles] = useState<AccessProfile[]>([]);
   const [accessNodeId, setAccessNodeId] = useState("");
   const [accessProtocol, setAccessProtocol] = useState<"wireguard" | "openvpn">("wireguard");
   const [accessDeviceName, setAccessDeviceName] = useState("My Mac");
@@ -380,6 +405,14 @@ export default function Home() {
   const [accessError, setAccessError] = useState("");
   const [accessConfig, setAccessConfig] = useState<{ name: string; config: string } | null>(null);
   const [timeZone, setTimeZone] = useState("UTC");
+  const [operationalLogs, setOperationalLogs] = useState<OperationalLogLine[]>([]);
+  const [logsAvailable, setLogsAvailable] = useState(true);
+  const [logsBusy, setLogsBusy] = useState(false);
+  const [logNodeId, setLogNodeId] = useState("");
+  const [logLevel, setLogLevel] = useState("");
+  const [logHours, setLogHours] = useState("24");
+  const [showLogPurge, setShowLogPurge] = useState(false);
+  const [logPurgeConfirmation, setLogPurgeConfirmation] = useState("");
 
   const loadNodes = useCallback(async () => {
     const response = await fetch("/api/nodes", { cache: "no-store" });
@@ -415,12 +448,47 @@ export default function Home() {
     setForm((current) => ({ ...current, regionId: payload.regions.some((region) => region.id === current.regionId) ? current.regionId : payload.regions[0]?.id || "" }));
   }, []);
 
+  const loadController = useCallback(async () => {
+    const response = await fetch("/api/controller", { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json() as ControllerInfo;
+    setController(payload);
+    setControllerForm({
+      displayName: payload.settings.display_name,
+      locationLabel: payload.settings.location_label,
+      latitude: payload.settings.latitude === null ? "" : String(payload.settings.latitude),
+      longitude: payload.settings.longitude === null ? "" : String(payload.settings.longitude),
+    });
+  }, []);
+
   const loadAccessDevices = useCallback(async () => {
     const response = await fetch("/api/access/devices", { cache: "no-store" });
     if (!response.ok) return;
     const payload = await response.json() as { devices?: AccessDevice[] };
     setAccessDevices(payload.devices || []);
   }, []);
+
+  const loadAccessProfiles = useCallback(async () => {
+    const response = await fetch("/api/access/profiles", { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json() as { profiles?: AccessProfile[] };
+    setAccessProfiles(payload.profiles || []);
+  }, []);
+
+  const loadOperationalLogs = useCallback(async () => {
+    setLogsBusy(true);
+    try {
+      const params = new URLSearchParams({ hours: logHours, limit: "300" });
+      if (logNodeId) params.set("nodeId", logNodeId);
+      if (logLevel) params.set("level", logLevel);
+      const response = await fetch(`/api/logs?${params}`, { cache: "no-store" });
+      const payload = await response.json().catch(() => ({})) as { logs?: OperationalLogLine[]; available?: boolean };
+      if (response.ok) {
+        setOperationalLogs(payload.logs || []);
+        setLogsAvailable(payload.available !== false);
+      }
+    } finally { setLogsBusy(false); }
+  }, [logHours, logLevel, logNodeId]);
 
   const loadNodeDiagnostics = useCallback(async (nodeId: string) => {
     setDiagnosticsBusy(true);
@@ -444,9 +512,9 @@ export default function Home() {
       const payload = await response.json() as { user: { displayName: string; email: string } };
       setUser(payload.user);
       setAuthStatus("signed-in");
-      await Promise.all([loadNodes(), loadRegions()]);
+      await Promise.all([loadNodes(), loadRegions(), loadController()]);
     }).catch(() => setAuthStatus("signed-out"));
-  }, [loadNodes, loadRegions]);
+  }, [loadController, loadNodes, loadRegions]);
 
   useEffect(() => {
     if (authStatus !== "signed-in") return undefined;
@@ -461,9 +529,16 @@ export default function Home() {
 
   useEffect(() => {
     if (authStatus !== "signed-in" || activeNav !== "Access") return undefined;
-    const timer = window.setTimeout(() => void loadAccessDevices(), 0);
+    const timer = window.setTimeout(() => { void Promise.all([loadAccessDevices(), loadAccessProfiles()]); }, 0);
     return () => window.clearTimeout(timer);
-  }, [activeNav, authStatus, loadAccessDevices]);
+  }, [activeNav, authStatus, loadAccessDevices, loadAccessProfiles]);
+
+  useEffect(() => {
+    if (authStatus !== "signed-in" || activeNav !== "Logs") return undefined;
+    void loadOperationalLogs();
+    const timer = window.setInterval(() => { void loadOperationalLogs(); }, 10_000);
+    return () => window.clearInterval(timer);
+  }, [activeNav, authStatus, loadOperationalLogs]);
 
   useEffect(() => {
     if (!showTerminal || !selectedNode) return undefined;
@@ -510,7 +585,7 @@ export default function Home() {
     setAuthStatus("signed-in");
     setLogin({ email: "", password: "" });
     setLoginBusy(false);
-    await Promise.all([loadNodes(), loadRegions()]);
+    await Promise.all([loadNodes(), loadRegions(), loadController()]);
   }
 
   async function signOut() {
@@ -546,23 +621,19 @@ export default function Home() {
       setAccessDevices((current) => [devicePayload.device!, ...current]);
       const profileResponse = await fetch("/api/access/profiles", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deviceId: devicePayload.device.id, nodeId: node.id, protocol: accessProtocol }),
+        body: JSON.stringify({ deviceId: devicePayload.device.id, nodeId: node.id, protocol: accessProtocol, clientPrivateKey: privateKey || undefined }),
       });
       const profilePayload = await profileResponse.json().catch(() => ({})) as { profile?: AccessProfile; error?: string };
       if (!profileResponse.ok || !profilePayload.profile) throw new Error(profilePayload.error || "Unable to create a connection profile");
       const activateResponse = await fetch(`/api/access/profiles/${profilePayload.profile.id}/activate`, { method: "POST" });
       const activatePayload = await activateResponse.json().catch(() => ({})) as { profile?: AccessProfile; error?: string };
       if (!activateResponse.ok || !activatePayload.profile) throw new Error(activatePayload.error || "Unable to activate the connection profile");
-      if (accessProtocol === "wireguard") {
-        setAccessConfig({ name: `${node.name.replaceAll(/[^A-Za-z0-9_-]+/g, "-")}.conf`, config: buildWireGuardConfig(activatePayload.profile, privateKey) });
-        setNotice(`${node.name} WireGuard profile is ready. Download it and import it into WireGuard.`);
-      } else {
-        const downloadResponse = await fetch(`/api/access/profiles/${activatePayload.profile.id}/download`, { cache: "no-store" });
-        const config = await downloadResponse.text();
-        if (!downloadResponse.ok) throw new Error(config || "Unable to export OpenVPN profile");
-        setAccessConfig({ name: `${node.name.replaceAll(/[^A-Za-z0-9_-]+/g, "-")}.ovpn`, config });
-        setNotice(`${node.name} OpenVPN profile is ready. Download it and import it into OpenVPN Connect.`);
-      }
+      const downloadResponse = await fetch(`/api/access/profiles/${activatePayload.profile.id}/download`, { cache: "no-store" });
+      const config = await downloadResponse.text();
+      if (!downloadResponse.ok) throw new Error(config || "Unable to export the connection profile");
+      setAccessConfig({ name: `${node.name.replaceAll(/[^A-Za-z0-9_-]+/g, "-")}.${accessProtocol === "openvpn" ? "ovpn" : "conf"}`, config });
+      setNotice(`${node.name} ${accessProtocol === "openvpn" ? "OpenVPN" : "WireGuard"} profile is ready. Download it and import it into the matching client.`);
+      await loadAccessProfiles();
     } catch (error) {
       setAccessError(error instanceof Error ? error.message : "Unable to prepare the Mac connection");
     } finally {
@@ -580,6 +651,24 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
+  async function exportAccessProfile(profile: AccessProfile) {
+    setAccessBusy(true);
+    setAccessError("");
+    try {
+      const response = await fetch(`/api/access/profiles/${profile.id}/download`, { cache: "no-store" });
+      const config = await response.text();
+      if (!response.ok) throw new Error(config || "Unable to export this profile");
+      const node = nodes.find((item) => item.id === profile.nodeId);
+      const extension = profile.protocol === "openvpn" ? "ovpn" : "conf";
+      setAccessConfig({ name: `${(node?.name || "northstar").replaceAll(/[^A-Za-z0-9_-]+/g, "-")}.${extension}`, config });
+      setNotice(`${profile.protocol === "openvpn" ? "OpenVPN" : "WireGuard"} configuration loaded. Download it below.`);
+    } catch (error) {
+      setAccessError(error instanceof Error ? error.message : "Unable to export this profile");
+    } finally {
+      setAccessBusy(false);
+    }
+  }
+
   async function revokeAccessDevice(device: AccessDevice) {
     setAccessDeviceBusy(device.id);
     try {
@@ -587,6 +676,7 @@ export default function Home() {
       const payload = await response.json().catch(() => ({})) as { device?: AccessDevice; error?: string };
       if (!response.ok || !payload.device) throw new Error(payload.error || "Unable to revoke the device");
       setAccessDevices((current) => current.map((item) => item.id === device.id ? payload.device! : item));
+      await loadAccessProfiles();
       setNotice(`${device.displayName} was revoked and removed from the VPN configuration.`);
     } catch (error) {
       setAccessError(error instanceof Error ? error.message : "Unable to revoke the device");
@@ -661,6 +751,30 @@ export default function Home() {
     await loadNodes();
   }
 
+  async function saveController(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setControllerBusy(true);
+    try {
+      const response = await fetch("/api/controller", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: controllerForm.displayName,
+          locationLabel: controllerForm.locationLabel,
+          latitude: controllerForm.latitude === "" ? null : Number(controllerForm.latitude),
+          longitude: controllerForm.longitude === "" ? null : Number(controllerForm.longitude),
+        }),
+      });
+      const payload = await response.json().catch(() => ({})) as ControllerInfo & { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Unable to update Controller settings");
+      setController(payload);
+      setNotice("Controller location and presentation settings saved.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to update Controller settings");
+    } finally {
+      setControllerBusy(false);
+    }
+  }
+
   function editRegion(region: Region) {
     setEditingRegionId(region.id);
     setRegionForm({ name: region.name, country: region.country, code: region.code });
@@ -676,6 +790,22 @@ export default function Home() {
     setRegions((current) => current.filter((item) => item.id !== region.id));
     setForm((current) => current.regionId === region.id ? { ...current, regionId: regions.find((item) => item.id !== region.id)?.id || "" } : current);
     setNotice(`${region.name} region deleted.`);
+  }
+
+  async function purgeOperationalLogs() {
+    if (logPurgeConfirmation !== "PURGE SYSTEM LOGS") return;
+    setLogsBusy(true);
+    try {
+      const response = await fetch("/api/logs/purge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmation: logPurgeConfirmation, nodeId: logNodeId || undefined }) });
+      const payload = await response.json().catch(() => ({})) as { error?: string; physicalDeletion?: string };
+      if (!response.ok) throw new Error(payload.error || "Unable to purge logs");
+      setOperationalLogs([]);
+      setNotice(`System logs were purged. Physical chunk deletion is ${payload.physicalDeletion || "scheduled"}. Audit records were retained.`);
+      setShowLogPurge(false);
+      setLogPurgeConfirmation("");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to purge logs");
+    } finally { setLogsBusy(false); }
   }
 
   async function executeNodeAction(node: Node, action: NodeOperation) {
@@ -880,8 +1010,8 @@ export default function Home() {
 
           <section className="network-grid">
             <article className="coverage-card card">
-              <div className="section-title"><div><p>GLOBAL FABRIC</p><h2>Edge coverage</h2></div><button className="plain-action" type="button" onClick={() => setNotice("Topology view is available from the live map.")}>View topology <span>↗</span></button></div>
-              <WorldMap nodes={nodes} />
+              <div className="section-title"><div><p>GLOBAL FABRIC</p><h2>Edge coverage</h2></div><button className="plain-action" type="button" onClick={() => setActiveNav("Controller")}>Controller settings <span>↗</span></button></div>
+              <WorldMap nodes={nodes} controller={controller} />
               <div className="coverage-footer"><span><i className="legend online" /> Online <b>{healthyNodes}</b></span><span><i className="legend warning" /> Attention <b>{attentionNodes}</b></span><span><i className="legend queued" /> Deploying <b>{nodes.filter((node) => node.status === "provisioning").length}</b></span></div>
             </article>
 
@@ -918,9 +1048,18 @@ export default function Home() {
           </div>
         </section>}
 
+        {activeNav === "Controller" && <section className="module-view card controller-workspace">
+          <div className="section-title route-title"><div><p>CONTROL PLANE</p><h1>Controller</h1></div><span className="route-status">{controller?.status === "healthy" ? "Healthy" : "Loading…"}</span></div>
+          <div className="controller-copy">The public endpoint and resolved address are detected from the configured Controller origin. Geographic position is deliberately explicit: public-IP geolocation is not reliable enough to place production infrastructure on the map without confirmation.</div>
+          <div className="controller-grid">
+            <section className="controller-card"><div className="diagnostics-section-head"><b>Runtime</b><span>{controller?.build || "—"}</span></div><div className="controller-facts"><div><span>Status</span><b>{controller?.status || "loading"}</b></div><div><span>Public origin</span><b>{controller?.publicOrigin || "—"}</b></div><div><span>Resolved IP</span><b>{controller?.publicIp || "Unresolved"}</b></div><div><span>Node runtime</span><b>{controller ? `${Math.floor(controller.runtime.uptimeSeconds / 60)} min · ${controller.runtime.nodeVersion}` : "—"}</b></div><div><span>Process memory</span><b>{controller ? `${formatBytes(controller.runtime.rssBytes)} RSS · ${formatBytes(controller.runtime.heapUsedBytes)} heap` : "—"}</b></div><div><span>Host load (1 min)</span><b>{controller ? controller.runtime.load1.toFixed(2) : "—"}</b></div><div><span>Observed</span><b>{controller ? formatTime(controller.runtime.observedAt, timeZone) : "—"}</b></div></div></section>
+            <form className="controller-card controller-form" onSubmit={saveController}><div className="diagnostics-section-head"><b>Map location</b><span>{controller?.settings.location_source || "unset"}</span></div><label>Display name<input required maxLength={120} value={controllerForm.displayName} onChange={(event) => setControllerForm({ ...controllerForm, displayName: event.target.value })} /></label><label>Location label<input maxLength={160} placeholder="e.g. Hangzhou, China" value={controllerForm.locationLabel} onChange={(event) => setControllerForm({ ...controllerForm, locationLabel: event.target.value })} /></label><div className="field-pair"><label>Latitude<input type="number" min="-90" max="90" step="any" placeholder="30.2741" value={controllerForm.latitude} onChange={(event) => setControllerForm({ ...controllerForm, latitude: event.target.value })} /></label><label>Longitude<input type="number" min="-180" max="180" step="any" placeholder="120.1551" value={controllerForm.longitude} onChange={(event) => setControllerForm({ ...controllerForm, longitude: event.target.value })} /></label></div><p>Set both coordinates to place the Controller on Edge coverage. Clearing both values removes the marker instead of showing an inaccurate default.</p><button className="primary-button" type="submit" disabled={controllerBusy}>{controllerBusy ? "Saving…" : "Save Controller location"}</button></form>
+          </div>
+        </section>}
+
         {activeNav === "Access" && <section className="module-view card access-workspace">
           <div className="section-title route-title"><div><p>USER ACCESS</p><h1>Connect a device</h1></div><span className="route-status">WireGuard · OpenVPN</span></div>
-          <div className="access-copy">Choose a healthy node and generate an import-ready macOS profile. WireGuard keys are created locally; OpenVPN credentials are issued by the managed controller CA.</div>
+          <div className="access-copy">Choose a healthy node and generate an import-ready macOS profile. Both WireGuard and OpenVPN configurations can be downloaded again from the profile list; private material is encrypted by the Controller and is never returned through a list API.</div>
           <div className="access-form">
             <label>Edge node<select value={accessNodeId || nodes.find((node) => node.status === "online")?.id || ""} onChange={(event) => setAccessNodeId(event.target.value)}>{nodes.length === 0 && <option value="">No nodes available</option>}{nodes.map((node) => <option key={node.id} value={node.id} disabled={node.status !== "online"}>{node.name} · {node.place} · {node.status}</option>)}</select></label>
             <label>Protocol<select value={accessProtocol} onChange={(event) => setAccessProtocol(event.target.value as "wireguard" | "openvpn")}><option value="wireguard">WireGuard</option><option value="openvpn">OpenVPN</option></select></label>
@@ -929,7 +1068,15 @@ export default function Home() {
           </div>
           {accessError && <p className="form-error" role="alert">{accessError}</p>}
           {accessConfig && <div className="access-result"><div><p className="eyebrow"><span /> PROFILE READY</p><h2>Import this profile into {accessProtocol === "openvpn" ? "OpenVPN Connect" : "WireGuard"}.</h2><p>Download the file, import it in the matching macOS app, then activate the connection. Keep the downloaded file private.</p></div><button className="secondary-button access-download" type="button" onClick={downloadAccessConfig}>Download {accessConfig.name} <span>↓</span></button><details><summary>Show configuration</summary><pre>{accessConfig.config}</pre></details></div>}
+          <div className="access-devices"><div className="diagnostics-section-head"><b>Connection profiles</b><span>{accessProfiles.length}</span></div>{accessProfiles.length ? accessProfiles.map((profile) => <div className="access-device access-profile" key={profile.id}><span className="flag">{profile.protocol === "openvpn" ? "OV" : "WG"}</span><div><b>{nodes.find((node) => node.id === profile.nodeId)?.name || "Unknown node"} · {profile.protocol}</b><small>{profile.status} · {profile.clientAddress || "address pending"} · {formatTime(profile.issuedAt, timeZone)}</small></div>{profile.status === "active" && <button className="access-profile-download" type="button" disabled={accessBusy} onClick={() => void exportAccessProfile(profile)}>{accessBusy ? "Loading…" : "Export config"}</button>}</div>) : <p className="diagnostics-empty">No connection profiles have been issued yet.</p>}</div>
           <div className="access-devices"><div className="diagnostics-section-head"><b>Registered devices</b><span>{accessDevices.length}</span></div>{accessDevices.length ? accessDevices.map((device) => <div className="access-device" key={device.id}><span className="flag">MAC</span><div><b>{device.displayName}</b><small>{device.status} · {device.publicKey.slice(0, 16)}…</small></div>{device.status === "active" && <button className="access-device-revoke" type="button" disabled={accessDeviceBusy === device.id} onClick={() => setPendingDeviceRevocation(device)}>{accessDeviceBusy === device.id ? "Revoking…" : "Revoke"}</button>}</div>) : <p className="diagnostics-empty">No devices have been registered yet.</p>}</div>
+        </section>}
+
+        {activeNav === "Logs" && <section className="module-view card logs-workspace">
+          <div className="section-title route-title"><div><p>OPERATIONS</p><h1>System logs</h1></div><span className={`route-status${logsAvailable ? "" : " route-status-warning"}`}>Loki · {logsAvailable ? `${operationalLogs.length} lines` : "unavailable"}</span></div>
+          <div className="logs-copy">Runtime logs are retained separately from audit records. Filters affect viewing and the optional node-scoped purge action.</div>
+          <div className="logs-toolbar"><label>Node<select value={logNodeId} onChange={(event) => setLogNodeId(event.target.value)}><option value="">All nodes</option>{nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label>Level<select value={logLevel} onChange={(event) => setLogLevel(event.target.value)}><option value="">All levels</option><option value="info">Info</option><option value="warning">Warning</option><option value="error">Error</option></select></label><label>Period<select value={logHours} onChange={(event) => setLogHours(event.target.value)}><option value="1">Last hour</option><option value="24">Last 24 hours</option><option value="168">Last 7 days</option></select></label><button type="button" className="secondary-button" onClick={() => void loadOperationalLogs()} disabled={logsBusy}>{logsBusy ? "Loading…" : "Refresh"}</button><button type="button" className="danger-button" onClick={() => setShowLogPurge(true)} disabled={logsBusy}>Purge {logNodeId ? "node" : "system"} logs</button></div>
+          <div className="logs-table">{operationalLogs.length ? operationalLogs.map((log, index) => <article key={`${log.timestamp}-${index}`} className={`log-line log-${log.labels.level || "info"}`}><time>{formatTime(log.timestamp, timeZone)}</time><span>{nodes.find((node) => node.id === log.labels.node)?.name || log.labels.node || "Controller"}</span><b>{log.labels.component || "system"}</b><p>{log.message}</p></article>) : <p className="diagnostics-empty">{logsBusy ? "Loading operational logs…" : logsAvailable ? "No matching operational logs are available." : "The operational log service is unavailable. Node actions continue to run; retry after the log service is healthy."}</p>}</div>
         </section>}
 
         {(activeNav === "Sessions" || activeNav === "Audit") && <section className="module-view card module-placeholder">
@@ -988,6 +1135,8 @@ export default function Home() {
           </section>
         </div>
       )}
+
+      {showLogPurge && <div className="modal-layer" role="presentation" onMouseDown={() => !logsBusy && setShowLogPurge(false)}><section className="modal confirm-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><p>IRREVERSIBLE OPERATION</p><h2>Purge {logNodeId ? "node" : "all"} system logs?</h2></div><button type="button" onClick={() => setShowLogPurge(false)} disabled={logsBusy}>×</button></div><div className="confirm-body"><p>This deletes operational logs and Controller-side raw job output. Audit records are retained. Loki removes matching logs from search immediately and its compactor deletes physical chunks shortly afterward.</p><label>Type <b>PURGE SYSTEM LOGS</b><input autoFocus value={logPurgeConfirmation} onChange={(event) => setLogPurgeConfirmation(event.target.value)} /></label></div><div className="modal-actions confirm-actions"><button type="button" className="cancel" onClick={() => setShowLogPurge(false)} disabled={logsBusy}>Cancel</button><button type="button" className="danger-button" onClick={() => void purgeOperationalLogs()} disabled={logsBusy || logPurgeConfirmation !== "PURGE SYSTEM LOGS"}>{logsBusy ? "Purging…" : "Purge permanently"}</button></div></section></div>}
 
       <ConfirmDialog
         open={Boolean(pendingNodeConfirmation)}

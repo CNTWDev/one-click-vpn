@@ -30,10 +30,11 @@ export async function POST(request: Request) {
     const nodeId = cleanText(body.nodeId, 128);
     const protocol = cleanText(body.protocol, 32) as Protocol;
     const transport = cleanText(body.transport, 32) || undefined;
+    const clientPrivateKey = cleanText(body.clientPrivateKey, 128) || undefined;
     const device = await findDevice(deviceId);
     if (!device || device.user_id !== user.id || !deviceId || !nodeId || !protocols.has(protocol)) return jsonError("deviceId, nodeId, and a supported protocol are required");
     if (!protocolForPlatform(device.platform, protocol)) return jsonError("Protocol is not supported by the device platform");
-    const profile = await issueConnectionProfile({ actorUserId: user.id, deviceId, nodeId, protocol, transport });
+    const profile = await issueConnectionProfile({ actorUserId: user.id, deviceId, nodeId, protocol, transport, clientPrivateKey });
     return NextResponse.json({ profile: publicProfile(profile) }, { status: 201 });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to issue profile", 409);

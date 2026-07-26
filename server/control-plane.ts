@@ -21,6 +21,7 @@ import {
 } from "./control-db";
 import { getProtocolAdapter } from "./protocols/registry";
 import { ensureOpenVpnClientCredential, ensureOpenVpnServerBundle, openVpnRevokedSerials } from "./openvpn-pki";
+import { createSecretMaterial, deleteSecretMaterialsByKind, readSecretMaterial } from "./secret-materials";
 
 export function publicDevice(device: Awaited<ReturnType<typeof findDevice>>) {
   if (!device) return null;
@@ -42,6 +43,7 @@ export function publicProfile(profile: ConnectionProfile) {
     delete protocolPayload.clientKeySecretId;
     delete protocolPayload.tlsCryptSecretId;
   }
+  if (profile.protocol === "wireguard") delete protocolPayload.clientPrivateKeySecretId;
   return {
     id: profile.id,
     deviceId: profile.device_id,
@@ -120,6 +122,7 @@ export async function issueConnectionProfile(input: {
   transport?: string;
   expiresInSeconds?: number;
   rotateCredential?: boolean;
+  clientPrivateKey?: string;
 }): Promise<ConnectionProfile> {
   const device = await findDevice(input.deviceId);
   if (!device || device.status !== "active") throw new Error("Device is not active");
@@ -155,6 +158,11 @@ export async function issueConnectionProfile(input: {
       tlsCryptSecretId: openvpnCredential.authority.tls_crypt_secret_id || "",
     } : undefined,
   });
+  if (input.protocol === "wireguard") {
+    if (!isWireGuardPrivateKey(input.clientPrivateKey)) throw new Error("A valid WireGuard private key is required to create an exportable profile");
+    const privateKey = await createSecretMaterial({ kind: `wireguard_client_private_key:${device.id}`, value: input.clientPrivateKey });
+    profile.protocolPayload.clientPrivateKeySecretId = privateKey.id;
+  }
   const saved = await createConnectionProfile({
     deviceId: input.deviceId,
     nodeId: input.nodeId,
@@ -171,6 +179,25 @@ export async function issueConnectionProfile(input: {
   return saved;
 }
 
+function isWireGuardPrivateKey(value: string | undefined): value is string {
+  if (!value || !/^[A-Za-z0-9+/]{43}=$/.test(value)) return false;
+  return Buffer.from(value, "base64").length === 32;
+}
+
+export async function renderWireGuardProfile(profile: ConnectionProfile): Promise<string> {
+  const serverPublicKey = typeof profile.protocol_payload.serverPublicKey === "string" ? profile.protocol_payload.serverPublicKey : "";
+  const privateKeySecretId = typeof profile.protocol_payload.clientPrivateKeySecretId === "string" ? profile.protocol_payload.clientPrivateKeySecretId : "";
+  const privateKey = privateKeySecretId ? await readSecretMaterial(privateKeySecretId) : undefined;
+  if (!serverPublicKey || !privateKey || !profile.client_address) {
+    throw new Error("WireGuard client key material is unavailable. Create a new profile for this device.");
+  }
+  return [
+    "[Interface]", `PrivateKey = ${privateKey}`, `Address = ${profile.client_address}`, `DNS = ${profile.dns.join(", ")}`,
+    "", "[Peer]", `PublicKey = ${serverPublicKey}`, `Endpoint = ${profile.endpoint.host}:${profile.endpoint.port}`,
+    `AllowedIPs = ${profile.allowed_ips.join(", ")}`, "PersistentKeepalive = 25", "",
+  ].join("\n");
+}
+
 export async function activateProfile(profileId: string, actorUserId?: string): Promise<ConnectionProfile> {
   const profile = await findConnectionProfile(profileId);
   if (!profile) throw new Error("Profile not found");
@@ -184,6 +211,7 @@ export async function activateProfile(profileId: string, actorUserId?: string): 
 export async function revokeDeviceAndReconcile(deviceId: string, actorUserId?: string): Promise<void> {
   const profiles = await listConnectionProfiles({ deviceId });
   await revokeCertificateIssuancesForDevice(deviceId);
+  await deleteSecretMaterialsByKind(`wireguard_client_private_key:${deviceId}`);
   await revokeDevice(deviceId);
   const affected = new Set(profiles.map((profile) => `${profile.node_id}:${profile.protocol}`));
   for (const key of affected) {

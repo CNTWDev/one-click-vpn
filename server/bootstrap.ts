@@ -6,6 +6,7 @@ import { allowTofuHostKeys, publicOrigin } from "./config";
 import { decryptSecret, hashToken } from "./crypto";
 import { addAudit, addNodeAction, appendNodeActionEvent, countRunningNodeActions, findNode, finishNodeAction, startNodeAction, updateNode, updateNodeActionProgress } from "./db";
 import { ensureDefaultNodeProtocols } from "./control-plane";
+import { writeOperationalLog } from "./operational-logs";
 
 const maximumConcurrentRemoteActions = 3;
 const remoteActionQueue: Array<() => Promise<void>> = [];
@@ -117,7 +118,7 @@ class ActionOutputRecorder {
   private remainder = "";
   private writes: Promise<void> = Promise.resolve();
 
-  constructor(private readonly actionId: string) {}
+  constructor(private readonly actionId: string, private readonly nodeId: string) {}
 
   write(chunk: string): void {
     const lines = (this.remainder + chunk).replaceAll("\r", "").split("\n");
@@ -133,7 +134,8 @@ class ActionOutputRecorder {
       if (marker) {
         await updateNodeActionProgress(this.actionId, { phase: marker[1], progress: Number(marker[2]) || 0, message: marker[3] });
       } else {
-        await appendNodeActionEvent(this.actionId, { phase: "output", message, level: /error|failed|unable|denied/i.test(message) ? "warning" : "info" });
+        void writeOperationalLog({ nodeId: this.nodeId, actionId: this.actionId, component: "bootstrap", level: /error|failed|unable|denied/i.test(message) ? "warning" : "info", message });
+        if (/error|failed|unable|denied/i.test(message)) await appendNodeActionEvent(this.actionId, { phase: "output", message, level: "warning" });
       }
     }).catch(() => undefined);
   }
@@ -366,7 +368,7 @@ progress agent-staged 88 'Agent files are staged; registering its new identity w
       readyTimeout: 15_000,
       ...(node.credential_type === "private_key" ? { privateKey: secret } : { password: secret }),
     };
-    const outputRecorder = new ActionOutputRecorder(actionId);
+    const outputRecorder = new ActionOutputRecorder(actionId, nodeId);
     recorder = outputRecorder;
     const result = await connectAndExec(config, command, expectedFingerprint, (chunk) => outputRecorder.write(chunk));
     await outputRecorder.flush();
@@ -444,7 +446,7 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
       readyTimeout: 15_000,
       ...(node.credential_type === "private_key" ? { privateKey: secret } : { password: secret }),
     };
-    const outputRecorder = new ActionOutputRecorder(actionId);
+    const outputRecorder = new ActionOutputRecorder(actionId, nodeId);
     recorder = outputRecorder;
     const result = await connectAndExec(config, command, node.host_fingerprint, (chunk) => outputRecorder.write(chunk));
     await outputRecorder.flush();

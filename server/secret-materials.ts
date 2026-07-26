@@ -45,3 +45,7 @@ export async function readSecretMaterial(id: string, ownerNodeId?: string): Prom
   if (!secret || (ownerNodeId && secret.owner_node_id !== ownerNodeId)) return undefined;
   return decryptSecret(secret);
 }
+
+export async function deleteSecretMaterialsByKind(kind: string): Promise<void> {
+  await dbExec("DELETE FROM secret_materials WHERE kind = $1", [kind]);
+}

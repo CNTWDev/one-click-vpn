@@ -46,6 +46,11 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   target_id TEXT, metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS audit_created_idx ON audit_logs(created_at);
+CREATE TABLE IF NOT EXISTS controller_settings (
+  id TEXT PRIMARY KEY, display_name TEXT NOT NULL DEFAULT 'Northstar Controller',
+  location_label TEXT NOT NULL DEFAULT '', latitude DOUBLE PRECISION, longitude DOUBLE PRECISION,
+  location_source TEXT NOT NULL DEFAULT 'unset', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS node_actions (
   id TEXT PRIMARY KEY, node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   action TEXT NOT NULL, status TEXT NOT NULL, output TEXT NOT NULL DEFAULT '',

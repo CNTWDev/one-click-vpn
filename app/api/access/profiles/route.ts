@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "../../../../server/auth";
-import { findDevice, type Protocol } from "../../../../server/control-db";
+import { findDevice, listConnectionProfiles, type Protocol } from "../../../../server/control-db";
 import { issueConnectionProfile, publicProfile } from "../../../../server/control-plane";
 import { cleanText, jsonError, readJson } from "../../../../server/http";
 
 export const runtime = "nodejs";
+
+export async function GET() {
+  const user = await currentUser();
+  if (!user) return jsonError("Authentication required", 401);
+  return NextResponse.json({ profiles: (await listConnectionProfiles({ userId: user.id })).map(publicProfile) });
+}
 
 export async function POST(request: Request) {
   const user = await currentUser();
@@ -18,7 +24,8 @@ export async function POST(request: Request) {
     if (!nodeId) return jsonError("A node is required");
     const protocol = cleanText(body.protocol, 32) as Protocol || "wireguard";
     if (protocol !== "wireguard" && protocol !== "openvpn") return jsonError("Unsupported access protocol");
-    const profile = await issueConnectionProfile({ actorUserId: user.id, deviceId, nodeId, protocol, transport: "udp" });
+    const clientPrivateKey = cleanText(body.clientPrivateKey, 128) || undefined;
+    const profile = await issueConnectionProfile({ actorUserId: user.id, deviceId, nodeId, protocol, transport: "udp", clientPrivateKey });
     return NextResponse.json({ profile: publicProfile(profile) }, { status: 201 });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to create connection profile", 409);

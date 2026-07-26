@@ -51,6 +51,10 @@ def log_failure(operation, error):
         print(message, file=sys.stderr, flush=True)
         last_error_message = message
         last_error_logged_at = now
+        try:
+            request_json("/api/v1/agent/logs", {"nodeId": NODE_ID, "token": TOKEN, "entries": [{"level": "error", "message": message}]})
+        except Exception:
+            pass
 
 
 def request_json(path, payload):

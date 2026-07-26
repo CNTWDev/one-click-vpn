@@ -1,6 +1,7 @@
 import { currentUser } from "../../../../../../server/auth";
 import { findConnectionProfile, findDevice } from "../../../../../../server/control-db";
 import { renderOpenVpnProfile } from "../../../../../../server/openvpn-pki";
+import { renderWireGuardProfile } from "../../../../../../server/control-plane";
 import { jsonError } from "../../../../../../server/http";
 
 export const runtime = "nodejs";
@@ -13,13 +14,15 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const device = profile ? await findDevice(profile.device_id) : undefined;
   if (!profile || !device || device.user_id !== user.id) return jsonError("Connection profile not found", 404);
   if (profile.status !== "active") return jsonError("Activate this profile before downloading it", 409);
-  if (profile.protocol !== "openvpn") return jsonError("This profile is downloaded from its client workflow", 409);
   try {
-    const config = await renderOpenVpnProfile({ endpoint: profile.endpoint, transport: profile.transport, dns: profile.dns, payload: profile.protocol_payload });
+    const config = profile.protocol === "openvpn"
+      ? await renderOpenVpnProfile({ endpoint: profile.endpoint, transport: profile.transport, dns: profile.dns, payload: profile.protocol_payload })
+      : await renderWireGuardProfile(profile);
+    const extension = profile.protocol === "openvpn" ? "ovpn" : "conf";
     return new Response(config, {
       headers: {
-        "Content-Type": "application/x-openvpn-profile; charset=utf-8",
-        "Content-Disposition": `attachment; filename="northstar-${profile.id}.ovpn"`,
+        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Disposition": `attachment; filename="northstar-${profile.id}.${extension}"`,
         "Cache-Control": "no-store, private",
       },
     });

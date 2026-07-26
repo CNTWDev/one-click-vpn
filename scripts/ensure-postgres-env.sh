@@ -31,3 +31,20 @@ case "$database_password" in
     echo "PostgreSQL password added to $APP_DIR/.env"
     ;;
 esac
+
+log_storage_password=$(awk -F= '$1 == "NORTHSTAR_LOG_STORAGE_PASSWORD" { sub(/^[^=]*=/, ""); print; exit }' "$APP_DIR/.env")
+case "$log_storage_password" in
+  ""|replace-with-*)
+    log_storage_password=$(openssl rand -hex 24)
+    env_tmp=$(mktemp "$APP_DIR/.env.tmp.XXXXXX")
+    awk -v value="$log_storage_password" '
+      BEGIN { found = 0 }
+      /^NORTHSTAR_LOG_STORAGE_PASSWORD=/ { print "NORTHSTAR_LOG_STORAGE_PASSWORD=" value; found = 1; next }
+      { print }
+      END { if (!found) print "NORTHSTAR_LOG_STORAGE_PASSWORD=" value }
+    ' "$APP_DIR/.env" > "$env_tmp"
+    chmod 600 "$env_tmp"
+    mv "$env_tmp" "$APP_DIR/.env"
+    echo "Operational log storage password added to $APP_DIR/.env"
+    ;;
+esac

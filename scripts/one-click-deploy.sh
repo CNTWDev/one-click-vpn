@@ -105,6 +105,7 @@ else
     echo "NORTHSTAR_MASTER_KEY=$master_key"
     echo "NORTHSTAR_PUBLIC_ORIGIN=https://$domain"
     echo "NORTHSTAR_DB_PASSWORD=$(openssl rand -hex 24)"
+    echo "NORTHSTAR_LOG_STORAGE_PASSWORD=$(openssl rand -hex 24)"
     echo "NORTHSTAR_ADMIN_NAME=Owner"
     echo "NORTHSTAR_SESSION_TTL_SECONDS=43200"
     echo "NORTHSTAR_ALLOW_TOFU_HOST_KEYS=false"

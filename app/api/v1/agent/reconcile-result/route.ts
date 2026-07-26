@@ -3,6 +3,7 @@ import { addAudit, updateNode } from "../../../../../server/db";
 import { cleanText, jsonError, readJson } from "../../../../../server/http";
 import { authenticateAgent } from "../../../../../server/agent";
 import { finishReconcileTask } from "../../../../../server/control-db";
+import { writeOperationalLog } from "../../../../../server/operational-logs";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
       observedHash: cleanText(body.observedHash, 128) || undefined,
       observedStatus: cleanText(body.observedStatus, 64) || undefined,
     });
+    void writeOperationalLog({ nodeId, component: "reconcile", level: status === "failed" ? "error" : "info", message: status === "failed" ? error || "Agent reconcile task failed" : "Agent reconcile task completed", fields: { taskId, status } });
     await updateNode(nodeId, { status: status === "succeeded" ? "online" : "attention", last_seen: "now", latency: "connected" });
     await addAudit({ action: `agent.reconcile.${status}`, targetType: "node", targetId: nodeId, metadata: { taskId, error } });
     return NextResponse.json({ ok: true });
