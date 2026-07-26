@@ -31,6 +31,10 @@ OPENVPN_DIR = STATE_DIR / "openvpn"
 OPENVPN_CONFIG = OPENVPN_DIR / "server.conf"
 OPENVPN_REVOKED_DIR = OPENVPN_DIR / "revoked"
 KEY_PATTERN = re.compile(r"^[A-Za-z0-9+/]{42}={0,2}$")
+VPN_PORTS = {
+    "wireguard": {"transport": "udp", "port": 51820, "comment": "northstar-wireguard"},
+    "openvpn": {"transport": "udp", "port": 1194, "comment": "northstar-openvpn"},
+}
 last_cpu_sample = None
 last_network_sample = None
 last_error_message = ""
@@ -142,14 +146,16 @@ def wireguard_sync_config(desired):
         raise ValueError("invalid WireGuard peer list")
     egress_interface = default_interface()
 
+    input_rule = f"iptables -C INPUT -p udp --dport {listen_port} -m comment --comment northstar-wireguard -j ACCEPT 2>/dev/null || iptables -I INPUT -p udp --dport {listen_port} -m comment --comment northstar-wireguard -j ACCEPT"
+    remove_input_rule = f"iptables -D INPUT -p udp --dport {listen_port} -m comment --comment northstar-wireguard -j ACCEPT 2>/dev/null || true"
     full_lines = [
         "[Interface]",
         f"PrivateKey = {private_key}",
         "Address = 10.70.0.1/24",
         f"ListenPort = {listen_port}",
         "SaveConfig = false",
-        "PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -A POSTROUTING -o " + egress_interface + " -j MASQUERADE",
-        "PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -D POSTROUTING -o " + egress_interface + " -j MASQUERADE",
+        "PostUp = " + input_rule + "; iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -A POSTROUTING -o " + egress_interface + " -j MASQUERADE",
+        "PostDown = " + remove_input_rule + "; iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -D POSTROUTING -o " + egress_interface + " -j MASQUERADE",
         "",
     ]
     sync_lines = [
@@ -229,16 +235,18 @@ def openvpn_sync_config(desired):
     for serial in serials:
         (OPENVPN_REVOKED_DIR / serial).touch(mode=0o600, exist_ok=True)
     firewall_rules = [
+        (["iptables", "-C", "INPUT", "-p", transport, "--dport", str(listen_port), "-m", "comment", "--comment", "northstar-openvpn", "-j", "ACCEPT"], "-I"),
         ["iptables", "-C", "FORWARD", "-s", "10.71.0.0/24", "-j", "ACCEPT"],
         ["iptables", "-C", "FORWARD", "-d", "10.71.0.0/24", "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"],
         ["iptables", "-t", "nat", "-C", "POSTROUTING", "-s", "10.71.0.0/24", "-o", egress_interface, "-j", "MASQUERADE"],
     ]
-    for check in firewall_rules:
+    firewall_rules = [(rule, "-A") if isinstance(rule, list) else rule for rule in firewall_rules]
+    for check, operation in firewall_rules:
         try:
             run_fixed(check)
         except subprocess.CalledProcessError:
             add = check.copy()
-            add[1] = "-A"
+            add[1] = operation
             run_fixed(add)
     for name, value in {
         "ca.crt": bundle["caCertificate"], "server.crt": bundle["serverCertificate"],
@@ -311,6 +319,97 @@ def capabilities():
             "wireguardTools": "wireguard" in protocols,
             "openvpn": "openvpn" in protocols,
             "python": os.sys.version.split()[0],
+        },
+        "connectivity": connectivity_snapshot(),
+    }
+
+
+def command_succeeds(command):
+    try:
+        run_fixed(command)
+        return True
+    except (subprocess.CalledProcessError, OSError):
+        return False
+
+
+def socket_listening(transport, port):
+    if shutil.which("ss") is None:
+        return None
+    arguments = ["ss", "-H", "-l", "-n", "-u" if transport == "udp" else "-t"]
+    try:
+        output = run_fixed(arguments).stdout
+        return bool(re.search(rf"(?:\[::\]|\*|[0-9a-fA-F:.]+):{port}(?:\s|$)", output))
+    except (subprocess.CalledProcessError, OSError):
+        return None
+
+
+def input_policy():
+    if shutil.which("iptables") is None:
+        return "unknown"
+    try:
+        output = run_fixed(["iptables", "-S", "INPUT"]).stdout
+        match = re.search(r"^-P INPUT (ACCEPT|DROP|REJECT)$", output, re.MULTILINE)
+        return match.group(1).lower() if match else "unknown"
+    except (subprocess.CalledProcessError, OSError):
+        return "unknown"
+
+
+def configured_listener(config_path, default_port, default_transport):
+    """Read the listener selected by Northstar's own generated config.
+
+    The controller may choose a non-default port (and OpenVPN may use TCP), so
+    telemetry must describe the live configuration rather than a UI default.
+    """
+    try:
+        contents = config_path.read_text()
+    except OSError:
+        return default_transport, default_port
+    port_match = re.search(r"^ListenPort\s*=\s*(\d+)$|^port\s+(\d+)$", contents, re.MULTILINE)
+    port = int(next(value for value in port_match.groups() if value is not None)) if port_match else default_port
+    transport_match = re.search(r"^proto\s+(\S+)$", contents, re.MULTILINE)
+    transport = "tcp" if transport_match and transport_match.group(1).startswith("tcp") else default_transport
+    return transport, port
+
+
+def firewall_snapshot(protocol_specs):
+    manager = "iptables" if shutil.which("iptables") else "unknown"
+    if shutil.which("ufw") is not None:
+        manager = "ufw"
+    elif shutil.which("firewall-cmd") is not None:
+        manager = "firewalld"
+    managed_rules = {}
+    for name, spec in protocol_specs.items():
+        command = ["iptables", "-C", "INPUT", "-p", spec["transport"], "--dport", str(spec["port"]), "-m", "comment", "--comment", spec["comment"], "-j", "ACCEPT"]
+        managed_rules[f"{spec['transport']}/{spec['port']}"] = command_succeeds(command) if shutil.which("iptables") else None
+    return {"manager": manager, "inputPolicy": input_policy(), "managedRules": managed_rules}
+
+
+def connectivity_snapshot():
+    wireguard_ready = shutil.which("wg") is not None and shutil.which("wg-quick") is not None
+    openvpn_ready = shutil.which("openvpn") is not None
+    wireguard_transport, wireguard_port = configured_listener(WIREGUARD_CONFIG, 51820, "udp")
+    openvpn_transport, openvpn_port = configured_listener(OPENVPN_CONFIG, 1194, "udp")
+    protocol_specs = {
+        "wireguard": {"transport": wireguard_transport, "port": wireguard_port, "comment": VPN_PORTS["wireguard"]["comment"]},
+        "openvpn": {"transport": openvpn_transport, "port": openvpn_port, "comment": VPN_PORTS["openvpn"]["comment"]},
+    }
+    return {
+        "firewall": firewall_snapshot(protocol_specs),
+        "protocols": {
+            "wireguard": {
+                "installed": wireguard_ready,
+                "interfaceActive": command_succeeds(["wg", "show", "northstar"]) if wireguard_ready else False,
+                "listening": socket_listening(wireguard_transport, wireguard_port),
+                "port": wireguard_port,
+                "transport": wireguard_transport,
+            },
+            "openvpn": {
+                "installed": openvpn_ready,
+                "serviceActive": command_succeeds(["systemctl", "is-active", "--quiet", "northstar-openvpn"]) if openvpn_ready else False,
+                "listening": socket_listening(openvpn_transport, openvpn_port),
+                "port": openvpn_port,
+                "transport": openvpn_transport,
+            },
         },
     }
 
@@ -393,7 +492,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.2.0",
+        "version": "agent 2.3.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),

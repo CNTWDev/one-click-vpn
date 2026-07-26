@@ -100,6 +100,12 @@ type NodeDiagnostics = {
     observed: Array<{ protocol: string; appliedRevision: number; status: string; lastError: string; updatedAt: string }>;
     tasks: ReconcileTask[];
   };
+  connectivity?: {
+    agentChannel: string;
+    firewall: { manager: string; inputPolicy: string };
+    protocols: Array<{ protocol: string; state: string; transport: string; port: number; installed: boolean; runtimeActive: boolean; listening: boolean; hostFirewall: string; cloudFirewall: string }>;
+    note: string;
+  };
 };
 
 type OperationalLogLine = { timestamp: string; labels: Record<string, string>; message: string; actionId?: string };
@@ -495,9 +501,9 @@ export default function Home() {
     try {
       const response = await fetch(`/api/nodes/${nodeId}`, { cache: "no-store" });
       if (!response.ok) return;
-      const payload = await response.json() as { node?: Partial<Node>; actions?: NodeAction[]; actionEvents?: NodeActionEvent[]; reconcile?: NodeDiagnostics["reconcile"] };
+      const payload = await response.json() as { node?: Partial<Node>; actions?: NodeAction[]; actionEvents?: NodeActionEvent[]; reconcile?: NodeDiagnostics["reconcile"]; connectivity?: NodeDiagnostics["connectivity"] };
       if (payload.node) setSelectedNode((current) => ({ ...current, ...payload.node }));
-      setNodeDiagnostics({ actions: payload.actions || [], actionEvents: payload.actionEvents || [], reconcile: payload.reconcile || { observed: [], tasks: [] } });
+      setNodeDiagnostics({ actions: payload.actions || [], actionEvents: payload.actionEvents || [], reconcile: payload.reconcile || { observed: [], tasks: [] }, connectivity: payload.connectivity });
     } finally {
       setDiagnosticsBusy(false);
     }
@@ -1122,6 +1128,7 @@ export default function Home() {
                 {nodeDiagnostics.actions[0] && <div className="job-overview"><div><span>CURRENT / LATEST JOB</span><b>{nodeDiagnostics.actions[0].action.replaceAll("-", " ")}</b><small>{nodeDiagnostics.actions[0].current_phase.replaceAll("-", " ")} · {nodeDiagnostics.actions[0].status}</small></div><div className="job-progress"><i style={{ width: `${nodeDiagnostics.actions[0].progress}%` }} /><span>{nodeDiagnostics.actions[0].progress}%</span></div><time>{formatTime(nodeDiagnostics.actions[0].finished_at || nodeDiagnostics.actions[0].started_at || nodeDiagnostics.actions[0].created_at, timeZone)}</time></div>}
                 {actionAdvice(nodeDiagnostics.actions[0]) && <aside className="diagnostic-advice"><b>Suggested next step</b><p>{actionAdvice(nodeDiagnostics.actions[0])}</p></aside>}
                 <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Resource health</b></div><ResourceMetrics metrics={selectedNode.metrics} timeZone={timeZone} /></div>
+                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Connectivity</b><span>{nodeDiagnostics.connectivity?.agentChannel || "awaiting Agent report"}</span></div>{nodeDiagnostics.connectivity ? <><div className="connectivity-summary"><span>Host firewall: <b>{nodeDiagnostics.connectivity.firewall.manager} · {nodeDiagnostics.connectivity.firewall.inputPolicy}</b></span><span>Cloud firewall: <b>unverified</b></span></div>{nodeDiagnostics.connectivity.protocols.map((protocol) => <article className={`connectivity-row connectivity-${protocol.state}`} key={protocol.protocol}><b>{protocol.protocol}</b><span>{protocol.transport.toUpperCase()} {protocol.port}</span><span>runtime {protocol.runtimeActive ? "active" : "inactive"}</span><span>listener {protocol.listening ? "ready" : "missing"}</span><span>host {protocol.hostFirewall}</span><span>cloud {protocol.cloudFirewall}</span></article>)}<p className="diagnostics-empty">{nodeDiagnostics.connectivity.note}</p></> : <p className="diagnostics-empty">Reinstall the Agent once after upgrading, then wait for its next heartbeat to collect VPN listener and host-firewall status.</p>}</div>
                 <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Operation timeline</b><button type="button" onClick={() => void loadNodeDiagnostics(selectedNode.id)}>Refresh now</button></div>
                   {nodeDiagnostics.actionEvents.length ? [...nodeDiagnostics.actionEvents].reverse().map((event) => <article className={`diagnostic-event event-${event.level}`} key={event.id}><time>{formatTime(event.created_at, timeZone)}</time><span>{event.phase.replaceAll("-", " ")}</span><p>{event.message}</p></article>) : <p className="diagnostics-empty">No operation events recorded yet.</p>}
                 </div>

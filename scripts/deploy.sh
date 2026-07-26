@@ -84,7 +84,40 @@ if [ -z "$db_healthy" ]; then
   exit 1
 fi
 
-echo "PostgreSQL is healthy. Starting Northstar..."
+echo "PostgreSQL is healthy. Preparing internal operational-log storage..."
+compose up -d minio minio-init
+
+minio_init_id=$(compose ps -q minio-init)
+if [ -z "$minio_init_id" ]; then
+  echo "MinIO initialization container was not created." >&2
+  compose ps >&2
+  exit 1
+fi
+
+minio_initialized=""
+i=0
+while [ "$i" -lt 65 ]; do
+  minio_init_status=$(docker inspect --format '{{.State.Status}}:{{.State.ExitCode}}' "$minio_init_id" 2>/dev/null || true)
+  if [ "$minio_init_status" = "exited:0" ]; then
+    minio_initialized="yes"
+    break
+  fi
+  case "$minio_init_status" in
+    exited:*|dead:*) break ;;
+  esac
+  i=$((i + 1))
+  sleep 2
+done
+
+if [ -z "$minio_initialized" ]; then
+  echo "MinIO bucket initialization did not complete successfully." >&2
+  compose ps >&2
+  compose logs --tail=160 minio minio-init >&2 || true
+  exit 1
+fi
+
+echo "Operational-log storage is ready. Starting Loki and Northstar..."
+compose up -d loki
 compose up -d --force-recreate --remove-orphans northstar
 
 container_id=$(compose ps -q northstar)

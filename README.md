@@ -63,6 +63,8 @@ The Controller uses the same Docker Compose deployment on every provider and doe
 
 WireGuard, OpenVPN, and IKEv2 are Edge Node data-plane services. Open their ports in each Edge Node security group separately; they are not Controller Compose entry points. For the current protocols, allow UDP `51820` for WireGuard and UDP `1194` for OpenVPN on the selected Edge Nodes.
 
+The Node Agent is the single lightweight host monitor. It maintains outbound HTTPS control-plane communication and reports protocol installation, service state, listening ports, NAT/forwarding prerequisites, and Northstar-managed host firewall rules in its heartbeat. The Controller evaluates and displays that data in the Node diagnostics view. The Agent can maintain host `iptables` INPUT rules for the active WireGuard and OpenVPN ports, but cloud security groups, network ACLs, and provider firewalls remain unverified until a provider integration with least-privilege credentials is configured. Agent communication requires only outbound TCP `443`; bootstrap and SSH-based recovery currently require Controller-to-Node TCP `22`.
+
 ### 2. Get the source code
 
 ```bash
