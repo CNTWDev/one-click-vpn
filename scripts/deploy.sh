@@ -51,7 +51,7 @@ else
 fi
 
 echo "Starting PostgreSQL and waiting for it to become healthy..."
-compose up -d --force-recreate db
+compose up -d db
 
 db_container_id=$(compose ps -q db)
 if [ -z "$db_container_id" ]; then
@@ -87,10 +87,13 @@ fi
 echo "PostgreSQL is healthy. Preparing internal operational-log storage..."
 compose up -d minio minio-init
 
-minio_init_id=$(compose ps -q minio-init)
+# minio-init is intentionally a short-lived one-shot container. It can finish
+# before this command runs, so include stopped containers when resolving it.
+minio_init_id=$(compose ps --all --quiet minio-init)
 if [ -z "$minio_init_id" ]; then
   echo "MinIO initialization container was not created." >&2
-  compose ps >&2
+  compose ps --all >&2
+  compose logs --tail=160 minio minio-init >&2 || true
   exit 1
 fi
 
@@ -111,7 +114,7 @@ done
 
 if [ -z "$minio_initialized" ]; then
   echo "MinIO bucket initialization did not complete successfully." >&2
-  compose ps >&2
+  compose ps --all >&2
   compose logs --tail=160 minio minio-init >&2 || true
   exit 1
 fi

@@ -208,6 +208,17 @@ sudo ./scripts/backup.sh ./backups
 
 The deployment script prints the latest 120 lines from both PostgreSQL and Controller logs when a health check fails. Alibaba Cloud uses ECS security groups and disks, Tencent Cloud uses CVM security groups and CBS disks, and GCP uses VPC firewalls and Persistent Disk; the application configuration is provider-neutral.
 
+If Nginx returns `502 Bad Gateway` after an interrupted deployment, first inspect all containers, including completed one-shot jobs, and then rerun the idempotent deployment script:
+
+```bash
+sudo docker compose ps --all
+sudo docker compose logs --tail=160 minio minio-init loki northstar
+sudo ./scripts/deploy.sh
+curl --fail http://127.0.0.1:3000/api/health
+```
+
+The `minio-init` service is expected to exit with code `0` after creating the Loki bucket. It is not a long-running service and therefore appears only in `docker compose ps --all`.
+
 ### 9. Docker Compose version problems
 
 The project requires Docker Compose v2. If logs show `KeyError: 'ContainerConfig'`, the server is usually still using the old `docker-compose 1.29.2`. Install Compose v2 first:
