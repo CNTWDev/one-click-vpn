@@ -14,7 +14,11 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const deviceId = cleanText(url.searchParams.get("deviceId"), 128) || undefined;
   const status = cleanText(url.searchParams.get("status"), 20) as "issued" | "active" | "expired" | "revoked" | undefined;
-  return NextResponse.json({ profiles: (await listConnectionProfiles({ deviceId, status })).map(publicProfile) });
+  if (deviceId) {
+    const device = await findDevice(deviceId);
+    if (!device || device.user_id !== user.id) return jsonError("Device not found", 404);
+  }
+  return NextResponse.json({ profiles: (await listConnectionProfiles({ deviceId, status, userId: user.id })).map(publicProfile) });
 }
 
 export async function POST(request: Request) {
@@ -27,7 +31,7 @@ export async function POST(request: Request) {
     const protocol = cleanText(body.protocol, 32) as Protocol;
     const transport = cleanText(body.transport, 32) || undefined;
     const device = await findDevice(deviceId);
-    if (!device || !deviceId || !nodeId || !protocols.has(protocol)) return jsonError("deviceId, nodeId, and a supported protocol are required");
+    if (!device || device.user_id !== user.id || !deviceId || !nodeId || !protocols.has(protocol)) return jsonError("deviceId, nodeId, and a supported protocol are required");
     if (!protocolForPlatform(device.platform, protocol)) return jsonError("Protocol is not supported by the device platform");
     const profile = await issueConnectionProfile({ actorUserId: user.id, deviceId, nodeId, protocol, transport });
     return NextResponse.json({ profile: publicProfile(profile) }, { status: 201 });

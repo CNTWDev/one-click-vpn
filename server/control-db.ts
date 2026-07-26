@@ -304,14 +304,17 @@ export async function expireDueConnectionProfiles(): Promise<number> {
     WHERE status IN ('issued', 'active') AND expires_at <= $2`, [now(), now()]);
 }
 
-export async function listConnectionProfiles(filters: { deviceId?: string; status?: ProfileStatus } = {}): Promise<ConnectionProfile[]> {
+export async function listConnectionProfiles(filters: { deviceId?: string; status?: ProfileStatus; userId?: string } = {}): Promise<ConnectionProfile[]> {
   await expireDueConnectionProfiles();
   const clauses: string[] = [];
   const values: string[] = [];
-  if (filters.deviceId) { clauses.push(`device_id = $${values.length + 1}`); values.push(filters.deviceId); }
-  if (filters.status) { clauses.push(`status = $${values.length + 1}`); values.push(filters.status); }
+  if (filters.deviceId) { clauses.push(`connection_profiles.device_id = $${values.length + 1}`); values.push(filters.deviceId); }
+  if (filters.status) { clauses.push(`connection_profiles.status = $${values.length + 1}`); values.push(filters.status); }
+  if (filters.userId) { clauses.push(`devices.user_id = $${values.length + 1}`); values.push(filters.userId); }
   const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "";
-  return (await dbQuery<Record<string, unknown>>(`SELECT * FROM connection_profiles${where} ORDER BY updated_at DESC`, values)).map(profileFromRow);
+  return (await dbQuery<Record<string, unknown>>(`SELECT connection_profiles.* FROM connection_profiles
+    INNER JOIN devices ON devices.id = connection_profiles.device_id${where}
+    ORDER BY connection_profiles.updated_at DESC`, values)).map(profileFromRow);
 }
 
 export async function findConnectionProfile(id: string): Promise<ConnectionProfile | undefined> {

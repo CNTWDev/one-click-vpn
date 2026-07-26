@@ -12,7 +12,7 @@ const platforms = new Set<Platform>(["macos", "ios", "android"]);
 export async function GET(request: Request) {
   const user = await requestUser(request);
   if (!user) return jsonError("Authentication required", 401);
-  return NextResponse.json({ devices: (await listDevices()).map(publicDevice) });
+  return NextResponse.json({ devices: (await listDevices(user.id)).map(publicDevice) });
 }
 
 export async function POST(request: Request) {

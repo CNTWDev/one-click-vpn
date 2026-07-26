@@ -14,7 +14,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     const oldProfile = await findConnectionProfile(id);
     if (!oldProfile) return jsonError("Profile not found", 404);
     const device = await findDevice(oldProfile.device_id);
-    if (!device) return jsonError("Device not found", 404);
+    if (!device || device.user_id !== user.id) return jsonError("Device not found", 404);
     const next = await issueConnectionProfile({ actorUserId: user.id, deviceId: oldProfile.device_id, nodeId: oldProfile.node_id, protocol: oldProfile.protocol, transport: oldProfile.transport });
     const activated = oldProfile.status === "active" ? await activateProfile(next.id, user.id) : next;
     await expireConnectionProfile(oldProfile.id);

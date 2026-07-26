@@ -74,6 +74,9 @@ button { cursor: pointer; }
 .auth-card .primary-button { width: 100%; justify-content: center; margin-top: 10px; }
 .auth-error { margin: 15px 0 0; color: #d86659; font-size: 11px; }
 
+.access-form input { display: block; width: 100%; height: 36px; margin-top: 7px; padding: 0 10px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); background: var(--canvas); font-size: 11px; outline: none; }
+.access-form input:focus { border-color: var(--acid); }
+
 @media (max-width: 760px) { .system-theme { display: none; } }
 
 @media (prefers-color-scheme: light) {

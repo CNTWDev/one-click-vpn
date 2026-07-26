@@ -11,6 +11,6 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   if (!user) return jsonError("Authentication required", 401);
   const { id } = await context.params;
   const device = await findDevice(id);
-  if (!device) return jsonError("Device not found", 404);
+  if (!device || device.user_id !== user.id) return jsonError("Device not found", 404);
   return NextResponse.json({ device: publicDevice(device) });
 }

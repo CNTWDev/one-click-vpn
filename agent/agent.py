@@ -14,6 +14,7 @@ import re
 import shutil
 import socket
 import subprocess
+import sys
 import time
 import urllib.request
 from pathlib import Path
@@ -29,6 +30,24 @@ WIREGUARD_CONFIG = WIREGUARD_DIR / "northstar.conf"
 KEY_PATTERN = re.compile(r"^[A-Za-z0-9+/]{42}={0,2}$")
 last_cpu_sample = None
 last_network_sample = None
+last_error_message = ""
+last_error_logged_at = 0
+
+
+def log_failure(operation, error):
+    """Write actionable, rate-limited errors to the systemd journal.
+
+    A node must never silently disappear from the Controller.  The same failure
+    is logged at most once a minute, while a changed failure is logged
+    immediately so a journal remains useful without becoming noisy.
+    """
+    global last_error_message, last_error_logged_at
+    message = f"northstar-agent {operation} failed: {error}"
+    now = time.time()
+    if message != last_error_message or now - last_error_logged_at >= 60:
+        print(message, file=sys.stderr, flush=True)
+        last_error_message = message
+        last_error_logged_at = now
 
 
 def request_json(path, payload):
@@ -302,13 +321,16 @@ def main():
         pass
     last_heartbeat = 0
     while True:
-        try:
-            if time.time() - last_heartbeat >= 30:
+        if time.time() - last_heartbeat >= 30:
+            try:
                 heartbeat()
                 last_heartbeat = time.time()
+            except Exception as error:
+                log_failure("heartbeat", error)
+        try:
             poll_tasks()
-        except Exception:
-            pass
+        except Exception as error:
+            log_failure("task poll", error)
         time.sleep(5)
 
 

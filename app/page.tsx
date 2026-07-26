@@ -308,6 +308,7 @@ export default function Home() {
   const [fingerprintCommandCopied, setFingerprintCommandCopied] = useState(false);
   const [accessDevices, setAccessDevices] = useState<AccessDevice[]>([]);
   const [accessNodeId, setAccessNodeId] = useState("");
+  const [accessDeviceName, setAccessDeviceName] = useState("My Mac");
   const [accessBusy, setAccessBusy] = useState(false);
   const [accessError, setAccessError] = useState("");
   const [accessConfig, setAccessConfig] = useState<{ name: string; config: string } | null>(null);
@@ -460,7 +461,7 @@ export default function Home() {
       const publicKey = base64(x25519.getPublicKey(privateBytes));
       const deviceResponse = await fetch("/api/access/devices", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName: "My Mac", publicKey }),
+        body: JSON.stringify({ displayName: accessDeviceName.trim() || "My Mac", platform: "macos", publicKey }),
       });
       const devicePayload = await deviceResponse.json().catch(() => ({})) as { device?: AccessDevice; error?: string };
       if (!deviceResponse.ok || !devicePayload.device) throw new Error(devicePayload.error || "Unable to register this Mac");
@@ -774,6 +775,7 @@ export default function Home() {
           <div className="access-copy">Choose a healthy node and create a local WireGuard profile. The private key is generated in this browser and is never sent to the Controller.</div>
           <div className="access-form">
             <label>Edge node<select value={accessNodeId || nodes.find((node) => node.status === "online")?.id || ""} onChange={(event) => setAccessNodeId(event.target.value)}>{nodes.length === 0 && <option value="">No nodes available</option>}{nodes.map((node) => <option key={node.id} value={node.id} disabled={node.status !== "online"}>{node.name} · {node.place} · {node.status}</option>)}</select></label>
+            <label>Device name<input value={accessDeviceName} maxLength={120} onChange={(event) => setAccessDeviceName(event.target.value)} placeholder="My Mac" /></label>
             <button className="primary-button" type="button" disabled={accessBusy || nodes.every((node) => node.status !== "online")} onClick={() => void createMacAccessProfile()}>{accessBusy ? "Preparing profile…" : "Prepare Mac profile"}<span>→</span></button>
           </div>
           {accessError && <p className="form-error" role="alert">{accessError}</p>}
