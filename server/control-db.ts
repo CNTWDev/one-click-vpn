@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { dbExec, dbQuery, findUserById, type DbNode, type DbUser } from "./db";
 import { hashToken } from "./crypto";
 
-export type Platform = "macos" | "ios" | "android";
+export type Platform = "web" | "macos" | "ios" | "android" | "windows" | "linux";
 export type Protocol = "wireguard" | "openvpn" | "ikev2";
 export type DeviceStatus = "pending" | "active" | "revoked";
 export type ProfileStatus = "issued" | "active" | "expired" | "revoked";

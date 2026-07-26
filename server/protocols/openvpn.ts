@@ -5,7 +5,7 @@ export const openvpnAdapter: ProtocolAdapter = {
   capability: {
     protocol: "openvpn",
     transports: ["udp", "tcp"],
-    platforms: ["macos", "ios", "android"],
+    platforms: ["web", "macos", "ios", "android", "windows", "linux"],
     routing: ["full", "split"],
     ipv6: true,
     minClientVersion: "0.1.0",

@@ -9,6 +9,12 @@ export type DbUser = {
   email: string;
   display_name: string;
   role: string;
+  status: "pending" | "active" | "rejected" | "suspended";
+  approved_at: string | null;
+  approved_by: string | null;
+  rejection_reason: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type DbNode = {
@@ -119,8 +125,8 @@ async function ensureReady(): Promise<void> {
       const seed = adminSeed();
       if (seed) {
         await database.query(
-          `INSERT INTO users (id, email, display_name, password_hash, role, created_at)
-           VALUES ($1, $2, $3, $4, 'owner', $5) ON CONFLICT (email) DO NOTHING`,
+          `INSERT INTO users (id, email, display_name, password_hash, role, status, approved_at, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, 'owner', 'active', $5, $5, $5) ON CONFLICT (email) DO NOTHING`,
           [randomUUID(), seed.email, seed.displayName, hashPassword(seed.password), timestamp],
         );
       }
@@ -162,13 +168,38 @@ export function publicNode(node: DbNode): Record<string, unknown> {
 }
 
 export async function findUserByEmail(email: string): Promise<(DbUser & { password_hash: string }) | undefined> {
-  const rows = await dbQuery<DbUser & { password_hash: string }>("SELECT id, email, display_name, role, password_hash FROM users WHERE email = $1", [email.toLowerCase()]);
+  const rows = await dbQuery<DbUser & { password_hash: string }>("SELECT id, email, display_name, role, status, approved_at, approved_by, rejection_reason, created_at, updated_at, password_hash FROM users WHERE email = $1", [email.toLowerCase()]);
   return rows[0];
 }
 
 export async function findUserById(id: string): Promise<DbUser | undefined> {
-  const rows = await dbQuery<DbUser>("SELECT id, email, display_name, role FROM users WHERE id = $1", [id]);
+  const rows = await dbQuery<DbUser>("SELECT id, email, display_name, role, status, approved_at, approved_by, rejection_reason, created_at, updated_at FROM users WHERE id = $1", [id]);
   return rows[0];
+}
+
+export async function createPendingUser(input: { email: string; displayName: string; passwordHash: string }): Promise<DbUser> {
+  const timestamp = now();
+  const id = `usr_${randomUUID()}`;
+  await dbExec(`INSERT INTO users
+    (id, email, display_name, password_hash, role, status, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, 'member', 'pending', $5, $5)`, [id, input.email.toLowerCase(), input.displayName, input.passwordHash, timestamp]);
+  return (await findUserById(id))!;
+}
+
+export async function listUsers(status?: DbUser["status"]): Promise<DbUser[]> {
+  const rows = status
+    ? await dbQuery<DbUser>("SELECT id, email, display_name, role, status, approved_at, approved_by, rejection_reason, created_at, updated_at FROM users WHERE status = $1 ORDER BY created_at DESC", [status])
+    : await dbQuery<DbUser>("SELECT id, email, display_name, role, status, approved_at, approved_by, rejection_reason, created_at, updated_at FROM users ORDER BY created_at DESC");
+  return rows;
+}
+
+export async function updateUserStatus(id: string, status: DbUser["status"], actorUserId: string, rejectionReason?: string): Promise<DbUser | undefined> {
+  const timestamp = now();
+  await dbExec(`UPDATE users SET status = $1, approved_at = CASE WHEN $1 = 'active' THEN $2 ELSE approved_at END,
+    approved_by = CASE WHEN $1 = 'active' THEN $3 ELSE approved_by END,
+    rejection_reason = CASE WHEN $1 = 'rejected' THEN $4 ELSE NULL END,
+    updated_at = $2 WHERE id = $5`, [status, timestamp, actorUserId, rejectionReason || null, id]);
+  return findUserById(id);
 }
 
 export async function createSession(userId: string, expiresAt: string, id: string = randomUUID()): Promise<string> {

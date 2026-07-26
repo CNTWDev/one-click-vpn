@@ -17,6 +17,10 @@ export async function POST(request: Request) {
       await addAudit({ action: "api.auth.login.failed", metadata: { email } });
       return jsonError("Invalid email or password", 401);
     }
+    if (user.status !== "active") {
+      await addAudit({ actorUserId: user.id, action: "api.auth.login.blocked", metadata: { status: user.status } });
+      return NextResponse.json({ error: `Account is ${user.status}`, code: `USER_${user.status.toUpperCase()}`, status: user.status }, { status: 403 });
+    }
     const session = await createApiSession(user.id);
     await addAudit({ actorUserId: user.id, action: "api.auth.login.succeeded" });
     return NextResponse.json({ user: publicUser(user), accessToken: session.accessToken, refreshToken: session.refreshToken, expiresAt: session.accessExpiresAt });

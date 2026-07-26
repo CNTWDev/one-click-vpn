@@ -6,7 +6,9 @@ The long-term architecture baseline is documented in [`ARCHITECTURE.md`](ARCHITE
 
 The current implementation includes:
 
+- independent customer Portal Web (`:3100`) and Admin Web (`:3200`) frontends, backed by a versioned Controller/API (`:3000`);
 - a protected owner console with cookie sessions and scrypt password hashes;
+- customer registration, manual approval, device/profile management, configuration export, and per-device traffic summaries;
 - PostgreSQL persistence with automatic schema initialization and a Compose health gate;
 - AES-256-GCM encryption for SSH recovery credentials;
 - audited node creation, bootstrap attempts, agent heartbeats, and node actions;
@@ -40,6 +42,8 @@ npm run dev
 ```
 
 Open `http://localhost:3000` and sign in with the owner credentials from `.env`.
+
+For the separated frontends, run `npm run dev:portal` on `:3100` or `npm run dev:admin-web` on `:3200`. Both Vite dev servers proxy `/api` to the Controller on `:3000`.
 
 For a production-like local process:
 
@@ -79,8 +83,10 @@ If the source was copied to the host by another method, enter the project direct
 ### 3. First deployment
 
 ```bash
-sudo ./scripts/one-click-deploy.sh --domain vpn.example.com --admin-email owner@your-domain.example
+sudo ./scripts/one-click-deploy.sh --domain example.com --admin-email owner@your-domain.example
 ```
+
+By default this creates `app.example.com` for Portal, `console.example.com` for Admin, and `api.example.com` for native clients and Edge Agents. Pass `--portal-domain`, `--admin-domain`, and `--api-domain` when the hostnames do not follow this convention.
 
 The administrator password is requested interactively by default. Avoid `--admin-password` so the password does not remain in shell history. The password must be at least 16 characters.
 
@@ -92,8 +98,8 @@ The script automatically:
 - creates a production `.env` with mode `0600`;
 - validates the domain, HTTPS origin, administrator credentials, master key, and Compose configuration;
 - builds the Northstar image;
-- starts or reuses the project PostgreSQL service, waits for its health check, runs migrations, and then starts the Controller;
-- checks `http://127.0.0.1:3000/api/health` on the host.
+- starts or reuses the project PostgreSQL service, waits for its health check, runs migrations, and then starts the Controller, Portal, and Admin services;
+- checks the Controller, Portal, and Admin health endpoints on the host.
 
 If `.env` already exists, the script reuses it by default. Use `--yes` only when you explicitly want to regenerate the configuration; the existing file is backed up to a timestamped `.env.backup.*` file first. Add `--skip-docker-install` when Docker and Compose are already installed.
 
@@ -127,7 +133,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-Edit `server_name` and the certificate paths in the configuration. The Nginx upstream must be `http://127.0.0.1:3000`. Keep the real `APP_DOMAIN` and `NORTHSTAR_PUBLIC_ORIGIN` in `.env` so the application generates correct public URLs and Agent callback URLs. Docker itself does not listen on public ports `80` or `443`.
+Edit `server_name` and the certificate paths in the configuration. The Nginx upstreams are Controller `http://127.0.0.1:3000`, Portal `http://127.0.0.1:3100`, and Admin `http://127.0.0.1:3200`. Keep `NORTHSTAR_PUBLIC_ORIGIN` on the Portal hostname, and set `NORTHSTAR_API_ORIGIN` plus `NORTHSTAR_AGENT_ORIGIN` to the API hostname so native clients and Agents have a stable dedicated entry point. Docker itself does not listen on public ports `80` or `443`.
 
 ### 6. Manual deployment
 
@@ -143,8 +149,13 @@ Put the generated master key, database password, and production values in `.env`
 
 ```dotenv
 NODE_ENV=production
-APP_DOMAIN=vpn.example.com
-NORTHSTAR_PUBLIC_ORIGIN=https://vpn.example.com
+APP_DOMAIN=app.example.com
+NORTHSTAR_PORTAL_DOMAIN=app.example.com
+NORTHSTAR_ADMIN_DOMAIN=console.example.com
+NORTHSTAR_API_DOMAIN=api.example.com
+NORTHSTAR_PUBLIC_ORIGIN=https://app.example.com
+NORTHSTAR_API_ORIGIN=https://api.example.com
+NORTHSTAR_AGENT_ORIGIN=https://api.example.com
 NORTHSTAR_ADMIN_EMAIL=owner@your-domain.example
 NORTHSTAR_ADMIN_PASSWORD=use-a-long-random-password
 NORTHSTAR_MASTER_KEY=the-generated-32-byte-base64-value

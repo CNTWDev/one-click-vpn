@@ -5,7 +5,7 @@ ENV NORTHSTAR_BUILD_REV=$NORTHSTAR_BUILD_REV
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+RUN npm run build:controller
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { addAudit, updateNode } from "../../../../../server/db";
 import { cleanText, jsonError, readJson } from "../../../../../server/http";
-import { authenticateAgent } from "../../../../../server/agent";
+import { agentTokenFromRequest, authenticateAgent } from "../../../../../server/agent";
 import { finishReconcileTask } from "../../../../../server/control-db";
 import { writeOperationalLog } from "../../../../../server/operational-logs";
 
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   try {
     const body = await readJson(request);
     const nodeId = cleanText(body.nodeId, 128);
-    const token = cleanText(body.token, 512);
+    const token = agentTokenFromRequest(request, cleanText(body.token, 512));
     if (!(await authenticateAgent(nodeId, token))) return jsonError("Invalid agent credentials", 401);
     const taskId = cleanText(body.taskId, 128);
     const status = body.status === "succeeded" ? "succeeded" : body.status === "failed" ? "failed" : null;

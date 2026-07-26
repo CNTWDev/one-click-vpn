@@ -1,21 +1,22 @@
 import { NextResponse } from "next/server";
 import { cleanText, jsonError, readJson } from "../../../../../server/http";
-import { authenticateAgent, recordAgentHeartbeat } from "../../../../../server/agent";
+import { agentTokenFromRequest, authenticateAgent, recordAgentHeartbeat } from "../../../../../server/agent";
 import { ensureDefaultNodeProtocols } from "../../../../../server/control-plane";
 import { listNodeProtocols, upsertNodeProtocol, type Platform, type Protocol } from "../../../../../server/control-db";
 import { getProtocolAdapter, listProtocolAdapters } from "../../../../../server/protocols/registry";
 import { reconcileEnabledVpnServices } from "../../../../../server/vpn-services";
+import { recordTrafficSnapshots, type UsageSnapshot } from "../../../../../server/traffic";
 
 export const runtime = "nodejs";
 
 const supportedProtocols = new Set<Protocol>(listProtocolAdapters().map((adapter) => adapter.id));
-const supportedPlatforms: Platform[] = ["macos", "ios", "android"];
+const supportedPlatforms: Platform[] = ["web", "macos", "ios", "android", "windows", "linux"];
 
 export async function POST(request: Request) {
   try {
     const body = await readJson(request);
     const nodeId = cleanText(body.nodeId, 128);
-    const token = cleanText(body.token, 512);
+    const token = agentTokenFromRequest(request, cleanText(body.token, 512));
     const node = await authenticateAgent(nodeId, token);
     if (!node) return jsonError("Invalid agent credentials", 401);
     const capabilities = body.capabilities && typeof body.capabilities === "object" && !Array.isArray(body.capabilities)
@@ -30,6 +31,8 @@ export async function POST(request: Request) {
       capabilities,
       metrics: body.metrics,
     });
+    const usageSnapshots = Array.isArray(body.usageSnapshots) ? body.usageSnapshots.filter((value): value is UsageSnapshot => Boolean(value && typeof value === "object" && !Array.isArray(value))) : [];
+    await recordTrafficSnapshots(nodeId, usageSnapshots);
     const protocols = Array.isArray(capabilities.protocols) ? capabilities.protocols.filter((value): value is Protocol => typeof value === "string" && supportedProtocols.has(value as Protocol)) : [];
     if (!protocols.length) {
       const knownProtocols = await listNodeProtocols(nodeId);

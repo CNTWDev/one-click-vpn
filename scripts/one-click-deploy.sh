@@ -5,6 +5,9 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 
 domain=""
+portal_domain=""
+admin_domain=""
+api_domain=""
 admin_email=""
 admin_password=""
 skip_docker_install="no"
@@ -13,13 +16,16 @@ force_env="no"
 usage() {
   cat <<'USAGE'
 Usage:
-  sudo ./scripts/one-click-deploy.sh --domain vpn.example.com --admin-email owner@example.com
+  sudo ./scripts/one-click-deploy.sh --domain example.com --admin-email owner@example.com
 
 The admin password is requested interactively when --admin-password is omitted.
 Existing .env is reused. Pass --yes to back it up and regenerate it from arguments.
 
 Options:
-  --domain HOST              Public DNS name served by host Nginx
+  --domain HOST              Base DNS name; defaults to app./console./api.HOST
+  --portal-domain HOST       Portal browser hostname (default: app.HOST)
+  --admin-domain HOST        Admin browser hostname (default: console.HOST)
+  --api-domain HOST          API and Agent hostname (default: api.HOST)
   --admin-email EMAIL        Initial owner email
   --admin-password PASSWORD  Initial owner password (prefer interactive prompt)
   --yes                      Back up and replace an existing .env
@@ -31,6 +37,9 @@ USAGE
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --domain) domain=${2:-}; shift 2 ;;
+    --portal-domain) portal_domain=${2:-}; shift 2 ;;
+    --admin-domain) admin_domain=${2:-}; shift 2 ;;
+    --api-domain) api_domain=${2:-}; shift 2 ;;
     --admin-email) admin_email=${2:-}; shift 2 ;;
     --admin-password) admin_password=${2:-}; shift 2 ;;
     --yes) force_env="yes"; shift ;;
@@ -70,9 +79,12 @@ if [ -f "$APP_DIR/.env" ] && [ "$force_env" != "yes" ]; then
   chmod 600 "$APP_DIR/.env" 2>/dev/null || true
 else
   if [ -z "$domain" ]; then
-    printf "Public domain (for example vpn.example.com): "
+    printf "Base domain (for example example.com): "
     read -r domain
   fi
+  if [ -z "$portal_domain" ]; then portal_domain="app.$domain"; fi
+  if [ -z "$admin_domain" ]; then admin_domain="console.$domain"; fi
+  if [ -z "$api_domain" ]; then api_domain="api.$domain"; fi
   if [ -z "$admin_email" ]; then
     printf "Owner email: "
     read -r admin_email
@@ -99,11 +111,16 @@ else
   umask 077
   {
     echo "NODE_ENV=production"
-    echo "APP_DOMAIN=$domain"
+    echo "APP_DOMAIN=$portal_domain"
+    echo "NORTHSTAR_PORTAL_DOMAIN=$portal_domain"
+    echo "NORTHSTAR_ADMIN_DOMAIN=$admin_domain"
+    echo "NORTHSTAR_API_DOMAIN=$api_domain"
     echo "NORTHSTAR_ADMIN_EMAIL=$admin_email"
     echo "NORTHSTAR_ADMIN_PASSWORD=$admin_password"
     echo "NORTHSTAR_MASTER_KEY=$master_key"
-    echo "NORTHSTAR_PUBLIC_ORIGIN=https://$domain"
+    echo "NORTHSTAR_PUBLIC_ORIGIN=https://$portal_domain"
+    echo "NORTHSTAR_API_ORIGIN=https://$api_domain"
+    echo "NORTHSTAR_AGENT_ORIGIN=https://$api_domain"
     echo "NORTHSTAR_DB_PASSWORD=$(openssl rand -hex 24)"
     echo "NORTHSTAR_LOG_STORAGE_PASSWORD=$(openssl rand -hex 24)"
     echo "NORTHSTAR_ADMIN_NAME=Owner"

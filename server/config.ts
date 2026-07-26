@@ -51,6 +51,18 @@ export function publicOrigin(): string {
   return value || "http://localhost:3000";
 }
 
+/** The origin used by native clients and the Agent gateway. */
+export function apiOrigin(): string {
+  const value = process.env.NORTHSTAR_API_ORIGIN?.trim();
+  return value || publicOrigin();
+}
+
+/** Kept separate so the Agent can move to its own hostname without changing client URLs. */
+export function agentOrigin(): string {
+  const value = process.env.NORTHSTAR_AGENT_ORIGIN?.trim();
+  return value || apiOrigin();
+}
+
 export function requireProductionSecret(name: string): string {
   if (!isProduction()) return process.env[name] || "development-only";
   return required(name);

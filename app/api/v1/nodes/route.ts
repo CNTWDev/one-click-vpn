@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requestUser } from "../../../../server/request-auth";
+import { requestAdmin } from "../../../../server/request-auth";
 import { findRegion, findRegionByLabel, insertNode, addAudit } from "../../../../server/db";
 import { encryptSecret } from "../../../../server/crypto";
 import { listControlNodes, listNodeProtocols, updateNodeControlMetadata } from "../../../../server/control-db";
@@ -12,7 +12,7 @@ import { STANDARD_POLICY_VERSION } from "../../../../server/deployment-policy";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const user = await requestUser(request);
+  const user = await requestAdmin(request);
   if (!user) return jsonError("Authentication required", 401);
   const nodes = [];
   for (const node of await listControlNodes()) {
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await requestUser(request);
+  const user = await requestAdmin(request);
   if (!user) return jsonError("Authentication required", 401);
   try {
     const body = await readJson(request);

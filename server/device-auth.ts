@@ -21,5 +21,14 @@ export async function refreshBearerSession(refreshToken: string): Promise<{ user
 }
 
 export function publicUser(user: DbUser) {
-  return { id: user.id, email: user.email, displayName: user.display_name, role: user.role };
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.display_name,
+    role: user.role,
+    status: user.status,
+    approvedAt: user.approved_at,
+    rejectionReason: user.rejection_reason,
+    createdAt: user.created_at,
+  };
 }

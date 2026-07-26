@@ -33,6 +33,13 @@ function tokenMatches(provided: string, expectedHash: string | null): boolean {
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
+/** Prefer the standard Authorization header; keep body-token fallback for older Agents. */
+export function agentTokenFromRequest(request: Request, fallback = ""): string {
+  const authorization = request.headers.get("authorization")?.trim() || "";
+  if (/^Bearer\s+/i.test(authorization)) return authorization.replace(/^Bearer\s+/i, "").trim();
+  return fallback;
+}
+
 export async function authenticateAgent(nodeId: string, token: string) {
   const node = await findNode(nodeId);
   if (!node || !tokenMatches(token, node.agent_token_hash)) return null;

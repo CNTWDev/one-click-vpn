@@ -3,7 +3,7 @@ import type { ProtocolAdapter, ProtocolCapability } from "./types";
 const baseCapability: ProtocolCapability = {
   protocol: "wireguard" as const,
   transports: ["udp"],
-  platforms: ["macos", "ios", "android"],
+  platforms: ["web", "macos", "ios", "android", "windows", "linux"],
   routing: ["full", "split"],
   ipv6: false,
   minClientVersion: "0.1.0",

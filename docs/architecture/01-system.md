@@ -11,7 +11,8 @@ flowchart TB
   end
 
   subgraph Control["Northstar Control Plane"]
-    Web["Web Console"]
+    Portal["Customer Web"]
+    Admin["Admin Web"]
     API["Controller API"]
     Reconcile["Desired State / Reconcile"]
     CA["Identity / Certificate Service"]
@@ -26,7 +27,8 @@ flowchart TB
     IKE["IKEv2 Adapter"]
   end
 
-  Web --> API
+  Portal --> API
+  Admin --> API
   Mac --> API
   IOS --> API
   Android --> API
@@ -34,7 +36,7 @@ flowchart TB
   API --> Reconcile
   API --> CA
   API --> Audit
-  Reconcile -->|"outbound mTLS"| Agent
+  Reconcile -->|"outbound HTTPS / Bearer"| Agent
   Agent --> WG
   Agent --> OVPN
   Agent --> IKE
@@ -92,7 +94,7 @@ flowchart TB
 ```text
 管理员浏览器 -- HTTPS/session --> Controller
 客户端 App   -- HTTPS/device auth --> Controller
-Node Agent   -- mTLS --> Controller Agent Gateway
+Node Agent   -- HTTPS + per-node Bearer --> Controller Agent Gateway
 VPN Client   -- protocol tunnel --> Edge Node
 SSH          -- bootstrap/recovery only --> Edge Node
 ```
@@ -109,7 +111,7 @@ SSH 不属于正常控制通道。Agent 正常工作后，节点不需要对公�
   -> SSH host key 校验
   -> 安装 Agent / VPN runtime
   -> Agent 本地生成身份和节点密钥
-  -> Agent 注册并获得短期 mTLS 身份
+  -> Controller 保存每节点 Agent token 的哈希
   -> Controller 下发 Desired State
   -> Agent 应用配置并上报结果
 ```

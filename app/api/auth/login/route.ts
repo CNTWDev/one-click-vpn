@@ -31,10 +31,14 @@ export async function POST(request: Request) {
       await addAudit({ action: "auth.login.failed", metadata: { email } });
       return jsonError("Invalid email or password", 401);
     }
+    if (user.status !== "active" || !["owner", "admin"].includes(user.role)) {
+      await addAudit({ actorUserId: user.id, action: "auth.login.blocked", metadata: { status: user.status, role: user.role } });
+      return NextResponse.json({ error: "This account is not allowed to access the administrator console", code: `USER_${user.status.toUpperCase()}`, status: user.status }, { status: 403 });
+    }
     const session = await createLoginSession(user.id);
     await addAudit({ actorUserId: user.id, action: "auth.login.succeeded" });
     const response = NextResponse.json({
-      user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role },
+      user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role, status: user.status },
     });
     response.headers.set("Set-Cookie", sessionCookie(session.id, session.expires));
     return response;

@@ -45,9 +45,9 @@ echo "Deploying build $NORTHSTAR_BUILD_REV"
 echo "Building Northstar image..."
 if [ "$no_cache" = "yes" ]; then
   echo "Docker build cache disabled."
-  compose build --no-cache northstar
+  compose build --no-cache northstar portal-web admin-web
 else
-  compose build northstar
+  compose build northstar portal-web admin-web
 fi
 
 echo "Starting PostgreSQL and waiting for it to become healthy..."
@@ -119,9 +119,9 @@ if [ -z "$minio_initialized" ]; then
   exit 1
 fi
 
-echo "Operational-log storage is ready. Starting Loki and Northstar..."
+echo "Operational-log storage is ready. Starting Loki, Controller, Portal, and Admin..."
 compose up -d loki
-compose up -d --force-recreate --remove-orphans northstar
+compose up -d --force-recreate --remove-orphans northstar portal-web admin-web
 
 container_id=$(compose ps -q northstar)
 if [ -z "$container_id" ]; then
@@ -165,10 +165,21 @@ if command -v curl >/dev/null 2>&1; then
     echo "Warning: the container health check passed, but the host-local controller check failed." >&2
     echo "Check the Northstar logs with: ./scripts/deploy.sh logs" >&2
   fi
+  for frontend_port in 3100 3200; do
+    frontend_ok=""
+    if curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$frontend_port/health" >/dev/null 2>&1; then
+      frontend_ok="yes"
+    fi
+    if [ -z "$frontend_ok" ]; then
+      echo "Warning: frontend on 127.0.0.1:$frontend_port did not answer its health endpoint." >&2
+    fi
+  done
 fi
 
 compose ps
 echo "Northstar deployment is healthy."
 echo "Controller: http://127.0.0.1:3000"
-echo "Configure host Nginx to proxy your HTTPS domain to 127.0.0.1:3000."
+echo "Portal: http://127.0.0.1:3100"
+echo "Admin: http://127.0.0.1:3200"
+echo "Configure host Nginx to proxy app, console, and api domains to these ports."
 echo "Logs: ./scripts/deploy.sh logs"

@@ -5,7 +5,9 @@
 ```text
 Cloud VM
   ├── Host Nginx / HTTPS
-  ├── Northstar Controller
+  ├── Northstar Controller/API :3000
+  ├── Northstar Portal Web :3100
+  ├── Northstar Admin Web :3200
   ├── PostgreSQL（Docker Compose db 服务）
   └── Backup worker
 
@@ -19,11 +21,13 @@ Controller 可以部署在阿里云 ECS、腾讯云 CVM、GCP Compute Engine 或
 
 ## 2. 网络入口
 
-Controller：
+Controller/API：
 
-- TCP 443：由宿主机 Nginx 提供 Web、API、Agent Gateway；
+- TCP 443：由宿主机 Nginx 提供 Portal、Admin、API 和 Agent Gateway；
 - TCP 3000：Northstar 容器，仅绑定到 Controller 主机的 `127.0.0.1`；
-- TCP 22：仅 bootstrap/recovery，尽量限制源地址。
+- TCP 3100：Portal Web，仅绑定到 Controller 主机的 `127.0.0.1`；
+- TCP 3200：Admin Web，仅绑定到 Controller 主机的 `127.0.0.1`；
+- TCP 22：仅 bootstrap/recovery，尽量限制源地址。Agent 正常运行后只需要向 API/Agent 域名出站 TCP 443，不需要给节点开放 Controller 入站端口。
 
 Edge Node：
 
@@ -63,7 +67,18 @@ interface NodeProviderAdapter {
 - 对象存储保存配置快照和审计归档；
 - 多 Controller 通过租约或分布式锁执行 Reconcile。
 
-## 5. 部署原则
+## 5. 前端和控制面升级边界
+
+Portal Web、Admin Web 和 Controller/API 是独立 Docker 服务：
+
+- 前端服务不连接 PostgreSQL；
+- 前端只依赖 `/api/v1` 和管理端 API 合同；
+- 更新 Portal 不需要重启 Controller 或 Edge Agent；
+- 更新 Admin 不会改变用户 VPN 会话；
+- 数据库迁移只由 Controller 部署流程执行；
+- 后续可以把 Reconcile Worker 和流量聚合 Worker 从 Controller/API 再拆出来。
+
+## 6. 部署原则
 
 - 应用容器不暴露宿主机 Docker socket；
 - Agent/协议服务只有必要的 Linux capabilities；
@@ -73,21 +88,23 @@ interface NodeProviderAdapter {
 - 构建、迁移、部署、回滚分开；
 - 升级前先备份数据库和配置版本。
 
-## 6. 一键部署和升级
+## 7. 一键部署和升级
 
 仓库提供可重复执行的 Ubuntu/Debian 部署入口：
 
-首次部署：
-sudo ./scripts/one-click-deploy.sh --domain vpn.example.com --admin-email owner@your-domain.example
+首次部署（`--domain` 是基础域名，脚本默认生成 `app/console/api` 三个子域名）：
+sudo ./scripts/one-click-deploy.sh --domain example.com --admin-email owner@your-domain.example
 
-它负责主机前置依赖、生产配置初始化、密钥生成、Docker Compose 构建、迁移、健康等待和公网健康检查。NORTHSTAR_MASTER_KEY 只在首次生成时写入 .env；更新时脚本默认复用既有配置。
+它负责主机前置依赖、生产配置初始化、密钥生成、Docker Compose 构建 Controller、Portal 和 Admin、迁移、健康等待和公网健康检查。NORTHSTAR_MASTER_KEY 只在首次生成时写入 .env；更新时脚本默认复用既有配置。
 
 更新代码后执行：
 git pull --ff-only
 ./scripts/deploy.sh
 
+Controller、Portal、Admin 会随本次部署升级；Edge Agent 不会被 Docker 自动覆盖。需要升级 Agent 时，在 Admin 的节点操作中重新执行一次 Bootstrap，让 Controller 重新写入 Agent 文件并等待新的 heartbeat；Agent 升级失败不会影响已有 VPN 数据面配置。
+
 脚本会校验：
-- APP_DOMAIN 与 NORTHSTAR_PUBLIC_ORIGIN 必须匹配；
+- APP_DOMAIN 与 NORTHSTAR_PUBLIC_ORIGIN 必须匹配；新部署会额外写入 `NORTHSTAR_API_ORIGIN` 和 `NORTHSTAR_AGENT_ORIGIN`，两者默认指向 API 域名；旧 `.env` 缺少这两个变量时会兼容回退，不阻断升级；
 - 生产环境必须使用 HTTPS；
 - 管理员密码至少 16 个字符；
 - 主密钥必须解码为 32 字节；
@@ -95,3 +112,12 @@ git pull --ff-only
 - Controller 容器必须通过 /api/health 健康检查。
 
 公有云安全组只开放 TCP 22/80/443。Edge Node 的 WireGuard/OpenVPN/IKEv2 数据面端口按节点能力单独开放，不能把这些端口混到 Controller 的 Compose 文件里。
+
+Nginx 需要为 `app.example.com`、`console.example.com` 和 `api.example.com` 配置 DNS 与证书，并安装仓库中的两个配置文件：
+
+```bash
+sudo mkdir -p /etc/nginx/snippets
+sudo cp deploy/nginx/snippets/northstar-proxy.conf /etc/nginx/snippets/northstar-proxy.conf
+sudo cp deploy/nginx/northstar.conf.example /etc/nginx/sites-available/northstar.conf
+sudo nginx -t && sudo systemctl reload nginx
+```

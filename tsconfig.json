@@ -37,6 +37,8 @@
     "build",
     "examples",
     "db/index.ts",
-    "tests"
+    "tests",
+    "portal-web",
+    "admin-web"
   ]
 }

@@ -7,7 +7,12 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build --webpack",
+    "build": "npm run build:controller && npm run build:portal && npm run build:admin-web",
+    "build:controller": "next build --webpack",
+    "build:portal": "vite build --config portal-web/vite.config.ts",
+    "build:admin-web": "vite build --config admin-web/vite.config.ts",
+    "dev:portal": "vite --config portal-web/vite.config.ts",
+    "dev:admin-web": "vite --config admin-web/vite.config.ts",
     "start": "next start",
     "deploy": "./scripts/deploy.sh",
     "test": "npm run build && node --test tests/core.test.mjs",

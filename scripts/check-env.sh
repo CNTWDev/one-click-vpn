@@ -38,6 +38,16 @@ required_value NORTHSTAR_LOG_STORAGE_PASSWORD
 
 domain=$(env_value APP_DOMAIN)
 origin=$(env_value NORTHSTAR_PUBLIC_ORIGIN)
+api_origin=$(env_value NORTHSTAR_API_ORIGIN)
+agent_origin=$(env_value NORTHSTAR_AGENT_ORIGIN)
+portal_domain=$(env_value NORTHSTAR_PORTAL_DOMAIN)
+admin_domain=$(env_value NORTHSTAR_ADMIN_DOMAIN)
+api_domain=$(env_value NORTHSTAR_API_DOMAIN)
+[ -n "$api_origin" ] || api_origin=$origin
+[ -n "$agent_origin" ] || agent_origin=$api_origin
+[ -n "$portal_domain" ] || portal_domain=$domain
+[ -n "$admin_domain" ] || admin_domain=$domain
+[ -n "$api_domain" ] || api_domain=$domain
 email=$(env_value NORTHSTAR_ADMIN_EMAIL)
 password=$(env_value NORTHSTAR_ADMIN_PASSWORD)
 master_key=$(env_value NORTHSTAR_MASTER_KEY)
@@ -50,9 +60,25 @@ if ! printf '%s' "$domain" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$
 fi
 
 if [ "$origin" != "https://$domain" ]; then
-  echo "NORTHSTAR_PUBLIC_ORIGIN must exactly be https://$domain in production." >&2
+  echo "NORTHSTAR_PUBLIC_ORIGIN must exactly be https://APP_DOMAIN in production." >&2
   exit 1
 fi
+
+for named_domain in "$portal_domain" "$admin_domain" "$api_domain"; do
+  if [ -z "$named_domain" ] || ! printf '%s' "$named_domain" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'; then
+    echo "NORTHSTAR_PORTAL_DOMAIN, NORTHSTAR_ADMIN_DOMAIN, and NORTHSTAR_API_DOMAIN must be DNS hostnames." >&2
+    exit 1
+  fi
+done
+
+case "$api_origin" in
+  https://*) : ;;
+  *) echo "NORTHSTAR_API_ORIGIN must be an https origin in production." >&2; exit 1 ;;
+esac
+case "$agent_origin" in
+  https://*) : ;;
+  *) echo "NORTHSTAR_AGENT_ORIGIN must be an https origin in production." >&2; exit 1 ;;
+esac
 
 if ! printf '%s' "$email" | grep -Eq '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'; then
   echo "NORTHSTAR_ADMIN_EMAIL is not a valid email address." >&2

@@ -74,10 +74,12 @@ def log_failure(operation, error):
 
 
 def request_json(path, payload):
+    request_payload = dict(payload)
+    request_payload.pop("token", None)
     request = urllib.request.Request(
         CONTROLLER + path,
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
+        data=json.dumps(request_payload).encode(),
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {TOKEN}"},
         method="POST",
     )
     try:
@@ -566,6 +568,42 @@ def metrics():
     }
 
 
+def counter_epoch():
+    try:
+        return Path("/proc/sys/kernel/random/boot_id").read_text().strip()[:128]
+    except OSError:
+        return "agent-" + NODE_ID
+
+
+def wireguard_usage_snapshots():
+    if shutil.which("wg") is None:
+        return []
+    result = run_optional(["wg", "show", "northstar", "dump"])
+    if result.returncode != 0:
+        return []
+    snapshots = []
+    epoch = counter_epoch()
+    for line in result.stdout.splitlines()[1:]:
+        fields = line.split("\t")
+        if len(fields) < 8 or not validate_key(fields[0]):
+            continue
+        try:
+            handshake = int(fields[5] or 0)
+            received = max(0, int(fields[6] or 0))
+            transmitted = max(0, int(fields[7] or 0))
+        except ValueError:
+            continue
+        snapshots.append({
+            "protocol": "wireguard",
+            "identityKey": fields[0],
+            "rxBytes": received,
+            "txBytes": transmitted,
+            "lastHandshakeAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(handshake)) if handshake else None,
+            "counterEpoch": epoch,
+        })
+    return snapshots
+
+
 def heartbeat():
     return request_json("/api/v1/agent/heartbeat", {
         "nodeId": NODE_ID,
@@ -575,6 +613,7 @@ def heartbeat():
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
+        "usageSnapshots": wireguard_usage_snapshots(),
     })
 
 

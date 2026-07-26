@@ -7,7 +7,7 @@ import { cleanText, jsonError, readJson } from "../../../../server/http";
 
 export const runtime = "nodejs";
 
-const platforms = new Set<Platform>(["macos", "ios", "android"]);
+const platforms = new Set<Platform>(["web", "macos", "ios", "android", "windows", "linux"]);
 
 export async function GET(request: Request) {
   const user = await requestUser(request);

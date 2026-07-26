@@ -43,6 +43,48 @@ services:
       timeout: 5s
       retries: 5
 
+  portal-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        FRONTEND: portal
+        PORT: 3100
+    restart: unless-stopped
+    depends_on:
+      northstar:
+        condition: service_healthy
+    environment:
+      PORT: 3100
+    ports:
+      - "127.0.0.1:3100:3100"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  admin-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        FRONTEND: admin-web
+        PORT: 3200
+    restart: unless-stopped
+    depends_on:
+      northstar:
+        condition: service_healthy
+    environment:
+      PORT: 3200
+    ports:
+      - "127.0.0.1:3200:3200"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3200/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     restart: unless-stopped

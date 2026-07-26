@@ -15,8 +15,17 @@ function hashPassword(password) {
 const schema = `
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL,
-  password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'owner', created_at TEXT NOT NULL
+  password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'owner',
+  status TEXT NOT NULL DEFAULT 'active', approved_at TEXT, approved_by TEXT,
+  rejection_reason TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS approved_at TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS approved_by TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TEXT;
+UPDATE users SET updated_at = COALESCE(updated_at, created_at);
+UPDATE users SET status = 'active' WHERE role IN ('owner', 'admin') AND status = 'pending';
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   expires_at TEXT NOT NULL, created_at TEXT NOT NULL
@@ -193,6 +202,32 @@ CREATE TABLE IF NOT EXISTS device_sessions (
 );
 CREATE INDEX IF NOT EXISTS device_sessions_access_idx ON device_sessions(access_token_hash, revoked_at);
 CREATE INDEX IF NOT EXISTS device_sessions_refresh_idx ON device_sessions(refresh_token_hash, revoked_at);
+CREATE TABLE IF NOT EXISTS traffic_counters (
+  node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  protocol TEXT NOT NULL,
+  identity_key TEXT NOT NULL,
+  device_id TEXT REFERENCES devices(id) ON DELETE SET NULL,
+  observed_rx_bytes BIGINT NOT NULL DEFAULT 0,
+  observed_tx_bytes BIGINT NOT NULL DEFAULT 0,
+  last_handshake_at TEXT,
+  counter_epoch TEXT NOT NULL DEFAULT '',
+  observed_at TEXT NOT NULL,
+  PRIMARY KEY (node_id, protocol, identity_key)
+);
+CREATE INDEX IF NOT EXISTS traffic_counters_device_idx ON traffic_counters(device_id, observed_at);
+CREATE TABLE IF NOT EXISTS traffic_daily (
+  day TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  protocol TEXT NOT NULL,
+  upload_bytes BIGINT NOT NULL DEFAULT 0,
+  download_bytes BIGINT NOT NULL DEFAULT 0,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  PRIMARY KEY (day, device_id, node_id, protocol)
+);
+CREATE INDEX IF NOT EXISTS traffic_daily_user_idx ON traffic_daily(user_id, day);
 `;
 
 try {
@@ -225,8 +260,8 @@ try {
   const password = process.env.NORTHSTAR_ADMIN_PASSWORD;
   if (email && password) {
     await pool.query(
-      `INSERT INTO users (id, email, display_name, password_hash, role, created_at)
-       VALUES ($1, $2, $3, $4, 'owner', $5) ON CONFLICT (email) DO NOTHING`,
+      `INSERT INTO users (id, email, display_name, password_hash, role, status, approved_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'owner', 'active', $5, $5, $5) ON CONFLICT (email) DO NOTHING`,
       [randomUUID(), email, process.env.NORTHSTAR_ADMIN_NAME?.trim() || "Owner", hashPassword(password), timestamp],
     );
   }
