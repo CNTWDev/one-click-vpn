@@ -47,6 +47,12 @@ class AgentRequestError(RuntimeError):
         self.status = status
 
 
+def request_retry_delay(error, failure_count):
+    if isinstance(error, AgentRequestError) and error.status in (401, 429):
+        return 60
+    return min(5 * (2 ** min(max(failure_count - 1, 0), 4)), 60)
+
+
 def log_failure(operation, error):
     """Write actionable, rate-limited errors to the systemd journal.
 
@@ -507,7 +513,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.3.1",
+        "version": "agent 2.3.2",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
@@ -564,25 +570,28 @@ def main():
         pass
     last_heartbeat_attempt = 0
     last_task_poll = 0
-    authentication_backoff_until = 0
+    request_backoff_until = 0
+    consecutive_request_failures = 0
     while True:
         now = time.time()
-        if now >= authentication_backoff_until and now - last_heartbeat_attempt >= 30:
+        if now >= request_backoff_until and now - last_heartbeat_attempt >= 30:
             last_heartbeat_attempt = now
             try:
                 heartbeat()
+                consecutive_request_failures = 0
             except Exception as error:
                 log_failure("heartbeat", error)
-                if isinstance(error, AgentRequestError) and error.status == 401:
-                    authentication_backoff_until = now + 60
-        if now >= authentication_backoff_until and now - last_task_poll >= 5:
+                consecutive_request_failures += 1
+                request_backoff_until = now + request_retry_delay(error, consecutive_request_failures)
+        if now >= request_backoff_until and now - last_task_poll >= 5:
             last_task_poll = now
             try:
                 poll_tasks()
+                consecutive_request_failures = 0
             except Exception as error:
                 log_failure("task poll", error)
-                if isinstance(error, AgentRequestError) and error.status == 401:
-                    authentication_backoff_until = now + 60
+                consecutive_request_failures += 1
+                request_backoff_until = now + request_retry_delay(error, consecutive_request_failures)
         time.sleep(1)
 
 
