@@ -65,7 +65,7 @@ else
 fi
 
 if [ "$no_cache" = "yes" ]; then
-  ./scripts/deploy.sh --service "$service" --no-cache
+  sh ./scripts/deploy.sh --service "$service" --no-cache
 else
-  ./scripts/deploy.sh --service "$service"
+  sh ./scripts/deploy.sh --service "$service"
 fi
