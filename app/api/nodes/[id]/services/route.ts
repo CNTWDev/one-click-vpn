@@ -18,10 +18,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const body = await readJson(request);
     const protocol = cleanText(body.protocol, 32) as Protocol;
-    const action = cleanText(body.action, 32) as "enable" | "disable" | "redeploy";
+    const action = cleanText(body.action, 32) as "enable" | "disable" | "restart" | "redeploy";
     const adapter = listProtocolAdapters().find((item) => item.id === protocol && item.capability.status === "enabled");
     if (!adapter) return jsonError("Unsupported VPN service protocol");
-    if (!["enable", "disable", "redeploy"].includes(action)) return jsonError("Unsupported VPN service action");
+    if (!["enable", "disable", "restart", "redeploy"].includes(action)) return jsonError("Unsupported VPN service action");
     const transport = cleanText(body.transport, 16) || undefined;
     if (transport && !adapter.capability.transports.includes(transport)) return jsonError("Unsupported transport for this protocol");
     const requestedPort = body.listenPort === undefined ? undefined : Number(body.listenPort);

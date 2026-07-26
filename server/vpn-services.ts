@@ -54,13 +54,26 @@ export async function reconcileEnabledVpnServices(nodeId: string): Promise<void>
 }
 
 export async function configureVpnService(input: {
-  nodeId: string; protocol: Protocol; action: "enable" | "disable" | "redeploy";
+  nodeId: string; protocol: Protocol; action: "enable" | "disable" | "restart" | "redeploy";
   actorUserId?: string; transport?: string; listenPort?: number;
 }): Promise<VpnService> {
   const adapter = listProtocolAdapters().find((item) => item.id === input.protocol);
   if (!adapter) throw new Error("Unsupported VPN service protocol");
   if (adapter.capability.status !== "enabled") throw new Error(`${input.protocol} is not enabled`);
   const current = await findVpnService(input.nodeId, input.protocol);
+  if (input.action === "restart") {
+    if (!current?.enabled) throw new Error(`${input.protocol} service is not enabled on this node`);
+    const desired = await findDesiredConfig(input.nodeId, input.protocol);
+    if (!desired) throw new Error(`${input.protocol} service has no deployed configuration`);
+    await updateVpnServiceState(input.nodeId, input.protocol, { status: "deploying" });
+    await enqueueReconcileTask({
+      nodeId: input.nodeId, protocol: input.protocol,
+      taskType: adapter.service.restartTask,
+      desiredRevision: desired.revision, payload: desired.payload,
+    });
+    await addAudit({ actorUserId: input.actorUserId, action: "vpn_service.restart", targetType: "node", targetId: input.nodeId, metadata: { protocol: input.protocol } });
+    return (await findVpnService(input.nodeId, input.protocol))!;
+  }
   if (input.action === "disable") {
     const service = await upsertVpnService({
       nodeId: input.nodeId, protocol: input.protocol, enabled: false,

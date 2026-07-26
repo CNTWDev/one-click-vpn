@@ -25,10 +25,13 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(migration, /CREATE TABLE IF NOT EXISTS policy_rollouts/);
   assert.match(agent, /DisableWireGuard/);
   assert.match(agent, /DisableOpenVpn/);
+  assert.match(agent, /RestartWireGuard/);
+  assert.match(agent, /RestartOpenVpn/);
+  assert.match(agent, /\["systemctl", "restart", "northstar-openvpn"\]/);
   assert.match(agent, /add\[add\.index\("-C"\)\] = operation/);
   assert.doesNotMatch(agent, /add\[1\] = operation/);
   assert.match(agent, /\/etc\/wireguard\/northstar\.conf/);
-  assert.match(agent, /agent 2\.4\.3/);
+  assert.match(agent, /agent 2\.4\.4/);
   assert.doesNotMatch(bootstrap, /CapabilityBoundingSet=CAP_NET_ADMIN/);
   assert.doesNotMatch(bootstrap, /AmbientCapabilities=CAP_NET_ADMIN/);
   assert.match(bootstrap, /ProtectSystem=strict/);

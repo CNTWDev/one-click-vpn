@@ -244,6 +244,18 @@ def disable_wireguard():
     return {"observedHash": hashlib.sha256(b"wireguard-disabled").hexdigest(), "observedStatus": "disabled"}
 
 
+def restart_wireguard(desired):
+    if not WIREGUARD_CONFIG.exists() or shutil.which("wg-quick") is None:
+        raise RuntimeError("WireGuard is not configured")
+    run_optional(["wg-quick", "down", str(WIREGUARD_CONFIG)])
+    try:
+        run_fixed(["wg-quick", "up", str(WIREGUARD_CONFIG)])
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError("WireGuard restart failed: " + command_failure_detail(error)) from error
+    digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
+    return {"observedHash": digest, "observedStatus": "applied", "serverPublicKey": wireguard_public_key()}
+
+
 def safe_revocation_serial(value):
     if not isinstance(value, str) or not re.fullmatch(r"[A-F0-9]{1,128}", value):
         raise ValueError("invalid OpenVPN revoked certificate serial")
@@ -339,7 +351,8 @@ WantedBy=multi-user.target
 """
     Path("/etc/systemd/system/northstar-openvpn.service").write_text(unit)
     run_fixed(["systemctl", "daemon-reload"])
-    run_fixed(["systemctl", "enable", "--now", "northstar-openvpn"])
+    run_fixed(["systemctl", "enable", "northstar-openvpn"])
+    run_fixed(["systemctl", "restart", "northstar-openvpn"])
     run_fixed(["systemctl", "is-active", "--quiet", "northstar-openvpn"])
     digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
     return {"observedHash": digest, "observedStatus": "applied"}
@@ -367,6 +380,18 @@ def disable_openvpn():
     return {"observedHash": hashlib.sha256(b"openvpn-disabled").hexdigest(), "observedStatus": "disabled"}
 
 
+def restart_openvpn(desired):
+    if not OPENVPN_CONFIG.exists() or shutil.which("openvpn") is None:
+        raise RuntimeError("OpenVPN is not configured")
+    try:
+        run_fixed(["systemctl", "restart", "northstar-openvpn"])
+        run_fixed(["systemctl", "is-active", "--quiet", "northstar-openvpn"])
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError("OpenVPN restart failed: " + command_failure_detail(error)) from error
+    digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
+    return {"observedHash": digest, "observedStatus": "applied"}
+
+
 def apply_task(task):
     task_type = task.get("taskType")
     payload = task.get("payload") or {}
@@ -374,6 +399,10 @@ def apply_task(task):
         return wireguard_sync_config(payload)
     if task_type == "ApplyOpenVpnServer":
         return openvpn_sync_config(payload)
+    if task_type == "RestartWireGuard":
+        return restart_wireguard(payload)
+    if task_type == "RestartOpenVpn":
+        return restart_openvpn(payload)
     if task_type == "DisableWireGuard":
         return disable_wireguard()
     if task_type == "DisableOpenVpn":
@@ -609,7 +638,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.4.3",
+        "version": "agent 2.4.4",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),

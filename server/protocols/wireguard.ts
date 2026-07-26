@@ -17,7 +17,7 @@ export const wireguardAdapter: ProtocolAdapter = {
   service: {
     standard: true, defaultTransport: "udp", defaultListenPort: 51820,
     defaultSubnet: "10.70.0.0/24", defaultDns: ["1.1.1.1"],
-    applyTask: "ApplyWireGuardPeers", disableTask: "DisableWireGuard",
+    applyTask: "ApplyWireGuardPeers", restartTask: "RestartWireGuard", disableTask: "DisableWireGuard",
   },
   buildProfile(input) {
     if (!input.serverPublicKey) throw new Error("WireGuard server public key is not available");

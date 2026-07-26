@@ -15,7 +15,7 @@ export const openvpnAdapter: ProtocolAdapter = {
   service: {
     standard: true, defaultTransport: "udp", defaultListenPort: 1194,
     defaultSubnet: "10.71.0.0/24", defaultDns: ["1.1.1.1"],
-    applyTask: "ApplyOpenVpnServer", disableTask: "DisableOpenVpn",
+    applyTask: "ApplyOpenVpnServer", restartTask: "RestartOpenVpn", disableTask: "DisableOpenVpn",
   },
   buildProfile(input) {
     if (!input.clientAddress) throw new Error("OpenVPN client address is not allocated");

@@ -119,7 +119,7 @@ Open `console.example.com` with the owner/admin account. The Console includes:
 - node creation/editing, Agent checks/restarts, reinstall/repair, deletion, and
   fleet batch operations;
 - node connectivity, protocol, firewall, action-event, and reconcile diagnostics;
-- VPN service enable/disable/redeploy and Standard policy canary/batch rollout;
+- VPN service enable/disable/restart/redeploy and Standard policy canary/batch rollout;
 - region and Controller settings, plus operational log query/purge.
 
 End-user devices, VPN profiles, and traffic remain in the customer Portal. Node
@@ -194,6 +194,10 @@ path and Compose configuration without removing anything.
 
 After upgrading Controller code, use the Admin node action **Reinstall agent** to
 upgrade an Edge Agent. Existing VPN configuration is retained.
+
+For runtime recovery, open **VPN Services** in Admin and choose **Restart service**.
+Use **Redeploy** when configuration or credentials changed; redeploy now restarts
+OpenVPN automatically so the running process loads the newly written key material.
 
 If the admin password is lost, reset an existing owner/admin account on the
 Controller host:

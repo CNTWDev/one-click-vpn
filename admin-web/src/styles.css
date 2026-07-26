@@ -227,8 +227,9 @@ td .pill + small { margin-top: 6px; }
 .modal-head p { margin: 8px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .form-grid label, .stack-form label, .log-toolbar label { color: #a1ada0; font-size: 9px; }
-.form-grid label > input, .form-grid label > select, .form-grid label > textarea, .stack-form label > input { margin-top: 7px; }
-.form-grid label > small, .stack-form > small { display: block; margin-top: 6px; color: #6c786a; font-size: 8px; line-height: 1.5; }
+.form-grid label > input, .form-grid label > select, .form-grid label > textarea, .stack-form label > input, .stack-form label > select { margin-top: 7px; }
+.form-grid label > small, .stack-form > small, .stack-form label > small { display: block; margin-top: 6px; color: #6c786a; font-size: 8px; line-height: 1.5; }
+.stack-form input[readonly] { color: #aab4a7; background: rgba(255, 255, 255, .025); cursor: default; }
 .span-2 { grid-column: span 2; }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 .stack-form { display: grid; gap: 16px; }

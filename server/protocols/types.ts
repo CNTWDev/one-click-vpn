@@ -60,6 +60,7 @@ export type ProtocolAdapter = {
     defaultSubnet: string;
     defaultDns: string[];
     applyTask: string;
+    restartTask: string;
     disableTask: string;
   };
   buildProfile(input: ProfileBuildInput): {

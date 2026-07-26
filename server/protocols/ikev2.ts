@@ -15,7 +15,7 @@ export const ikev2Adapter: ProtocolAdapter = {
   service: {
     standard: false, defaultTransport: "udp", defaultListenPort: 500,
     defaultSubnet: "10.72.0.0/24", defaultDns: ["1.1.1.1"],
-    applyTask: "ApplyIkev2Server", disableTask: "DisableIkev2",
+    applyTask: "ApplyIkev2Server", restartTask: "RestartIkev2", disableTask: "DisableIkev2",
   },
   buildProfile() {
     throw new Error("IKEv2 adapter is registered but not enabled until the certificate lifecycle is configured");
