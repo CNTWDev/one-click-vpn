@@ -106,14 +106,6 @@ install_wireguard_tools() {
     return 0
   fi
 
-  # Alibaba Cloud Linux 4 ships WireGuard support through NetworkManager,
-  # but its enabled repositories do not currently publish wireguard-tools.
-  # The Agent has a NetworkManager backend for this case.
-  if command -v nmcli >/dev/null 2>&1 && command -v openssl >/dev/null 2>&1; then
-    echo "wireguard-tools is unavailable; using NetworkManager WireGuard backend" >&2
-    return 0
-  fi
-
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update -y
     DEBIAN_FRONTEND=noninteractive apt-get install -y wireguard-tools
@@ -146,15 +138,15 @@ install_wireguard_tools() {
     exit 1
   fi
 
-  if ! command -v wg >/dev/null 2>&1 && ! (command -v nmcli >/dev/null 2>&1 && command -v openssl >/dev/null 2>&1); then
-    echo "Unable to install wireguard-tools or find a NetworkManager WireGuard backend" >&2
+  if ! command -v wg >/dev/null 2>&1 || ! command -v wg-quick >/dev/null 2>&1; then
+    echo "Unable to install wireguard-tools and wg-quick" >&2
     echo "Operating system:" >&2
     cat /etc/os-release >&2 2>/dev/null || true
     if command -v dnf >/dev/null 2>&1; then
       echo "Enabled DNF repositories:" >&2
       dnf repolist >&2 || true
     fi
-    echo "Enable the repository that provides wireguard-tools, or use a distribution with native WireGuard packages and NetworkManager support." >&2
+    echo "Enable the repository that provides wireguard-tools, or use a distribution with native WireGuard packages." >&2
     exit 1
   fi
 }
@@ -202,6 +194,13 @@ if [ -z "$python_path" ] || [ ! -x "$python_path" ]; then
 fi
 install -d -m 700 /opt/northstar-agent
 echo ${shellQuote(source)} | base64 -d > /opt/northstar-agent/agent.py
+if command -v wg >/dev/null 2>&1; then
+  install -d -m 700 /opt/northstar-agent/state/wireguard
+  if [ ! -s /opt/northstar-agent/state/wireguard/server.key ]; then
+    (umask 077; wg genkey > /opt/northstar-agent/state/wireguard/server.key)
+  fi
+  chmod 600 /opt/northstar-agent/state/wireguard/server.key
+fi
 cat > /opt/northstar-agent/config.env <<'NORTHSTAR_CONFIG'
 NORTHSTAR_CONTROLLER_URL=${publicOrigin()}
 NORTHSTAR_NODE_ID=${node.id}

@@ -115,6 +115,9 @@ export async function issueConnectionProfile(input: {
   if (adapter.capability.status !== "enabled") throw new Error(`${input.protocol} adapter is not enabled`);
   const capability = (await listNodeProtocols(input.nodeId)).find((item) => item.protocol === input.protocol);
   if (!capability || capability.status !== "enabled") throw new Error("Node does not advertise this protocol");
+  if (input.protocol === "wireguard" && !node.server_public_key) {
+    throw new Error("This node is online but has not reported its WireGuard server key. Reinstall or restart the Agent, then wait for a heartbeat.");
+  }
   const transport = input.transport || adapter.capability.transports[0];
   if (!adapter.capability.transports.includes(transport)) throw new Error("Unsupported protocol transport");
   const clientAddress = await allocateIpLease(input.nodeId, input.protocol, input.deviceId);

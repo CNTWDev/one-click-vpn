@@ -74,10 +74,11 @@ def run_fixed(command, *, input_text=None):
 
 
 def wireguard_public_key():
-    if not WIREGUARD_KEY.exists() or shutil.which("wg") is None:
+    if shutil.which("wg") is None:
         return ""
     try:
-        result = run_fixed(["wg", "pubkey"], input_text=WIREGUARD_KEY.read_text())
+        private_key = ensure_wireguard_key()
+        result = run_fixed(["wg", "pubkey"], input_text=private_key + "\n")
         return result.stdout.strip()
     except Exception:
         return ""
@@ -273,7 +274,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.0.0",
+        "version": "agent 2.1.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),

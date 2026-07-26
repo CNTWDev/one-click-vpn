@@ -31,6 +31,7 @@ export type DbNode = {
   credential_tag: string;
   host_fingerprint: string | null;
   agent_token_hash: string | null;
+  server_public_key?: string | null;
   created_at: string;
   updated_at: string;
   metrics_json?: string | null;

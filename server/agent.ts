@@ -59,7 +59,7 @@ export async function recordAgentHeartbeat(input: {
   });
   await updateNodeControlMetadata(input.nodeId, {
     publicEndpoint: input.publicEndpoint,
-    serverPublicKey: input.serverPublicKey,
+    ...(input.serverPublicKey ? { serverPublicKey: input.serverPublicKey } : {}),
     capabilities: {
       hostname: input.hostname || "",
       ...(input.capabilities || {}),

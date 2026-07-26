@@ -21,6 +21,7 @@ type Node = {
   lastSeen: string;
   hostFingerprint?: string | null;
   sshUser?: string;
+  serverPublicKey?: string | null;
   metrics?: NodeMetrics | null;
 };
 
@@ -309,6 +310,8 @@ export default function Home() {
   const [accessDevices, setAccessDevices] = useState<AccessDevice[]>([]);
   const [accessNodeId, setAccessNodeId] = useState("");
   const [accessDeviceName, setAccessDeviceName] = useState("My Mac");
+  const [accessDeviceBusy, setAccessDeviceBusy] = useState<string | null>(null);
+  const [pendingDeviceRevocation, setPendingDeviceRevocation] = useState<AccessDevice | null>(null);
   const [accessBusy, setAccessBusy] = useState(false);
   const [accessError, setAccessError] = useState("");
   const [accessConfig, setAccessConfig] = useState<{ name: string; config: string } | null>(null);
@@ -334,6 +337,7 @@ export default function Home() {
       lastSeen: String(node.last_seen || "never"),
       hostFingerprint: typeof node.host_fingerprint === "string" ? node.host_fingerprint : null,
       sshUser: String(node.ssh_user || "root"),
+      serverPublicKey: typeof node.server_public_key === "string" ? node.server_public_key : null,
       metrics: node.metrics && typeof node.metrics === "object" ? node.metrics as NodeMetrics : null,
     })));
   }, []);
@@ -452,6 +456,10 @@ export default function Home() {
       setAccessError("Add and bootstrap at least one healthy node first.");
       return;
     }
+    if (!node.serverPublicKey) {
+      setAccessError("This node has not reported a WireGuard server key yet. Reinstall or restart its Agent, then wait for the next heartbeat.");
+      return;
+    }
     setAccessBusy(true);
     setAccessError("");
     setAccessConfig(null);
@@ -492,6 +500,22 @@ export default function Home() {
     link.download = accessConfig.name;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function revokeAccessDevice(device: AccessDevice) {
+    setAccessDeviceBusy(device.id);
+    try {
+      const response = await fetch(`/api/access/devices/${device.id}`, { method: "DELETE" });
+      const payload = await response.json().catch(() => ({})) as { device?: AccessDevice; error?: string };
+      if (!response.ok || !payload.device) throw new Error(payload.error || "Unable to revoke the device");
+      setAccessDevices((current) => current.map((item) => item.id === device.id ? payload.device! : item));
+      setNotice(`${device.displayName} was revoked and removed from the VPN configuration.`);
+    } catch (error) {
+      setAccessError(error instanceof Error ? error.message : "Unable to revoke the device");
+    } finally {
+      setAccessDeviceBusy(null);
+      setPendingDeviceRevocation(null);
+    }
   }
 
   async function deployNode(event: FormEvent<HTMLFormElement>) {
@@ -780,7 +804,7 @@ export default function Home() {
           </div>
           {accessError && <p className="form-error" role="alert">{accessError}</p>}
           {accessConfig && <div className="access-result"><div><p className="eyebrow"><span /> PROFILE READY</p><h2>Import this profile into WireGuard.</h2><p>Download the file, open WireGuard on macOS, choose <b>Import tunnel(s) from file</b>, then activate the tunnel. Keep the downloaded file private.</p></div><button className="secondary-button access-download" type="button" onClick={downloadAccessConfig}>Download {accessConfig.name} <span>↓</span></button><details><summary>Show configuration</summary><pre>{accessConfig.config}</pre></details></div>}
-          <div className="access-devices"><div className="diagnostics-section-head"><b>Registered devices</b><span>{accessDevices.length}</span></div>{accessDevices.length ? accessDevices.map((device) => <div className="access-device" key={device.id}><span className="flag">MAC</span><div><b>{device.displayName}</b><small>{device.status} · {device.publicKey.slice(0, 16)}…</small></div></div>) : <p className="diagnostics-empty">No devices have been registered yet.</p>}</div>
+          <div className="access-devices"><div className="diagnostics-section-head"><b>Registered devices</b><span>{accessDevices.length}</span></div>{accessDevices.length ? accessDevices.map((device) => <div className="access-device" key={device.id}><span className="flag">MAC</span><div><b>{device.displayName}</b><small>{device.status} · {device.publicKey.slice(0, 16)}…</small></div>{device.status === "active" && <button className="access-device-revoke" type="button" disabled={accessDeviceBusy === device.id} onClick={() => setPendingDeviceRevocation(device)}>{accessDeviceBusy === device.id ? "Revoking…" : "Revoke"}</button>}</div>) : <p className="diagnostics-empty">No devices have been registered yet.</p>}</div>
         </section>}
 
         {(activeNav === "Sessions" || activeNav === "Audit") && <section className="module-view card module-placeholder">
@@ -846,6 +870,17 @@ export default function Home() {
         busy={Boolean(nodeActionBusy)}
         onCancel={() => setPendingNodeConfirmation(null)}
         onConfirm={() => void confirmNodeAction()}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingDeviceRevocation)}
+        eyebrow="REVOKE DEVICE"
+        title={`Revoke ${pendingDeviceRevocation?.displayName || "this device"}?`}
+        description="This immediately revokes its profile and removes the device public key from the next WireGuard reconciliation. The downloaded configuration will stop working after the node applies the update."
+        confirmLabel="Revoke device"
+        tone="danger"
+        busy={Boolean(accessDeviceBusy)}
+        onCancel={() => setPendingDeviceRevocation(null)}
+        onConfirm={() => pendingDeviceRevocation && void revokeAccessDevice(pendingDeviceRevocation)}
       />
     </main>
   );
