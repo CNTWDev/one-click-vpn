@@ -101,7 +101,9 @@ type NodeDiagnostics = {
     tasks: ReconcileTask[];
   };
   connectivity?: {
+    status: string;
     agentChannel: string;
+    lastAuthenticatedHeartbeat: string | null;
     firewall: { manager: string; inputPolicy: string };
     protocols: Array<{ protocol: string; state: string; transport: string; port: number; installed: boolean; runtimeActive: boolean; listening: boolean; hostFirewall: string; cloudFirewall: string }>;
     note: string;
@@ -423,6 +425,7 @@ export default function Home() {
   const [logLevel, setLogLevel] = useState("");
   const [logHours, setLogHours] = useState("24");
   const [showLogPurge, setShowLogPurge] = useState(false);
+  const [logPurgeNodeId, setLogPurgeNodeId] = useState<string | null>(null);
   const [logPurgeConfirmation, setLogPurgeConfirmation] = useState("");
 
   const loadNodes = useCallback(async () => {
@@ -804,15 +807,18 @@ export default function Home() {
   }
 
   async function purgeOperationalLogs() {
-    if (logPurgeConfirmation !== "PURGE SYSTEM LOGS") return;
+    const requiredConfirmation = logPurgeNodeId ? "PURGE NODE LOGS" : "PURGE SYSTEM LOGS";
+    if (logPurgeConfirmation !== requiredConfirmation) return;
     setLogsBusy(true);
     try {
-      const response = await fetch("/api/logs/purge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmation: logPurgeConfirmation, nodeId: logNodeId || undefined }) });
+      const response = await fetch("/api/logs/purge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmation: logPurgeConfirmation, nodeId: logPurgeNodeId || undefined }) });
       const payload = await response.json().catch(() => ({})) as { error?: string; physicalDeletion?: string };
       if (!response.ok) throw new Error(payload.error || "Unable to purge logs");
-      setOperationalLogs([]);
-      setNotice(`System logs were purged. Physical chunk deletion is ${payload.physicalDeletion || "scheduled"}. Audit records were retained.`);
+      setOperationalLogs((current) => logPurgeNodeId ? current.filter((log) => log.labels.node !== logPurgeNodeId) : []);
+      const purgedNode = nodes.find((node) => node.id === logPurgeNodeId);
+      setNotice(`${purgedNode ? `${purgedNode.name} operational logs` : "All operational logs"} were purged. Physical chunk deletion is ${payload.physicalDeletion || "scheduled"}. Audit records were retained.`);
       setShowLogPurge(false);
+      setLogPurgeNodeId(null);
       setLogPurgeConfirmation("");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to purge logs");
@@ -1085,8 +1091,9 @@ export default function Home() {
 
         {activeNav === "Logs" && <section className="module-view card logs-workspace">
           <div className="section-title route-title"><div><p>OPERATIONS</p><h1>System logs</h1></div><span className={`route-status${logsAvailable ? "" : " route-status-warning"}`}>Loki · {logsAvailable ? `${operationalLogs.length} lines` : "unavailable"}</span></div>
-          <div className="logs-copy">Runtime logs are retained separately from audit records. Filters affect viewing and the optional node-scoped purge action.</div>
-          <div className="logs-toolbar"><label>Node<select value={logNodeId} onChange={(event) => setLogNodeId(event.target.value)}><option value="">All nodes</option>{nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label>Level<select value={logLevel} onChange={(event) => setLogLevel(event.target.value)}><option value="">All levels</option><option value="info">Info</option><option value="warning">Warning</option><option value="error">Error</option></select></label><label>Period<select value={logHours} onChange={(event) => setLogHours(event.target.value)}><option value="1">Last hour</option><option value="24">Last 24 hours</option><option value="168">Last 7 days</option></select></label><button type="button" className="secondary-button" onClick={() => void loadOperationalLogs()} disabled={logsBusy}>{logsBusy ? "Loading…" : "Refresh"}</button><button type="button" className="danger-button" onClick={() => setShowLogPurge(true)} disabled={logsBusy}>Purge {logNodeId ? "node" : "system"} logs</button></div>
+          <div className="logs-copy">Operational logs can be cleared without affecting immutable audit records. Physical Loki chunks are removed asynchronously after a purge request.</div>
+          <div className="logs-toolbar"><label>Node<select value={logNodeId} onChange={(event) => setLogNodeId(event.target.value)}><option value="">All nodes</option>{nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label>Level<select value={logLevel} onChange={(event) => setLogLevel(event.target.value)}><option value="">All levels</option><option value="info">Info</option><option value="warning">Warning</option><option value="error">Error</option></select></label><label>Period<select value={logHours} onChange={(event) => setLogHours(event.target.value)}><option value="1">Last hour</option><option value="24">Last 24 hours</option><option value="168">Last 7 days</option></select></label><button type="button" className="secondary-button" onClick={() => void loadOperationalLogs()} disabled={logsBusy}>{logsBusy ? "Loading…" : "Refresh"}</button></div>
+          <div className="logs-retention"><div><b>Retention controls</b><span>Delete disposable operational output. Audit records are protected and retained.</span></div><button type="button" className="warning-button" disabled={logsBusy || !logNodeId} onClick={() => { setLogPurgeNodeId(logNodeId); setLogPurgeConfirmation(""); setShowLogPurge(true); }}>Clear selected node logs</button><button type="button" className="danger-button" disabled={logsBusy} onClick={() => { setLogPurgeNodeId(null); setLogPurgeConfirmation(""); setShowLogPurge(true); }}>Clear all operational logs</button></div>
           <div className="logs-table">{operationalLogs.length ? operationalLogs.map((log, index) => <article key={`${log.timestamp}-${index}`} className={`log-line log-${log.labels.level || "info"}`}><time>{formatTime(log.timestamp, timeZone)}</time><span>{nodes.find((node) => node.id === log.labels.node)?.name || log.labels.node || "Controller"}</span><b>{log.labels.component || "system"}</b><p>{log.message}</p></article>) : <p className="diagnostics-empty">{logsBusy ? "Loading operational logs…" : logsAvailable ? "No matching operational logs are available." : "The operational log service is unavailable. Node actions continue to run; retry after the log service is healthy."}</p>}</div>
         </section>}
 
@@ -1134,8 +1141,8 @@ export default function Home() {
                 {actionAdvice(nodeDiagnostics.actions[0]) && <aside className="diagnostic-advice"><b>Suggested next step</b><p>{actionAdvice(nodeDiagnostics.actions[0])}</p></aside>}
                 {!actionAdvice(nodeDiagnostics.actions[0]) && selectedNode.status !== "online" && hasAgentCredentialFailure(nodeDiagnostics.actionEvents) && <aside className="diagnostic-advice"><b>Agent identity rejected</b><p>The node reached the Controller, but its saved credential is no longer accepted. Repairing the Agent rotates and synchronizes that credential over verified SSH without deleting VPN configuration.</p><button type="button" disabled={Boolean(nodeActionBusy)} onClick={() => requestNodeAction(selectedNode, "bootstrap")}>Reinstall / repair agent</button></aside>}
                 <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Resource health</b></div><ResourceMetrics metrics={selectedNode.metrics} timeZone={timeZone} /></div>
-                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Connectivity</b><span>{nodeDiagnostics.connectivity?.agentChannel || "awaiting Agent report"}</span></div>{nodeDiagnostics.connectivity ? <><div className="connectivity-summary"><span>Host firewall: <b>{nodeDiagnostics.connectivity.firewall.manager} · {nodeDiagnostics.connectivity.firewall.inputPolicy}</b></span><span>Cloud firewall: <b>unverified</b></span></div>{nodeDiagnostics.connectivity.protocols.map((protocol) => <article className={`connectivity-row connectivity-${protocol.state}`} key={protocol.protocol}><b>{protocol.protocol}</b><span>{protocol.transport.toUpperCase()} {protocol.port}</span><span>runtime {protocol.runtimeActive ? "active" : "inactive"}</span><span>listener {protocol.listening ? "ready" : "missing"}</span><span>host {protocol.hostFirewall}</span><span>cloud {protocol.cloudFirewall}</span></article>)}<p className="diagnostics-empty">{nodeDiagnostics.connectivity.note}</p></> : <p className="diagnostics-empty">Reinstall the Agent once after upgrading, then wait for its next heartbeat to collect VPN listener and host-firewall status.</p>}</div>
-                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Operation timeline</b><button type="button" onClick={() => void loadNodeDiagnostics(selectedNode.id)}>Refresh now</button></div>
+                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Connectivity</b><span>{nodeDiagnostics.connectivity?.status.replaceAll("_", " ") || "awaiting Agent report"}</span></div>{nodeDiagnostics.connectivity ? <><div className="connectivity-summary"><span>Agent channel: <b>{nodeDiagnostics.connectivity.agentChannel}</b></span><span>Last authenticated heartbeat: <b>{formatTime(nodeDiagnostics.connectivity.lastAuthenticatedHeartbeat, timeZone)}</b></span><span>Host firewall: <b>{nodeDiagnostics.connectivity.firewall.manager} · {nodeDiagnostics.connectivity.firewall.inputPolicy}</b></span><span>Cloud firewall: <b>unverified</b></span></div>{nodeDiagnostics.connectivity.protocols.map((protocol) => <article className={`connectivity-row connectivity-${protocol.state}`} key={protocol.protocol}><b>{protocol.protocol}</b><span>{protocol.state.replaceAll("_", " ")}</span><span>{protocol.transport.toUpperCase()} {protocol.port}</span><span>runtime {protocol.runtimeActive ? "active" : "inactive"}</span><span>listener {protocol.listening ? "ready" : "missing"}</span><span>host {protocol.hostFirewall}</span><span>cloud {protocol.cloudFirewall}</span></article>)}<p className="diagnostics-empty">{nodeDiagnostics.connectivity.note}</p></> : <p className="diagnostics-empty">Reinstall the Agent once after upgrading, then wait for its next heartbeat to collect VPN listener and host-firewall status.</p>}</div>
+                <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Operation timeline</b><span>Controller collection time · node time retained in message</span><button type="button" onClick={() => void loadNodeDiagnostics(selectedNode.id)}>Refresh now</button></div>
                   {nodeDiagnostics.actionEvents.length ? [...nodeDiagnostics.actionEvents].reverse().map((event) => <article className={`diagnostic-event event-${event.level}`} key={event.id}><time>{formatTime(event.created_at, timeZone)}</time><span>{event.phase.replaceAll("-", " ")}</span><p>{event.message}</p></article>) : <p className="diagnostics-empty">No operation events recorded yet.</p>}
                 </div>
                 <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Protocol reconcile</b></div>
@@ -1149,7 +1156,7 @@ export default function Home() {
         </div>
       )}
 
-      {showLogPurge && <div className="modal-layer" role="presentation" onMouseDown={() => !logsBusy && setShowLogPurge(false)}><section className="modal confirm-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><p>IRREVERSIBLE OPERATION</p><h2>Purge {logNodeId ? "node" : "all"} system logs?</h2></div><button type="button" onClick={() => setShowLogPurge(false)} disabled={logsBusy}>×</button></div><div className="confirm-body"><p>This deletes operational logs and Controller-side raw job output. Audit records are retained. Loki removes matching logs from search immediately and its compactor deletes physical chunks shortly afterward.</p><label>Type <b>PURGE SYSTEM LOGS</b><input autoFocus value={logPurgeConfirmation} onChange={(event) => setLogPurgeConfirmation(event.target.value)} /></label></div><div className="modal-actions confirm-actions"><button type="button" className="cancel" onClick={() => setShowLogPurge(false)} disabled={logsBusy}>Cancel</button><button type="button" className="danger-button" onClick={() => void purgeOperationalLogs()} disabled={logsBusy || logPurgeConfirmation !== "PURGE SYSTEM LOGS"}>{logsBusy ? "Purging…" : "Purge permanently"}</button></div></section></div>}
+      {showLogPurge && <div className="modal-layer" role="presentation" onMouseDown={() => !logsBusy && setShowLogPurge(false)}><section className="modal confirm-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><p>IRREVERSIBLE OPERATION</p><h2>{logPurgeNodeId ? `Clear ${nodes.find((node) => node.id === logPurgeNodeId)?.name || "selected node"} logs?` : "Clear all operational logs?"}</h2></div><button type="button" onClick={() => setShowLogPurge(false)} disabled={logsBusy}>×</button></div><div className="confirm-body"><p>This deletes operational logs and Controller-side raw job output. Audit records are retained. Loki removes matching logs from search immediately and its compactor deletes physical chunks shortly afterward.</p><label>Type <b>{logPurgeNodeId ? "PURGE NODE LOGS" : "PURGE SYSTEM LOGS"}</b><input autoFocus value={logPurgeConfirmation} onChange={(event) => setLogPurgeConfirmation(event.target.value)} /></label></div><div className="modal-actions confirm-actions"><button type="button" className="cancel" onClick={() => setShowLogPurge(false)} disabled={logsBusy}>Cancel</button><button type="button" className="danger-button" onClick={() => void purgeOperationalLogs()} disabled={logsBusy || logPurgeConfirmation !== (logPurgeNodeId ? "PURGE NODE LOGS" : "PURGE SYSTEM LOGS")}>{logsBusy ? "Purging…" : "Purge permanently"}</button></div></section></div>}
 
       <ConfirmDialog
         open={Boolean(pendingNodeConfirmation)}

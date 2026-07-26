@@ -50,8 +50,18 @@ export async function getNodeConnectivity(nodeId: string) {
     hostFirewall: managedRules[`${item.transport}/${item.port}`] === true ? "managed" : firewall.inputPolicy === "accept" ? "permissive" : "unknown",
     cloudFirewall: "unverified" as const,
   }));
+  const heartbeatAt = node.last_heartbeat_at || null;
+  const heartbeatTime = heartbeatAt ? new Date(heartbeatAt).getTime() : Number.NaN;
+  const heartbeatFresh = Number.isFinite(heartbeatTime) && Date.now() - heartbeatTime <= 90_000;
+  const protocolStates = assessed.map((item) => item.state);
+  const status: ConnectivityState = !heartbeatFresh ? "attention"
+    : protocolStates.includes("attention") ? "attention"
+      : protocolStates.includes("healthy") ? "healthy"
+        : protocolStates.every((state) => state === "unavailable") ? "unavailable" : "not_configured";
   return {
-    agentChannel: node.status === "online" ? "healthy" : "attention",
+    status,
+    agentChannel: heartbeatFresh ? "healthy" : "attention",
+    lastAuthenticatedHeartbeat: heartbeatAt,
     firewall: { manager: typeof firewall.manager === "string" ? firewall.manager : "unknown", inputPolicy: typeof firewall.inputPolicy === "string" ? firewall.inputPolicy : "unknown" },
     protocols: assessed,
     note: "Cloud security groups and network ACLs cannot be inspected without a provider integration; keep their status unverified until an adapter is configured.",

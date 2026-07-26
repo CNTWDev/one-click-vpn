@@ -34,6 +34,12 @@ function pause(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function hasFreshAgentHeartbeat(node: Awaited<ReturnType<typeof findNode>>, maximumAgeMilliseconds = 90_000): boolean {
+  if (!node?.last_heartbeat_at) return false;
+  const heartbeatAt = new Date(node.last_heartbeat_at).getTime();
+  return Number.isFinite(heartbeatAt) && Date.now() - heartbeatAt <= maximumAgeMilliseconds;
+}
+
 async function waitForAgentHeartbeat(nodeId: string, notBefore: number, timeoutMilliseconds: number = 25_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMilliseconds;
   while (Date.now() < deadline) {
@@ -448,12 +454,25 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
     };
     const outputRecorder = new ActionOutputRecorder(actionId, nodeId);
     recorder = outputRecorder;
+    const actionStartedAt = Date.now();
     const result = await connectAndExec(config, command, node.host_fingerprint, (chunk) => outputRecorder.write(chunk));
     await outputRecorder.flush();
     const output = result.output.slice(-12000);
+    if (action === "restart-agent") {
+      if (!(await waitForAgentHeartbeat(nodeId, actionStartedAt, 35_000))) {
+        throw new Error("Agent service restarted, but no authenticated heartbeat reached the Controller. Use Reinstall / repair agent if the node journal reports HTTP 401 Unauthorized.");
+      }
+    } else {
+      const inspectedNode = await findNode(nodeId);
+      if (!hasFreshAgentHeartbeat(inspectedNode)) {
+        const authenticationRejected = /HTTP (?:Error )?401|Unauthorized|Invalid agent credentials/i.test(output);
+        throw new Error(authenticationRejected
+          ? "Agent service is running, but the Controller rejected its identity with HTTP 401. Use Reinstall / repair agent to synchronize its credential."
+          : "Agent service is running, but the Controller has not received an authenticated heartbeat within 90 seconds.");
+      }
+    }
     await finishNodeAction(actionId, "succeeded", output);
     await addAudit({ actorUserId, action: `node.${action}.succeeded`, targetType: "node", targetId: nodeId });
-    await updateNode(nodeId, { status: "online", last_seen: "now", latency: "connected" });
     return output;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

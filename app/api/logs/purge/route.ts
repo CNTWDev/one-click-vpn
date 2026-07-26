@@ -11,9 +11,10 @@ export async function POST(request: Request) {
   if (!user) return jsonError("Authentication required", 401);
   try {
     const body = await readJson(request);
-    if (cleanText(body.confirmation, 64) !== "PURGE SYSTEM LOGS") return jsonError("Type PURGE SYSTEM LOGS to confirm this irreversible operation", 409);
     const nodeId = cleanText(body.nodeId, 128) || undefined;
     if (nodeId && !(await findNode(nodeId))) return jsonError("Node not found", 404);
+    const requiredConfirmation = nodeId ? "PURGE NODE LOGS" : "PURGE SYSTEM LOGS";
+    if (cleanText(body.confirmation, 64) !== requiredConfirmation) return jsonError(`Type ${requiredConfirmation} to confirm this irreversible operation`, 409);
     await requestOperationalLogPurge(nodeId);
     await purgeStoredOperationalLogs(nodeId);
     await addAudit({ actorUserId: user.id, action: "operational_logs.purged", targetType: nodeId ? "node" : "system_logs", targetId: nodeId, metadata: { nodeId: nodeId || null, irreversible: true } });
