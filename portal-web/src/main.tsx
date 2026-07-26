@@ -19,8 +19,11 @@ const formatBytes = (bytes: number) => {
 };
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { ...init, credentials: "include", headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw Object.assign(new Error(body.error || "请求失败"), { body, status: response.status });
+  const contentType = response.headers.get("content-type") || "";
+  const text = await response.text();
+  if (!contentType.includes("application/json")) throw new Error(`API 返回了非 JSON 响应（HTTP ${response.status}），请检查 Portal 的 /api/ 反向代理。`);
+  const body = text ? JSON.parse(text) as Record<string, unknown> : {};
+  if (!response.ok) throw Object.assign(new Error(typeof body.error === "string" ? body.error : `请求失败（HTTP ${response.status}）`), { body, status: response.status });
   return body as T;
 }
 
@@ -34,6 +37,7 @@ function Auth({ mode, onMode, onUser }: { mode: "login" | "register"; onMode: (m
     event.preventDefault(); setBusy(true); setError("");
     try {
       const result = await api<{ user: User; message?: string }>(mode === "login" ? "/api/v1/auth/web-login" : "/api/v1/auth/register", { method: "POST", body: JSON.stringify(form) });
+      if (!result.user?.id) throw new Error("登录接口返回异常，请检查 Portal 的 /api/ 反向代理。");
       onUser(result.user);
     } catch (err) {
       const error = err as Error & { body?: { user?: User } };
