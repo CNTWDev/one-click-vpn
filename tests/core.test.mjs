@@ -26,7 +26,8 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(agent, /DisableOpenVpn/);
   assert.match(agent, /add\[add\.index\("-C"\)\] = operation/);
   assert.doesNotMatch(agent, /add\[1\] = operation/);
-  assert.match(agent, /agent 2\.4\.1/);
+  assert.match(agent, /\/etc\/wireguard\/northstar\.conf/);
+  assert.match(agent, /agent 2\.4\.2/);
 });
 
 async function waitForServer() {

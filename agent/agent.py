@@ -28,7 +28,7 @@ TOKEN = os.environ["NORTHSTAR_AGENT_TOKEN"]
 STATE_DIR = Path(os.environ.get("NORTHSTAR_AGENT_STATE_DIR", "/opt/northstar-agent/state"))
 WIREGUARD_DIR = STATE_DIR / "wireguard"
 WIREGUARD_KEY = WIREGUARD_DIR / "server.key"
-WIREGUARD_CONFIG = WIREGUARD_DIR / "northstar.conf"
+WIREGUARD_CONFIG = Path("/etc/wireguard/northstar.conf")
 OPENVPN_DIR = STATE_DIR / "openvpn"
 OPENVPN_CONFIG = OPENVPN_DIR / "server.conf"
 OPENVPN_REVOKED_DIR = OPENVPN_DIR / "revoked"
@@ -178,6 +178,7 @@ def wireguard_sync_config(desired):
     if listen_port < 1 or listen_port > 65535:
         raise ValueError("invalid WireGuard listen port")
     private_key = ensure_wireguard_key()
+    WIREGUARD_CONFIG.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     peers = desired.get("peers", [])
     if not isinstance(peers, list) or len(peers) > 4096:
         raise ValueError("invalid WireGuard peer list")
@@ -570,7 +571,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.4.1",
+        "version": "agent 2.4.2",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),

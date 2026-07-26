@@ -331,6 +331,7 @@ install -d -m 700 /opt/northstar-agent
 echo ${shellQuote(source)} | base64 -d > /opt/northstar-agent/agent.py
 if command -v wg >/dev/null 2>&1; then
   install -d -m 700 /opt/northstar-agent/state/wireguard
+  install -d -m 700 /etc/wireguard
   if [ ! -s /opt/northstar-agent/state/wireguard/server.key ]; then
     (umask 077; wg genkey > /opt/northstar-agent/state/wireguard/server.key)
   fi
