@@ -134,12 +134,17 @@ function formatTime(value: string | null | undefined, timeZone: string): string 
 function actionAdvice(action?: NodeAction): string | null {
   if (!action || action.status !== "failed") return null;
   const text = `${action.error}\n${action.output}`.toLowerCase();
+  if (text.includes("401") || text.includes("unauthorized") || text.includes("invalid agent credentials")) return "The Agent identity no longer matches the Controller. Use Reinstall / repair Agent once to rotate and synchronize the node credential over verified SSH.";
   if (text.includes("fingerprint")) return "Verify the SSH host fingerprint from the provider console, then update the node configuration and retry.";
   if (text.includes("heartbeat") || text.includes("controller health preflight")) return "The node could not reach the public Controller URL. Check DNS, HTTPS certificate, outbound firewall, and NORTHSTAR_PUBLIC_ORIGIN.";
   if (text.includes("permission denied") || text.includes("authentication failed")) return "Check the SSH username and credential in the node configuration, then retry the operation.";
   if (text.includes("wireguard-tools") || text.includes("openvpn")) return "Review the package-manager output below. This distribution may need a supported repository or an Ubuntu/Debian image.";
   if (text.includes("namespace") || text.includes("systemd")) return "Use Reinstall Agent to replace the managed service unit, then inspect the new service check event.";
   return "Open the failed event details below. The final error and remote output are retained for diagnosis and safe retry.";
+}
+
+function hasAgentCredentialFailure(events: NodeActionEvent[]): boolean {
+  return events.slice(-100).some((event) => /401|unauthorized|invalid agent credentials/i.test(event.message));
 }
 
 type NodeOperation = "status-agent" | "restart-agent" | "bootstrap" | "delete";
@@ -357,7 +362,7 @@ function NodeFleet({
                 <div className="node-action-popover">
                   <button type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onNodeAction(node, "status-agent"); }}>Check agent</button>
                   <button type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onNodeAction(node, "restart-agent"); }}>Restart agent</button>
-                  <button type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onNodeAction(node, "bootstrap"); }}>Reinstall agent</button>
+                  <button type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onNodeAction(node, "bootstrap"); }}>Reinstall / repair agent</button>
                   <button type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onOpenTerminal(node); }}>View logs</button>
                   <button type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onEditNode(node); }}>Edit configuration</button>
                   <button className="menu-danger" type="button" disabled={Boolean(busyNodeAction)} onClick={(event) => { (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open"); onNodeAction(node, "delete"); }}>Delete node</button>
@@ -890,9 +895,9 @@ export default function Home() {
         tone: "warning",
       },
       bootstrap: {
-        title: `Reinstall ${node.name}'s agent?`,
-        description: "This will reconnect over SSH, overwrite the remote Agent files, and restart the node service. Existing VPN configuration is not intentionally deleted.",
-        confirmLabel: "Reinstall agent",
+        title: `Reinstall and repair ${node.name}'s agent?`,
+        description: "This reconnects over verified SSH, rotates the Agent identity, overwrites its managed files, and restarts the service. Existing VPN configuration is preserved.",
+        confirmLabel: "Reinstall and repair agent",
         tone: "warning",
       },
       delete: {
@@ -1127,6 +1132,7 @@ export default function Home() {
                 <div className="diagnostics-grid"><div><span>NODE STATUS</span><b className={`diagnostic-${selectedNode.status}`}>{selectedNode.status}</b></div><div><span>LAST SEEN</span><b>{selectedNode.lastSeen}</b></div><div><span>AGENT VERSION</span><b>{selectedNode.version}</b></div></div>
                 {nodeDiagnostics.actions[0] && <div className="job-overview"><div><span>CURRENT / LATEST JOB</span><b>{nodeDiagnostics.actions[0].action.replaceAll("-", " ")}</b><small>{nodeDiagnostics.actions[0].current_phase.replaceAll("-", " ")} · {nodeDiagnostics.actions[0].status}</small></div><div className="job-progress"><i style={{ width: `${nodeDiagnostics.actions[0].progress}%` }} /><span>{nodeDiagnostics.actions[0].progress}%</span></div><time>{formatTime(nodeDiagnostics.actions[0].finished_at || nodeDiagnostics.actions[0].started_at || nodeDiagnostics.actions[0].created_at, timeZone)}</time></div>}
                 {actionAdvice(nodeDiagnostics.actions[0]) && <aside className="diagnostic-advice"><b>Suggested next step</b><p>{actionAdvice(nodeDiagnostics.actions[0])}</p></aside>}
+                {!actionAdvice(nodeDiagnostics.actions[0]) && selectedNode.status !== "online" && hasAgentCredentialFailure(nodeDiagnostics.actionEvents) && <aside className="diagnostic-advice"><b>Agent identity rejected</b><p>The node reached the Controller, but its saved credential is no longer accepted. Repairing the Agent rotates and synchronizes that credential over verified SSH without deleting VPN configuration.</p><button type="button" disabled={Boolean(nodeActionBusy)} onClick={() => requestNodeAction(selectedNode, "bootstrap")}>Reinstall / repair agent</button></aside>}
                 <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Resource health</b></div><ResourceMetrics metrics={selectedNode.metrics} timeZone={timeZone} /></div>
                 <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Connectivity</b><span>{nodeDiagnostics.connectivity?.agentChannel || "awaiting Agent report"}</span></div>{nodeDiagnostics.connectivity ? <><div className="connectivity-summary"><span>Host firewall: <b>{nodeDiagnostics.connectivity.firewall.manager} · {nodeDiagnostics.connectivity.firewall.inputPolicy}</b></span><span>Cloud firewall: <b>unverified</b></span></div>{nodeDiagnostics.connectivity.protocols.map((protocol) => <article className={`connectivity-row connectivity-${protocol.state}`} key={protocol.protocol}><b>{protocol.protocol}</b><span>{protocol.transport.toUpperCase()} {protocol.port}</span><span>runtime {protocol.runtimeActive ? "active" : "inactive"}</span><span>listener {protocol.listening ? "ready" : "missing"}</span><span>host {protocol.hostFirewall}</span><span>cloud {protocol.cloudFirewall}</span></article>)}<p className="diagnostics-empty">{nodeDiagnostics.connectivity.note}</p></> : <p className="diagnostics-empty">Reinstall the Agent once after upgrading, then wait for its next heartbeat to collect VPN listener and host-firewall status.</p>}</div>
                 <div className="diagnostics-section"><div className="diagnostics-section-head"><b>Operation timeline</b><button type="button" onClick={() => void loadNodeDiagnostics(selectedNode.id)}>Refresh now</button></div>
