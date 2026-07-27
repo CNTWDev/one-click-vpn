@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { countryMapPoints } from "../../admin-web/src/country-map-points";
+import { countryMapPoints } from "./country-map-points";
 
 export type RegionMapRegion = {
   id: string;
