@@ -49,6 +49,30 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(traffic, /export async function usageByCredentials/);
 });
 
+test("regional profiles provide protocol-appropriate multi-node behavior", async () => {
+  const controlPlane = readFileSync(path.join(root, "server/control-plane.ts"), "utf8");
+  const openVpnPki = readFileSync(path.join(root, "server/openvpn-pki.ts"), "utf8");
+  const heartbeat = readFileSync(path.join(root, "app/api/v1/agent/heartbeat/route.ts"), "utf8");
+  const portal = readFileSync(path.join(root, "portal-web/src/main.tsx"), "utf8");
+  assert.match(controlPlane, /export async function issueRegionalConnectionProfiles/);
+  assert.match(controlPlane, /input\.protocol === "wireguard"/);
+  assert.match(controlPlane, /regionalEndpoints: regionalCandidates\.map/);
+  assert.match(controlPlane, /reconcileAllOpenVpnNodes/);
+  assert.match(openVpnPki, /remote-random/);
+  assert.match(openVpnPki, /regionalEndpoints/);
+  assert.match(openVpnPki, /endpoint\.transport === "tcp" \? "tcp-client" : "udp"/);
+  assert.match(heartbeat, /activeSessionCount/);
+  assert.match(portal, /createZipBlob/);
+  const { createZipBlob } = await import("../portal-web/src/zip.ts");
+  const archive = new Uint8Array(await createZipBlob([
+    { name: "SG-node-1.conf", text: "[Interface]\nPrivateKey = one\n" },
+    { name: "SG-node-2.conf", text: "[Interface]\nPrivateKey = two\n" },
+  ]).arrayBuffer());
+  assert.deepEqual([...archive.slice(0, 4)], [0x50, 0x4b, 0x03, 0x04]);
+  assert.match(new TextDecoder().decode(archive), /SG-node-1\.conf/);
+  assert.match(new TextDecoder().decode(archive), /SG-node-2\.conf/);
+});
+
 async function waitForServer() {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {

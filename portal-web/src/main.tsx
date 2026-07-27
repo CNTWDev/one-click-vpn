@@ -3,14 +3,16 @@ import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { x25519 } from "@noble/curves/ed25519.js";
 import { RegionMap } from "./region-map";
+import { createZipBlob } from "./zip";
 import "./styles.css";
 import "./profile-actions.css";
 import "./region-map.css";
 
 type User = { id: string; email: string; displayName: string; role: string; status: string; rejectionReason?: string | null };
-type Region = { id: string; name: string; country: string; code: string; protocols: string[]; status: string; onlineNodeCount?: number; healthyNodeCount?: number };
+type Region = { id: string; name: string; country: string; code: string; protocols: string[]; status: string; onlineNodeCount?: number; healthyNodeCount?: number; protocolNodeCounts?: Record<string, number> };
 type Device = { id: string; displayName: string; platform: string; publicKey: string; status: string; lastSeenAt?: string | null };
-type Profile = { id: string; deviceId: string; displayName?: string | null; nodeId: string; regionCode?: string | null; regionName?: string | null; protocol: string; status: string; issuedAt: string; expiresAt: string };
+type Profile = { id: string; deviceId: string; displayName?: string | null; nodeId: string; nodeName?: string | null; regionalNodeCount?: number; regionCode?: string | null; regionName?: string | null; protocol: string; status: string; issuedAt: string; expiresAt: string };
+type GeneratedDownload = { profileId: string; name: string; text?: string; files?: Array<{ name: string; text: string }> };
 type Usage = { totals: { uploadBytes: number; downloadBytes: number; totalBytes: number }; daily: Array<{ day: string; totalBytes: number }> };
 type CredentialUsage = { profileId: string; deviceId: string; displayName: string; protocol: string; regionName: string; regionCode: string; credentialSuffix: string; online: boolean; lastActivityAt?: string | null; totalBytes: number };
 
@@ -24,6 +26,13 @@ function saveTextFile(name: string, text: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+function saveBlobFile(name: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url; link.download = name; link.style.display = "none";
+  document.body.appendChild(link); link.click(); link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 const formatBytes = (bytes: number) => {
@@ -44,7 +53,12 @@ function profileFilename(profile: Profile): string {
   const shortId = filenamePart(profile.id.split("_").at(-1)?.slice(-4), "cfg", 4);
   const regionCode = filenamePart(profile.regionCode?.toUpperCase(), "AUTO", 8);
   const regionName = profile.regionName ? `-${filenamePart(profile.regionName, "region", 14)}` : "";
-  return `${regionCode}${regionName}-${filenamePart(profile.displayName, "device")}-${protocolCode}-${shortId}.${extension}`;
+  const node = (profile.regionalNodeCount || 0) > 1 ? `-${profile.regionalNodeCount}nodes` : profile.nodeName ? `-${filenamePart(profile.nodeName, "node", 12)}-${shortId}` : `-${shortId}`;
+  return `${regionCode}${regionName}-${filenamePart(profile.displayName, "device")}-${protocolCode}${node}.${extension}`;
+}
+function bundleFilename(profile: Profile, count: number): string {
+  const protocolCode = profile.protocol === "wireguard" ? "WG" : "OV";
+  return `${filenamePart(profile.regionCode?.toUpperCase(), "AUTO", 8)}-${filenamePart(profile.regionName, "region", 14)}-${filenamePart(profile.displayName, "device")}-${protocolCode}-${count}nodes.zip`;
 }
 function activityLabel(value?: string | null): string {
   if (!value) return "尚未使用";
@@ -89,26 +103,83 @@ function Pending({ user, onLogout }: { user: User; onLogout: () => void }) { ret
 
 function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [regions, setRegions] = useState<Region[]>([]); const [devices, setDevices] = useState<Device[]>([]); const [profiles, setProfiles] = useState<Profile[]>([]); const [usage, setUsage] = useState<Usage | null>(null); const [credentialUsage, setCredentialUsage] = useState<CredentialUsage[]>([]);
-  const [deviceName, setDeviceName] = useState("我的设备"); const [regionId, setRegionId] = useState(""); const [protocol, setProtocol] = useState("wireguard"); const [busy, setBusy] = useState(false); const [notice, setNotice] = useState(""); const [error, setError] = useState(""); const [download, setDownload] = useState<{ profileId: string; name: string; text: string } | null>(null); const [downloadingProfileId, setDownloadingProfileId] = useState(""); const [revokingProfileId, setRevokingProfileId] = useState(""); const [profileDownloadNotice, setProfileDownloadNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
-  const selectedRegion = regions.find((item) => item.id === regionId); const protocols = selectedRegion?.protocols || ["wireguard", "openvpn"];
+  const [deviceName, setDeviceName] = useState("我的设备"); const [regionId, setRegionId] = useState(""); const [protocol, setProtocol] = useState("wireguard"); const [busy, setBusy] = useState(false); const [notice, setNotice] = useState(""); const [error, setError] = useState(""); const [download, setDownload] = useState<GeneratedDownload | null>(null); const [downloadingProfileId, setDownloadingProfileId] = useState(""); const [revokingProfileId, setRevokingProfileId] = useState(""); const [profileDownloadNotice, setProfileDownloadNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const selectedRegion = regions.find((item) => item.id === regionId); const protocols = selectedRegion?.protocols || ["wireguard", "openvpn"]; const selectedProtocolNodeCount = selectedRegion?.protocolNodeCounts?.[protocol] || 0;
   async function refresh() { const [availability, deviceResult, profileResult, usageResult, credentialResult] = await Promise.all([api<{ regions: Region[] }>("/api/v1/availability"), api<{ devices: Device[] }>("/api/v1/devices"), api<{ profiles: Profile[] }>("/api/v1/profiles"), api<Usage>("/api/v1/usage/summary"), api<{ credentials: CredentialUsage[] }>("/api/v1/usage/credentials")]); setRegions(availability.regions); setDevices(deviceResult.devices); setProfiles(profileResult.profiles); setUsage(usageResult); setCredentialUsage(credentialResult.credentials || []); if (!regionId) { const preferred = availability.regions.find((item) => item.status === "available") || availability.regions[0]; if (preferred) setRegionId(preferred.id); } }
   useEffect(() => { void refresh().catch((err) => setError((err as Error).message)); }, []);
   useEffect(() => { if (selectedRegion && !selectedRegion.protocols.includes(protocol)) setProtocol(selectedRegion.protocols[0] || "wireguard"); }, [selectedRegion, protocol]);
-  async function createProfile(event: React.FormEvent) { event.preventDefault(); setBusy(true); setError(""); setNotice(""); setDownload(null); try { const privateBytes = protocol === "wireguard" ? x25519.utils.randomSecretKey() : null; const clientPrivateKey = privateBytes ? base64(privateBytes) : undefined; const publicKey = privateBytes ? base64(x25519.getPublicKey(privateBytes)) : "openvpn-managed"; const device = await api<{ device: Device }>("/api/v1/devices", { method: "POST", body: JSON.stringify({ displayName: deviceName || "我的设备", platform: "web", appVersion: "portal-0.1.0", publicKey }) }); setDevices((items) => [device.device, ...items]); const issued = await api<{ profile: Profile }>("/api/v1/profiles", { method: "POST", body: JSON.stringify({ deviceId: device.device.id, regionId: regionId || undefined, protocol, clientPrivateKey }) }); const active = await api<{ profile: Profile }>(`/api/v1/profiles/${issued.profile.id}/activate`, { method: "POST" }); const response = await fetch(`/api/v1/profiles/${active.profile.id}/download`, { credentials: "include" }); const text = await response.text(); if (!response.ok) throw new Error(text || "配置下载失败"); setDownload({ profileId: active.profile.id, name: profileFilename({ ...active.profile, displayName: issued.profile.displayName || device.device.displayName, regionCode: issued.profile.regionCode || selectedRegion?.code, regionName: issued.profile.regionName || selectedRegion?.name }), text }); setNotice("配置已生成，请下载后导入对应 VPN 客户端。"); await refresh(); } catch (err) { setError((err as Error).message); } finally { setBusy(false); } }
+  async function createProfile(event: React.FormEvent) {
+    event.preventDefault(); setBusy(true); setError(""); setNotice(""); setDownload(null);
+    try {
+      const privateBytes = protocol === "wireguard" ? x25519.utils.randomSecretKey() : null;
+      const clientPrivateKey = privateBytes ? base64(privateBytes) : undefined;
+      const publicKey = privateBytes ? base64(x25519.getPublicKey(privateBytes)) : "openvpn-managed";
+      const device = await api<{ device: Device }>("/api/v1/devices", {
+        method: "POST",
+        body: JSON.stringify({ displayName: deviceName || "我的设备", platform: "web", appVersion: "portal-0.2.0", publicKey }),
+      });
+      setDevices((items) => [device.device, ...items]);
+      const issued = await api<{ profile: Profile; profiles?: Profile[] }>("/api/v1/profiles", {
+        method: "POST",
+        body: JSON.stringify({ deviceId: device.device.id, regionId: regionId || undefined, protocol, clientPrivateKey }),
+      });
+      const issuedProfiles = issued.profiles?.length ? issued.profiles : [issued.profile];
+      const activeProfiles = await Promise.all(issuedProfiles.map(async (profile) => {
+        const active = await api<{ profile: Profile }>(`/api/v1/profiles/${profile.id}/activate`, { method: "POST" });
+        return { active: active.profile, issued: profile };
+      }));
+      const files = await Promise.all(activeProfiles.map(async ({ active, issued: source }) => {
+        const response = await fetch(`/api/v1/profiles/${active.id}/download`, { credentials: "include" });
+        const text = await response.text();
+        if (!response.ok) throw new Error(text || "配置下载失败");
+        const profile = {
+          ...active,
+          displayName: source.displayName || device.device.displayName,
+          nodeName: source.nodeName,
+          regionalNodeCount: source.regionalNodeCount,
+          regionCode: source.regionCode || selectedRegion?.code,
+          regionName: source.regionName || selectedRegion?.name,
+        };
+        return { name: profileFilename(profile), text, profile };
+      }));
+      if (files.length === 1) {
+        setDownload({ profileId: files[0].profile.id, name: files[0].name, text: files[0].text });
+        setNotice(protocol === "openvpn" && selectedRegion && (selectedRegion.protocolNodeCounts?.openvpn || 0) > 1
+          ? `区域配置已生成，内含 ${selectedRegion.protocolNodeCounts?.openvpn} 个 OpenVPN 节点，可自动故障切换。`
+          : "配置已生成，请下载后导入对应 VPN 客户端。");
+      } else {
+        setDownload({
+          profileId: files[0].profile.id,
+          name: bundleFilename(files[0].profile, files.length),
+          files: files.map(({ name, text }) => ({ name, text })),
+        });
+        setNotice(`已生成 ${files.length} 个 WireGuard 节点配置，请下载 ZIP 后按需导入。`);
+      }
+      await refresh();
+    } catch (err) { setError((err as Error).message); }
+    finally { setBusy(false); }
+  }
   async function revoke(device: Device) { if (!confirm(`撤销 ${device.displayName}？`)) return; try { await api(`/api/v1/devices/${device.id}/revoke`, { method: "POST" }); await refresh(); } catch (err) { setError((err as Error).message); } }
-  function saveDownload() { if (download) saveTextFile(download.name, download.text); }
+  function saveDownload() { if (download?.text) saveTextFile(download.name, download.text); else if (download?.files) saveBlobFile(download.name, createZipBlob(download.files)); }
   async function downloadProfile(profile: Profile) {
     setDownloadingProfileId(profile.id); setProfileDownloadNotice(null);
     try {
-      const response = await fetch(`/api/v1/profiles/${profile.id}/download`, { credentials: "include" });
-      const text = await response.text();
-      if (!response.ok) {
-        let message = text || `配置下载失败（HTTP ${response.status}）`;
-        try { const body = JSON.parse(text) as { error?: string }; if (body.error) message = body.error; } catch { /* plain-text error */ }
-        throw new Error(message);
-      }
-      saveTextFile(profileFilename(profile), text);
-      setProfileDownloadNotice({ tone: "success", message: "下载已开始。" });
+      const siblings = profile.protocol === "wireguard"
+        ? availableProfiles.filter((item) => item.deviceId === profile.deviceId && item.protocol === profile.protocol)
+        : [profile];
+      const files = await Promise.all(siblings.map(async (item) => {
+        const response = await fetch(`/api/v1/profiles/${item.id}/download`, { credentials: "include" });
+        const text = await response.text();
+        if (!response.ok) {
+          let message = text || `配置下载失败（HTTP ${response.status}）`;
+          try { const body = JSON.parse(text) as { error?: string }; if (body.error) message = body.error; } catch { /* plain-text error */ }
+          throw new Error(message);
+        }
+        return { name: profileFilename(item), text };
+      }));
+      if (files.length > 1) saveBlobFile(bundleFilename(profile, files.length), createZipBlob(files));
+      else saveTextFile(files[0].name, files[0].text);
+      setProfileDownloadNotice({ tone: "success", message: files.length > 1 ? `包含 ${files.length} 个节点的配置包已开始下载。` : "下载已开始。" });
     } catch (err) {
       setProfileDownloadNotice({ tone: "error", message: (err as Error).message });
     } finally { setDownloadingProfileId(""); }
@@ -116,7 +187,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   async function revokeProfile(profile: Profile) {
     const device = devices.find((item) => item.id === profile.deviceId);
     if (!device) { setProfileDownloadNotice({ tone: "error", message: "找不到该配置关联的设备，请刷新后重试。" }); return; }
-    if (!confirm(`确定撤销这份 ${profile.protocol === "wireguard" ? "WireGuard" : "OpenVPN"} 配置吗？\n\n已导入客户端的配置也会失效。`)) return;
+    const siblingCount = profiles.filter((item) => item.deviceId === profile.deviceId && (item.status === "active" || item.status === "issued")).length;
+    if (!confirm(`确定撤销这${siblingCount > 1 ? `组 ${siblingCount} 份` : "份"} ${profile.protocol === "wireguard" ? "WireGuard" : "OpenVPN"} 配置吗？\n\n同一设备下已导入客户端的配置都会失效。`)) return;
     setRevokingProfileId(profile.id); setProfileDownloadNotice(null);
     try {
       await api(`/api/v1/devices/${device.id}/revoke`, { method: "POST" });
@@ -130,7 +202,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const maxDay = Math.max(...(usage?.daily || []).map((item) => item.totalBytes), 1);
   const availableProfiles = profiles.filter((profile) => profile.status === "active" || profile.status === "issued");
   const usageByProfile = new Map(credentialUsage.map((item) => [item.profileId, item]));
-  return <main className="dashboard"><header><Brand /><div className="account"><span>{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b><small>{user.email}</small></div><button onClick={onLogout}>退出</button></div></header><section className="welcome"><div><p className="kicker">ACCOUNT ACTIVE</p><h1>你好，{user.displayName}。</h1><p>账号已审核，可以使用所有当前健康的 VPN 区域。</p></div><span className="active-badge">● 已审核</span></section><section className="stats"><article><small>本期总流量</small><strong>{formatBytes(usage?.totals.totalBytes || 0)}</strong><span>最近 30 天</span></article><article><small>下载</small><strong>{formatBytes(usage?.totals.downloadBytes || 0)}</strong><span>服务端发送给设备</span></article><article><small>上传</small><strong>{formatBytes(usage?.totals.uploadBytes || 0)}</strong><span>服务端收到的设备流量</span></article></section><RegionMap regions={regions} selectedRegionId={regionId} onSelect={setRegionId} /><div className="grid"><section className="card"><div className="card-head"><div><p className="kicker">GET CONNECTED</p><h2>生成 VPN 配置</h2></div><span className="muted">WireGuard 推荐</span></div><form className="form-grid" onSubmit={createProfile}><label>设备名称<input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} /></label><label>区域<select value={regionId} onChange={(e) => setRegionId(e.target.value)}><option value="">自动选择</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} · {region.country} {region.status !== "available" ? "（不可用）" : ""}</option>)}</select></label><label>协议<select value={protocol} onChange={(e) => setProtocol(e.target.value)}>{protocols.map((item) => <option key={item} value={item}>{item === "wireguard" ? "WireGuard" : "OpenVPN"}</option>)}</select></label><button className="primary" disabled={busy || !regions.some((item) => item.status === "available")}>{busy ? "生成中…" : "生成并下载配置"}<span>→</span></button></form>{download && <div className="download-box"><b>配置已经准备好</b><p>私钥已包含在配置中，请只保存到自己的设备。</p><button className="secondary" onClick={saveDownload}>下载 {download.name}</button><details><summary>查看配置文本</summary><pre>{download.text}</pre></details></div>}{notice && <p className="success">{notice}</p>}{error && <p className="error">{error}</p>}</section><section className="card"><div className="card-head"><div><p className="kicker">LAST 30 DAYS</p><h2>流量趋势</h2></div><span className="muted">约 1–2 分钟延迟</span></div><div className="bars">{(usage?.daily || []).slice(-14).map((day) => <div key={day.day} title={`${day.day} ${formatBytes(day.totalBytes)}`}><i style={{ height: `${Math.max(6, day.totalBytes / maxDay * 100)}%` }} /><small>{day.day.slice(5)}</small></div>)}</div></section></div><div className="grid lower"><section className="card"><div className="card-head"><div><p className="kicker">DEVICES</p><h2>我的设备</h2></div><b>{devices.filter((item) => item.status === "active").length} 个活动设备</b></div>{devices.length ? devices.map((device) => <div className="list-row" key={device.id}><span className="device-icon">{device.platform === "web" ? "WEB" : "VPN"}</span><div><b>{device.displayName}</b><small>{device.platform} · {device.status}</small></div>{device.status === "active" && <button className="danger-link" onClick={() => void revoke(device)}>撤销</button>}</div>) : <p className="empty">还没有设备，生成一份配置即可添加。</p>}</section><section className="card"><div className="card-head"><div><p className="kicker">PROFILES</p><h2>最近配置</h2></div><b>{availableProfiles.length} 个可用</b></div>{availableProfiles.slice(0, 5).map((profile) => { const item = usageByProfile.get(profile.id); return <div className="list-row profile-usage-row" key={profile.id}><span className="protocol-icon">{profile.protocol === "wireguard" ? "WG" : "OV"}</span><div><b><span className={`usage-state ${item?.online ? "online" : "idle"}`} />{profile.regionCode || "AUTO"} · {profile.protocol === "wireguard" ? "WireGuard" : "OpenVPN"}</b><small>{item?.online ? "使用中" : activityLabel(item?.lastActivityAt)} · 30 天 {formatBytes(item?.totalBytes || 0)}{item?.credentialSuffix ? ` · 凭据 …${item.credentialSuffix}` : ""}</small></div><div className="list-actions"><button className="text-link" disabled={Boolean(downloadingProfileId) || Boolean(revokingProfileId)} onClick={() => void downloadProfile(profile)}>{downloadingProfileId === profile.id ? "下载中…" : "下载"}</button><button className="danger-link" disabled={Boolean(downloadingProfileId) || Boolean(revokingProfileId)} onClick={() => void revokeProfile(profile)}>{revokingProfileId === profile.id ? "撤销中…" : "撤销"}</button></div></div>; })}{!availableProfiles.length && <p className="empty">还没有可用配置，生成后会显示在这里。</p>}{profileDownloadNotice && <p className={profileDownloadNotice.tone}>{profileDownloadNotice.message}</p>}</section></div><footer>Northstar · 流量统计仅用于查看，不包含配额或计费 · 数据以 UTC 日期汇总</footer></main>;
+  return <main className="dashboard"><header><Brand /><div className="account"><span>{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b><small>{user.email}</small></div><button onClick={onLogout}>退出</button></div></header><section className="welcome"><div><p className="kicker">ACCOUNT ACTIVE</p><h1>你好，{user.displayName}。</h1><p>账号已审核，可以使用所有当前健康的 VPN 区域。</p></div><span className="active-badge">● 已审核</span></section><section className="stats"><article><small>本期总流量</small><strong>{formatBytes(usage?.totals.totalBytes || 0)}</strong><span>最近 30 天</span></article><article><small>下载</small><strong>{formatBytes(usage?.totals.downloadBytes || 0)}</strong><span>服务端发送给设备</span></article><article><small>上传</small><strong>{formatBytes(usage?.totals.uploadBytes || 0)}</strong><span>服务端收到的设备流量</span></article></section><RegionMap regions={regions} selectedRegionId={regionId} onSelect={setRegionId} /><div className="grid"><section className="card"><div className="card-head"><div><p className="kicker">GET CONNECTED</p><h2>生成 VPN 配置</h2></div><span className="muted">{selectedProtocolNodeCount > 1 ? `${selectedProtocolNodeCount} 个健康节点 · ${protocol === "openvpn" ? "自动切换" : "配置包"}` : "WireGuard 推荐"}</span></div><form className="form-grid" onSubmit={createProfile}><label>设备名称<input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} /></label><label>区域<select value={regionId} onChange={(e) => setRegionId(e.target.value)}><option value="">自动选择</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} · {region.country} {region.status !== "available" ? "（不可用）" : ""}</option>)}</select></label><label>协议<select value={protocol} onChange={(e) => setProtocol(e.target.value)}>{protocols.map((item) => <option key={item} value={item}>{item === "wireguard" ? "WireGuard" : "OpenVPN"}</option>)}</select></label><button className="primary" disabled={busy || !regions.some((item) => item.status === "available")}>{busy ? "生成中…" : "生成并下载配置"}<span>→</span></button></form>{download && <div className="download-box"><b>配置已经准备好</b><p>{download.files ? `压缩包包含 ${download.files.length} 个节点配置；同一时间只需启用其中一个。` : "私钥已包含在配置中，请只保存到自己的设备。"}</p><button className="secondary" onClick={saveDownload}>下载 {download.name}</button>{download.text && <details><summary>查看配置文本</summary><pre>{download.text}</pre></details>}{download.files && <div className="bundle-files">{download.files.map((file) => <span key={file.name}>{file.name}</span>)}</div>}</div>}{notice && <p className="success">{notice}</p>}{error && <p className="error">{error}</p>}</section><section className="card"><div className="card-head"><div><p className="kicker">LAST 30 DAYS</p><h2>流量趋势</h2></div><span className="muted">约 1–2 分钟延迟</span></div><div className="bars">{(usage?.daily || []).slice(-14).map((day) => <div key={day.day} title={`${day.day} ${formatBytes(day.totalBytes)}`}><i style={{ height: `${Math.max(6, day.totalBytes / maxDay * 100)}%` }} /><small>{day.day.slice(5)}</small></div>)}</div></section></div><div className="grid lower"><section className="card"><div className="card-head"><div><p className="kicker">DEVICES</p><h2>我的设备</h2></div><b>{devices.filter((item) => item.status === "active").length} 个活动设备</b></div>{devices.length ? devices.map((device) => <div className="list-row" key={device.id}><span className="device-icon">{device.platform === "web" ? "WEB" : "VPN"}</span><div><b>{device.displayName}</b><small>{device.platform} · {device.status}</small></div>{device.status === "active" && <button className="danger-link" onClick={() => void revoke(device)}>撤销</button>}</div>) : <p className="empty">还没有设备，生成一份配置即可添加。</p>}</section><section className="card"><div className="card-head"><div><p className="kicker">PROFILES</p><h2>最近配置</h2></div><b>{availableProfiles.length} 个可用</b></div>{availableProfiles.slice(0, 5).map((profile) => { const item = usageByProfile.get(profile.id); return <div className="list-row profile-usage-row" key={profile.id}><span className="protocol-icon">{profile.protocol === "wireguard" ? "WG" : "OV"}</span><div><b><span className={`usage-state ${item?.online ? "online" : "idle"}`} />{profile.regionCode || "AUTO"} · {profile.protocol === "wireguard" ? "WireGuard" : "OpenVPN"}{(profile.regionalNodeCount || 0) > 1 ? ` · ${profile.regionalNodeCount} 节点自动切换` : profile.nodeName ? ` · ${profile.nodeName}` : ""}</b><small>{item?.online ? "使用中" : activityLabel(item?.lastActivityAt)} · 30 天 {formatBytes(item?.totalBytes || 0)}{item?.credentialSuffix ? ` · 凭据 …${item.credentialSuffix}` : ""}</small></div><div className="list-actions"><button className="text-link" disabled={Boolean(downloadingProfileId) || Boolean(revokingProfileId)} onClick={() => void downloadProfile(profile)}>{downloadingProfileId === profile.id ? "下载中…" : "下载"}</button><button className="danger-link" disabled={Boolean(downloadingProfileId) || Boolean(revokingProfileId)} onClick={() => void revokeProfile(profile)}>{revokingProfileId === profile.id ? "撤销中…" : "撤销"}</button></div></div>; })}{!availableProfiles.length && <p className="empty">还没有可用配置，生成后会显示在这里。</p>}{profileDownloadNotice && <p className={profileDownloadNotice.tone}>{profileDownloadNotice.message}</p>}</section></div><footer>Northstar · 流量统计仅用于查看，不包含配额或计费 · 数据以 UTC 日期汇总</footer></main>;
 }
 
 export default function App() { const [user, setUser] = useState<User | null>(null); const [mode, setMode] = useState<"login" | "register">("login"); const [loading, setLoading] = useState(true); useEffect(() => { api<{ user: User }>("/api/v1/auth/me").then((result) => setUser(result.user)).catch(() => undefined).finally(() => setLoading(false)); }, []); async function logout() { await fetch("/api/v1/auth/web-logout", { method: "POST", credentials: "include" }); setUser(null); setMode("login"); } if (loading) return <main className="center-page"><Brand /><p>正在连接 Northstar…</p></main>; if (!user) return <Auth mode={mode} onMode={setMode} onUser={setUser} />; if (user.status !== "active") return <Pending user={user} onLogout={() => void logout()} />; return <Dashboard user={user} onLogout={() => void logout()} />; }

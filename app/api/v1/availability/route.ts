@@ -16,13 +16,20 @@ export async function GET(request: Request) {
     const regionNodes = onlineNodes.filter((node) => node.region_id === region.id);
     const protocols = new Set<string>();
     const healthyNodeIds = new Set<string>();
+    const protocolNodeIds = new Map<string, Set<string>>();
     for (const node of regionNodes) {
       const healthy = services.filter((service) => service.node_id === node.id && service.enabled && service.status === "healthy");
       for (const service of healthy) {
         const capability = (await listNodeProtocols(node.id)).find((item) => item.protocol === service.protocol);
-        if (capability?.status === "enabled") {
+        const connectivity = node.capabilities.connectivity as { protocols?: Record<string, { runtimeActive?: boolean; interfaceActive?: boolean; serviceActive?: boolean; listening?: boolean }> } | undefined;
+        const observed = connectivity?.protocols?.[service.protocol];
+        const active = observed?.runtimeActive ?? observed?.interfaceActive ?? observed?.serviceActive;
+        if (capability?.status === "enabled" && active === true && observed?.listening === true) {
           protocols.add(service.protocol);
           healthyNodeIds.add(node.id);
+          const nodeIds = protocolNodeIds.get(service.protocol) || new Set<string>();
+          nodeIds.add(node.id);
+          protocolNodeIds.set(service.protocol, nodeIds);
         }
       }
     }
@@ -35,6 +42,7 @@ export async function GET(request: Request) {
       status: protocols.size ? "available" : "unavailable",
       onlineNodeCount: regionNodes.length,
       healthyNodeCount: healthyNodeIds.size,
+      protocolNodeCounts: Object.fromEntries([...protocolNodeIds].map(([protocol, nodeIds]) => [protocol, nodeIds.size])),
     });
   }
   return NextResponse.json({ regions: available });

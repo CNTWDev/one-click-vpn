@@ -126,6 +126,11 @@ End-user devices, VPN profiles, and traffic remain in the customer Portal. Node
 repair uses the saved encrypted SSH credential; normal Agent communication uses
 outbound HTTPS to the Controller API.
 
+When a region has multiple healthy nodes, the Portal uses the least-loaded node
+first. OpenVPN exports one profile containing all regional endpoints for automatic
+failover. WireGuard exports one profile per node in a ZIP package; enable only one
+of them at a time. Revoking the device invalidates the complete generated group.
+
 ## Upgrade
 
 Recommended upgrade, including a PostgreSQL backup:
@@ -150,6 +155,9 @@ sudo ./one-click-update.sh --service northstar    # Controller/API
 sudo ./one-click-update.sh --service portal-web   # Portal
 sudo ./one-click-update.sh --service admin-web    # Admin
 ```
+
+Regional multi-node profiles change both the Controller and Portal, so deploy them
+together with `sudo ./one-click-update.sh --service all`.
 
 `northstar` and `all` create a database backup. Frontend-only updates skip the
 database backup and do not restart the Controller. Use the full update when a

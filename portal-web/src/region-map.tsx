@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { countryMapPoints } from "./country-map-points";
 
 export type RegionMapRegion = {
@@ -10,6 +10,7 @@ export type RegionMapRegion = {
   status: string;
   onlineNodeCount?: number;
   healthyNodeCount?: number;
+  protocolNodeCounts?: Record<string, number>;
 };
 
 type MapPoint = { x: number; y: number };
@@ -44,6 +45,30 @@ function protocolLabel(protocol: string): string {
   return protocol;
 }
 
+function requestBrowserLocation(setLocation: (state: LocationState) => void) {
+  if (!window.isSecureContext) {
+    setLocation({ status: "error", message: "浏览器定位需要通过 HTTPS 访问 Portal。" });
+    return;
+  }
+  if (!navigator.geolocation) {
+    setLocation({ status: "error", message: "当前浏览器不支持定位。" });
+    return;
+  }
+  setLocation({ status: "locating", message: "正在自动获取浏览器位置…" });
+  navigator.geolocation.getCurrentPosition(
+    (position) => setLocation({ status: "located", latitude: position.coords.latitude, longitude: position.coords.longitude, message: "已自动使用浏览器位置" }),
+    (error) => {
+      const message = error.code === error.PERMISSION_DENIED
+        ? "未获得定位权限，可点击按钮重试。"
+        : error.code === error.TIMEOUT
+          ? "自动定位超时，可点击按钮重试。"
+          : "无法获取当前位置，请检查系统定位服务。";
+      setLocation({ status: "error", message });
+    },
+    { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
+  );
+}
+
 export function RegionMap({ regions, selectedRegionId, onSelect }: {
   regions: RegionMapRegion[];
   selectedRegionId: string;
@@ -76,29 +101,9 @@ export function RegionMap({ regions, selectedRegionId, onSelect }: {
   const hasLocation = location.status === "located" && location.latitude !== undefined && location.longitude !== undefined;
   const origin = hasLocation ? projectGeoPoint(location.latitude!, location.longitude!) : { x: 505, y: 606 };
 
-  function locateUser() {
-    if (!window.isSecureContext) {
-      setLocation({ status: "error", message: "浏览器定位需要通过 HTTPS 访问 Portal。" });
-      return;
-    }
-    if (!navigator.geolocation) {
-      setLocation({ status: "error", message: "当前浏览器不支持定位。" });
-      return;
-    }
-    setLocation({ status: "locating", message: "正在请求浏览器定位…" });
-    navigator.geolocation.getCurrentPosition(
-      (position) => setLocation({ status: "located", latitude: position.coords.latitude, longitude: position.coords.longitude, message: "已使用浏览器位置" }),
-      (error) => {
-        const message = error.code === error.PERMISSION_DENIED
-          ? "未获得定位权限，当前仍显示逻辑入口。"
-          : error.code === error.TIMEOUT
-            ? "定位超时，请重试。"
-            : "无法获取当前位置，请检查系统定位服务。";
-        setLocation({ status: "error", message });
-      },
-      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
-    );
-  }
+  useEffect(() => { requestBrowserLocation(setLocation); }, []);
+
+  function locateUser() { requestBrowserLocation(setLocation); }
 
   return <section className="region-map-panel">
     <div className="region-map-head">

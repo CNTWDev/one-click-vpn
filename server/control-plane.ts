@@ -122,10 +122,26 @@ export async function rebuildDesiredState(nodeId: string, protocol: Protocol, op
 }
 
 export async function selectVpnService(input: { protocol: Protocol; regionId?: string }) {
+  const candidates = await selectVpnServices(input);
+  const selected = candidates[0];
+  if (!selected) throw new Error(input.regionId ? "No healthy VPN service is available in this region" : "No healthy VPN service is available");
+  return selected;
+}
+
+export async function selectVpnServices(input: { protocol: Protocol; regionId?: string }) {
   const services = (await listVpnServices()).filter((service) => service.protocol === input.protocol && service.enabled && service.status === "healthy");
   const nodes = await listControlNodes();
-  const candidates = nodes.filter((node) => {
+  const activeProfiles = await listConnectionProfiles({ status: "active" });
+  const profileCounts = new Map<string, number>();
+  for (const profile of activeProfiles) profileCounts.set(profile.node_id, (profileCounts.get(profile.node_id) || 0) + 1);
+  const advertised = new Map<string, boolean>();
+  await Promise.all(nodes.map(async (node) => {
+    const capability = (await listNodeProtocols(node.id)).find((item) => item.protocol === input.protocol);
+    advertised.set(node.id, capability?.status === "enabled");
+  }));
+  return nodes.filter((node) => {
     if (!services.some((service) => service.node_id === node.id)) return false;
+    if (!advertised.get(node.id)) return false;
     if (input.regionId && node.region_id !== input.regionId) return false;
     if (node.status !== "online" || !node.last_heartbeat_at) return false;
     if (Date.now() - new Date(node.last_heartbeat_at).getTime() >= 90_000) return false;
@@ -133,15 +149,53 @@ export async function selectVpnService(input: { protocol: Protocol; regionId?: s
     const observed = connectivity?.protocols?.[input.protocol];
     const active = observed?.runtimeActive ?? observed?.interfaceActive ?? observed?.serviceActive;
     return active === true && observed?.listening === true;
-  }).sort((left, right) => left.users - right.users || left.name.localeCompare(right.name));
-  const node = candidates[0];
-  if (!node) throw new Error(input.regionId ? "No healthy VPN service is available in this region" : "No healthy VPN service is available");
-  return { node, service: services.find((item) => item.node_id === node.id)! };
+  }).sort((left, right) => left.users - right.users || (profileCounts.get(left.id) || 0) - (profileCounts.get(right.id) || 0) || left.name.localeCompare(right.name))
+    .map((node) => ({ node, service: services.find((item) => item.node_id === node.id)! }));
 }
 
 export async function issueScheduledConnectionProfile(input: Omit<Parameters<typeof issueConnectionProfile>[0], "nodeId"> & { regionId?: string }): Promise<ConnectionProfile> {
   const selected = await selectVpnService({ protocol: input.protocol, regionId: input.regionId });
   return issueConnectionProfile({ ...input, nodeId: selected.node.id });
+}
+
+export async function issueRegionalConnectionProfiles(input: Omit<Parameters<typeof issueConnectionProfile>[0], "nodeId" | "regionalEndpoints"> & { regionId?: string }): Promise<ConnectionProfile[]> {
+  const candidates = await selectVpnServices({ protocol: input.protocol, regionId: input.regionId });
+  if (!candidates.length) throw new Error(input.regionId ? "No healthy VPN service is available in this region" : "No healthy VPN service is available");
+  const regionalCandidates = input.regionId ? candidates : candidates.slice(0, 1);
+  if (input.protocol === "wireguard") {
+    const profiles: ConnectionProfile[] = [];
+    let firstError: unknown;
+    for (const candidate of regionalCandidates) {
+      try {
+        profiles.push(await issueConnectionProfile({ ...input, nodeId: candidate.node.id }));
+      } catch (error) {
+        firstError ??= error;
+        await addAudit({
+          actorUserId: input.actorUserId,
+          action: "profile.issue.skipped",
+          targetType: "node",
+          targetId: candidate.node.id,
+          metadata: { protocol: input.protocol, reason: error instanceof Error ? error.message : "Unknown profile issuance error" },
+        });
+      }
+    }
+    if (!profiles.length) throw firstError instanceof Error ? firstError : new Error("No WireGuard profile could be issued in this region");
+    return profiles;
+  }
+  if (input.protocol === "openvpn") {
+    const primary = regionalCandidates[0];
+    return [await issueConnectionProfile({
+      ...input,
+      nodeId: primary.node.id,
+      regionalEndpoints: regionalCandidates.map((candidate) => ({
+        nodeId: candidate.node.id,
+        host: candidate.node.public_endpoint || candidate.node.ip,
+        port: candidate.service.listen_port,
+        transport: candidate.service.transport,
+      })),
+    })];
+  }
+  return [await issueConnectionProfile({ ...input, nodeId: regionalCandidates[0].node.id })];
 }
 
 export async function issueConnectionProfile(input: {
@@ -153,6 +207,7 @@ export async function issueConnectionProfile(input: {
   expiresInSeconds?: number;
   rotateCredential?: boolean;
   clientPrivateKey?: string;
+  regionalEndpoints?: Array<{ nodeId: string; host: string; port: number; transport: string }>;
 }): Promise<ConnectionProfile> {
   const device = await findDevice(input.deviceId);
   if (!device || device.status !== "active") throw new Error("Device is not active");
@@ -190,6 +245,7 @@ export async function issueConnectionProfile(input: {
       tlsCryptSecretId: openvpnCredential.authority.tls_crypt_secret_id || "",
     } : undefined,
   });
+  if (input.regionalEndpoints?.length) profile.protocolPayload.regionalEndpoints = input.regionalEndpoints;
   if (input.protocol === "wireguard") {
     if (!isWireGuardPrivateKey(input.clientPrivateKey)) throw new Error("A valid WireGuard private key is required to create an exportable profile");
     const privateKey = await createSecretMaterial({ kind: `wireguard_client_private_key:${device.id}`, value: input.clientPrivateKey });
@@ -207,8 +263,16 @@ export async function issueConnectionProfile(input: {
     protocolPayload: profile.protocolPayload,
     expiresAt: new Date(Date.now() + (input.expiresInSeconds || 24 * 60 * 60) * 1000).toISOString(),
   });
+  if (input.protocol === "openvpn" && input.rotateCredential) await reconcileAllOpenVpnNodes();
   await addAudit({ actorUserId: input.actorUserId, action: "profile.issued", targetType: "profile", targetId: saved.id, metadata: { deviceId: input.deviceId, nodeId: input.nodeId, protocol: input.protocol } });
   return saved;
+}
+
+async function reconcileAllOpenVpnNodes(): Promise<void> {
+  const services = (await listVpnServices()).filter((service) => service.protocol === "openvpn" && service.enabled);
+  for (const service of services) {
+    try { await rebuildDesiredState(service.node_id, "openvpn", { force: true }); } catch { /* offline nodes reconcile after their next heartbeat */ }
+  }
 }
 
 function isWireGuardPrivateKey(value: string | undefined): value is string {
@@ -242,14 +306,17 @@ export async function activateProfile(profileId: string, actorUserId?: string): 
 
 export async function revokeDeviceAndReconcile(deviceId: string, actorUserId?: string): Promise<void> {
   const profiles = await listConnectionProfiles({ deviceId });
+  const hasOpenVpnProfile = profiles.some((profile) => profile.protocol === "openvpn");
   await revokeCertificateIssuancesForDevice(deviceId);
   await deleteSecretMaterialsByKind(`wireguard_client_private_key:${deviceId}`);
   await revokeDevice(deviceId);
   const affected = new Set(profiles.map((profile) => `${profile.node_id}:${profile.protocol}`));
   for (const key of affected) {
     const [nodeId, protocol] = key.split(":") as [string, Protocol];
+    if (protocol === "openvpn") continue;
     try { await rebuildDesiredState(nodeId, protocol); } catch { /* a disabled adapter needs no reconcile */ }
   }
+  if (hasOpenVpnProfile) await reconcileAllOpenVpnNodes();
   await addAudit({ actorUserId, action: "device.revoked", targetType: "device", targetId: deviceId });
 }
 

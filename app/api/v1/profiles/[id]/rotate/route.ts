@@ -15,7 +15,10 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     if (!oldProfile) return jsonError("Profile not found", 404);
     const device = await findDevice(oldProfile.device_id);
     if (!device || device.user_id !== user.id) return jsonError("Device not found", 404);
-    const next = await issueConnectionProfile({ actorUserId: user.id, deviceId: oldProfile.device_id, nodeId: oldProfile.node_id, protocol: oldProfile.protocol, transport: oldProfile.transport, rotateCredential: oldProfile.protocol === "openvpn" });
+    const regionalEndpoints = Array.isArray(oldProfile.protocol_payload.regionalEndpoints)
+      ? oldProfile.protocol_payload.regionalEndpoints.filter((value): value is { nodeId: string; host: string; port: number; transport: string } => Boolean(value && typeof value === "object" && !Array.isArray(value)))
+      : undefined;
+    const next = await issueConnectionProfile({ actorUserId: user.id, deviceId: oldProfile.device_id, nodeId: oldProfile.node_id, protocol: oldProfile.protocol, transport: oldProfile.transport, rotateCredential: oldProfile.protocol === "openvpn", regionalEndpoints });
     const activated = oldProfile.status === "active" ? await activateProfile(next.id, user.id) : next;
     await expireConnectionProfile(oldProfile.id);
     return NextResponse.json({ profile: publicProfile(activated, undefined, device) });

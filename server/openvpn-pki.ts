@@ -190,9 +190,23 @@ export async function renderOpenVpnProfile(input: { endpoint: { host: string; po
   const [clientKey, tlsCryptKey] = await Promise.all([readSecretMaterial(clientKeySecretId), readSecretMaterial(tlsCryptSecretId)]);
   if (!clientKey || !tlsCryptKey) throw new Error("OpenVPN profile private key material is unavailable");
   const proto = input.transport === "tcp" ? "tcp-client" : "udp";
+  const regionalEndpoints = Array.isArray(input.payload.regionalEndpoints)
+    ? input.payload.regionalEndpoints.filter((value): value is { host: string; port: number; transport: string } => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+      const endpoint = value as Record<string, unknown>;
+      return typeof endpoint.host === "string" && Number.isInteger(endpoint.port) && (endpoint.port as number) > 0 && (endpoint.port as number) <= 65535 && (endpoint.transport === "udp" || endpoint.transport === "tcp");
+    })
+    : [];
+  const endpoints = [{ host: input.endpoint.host, port: input.endpoint.port, transport: input.transport }, ...regionalEndpoints]
+    .filter((endpoint, index, all) => all.findIndex((candidate) => candidate.host === endpoint.host && candidate.port === endpoint.port && candidate.transport === endpoint.transport) === index);
+  const remoteLines = endpoints.map((endpoint) => {
+    const host = endpoint.host.trim();
+    if (!/^[A-Za-z0-9._:[\]-]+$/.test(host)) throw new Error("OpenVPN endpoint contains unsupported characters");
+    return `remote ${host} ${endpoint.port} ${endpoint.transport === "tcp" ? "tcp-client" : "udp"}`;
+  });
   const dnsLines = input.dns.map((dns) => `dhcp-option DNS ${dns}`);
   return [
-    "client", "dev tun", `proto ${proto}`, `remote ${input.endpoint.host} ${input.endpoint.port}`, "nobind", "persist-key", "persist-tun",
+    "client", "dev tun", `proto ${proto}`, ...remoteLines, ...(remoteLines.length > 1 ? ["remote-random"] : []), "resolv-retry infinite", "nobind", "persist-key", "persist-tun",
     "remote-cert-tls server", "auth-nocache", "auth SHA256", "data-ciphers AES-256-GCM:CHACHA20-POLY1305", "data-ciphers-fallback AES-256-GCM",
     "verb 3", ...dnsLines, "<ca>", caCertificate.trim(), "</ca>", "<cert>", certificate.trim(), "</cert>", "<key>", clientKey.trim(), "</key>", "<tls-crypt>", tlsCryptKey.trim(), "</tls-crypt>", "",
   ].join("\n");

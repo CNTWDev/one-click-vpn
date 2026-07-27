@@ -12,6 +12,20 @@ export const runtime = "nodejs";
 const supportedProtocols = new Set<Protocol>(listProtocolAdapters().map((adapter) => adapter.id));
 const supportedPlatforms: Platform[] = ["web", "macos", "ios", "android", "windows", "linux"];
 
+function activeSessionCount(snapshots: UsageSnapshot[]): number {
+  const cutoff = Date.now() - 180_000;
+  const active = new Set<string>();
+  for (const snapshot of snapshots) {
+    if (!snapshot.identityKey) continue;
+    if (snapshot.protocol === "openvpn") active.add(`openvpn:${snapshot.identityKey}`);
+    if (snapshot.protocol === "wireguard" && snapshot.lastHandshakeAt) {
+      const handshake = new Date(snapshot.lastHandshakeAt).getTime();
+      if (Number.isFinite(handshake) && handshake >= cutoff) active.add(`wireguard:${snapshot.identityKey}`);
+    }
+  }
+  return active.size;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await readJson(request);
@@ -22,6 +36,7 @@ export async function POST(request: Request) {
     const capabilities = body.capabilities && typeof body.capabilities === "object" && !Array.isArray(body.capabilities)
       ? body.capabilities as Record<string, unknown>
       : {};
+    const usageSnapshots = Array.isArray(body.usageSnapshots) ? body.usageSnapshots.filter((value): value is UsageSnapshot => Boolean(value && typeof value === "object" && !Array.isArray(value))) : [];
     await recordAgentHeartbeat({
       nodeId,
       version: cleanText(body.version, 64),
@@ -30,8 +45,8 @@ export async function POST(request: Request) {
       serverPublicKey: cleanText(body.serverPublicKey, 512),
       capabilities,
       metrics: body.metrics,
+      activeUsers: activeSessionCount(usageSnapshots),
     });
-    const usageSnapshots = Array.isArray(body.usageSnapshots) ? body.usageSnapshots.filter((value): value is UsageSnapshot => Boolean(value && typeof value === "object" && !Array.isArray(value))) : [];
     await recordTrafficSnapshots(nodeId, usageSnapshots);
     const protocols = Array.isArray(capabilities.protocols) ? capabilities.protocols.filter((value): value is Protocol => typeof value === "string" && supportedProtocols.has(value as Protocol)) : [];
     if (!protocols.length) {

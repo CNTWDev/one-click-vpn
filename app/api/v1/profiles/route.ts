@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requestUser } from "../../../../server/request-auth";
 import { findDevice, listConnectionProfiles, listDevices, type ConnectionProfile, type Protocol } from "../../../../server/control-db";
-import { issueScheduledConnectionProfile, publicProfile, protocolForPlatform } from "../../../../server/control-plane";
+import { issueRegionalConnectionProfiles, publicProfile, protocolForPlatform } from "../../../../server/control-plane";
 import { listNodes, listRegions } from "../../../../server/db";
 import { cleanText, jsonError, readJson } from "../../../../server/http";
 import { listProtocolAdapters } from "../../../../server/protocols/registry";
@@ -16,9 +16,11 @@ async function profilesWithRegions(profiles: ConnectionProfile[], userId: string
   const regionsById = new Map(regions.map((region) => [region.id, region]));
   const devicesById = new Map(devices.map((device) => [device.id, device]));
   return profiles.map((profile) => {
-    const regionId = nodesById.get(profile.node_id)?.region_id;
+    const node = nodesById.get(profile.node_id);
+    const regionId = node?.region_id;
     const region = regionId ? regionsById.get(regionId) : undefined;
-    return publicProfile(profile, region ? { code: region.code, name: region.name } : undefined, devicesById.get(profile.device_id));
+    const regionalNodeCount = Array.isArray(profile.protocol_payload.regionalEndpoints) ? profile.protocol_payload.regionalEndpoints.length : 1;
+    return { ...publicProfile(profile, region ? { code: region.code, name: region.name } : undefined, devicesById.get(profile.device_id)), nodeName: node?.name || null, regionalNodeCount };
   });
 }
 
@@ -48,8 +50,9 @@ export async function POST(request: Request) {
     const device = await findDevice(deviceId);
     if (!device || device.user_id !== user.id || !deviceId || !protocols.has(protocol)) return jsonError("deviceId and a supported protocol are required");
     if (!protocolForPlatform(device.platform, protocol)) return jsonError("Protocol is not supported by the device platform");
-    const profile = await issueScheduledConnectionProfile({ actorUserId: user.id, deviceId, regionId, protocol, transport, clientPrivateKey });
-    return NextResponse.json({ profile: (await profilesWithRegions([profile], user.id))[0] }, { status: 201 });
+    const profiles = await issueRegionalConnectionProfiles({ actorUserId: user.id, deviceId, regionId, protocol, transport, clientPrivateKey });
+    const publicProfiles = await profilesWithRegions(profiles, user.id);
+    return NextResponse.json({ profile: publicProfiles[0], profiles: publicProfiles }, { status: 201 });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to issue profile", 409);
   }

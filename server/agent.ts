@@ -54,6 +54,7 @@ export async function recordAgentHeartbeat(input: {
   serverPublicKey?: string;
   capabilities?: Record<string, unknown>;
   metrics?: unknown;
+  activeUsers?: number;
 }): Promise<void> {
   const normalizedMetrics = input.metrics === undefined ? undefined : normalizeMetrics(input.metrics);
   await updateNode(input.nodeId, {
@@ -61,6 +62,7 @@ export async function recordAgentHeartbeat(input: {
     last_seen: "now",
     last_heartbeat_at: new Date().toISOString(),
     latency: "connected",
+    ...(input.activeUsers !== undefined ? { users: Math.max(0, Math.floor(input.activeUsers)) } : {}),
     version: input.version || "unknown",
     ...(normalizedMetrics ? { metrics_json: normalizedMetrics } : {}),
   });

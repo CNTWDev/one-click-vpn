@@ -123,12 +123,12 @@ export async function usageByCredentials(userId: string, input: { from?: string;
     LEFT JOIN LATERAL (
       SELECT SUM(t.upload_bytes) AS upload_bytes, SUM(t.download_bytes) AS download_bytes,
         MIN(t.first_seen_at) AS first_seen_at, MAX(t.last_seen_at) AS last_seen_at
-      FROM traffic_daily t WHERE t.device_id = p.device_id AND t.node_id = p.node_id
+      FROM traffic_daily t WHERE t.device_id = p.device_id AND (p.protocol = 'openvpn' OR t.node_id = p.node_id)
         AND t.protocol = p.protocol AND t.day BETWEEN $2 AND $3
     ) usage ON true
     LEFT JOIN LATERAL (
       SELECT MAX(c.last_handshake_at) AS last_activity_at, MAX(c.observed_at) AS observed_at
-      FROM traffic_counters c WHERE c.device_id = p.device_id AND c.node_id = p.node_id AND c.protocol = p.protocol
+      FROM traffic_counters c WHERE c.device_id = p.device_id AND (p.protocol = 'openvpn' OR c.node_id = p.node_id) AND c.protocol = p.protocol
     ) counters ON true
     LEFT JOIN LATERAL (
       SELECT c.serial FROM certificate_issuances c WHERE c.device_id = p.device_id
