@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { countryMapPoints } from "./country-map-points";
 
 export type RegionMapRegion = {
@@ -13,6 +13,24 @@ export type RegionMapRegion = {
 };
 
 type MapPoint = { x: number; y: number };
+type LocationState = {
+  status: "unset" | "locating" | "located" | "error";
+  latitude?: number;
+  longitude?: number;
+  message?: string;
+};
+
+function projectGeoPoint(latitude: number, longitude: number): MapPoint {
+  const width = 1010;
+  const scale = width / (2 * Math.PI);
+  const safeLatitude = Math.max(-85, Math.min(85, latitude));
+  let x = 475 + longitude * width / 360;
+  while (x < 0) x += width;
+  while (x > width) x -= width;
+  const radians = safeLatitude * Math.PI / 180;
+  const y = 462.8 - scale * Math.log(Math.tan(Math.PI / 4 + radians / 2));
+  return { x, y: Math.max(10, Math.min(656, y)) };
+}
 
 function pointCode(region: RegionMapRegion): string {
   const code = region.code.toUpperCase();
@@ -31,6 +49,7 @@ export function RegionMap({ regions, selectedRegionId, onSelect }: {
   selectedRegionId: string;
   onSelect: (regionId: string) => void;
 }) {
+  const [location, setLocation] = useState<LocationState>({ status: "unset" });
   const points = useMemo(() => {
     const next: Record<string, MapPoint> = {};
     const byCountry = new Map<string, RegionMapRegion[]>();
@@ -54,12 +73,37 @@ export function RegionMap({ regions, selectedRegionId, onSelect }: {
   const availableRegions = visibleRegions.filter((region) => region.status === "available");
   const selected = regions.find((region) => region.id === selectedRegionId);
   const protocolCount = new Set(availableRegions.flatMap((region) => region.protocols)).size;
-  const origin = { x: 505, y: 606 };
+  const hasLocation = location.status === "located" && location.latitude !== undefined && location.longitude !== undefined;
+  const origin = hasLocation ? projectGeoPoint(location.latitude!, location.longitude!) : { x: 505, y: 606 };
+
+  function locateUser() {
+    if (!window.isSecureContext) {
+      setLocation({ status: "error", message: "浏览器定位需要通过 HTTPS 访问 Portal。" });
+      return;
+    }
+    if (!navigator.geolocation) {
+      setLocation({ status: "error", message: "当前浏览器不支持定位。" });
+      return;
+    }
+    setLocation({ status: "locating", message: "正在请求浏览器定位…" });
+    navigator.geolocation.getCurrentPosition(
+      (position) => setLocation({ status: "located", latitude: position.coords.latitude, longitude: position.coords.longitude, message: "已使用浏览器位置" }),
+      (error) => {
+        const message = error.code === error.PERMISSION_DENIED
+          ? "未获得定位权限，当前仍显示逻辑入口。"
+          : error.code === error.TIMEOUT
+            ? "定位超时，请重试。"
+            : "无法获取当前位置，请检查系统定位服务。";
+        setLocation({ status: "error", message });
+      },
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
+    );
+  }
 
   return <section className="region-map-panel">
     <div className="region-map-head">
       <div><p className="kicker">GLOBAL NETWORK</p><h2>全球可用网络</h2><p>点击地图选择区域，生成配置时会自动使用该区域。</p></div>
-      <div className="region-map-summary"><span><b>{availableRegions.length}</b>可用区域</span><span><b>{protocolCount}</b>可用协议</span>{selected && <span className="selected-region"><b>{selected.code}</b>{selected.name}</span>}</div>
+      <div className="region-map-actions"><div className="region-map-summary"><span><b>{availableRegions.length}</b>可用区域</span><span><b>{protocolCount}</b>可用协议</span>{selected && <span className="selected-region"><b>{selected.code}</b>{selected.name}</span>}</div><button type="button" className={`region-locate-button ${hasLocation ? "located" : ""}`} disabled={location.status === "locating"} onClick={locateUser}>{location.status === "locating" ? "定位中…" : hasLocation ? "重新定位" : "定位我的位置"}</button>{location.message && <small className={`region-location-status ${location.status}`} role="status">{location.message}{hasLocation ? ` · ${location.latitude!.toFixed(2)}, ${location.longitude!.toFixed(2)}` : ""}</small>}</div>
     </div>
     <div className="region-map-stage">
       <div className="region-map-scan" />
@@ -76,7 +120,6 @@ export function RegionMap({ regions, selectedRegionId, onSelect }: {
           const bend = Math.max(point.y, origin.y) + 20 + (index % 3) * 8;
           return <path key={`route-${region.id}`} className={selectedRoute ? "selected" : ""} d={`M${origin.x} ${origin.y} Q ${(origin.x + point.x) / 2} ${bend} ${point.x} ${point.y}`} />;
         })}</g>
-        <g className="region-map-origin" transform={`translate(${origin.x} ${origin.y})`}><circle className="origin-halo" r="14" /><circle className="origin-core" r="4" /><text x="0" y="24" textAnchor="middle">YOUR DEVICE</text></g>
         <g>{visibleRegions.map((region) => {
           const point = points[region.id];
           const available = region.status === "available";
@@ -99,11 +142,16 @@ export function RegionMap({ regions, selectedRegionId, onSelect }: {
             <text className="marker-label" x={labelOnLeft ? -13 : 13} y="4" textAnchor={labelOnLeft ? "end" : "start"}>{region.name}</text>
           </g>;
         })}</g>
+        <g className={`region-map-origin ${hasLocation ? "located" : "logical"}`} transform={`translate(${origin.x} ${origin.y})`}>
+          <title>{hasLocation ? `浏览器定位\n${location.latitude}, ${location.longitude}` : "逻辑入口，不代表你的真实地理位置"}</title>
+          <circle className="origin-halo" r="14" /><circle className="origin-ring" r="7" /><path className="origin-core" d="M0 -4.8 L4.8 0 L0 4.8 L-4.8 0 Z" />
+          <text x={origin.x > 790 ? -14 : 14} y="4" textAnchor={origin.x > 790 ? "end" : "start"}>{hasLocation ? "YOUR LOCATION" : "LOGICAL ENTRY"}</text>
+        </g>
       </svg>
       {!visibleRegions.length && <div className="region-map-empty">管理员部署并启用节点后，可用区域会显示在这里。</div>}
-      <div className="region-map-caption"><span>逻辑连接：你的设备 → 可用区域</span><small>不代表实际公网路由或节点间直连</small></div>
+      <div className="region-map-caption"><span>{hasLocation ? "浏览器位置 → 可用区域" : "逻辑入口 → 可用区域（未定位）"}</span><small>不代表实际公网路由或节点间直连</small></div>
       <div className="region-map-attribution">Map data · @svg-maps/world · CC BY 4.0</div>
     </div>
-    <div className="region-map-footer"><div><span><i className="available" />可用</span><span><i className="selected" />已选择</span><span><i className="unavailable" />暂不可用</span></div><small>出于安全考虑，Portal 不展示节点 IP 和 Agent 管理拓扑。</small></div>
+    <div className="region-map-footer"><div><span><i className="available" />可用</span><span><i className="selected" />已选择</span><span><i className="unavailable" />暂不可用</span></div><small>定位坐标仅在当前浏览器中用于绘图，不会上传 Controller。</small></div>
   </section>;
 }
