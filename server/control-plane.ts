@@ -39,7 +39,7 @@ export function publicDevice(device: Awaited<ReturnType<typeof findDevice>>) {
   };
 }
 
-export function publicProfile(profile: ConnectionProfile) {
+export function publicProfile(profile: ConnectionProfile, region?: { code: string; name: string }) {
   const protocolPayload = { ...profile.protocol_payload };
   if (profile.protocol === "openvpn") {
     delete protocolPayload.clientKeySecretId;
@@ -50,6 +50,8 @@ export function publicProfile(profile: ConnectionProfile) {
     id: profile.id,
     deviceId: profile.device_id,
     nodeId: profile.node_id,
+    regionCode: region?.code || null,
+    regionName: region?.name || null,
     revision: profile.revision,
     status: profile.status,
     protocol: profile.protocol,

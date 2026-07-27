@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export async function GET() {
   const user = await currentUser();
   if (!user) return jsonError("Authentication required", 401);
-  return NextResponse.json({ profiles: (await listConnectionProfiles({ userId: user.id })).map(publicProfile) });
+  return NextResponse.json({ profiles: (await listConnectionProfiles({ userId: user.id })).map((profile) => publicProfile(profile)) });
 }
 
 export async function POST(request: Request) {
