@@ -195,6 +195,13 @@ aside nav button > em { min-width: 19px; height: 19px; display: grid; place-item
 @keyframes fleet-pulse { 0% { opacity: .9; transform: scale(.72); } 75%, 100% { opacity: 0; transform: scale(1.65); } }
 @keyframes fleet-scan { to { transform: translateY(580%); } }
 
+.topology-notes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+.topology-notes article { min-height: 92px; padding: 16px; display: flex; align-items: center; gap: 13px; background: rgba(17, 22, 18, .78); border: 1px solid var(--line); border-radius: 10px; }
+.topology-notes article > span { width: 34px; height: 34px; flex: none; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); border: 1px solid rgba(175, 211, 92, .2); border-radius: 50%; font-size: 10px; font-weight: 900; }
+.topology-notes b, .topology-notes small { display: block; }
+.topology-notes b { color: #dce4d8; font-size: 10px; }
+.topology-notes small { margin-top: 5px; color: #748074; font-size: 8px; line-height: 1.55; }
+
 .two-column { display: grid; grid-template-columns: 1.15fr .85fr; gap: 18px; }
 .panel { margin-bottom: 18px; padding: 22px; background: rgba(17, 22, 18, .78); border: 1px solid var(--line); border-radius: 11px; }
 .panel.flush { padding: 0; }
@@ -443,7 +450,7 @@ td .pill + small { margin-top: 6px; }
   .workspace { display: block; }
   .topbar { padding: 0 17px; }
   .content { padding: 34px 17px 55px; }
-  .two-column, .region-layout, .controller-layout { grid-template-columns: 1fr; }
+  .two-column, .region-layout, .controller-layout, .topology-notes { grid-template-columns: 1fr; }
   .sticky-panel { position: static; }
   .diagnostic-cards { grid-template-columns: repeat(2, 1fr); }
   .policy-banner { grid-template-columns: 1fr; }

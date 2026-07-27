@@ -3,15 +3,16 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { api } from "./api";
 import {
-  ControllerPage, LogsPage, NodesPage, OverviewPage, RegionsPage, ServicesPage, UsersPage,
+  ControllerPage, LogsPage, NodesPage, OverviewPage, RegionsPage, ServicesPage, TopologyPage, UsersPage,
 } from "./pages";
 import type { AdminUser, NodeRecord, Region } from "./types";
 import "./styles.css";
 import "./credential-usage.css";
 
-type PageId = "overview" | "users" | "nodes" | "services" | "regions" | "controller" | "logs";
+type PageId = "overview" | "topology" | "users" | "nodes" | "services" | "regions" | "controller" | "logs";
 const navigation: Array<{ id: PageId; icon: string; label: string; description: string }> = [
   { id: "overview", icon: "⌂", label: "运维总览", description: "状态与待处理" },
+  { id: "topology", icon: "G", label: "全球拓扑", description: "节点分布与管理通道" },
   { id: "users", icon: "U", label: "账号管理", description: "审核与访问控制" },
   { id: "nodes", icon: "N", label: "节点运维", description: "部署、修复与诊断" },
   { id: "services", icon: "V", label: "VPN 服务", description: "协议与部署策略" },
@@ -105,6 +106,7 @@ function App() {
       <div className="content">
         {error && <div className="inline-notice error" role="alert">{error}<button className="text-button" onClick={() => void refreshCore()}>重试</button></div>}
         {page === "overview" && <OverviewPage users={users} nodes={nodes} regions={regions} onNavigate={navigate} onRefresh={refreshCore} />}
+        {page === "topology" && <TopologyPage nodes={nodes} regions={regions} onNavigate={navigate} onRefresh={refreshCore} />}
         {page === "users" && <UsersPage users={users} onRefresh={refreshCore} />}
         {page === "nodes" && <NodesPage nodes={nodes} regions={regions} onRefresh={refreshCore} />}
         {page === "services" && <ServicesPage nodes={nodes} />}

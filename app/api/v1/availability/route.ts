@@ -15,14 +15,27 @@ export async function GET(request: Request) {
   for (const region of regions) {
     const regionNodes = onlineNodes.filter((node) => node.region_id === region.id);
     const protocols = new Set<string>();
+    const healthyNodeIds = new Set<string>();
     for (const node of regionNodes) {
       const healthy = services.filter((service) => service.node_id === node.id && service.enabled && service.status === "healthy");
       for (const service of healthy) {
         const capability = (await listNodeProtocols(node.id)).find((item) => item.protocol === service.protocol);
-        if (capability?.status === "enabled") protocols.add(service.protocol);
+        if (capability?.status === "enabled") {
+          protocols.add(service.protocol);
+          healthyNodeIds.add(node.id);
+        }
       }
     }
-    available.push({ id: region.id, name: region.name, country: region.country, code: region.code, protocols: [...protocols].sort(), status: protocols.size ? "available" : "unavailable" });
+    available.push({
+      id: region.id,
+      name: region.name,
+      country: region.country,
+      code: region.code,
+      protocols: [...protocols].sort(),
+      status: protocols.size ? "available" : "unavailable",
+      onlineNodeCount: regionNodes.length,
+      healthyNodeCount: healthyNodeIds.size,
+    });
   }
   return NextResponse.json({ regions: available });
 }

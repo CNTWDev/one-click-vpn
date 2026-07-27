@@ -1,0 +1,64 @@
+.region-map-panel { max-width: 1240px; margin: 18px auto 0; overflow: hidden; color: #eef4e6; background: linear-gradient(145deg, #111b17, #09110e); border: 1px solid rgba(98, 128, 89, .35); border-radius: 14px; box-shadow: 0 26px 70px rgba(24, 42, 22, .12); }
+.region-map-head { min-height: 94px; padding: 20px 24px 16px; display: flex; align-items: start; justify-content: space-between; gap: 24px; }
+.region-map-head h2 { margin: 0; font-size: 22px; letter-spacing: -.045em; }
+.region-map-head > div:first-child > p:last-child { margin: 7px 0 0; color: #7f8d81; font-size: 11px; }
+.region-map-summary { display: flex; align-items: center; gap: 22px; }
+.region-map-summary span { color: #78867a; font-size: 9px; white-space: nowrap; }
+.region-map-summary b { display: block; margin-bottom: 3px; color: #e3ecdc; font-size: 17px; }
+.region-map-summary .selected-region { padding-left: 18px; border-left: 1px solid rgba(158, 184, 150, .18); color: #aeb9ab; }
+.region-map-summary .selected-region b { color: #b7df5d; }
+.region-map-stage { height: clamp(330px, 42vw, 510px); position: relative; overflow: hidden; isolation: isolate; background: radial-gradient(circle at 70% 33%, rgba(95, 131, 255, .1), transparent 28%), radial-gradient(circle at 27% 70%, rgba(183, 223, 93, .08), transparent 27%), #09110e; border-top: 1px solid rgba(154, 182, 145, .11); border-bottom: 1px solid rgba(154, 182, 145, .11); }
+.region-map-stage::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: .35; background-image: linear-gradient(rgba(139, 169, 157, .08) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 169, 157, .08) 1px, transparent 1px); background-size: 42px 42px; mask-image: linear-gradient(to bottom, transparent, black 18%, black 84%, transparent); }
+.region-map-stage svg { width: 100%; height: 100%; display: block; position: relative; z-index: 2; }
+.region-map-ocean { fill: transparent; }
+.region-map-base { opacity: .74; filter: sepia(.1) hue-rotate(35deg) drop-shadow(0 0 16px rgba(81, 125, 104, .12)); }
+.region-map-routes path { fill: none; stroke: url(#portal-route); stroke-width: 1.25; stroke-dasharray: 7 8; vector-effect: non-scaling-stroke; opacity: .4; animation: region-route-flow 2.6s linear infinite; }
+.region-map-routes path.selected { stroke-width: 2.1; opacity: .95; filter: url(#portal-glow); }
+.region-map-origin, .region-map-marker { font-family: Inter, ui-sans-serif, system-ui, sans-serif; outline: none; }
+.region-map-origin .origin-halo { fill: rgba(111, 144, 255, .12); stroke: rgba(111, 144, 255, .55); animation: region-pulse 2.7s ease-out infinite; }
+.region-map-origin .origin-core { fill: #9cb1ff; filter: url(#portal-glow); }
+.region-map-origin text { fill: #aebeff; font-size: 8px; font-weight: 850; letter-spacing: .11em; paint-order: stroke; stroke: #09110e; stroke-width: 3px; }
+.region-map-marker.available { cursor: pointer; }
+.region-map-marker .marker-pulse { fill: rgba(183, 223, 93, .1); stroke: rgba(183, 223, 93, .2); animation: region-pulse 2.25s ease-out infinite; transform-origin: center; }
+.region-map-marker .marker-ring { fill: rgba(183, 223, 93, .12); stroke: #b7df5d; stroke-width: 1.2; }
+.region-map-marker .marker-core { fill: #d9ff89; filter: url(#portal-glow); }
+.region-map-marker.selected .marker-ring { fill: rgba(111, 144, 255, .2); stroke: #9cb1ff; stroke-width: 2.7; }
+.region-map-marker.selected .marker-core { fill: #cbd5ff; }
+.region-map-marker.unavailable { opacity: .48; cursor: not-allowed; }
+.region-map-marker.unavailable .marker-pulse { animation: none; opacity: 0; }
+.region-map-marker.unavailable .marker-ring { fill: rgba(139, 148, 139, .1); stroke: #7c887d; }
+.region-map-marker.unavailable .marker-core { fill: #89948a; filter: none; }
+.region-map-marker:hover .marker-ring, .region-map-marker:focus .marker-ring { stroke-width: 2.7; }
+.region-map-marker .marker-label { fill: #e6ede1; font-size: 9px; font-weight: 750; paint-order: stroke; stroke: #09110e; stroke-width: 3px; stroke-linejoin: round; }
+.region-map-scan { width: 100%; height: 22%; position: absolute; z-index: 3; left: 0; top: -25%; pointer-events: none; opacity: .28; background: linear-gradient(to bottom, transparent, rgba(183, 223, 93, .08), transparent); animation: region-scan 7s linear infinite; }
+.region-map-caption, .region-map-attribution { position: absolute; z-index: 4; bottom: 10px; pointer-events: none; }
+.region-map-caption { left: 14px; display: flex; gap: 9px; color: #9aab9c; font-size: 8px; }
+.region-map-caption small { color: #59675d; }
+.region-map-attribution { right: 14px; color: #526159; font-size: 7px; }
+.region-map-empty { position: absolute; z-index: 5; inset: 0; display: grid; place-items: center; color: #7e8c80; font-size: 11px; pointer-events: none; }
+.region-map-footer { min-height: 62px; padding: 13px 20px; display: flex; align-items: center; justify-content: space-between; gap: 18px; color: #748176; }
+.region-map-footer > div { display: flex; gap: 16px; }
+.region-map-footer span { display: flex; align-items: center; gap: 6px; font-size: 9px; }
+.region-map-footer i { width: 7px; height: 7px; display: inline-block; border-radius: 50%; }
+.region-map-footer i.available { background: #b7df5d; box-shadow: 0 0 8px rgba(183, 223, 93, .65); }
+.region-map-footer i.selected { background: #9cb1ff; box-shadow: 0 0 8px rgba(111, 144, 255, .65); }
+.region-map-footer i.unavailable { background: #778278; }
+.region-map-footer small { color: #667368; font-size: 8px; text-align: right; }
+@keyframes region-route-flow { to { stroke-dashoffset: -30; } }
+@keyframes region-pulse { 0% { opacity: .9; transform: scale(.72); } 75%, 100% { opacity: 0; transform: scale(1.65); } }
+@keyframes region-scan { to { transform: translateY(580%); } }
+@media (max-width: 780px) {
+  .region-map-head { display: block; }
+  .region-map-summary { margin-top: 16px; justify-content: space-between; gap: 10px; }
+  .region-map-summary .selected-region { padding-left: 10px; }
+  .region-map-stage { height: 310px; }
+  .region-map-marker .marker-label { display: none; }
+  .region-map-caption { display: block; }
+  .region-map-caption small { display: block; margin-top: 3px; }
+  .region-map-attribution { display: none; }
+  .region-map-footer { align-items: flex-start; flex-direction: column; }
+  .region-map-footer small { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .region-map-routes path, .region-map-origin .origin-halo, .region-map-marker .marker-pulse, .region-map-scan { animation: none; }
+}

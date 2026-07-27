@@ -5,6 +5,7 @@ RUN npm ci
 
 FROM dependencies AS portal-build
 COPY portal-web ./portal-web
+COPY admin-web/public ./admin-web/public
 RUN npm run build:portal
 
 FROM dependencies AS admin-build
