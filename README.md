@@ -195,6 +195,10 @@ path and Compose configuration without removing anything.
 After upgrading Controller code, use the Admin node action **Reinstall agent** to
 upgrade an Edge Agent. Existing VPN configuration is retained.
 
+After upgrading to Agent 2.5, redeploy OpenVPN once from **VPN Services** to
+enable per-credential online status and traffic counters. This status file stays
+local to the Edge Node and is read only by the Agent.
+
 For runtime recovery, open **VPN Services** in Admin and choose **Restart service**.
 Use **Redeploy** when configuration or credentials changed; redeploy now restarts
 OpenVPN automatically so the running process loads the newly written key material.

@@ -7,6 +7,7 @@ import {
 } from "./pages";
 import type { AdminUser, NodeRecord, Region } from "./types";
 import "./styles.css";
+import "./credential-usage.css";
 
 type PageId = "overview" | "users" | "nodes" | "services" | "regions" | "controller" | "logs";
 const navigation: Array<{ id: PageId; icon: string; label: string; description: string }> = [

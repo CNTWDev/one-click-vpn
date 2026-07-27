@@ -36,9 +36,14 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
     const sameCounter = previous && previous.counter_epoch === epoch;
     const uploadDelta = sameCounter ? Math.max(0, rxBytes - Number(previous.observed_rx_bytes)) : rxBytes;
     const downloadDelta = sameCounter ? Math.max(0, txBytes - Number(previous.observed_tx_bytes)) : txBytes;
-    const device = (await dbQuery<{ id: string; user_id: string }>(
-      "SELECT id, user_id FROM devices WHERE public_key = $1 AND status = 'active' LIMIT 1", [identityKey],
-    ))[0];
+    const device = snapshot.protocol === "wireguard"
+      ? (await dbQuery<{ id: string; user_id: string }>(
+        "SELECT id, user_id FROM devices WHERE public_key = $1 AND status = 'active' LIMIT 1", [identityKey],
+      ))[0]
+      : (await dbQuery<{ id: string; user_id: string }>(`SELECT d.id, d.user_id FROM certificate_issuances c
+          INNER JOIN devices d ON d.id = c.device_id
+          WHERE c.subject = $1 AND c.purpose = 'client' AND c.status = 'active' AND d.status = 'active'
+          ORDER BY c.created_at DESC LIMIT 1`, [`CN=${identityKey}`]))[0];
     await dbExec(`INSERT INTO traffic_counters
       (node_id, protocol, identity_key, device_id, observed_rx_bytes, observed_tx_bytes, last_handshake_at, counter_epoch, observed_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -96,6 +101,58 @@ export async function usageByDevices(userId: string, input: { from?: string; to?
       GROUP BY t.device_id, d.display_name, d.platform ORDER BY SUM(t.upload_bytes + t.download_bytes) DESC`, [userId, from, to],
   );
   return { from, to, devices: rows.map((row) => ({ deviceId: row.device_id, displayName: row.display_name, platform: row.platform, ...numbers(row) })) };
+}
+
+export async function usageByCredentials(userId: string, input: { from?: string; to?: string }) {
+  const { from, to } = range(input);
+  const rows = await dbQuery<{
+    profile_id: string; device_id: string; display_name: string; platform: string; profile_status: string;
+    protocol: string; node_id: string; region_name: string | null; region_code: string | null;
+    issued_at: string; credential_identity: string | null; upload_bytes: string; download_bytes: string;
+    first_seen_at: string | null; last_seen_at: string | null; last_activity_at: string | null; observed_at: string | null;
+  }>(`SELECT p.id AS profile_id, d.id AS device_id, d.display_name, d.platform, p.status AS profile_status,
+      p.protocol, p.node_id, r.name AS region_name, r.code AS region_code, p.issued_at,
+      CASE WHEN p.protocol = 'openvpn' THEN cert.serial ELSE d.public_key END AS credential_identity,
+      COALESCE(usage.upload_bytes, 0)::text AS upload_bytes,
+      COALESCE(usage.download_bytes, 0)::text AS download_bytes,
+      usage.first_seen_at, usage.last_seen_at, counters.last_activity_at, counters.observed_at
+    FROM connection_profiles p
+    INNER JOIN devices d ON d.id = p.device_id
+    INNER JOIN nodes n ON n.id = p.node_id
+    LEFT JOIN regions r ON r.id = n.region_id
+    LEFT JOIN LATERAL (
+      SELECT SUM(t.upload_bytes) AS upload_bytes, SUM(t.download_bytes) AS download_bytes,
+        MIN(t.first_seen_at) AS first_seen_at, MAX(t.last_seen_at) AS last_seen_at
+      FROM traffic_daily t WHERE t.device_id = p.device_id AND t.node_id = p.node_id
+        AND t.protocol = p.protocol AND t.day BETWEEN $2 AND $3
+    ) usage ON true
+    LEFT JOIN LATERAL (
+      SELECT MAX(c.last_handshake_at) AS last_activity_at, MAX(c.observed_at) AS observed_at
+      FROM traffic_counters c WHERE c.device_id = p.device_id AND c.node_id = p.node_id AND c.protocol = p.protocol
+    ) counters ON true
+    LEFT JOIN LATERAL (
+      SELECT c.serial FROM certificate_issuances c WHERE c.device_id = p.device_id
+        AND c.purpose = 'client' ORDER BY (c.status = 'active') DESC, c.created_at DESC LIMIT 1
+    ) cert ON p.protocol = 'openvpn'
+    WHERE d.user_id = $1 AND p.status IN ('issued', 'active')
+    ORDER BY p.updated_at DESC`, [userId, from, to]);
+  const onlineCutoff = Date.now() - 120_000;
+  return {
+    from, to, updatedAt: now(),
+    credentials: rows.map((row) => {
+      const activityTime = row.last_activity_at ? new Date(row.last_activity_at).getTime() : 0;
+      const identity = row.credential_identity || "";
+      return {
+        profileId: row.profile_id, deviceId: row.device_id, displayName: row.display_name, platform: row.platform,
+        profileStatus: row.profile_status, protocol: row.protocol, nodeId: row.node_id,
+        regionName: row.region_name || "Unknown", regionCode: row.region_code || "",
+        issuedAt: row.issued_at, credentialSuffix: identity ? identity.replaceAll(":", "").slice(-8) : "",
+        online: activityTime >= onlineCutoff, lastActivityAt: row.last_activity_at,
+        observedAt: row.observed_at, firstSeenAt: row.first_seen_at, lastSeenAt: row.last_seen_at,
+        ...numbers(row),
+      };
+    }),
+  };
 }
 
 export async function usageByRegions(userId: string, input: { from?: string; to?: string }) {

@@ -21,6 +21,7 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   const agent = readFileSync(path.join(root, "agent/agent.py"), "utf8");
   const bootstrap = readFileSync(path.join(root, "server/bootstrap.ts"), "utf8");
   const openVpnPki = readFileSync(path.join(root, "server/openvpn-pki.ts"), "utf8");
+  const traffic = readFileSync(path.join(root, "server/traffic.ts"), "utf8");
   assert.match(migration, /CREATE TABLE IF NOT EXISTS vpn_services/);
   assert.match(migration, /deployment_policy TEXT NOT NULL DEFAULT 'standard'/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS policy_rollouts/);
@@ -32,13 +33,19 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(agent, /add\[add\.index\("-C"\)\] = operation/);
   assert.doesNotMatch(agent, /add\[1\] = operation/);
   assert.match(agent, /\/etc\/wireguard\/northstar\.conf/);
-  assert.match(agent, /agent 2\.4\.4/);
+  assert.match(agent, /agent 2\.5\.0/);
+  assert.match(agent, /status-version 3/);
+  assert.match(agent, /def openvpn_usage_snapshots/);
+  assert.match(agent, /wireguard_usage_snapshots\(\) \+ openvpn_usage_snapshots\(\)/);
   assert.doesNotMatch(bootstrap, /CapabilityBoundingSet=CAP_NET_ADMIN/);
   assert.doesNotMatch(bootstrap, /AmbientCapabilities=CAP_NET_ADMIN/);
   assert.match(bootstrap, /ProtectSystem=strict/);
   assert.match(bootstrap, /ReadWritePaths=\/opt\/northstar-agent \/etc\/wireguard \/etc\/systemd\/system/);
   assert.match(openVpnPki, /safeCommonName\(`northstar-\$\{deviceId\}`\)/);
   assert.doesNotMatch(openVpnPki, /commonName: `northstar-device-\$\{deviceName\}`/);
+  assert.match(traffic, /snapshot\.protocol === "wireguard"/);
+  assert.match(traffic, /certificate_issuances c/);
+  assert.match(traffic, /export async function usageByCredentials/);
 });
 
 async function waitForServer() {

@@ -3,7 +3,7 @@ import { api } from "./api";
 import { FleetMap } from "./fleet-map";
 import { countryName, countryOptions, presetGroups, regionPresets } from "./region-catalog";
 import type {
-  AdminUser, ControllerInfo, DeploymentPolicyOverview, NodeDiagnostics, NodeRecord,
+  AdminUser, ControllerInfo, CredentialUsage, DeploymentPolicyOverview, NodeDiagnostics, NodeRecord,
   OperationalLogLine, Region, VpnService,
 } from "./types";
 
@@ -100,6 +100,9 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
   const [filter, setFilter] = useState("all");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [credentialOwner, setCredentialOwner] = useState<AdminUser | null>(null);
+  const [credentials, setCredentials] = useState<CredentialUsage[]>([]);
+  const [credentialsBusy, setCredentialsBusy] = useState(false);
   const visible = filter === "all" ? users : users.filter((user) => user.status === filter);
   const pending = users.filter((user) => user.status === "pending");
 
@@ -120,6 +123,15 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
     finally { setBusy(""); }
   }
 
+  async function openCredentials(user: AdminUser) {
+    setCredentialOwner(user); setCredentials([]); setCredentialsBusy(true);
+    try {
+      const result = await api<{ credentials: CredentialUsage[] }>(`/api/v1/admin/users/${user.id}/credentials`);
+      setCredentials(result.credentials || []);
+    } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); setCredentialOwner(null); }
+    finally { setCredentialsBusy(false); }
+  }
+
   return <>
     <PageHeader eyebrow="ACCESS CONTROL" title="账号管理" description="审核新账号，并管理现有用户的访问状态。" actions={<button className="button ghost" onClick={() => void onRefresh()}>刷新</button>} />
     <InlineNotice notice={notice} />
@@ -134,9 +146,17 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
     <section className="panel">
       <div className="panel-head"><div><p className="eyebrow">USER DIRECTORY</p><h2>全部账号</h2></div><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">全部状态</option><option value="active">已启用</option><option value="pending">待审核</option><option value="suspended">已停用</option><option value="rejected">已拒绝</option></select></div>
       <div className="table-wrap"><table className="action-table"><thead><tr><th>用户</th><th>角色</th><th>状态</th><th>注册时间</th><th className="align-right">操作</th></tr></thead><tbody>{visible.map((user) => <tr key={user.id}>
-        <td><b>{user.displayName}</b><small>{user.email}</small></td><td>{user.role}</td><td><Pill value={user.status} />{user.rejectionReason && <small>{user.rejectionReason}</small>}</td><td>{formatTime(user.createdAt)}</td><td className="align-right">{user.role !== "owner" && user.status === "active" && <button className="text-button danger-text" disabled={busy === user.id} onClick={() => void update(user, "suspended")}>停用</button>}{user.status === "suspended" && <button className="text-button" disabled={busy === user.id} onClick={() => void update(user, "active")}>恢复</button>}</td>
+        <td><b>{user.displayName}</b><small>{user.email}</small></td><td>{user.role}</td><td><Pill value={user.status} />{user.rejectionReason && <small>{user.rejectionReason}</small>}</td><td>{formatTime(user.createdAt)}</td><td className="align-right"><button className="text-button" onClick={() => void openCredentials(user)}>凭据 / 流量</button>{user.role !== "owner" && user.status === "active" && <button className="text-button danger-text" disabled={busy === user.id} onClick={() => void update(user, "suspended")}>停用</button>}{user.status === "suspended" && <button className="text-button" disabled={busy === user.id} onClick={() => void update(user, "active")}>恢复</button>}</td>
       </tr>)}</tbody></table></div>
     </section>
+    {credentialOwner && <Modal title={`${credentialOwner.displayName} 的 VPN 凭据`} description="查看每份配置当前是否活跃，以及最近 30 天累计流量。" onClose={() => setCredentialOwner(null)} wide>
+      {credentialsBusy ? <Empty>正在读取凭据使用情况…</Empty> : credentials.length ? <div className="credential-usage-list">{credentials.map((item) => <article key={item.profileId}>
+        <span className={`credential-live ${item.online ? "online" : ""}`} />
+        <span className="credential-protocol">{item.protocol === "wireguard" ? "WG" : "OV"}</span>
+        <div><b>{item.displayName} · {item.regionCode || "—"} {item.regionName}</b><small>{item.online ? "正在使用" : item.lastActivityAt ? `最后活动 ${formatTime(item.lastActivityAt)}` : "尚未使用"} · 凭据 …{item.credentialSuffix || "—"}</small></div>
+        <span className="credential-traffic"><b>{formatBytes(item.totalBytes)}</b><small>30 天流量</small></span>
+      </article>)}</div> : <Empty>该账号还没有可用 VPN 凭据。</Empty>}
+    </Modal>}
   </>;
 }
 

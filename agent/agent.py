@@ -31,6 +31,7 @@ WIREGUARD_KEY = WIREGUARD_DIR / "server.key"
 WIREGUARD_CONFIG = Path("/etc/wireguard/northstar.conf")
 OPENVPN_DIR = STATE_DIR / "openvpn"
 OPENVPN_CONFIG = OPENVPN_DIR / "server.conf"
+OPENVPN_STATUS = OPENVPN_DIR / "status.tsv"
 OPENVPN_REVOKED_DIR = OPENVPN_DIR / "revoked"
 KEY_PATTERN = re.compile(r"^[A-Za-z0-9+/]{43}=$")
 VPN_PORTS = {
@@ -327,7 +328,7 @@ def openvpn_sync_config(desired):
         f"ca {OPENVPN_DIR / 'ca.crt'}", f"cert {OPENVPN_DIR / 'server.crt'}", f"key {OPENVPN_DIR / 'server.key'}",
         f"crl-verify {OPENVPN_REVOKED_DIR} dir", f"tls-crypt {OPENVPN_DIR / 'tls-crypt.key'}", "dh none", "ecdh-curve prime256v1",
         "auth SHA256", "data-ciphers AES-256-GCM:CHACHA20-POLY1305", "data-ciphers-fallback AES-256-GCM", "keepalive 10 120",
-        "persist-key", "persist-tun", "explicit-exit-notify 1", "verb 3", *push_lines, "",
+        "persist-key", "persist-tun", "explicit-exit-notify 1", f"status {OPENVPN_STATUS} 30", "status-version 3", "verb 3", *push_lines, "",
     ]
     OPENVPN_CONFIG.write_text("\n".join(config_lines))
     os.chmod(OPENVPN_CONFIG, 0o600)
@@ -377,6 +378,7 @@ def disable_openvpn():
             while run_optional(rule).returncode == 0:
                 pass
     OPENVPN_CONFIG.unlink(missing_ok=True)
+    OPENVPN_STATUS.unlink(missing_ok=True)
     return {"observedHash": hashlib.sha256(b"openvpn-disabled").hexdigest(), "observedStatus": "disabled"}
 
 
@@ -633,16 +635,55 @@ def wireguard_usage_snapshots():
     return snapshots
 
 
+def openvpn_usage_snapshots():
+    """Read per-client cumulative counters from OpenVPN's local status file."""
+    try:
+        lines = OPENVPN_STATUS.read_text().splitlines()
+    except OSError:
+        return []
+    header = None
+    snapshots = []
+    observed_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    boot_epoch = counter_epoch()
+    for line in lines:
+        fields = line.split("\t")
+        if len(fields) >= 3 and fields[0] == "HEADER" and fields[1] == "CLIENT_LIST":
+            header = fields[2:]
+            continue
+        if not header or len(fields) < 2 or fields[0] != "CLIENT_LIST":
+            continue
+        values = dict(zip(header, fields[1:]))
+        common_name = values.get("Common Name", "").strip()
+        if not common_name or len(common_name) > 128 or not re.fullmatch(r"[A-Za-z0-9_.@-]+", common_name):
+            continue
+        try:
+            received = max(0, int(values.get("Bytes Received", "0")))
+            transmitted = max(0, int(values.get("Bytes Sent", "0")))
+        except ValueError:
+            continue
+        connected_since = values.get("Connected Since (time_t)", "") or values.get("Connected Since", "")
+        client_id = values.get("Client ID", "")
+        snapshots.append({
+            "protocol": "openvpn",
+            "identityKey": common_name,
+            "rxBytes": received,
+            "txBytes": transmitted,
+            "lastHandshakeAt": observed_at,
+            "counterEpoch": f"{boot_epoch}:openvpn:{connected_since}:{client_id}",
+        })
+    return snapshots
+
+
 def heartbeat():
     return request_json("/api/v1/agent/heartbeat", {
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.4.4",
+        "version": "agent 2.5.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
-        "usageSnapshots": wireguard_usage_snapshots(),
+        "usageSnapshots": wireguard_usage_snapshots() + openvpn_usage_snapshots(),
     })
 
 

@@ -9,6 +9,24 @@ export type AdminUser = {
   createdAt?: string;
 };
 
+export type CredentialUsage = {
+  profileId: string;
+  deviceId: string;
+  displayName: string;
+  platform: string;
+  profileStatus: string;
+  protocol: string;
+  nodeId: string;
+  regionName: string;
+  regionCode: string;
+  credentialSuffix: string;
+  online: boolean;
+  lastActivityAt?: string | null;
+  uploadBytes: number;
+  downloadBytes: number;
+  totalBytes: number;
+};
+
 export type NodeMetrics = {
   collectedAt: string;
   cpuPercent: number;

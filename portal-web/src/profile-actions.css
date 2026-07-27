@@ -9,3 +9,22 @@
   cursor: wait;
   opacity: 0.55;
 }
+
+.profile-usage-row b {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.usage-state {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #a5ada2;
+}
+
+.usage-state.online {
+  background: #76a51e;
+  box-shadow: 0 0 0 4px rgba(118, 165, 30, 0.12);
+}
