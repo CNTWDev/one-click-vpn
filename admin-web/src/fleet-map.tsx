@@ -4,6 +4,26 @@ import type { NodeRecord, Region } from "./types";
 
 type MapPoint = { x: number; y: number };
 type RegionCluster = { region: Region; nodes: NodeRecord[]; status: "online" | "provisioning" | "attention" };
+export type ControllerMapLocation = {
+  display_name: string;
+  location_label: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+// @svg-maps/world uses a wrapped Web Mercator-like projection in a 1010 × 666 viewBox.
+// Its prime meridian is approximately x=475 and the equator is approximately y=462.8.
+export function projectGeoPoint(latitude: number, longitude: number): MapPoint {
+  const width = 1010;
+  const scale = width / (2 * Math.PI);
+  const safeLatitude = Math.max(-85, Math.min(85, latitude));
+  let x = 475 + longitude * width / 360;
+  while (x < 0) x += width;
+  while (x > width) x -= width;
+  const radians = safeLatitude * Math.PI / 180;
+  const y = 462.8 - scale * Math.log(Math.tan(Math.PI / 4 + radians / 2));
+  return { x, y: Math.max(10, Math.min(656, y)) };
+}
 
 const coverageTargets = [
   { name: "新加坡", detail: "东南亚枢纽", codes: ["SG", "MY"] },
@@ -22,7 +42,7 @@ function clusterStatus(nodes: NodeRecord[]): RegionCluster["status"] {
   return "attention";
 }
 
-export function FleetMap({ nodes, regions, onNavigate }: { nodes: NodeRecord[]; regions: Region[]; onNavigate: (page: string) => void }) {
+export function FleetMap({ nodes, regions, controller, onNavigate }: { nodes: NodeRecord[]; regions: Region[]; controller?: ControllerMapLocation | null; onNavigate: (page: string) => void }) {
   const regionMap = useMemo(() => new Map(regions.map((region) => [region.id, region])), [regions]);
   const clusters = useMemo(() => {
     const grouped = new Map<string, NodeRecord[]>();
@@ -56,10 +76,14 @@ export function FleetMap({ nodes, regions, onNavigate }: { nodes: NodeRecord[]; 
   const coveredCodes = new Set(clusters.map((cluster) => cluster.region.code.toUpperCase()));
   const gaps = coverageTargets.filter((target) => !target.codes.some((code) => coveredCodes.has(code))).slice(0, 4);
   const online = nodes.filter((node) => node.status === "online").length;
-  const control = { x: 78, y: 58 };
+  const hasControllerGps = controller?.latitude !== null && controller?.latitude !== undefined && controller.longitude !== null && controller.longitude !== undefined;
+  const control = hasControllerGps ? projectGeoPoint(controller.latitude!, controller.longitude!) : { x: 78, y: 58 };
+  const controlLabel = controller?.location_label || controller?.display_name || "CONTROL PLANE";
+  const controlMapLabel = controlLabel.length > 24 ? `${controlLabel.slice(0, 23)}…` : controlLabel;
+  const controlLabelOnLeft = control.x > 790;
 
   return <section className="fleet-map-panel">
-    <div className="fleet-map-head"><div><p className="eyebrow">GLOBAL FABRIC</p><h2>全球节点态势</h2><p>按区域聚合 Edge Node，点击节点标记进入运维。</p></div><div className="fleet-map-stats"><span><b>{clusters.length}</b>覆盖区域</span><span><b>{online}/{nodes.length}</b>节点在线</span><button className="text-button" onClick={() => onNavigate("regions")}>管理区域 →</button></div></div>
+    <div className="fleet-map-head"><div><p className="eyebrow">GLOBAL FABRIC</p><h2>全球节点态势</h2><p>按区域聚合 Edge Node，点击节点标记进入运维。</p></div><div className="fleet-map-stats"><span><b>{clusters.length}</b>覆盖区域</span><span><b>{online}/{nodes.length}</b>节点在线</span><span><b>{hasControllerGps ? controlLabel : "未设置"}</b>Controller GPS</span><button className="text-button" onClick={() => onNavigate("regions")}>管理区域 →</button></div></div>
     <div className="fleet-map-stage">
       <div className="fleet-map-scan" />
       <svg viewBox="0 0 1010 666" role="img" aria-label="Northstar 全球 VPN 节点分布图">
@@ -70,11 +94,15 @@ export function FleetMap({ nodes, regions, onNavigate }: { nodes: NodeRecord[]; 
         <rect className="fleet-map-ocean" x="0" y="0" width="1010" height="666" />
         <image className="fleet-map-base" href="/world-map.webp" x="0" y="0" width="1010" height="666" />
         <g className="fleet-map-routes">{visibleClusters.map((cluster, index) => { const point = points[cluster.region.id]; const bend = Math.min(control.y, point.y) - 24 - (index % 3) * 8; return <path key={`route-${cluster.region.id}`} className={cluster.status} d={`M${control.x} ${control.y} Q ${(control.x + point.x) / 2} ${bend} ${point.x} ${point.y}`} />; })}</g>
-        <g className="fleet-map-control" transform={`translate(${control.x} ${control.y})`}><circle className="control-halo" r="13" /><circle className="control-core" r="4" /><text x="18" y="4">CONTROL PLANE</text></g>
         <g className="fleet-map-markers">{visibleClusters.map((cluster) => { const point = points[cluster.region.id]; const onlineCount = cluster.nodes.filter((node) => node.status === "online").length; const labelOnLeft = point.x > 780; return <g key={cluster.region.id} className={`fleet-map-marker ${cluster.status}`} transform={`translate(${point.x} ${point.y})`} role="button" tabIndex={0} aria-label={`${cluster.region.name}，${cluster.nodes.length} 个节点，${onlineCount} 个在线`} onClick={() => onNavigate("nodes")} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onNavigate("nodes"); }}><title>{`${cluster.region.name} · ${cluster.region.country}\n${cluster.nodes.map((node) => `${node.name}: ${node.status}`).join("\n")}`}</title><circle className="marker-pulse" r="13" /><circle className="marker-ring" r="8" /><circle className="marker-core" r="3.2" />{cluster.nodes.length > 1 && <><circle className="marker-count-bg" cx="8" cy="-8" r="6" /><text className="marker-count" x="8" y="-5.6" textAnchor="middle">{cluster.nodes.length}</text></>}<text className="marker-label" x={labelOnLeft ? -13 : 13} y="4" textAnchor={labelOnLeft ? "end" : "start"}>{cluster.region.name}</text></g>; })}</g>
+        <g className={`fleet-map-control ${hasControllerGps ? "positioned" : "unset"}`} transform={`translate(${control.x} ${control.y})`}>
+          <title>{hasControllerGps ? `${controller?.display_name}\n${controlLabel}\n${controller?.latitude}, ${controller?.longitude}` : "Controller GPS 尚未设置"}</title>
+          <circle className="control-halo" r="14" /><circle className="control-ring" r="7" /><path className="control-core" d="M0 -4.8 L4.8 0 L0 4.8 L-4.8 0 Z" />
+          <text x={controlLabelOnLeft ? -18 : 18} y="4" textAnchor={controlLabelOnLeft ? "end" : "start"}>{hasControllerGps ? controlMapLabel : "CONTROL PLANE · GPS UNSET"}</text>
+        </g>
       </svg>
       {!visibleClusters.length && <div className="fleet-map-empty">创建区域并部署节点后，全球分布会显示在这里。</div>}
-      <div className="fleet-map-caption"><span>动态连线：Agent 管理通道</span><small>不代表用户 VPN 流量路径</small></div>
+      <div className="fleet-map-caption"><span>{hasControllerGps ? "动态连线：Controller GPS → Agent 区域" : "动态连线：Agent 管理通道（Controller GPS 未设置）"}</span><small>不代表用户 VPN 流量路径</small></div>
       <div className="fleet-map-attribution">Map data · @svg-maps/world · CC BY 4.0</div>
     </div>
     <div className="fleet-map-footer"><div className="fleet-map-legend"><span><i className="online" />在线</span><span><i className="provisioning" />部署中</span><span><i className="attention" />需关注</span></div><div className="coverage-gaps"><b>{gaps.length ? "基础覆盖空白" : "基础全球覆盖已齐备"}</b>{gaps.length ? gaps.map((gap) => <button key={gap.name} onClick={() => onNavigate("regions")}><span>＋ {gap.name}</span><small>{gap.detail}</small></button>) : <small>可结合用户位置与延迟继续扩容。</small>}</div></div>

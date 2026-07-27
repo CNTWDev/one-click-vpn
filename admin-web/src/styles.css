@@ -145,9 +145,9 @@ aside nav button > em { min-width: 19px; height: 19px; display: grid; place-item
 .fleet-map-head { min-height: 92px; padding: 20px 22px 15px; display: flex; align-items: start; justify-content: space-between; gap: 24px; }
 .fleet-map-head h2 { margin: 0; font-size: 22px; letter-spacing: -.045em; }
 .fleet-map-head p:not(.eyebrow) { margin: 7px 0 0; color: #748176; font-size: 9px; }
-.fleet-map-stats { display: flex; align-items: center; gap: 20px; }
-.fleet-map-stats span { color: #69766c; font-size: 8px; white-space: nowrap; }
-.fleet-map-stats b { display: block; margin-bottom: 3px; color: #dce7d8; font-size: 16px; }
+.fleet-map-stats { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: flex-end; }
+.fleet-map-stats span { max-width: 160px; color: #69766c; font-size: 8px; white-space: nowrap; }
+.fleet-map-stats b { display: block; margin-bottom: 3px; overflow: hidden; color: #dce7d8; font-size: 16px; text-overflow: ellipsis; }
 .fleet-map-stage { height: clamp(330px, 43vw, 510px); position: relative; overflow: hidden; isolation: isolate; background: radial-gradient(circle at 68% 38%, rgba(95, 131, 255, .08), transparent 25%), radial-gradient(circle at 22% 70%, rgba(185, 239, 105, .07), transparent 28%), #09110f; border-top: 1px solid rgba(151, 182, 143, .1); border-bottom: 1px solid rgba(151, 182, 143, .1); }
 .fleet-map-stage::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: .35; background-image: linear-gradient(rgba(139, 169, 157, .08) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 169, 157, .08) 1px, transparent 1px); background-size: 42px 42px; mask-image: linear-gradient(to bottom, transparent, black 18%, black 84%, transparent); }
 .fleet-map-stage svg { width: 100%; height: 100%; display: block; position: relative; z-index: 2; }
@@ -158,7 +158,9 @@ aside nav button > em { min-width: 19px; height: 19px; display: grid; place-item
 .fleet-map-routes path.attention { stroke: #efc276; opacity: .75; }
 .fleet-map-control, .fleet-map-marker { font-family: Inter, ui-sans-serif, system-ui, sans-serif; cursor: pointer; outline: none; }
 .fleet-map-control .control-halo { fill: rgba(95, 131, 255, .12); stroke: rgba(130, 158, 255, .65); stroke-width: 1; animation: fleet-pulse 2.7s ease-out infinite; }
-.fleet-map-control .control-core { fill: #8da7ff; filter: url(#northstar-glow); }
+.fleet-map-control .control-ring { fill: rgba(95, 131, 255, .2); stroke: #8da7ff; stroke-width: 1.3; }
+.fleet-map-control .control-core { fill: #b3c1ff; filter: url(#northstar-glow); }
+.fleet-map-control.unset { opacity: .64; }
 .fleet-map-control text { fill: #aebeff; font-size: 9px; font-weight: 800; letter-spacing: .12em; paint-order: stroke; stroke: #09110f; stroke-width: 3px; }
 .fleet-map-marker .marker-pulse { fill: rgba(185, 239, 105, .1); stroke: rgba(185, 239, 105, .22); animation: fleet-pulse 2.2s ease-out infinite; transform-origin: center; }
 .fleet-map-marker .marker-ring { fill: rgba(185, 239, 105, .13); stroke: #b9ef69; stroke-width: 1.2; }

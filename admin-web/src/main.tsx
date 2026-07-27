@@ -5,7 +5,7 @@ import { api } from "./api";
 import {
   ControllerPage, LogsPage, NodesPage, OverviewPage, RegionsPage, ServicesPage, TopologyPage, UsersPage,
 } from "./pages";
-import type { AdminUser, NodeRecord, Region } from "./types";
+import type { AdminUser, ControllerInfo, NodeRecord, Region } from "./types";
 import "./styles.css";
 import "./credential-usage.css";
 
@@ -58,6 +58,7 @@ function App() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [nodes, setNodes] = useState<NodeRecord[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
+  const [controllerSettings, setControllerSettings] = useState<ControllerInfo["settings"] | null>(null);
   const [page, setPage] = useState<PageId>("overview");
   const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState("");
@@ -65,12 +66,13 @@ function App() {
   const refreshCore = useCallback(async () => {
     setDataLoading(true); setError("");
     try {
-      const [userResult, nodeResult, regionResult] = await Promise.all([
+      const [userResult, nodeResult, regionResult, controllerResult] = await Promise.all([
         api<{ users: AdminUser[] }>("/api/v1/admin/users"),
         api<{ nodes: NodeRecord[] }>("/api/nodes"),
         api<{ regions: Region[] }>("/api/regions"),
+        api<ControllerInfo>("/api/controller"),
       ]);
-      setUsers(userResult.users || []); setNodes(nodeResult.nodes || []); setRegions(regionResult.regions || []);
+      setUsers(userResult.users || []); setNodes(nodeResult.nodes || []); setRegions(regionResult.regions || []); setControllerSettings(controllerResult.settings);
     } catch (reason) { setError((reason as Error).message); }
     finally { setDataLoading(false); }
   }, []);
@@ -85,7 +87,7 @@ function App() {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => undefined);
-    setUser(null); setUsers([]); setNodes([]); setRegions([]); setPage("overview");
+    setUser(null); setUsers([]); setNodes([]); setRegions([]); setControllerSettings(null); setPage("overview");
   }
   function navigate(next: string) { setPage(next as PageId); setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }
 
@@ -105,13 +107,13 @@ function App() {
       <header className="topbar"><button className="icon-button mobile-only" onClick={() => setMenuOpen(true)}>☰</button><div><small>Northstar Console</small><b>{current.label}</b></div><span>{dataLoading ? "正在同步…" : `${nodes.filter((node) => node.status === "online").length}/${nodes.length} 节点在线`}</span></header>
       <div className="content">
         {error && <div className="inline-notice error" role="alert">{error}<button className="text-button" onClick={() => void refreshCore()}>重试</button></div>}
-        {page === "overview" && <OverviewPage users={users} nodes={nodes} regions={regions} onNavigate={navigate} onRefresh={refreshCore} />}
-        {page === "topology" && <TopologyPage nodes={nodes} regions={regions} onNavigate={navigate} onRefresh={refreshCore} />}
+        {page === "overview" && <OverviewPage users={users} nodes={nodes} regions={regions} controllerSettings={controllerSettings} onNavigate={navigate} onRefresh={refreshCore} />}
+        {page === "topology" && <TopologyPage nodes={nodes} regions={regions} controllerSettings={controllerSettings} onNavigate={navigate} onRefresh={refreshCore} />}
         {page === "users" && <UsersPage users={users} onRefresh={refreshCore} />}
         {page === "nodes" && <NodesPage nodes={nodes} regions={regions} onRefresh={refreshCore} />}
         {page === "services" && <ServicesPage nodes={nodes} />}
         {page === "regions" && <RegionsPage regions={regions} nodes={nodes} onRefresh={refreshCore} />}
-        {page === "controller" && <ControllerPage />}
+        {page === "controller" && <ControllerPage onSettingsChange={setControllerSettings} />}
         {page === "logs" && <LogsPage nodes={nodes} />}
       </div>
     </section>

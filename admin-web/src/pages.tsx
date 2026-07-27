@@ -66,8 +66,8 @@ function InlineNotice({ notice }: { notice: Notice | null }) {
   return notice ? <div className={`inline-notice ${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"}>{notice.message}</div> : null;
 }
 
-export function OverviewPage({ users, nodes, regions, onNavigate, onRefresh }: {
-  users: AdminUser[]; nodes: NodeRecord[]; regions: Region[]; onNavigate: (page: string) => void; onRefresh: () => Promise<void>;
+export function OverviewPage({ users, nodes, regions, controllerSettings, onNavigate, onRefresh }: {
+  users: AdminUser[]; nodes: NodeRecord[]; regions: Region[]; controllerSettings?: ControllerInfo["settings"] | null; onNavigate: (page: string) => void; onRefresh: () => Promise<void>;
 }) {
   const pending = users.filter((user) => user.status === "pending");
   const attention = nodes.filter((node) => node.status !== "online");
@@ -79,7 +79,7 @@ export function OverviewPage({ users, nodes, regions, onNavigate, onRefresh }: {
       <button onClick={() => onNavigate("services")}><small>需关注节点</small><b>{attention.length}</b><span>检查服务状态 →</span></button>
       <button onClick={() => onNavigate("logs")}><small>当前用户</small><b>{users.filter((user) => user.status === "active").length}</b><span>查看运行日志 →</span></button>
     </section>
-    <FleetMap nodes={nodes} regions={regions} onNavigate={onNavigate} />
+    <FleetMap nodes={nodes} regions={regions} controller={controllerSettings} onNavigate={onNavigate} />
     <div className="two-column">
       <section className="panel">
         <div className="panel-head"><div><p className="eyebrow">ATTENTION</p><h2>需要处理</h2></div></div>
@@ -96,8 +96,8 @@ export function OverviewPage({ users, nodes, regions, onNavigate, onRefresh }: {
   </>;
 }
 
-export function TopologyPage({ nodes, regions, onNavigate, onRefresh }: {
-  nodes: NodeRecord[]; regions: Region[]; onNavigate: (page: string) => void; onRefresh: () => Promise<void>;
+export function TopologyPage({ nodes, regions, controllerSettings, onNavigate, onRefresh }: {
+  nodes: NodeRecord[]; regions: Region[]; controllerSettings?: ControllerInfo["settings"] | null; onNavigate: (page: string) => void; onRefresh: () => Promise<void>;
 }) {
   return <>
     <PageHeader
@@ -106,7 +106,7 @@ export function TopologyPage({ nodes, regions, onNavigate, onRefresh }: {
       description="查看 Controller 与各区域 Agent 的管理通道、节点状态和全球覆盖空白。"
       actions={<button className="button ghost" onClick={() => void onRefresh()}>刷新拓扑</button>}
     />
-    <FleetMap nodes={nodes} regions={regions} onNavigate={onNavigate} />
+    <FleetMap nodes={nodes} regions={regions} controller={controllerSettings} onNavigate={onNavigate} />
     <section className="topology-notes">
       <article><span>C</span><div><b>Controller 控制面</b><small>统一下发部署、修复、配置同步和诊断任务。</small></div></article>
       <article><span>A</span><div><b>Agent 管理通道</b><small>连线表示 Controller 与节点 Agent 的控制关系，不暴露用户流量。</small></div></article>
@@ -471,28 +471,29 @@ export function RegionsPage({ regions, nodes, onRefresh }: { regions: Region[]; 
   </>;
 }
 
-export function ControllerPage() {
+export function ControllerPage({ onSettingsChange }: { onSettingsChange: (settings: ControllerInfo["settings"]) => void }) {
   const [info, setInfo] = useState<ControllerInfo | null>(null);
   const [form, setForm] = useState({ displayName: "", locationLabel: "", latitude: "", longitude: "" });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   async function refresh() {
     try {
-      const result = await api<ControllerInfo>("/api/controller"); setInfo(result);
+      const result = await api<ControllerInfo>("/api/controller"); setInfo(result); onSettingsChange(result.settings);
       setForm({ displayName: result.settings.display_name, locationLabel: result.settings.location_label, latitude: result.settings.latitude === null ? "" : String(result.settings.latitude), longitude: result.settings.longitude === null ? "" : String(result.settings.longitude) });
     } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
   }
   useEffect(() => {
     void api<ControllerInfo>("/api/controller").then((result) => {
       setInfo(result);
+      onSettingsChange(result.settings);
       setForm({ displayName: result.settings.display_name, locationLabel: result.settings.location_label, latitude: result.settings.latitude === null ? "" : String(result.settings.latitude), longitude: result.settings.longitude === null ? "" : String(result.settings.longitude) });
     }).catch((error: Error) => setNotice({ tone: "error", message: error.message }));
-  }, []);
+  }, [onSettingsChange]);
   async function save(event: FormEvent) {
     event.preventDefault(); setBusy(true); setNotice(null);
     try {
       const result = await api<ControllerInfo>("/api/controller", { method: "PUT", body: JSON.stringify({ displayName: form.displayName, locationLabel: form.locationLabel, latitude: form.latitude === "" ? null : Number(form.latitude), longitude: form.longitude === "" ? null : Number(form.longitude) }) });
-      setInfo(result); setNotice({ tone: "success", message: "Controller 设置已保存。" });
+      setInfo(result); onSettingsChange(result.settings); setNotice({ tone: "success", message: "Controller 设置已保存，全球拓扑已同步更新。" });
     } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
     finally { setBusy(false); }
   }
