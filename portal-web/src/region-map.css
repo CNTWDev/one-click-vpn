@@ -7,12 +7,13 @@
 .region-map-summary b { display: block; margin-bottom: 3px; color: #e3ecdc; font-size: 17px; }
 .region-map-summary .selected-region { padding-left: 18px; border-left: 1px solid rgba(158, 184, 150, .18); color: #aeb9ab; }
 .region-map-summary .selected-region b { color: #b7df5d; }
-.region-map-actions { display: grid; justify-items: end; gap: 8px; }
-.region-locate-button { min-height: 31px; padding: 0 12px; color: #b9c6b9; background: rgba(255, 255, 255, .035); border: 1px solid rgba(183, 223, 93, .25); border-radius: 7px; font-size: 9px; font-weight: 750; }
-.region-locate-button:hover { color: #e9f7d1; background: rgba(183, 223, 93, .09); border-color: rgba(183, 223, 93, .48); }
-.region-locate-button.located { color: #cbd5ff; border-color: rgba(156, 177, 255, .38); }
+.region-map-location-control { min-width: 178px; position: absolute; z-index: 7; top: 16px; right: 16px; display: grid; justify-items: end; gap: 7px; }
+.region-locate-button { min-height: 39px; padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; color: #16200c; background: #b7df5d; border: 1px solid #d6f78c; border-radius: 9px; box-shadow: 0 8px 28px rgba(183, 223, 93, .2); font-size: 11px; font-weight: 850; }
+.region-locate-button > span { font-size: 17px; line-height: 1; }
+.region-locate-button:hover { color: #0c1207; background: #c9ed78; border-color: #e7ffad; transform: translateY(-1px); }
+.region-locate-button.located { color: #17203b; background: #aebeff; border-color: #d3dcff; box-shadow: 0 8px 28px rgba(111, 144, 255, .22); }
 .region-locate-button:disabled { opacity: .55; cursor: wait; }
-.region-location-status { max-width: 330px; color: #7f8d81; font-size: 8px; line-height: 1.4; text-align: right; }
+.region-location-status { max-width: 290px; padding: 6px 8px; color: #b8c5b9; background: rgba(8, 14, 11, .82); border: 1px solid rgba(150, 177, 142, .16); border-radius: 6px; font-size: 8px; line-height: 1.4; text-align: right; }
 .region-location-status.located { color: #aebeff; }
 .region-location-status.error { color: #d9a38f; }
 .region-map-stage { height: clamp(330px, 42vw, 510px); position: relative; overflow: hidden; isolation: isolate; background: radial-gradient(circle at 70% 33%, rgba(95, 131, 255, .1), transparent 28%), radial-gradient(circle at 27% 70%, rgba(183, 223, 93, .08), transparent 27%), #09110e; border-top: 1px solid rgba(154, 182, 145, .11); border-bottom: 1px solid rgba(154, 182, 145, .11); }
@@ -59,11 +60,10 @@
 @keyframes region-scan { to { transform: translateY(580%); } }
 @media (max-width: 780px) {
   .region-map-head { display: block; }
-  .region-map-actions { margin-top: 16px; justify-items: stretch; }
   .region-map-summary { margin-top: 16px; justify-content: space-between; gap: 10px; }
-  .region-map-actions .region-map-summary { margin-top: 0; }
-  .region-locate-button { justify-self: start; }
-  .region-location-status { max-width: none; text-align: left; }
+  .region-map-location-control { top: 11px; right: 11px; min-width: 0; }
+  .region-locate-button { min-height: 36px; padding: 0 12px; font-size: 10px; }
+  .region-location-status { max-width: min(270px, calc(100vw - 54px)); }
   .region-map-summary .selected-region { padding-left: 10px; }
   .region-map-stage { height: 310px; }
   .region-map-marker .marker-label { display: none; }

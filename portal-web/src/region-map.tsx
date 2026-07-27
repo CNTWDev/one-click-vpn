@@ -103,10 +103,11 @@ export function RegionMap({ regions, selectedRegionId, onSelect }: {
   return <section className="region-map-panel">
     <div className="region-map-head">
       <div><p className="kicker">GLOBAL NETWORK</p><h2>全球可用网络</h2><p>点击地图选择区域，生成配置时会自动使用该区域。</p></div>
-      <div className="region-map-actions"><div className="region-map-summary"><span><b>{availableRegions.length}</b>可用区域</span><span><b>{protocolCount}</b>可用协议</span>{selected && <span className="selected-region"><b>{selected.code}</b>{selected.name}</span>}</div><button type="button" className={`region-locate-button ${hasLocation ? "located" : ""}`} disabled={location.status === "locating"} onClick={locateUser}>{location.status === "locating" ? "定位中…" : hasLocation ? "重新定位" : "定位我的位置"}</button>{location.message && <small className={`region-location-status ${location.status}`} role="status">{location.message}{hasLocation ? ` · ${location.latitude!.toFixed(2)}, ${location.longitude!.toFixed(2)}` : ""}</small>}</div>
+      <div className="region-map-summary"><span><b>{availableRegions.length}</b>可用区域</span><span><b>{protocolCount}</b>可用协议</span>{selected && <span className="selected-region"><b>{selected.code}</b>{selected.name}</span>}</div>
     </div>
     <div className="region-map-stage">
       <div className="region-map-scan" />
+      <div className="region-map-location-control"><button type="button" className={`region-locate-button ${hasLocation ? "located" : ""}`} disabled={location.status === "locating"} onClick={locateUser}><span>◎</span>{location.status === "locating" ? "定位中…" : hasLocation ? "重新定位" : "定位我的位置"}</button>{location.message && <small className={`region-location-status ${location.status}`} role="status">{location.message}{hasLocation ? ` · ${location.latitude!.toFixed(2)}, ${location.longitude!.toFixed(2)}` : ""}</small>}</div>
       <svg viewBox="0 0 1010 666" role="img" aria-label="Northstar 当前可用 VPN 区域地图">
         <defs>
           <linearGradient id="portal-route" x1="0" x2="1"><stop offset="0" stopColor="#6f90ff" /><stop offset="1" stopColor="#b7df5d" /></linearGradient>
