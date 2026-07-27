@@ -1,5 +1,6 @@
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
+import { FleetMap } from "./fleet-map";
 import { countryName, countryOptions, presetGroups, regionPresets } from "./region-catalog";
 import type {
   AdminUser, ControllerInfo, DeploymentPolicyOverview, NodeDiagnostics, NodeRecord,
@@ -65,8 +66,8 @@ function InlineNotice({ notice }: { notice: Notice | null }) {
   return notice ? <div className={`inline-notice ${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"}>{notice.message}</div> : null;
 }
 
-export function OverviewPage({ users, nodes, onNavigate, onRefresh }: {
-  users: AdminUser[]; nodes: NodeRecord[]; onNavigate: (page: string) => void; onRefresh: () => Promise<void>;
+export function OverviewPage({ users, nodes, regions, onNavigate, onRefresh }: {
+  users: AdminUser[]; nodes: NodeRecord[]; regions: Region[]; onNavigate: (page: string) => void; onRefresh: () => Promise<void>;
 }) {
   const pending = users.filter((user) => user.status === "pending");
   const attention = nodes.filter((node) => node.status !== "online");
@@ -78,6 +79,7 @@ export function OverviewPage({ users, nodes, onNavigate, onRefresh }: {
       <button onClick={() => onNavigate("services")}><small>需关注节点</small><b>{attention.length}</b><span>检查服务状态 →</span></button>
       <button onClick={() => onNavigate("logs")}><small>当前用户</small><b>{users.filter((user) => user.status === "active").length}</b><span>查看运行日志 →</span></button>
     </section>
+    <FleetMap nodes={nodes} regions={regions} onNavigate={onNavigate} />
     <div className="two-column">
       <section className="panel">
         <div className="panel-head"><div><p className="eyebrow">ATTENTION</p><h2>需要处理</h2></div></div>

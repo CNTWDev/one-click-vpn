@@ -168,7 +168,7 @@ export async function issueConnectionProfile(input: {
   if (!adapter.capability.transports.includes(transport)) throw new Error("Unsupported protocol transport");
   const clientAddress = await allocateIpLease(input.nodeId, input.protocol, input.deviceId);
   const openvpnCredential = input.protocol === "openvpn"
-    ? await ensureOpenVpnClientCredential(device.id, device.display_name, input.rotateCredential)
+    ? await ensureOpenVpnClientCredential(device.id, input.rotateCredential)
     : undefined;
   const profile = adapter.buildProfile({
     deviceId: device.id,

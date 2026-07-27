@@ -103,7 +103,7 @@ function App() {
       <header className="topbar"><button className="icon-button mobile-only" onClick={() => setMenuOpen(true)}>☰</button><div><small>Northstar Console</small><b>{current.label}</b></div><span>{dataLoading ? "正在同步…" : `${nodes.filter((node) => node.status === "online").length}/${nodes.length} 节点在线`}</span></header>
       <div className="content">
         {error && <div className="inline-notice error" role="alert">{error}<button className="text-button" onClick={() => void refreshCore()}>重试</button></div>}
-        {page === "overview" && <OverviewPage users={users} nodes={nodes} onNavigate={navigate} onRefresh={refreshCore} />}
+        {page === "overview" && <OverviewPage users={users} nodes={nodes} regions={regions} onNavigate={navigate} onRefresh={refreshCore} />}
         {page === "users" && <UsersPage users={users} onRefresh={refreshCore} />}
         {page === "nodes" && <NodesPage nodes={nodes} regions={regions} onRefresh={refreshCore} />}
         {page === "services" && <ServicesPage nodes={nodes} />}

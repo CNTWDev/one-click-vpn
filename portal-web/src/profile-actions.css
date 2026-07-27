@@ -1,0 +1,11 @@
+.list-row > .list-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+}
+
+.list-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}

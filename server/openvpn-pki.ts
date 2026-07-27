@@ -156,19 +156,20 @@ export async function ensureOpenVpnServerBundle(nodeId: string, nodeName: string
   return { authority, issuance, bundleSecretId: bundle.id };
 }
 
-export async function ensureOpenVpnClientCredential(deviceId: string, deviceName: string, rotate = false): Promise<{ authority: CredentialAuthority; issuance: CertificateIssuance }> {
+export async function ensureOpenVpnClientCredential(deviceId: string, rotate = false): Promise<{ authority: CredentialAuthority; issuance: CertificateIssuance }> {
   const authority = await ensureOpenVpnAuthority();
+  const commonName = safeCommonName(`northstar-${deviceId}`);
   let issuance = await findActiveCertificateIssuance({ authorityId: authority.id, deviceId, purpose: "client" });
-  if (issuance && rotate) {
+  if (issuance && (rotate || issuance.subject !== `CN=${commonName}`)) {
     await revokeCertificateIssuance(issuance.id);
     issuance = undefined;
   }
   if (!issuance) {
-    const issued = await issueCertificate({ authority, purpose: "client", commonName: `northstar-device-${deviceName}` });
+    const issued = await issueCertificate({ authority, purpose: "client", commonName });
     const privateKey = await createSecretMaterial({ kind: "openvpn_client_private_key", value: issued.privateKeyPem });
     issuance = await createCertificateIssuance({
       authority_id: authority.id, node_id: null, device_id: deviceId, purpose: "client", serial: issued.serial,
-      subject: `CN=northstar-device-${safeCommonName(deviceName)}`, certificate_pem: issued.certificatePem,
+      subject: `CN=${commonName}`, certificate_pem: issued.certificatePem,
       private_key_secret_id: privateKey.id, not_before: issued.notBefore, not_after: issued.notAfter,
     });
   }
