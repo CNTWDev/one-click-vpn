@@ -18,7 +18,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     const next = await issueConnectionProfile({ actorUserId: user.id, deviceId: oldProfile.device_id, nodeId: oldProfile.node_id, protocol: oldProfile.protocol, transport: oldProfile.transport, rotateCredential: oldProfile.protocol === "openvpn" });
     const activated = oldProfile.status === "active" ? await activateProfile(next.id, user.id) : next;
     await expireConnectionProfile(oldProfile.id);
-    return NextResponse.json({ profile: publicProfile(activated) });
+    return NextResponse.json({ profile: publicProfile(activated, undefined, device) });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to rotate profile", 409);
   }

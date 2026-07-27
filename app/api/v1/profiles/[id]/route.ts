@@ -13,5 +13,5 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const profile = await findConnectionProfile(id);
   const device = profile ? await findDevice(profile.device_id) : null;
   if (!profile || !device || device.user_id !== user.id) return jsonError("Profile not found", 404);
-  return NextResponse.json({ profile: publicProfile(profile) });
+  return NextResponse.json({ profile: publicProfile(profile, undefined, device) });
 }

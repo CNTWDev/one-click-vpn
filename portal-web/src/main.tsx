@@ -8,7 +8,7 @@ import "./profile-actions.css";
 type User = { id: string; email: string; displayName: string; role: string; status: string; rejectionReason?: string | null };
 type Region = { id: string; name: string; country: string; code: string; protocols: string[]; status: string };
 type Device = { id: string; displayName: string; platform: string; publicKey: string; status: string; lastSeenAt?: string | null };
-type Profile = { id: string; deviceId: string; nodeId: string; regionCode?: string | null; regionName?: string | null; protocol: string; status: string; issuedAt: string; expiresAt: string };
+type Profile = { id: string; deviceId: string; displayName?: string | null; nodeId: string; regionCode?: string | null; regionName?: string | null; protocol: string; status: string; issuedAt: string; expiresAt: string };
 type Usage = { totals: { uploadBytes: number; downloadBytes: number; totalBytes: number }; daily: Array<{ day: string; totalBytes: number }> };
 type CredentialUsage = { profileId: string; deviceId: string; displayName: string; protocol: string; regionName: string; regionCode: string; credentialSuffix: string; online: boolean; lastActivityAt?: string | null; totalBytes: number };
 
@@ -36,13 +36,13 @@ function filenamePart(value: string | null | undefined, fallback: string, maxLen
     .replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^[-.]+|[-.]+$/g, "");
   return cleaned.slice(0, maxLength) || fallback;
 }
-function profileFilename(profile: Profile, displayName?: string): string {
+function profileFilename(profile: Profile): string {
   const extension = profile.protocol === "openvpn" ? "ovpn" : "conf";
   const protocolCode = profile.protocol === "openvpn" ? "OV" : profile.protocol === "wireguard" ? "WG" : filenamePart(profile.protocol, "VPN", 4).toUpperCase();
   const shortId = filenamePart(profile.id.split("_").at(-1)?.slice(-4), "cfg", 4);
   const regionCode = filenamePart(profile.regionCode?.toUpperCase(), "AUTO", 8);
   const regionName = profile.regionName ? `-${filenamePart(profile.regionName, "region", 14)}` : "";
-  return `${regionCode}${regionName}-${filenamePart(displayName, "device")}-${protocolCode}-${shortId}.${extension}`;
+  return `${regionCode}${regionName}-${filenamePart(profile.displayName, "device")}-${protocolCode}-${shortId}.${extension}`;
 }
 function activityLabel(value?: string | null): string {
   if (!value) return "尚未使用";
@@ -92,7 +92,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   async function refresh() { const [availability, deviceResult, profileResult, usageResult, credentialResult] = await Promise.all([api<{ regions: Region[] }>("/api/v1/availability"), api<{ devices: Device[] }>("/api/v1/devices"), api<{ profiles: Profile[] }>("/api/v1/profiles"), api<Usage>("/api/v1/usage/summary"), api<{ credentials: CredentialUsage[] }>("/api/v1/usage/credentials")]); setRegions(availability.regions); setDevices(deviceResult.devices); setProfiles(profileResult.profiles); setUsage(usageResult); setCredentialUsage(credentialResult.credentials || []); if (!regionId && availability.regions[0]) setRegionId(availability.regions[0].id); }
   useEffect(() => { void refresh().catch((err) => setError((err as Error).message)); }, []);
   useEffect(() => { if (selectedRegion && !selectedRegion.protocols.includes(protocol)) setProtocol(selectedRegion.protocols[0] || "wireguard"); }, [selectedRegion, protocol]);
-  async function createProfile(event: React.FormEvent) { event.preventDefault(); setBusy(true); setError(""); setNotice(""); setDownload(null); try { const privateBytes = protocol === "wireguard" ? x25519.utils.randomSecretKey() : null; const clientPrivateKey = privateBytes ? base64(privateBytes) : undefined; const publicKey = privateBytes ? base64(x25519.getPublicKey(privateBytes)) : "openvpn-managed"; const device = await api<{ device: Device }>("/api/v1/devices", { method: "POST", body: JSON.stringify({ displayName: deviceName || "我的设备", platform: "web", appVersion: "portal-0.1.0", publicKey }) }); setDevices((items) => [device.device, ...items]); const issued = await api<{ profile: Profile }>("/api/v1/profiles", { method: "POST", body: JSON.stringify({ deviceId: device.device.id, regionId: regionId || undefined, protocol, clientPrivateKey }) }); const active = await api<{ profile: Profile }>(`/api/v1/profiles/${issued.profile.id}/activate`, { method: "POST" }); const response = await fetch(`/api/v1/profiles/${active.profile.id}/download`, { credentials: "include" }); const text = await response.text(); if (!response.ok) throw new Error(text || "配置下载失败"); setDownload({ profileId: active.profile.id, name: profileFilename({ ...active.profile, regionCode: issued.profile.regionCode || selectedRegion?.code }, device.device.displayName), text }); setNotice("配置已生成，请下载后导入对应 VPN 客户端。"); await refresh(); } catch (err) { setError((err as Error).message); } finally { setBusy(false); } }
+  async function createProfile(event: React.FormEvent) { event.preventDefault(); setBusy(true); setError(""); setNotice(""); setDownload(null); try { const privateBytes = protocol === "wireguard" ? x25519.utils.randomSecretKey() : null; const clientPrivateKey = privateBytes ? base64(privateBytes) : undefined; const publicKey = privateBytes ? base64(x25519.getPublicKey(privateBytes)) : "openvpn-managed"; const device = await api<{ device: Device }>("/api/v1/devices", { method: "POST", body: JSON.stringify({ displayName: deviceName || "我的设备", platform: "web", appVersion: "portal-0.1.0", publicKey }) }); setDevices((items) => [device.device, ...items]); const issued = await api<{ profile: Profile }>("/api/v1/profiles", { method: "POST", body: JSON.stringify({ deviceId: device.device.id, regionId: regionId || undefined, protocol, clientPrivateKey }) }); const active = await api<{ profile: Profile }>(`/api/v1/profiles/${issued.profile.id}/activate`, { method: "POST" }); const response = await fetch(`/api/v1/profiles/${active.profile.id}/download`, { credentials: "include" }); const text = await response.text(); if (!response.ok) throw new Error(text || "配置下载失败"); setDownload({ profileId: active.profile.id, name: profileFilename({ ...active.profile, displayName: issued.profile.displayName || device.device.displayName, regionCode: issued.profile.regionCode || selectedRegion?.code, regionName: issued.profile.regionName || selectedRegion?.name }), text }); setNotice("配置已生成，请下载后导入对应 VPN 客户端。"); await refresh(); } catch (err) { setError((err as Error).message); } finally { setBusy(false); } }
   async function revoke(device: Device) { if (!confirm(`撤销 ${device.displayName}？`)) return; try { await api(`/api/v1/devices/${device.id}/revoke`, { method: "POST" }); await refresh(); } catch (err) { setError((err as Error).message); } }
   function saveDownload() { if (download) saveTextFile(download.name, download.text); }
   async function downloadProfile(profile: Profile) {
@@ -105,8 +105,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         try { const body = JSON.parse(text) as { error?: string }; if (body.error) message = body.error; } catch { /* plain-text error */ }
         throw new Error(message);
       }
-      const device = devices.find((item) => item.id === profile.deviceId);
-      saveTextFile(profileFilename(profile, device?.displayName), text);
+      saveTextFile(profileFilename(profile), text);
       setProfileDownloadNotice({ tone: "success", message: "下载已开始。" });
     } catch (err) {
       setProfileDownloadNotice({ tone: "error", message: (err as Error).message });

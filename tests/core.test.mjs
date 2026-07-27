@@ -43,6 +43,7 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(bootstrap, /ReadWritePaths=\/opt\/northstar-agent \/etc\/wireguard \/etc\/systemd\/system/);
   assert.match(openVpnPki, /safeCommonName\(`northstar-\$\{deviceId\}`\)/);
   assert.doesNotMatch(openVpnPki, /commonName: `northstar-device-\$\{deviceName\}`/);
+  assert.match(readFileSync(path.join(root, "server/control-plane.ts"), "utf8"), /displayName: device\?\.display_name \|\| null/);
   assert.match(traffic, /snapshot\.protocol === "wireguard"/);
   assert.match(traffic, /certificate_issuances c/);
   assert.match(traffic, /export async function usageByCredentials/);
