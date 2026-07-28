@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { createHash, randomBytes } from "node:crypto";
-import { Client, type ConnectConfig } from "ssh2";
+import { randomBytes } from "node:crypto";
 import { agentOrigin, allowTofuHostKeys } from "./config";
 import { decryptSecret, hashToken } from "./crypto";
 import { addAudit, addNodeAction, appendNodeActionEvent, countRunningNodeActions, findNode, finishNodeAction, startNodeAction, updateNode, updateNodeActionProgress } from "./db";
 import { ensureDefaultNodeProtocols } from "./control-plane";
 import { reconcileEnabledVpnServices } from "./vpn-services";
 import { writeOperationalLog } from "./operational-logs";
+import { executeRemoteCommand } from "./remote-ssh";
 
 const maximumConcurrentRemoteActions = 3;
 const remoteActionQueue: Array<() => Promise<void>> = [];
@@ -56,69 +56,8 @@ function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
-function fingerprintForms(key: Buffer): { standard: string; hex: string } {
-  const digest = createHash("sha256").update(key).digest();
-  return {
-    standard: digest.toString("base64").replace(/=+$/, "").toLowerCase(),
-    hex: digest.toString("hex").toLowerCase(),
-  };
-}
-
-function normalizeFingerprint(value: string): string {
-  const input = value.trim();
-  const sha256 = input.match(/SHA256:([A-Za-z0-9+/]+={0,2})/i);
-  if (sha256) return sha256[1].replace(/=+$/, "").toLowerCase();
-  const hex = input.match(/(?:^|\s)([a-f0-9]{64})(?:\s|$)/i);
-  if (hex) return hex[1].toLowerCase();
-  return input.replace(/^sha256:/i, "").replace(/=+$/, "").toLowerCase();
-}
-
 function agentSource(): string {
   return readFileSync(path.join(process.cwd(), "agent", "agent.py"), "utf8");
-}
-
-function connectAndExec(config: ConnectConfig, command: string, expectedFingerprint: string | null, onOutput?: (chunk: string) => void): Promise<{ output: string; fingerprint: string }> {
-  return new Promise((resolve, reject) => {
-    const client = new Client();
-    let output = "";
-    let fingerprint = "";
-    const expected = expectedFingerprint ? normalizeFingerprint(expectedFingerprint) : "";
-    client.on("ready", () => {
-      client.exec(command, (error, stream) => {
-        if (error) {
-          client.end();
-          reject(error);
-          return;
-        }
-        stream.on("data", (chunk: Buffer) => { const text = chunk.toString(); output += text; onOutput?.(text); });
-        stream.stderr.on("data", (chunk: Buffer) => { const text = chunk.toString(); output += text; onOutput?.(text); });
-        stream.on("close", (code: number) => {
-          client.end();
-          if (code === 0) resolve({ output, fingerprint });
-          else reject(new Error(`Remote bootstrap exited with code ${code}: ${output.slice(-4000)}`));
-        });
-      });
-    });
-    client.on("error", (error) => {
-      if (expected && fingerprint) {
-        const received = normalizeFingerprint(fingerprint);
-        if (expected !== received) {
-          reject(new Error(`SSH host fingerprint mismatch. Expected ${expectedFingerprint}; received ${fingerprint}. Verify the node fingerprint from a trusted console.`));
-          return;
-        }
-      }
-      reject(error);
-    });
-    const verifier = ((key: Buffer) => {
-      const forms = fingerprintForms(key);
-      fingerprint = `SHA256:${forms.standard}`;
-      return !expected || expected === forms.standard || expected === forms.hex;
-    }) as NonNullable<ConnectConfig["hostVerifier"]>;
-    client.connect({
-      ...config,
-      hostVerifier: verifier,
-    });
-  });
 }
 
 class ActionOutputRecorder {
@@ -191,7 +130,6 @@ export async function bootstrapNode(nodeId: string, actorUserId?: string, queued
       tag: node.credential_tag,
     });
     const agentToken = randomBytes(32).toString("base64url");
-    const expectedFingerprint = node.host_fingerprint;
     const source = Buffer.from(agentSource(), "utf8").toString("base64");
     const controllerOrigin = shellQuote(agentOrigin());
     const command = `set -eu
@@ -366,16 +304,9 @@ WantedBy=multi-user.target
 NORTHSTAR_SERVICE
 progress agent-staged 88 'Agent files are staged; registering its new identity with the Controller'
 `;
-    const config: ConnectConfig = {
-      host: node.ip,
-      port: node.ssh_port,
-      username: node.ssh_user,
-      readyTimeout: 15_000,
-      ...(node.credential_type === "private_key" ? { privateKey: secret } : { password: secret }),
-    };
     const outputRecorder = new ActionOutputRecorder(actionId, nodeId);
     recorder = outputRecorder;
-    const result = await connectAndExec(config, command, expectedFingerprint, (chunk) => outputRecorder.write(chunk));
+    const result = await executeRemoteCommand(node, secret, command, (chunk) => outputRecorder.write(chunk));
     await outputRecorder.flush();
     await updateNodeActionProgress(actionId, { phase: "registration", progress: 90, message: "Controller registered the new Agent token; starting the service" });
     await updateNode(nodeId, {
@@ -400,14 +331,14 @@ fi
 systemctl --no-pager --full status northstar-agent
 printf 'NORTHSTAR_PROGRESS|heartbeat|96|Agent is active; waiting for its first Controller heartbeat\\n'
 `;
-    const startResult = await connectAndExec(config, startCommand, expectedFingerprint, (chunk) => outputRecorder.write(chunk));
+    const startResult = await executeRemoteCommand(node, secret, startCommand, (chunk) => outputRecorder.write(chunk));
     await outputRecorder.flush();
     const combinedOutput = `${result.output}\n${startResult.output}`;
     if (!(await waitForAgentHeartbeat(nodeId, heartbeatNotBefore))) {
       let runtimeDiagnostics = "";
       try {
         await updateNodeActionProgress(actionId, { phase: "heartbeat", progress: 96, message: "Heartbeat did not arrive; collecting remote service diagnostics", level: "warning" });
-        const diagnostics = await connectAndExec(config, "printf 'NORTHSTAR_PROGRESS|diagnostics|97|Collecting systemd status and recent Agent journal\\n'; systemctl --no-pager --full status northstar-agent || true; journalctl -u northstar-agent -n 100 --no-pager || true", expectedFingerprint, (chunk) => outputRecorder.write(chunk));
+        const diagnostics = await executeRemoteCommand(node, secret, "printf 'NORTHSTAR_PROGRESS|diagnostics|97|Collecting systemd status and recent Agent journal\\n'; systemctl --no-pager --full status northstar-agent || true; journalctl -u northstar-agent -n 100 --no-pager || true", (chunk) => outputRecorder.write(chunk));
         runtimeDiagnostics = diagnostics.output.slice(-12_000);
       } catch (diagnosticError) {
         runtimeDiagnostics = `Unable to collect Agent diagnostics: ${diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError)}`;
@@ -445,17 +376,10 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
     const command = action === "restart-agent"
       ? "printf 'NORTHSTAR_PROGRESS|restart|30|Requesting a managed Agent restart\\n'; systemctl restart northstar-agent; printf 'NORTHSTAR_PROGRESS|verify|75|Checking service status after restart\\n'; systemctl --no-pager --full status northstar-agent; printf 'NORTHSTAR_PROGRESS|complete|100|Agent restart completed\\n'"
       : "printf 'NORTHSTAR_PROGRESS|check|25|Reading Agent service state\\n'; systemctl is-active --quiet northstar-agent; service_status=$?; systemctl --no-pager --full status northstar-agent || true; printf 'NORTHSTAR_PROGRESS|journal|60|Collecting the latest Agent journal entries\\n'; journalctl -u northstar-agent -n 80 --no-pager || true; if [ $service_status -ne 0 ]; then printf 'NORTHSTAR_PROGRESS|failed|100|Agent service is not active\\n'; exit $service_status; fi; printf 'NORTHSTAR_PROGRESS|complete|100|Agent check completed\\n'";
-    const config: ConnectConfig = {
-      host: node.ip,
-      port: node.ssh_port,
-      username: node.ssh_user,
-      readyTimeout: 15_000,
-      ...(node.credential_type === "private_key" ? { privateKey: secret } : { password: secret }),
-    };
     const outputRecorder = new ActionOutputRecorder(actionId, nodeId);
     recorder = outputRecorder;
     const actionStartedAt = Date.now();
-    const result = await connectAndExec(config, command, node.host_fingerprint, (chunk) => outputRecorder.write(chunk));
+    const result = await executeRemoteCommand(node, secret, command, (chunk) => outputRecorder.write(chunk));
     await outputRecorder.flush();
     const output = result.output.slice(-12000);
     if (action === "restart-agent") {

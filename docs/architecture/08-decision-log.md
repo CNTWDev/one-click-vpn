@@ -66,3 +66,16 @@ Node 只表示安装 Agent 的受管 Linux 主机；VPN Service 表示某个 Nod
 Standard 不再只是新增 Node 时复制的一组静态服务，而是持久化在 Node 上的版本化部署策略。协议 Adapter 提供默认监听参数和结构化 apply/disable 任务名；进入 Standard 的 Adapter 必须显式标记并提升策略版本。
 
 老节点升级采用 capability preflight、单节点 Canary 和有限批次 rollout。无新鲜心跳或未上报目标协议能力的节点保持 blocked，不修改其现有服务。Custom 和 Agent-only 节点不参加 Standard rollout；管理员手动启停服务会将节点切换为 Custom，防止未来 rollout 覆盖明确的人为选择。
+
+## ADR-0010：SSH 认证和远端权限收敛在连接层
+
+状态：Accepted
+日期：2026-07-29
+
+节点可以使用密码或专用 SSH 私钥认证，也可以选择直接 root 或非 root +
+免密 sudo。认证、主机指纹和权限提升全部由统一 SSH 执行器处理；bootstrap、
+修复、检查和重启只提交受控命令，不感知凭据类型。Agent、Desired State 和
+VPN Adapter 不增加密码/私钥分支，避免新增 VPN 协议时复制运维流程。
+
+当前版本拒绝带口令私钥和交互式 sudo 密码。未来如果增加 KMS、SSH
+Certificate、跳板机或临时云凭据，应扩展连接层，不修改协议层。

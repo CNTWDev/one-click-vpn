@@ -8,6 +8,7 @@ import { queueNodeBootstrap } from "../../../../server/bootstrap";
 import { cleanText, isValidIp, isValidPort, jsonError, readJson } from "../../../../server/http";
 import { initializeVpnServices, type DeploymentTemplate } from "../../../../server/vpn-services";
 import { STANDARD_POLICY_VERSION } from "../../../../server/deployment-policy";
+import { credentialType as resolveCredentialType, privilegeMode, validateSshCredential } from "../../../../server/remote-ssh";
 
 export const runtime = "nodejs";
 
@@ -45,17 +46,18 @@ export async function POST(request: Request) {
     const region = (cleanText(body.regionId, 80) && await findRegion(cleanText(body.regionId, 80))) || (requestedPlace && await findRegionByLabel(requestedPlace));
     const place = region ? `${region.name} · ${region.country}` : requestedPlace || "Unassigned";
     const sshUser = cleanText(body.sshUser || body.user, 64) || "root";
-    const secret = typeof body.secret === "string" ? body.secret : "";
-    const credentialType = body.credentialType === "private_key" ? "private_key" : "password";
+    const rawSecret = typeof body.secret === "string" ? body.secret : "";
+    const credentialType = resolveCredentialType(body.credentialType, rawSecret);
+    const sshPrivilegeMode = privilegeMode(body.sshPrivilegeMode, sshUser);
     const hostFingerprint = cleanText(body.hostFingerprint, 256) || null;
     const deploymentTemplate = cleanText(body.deploymentTemplate, 32) as DeploymentTemplate || "standard";
     if (!["standard", "wireguard", "openvpn", "agent-only"].includes(deploymentTemplate)) return jsonError("Invalid deployment template");
-    if (!name || !isValidIp(ip) || !secret) return jsonError("Name, IPv4 address, and SSH credential are required");
+    if (!name || !isValidIp(ip) || !rawSecret) return jsonError("Name, IPv4 address, and SSH credential are required");
     if (!region) return jsonError("A valid region is required");
-    if (credentialType === "private_key" && !secret.includes("BEGIN")) return jsonError("Private key is not valid PEM text");
+    const secret = validateSshCredential(credentialType, rawSecret);
     const encrypted = encryptSecret(secret);
     const node = await insertNode({
-      name, place, region_id: region.id, ip, ssh_user: sshUser, ssh_port: isValidPort(body.sshPort), status: "provisioning",
+      name, place, region_id: region.id, ip, ssh_user: sshUser, ssh_port: isValidPort(body.sshPort), ssh_privilege_mode: sshPrivilegeMode, status: "provisioning",
       latency: "checking", users: 0, traffic: "—", version: "bootstrap queued", last_seen: "just added",
       credential_type: credentialType, credential_ciphertext: encrypted.ciphertext, credential_iv: encrypted.iv,
       credential_tag: encrypted.tag, host_fingerprint: hostFingerprint, agent_token_hash: null,
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
     });
     await ensureDefaultNodeProtocols(node.id);
     await initializeVpnServices(node.id, deploymentTemplate);
-    await addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { credentialType } });
+    await addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { credentialType, sshPrivilegeMode } });
     const actionId = await queueNodeBootstrap(node.id, user.id);
     return NextResponse.json({ node: { id: node.id, name: node.name, place: node.place, ip: node.ip, status: node.status, version: node.version }, actionId }, { status: 201 });
   } catch (error) {

@@ -34,6 +34,7 @@ CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
 CREATE TABLE IF NOT EXISTS nodes (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, place TEXT NOT NULL, region_id TEXT,
   ip TEXT NOT NULL, ssh_user TEXT NOT NULL, ssh_port INTEGER NOT NULL DEFAULT 22,
+  ssh_privilege_mode TEXT NOT NULL DEFAULT 'auto',
   status TEXT NOT NULL DEFAULT 'provisioning', latency TEXT NOT NULL DEFAULT 'checking',
   users INTEGER NOT NULL DEFAULT 0, traffic TEXT NOT NULL DEFAULT '—',
   version TEXT NOT NULL DEFAULT 'bootstrap pending', last_seen TEXT NOT NULL DEFAULT 'never',
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 ALTER TABLE nodes ADD COLUMN IF NOT EXISTS metrics_json TEXT;
+ALTER TABLE nodes ADD COLUMN IF NOT EXISTS ssh_privilege_mode TEXT NOT NULL DEFAULT 'auto';
 ALTER TABLE nodes ADD COLUMN IF NOT EXISTS deployment_policy TEXT NOT NULL DEFAULT 'standard';
 ALTER TABLE nodes ADD COLUMN IF NOT EXISTS policy_version INTEGER NOT NULL DEFAULT 1;
 CREATE INDEX IF NOT EXISTS nodes_region_idx ON nodes(region_id);

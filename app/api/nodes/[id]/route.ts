@@ -6,6 +6,7 @@ import { queueNodeBootstrap } from "../../../../server/bootstrap";
 import { getNodeReconcileStatus } from "../../../../server/control-db";
 import { getNodeConnectivity } from "../../../../server/connectivity";
 import { encryptSecret } from "../../../../server/crypto";
+import { credentialType as resolveCredentialType, privilegeMode, validateSshCredential } from "../../../../server/remote-ssh";
 
 export const runtime = "nodejs";
 
@@ -48,10 +49,17 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const hostFingerprint = cleanText(body.hostFingerprint, 256) || null;
     const regionId = cleanText(body.regionId, 80);
     const region = await findRegion(regionId);
-    const secret = typeof body.secret === "string" ? body.secret : "";
+    const rawSecret = typeof body.secret === "string" ? body.secret : "";
+    const sshPrivilegeMode = body.sshPrivilegeMode === "root" || body.sshPrivilegeMode === "sudo"
+      ? privilegeMode(body.sshPrivilegeMode, sshUser)
+      : sshUser !== node.ssh_user
+        ? privilegeMode(undefined, sshUser)
+        : node.ssh_privilege_mode || privilegeMode(undefined, sshUser);
     if (!name) return jsonError("Node name is required");
     if (!isValidIp(ip)) return jsonError("Public IP must be a valid IPv4 address, for example 203.0.113.10");
     if (!region) return jsonError("A valid region is required");
+    const nextCredentialType = resolveCredentialType(body.credentialType, rawSecret);
+    const secret = rawSecret ? validateSshCredential(nextCredentialType, rawSecret) : "";
     const encrypted = secret ? encryptSecret(secret) : undefined;
     const updated = await updateNodeConfig(id, {
       name,
@@ -60,10 +68,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       ip,
       sshUser,
       sshPort: isValidPort(body.sshPort || node.ssh_port),
+      sshPrivilegeMode,
       hostFingerprint,
-      ...(encrypted ? { credential: { type: body.credentialType === "private_key" ? "private_key" : "password", ...encrypted } } : {}),
+      ...(encrypted ? { credential: { type: nextCredentialType, ...encrypted } } : {}),
     });
-    await addAudit({ actorUserId: user.id, action: "node.updated", targetType: "node", targetId: id, metadata: { credentialChanged: Boolean(encrypted) } });
+    await addAudit({ actorUserId: user.id, action: "node.updated", targetType: "node", targetId: id, metadata: { credentialChanged: Boolean(encrypted), sshPrivilegeMode } });
     return NextResponse.json({ node: publicNode(updated!) });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to update node");

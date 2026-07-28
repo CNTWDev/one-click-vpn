@@ -224,6 +224,13 @@ In Admin, create a node with its public address, SSH credential, and verified
 `SHA256:` host fingerprint. Then choose a deployment template and run Bootstrap.
 The Controller installs the Agent and waits for a real heartbeat.
 
+SSH authentication supports a password or an unencrypted OpenSSH/PEM private
+key. Use **root** when the SSH account has uid 0; for cloud accounts such as
+`ubuntu`, `ec2-user`, or `debian`, choose **passwordless sudo**. The Admin form
+can import a `.pem`/`.key` file and test authentication, host fingerprint, and
+remote privileges before saving. SSH access is shared by bootstrap, repair,
+status, and restart operations; VPN protocol configuration remains Agent-driven.
+
 Get the trusted fingerprint from the Edge Node's cloud console:
 
 ```bash

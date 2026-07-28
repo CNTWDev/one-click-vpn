@@ -25,6 +25,7 @@ export type DbNode = {
   ip: string;
   ssh_user: string;
   ssh_port: number;
+  ssh_privilege_mode: string;
   status: string;
   latency: string;
   users: number;
@@ -293,11 +294,11 @@ export async function insertNode(input: Omit<DbNode, "id" | "created_at" | "upda
   const id = randomUUID();
   const timestamp = now();
   await dbExec(`INSERT INTO nodes
-    (id, name, place, region_id, ip, ssh_user, ssh_port, status, latency, users, traffic, version, last_seen,
+    (id, name, place, region_id, ip, ssh_user, ssh_port, ssh_privilege_mode, status, latency, users, traffic, version, last_seen,
      credential_type, credential_ciphertext, credential_iv, credential_tag, host_fingerprint, deployment_policy, policy_version, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`, [
-    id, input.name, input.place, input.region_id, input.ip, input.ssh_user, input.ssh_port, input.status, input.latency,
-    input.users, input.traffic, input.version, input.last_seen, input.credential_type,
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`, [
+    id, input.name, input.place, input.region_id, input.ip, input.ssh_user, input.ssh_port, input.ssh_privilege_mode,
+    input.status, input.latency, input.users, input.traffic, input.version, input.last_seen, input.credential_type,
     input.credential_ciphertext, input.credential_iv, input.credential_tag, input.host_fingerprint,
     input.deployment_policy || "standard", input.policy_version ?? 1, timestamp, timestamp,
   ]);
@@ -323,18 +324,19 @@ export async function updateNodeConfig(id: string, values: {
   ip: string;
   sshUser: string;
   sshPort: number;
+  sshPrivilegeMode: string;
   hostFingerprint: string | null;
   credential?: { type: string; ciphertext: string; iv: string; tag: string };
 }): Promise<DbNode | undefined> {
   if (values.credential) {
     await dbExec(`UPDATE nodes SET name = $1, place = $2, region_id = $3, ip = $4, ssh_user = $5, ssh_port = $6,
-      host_fingerprint = $7, credential_type = $8, credential_ciphertext = $9, credential_iv = $10, credential_tag = $11, updated_at = $12 WHERE id = $13`, [
-      values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.hostFingerprint,
+      ssh_privilege_mode = $7, host_fingerprint = $8, credential_type = $9, credential_ciphertext = $10, credential_iv = $11, credential_tag = $12, updated_at = $13 WHERE id = $14`, [
+      values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.sshPrivilegeMode, values.hostFingerprint,
       values.credential.type, values.credential.ciphertext, values.credential.iv, values.credential.tag, now(), id,
     ]);
   } else {
     await dbExec(`UPDATE nodes SET name = $1, place = $2, region_id = $3, ip = $4, ssh_user = $5, ssh_port = $6,
-      host_fingerprint = $7, updated_at = $8 WHERE id = $9`, [values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.hostFingerprint, now(), id]);
+      ssh_privilege_mode = $7, host_fingerprint = $8, updated_at = $9 WHERE id = $10`, [values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.sshPrivilegeMode, values.hostFingerprint, now(), id]);
   }
   return findNode(id);
 }

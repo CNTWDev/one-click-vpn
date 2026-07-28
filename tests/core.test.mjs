@@ -73,6 +73,26 @@ test("regional profiles provide protocol-appropriate multi-node behavior", async
   assert.match(new TextDecoder().decode(archive), /SG-node-2\.conf/);
 });
 
+test("SSH access supports parsed private keys and a shared privilege boundary", async () => {
+  const migration = readFileSync(path.join(root, "scripts/migrate.mjs"), "utf8");
+  const bootstrap = readFileSync(path.join(root, "server/bootstrap.ts"), "utf8");
+  const admin = readFileSync(path.join(root, "admin-web/src/pages.tsx"), "utf8");
+  assert.match(migration, /ssh_privilege_mode TEXT NOT NULL DEFAULT 'auto'/);
+  assert.match(bootstrap, /executeRemoteCommand/);
+  assert.doesNotMatch(bootstrap, /privateKey: secret/);
+  assert.match(admin, /测试 SSH 连接/);
+  assert.match(admin, /选择 \.pem \/ \.key 文件/);
+  const [{ default: ssh2 }, remoteSsh] = await Promise.all([import("ssh2"), import("../server/remote-ssh.ts")]);
+  const privateKey = ssh2.utils.generateKeyPairSync("ed25519").private;
+  const normalized = remoteSsh.validateSshCredential("private_key", privateKey);
+  const parsed = ssh2.utils.parseKey(normalized);
+  assert.equal(parsed.isPrivateKey(), true);
+  const publicKey = `${parsed.type} ${parsed.getPublicSSH().toString("base64")}`;
+  assert.throws(() => remoteSsh.validateSshCredential("private_key", publicKey), /private key is required/i);
+  assert.equal(remoteSsh.privilegeMode(undefined, "root"), "root");
+  assert.equal(remoteSsh.privilegeMode(undefined, "ubuntu"), "sudo");
+});
+
 async function waitForServer() {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {

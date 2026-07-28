@@ -44,6 +44,8 @@ export type NodeRecord = {
   ip: string;
   ssh_user: string;
   ssh_port: number;
+  ssh_privilege_mode?: "auto" | "root" | "sudo";
+  credential_type?: "password" | "private_key";
   status: string;
   latency: string;
   users: number;
