@@ -207,7 +207,7 @@ export async function createDevice(input: {
   const timestamp = now();
   await dbExec(`INSERT INTO devices
     (id, user_id, display_name, platform, app_version, public_key, status, created_at, last_seen_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $7, $7)`, [id, input.userId, input.displayName, input.platform, input.appVersion, input.publicKey, timestamp]);
+    VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, NULL, $7)`, [id, input.userId, input.displayName, input.platform, input.appVersion, input.publicKey, timestamp]);
   return (await findDevice(id))!;
 }
 
