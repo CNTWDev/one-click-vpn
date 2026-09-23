@@ -8,6 +8,7 @@ import {
 import type { AdminUser, ControllerInfo, NodeRecord, Region } from "./types";
 import "./styles.css";
 import "./credential-usage.css";
+import "./ui-refinements.css";
 
 type PageId = "overview" | "topology" | "users" | "nodes" | "services" | "regions" | "controller" | "logs";
 const navigation: Array<{ id: PageId; icon: string; label: string; description: string }> = [

@@ -4,6 +4,7 @@ import { CredentialDashboard } from "./credential-dashboard";
 import "./styles.css";
 import "./profile-actions.css";
 import "./region-map.css";
+import "./ui-refinements.css";
 
 type User = {
   id: string;

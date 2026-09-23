@@ -26,8 +26,8 @@ export async function generateMetadata(): Promise<Metadata> {
       images: ["/og.png"],
     },
     icons: {
-      icon: "/favicon.svg",
-      shortcut: "/favicon.svg",
+      icon: "/favicon.svg?v=northstar-1",
+      shortcut: "/favicon.svg?v=northstar-1",
     },
   };
 }
