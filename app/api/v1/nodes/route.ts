@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requestAdmin } from "../../../../server/request-auth";
-import { findRegion, findRegionByLabel, insertNode, addAudit } from "../../../../server/db";
+import { findRegion, findRegionByLabel, insertNode, addAudit, NodeIdentityConflictError } from "../../../../server/db";
 import { encryptSecret } from "../../../../server/crypto";
 import { listControlNodes, listNodeProtocols, updateNodeControlMetadata } from "../../../../server/control-db";
 import { ensureDefaultNodeProtocols } from "../../../../server/control-plane";
@@ -8,7 +8,7 @@ import { queueNodeBootstrap } from "../../../../server/bootstrap";
 import { cleanText, isValidIp, isValidPort, jsonError, readJson } from "../../../../server/http";
 import { initializeVpnServices, type DeploymentTemplate } from "../../../../server/vpn-services";
 import { STANDARD_POLICY_VERSION } from "../../../../server/deployment-policy";
-import { credentialType as resolveCredentialType, privilegeMode, validateSshCredential } from "../../../../server/remote-ssh";
+import { credentialType as resolveCredentialType, discoverRemoteNode, privilegeMode, validateSshCredential } from "../../../../server/remote-ssh";
 
 export const runtime = "nodejs";
 
@@ -55,12 +55,19 @@ export async function POST(request: Request) {
     if (!name || !isValidIp(ip) || !rawSecret) return jsonError("Name, IPv4 address, and SSH credential are required");
     if (!region) return jsonError("A valid region is required");
     const secret = validateSshCredential(credentialType, rawSecret);
+    const sshPort = isValidPort(body.sshPort);
+    const discovery = await discoverRemoteNode({
+      ip, ssh_port: sshPort, ssh_user: sshUser, ssh_privilege_mode: sshPrivilegeMode,
+      credential_type: credentialType, host_fingerprint: hostFingerprint,
+    }, secret);
     const encrypted = encryptSecret(secret);
     const node = await insertNode({
-      name, place, region_id: region.id, ip, ssh_user: sshUser, ssh_port: isValidPort(body.sshPort), ssh_privilege_mode: sshPrivilegeMode, status: "provisioning",
+      name, place, region_id: region.id, ip, ssh_user: sshUser, ssh_port: sshPort, ssh_privilege_mode: sshPrivilegeMode, status: "provisioning",
       latency: "checking", users: 0, traffic: "—", version: "bootstrap queued", last_seen: "just added",
       credential_type: credentialType, credential_ciphertext: encrypted.ciphertext, credential_iv: encrypted.iv,
-      credential_tag: encrypted.tag, host_fingerprint: hostFingerprint, agent_token_hash: null,
+      credential_tag: encrypted.tag, host_fingerprint: discovery.fingerprint,
+      host_fingerprint_source: hostFingerprint ? "operator" : "ssh_tofu", node_identity: discovery.nodeIdentity,
+      identity_verified_at: new Date().toISOString(), agent_token_hash: null,
       deployment_policy: deploymentTemplate === "standard" ? "standard" : deploymentTemplate === "agent-only" ? "agent-only" : "custom",
       policy_version: deploymentTemplate === "standard" ? STANDARD_POLICY_VERSION : 0,
     });
@@ -71,10 +78,10 @@ export async function POST(request: Request) {
     });
     await ensureDefaultNodeProtocols(node.id);
     await initializeVpnServices(node.id, deploymentTemplate);
-    await addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { credentialType, sshPrivilegeMode } });
+    await addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { credentialType, sshPrivilegeMode, nodeIdentity: discovery.nodeIdentity, hostFingerprint: discovery.fingerprint, fingerprintSource: hostFingerprint ? "operator" : "ssh_tofu" } });
     const actionId = await queueNodeBootstrap(node.id, user.id);
     return NextResponse.json({ node: { id: node.id, name: node.name, place: node.place, ip: node.ip, status: node.status, version: node.version }, actionId }, { status: 201 });
   } catch (error) {
-    return jsonError(error instanceof Error ? error.message : "Unable to create node");
+    return jsonError(error instanceof Error ? error.message : "Unable to create node", error instanceof NodeIdentityConflictError ? 409 : 400);
   }
 }

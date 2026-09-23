@@ -1,6 +1,7 @@
-import { createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import ssh2, { type ConnectConfig } from "ssh2";
 import type { DbNode } from "./db";
+import { fingerprintForms, fingerprintsEqual, normalizeFingerprint } from "./ssh-fingerprint.js";
 
 const { Client, utils } = ssh2;
 
@@ -13,22 +14,7 @@ function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
-function fingerprintForms(key: Buffer): { standard: string; hex: string } {
-  const digest = createHash("sha256").update(key).digest();
-  return {
-    standard: digest.toString("base64").replace(/=+$/, "").toLowerCase(),
-    hex: digest.toString("hex").toLowerCase(),
-  };
-}
-
-export function normalizeFingerprint(value: string): string {
-  const input = value.trim();
-  const sha256 = input.match(/SHA256:([A-Za-z0-9+/]+={0,2})/i);
-  if (sha256) return sha256[1].replace(/=+$/, "").toLowerCase();
-  const hex = input.match(/(?:^|\s)([a-f0-9]{64})(?:\s|$)/i);
-  if (hex) return hex[1].toLowerCase();
-  return input.replace(/^sha256:/i, "").replace(/=+$/, "").toLowerCase();
-}
+export { normalizeFingerprint } from "./ssh-fingerprint.js";
 
 export function credentialType(value: unknown, secret = ""): SshCredentialType {
   if (value === "private_key") return "private_key";
@@ -115,7 +101,7 @@ export function executeRemoteCommand(
       });
     });
     client.on("error", (error) => {
-      if (expected && fingerprint && expected !== normalizeFingerprint(fingerprint)) {
+      if (expected && fingerprint && !fingerprintsEqual(expectedFingerprint!, fingerprint)) {
         finish(new Error(`SSH host fingerprint mismatch. Expected ${expectedFingerprint}; received ${fingerprint}. Verify the node fingerprint from a trusted console.`));
         return;
       }
@@ -124,7 +110,7 @@ export function executeRemoteCommand(
     const verifier = ((key: Buffer) => {
       const forms = fingerprintForms(key);
       fingerprint = `SHA256:${forms.standard}`;
-      return !expected || expected === forms.standard || expected === forms.hex;
+      return !expected || fingerprintsEqual(expectedFingerprint!, forms.standard) || fingerprintsEqual(expectedFingerprint!, forms.hex);
     }) as NonNullable<ConnectConfig["hostVerifier"]>;
     client.connect({ ...connectConfig(node, secret), hostVerifier: verifier });
   });
@@ -134,4 +120,35 @@ export async function testRemoteAccess(node: RemoteNodeAccess, secret: string): 
   const result = await executeRemoteCommand(node, secret, "printf 'NORTHSTAR_SSH_TEST_OK\\n'; id -un; uname -srm", undefined, 30_000);
   if (!result.output.includes("NORTHSTAR_SSH_TEST_OK")) throw new Error("SSH connection completed without the expected verification response");
   return { fingerprint: result.fingerprint, privilegeMode: privilegeMode(node.ssh_privilege_mode, node.ssh_user), output: result.output };
+}
+
+const nodeIdentityPattern = /^nsn_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+export async function discoverRemoteNode(
+  node: RemoteNodeAccess,
+  secret: string,
+): Promise<{ fingerprint: string; nodeIdentity: string; privilegeMode: SshPrivilegeMode }> {
+  const candidate = `nsn_${randomUUID()}`;
+  const command = `set -eu
+identity_dir=/var/lib/northstar
+identity_file="$identity_dir/node-id"
+install -d -m 0700 "$identity_dir"
+if [ ! -s "$identity_file" ]; then
+  (set -C; umask 077; printf '%s\\n' ${shellQuote(candidate)} > "$identity_file") 2>/dev/null || true
+fi
+chown root:root "$identity_file"
+chmod 0600 "$identity_file"
+identity="$(head -n 1 "$identity_file")"
+printf 'NORTHSTAR_NODE_ID=%s\\n' "$identity"`;
+  const result = await executeRemoteCommand(node, secret, command, undefined, 30_000);
+  const match = result.output.match(/(?:^|\n)NORTHSTAR_NODE_ID=(nsn_[0-9a-f-]+)(?:\n|$)/i);
+  const nodeIdentity = match?.[1]?.toLowerCase() || "";
+  if (!nodeIdentityPattern.test(nodeIdentity)) {
+    throw new Error("The remote Northstar node identity is missing or invalid. Inspect /var/lib/northstar/node-id before retrying.");
+  }
+  return {
+    fingerprint: result.fingerprint,
+    nodeIdentity,
+    privilegeMode: privilegeMode(node.ssh_privilege_mode, node.ssh_user),
+  };
 }

@@ -53,6 +53,9 @@ export type NodeRecord = {
   version: string;
   last_seen: string;
   host_fingerprint?: string | null;
+  host_fingerprint_source?: "legacy" | "operator" | "ssh_tofu" | null;
+  node_identity?: string | null;
+  identity_verified_at?: string | null;
   deployment_policy?: string;
   policy_version?: number;
   metrics?: NodeMetrics | null;

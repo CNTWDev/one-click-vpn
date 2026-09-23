@@ -147,7 +147,8 @@ function actionAdvice(action?: NodeAction): string | null {
   if (!action || action.status !== "failed") return null;
   const text = `${action.error}\n${action.output}`.toLowerCase();
   if (text.includes("401") || text.includes("unauthorized") || text.includes("invalid agent credentials")) return "The Agent identity no longer matches the Controller. Use Reinstall / repair Agent once to rotate and synchronize the node credential over verified SSH.";
-  if (text.includes("fingerprint")) return "Verify the SSH host fingerprint from the provider console, then update the node configuration and retry.";
+  if (text.includes("fingerprint") || text.includes("host key")) return "The server SSH identity changed or is already assigned to another node. Confirm whether this is a host-key rotation, rebuilt server, or cloned image before retrying.";
+  if (text.includes("node identity")) return "The persistent server identity does not match this node. Use the existing node record or investigate whether the server was rebuilt or cloned.";
   if (text.includes("heartbeat") || text.includes("controller health preflight")) return "The node could not reach the public Controller URL. Check DNS, HTTPS certificate, outbound firewall, and NORTHSTAR_PUBLIC_ORIGIN.";
   if (text.includes("permission denied") || text.includes("authentication failed")) return "Check the SSH username and credential in the node configuration, then retry the operation.";
   if (text.includes("wireguard-tools") || text.includes("openvpn")) return "Review the package-manager output below. This distribution may need a supported repository or an Ubuntu/Debian image.";
@@ -235,7 +236,6 @@ const navItems = [
   ["Audit", "◌"],
 ];
 
-const fingerprintCommand = "sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256";
 
 function StatusPill({ status }: { status: NodeStatus }) {
   const labels = {
@@ -414,12 +414,10 @@ export default function Home() {
   const [pendingFleetConfirmation, setPendingFleetConfirmation] = useState<PendingFleetConfirmation | null>(null);
   const [selectedNode, setSelectedNode] = useState<Node>(initialNodes[0]);
   const [notice, setNotice] = useState("All systems nominal");
-  const [form, setForm] = useState({ name: "", ip: "", user: "root", secret: "", regionId: "tokyo-jp", hostFingerprint: "", deploymentTemplate: "standard" });
+  const [form, setForm] = useState({ name: "", ip: "", user: "root", secret: "", regionId: "tokyo-jp", deploymentTemplate: "standard" });
   const [regionForm, setRegionForm] = useState({ name: "", country: "", code: "" });
   const [editingRegionId, setEditingRegionId] = useState<string | null>(null);
   const [regionBusy, setRegionBusy] = useState(false);
-  const [showFingerprintGuide, setShowFingerprintGuide] = useState(false);
-  const [fingerprintCommandCopied, setFingerprintCommandCopied] = useState(false);
   const [accessDevices, setAccessDevices] = useState<AccessDevice[]>([]);
   const [accessProfiles, setAccessProfiles] = useState<AccessProfile[]>([]);
   const [accessRegionId, setAccessRegionId] = useState("");
@@ -617,14 +615,14 @@ export default function Home() {
   function openAddNode() {
     setEditingNodeId(null);
     setDeployError("");
-    setForm({ name: "", ip: "", user: "root", secret: "", regionId: regions[0]?.id || "", hostFingerprint: "", deploymentTemplate: "standard" });
+    setForm({ name: "", ip: "", user: "root", secret: "", regionId: regions[0]?.id || "", deploymentTemplate: "standard" });
     setShowDeploy(true);
   }
 
   function openEditNode(node: Node) {
     setEditingNodeId(node.id);
     setDeployError("");
-    setForm({ name: node.name, ip: node.ip, user: node.sshUser || "root", secret: "", regionId: node.regionId, hostFingerprint: node.hostFingerprint || "", deploymentTemplate: "standard" });
+    setForm({ name: node.name, ip: node.ip, user: node.sshUser || "root", secret: "", regionId: node.regionId, deploymentTemplate: "standard" });
     setShowDeploy(true);
   }
 
@@ -793,7 +791,7 @@ export default function Home() {
     setDeploying(true);
     setNotice(editing ? "Saving node configuration…" : "Verifying SSH host key and preparing a signed deployment task…");
     const response = await fetch(editing ? `/api/nodes/${editingNodeId}` : "/api/nodes", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-      name: form.name, ip: form.ip, regionId: form.regionId, sshUser: form.user, secret: form.secret, hostFingerprint: form.hostFingerprint, deploymentTemplate: form.deploymentTemplate,
+      name: form.name, ip: form.ip, regionId: form.regionId, sshUser: form.user, secret: form.secret, deploymentTemplate: form.deploymentTemplate,
     }) });
     const payload = await response.json().catch(() => ({})) as { error?: string; node?: Node };
     setDeploying(false);
@@ -808,18 +806,8 @@ export default function Home() {
     setShowDeploy(false);
     setEditingNodeId(null);
     setDeployError("");
-    setForm({ name: "", ip: "", user: "root", secret: "", regionId: regions[0]?.id || "", hostFingerprint: "", deploymentTemplate: "standard" });
+    setForm({ name: "", ip: "", user: "root", secret: "", regionId: regions[0]?.id || "", deploymentTemplate: "standard" });
     setNotice(editing ? `${payload.node.name} configuration saved.` : `${payload.node.name} is queued for secure bootstrap. The credential is encrypted server-side.`);
-  }
-
-  async function copyFingerprintCommand() {
-    try {
-      await navigator.clipboard.writeText(fingerprintCommand);
-      setFingerprintCommandCopied(true);
-      window.setTimeout(() => setFingerprintCommandCopied(false), 1800);
-    } catch {
-      setNotice("Clipboard access is unavailable; please copy the command manually.");
-    }
   }
 
   async function saveRegion(event: FormEvent<HTMLFormElement>) {
@@ -1115,7 +1103,7 @@ export default function Home() {
               <div className="section-title"><div><p>SECURITY POSTURE</p><h2>Recovery, without exposure.</h2></div><button className="kebab" type="button" aria-label="More security options">•••</button></div>
               <div className="security-seal"><div className="seal"><div>⌁</div></div><span>SEALED</span></div>
               <p className="security-copy">Emergency SSH credentials are encrypted per node and never exposed in the browser.</p>
-              <div className="security-facts"><div><span>SSH fingerprints</span><b>Verified at bootstrap</b></div><div><span>Latest backup</span><b>Controller managed</b></div></div>
+              <div className="security-facts"><div><span>Server identity</span><b>Auto-discovered & pinned</b></div><div><span>Latest backup</span><b>Controller managed</b></div></div>
               <button className="secondary-button" type="button" onClick={() => setNotice("Recovery vault opened in read-only audit mode.")}>Open recovery vault <span>→</span></button>
             </article>
           </section>
@@ -1203,11 +1191,10 @@ export default function Home() {
               {!editingNodeId && <label>Deployment template<select value={form.deploymentTemplate} onChange={(event) => setForm({ ...form, deploymentTemplate: event.target.value })}><option value="standard">Standard edge · managed protocol set</option><option value="wireguard">WireGuard only</option><option value="openvpn">OpenVPN only</option><option value="agent-only">Agent only · no VPN listener</option></select></label>}
               <div className="field-pair"><label>SSH user<input autoComplete="username" value={form.user} onChange={(event) => setForm({ ...form, user: event.target.value })} /></label><label>SSH password or private key<input type="password" autoComplete="current-password" placeholder={editingNodeId ? "Leave blank to keep existing credential" : "Encrypted on the controller"} value={form.secret} onChange={(event) => setForm({ ...form, secret: event.target.value })} /></label></div>
               <div className="fingerprint-field">
-                <div className="fingerprint-label"><label htmlFor="host-fingerprint">SSH host fingerprint</label><button type="button" className="help-toggle" onClick={() => setShowFingerprintGuide((current) => !current)} aria-expanded={showFingerprintGuide}>{showFingerprintGuide ? "收起" : "如何获取？"}</button></div>
-                <input id="host-fingerprint" placeholder="SHA256:… (required in production)" value={form.hostFingerprint} onChange={(event) => setForm({ ...form, hostFingerprint: event.target.value })} />
-                {showFingerprintGuide && <aside className="fingerprint-guide"><b>在目标 VPN 节点上获取</b><p>请先通过云厂商控制台或已确认安全的 SSH 会话登录目标服务器，然后执行：</p><div className="fingerprint-command"><code>{fingerprintCommand}</code><button type="button" onClick={() => void copyFingerprintCommand()}>{fingerprintCommandCopied ? "已复制" : "复制命令"}</button></div><p>可以粘贴整行输出，系统会自动提取 <strong>SHA256:</strong> 指纹。如果没有 ed25519 主机密钥，可改用 <code>/etc/ssh/ssh_host_rsa_key.pub</code>。</p><small>不要直接把本次首次连接得到的指纹自动当作可信值；请通过云控制台或其他可信渠道核对。</small></aside>}
+                <div className="fingerprint-label"><label>Automatic server identity</label></div>
+                <aside className="fingerprint-guide"><b>No manual fingerprint step</b><p>The Controller reads and pins the SSH host key, then reads or creates a persistent Northstar node ID on the server. Duplicate identities, reused host keys, and duplicate SSH endpoints stop deployment.</p><small>The first connection uses TOFU. Every later deployment and repair must match both saved identity signals.</small></aside>
               </div>
-              <p className="form-note"><span>⌑</span> The controller verifies the host key and encrypts this credential with the server master key. It is never returned to the browser.</p>
+              <p className="form-note"><span>⌑</span> The Controller discovers the server identity, checks for duplicates, and encrypts the SSH credential. It is never returned to the browser.</p>
               {deployError && <p className="form-error" role="alert">{deployError}</p>}
               <div className="modal-actions"><button type="button" className="cancel" onClick={() => setShowDeploy(false)}>Cancel</button><button className="primary-button" type="submit" disabled={deploying}>{deploying ? (editingNodeId ? "Saving…" : "Creating signed task…") : (editingNodeId ? "Save changes" : "Verify & deploy")}<span>→</span></button></div>
             </form>

@@ -3,6 +3,7 @@ import path from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { promisify } from "node:util";
 import test, { after, before } from "node:test";
 
@@ -91,6 +92,27 @@ test("SSH access supports parsed private keys and a shared privilege boundary", 
   assert.throws(() => remoteSsh.validateSshCredential("private_key", publicKey), /private key is required/i);
   assert.equal(remoteSsh.privilegeMode(undefined, "root"), "root");
   assert.equal(remoteSsh.privilegeMode(undefined, "ubuntu"), "sudo");
+});
+
+test("node onboarding discovers persistent identity and preserves canonical SSH fingerprints", async () => {
+  const migration = readFileSync(path.join(root, "scripts/migrate.mjs"), "utf8");
+  const bootstrap = readFileSync(path.join(root, "server/bootstrap.ts"), "utf8");
+  const createRoute = readFileSync(path.join(root, "app/api/nodes/route.ts"), "utf8");
+  const admin = readFileSync(path.join(root, "admin-web/src/pages.tsx"), "utf8");
+  const fingerprint = await import("../server/ssh-fingerprint.js");
+  const key = Buffer.from("case-sensitive-host-key");
+  const expected = createHash("sha256").update(key).digest("base64").replace(/=+$/, "");
+  assert.equal(fingerprint.fingerprintForms(key).standard, expected);
+  assert.equal(fingerprint.normalizeFingerprint("SHA256:AbCDef012+/="), "AbCDef012+/");
+  assert.equal(fingerprint.fingerprintsEqual("SHA256:AbCDef", "SHA256:aBcDef"), false);
+  assert.match(migration, /node_identity TEXT/);
+  assert.match(migration, /nodes_node_identity_unique_idx/);
+  assert.match(createRoute, /discoverRemoteNode/);
+  assert.ok(createRoute.indexOf("await discoverRemoteNode") < createRoute.indexOf("await insertNode"));
+  assert.match(bootstrap, /bindNodeIdentity/);
+  assert.match(readFileSync(path.join(root, "server/remote-ssh.ts"), "utf8"), /\/var\/lib\/northstar\/node-id/);
+  assert.match(admin, /无需手工生成或填写指纹/);
+  assert.doesNotMatch(admin, /SSH 主机指纹（生产环境必填）/);
 });
 
 async function waitForServer() {

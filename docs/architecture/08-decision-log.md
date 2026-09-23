@@ -79,3 +79,17 @@ VPN Adapter 不增加密码/私钥分支，避免新增 VPN 协议时复制运�
 
 当前版本拒绝带口令私钥和交互式 sudo 密码。未来如果增加 KMS、SSH
 Certificate、跳板机或临时云凭据，应扩展连接层，不修改协议层。
+
+## ADR-0011：节点身份与 SSH host key 分离并自动发现
+
+状态：Accepted
+日期：2026-09-23
+
+节点添加不再要求运维手工生成和复制 SSH 指纹。Controller 在首次认证时读取
+握手 host key，并在远端读取或原子创建 `/var/lib/northstar/node-id`。持久节点
+ID 用于判断是否是同一台受管机器；SSH host key 用于固定远端 SSH 身份。两者
+连同 SSH endpoint 在数据库事务内检查冲突，后续部署重新验证后才执行变更。
+
+默认首次连接采用 TOFU。若调用方掌握云控制台、云 API 或其他带外可信指纹，
+可在 API 请求中提供 `hostFingerprint`，使首次认证也执行严格匹配。host key
+轮换、节点 ID 变化和镜像复制均视为需要人工处置的身份冲突，不静默覆盖。

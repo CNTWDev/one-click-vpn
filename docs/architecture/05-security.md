@@ -63,7 +63,10 @@ SSH 只用于：
 
 要求：
 
-- host fingerprint 校验；
+- 首次添加自动采集并固定 SSH host fingerprint，后续连接强制校验；
+- 需要抵御首次连接中间人时，由调用方通过 `hostFingerprint` 提供带外可信值；
+- `/var/lib/northstar/node-id` 作为持久节点身份，和 SSH host key 分开建模；
+- 节点 ID、SSH host key、SSH endpoint 在创建事务内去重，冲突时停止部署；
 - 短期凭据；
 - 优先使用密钥而不是密码；
 - 密码和私钥只在统一 SSH 连接层决定认证方式，不进入 Agent 或 VPN Adapter；

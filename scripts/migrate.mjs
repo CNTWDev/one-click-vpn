@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   version TEXT NOT NULL DEFAULT 'bootstrap pending', last_seen TEXT NOT NULL DEFAULT 'never',
   last_heartbeat_at TEXT, credential_type TEXT NOT NULL, credential_ciphertext TEXT NOT NULL,
   credential_iv TEXT NOT NULL, credential_tag TEXT NOT NULL, host_fingerprint TEXT,
+  host_fingerprint_source TEXT NOT NULL DEFAULT 'legacy', node_identity TEXT, identity_verified_at TEXT,
   agent_token_hash TEXT, provider TEXT NOT NULL DEFAULT 'unknown', region TEXT NOT NULL DEFAULT '',
   public_endpoint TEXT, server_public_key TEXT, agent_capabilities_json TEXT NOT NULL DEFAULT '{}',
   metrics_json TEXT, deployment_policy TEXT NOT NULL DEFAULT 'standard', policy_version INTEGER NOT NULL DEFAULT 1,
@@ -49,6 +50,10 @@ ALTER TABLE nodes ADD COLUMN IF NOT EXISTS metrics_json TEXT;
 ALTER TABLE nodes ADD COLUMN IF NOT EXISTS ssh_privilege_mode TEXT NOT NULL DEFAULT 'auto';
 ALTER TABLE nodes ADD COLUMN IF NOT EXISTS deployment_policy TEXT NOT NULL DEFAULT 'standard';
 ALTER TABLE nodes ADD COLUMN IF NOT EXISTS policy_version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE nodes ADD COLUMN IF NOT EXISTS host_fingerprint_source TEXT NOT NULL DEFAULT 'legacy';
+ALTER TABLE nodes ADD COLUMN IF NOT EXISTS node_identity TEXT;
+ALTER TABLE nodes ADD COLUMN IF NOT EXISTS identity_verified_at TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS nodes_node_identity_unique_idx ON nodes(node_identity) WHERE node_identity IS NOT NULL;
 CREATE INDEX IF NOT EXISTS nodes_region_idx ON nodes(region_id);
 CREATE TABLE IF NOT EXISTS regions (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, country TEXT NOT NULL, code TEXT NOT NULL,

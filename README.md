@@ -220,26 +220,21 @@ sudo ./scripts/reset-admin-password.sh
 
 ## Edge Node bootstrap
 
-In Admin, create a node with its public address, SSH credential, and verified
-`SHA256:` host fingerprint. Then choose a deployment template and run Bootstrap.
-The Controller installs the Agent and waits for a real heartbeat.
+In Admin, create a node with its public address and SSH credential, then choose
+a deployment template. Before creating the database record, the Controller logs
+in, reads and pins the negotiated SSH host key, and reads or atomically creates
+`/var/lib/northstar/node-id`. The Controller rejects duplicate node identities,
+reused SSH host keys, and reused SSH endpoints before it queues bootstrap.
 
 SSH authentication supports a password or an unencrypted OpenSSH/PEM private
 key. Use **root** when the SSH account has uid 0; for cloud accounts such as
 `ubuntu`, `ec2-user`, or `debian`, choose **passwordless sudo**. The Admin form
-can import a `.pem`/`.key` file and test authentication, host fingerprint, and
-remote privileges before saving. SSH access is shared by bootstrap, repair,
-status, and restart operations; VPN protocol configuration remains Agent-driven.
-
-Get the trusted fingerprint from the Edge Node's cloud console:
-
-```bash
-sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256
-```
-
-The Admin node form includes this command, a copy button, and a remote
-`ssh-keyscan` command generated from the entered IP and SSH port. Always compare
-remote scan output with the trusted console value before the first deployment.
+can import a `.pem`/`.key` file and test authentication, the discovered host
+fingerprint, and remote privileges before saving. The first connection uses
+trust on first use (TOFU); every bootstrap, repair, status, and restart after
+that must match the pinned key. API callers with an independently trusted host
+fingerprint may still supply `hostFingerprint` to require strict verification
+on the first connection. VPN protocol configuration remains Agent-driven.
 
 On the Edge Node:
 

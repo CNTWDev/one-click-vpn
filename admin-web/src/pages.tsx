@@ -181,11 +181,10 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
 
 type NodeForm = {
   name: string; ip: string; regionId: string; sshUser: string; sshPort: string; secret: string;
-  credentialType: "password" | "private_key"; sshPrivilegeMode: "root" | "sudo"; hostFingerprint: string; deploymentTemplate: string;
+  credentialType: "password" | "private_key"; sshPrivilegeMode: "root" | "sudo"; deploymentTemplate: string;
 };
 
-const blankNodeForm: NodeForm = { name: "", ip: "", regionId: "", sshUser: "root", sshPort: "22", secret: "", credentialType: "password", sshPrivilegeMode: "root", hostFingerprint: "", deploymentTemplate: "standard" };
-const localFingerprintCommand = "sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256";
+const blankNodeForm: NodeForm = { name: "", ip: "", regionId: "", sshUser: "root", sshPort: "22", secret: "", credentialType: "password", sshPrivilegeMode: "root", deploymentTemplate: "standard" };
 
 export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; regions: Region[]; onRefresh: () => Promise<void> }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -198,34 +197,17 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
   const [diagnosticNode, setDiagnosticNode] = useState<NodeRecord | null>(null);
   const [diagnostics, setDiagnostics] = useState<NodeDiagnostics | null>(null);
   const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
-  const [showFingerprintGuide, setShowFingerprintGuide] = useState(true);
-  const [copiedFingerprintCommand, setCopiedFingerprintCommand] = useState<"local" | "remote" | "">("");
   const [testedFingerprint, setTestedFingerprint] = useState("");
 
   function openCreate() {
-    setEditing(null); setForm({ ...blankNodeForm, regionId: regions[0]?.id || "" }); setShowFingerprintGuide(true); setCopiedFingerprintCommand(""); setTestedFingerprint(""); setShowForm(true);
+    setEditing(null); setForm({ ...blankNodeForm, regionId: regions[0]?.id || "" }); setTestedFingerprint(""); setShowForm(true);
   }
 
   function openEdit(node: NodeRecord) {
     setEditing(node);
     const sshUser = node.ssh_user || "root";
-    setForm({ name: node.name, ip: node.ip, regionId: node.region_id || "", sshUser, sshPort: String(node.ssh_port || 22), secret: "", credentialType: node.credential_type || "password", sshPrivilegeMode: node.ssh_privilege_mode === "sudo" || (node.ssh_privilege_mode === "auto" && sshUser !== "root") ? "sudo" : "root", hostFingerprint: node.host_fingerprint || "", deploymentTemplate: node.deployment_policy || "standard" });
-    setShowFingerprintGuide(false); setCopiedFingerprintCommand(""); setTestedFingerprint(""); setShowForm(true);
-  }
-
-  const safeFingerprintHost = /^[A-Za-z0-9.-]+$/.test(form.ip.trim()) ? form.ip.trim() : "";
-  const safeFingerprintPort = /^\d{1,5}$/.test(form.sshPort) && Number(form.sshPort) >= 1 && Number(form.sshPort) <= 65535 ? form.sshPort : "22";
-  const remoteFingerprintCommand = safeFingerprintHost ? `ssh-keyscan -p ${safeFingerprintPort} -t ed25519 ${safeFingerprintHost} 2>/dev/null | ssh-keygen -lf - -E sha256` : "";
-
-  async function copyFingerprintCommand(kind: "local" | "remote", command: string) {
-    if (!command) return;
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopiedFingerprintCommand(kind);
-      window.setTimeout(() => setCopiedFingerprintCommand(""), 1_800);
-    } catch {
-      setNotice({ tone: "error", message: "浏览器无法访问剪贴板，请手动选中命令复制。" });
-    }
+    setForm({ name: node.name, ip: node.ip, regionId: node.region_id || "", sshUser, sshPort: String(node.ssh_port || 22), secret: "", credentialType: node.credential_type || "password", sshPrivilegeMode: node.ssh_privilege_mode === "sudo" || (node.ssh_privilege_mode === "auto" && sshUser !== "root") ? "sudo" : "root", deploymentTemplate: node.deployment_policy || "standard" });
+    setTestedFingerprint(""); setShowForm(true);
   }
 
   async function saveNode(event: FormEvent) {
@@ -257,7 +239,7 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
         body: JSON.stringify({ ...form, nodeId: editing?.id, sshPort: Number(form.sshPort) }),
       });
       setTestedFingerprint(result.fingerprint);
-      setNotice({ tone: "success", message: `SSH 连接与${result.sshPrivilegeMode === "sudo" ? "免密 sudo" : "root 权限"}验证通过。` });
+      setNotice({ tone: "success", message: `SSH 连接与${result.sshPrivilegeMode === "sudo" ? "免密 sudo" : "root 权限"}验证通过，主机指纹已自动读取。` });
     } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
     finally { setBusy(""); }
   }
@@ -341,15 +323,15 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
     {showForm && <Modal title={editing ? `编辑 ${editing.name}` : "添加节点"} description={editing ? "留空凭据表示保持当前 SSH 凭据。" : "节点会先验证 SSH 主机，再加入安全部署队列。"} onClose={() => setShowForm(false)}>
       <form className="form-grid" onSubmit={saveNode}>
         <label className="span-2">节点名称<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Tokyo Edge" /></label>
-        <label>公网 IPv4<input required value={form.ip} onChange={(event) => setForm({ ...form, ip: event.target.value })} placeholder="203.0.113.10" /></label>
+        <label>公网 IPv4<input required value={form.ip} onChange={(event) => { setForm({ ...form, ip: event.target.value }); setTestedFingerprint(""); }} placeholder="203.0.113.10" /></label>
         <label>区域<select required value={form.regionId} onChange={(event) => setForm({ ...form, regionId: event.target.value })}><option value="">选择区域</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} · {region.country}</option>)}</select></label>
-        <label>SSH 用户<input required value={form.sshUser} onChange={(event) => setForm({ ...form, sshUser: event.target.value })} /></label>
-        <label>SSH 端口<input required type="number" min="1" max="65535" value={form.sshPort} onChange={(event) => setForm({ ...form, sshPort: event.target.value })} /></label>
+        <label>SSH 用户<input required value={form.sshUser} onChange={(event) => { setForm({ ...form, sshUser: event.target.value }); setTestedFingerprint(""); }} /></label>
+        <label>SSH 端口<input required type="number" min="1" max="65535" value={form.sshPort} onChange={(event) => { setForm({ ...form, sshPort: event.target.value }); setTestedFingerprint(""); }} /></label>
         <label>凭据类型<select value={form.credentialType} onChange={(event) => { setForm({ ...form, credentialType: event.target.value as NodeForm["credentialType"], secret: "" }); setTestedFingerprint(""); }}><option value="password">SSH 密码</option><option value="private_key">SSH 私钥</option></select></label>
         <label>远程权限<select value={form.sshPrivilegeMode} onChange={(event) => { setForm({ ...form, sshPrivilegeMode: event.target.value as NodeForm["sshPrivilegeMode"] }); setTestedFingerprint(""); }}><option value="root">直接使用 root</option><option value="sudo">非 root + 免密 sudo</option></select><small>{form.sshPrivilegeMode === "sudo" ? "适合 ubuntu、ec2-user、debian 等云主机账号。" : "SSH 登录账号必须具有 uid 0。"}</small></label>
         {!editing && <label className="span-2">部署模板<select value={form.deploymentTemplate} onChange={(event) => setForm({ ...form, deploymentTemplate: event.target.value })}><option value="standard">Standard（推荐）</option><option value="wireguard">仅 WireGuard</option><option value="openvpn">仅 OpenVPN</option><option value="agent-only">仅 Agent</option></select></label>}
         <label className="span-2 credential-input">{editing ? "新凭据（可留空）" : "SSH 凭据"}{form.credentialType === "private_key" && <span className="credential-file"><input type="file" accept=".pem,.key,text/plain" onChange={(event) => void loadPrivateKey(event.target.files?.[0])} /><em>选择 .pem / .key 文件</em></span>}<textarea required={!editing} rows={form.credentialType === "private_key" ? 7 : 2} value={form.secret} onChange={(event) => { setForm({ ...form, secret: event.target.value }); setTestedFingerprint(""); }} autoComplete="new-password" placeholder={form.credentialType === "private_key" ? "粘贴 OpenSSH、RSA、EC 或 PKCS#8 私钥" : "输入 SSH 密码"} /><small>{form.credentialType === "private_key" ? "私钥会在 Controller 使用主密钥加密；暂不支持带口令的私钥。" : "密码会加密保存，仅用于节点安装和应急修复。"}</small></label>
-        <div className="fingerprint-field span-2"><div className="fingerprint-label"><label htmlFor="host-fingerprint">SSH 主机指纹（生产环境必填）</label><button type="button" className="help-toggle" onClick={() => setShowFingerprintGuide((current) => !current)} aria-expanded={showFingerprintGuide}>{showFingerprintGuide ? "收起说明" : "如何获取？"}</button></div><input id="host-fingerprint" required value={form.hostFingerprint} onChange={(event) => { setForm({ ...form, hostFingerprint: event.target.value }); setTestedFingerprint(""); }} placeholder="SHA256:…" />{testedFingerprint && <div className="ssh-test-result"><b>连接返回指纹</b><code>{testedFingerprint}</code><small>{form.hostFingerprint ? "已使用填写的主机指纹完成校验。" : "尚未锁定主机身份，请与云厂商控制台核对后填入上方。"}</small></div>}{showFingerprintGuide && <aside className="fingerprint-guide"><b>推荐：在目标节点的可信控制台获取</b><p>通过云厂商控制台登录目标 VPN 节点，执行下面的命令：</p><div className="fingerprint-command"><code>{localFingerprintCommand}</code><button type="button" onClick={() => void copyFingerprintCommand("local", localFingerprintCommand)}>{copiedFingerprintCommand === "local" ? "已复制" : "复制命令"}</button></div><p>可以把整行输出直接粘贴到上面的输入框，系统会自动提取其中的 <strong>SHA256:</strong> 指纹。</p><b>快捷读取：从 Controller 或自己的终端执行</b>{remoteFingerprintCommand ? <div className="fingerprint-command"><code>{remoteFingerprintCommand}</code><button type="button" onClick={() => void copyFingerprintCommand("remote", remoteFingerprintCommand)}>{copiedFingerprintCommand === "remote" ? "已复制" : "复制命令"}</button></div> : <p>填写公网 IPv4 后，这里会自动生成带 IP 和 SSH 端口的命令。</p>}<small><code>ssh-keyscan</code> 只能读取指纹，不能证明主机身份。首次添加节点时，请与云厂商控制台里的本机指纹核对。如果没有 Ed25519 主机密钥，可将文件名改为 <code>/etc/ssh/ssh_host_rsa_key.pub</code>。</small></aside>}</div>
+        <div className="fingerprint-field span-2"><div className="fingerprint-label"><label>服务器身份自动识别</label></div><aside className="fingerprint-guide"><b>无需手工生成或填写指纹</b><p>添加时，Controller 会通过 SSH 自动读取并固定主机公钥，同时在服务器上读取或生成持久的 Northstar 节点 ID。发现重复节点、复用的 SSH host key 或重复 IP/端口时会停止部署。</p><small>首次连接采用 TOFU；后续部署和修复必须匹配已固定的主机指纹与节点 ID。</small></aside>{testedFingerprint && <div className="ssh-test-result"><b>本次连接读取到的 SSH 指纹</b><code>{testedFingerprint}</code><small>保存节点时会重新连接、登记节点 ID，并执行去重检查。</small></div>}</div>
         <div className="form-actions span-2"><button type="button" className="button ghost" disabled={Boolean(busy)} onClick={() => setShowForm(false)}>取消</button><button type="button" className="button ghost" disabled={Boolean(busy) || !form.ip || !form.sshUser || (!editing && !form.secret)} onClick={() => void testSshConnection()}>{busy === "test-ssh" ? "测试中…" : "测试 SSH 连接"}</button><button className="button primary" disabled={Boolean(busy)}>{busy === "save-node" ? "保存中…" : editing ? "保存配置" : "添加并部署"}</button></div>
       </form>
     </Modal>}
@@ -373,7 +355,7 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
           <div className="job-progress"><i style={{ width: `${Math.min(Math.max(diagnostics.actions[0].progress || 0, 0), 100)}%` }} /><span>{diagnostics.actions[0].progress || 0}%</span></div>
           {diagnostics.actions[0].error && <pre className="job-error">{diagnostics.actions[0].error}</pre>}
         </section> : <InlineNotice notice={{ tone: "info", message: "该节点还没有部署或运维任务记录。" }} />}
-        <div className="diagnostic-cards"><article><small>节点</small><b><Pill value={diagnostics.connectivity?.status || diagnosticNode.status} /></b><span>{diagnosticNode.ip}</span></article><article><small>Agent 通道</small><b>{diagnostics.connectivity?.agentChannel || "unknown"}</b><span>{formatTime(diagnostics.connectivity?.lastAuthenticatedHeartbeat)}</span></article><article><small>防火墙</small><b>{diagnostics.connectivity?.firewall.manager || "unknown"}</b><span>{diagnostics.connectivity?.firewall.inputPolicy || "—"}</span></article><article><small>资源</small><b>{diagnosticNode.metrics ? `CPU ${diagnosticNode.metrics.cpuPercent.toFixed(0)}%` : "暂无指标"}</b><span>{diagnosticNode.metrics ? `内存 ${diagnosticNode.metrics.memory.percent.toFixed(0)}% · 网络 ↓ ${formatBytes(diagnosticNode.metrics.network.rxBytesPerSecond)}/s` : "等待心跳上报"}</span></article></div>
+        <div className="diagnostic-cards"><article><small>节点身份</small><b><Pill value={diagnostics.connectivity?.status || diagnosticNode.status} /></b><span title={diagnosticNode.node_identity || undefined}>{diagnosticNode.ip}{diagnosticNode.node_identity ? ` · ID …${diagnosticNode.node_identity.slice(-8)}` : " · 等待首次身份绑定"}</span></article><article><small>Agent 通道</small><b>{diagnostics.connectivity?.agentChannel || "unknown"}</b><span>{formatTime(diagnostics.connectivity?.lastAuthenticatedHeartbeat)}</span></article><article><small>防火墙</small><b>{diagnostics.connectivity?.firewall.manager || "unknown"}</b><span>{diagnostics.connectivity?.firewall.inputPolicy || "—"}</span></article><article><small>资源</small><b>{diagnosticNode.metrics ? `CPU ${diagnosticNode.metrics.cpuPercent.toFixed(0)}%` : "暂无指标"}</b><span>{diagnosticNode.metrics ? `内存 ${diagnosticNode.metrics.memory.percent.toFixed(0)}% · 网络 ↓ ${formatBytes(diagnosticNode.metrics.network.rxBytesPerSecond)}/s` : "等待心跳上报"}</span></article></div>
         {diagnostics.connectivity?.note && <div className="inline-notice info">{diagnostics.connectivity.note}</div>}
         <section className="deployment-log"><div className="diagnostic-section-head"><div><h3>部署与操作日志</h3><p>Controller 记录的 Bootstrap、Agent 和修复任务事件，最新事件在最上方。</p></div><span>{diagnostics.actionEvents.length} 条事件</span></div>{diagnostics.actionEvents.length ? <div className="event-list">{diagnostics.actionEvents.slice(0, 100).map((event) => <div key={event.id}><time>{formatTime(event.created_at)}</time><Pill value={event.level} /><span><b>{phaseLabel(event.phase)}</b>{event.message}</span></div>)}</div> : <Empty>还没有部署或操作日志。</Empty>}</section>
         <section><h3>VPN 协议运行状态</h3>{diagnostics.connectivity?.protocols.length ? <div className="protocol-grid">{diagnostics.connectivity.protocols.map((protocol) => <article key={protocol.protocol}><div><b>{protocol.protocol}</b><Pill value={protocol.state} /></div><small>{protocol.transport}:{protocol.port} · {protocol.listening ? "正在监听" : "未监听"} · runtime {protocol.runtimeActive ? "active" : "inactive"}</small><small>Host FW: {protocol.hostFirewall} · Cloud FW: {protocol.cloudFirewall}</small>{protocol.lastError && <p>{protocol.lastError}</p>}</article>)}</div> : <Empty>没有 Agent 协议状态。</Empty>}</section>

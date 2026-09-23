@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addAudit, countRunningNodeActions, deleteNode, findNode, findRegion, listNodeActionEvents, listNodeActions, publicNode, updateNode, updateNodeConfig } from "../../../../server/db";
+import { addAudit, countRunningNodeActions, deleteNode, findNode, findRegion, listNodeActionEvents, listNodeActions, NodeIdentityConflictError, publicNode, updateNode, updateNodeConfig } from "../../../../server/db";
 import { currentUser } from "../../../../server/auth";
 import { cleanText, isValidIp, isValidPort, jsonError, readJson } from "../../../../server/http";
 import { queueNodeBootstrap } from "../../../../server/bootstrap";
@@ -46,7 +46,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const name = cleanText(body.name, 120);
     const ip = cleanText(body.ip, 64);
     const sshUser = cleanText(body.sshUser || body.user, 64) || node.ssh_user;
-    const hostFingerprint = cleanText(body.hostFingerprint, 256) || null;
     const regionId = cleanText(body.regionId, 80);
     const region = await findRegion(regionId);
     const rawSecret = typeof body.secret === "string" ? body.secret : "";
@@ -69,13 +68,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       sshUser,
       sshPort: isValidPort(body.sshPort || node.ssh_port),
       sshPrivilegeMode,
-      hostFingerprint,
+      hostFingerprint: node.host_fingerprint,
       ...(encrypted ? { credential: { type: nextCredentialType, ...encrypted } } : {}),
     });
     await addAudit({ actorUserId: user.id, action: "node.updated", targetType: "node", targetId: id, metadata: { credentialChanged: Boolean(encrypted), sshPrivilegeMode } });
     return NextResponse.json({ node: publicNode(updated!) });
   } catch (error) {
-    return jsonError(error instanceof Error ? error.message : "Unable to update node");
+    return jsonError(error instanceof Error ? error.message : "Unable to update node", error instanceof NodeIdentityConflictError ? 409 : 400);
   }
 }
 

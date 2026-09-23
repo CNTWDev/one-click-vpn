@@ -41,10 +41,6 @@ export function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
-export function allowTofuHostKeys(): boolean {
-  return process.env.NORTHSTAR_ALLOW_TOFU_HOST_KEYS === "true" && !isProduction();
-}
-
 export function publicOrigin(): string {
   const value = process.env.NORTHSTAR_PUBLIC_ORIGIN?.trim();
   if (isProduction() && !value) throw new Error("NORTHSTAR_PUBLIC_ORIGIN is required in production");

@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { Pool, type QueryResultRow } from "pg";
+import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { adminSeed } from "./config";
 import { hashPassword } from "./password";
 import { writeOperationalLog } from "./operational-logs";
+import { fingerprintLockKey, fingerprintsEqual } from "./ssh-fingerprint.js";
 
 export type DbUser = {
   id: string;
@@ -38,6 +39,9 @@ export type DbNode = {
   credential_iv: string;
   credential_tag: string;
   host_fingerprint: string | null;
+  host_fingerprint_source?: "legacy" | "operator" | "ssh_tofu" | null;
+  node_identity?: string | null;
+  identity_verified_at?: string | null;
   agent_token_hash: string | null;
   server_public_key?: string | null;
   created_at: string;
@@ -290,23 +294,121 @@ export async function findNode(id: string): Promise<DbNode | undefined> {
   return rows[0];
 }
 
+export type NodeIdentityConflictKind = "node_identity" | "host_fingerprint" | "endpoint" | "identity_changed";
+
+export class NodeIdentityConflictError extends Error {
+  constructor(
+    public readonly kind: NodeIdentityConflictKind,
+    public readonly existingNodeId: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "NodeIdentityConflictError";
+  }
+}
+
+type IdentityCandidate = Pick<DbNode, "id" | "name" | "ip" | "ssh_port" | "host_fingerprint" | "node_identity">;
+
+async function lockIdentitySignals(client: PoolClient, nodeIdentity: string, fingerprint: string, endpoint?: string): Promise<void> {
+  const keys = [
+    `identity:${nodeIdentity}`,
+    `host-key:${fingerprintLockKey(fingerprint)}`,
+    ...(endpoint ? [`endpoint:${endpoint}`] : []),
+  ].sort();
+  for (const key of keys) await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [key]);
+}
+
+function identityConflict(
+  candidates: IdentityCandidate[],
+  input: { nodeIdentity: string; fingerprint: string; ip?: string; sshPort?: number; excludeNodeId?: string },
+): NodeIdentityConflictError | undefined {
+  const eligible = candidates.filter((candidate) => candidate.id !== input.excludeNodeId);
+  const sameIdentity = eligible.find((candidate) => candidate.node_identity === input.nodeIdentity);
+  if (sameIdentity) {
+    return new NodeIdentityConflictError("node_identity", sameIdentity.id, `This server is already managed as "${sameIdentity.name}". Update or redeploy the existing node instead of creating a duplicate.`);
+  }
+  const sameHostKey = eligible.find((candidate) => candidate.host_fingerprint && fingerprintsEqual(candidate.host_fingerprint, input.fingerprint));
+  if (sameHostKey) {
+    return new NodeIdentityConflictError("host_fingerprint", sameHostKey.id, `This SSH host key is already assigned to "${sameHostKey.name}". The server may be a duplicate record or a cloned image with copied SSH host keys.`);
+  }
+  const sameEndpoint = input.ip && input.sshPort
+    ? eligible.find((candidate) => candidate.ip === input.ip && candidate.ssh_port === input.sshPort)
+    : undefined;
+  if (sameEndpoint) {
+    return new NodeIdentityConflictError("endpoint", sameEndpoint.id, `SSH endpoint ${input.ip}:${input.sshPort} is already assigned to "${sameEndpoint.name}". Update or replace that node instead of creating a duplicate.`);
+  }
+  return undefined;
+}
+
 export async function insertNode(input: Omit<DbNode, "id" | "created_at" | "updated_at">): Promise<DbNode> {
   const id = randomUUID();
   const timestamp = now();
-  await dbExec(`INSERT INTO nodes
-    (id, name, place, region_id, ip, ssh_user, ssh_port, ssh_privilege_mode, status, latency, users, traffic, version, last_seen,
-     credential_type, credential_ciphertext, credential_iv, credential_tag, host_fingerprint, deployment_policy, policy_version, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`, [
-    id, input.name, input.place, input.region_id, input.ip, input.ssh_user, input.ssh_port, input.ssh_privilege_mode,
-    input.status, input.latency, input.users, input.traffic, input.version, input.last_seen, input.credential_type,
-    input.credential_ciphertext, input.credential_iv, input.credential_tag, input.host_fingerprint,
-    input.deployment_policy || "standard", input.policy_version ?? 1, timestamp, timestamp,
-  ]);
+  await ensureReady();
+  const client = await getDb().connect();
+  try {
+    await client.query("BEGIN");
+    if (input.node_identity && input.host_fingerprint) {
+      await lockIdentitySignals(client, input.node_identity, input.host_fingerprint, `${input.ip}:${input.ssh_port}`);
+      const candidates = (await client.query<IdentityCandidate>("SELECT id, name, ip, ssh_port, host_fingerprint, node_identity FROM nodes WHERE node_identity IS NOT NULL OR host_fingerprint IS NOT NULL OR (ip = $1 AND ssh_port = $2) FOR UPDATE", [input.ip, input.ssh_port])).rows;
+      const conflict = identityConflict(candidates, { nodeIdentity: input.node_identity, fingerprint: input.host_fingerprint, ip: input.ip, sshPort: input.ssh_port });
+      if (conflict) throw conflict;
+    }
+    await client.query(`INSERT INTO nodes
+      (id, name, place, region_id, ip, ssh_user, ssh_port, ssh_privilege_mode, status, latency, users, traffic, version, last_seen,
+       credential_type, credential_ciphertext, credential_iv, credential_tag, host_fingerprint, host_fingerprint_source,
+       node_identity, identity_verified_at, deployment_policy, policy_version, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)`, [
+      id, input.name, input.place, input.region_id, input.ip, input.ssh_user, input.ssh_port, input.ssh_privilege_mode,
+      input.status, input.latency, input.users, input.traffic, input.version, input.last_seen, input.credential_type,
+      input.credential_ciphertext, input.credential_iv, input.credential_tag, input.host_fingerprint,
+      input.host_fingerprint_source || "legacy", input.node_identity || null, input.node_identity ? timestamp : null,
+      input.deployment_policy || "standard", input.policy_version ?? 1, timestamp, timestamp,
+    ]);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
   return (await findNode(id))!;
 }
 
+export async function bindNodeIdentity(
+  nodeId: string,
+  nodeIdentity: string,
+  hostFingerprint: string,
+  source: "operator" | "ssh_tofu",
+): Promise<DbNode> {
+  await ensureReady();
+  const client = await getDb().connect();
+  try {
+    await client.query("BEGIN");
+    await lockIdentitySignals(client, nodeIdentity, hostFingerprint);
+    const current = (await client.query<DbNode>("SELECT * FROM nodes WHERE id = $1 FOR UPDATE", [nodeId])).rows[0];
+    if (!current) throw new Error("Node not found");
+    if (current.node_identity && current.node_identity !== nodeIdentity) {
+      throw new NodeIdentityConflictError("identity_changed", current.id, `Remote node identity changed for "${current.name}". Deployment was stopped to prevent managing the wrong server.`);
+    }
+    const candidates = (await client.query<IdentityCandidate>("SELECT id, name, ip, ssh_port, host_fingerprint, node_identity FROM nodes WHERE id <> $1 AND (node_identity IS NOT NULL OR host_fingerprint IS NOT NULL) FOR UPDATE", [nodeId])).rows;
+    const conflict = identityConflict(candidates, { nodeIdentity, fingerprint: hostFingerprint, excludeNodeId: nodeId });
+    if (conflict) throw conflict;
+    const timestamp = now();
+    const updated = (await client.query<DbNode>(`UPDATE nodes SET node_identity = $1, identity_verified_at = $2,
+      host_fingerprint = $3, host_fingerprint_source = $4, updated_at = $2 WHERE id = $5 RETURNING *`,
+    [nodeIdentity, timestamp, hostFingerprint, source, nodeId])).rows[0];
+    await client.query("COMMIT");
+    return updated;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function updateNode(id: string, values: Record<string, string | number | null>): Promise<DbNode | undefined> {
-  const allowed = new Set(["status", "latency", "users", "traffic", "version", "last_seen", "last_heartbeat_at", "host_fingerprint", "agent_token_hash", "metrics_json"]);
+  const allowed = new Set(["status", "latency", "users", "traffic", "version", "last_seen", "last_heartbeat_at", "host_fingerprint", "host_fingerprint_source", "node_identity", "identity_verified_at", "agent_token_hash", "metrics_json"]);
   const entries = Object.entries(values).filter(([key]) => allowed.has(key));
   if (entries.length) {
     const assignments = entries.map(([key], index) => `${key} = $${index + 1}`).join(", ");
@@ -328,17 +430,32 @@ export async function updateNodeConfig(id: string, values: {
   hostFingerprint: string | null;
   credential?: { type: string; ciphertext: string; iv: string; tag: string };
 }): Promise<DbNode | undefined> {
-  if (values.credential) {
-    await dbExec(`UPDATE nodes SET name = $1, place = $2, region_id = $3, ip = $4, ssh_user = $5, ssh_port = $6,
-      ssh_privilege_mode = $7, host_fingerprint = $8, credential_type = $9, credential_ciphertext = $10, credential_iv = $11, credential_tag = $12, updated_at = $13 WHERE id = $14`, [
-      values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.sshPrivilegeMode, values.hostFingerprint,
-      values.credential.type, values.credential.ciphertext, values.credential.iv, values.credential.tag, now(), id,
-    ]);
-  } else {
-    await dbExec(`UPDATE nodes SET name = $1, place = $2, region_id = $3, ip = $4, ssh_user = $5, ssh_port = $6,
-      ssh_privilege_mode = $7, host_fingerprint = $8, updated_at = $9 WHERE id = $10`, [values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.sshPrivilegeMode, values.hostFingerprint, now(), id]);
+  await ensureReady();
+  const client = await getDb().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`endpoint:${values.ip}:${values.sshPort}`]);
+    const endpointOwner = (await client.query<Pick<DbNode, "id" | "name">>("SELECT id, name FROM nodes WHERE id <> $1 AND ip = $2 AND ssh_port = $3 FOR UPDATE", [id, values.ip, values.sshPort])).rows[0];
+    if (endpointOwner) {
+      throw new NodeIdentityConflictError("endpoint", endpointOwner.id, `SSH endpoint ${values.ip}:${values.sshPort} is already assigned to "${endpointOwner.name}". Update or replace that node instead of creating a duplicate.`);
+    }
+    const timestamp = now();
+    const updated = values.credential
+      ? (await client.query<DbNode>(`UPDATE nodes SET name = $1, place = $2, region_id = $3, ip = $4, ssh_user = $5, ssh_port = $6,
+        ssh_privilege_mode = $7, host_fingerprint = $8, credential_type = $9, credential_ciphertext = $10, credential_iv = $11, credential_tag = $12, updated_at = $13 WHERE id = $14 RETURNING *`, [
+        values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.sshPrivilegeMode, values.hostFingerprint,
+        values.credential.type, values.credential.ciphertext, values.credential.iv, values.credential.tag, timestamp, id,
+      ])).rows[0]
+      : (await client.query<DbNode>(`UPDATE nodes SET name = $1, place = $2, region_id = $3, ip = $4, ssh_user = $5, ssh_port = $6,
+        ssh_privilege_mode = $7, host_fingerprint = $8, updated_at = $9 WHERE id = $10 RETURNING *`, [values.name, values.place, values.regionId, values.ip, values.sshUser, values.sshPort, values.sshPrivilegeMode, values.hostFingerprint, timestamp, id])).rows[0];
+    await client.query("COMMIT");
+    return updated;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
-  return findNode(id);
 }
 
 export async function countRunningNodeActions(nodeId: string, excludeActionId?: string): Promise<number> {

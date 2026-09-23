@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { agentOrigin, allowTofuHostKeys } from "./config";
+import { agentOrigin } from "./config";
 import { decryptSecret, hashToken } from "./crypto";
-import { addAudit, addNodeAction, appendNodeActionEvent, countRunningNodeActions, findNode, finishNodeAction, startNodeAction, updateNode, updateNodeActionProgress } from "./db";
+import { addAudit, addNodeAction, appendNodeActionEvent, bindNodeIdentity, countRunningNodeActions, findNode, finishNodeAction, startNodeAction, updateNode, updateNodeActionProgress } from "./db";
 import { ensureDefaultNodeProtocols } from "./control-plane";
 import { reconcileEnabledVpnServices } from "./vpn-services";
 import { writeOperationalLog } from "./operational-logs";
-import { executeRemoteCommand } from "./remote-ssh";
+import { discoverRemoteNode, executeRemoteCommand } from "./remote-ssh";
 
 const maximumConcurrentRemoteActions = 3;
 const remoteActionQueue: Array<() => Promise<void>> = [];
@@ -113,7 +113,7 @@ export async function queueNodeAction(nodeId: string, action: "restart-agent" | 
 }
 
 export async function bootstrapNode(nodeId: string, actorUserId?: string, queuedActionId?: string): Promise<void> {
-  const node = await findNode(nodeId);
+  let node = await findNode(nodeId);
   if (!node) return;
   const actionId = queuedActionId || await addNodeAction(nodeId, "bootstrap", "running");
   await startNodeAction(actionId);
@@ -121,14 +121,19 @@ export async function bootstrapNode(nodeId: string, actorUserId?: string, queued
   let recorder: ActionOutputRecorder | undefined;
 
   try {
-    if (!node.host_fingerprint && !allowTofuHostKeys()) {
-      throw new Error("Host fingerprint is required. Set it before bootstrapping a production node.");
-    }
     const secret = decryptSecret({
       ciphertext: node.credential_ciphertext,
       iv: node.credential_iv,
       tag: node.credential_tag,
     });
+    await updateNodeActionProgress(actionId, { phase: "identity", progress: 8, message: "Discovering and verifying the persistent node identity" });
+    const discovery = await discoverRemoteNode(node, secret);
+    node = await bindNodeIdentity(
+      nodeId,
+      discovery.nodeIdentity,
+      discovery.fingerprint,
+      node.host_fingerprint_source === "operator" ? "operator" : "ssh_tofu",
+    );
     const agentToken = randomBytes(32).toString("base64url");
     const source = Buffer.from(agentSource(), "utf8").toString("base64");
     const controllerOrigin = shellQuote(agentOrigin());
@@ -314,7 +319,7 @@ progress agent-staged 88 'Agent files are staged; registering its new identity w
       version: "agent installed",
       last_seen: "awaiting heartbeat",
       latency: "connected",
-      host_fingerprint: node.host_fingerprint || result.fingerprint,
+      host_fingerprint: result.fingerprint,
       agent_token_hash: hashToken(agentToken),
     });
     const heartbeatNotBefore = Date.now();

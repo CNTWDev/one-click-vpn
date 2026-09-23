@@ -33,6 +33,13 @@ Controller/API：
 模式和 `sudo -n` 的免密 sudo 模式；这个差异由 SSH 执行器消化，后续的
 Agent 安装、Desired State 和 VPN Adapter 不区分登录凭据类型。
 
+添加节点时，Controller 先完成 SSH 认证和权限检查，从握手中取得并固定
+host key，然后读取或原子创建 `/var/lib/northstar/node-id`。节点 ID 是机器在
+Northstar 中的持久身份；host key 只表示 SSH 端点身份。数据库在同一事务中
+检查节点 ID、host key 和 IP/端口，任何冲突都不会进入部署队列。后续部署会
+在执行安装命令前重新验证这两种身份，防止 IP 回收、重复配置或镜像克隆导致
+操作落到错误服务器。
+
 Portal/Admin 不通过公网域名回调 Controller。两个前端容器统一使用 Docker DNS 地址 `http://northstar:3000` 转发 `/api`。宿主机 Nginx 只负责 TLS 和站点入口；独立 API 域名仅供原生客户端与远程 Agent 使用。
 
 Edge Node：
