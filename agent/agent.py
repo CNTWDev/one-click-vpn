@@ -328,7 +328,7 @@ def openvpn_sync_config(desired):
         f"ca {OPENVPN_DIR / 'ca.crt'}", f"cert {OPENVPN_DIR / 'server.crt'}", f"key {OPENVPN_DIR / 'server.key'}",
         f"crl-verify {OPENVPN_REVOKED_DIR} dir", f"tls-crypt {OPENVPN_DIR / 'tls-crypt.key'}", "dh none", "ecdh-curve prime256v1",
         "auth SHA256", "data-ciphers AES-256-GCM:CHACHA20-POLY1305", "data-ciphers-fallback AES-256-GCM", "keepalive 10 120",
-        "persist-key", "persist-tun", "explicit-exit-notify 1", f"status {OPENVPN_STATUS} 30", "status-version 3", "verb 3", *push_lines, "",
+        "persist-key", "persist-tun", "duplicate-cn", "explicit-exit-notify 1", f"status {OPENVPN_STATUS} 30", "status-version 3", "verb 3", *push_lines, "",
     ]
     OPENVPN_CONFIG.write_text("\n".join(config_lines))
     os.chmod(OPENVPN_CONFIG, 0o600)
@@ -663,9 +663,12 @@ def openvpn_usage_snapshots():
             continue
         connected_since = values.get("Connected Since (time_t)", "") or values.get("Connected Since", "")
         client_id = values.get("Client ID", "")
+        real_address = values.get("Real Address", "")
+        session_key = f"{connected_since}:{client_id}:{real_address}"[:512]
         snapshots.append({
             "protocol": "openvpn",
             "identityKey": common_name,
+            "sessionKey": session_key,
             "rxBytes": received,
             "txBytes": transmitted,
             "lastHandshakeAt": observed_at,
@@ -679,7 +682,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.5.0",
+        "version": "agent 2.6.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),

@@ -11,6 +11,7 @@ import {
   findActiveCredentialAuthority,
   listRevokedCertificateSerials,
   revokeCertificateIssuance,
+  updateAccessCredentialMaterial,
   type CertificateIssuance,
   type CredentialAuthority,
 } from "./control-db";
@@ -131,7 +132,7 @@ export async function ensureOpenVpnServerBundle(nodeId: string, nodeName: string
     const issued = await issueCertificate({ authority, purpose: "server", commonName: `northstar-node-${nodeName}`, ownerNodeId: nodeId });
     const privateKey = await createSecretMaterial({ kind: "openvpn_server_private_key", value: issued.privateKeyPem, ownerNodeId: nodeId });
     issuance = await createCertificateIssuance({
-      authority_id: authority.id, node_id: nodeId, device_id: null, purpose: "server", serial: issued.serial,
+      authority_id: authority.id, node_id: nodeId, device_id: null, credential_id: null, purpose: "server", serial: issued.serial,
       subject: `CN=northstar-node-${safeCommonName(nodeName)}`, certificate_pem: issued.certificatePem,
       private_key_secret_id: privateKey.id, not_before: issued.notBefore, not_after: issued.notAfter,
     });
@@ -156,10 +157,10 @@ export async function ensureOpenVpnServerBundle(nodeId: string, nodeName: string
   return { authority, issuance, bundleSecretId: bundle.id };
 }
 
-export async function ensureOpenVpnClientCredential(deviceId: string, rotate = false): Promise<{ authority: CredentialAuthority; issuance: CertificateIssuance }> {
+export async function ensureOpenVpnClientCredential(credentialId: string, deviceId: string, rotate = false): Promise<{ authority: CredentialAuthority; issuance: CertificateIssuance }> {
   const authority = await ensureOpenVpnAuthority();
-  const commonName = safeCommonName(`northstar-${deviceId}`);
-  let issuance = await findActiveCertificateIssuance({ authorityId: authority.id, deviceId, purpose: "client" });
+  const commonName = safeCommonName(`northstar-${credentialId}`);
+  let issuance = await findActiveCertificateIssuance({ authorityId: authority.id, credentialId, purpose: "client" });
   if (issuance && (rotate || issuance.subject !== `CN=${commonName}`)) {
     await revokeCertificateIssuance(issuance.id);
     issuance = undefined;
@@ -168,11 +169,12 @@ export async function ensureOpenVpnClientCredential(deviceId: string, rotate = f
     const issued = await issueCertificate({ authority, purpose: "client", commonName });
     const privateKey = await createSecretMaterial({ kind: "openvpn_client_private_key", value: issued.privateKeyPem });
     issuance = await createCertificateIssuance({
-      authority_id: authority.id, node_id: null, device_id: deviceId, purpose: "client", serial: issued.serial,
+      authority_id: authority.id, node_id: null, device_id: deviceId, credential_id: credentialId, purpose: "client", serial: issued.serial,
       subject: `CN=${commonName}`, certificate_pem: issued.certificatePem,
       private_key_secret_id: privateKey.id, not_before: issued.notBefore, not_after: issued.notAfter,
     });
   }
+  await updateAccessCredentialMaterial(credentialId, commonName, issuance.not_after);
   return { authority, issuance };
 }
 

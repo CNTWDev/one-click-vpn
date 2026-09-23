@@ -17,7 +17,7 @@ function activeSessionCount(snapshots: UsageSnapshot[]): number {
   const active = new Set<string>();
   for (const snapshot of snapshots) {
     if (!snapshot.identityKey) continue;
-    if (snapshot.protocol === "openvpn") active.add(`openvpn:${snapshot.identityKey}`);
+    if (snapshot.protocol === "openvpn") active.add(`openvpn:${snapshot.identityKey}:${snapshot.sessionKey || "default"}`);
     if (snapshot.protocol === "wireguard" && snapshot.lastHandshakeAt) {
       const handshake = new Date(snapshot.lastHandshakeAt).getTime();
       if (Number.isFinite(handshake) && handshake >= cutoff) active.add(`wireguard:${snapshot.identityKey}`);

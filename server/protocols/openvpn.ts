@@ -41,6 +41,7 @@ export const openvpnAdapter: ProtocolAdapter = {
       interface: "northstar-openvpn",
       serverBundleSecretId: input.openvpn.serverBundleSecretId,
       revokedSerials: input.openvpn.revokedSerials,
+      allowSharedCredentials: true,
       transport: input.openvpn.transport,
       subnet: input.openvpn.subnet,
       listenPort: input.openvpn.listenPort,

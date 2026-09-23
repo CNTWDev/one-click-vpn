@@ -4,6 +4,7 @@ import { X509Certificate } from "node:crypto";
 export type UsageSnapshot = {
   protocol: "wireguard" | "openvpn";
   identityKey: string;
+  sessionKey?: string;
   rxBytes: number;
   txBytes: number;
   lastHandshakeAt?: string | null;
@@ -23,47 +24,63 @@ function dayOf(value: string): string {
 
 export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSnapshot[]): Promise<void> {
   const observedAt = now();
+  await dbExec("UPDATE traffic_counters SET connected = 0 WHERE node_id = $1 AND protocol = 'openvpn'", [nodeId]);
   for (const snapshot of snapshots.slice(0, 10000)) {
     const identityKey = typeof snapshot.identityKey === "string" ? snapshot.identityKey.trim().slice(0, 512) : "";
     if (!identityKey || !["wireguard", "openvpn"].includes(snapshot.protocol)) continue;
+    const sessionKey = snapshot.protocol === "openvpn" && typeof snapshot.sessionKey === "string" ? snapshot.sessionKey.trim().slice(0, 512) : "";
     const rxBytes = validBytes(snapshot.rxBytes);
     const txBytes = validBytes(snapshot.txBytes);
     const epoch = (snapshot.counterEpoch || "").trim().slice(0, 128);
-    const previous = (await dbQuery<{ device_id: string | null; counter_epoch: string; observed_rx_bytes: string; observed_tx_bytes: string; observed_at: string }>(
-      "SELECT device_id, counter_epoch, observed_rx_bytes, observed_tx_bytes, observed_at FROM traffic_counters WHERE node_id = $1 AND protocol = $2 AND identity_key = $3",
-      [nodeId, snapshot.protocol, identityKey],
+    const previous = (await dbQuery<{ device_id: string | null; credential_id: string | null; counter_epoch: string; observed_rx_bytes: string; observed_tx_bytes: string; observed_at: string; last_traffic_at: string | null }>(
+      "SELECT device_id, credential_id, counter_epoch, observed_rx_bytes, observed_tx_bytes, observed_at, last_traffic_at FROM traffic_counters WHERE node_id = $1 AND protocol = $2 AND identity_key = $3 AND session_key = $4",
+      [nodeId, snapshot.protocol, identityKey, sessionKey],
     ))[0];
     if (previous && new Date(previous.observed_at).getTime() >= new Date(observedAt).getTime()) continue;
     const sameCounter = previous && previous.counter_epoch === epoch;
     const uploadDelta = sameCounter ? Math.max(0, rxBytes - Number(previous.observed_rx_bytes)) : rxBytes;
     const downloadDelta = sameCounter ? Math.max(0, txBytes - Number(previous.observed_tx_bytes)) : txBytes;
-    const device = snapshot.protocol === "wireguard"
-      ? (await dbQuery<{ id: string; user_id: string }>(
-        "SELECT id, user_id FROM devices WHERE public_key = $1 AND status = 'active' LIMIT 1", [identityKey],
+    const owner = snapshot.protocol === "wireguard"
+      ? (await dbQuery<{ device_id: string; credential_id: string; user_id: string }>(
+        `SELECT c.device_id, c.id AS credential_id, c.user_id FROM access_credentials c
+         WHERE c.protocol = 'wireguard' AND c.identity_key = $1 AND c.status = 'active' LIMIT 1`, [identityKey],
       ))[0]
-      : (await dbQuery<{ id: string; user_id: string }>(`SELECT d.id, d.user_id FROM certificate_issuances c
-          INNER JOIN devices d ON d.id = c.device_id
-          WHERE c.subject = $1 AND c.purpose = 'client' AND c.status = 'active' AND d.status = 'active'
+      : (await dbQuery<{ device_id: string; credential_id: string; user_id: string }>(`SELECT ac.device_id, ac.id AS credential_id, ac.user_id FROM certificate_issuances c
+          INNER JOIN access_credentials ac ON ac.id = c.credential_id
+          WHERE c.subject = $1 AND c.purpose = 'client' AND c.status = 'active' AND ac.status = 'active'
           ORDER BY c.created_at DESC LIMIT 1`, [`CN=${identityKey}`]))[0];
+    const hasTraffic = uploadDelta > 0 || downloadDelta > 0;
+    const handshakeTime = snapshot.lastHandshakeAt ? new Date(snapshot.lastHandshakeAt).getTime() : 0;
+    const connected = snapshot.protocol === "openvpn" || (Number.isFinite(handshakeTime) && handshakeTime >= Date.now() - 180_000);
+    const lastTrafficAt = hasTraffic ? observedAt : previous?.last_traffic_at || null;
     await dbExec(`INSERT INTO traffic_counters
-      (node_id, protocol, identity_key, device_id, observed_rx_bytes, observed_tx_bytes, last_handshake_at, counter_epoch, observed_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      ON CONFLICT(node_id, protocol, identity_key) DO UPDATE SET
-        device_id = excluded.device_id, observed_rx_bytes = excluded.observed_rx_bytes,
+      (node_id, protocol, identity_key, session_key, device_id, credential_id, observed_rx_bytes, observed_tx_bytes, last_handshake_at, last_traffic_at, connected, counter_epoch, observed_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ON CONFLICT(node_id, protocol, identity_key, session_key) DO UPDATE SET
+        device_id = excluded.device_id, credential_id = excluded.credential_id, observed_rx_bytes = excluded.observed_rx_bytes,
         observed_tx_bytes = excluded.observed_tx_bytes, last_handshake_at = excluded.last_handshake_at,
+        last_traffic_at = excluded.last_traffic_at, connected = excluded.connected,
         counter_epoch = excluded.counter_epoch, observed_at = excluded.observed_at`, [
-      nodeId, snapshot.protocol, identityKey, device?.id || null, String(rxBytes), String(txBytes), snapshot.lastHandshakeAt || null, epoch, observedAt,
+      nodeId, snapshot.protocol, identityKey, sessionKey, owner?.device_id || null, owner?.credential_id || null,
+      String(rxBytes), String(txBytes), snapshot.lastHandshakeAt || null, lastTrafficAt, connected ? 1 : 0, epoch, observedAt,
     ]);
-    if (!device || (uploadDelta <= 0 && downloadDelta <= 0)) continue;
+    if (owner && (connected || hasTraffic)) {
+      await Promise.all([
+        dbExec("UPDATE access_credentials SET last_seen_at = $1, updated_at = GREATEST(updated_at, $1) WHERE id = $2", [observedAt, owner.credential_id]),
+        dbExec("UPDATE devices SET last_seen_at = $1 WHERE id = $2", [observedAt, owner.device_id]),
+      ]);
+    }
+    if (!owner || !hasTraffic) continue;
     const day = dayOf(observedAt);
     await dbExec(`INSERT INTO traffic_daily
-      (day, user_id, device_id, node_id, protocol, upload_bytes, download_bytes, first_seen_at, last_seen_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+      (day, user_id, device_id, credential_id, node_id, protocol, upload_bytes, download_bytes, first_seen_at, last_seen_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
       ON CONFLICT(day, device_id, node_id, protocol) DO UPDATE SET
+        credential_id = excluded.credential_id,
         upload_bytes = traffic_daily.upload_bytes + excluded.upload_bytes,
         download_bytes = traffic_daily.download_bytes + excluded.download_bytes,
         last_seen_at = excluded.last_seen_at`, [
-      day, device.user_id, device.id, nodeId, snapshot.protocol, String(uploadDelta), String(downloadDelta), observedAt,
+      day, owner.user_id, owner.device_id, owner.credential_id, nodeId, snapshot.protocol, String(uploadDelta), String(downloadDelta), observedAt,
     ]);
   }
 }
@@ -104,14 +121,89 @@ export async function usageByDevices(userId: string, input: { from?: string; to?
   return { from, to, devices: rows.map((row) => ({ deviceId: row.device_id, displayName: row.display_name, platform: row.platform, ...numbers(row) })) };
 }
 
+export async function credentialAccessOverview(userId: string, input: { from?: string; to?: string } = {}) {
+  const { from, to } = range(input);
+  const currentTime = now();
+  const onlineCutoff = new Date(Date.now() - 90_000).toISOString();
+  const wireGuardCutoff = new Date(Date.now() - 180_000).toISOString();
+  const rows = await dbQuery<{
+    id: string; display_name: string; protocol: string; identity_key: string; credential_status: string;
+    expires_at: string | null; revoked_at: string | null; created_at: string; updated_at: string;
+    certificate_id: string | null; serial: string | null; subject: string | null; certificate_pem: string | null;
+    certificate_not_before: string | null; certificate_not_after: string | null;
+    upload_bytes: string; download_bytes: string; profile_count: string; active_profile_count: string;
+    fresh_node_count: string; connection_count: string; last_activity_at: string | null; last_observed_at: string | null;
+  }>(`SELECT c.id, c.display_name, c.protocol, c.identity_key,
+      CASE WHEN c.status = 'active' AND c.expires_at IS NOT NULL AND c.expires_at <= $6 THEN 'expired' ELSE c.status END AS credential_status,
+      c.expires_at, c.revoked_at, c.created_at, c.updated_at,
+      cert.id AS certificate_id, cert.serial, cert.subject, cert.certificate_pem,
+      cert.not_before AS certificate_not_before, cert.not_after AS certificate_not_after,
+      COALESCE(usage.upload_bytes, 0)::text AS upload_bytes, COALESCE(usage.download_bytes, 0)::text AS download_bytes,
+      COALESCE(profiles.profile_count, 0)::text AS profile_count, COALESCE(profiles.active_profile_count, 0)::text AS active_profile_count,
+      COALESCE(profiles.fresh_node_count, 0)::text AS fresh_node_count,
+      COALESCE(presence.connection_count, 0)::text AS connection_count,
+      presence.last_activity_at, presence.last_observed_at
+    FROM access_credentials c
+    LEFT JOIN LATERAL (
+      SELECT ci.id, ci.serial, ci.subject, ci.certificate_pem, ci.not_before, ci.not_after
+      FROM certificate_issuances ci WHERE ci.credential_id = c.id AND ci.purpose = 'client'
+      ORDER BY (ci.status = 'active') DESC, ci.created_at DESC LIMIT 1
+    ) cert ON true
+    LEFT JOIN LATERAL (
+      SELECT SUM(t.upload_bytes) AS upload_bytes, SUM(t.download_bytes) AS download_bytes
+      FROM traffic_daily t WHERE t.credential_id = c.id AND t.day BETWEEN $2 AND $3
+    ) usage ON true
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*) AS profile_count,
+        COUNT(*) FILTER (WHERE p.status IN ('issued', 'active') AND p.expires_at > $6) AS active_profile_count,
+        COUNT(DISTINCT p.node_id) FILTER (WHERE p.status IN ('issued', 'active') AND p.expires_at > $6 AND n.last_heartbeat_at > $4) AS fresh_node_count
+      FROM connection_profiles p INNER JOIN nodes n ON n.id = p.node_id WHERE p.credential_id = c.id
+    ) profiles ON true
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*) FILTER (WHERE n.last_heartbeat_at > $4 AND (
+          (tc.protocol = 'openvpn' AND tc.connected = 1 AND tc.observed_at > $4) OR
+          (tc.protocol = 'wireguard' AND (tc.last_handshake_at > $5 OR tc.last_traffic_at > $4))
+        )) AS connection_count,
+        MAX(NULLIF(GREATEST(COALESCE(tc.last_handshake_at, ''), COALESCE(tc.last_traffic_at, '')), '')) AS last_activity_at,
+        MAX(tc.observed_at) AS last_observed_at
+      FROM traffic_counters tc INNER JOIN nodes n ON n.id = tc.node_id WHERE tc.credential_id = c.id
+    ) presence ON true
+    WHERE c.user_id = $1 ORDER BY c.created_at DESC`, [userId, from, to, onlineCutoff, wireGuardCutoff, currentTime]);
+  return {
+    from, to, updatedAt: currentTime,
+    credentials: rows.map((row) => {
+      const connectionCount = Number(row.connection_count || 0);
+      const activeProfileCount = Number(row.active_profile_count || 0);
+      const lastActivityAt = row.last_activity_at || null;
+      const state = row.credential_status !== "active" ? row.credential_status
+        : connectionCount > 0 ? "online"
+          : activeProfileCount > 0 && Number(row.fresh_node_count || 0) === 0 ? "telemetry-delayed"
+            : lastActivityAt ? "offline" : "never-connected";
+      return {
+        id: row.id, name: row.display_name, protocol: row.protocol, status: row.credential_status,
+        identitySuffix: row.identity_key.replaceAll(":", "").slice(-10), expiresAt: row.expires_at,
+        revokedAt: row.revoked_at, createdAt: row.created_at, updatedAt: row.updated_at,
+        online: connectionCount > 0, state, connectionCount, lastActivityAt, lastObservedAt: row.last_observed_at,
+        profileCount: Number(row.profile_count || 0), activeProfileCount,
+        certificate: row.certificate_id ? {
+          id: row.certificate_id, serial: row.serial, subject: row.subject, pem: row.certificate_pem,
+          notBefore: row.certificate_not_before, notAfter: row.certificate_not_after,
+          fingerprint: row.certificate_pem ? certificateFingerprint(row.certificate_pem) : "",
+        } : null,
+        ...numbers(row),
+      };
+    }),
+  };
+}
+
 export async function usageByCredentials(userId: string, input: { from?: string; to?: string }) {
   const { from, to } = range(input);
   const rows = await dbQuery<{
-    profile_id: string; device_id: string; display_name: string; platform: string; profile_status: string;
+    profile_id: string; device_id: string; credential_id: string | null; display_name: string; platform: string; profile_status: string;
     protocol: string; node_id: string; region_name: string | null; region_code: string | null;
     issued_at: string; credential_identity: string | null; upload_bytes: string; download_bytes: string;
     first_seen_at: string | null; last_seen_at: string | null; last_activity_at: string | null; observed_at: string | null;
-  }>(`SELECT p.id AS profile_id, d.id AS device_id, d.display_name, d.platform, p.status AS profile_status,
+  }>(`SELECT p.id AS profile_id, d.id AS device_id, p.credential_id, COALESCE(ac.display_name, d.display_name) AS display_name, d.platform, p.status AS profile_status,
       p.protocol, p.node_id, r.name AS region_name, r.code AS region_code, p.issued_at,
       CASE WHEN p.protocol = 'openvpn' THEN cert.serial ELSE d.public_key END AS credential_identity,
       COALESCE(usage.upload_bytes, 0)::text AS upload_bytes,
@@ -119,6 +211,7 @@ export async function usageByCredentials(userId: string, input: { from?: string;
       usage.first_seen_at, usage.last_seen_at, counters.last_activity_at, counters.observed_at
     FROM connection_profiles p
     INNER JOIN devices d ON d.id = p.device_id
+    LEFT JOIN access_credentials ac ON ac.id = p.credential_id
     INNER JOIN nodes n ON n.id = p.node_id
     LEFT JOIN regions r ON r.id = n.region_id
     LEFT JOIN LATERAL (
@@ -137,18 +230,19 @@ export async function usageByCredentials(userId: string, input: { from?: string;
     ) cert ON p.protocol = 'openvpn'
     WHERE d.user_id = $1 AND p.status IN ('issued', 'active')
     ORDER BY p.updated_at DESC`, [userId, from, to]);
-  const onlineCutoff = Date.now() - 120_000;
+  const openVpnCutoff = Date.now() - 90_000;
+  const wireGuardCutoff = Date.now() - 180_000;
   return {
     from, to, updatedAt: now(),
     credentials: rows.map((row) => {
       const activityTime = row.last_activity_at ? new Date(row.last_activity_at).getTime() : 0;
       const identity = row.credential_identity || "";
       return {
-        profileId: row.profile_id, deviceId: row.device_id, displayName: row.display_name, platform: row.platform,
+        profileId: row.profile_id, deviceId: row.device_id, credentialId: row.credential_id || row.device_id, displayName: row.display_name, platform: row.platform,
         profileStatus: row.profile_status, protocol: row.protocol, nodeId: row.node_id,
         regionName: row.region_name || "Unknown", regionCode: row.region_code || "",
         issuedAt: row.issued_at, credentialSuffix: identity ? identity.replaceAll(":", "").slice(-8) : "",
-        online: activityTime >= onlineCutoff, lastActivityAt: row.last_activity_at,
+        online: activityTime >= (row.protocol === "openvpn" ? openVpnCutoff : wireGuardCutoff), lastActivityAt: row.last_activity_at,
         observedAt: row.observed_at, firstSeenAt: row.first_seen_at, lastSeenAt: row.last_seen_at,
         ...numbers(row),
       };
@@ -163,11 +257,13 @@ function certificateFingerprint(pem: string): string {
 export async function adminUserAccessSummaries() {
   const { from, to } = range({});
   const rows = await dbQuery<{
-    user_id: string; device_count: string; active_device_count: string; profile_count: string; active_profile_count: string;
+    user_id: string; device_count: string; active_device_count: string; credential_count: string; active_credential_count: string; profile_count: string; active_profile_count: string;
     certificate_count: string; active_certificate_count: string; upload_bytes: string; download_bytes: string; last_activity_at: string | null;
   }>(`SELECT u.id AS user_id,
       (SELECT COUNT(*)::text FROM devices d WHERE d.user_id = u.id) AS device_count,
       (SELECT COUNT(*)::text FROM devices d WHERE d.user_id = u.id AND d.status = 'active') AS active_device_count,
+      (SELECT COUNT(*)::text FROM access_credentials c WHERE c.user_id = u.id) AS credential_count,
+      (SELECT COUNT(*)::text FROM access_credentials c WHERE c.user_id = u.id AND c.status = 'active' AND (c.expires_at IS NULL OR c.expires_at > $3)) AS active_credential_count,
       (SELECT COUNT(*)::text FROM connection_profiles p INNER JOIN devices d ON d.id = p.device_id WHERE d.user_id = u.id) AS profile_count,
       (SELECT COUNT(*)::text FROM connection_profiles p INNER JOIN devices d ON d.id = p.device_id
         WHERE d.user_id = u.id AND p.status IN ('issued', 'active') AND p.expires_at > $3) AS active_profile_count,
@@ -181,6 +277,7 @@ export async function adminUserAccessSummaries() {
     FROM users u`, [from, to, now()]);
   return new Map(rows.map((row) => [row.user_id, {
     deviceCount: Number(row.device_count || 0), activeDeviceCount: Number(row.active_device_count || 0),
+    credentialCount: Number(row.credential_count || 0), activeCredentialCount: Number(row.active_credential_count || 0),
     profileCount: Number(row.profile_count || 0), activeProfileCount: Number(row.active_profile_count || 0),
     certificateCount: Number(row.certificate_count || 0), activeCertificateCount: Number(row.active_certificate_count || 0),
     lastActivityAt: row.last_activity_at, ...numbers(row),
@@ -190,6 +287,7 @@ export async function adminUserAccessSummaries() {
 export async function adminUserAccessOverview(userId: string, input: { from?: string; to?: string }) {
   const { from, to } = range(input);
   const currentTime = now();
+  const credentialOverview = await credentialAccessOverview(userId, input);
   const devices = await dbQuery<{
     id: string; display_name: string; platform: string; app_version: string; public_key: string; status: string;
     created_at: string; updated_at: string; last_seen_at: string | null; upload_bytes: string; download_bytes: string; last_activity_at: string | null;
@@ -207,10 +305,10 @@ export async function adminUserAccessOverview(userId: string, input: { from?: st
     WHERE d.user_id = $1 ORDER BY d.created_at DESC`, [userId, from, to]);
 
   const profiles = await dbQuery<{
-    id: string; device_id: string; protocol: string; node_id: string; node_name: string; region_name: string | null; region_code: string | null;
+    id: string; device_id: string; credential_id: string | null; protocol: string; node_id: string; node_name: string; region_name: string | null; region_code: string | null;
     transport: string; revision: number; profile_status: string; client_address: string | null; issued_at: string; expires_at: string; updated_at: string;
     credential_identity: string | null; upload_bytes: string; download_bytes: string; last_activity_at: string | null;
-  }>(`SELECT p.id, p.device_id, p.protocol, p.node_id, n.name AS node_name, r.name AS region_name, r.code AS region_code,
+  }>(`SELECT p.id, p.device_id, p.credential_id, p.protocol, p.node_id, n.name AS node_name, r.name AS region_name, r.code AS region_code,
       p.transport, p.revision, CASE WHEN p.status IN ('issued', 'active') AND p.expires_at <= $4 THEN 'expired' ELSE p.status END AS profile_status,
       p.client_address, p.issued_at, p.expires_at, p.updated_at,
       CASE WHEN p.protocol = 'openvpn' THEN cert.serial ELSE d.public_key END AS credential_identity,
@@ -244,10 +342,10 @@ export async function adminUserAccessOverview(userId: string, input: { from?: st
     WHERE d.user_id = $1 ORDER BY p.updated_at DESC`, [userId, from, to, currentTime]);
 
   const certificates = await dbQuery<{
-    id: string; authority_id: string; device_id: string; serial: string; subject: string; certificate_pem: string;
+    id: string; authority_id: string; device_id: string; credential_id: string | null; serial: string; subject: string; certificate_pem: string;
     certificate_status: string; not_before: string; not_after: string; revoked_at: string | null; created_at: string; updated_at: string;
     authority_realm: string; authority_status: string; upload_bytes: string; download_bytes: string; last_activity_at: string | null;
-  }>(`SELECT c.id, c.authority_id, c.device_id, c.serial, c.subject, c.certificate_pem,
+  }>(`SELECT c.id, c.authority_id, c.device_id, c.credential_id, c.serial, c.subject, c.certificate_pem,
       CASE WHEN c.status = 'active' AND c.not_after <= $4 THEN 'expired' ELSE c.status END AS certificate_status,
       c.not_before, c.not_after, c.revoked_at, c.created_at, c.updated_at,
       a.realm AS authority_realm, a.status AS authority_status,
@@ -278,14 +376,14 @@ export async function adminUserAccessOverview(userId: string, input: { from?: st
     lastSeenAt: row.last_seen_at, lastActivityAt: row.last_activity_at, ...numbers(row),
   }));
   const mappedProfiles = profiles.map((row) => ({
-    profileId: row.id, deviceId: row.device_id, protocol: row.protocol, nodeId: row.node_id, nodeName: row.node_name,
+    profileId: row.id, deviceId: row.device_id, credentialId: row.credential_id, protocol: row.protocol, nodeId: row.node_id, nodeName: row.node_name,
     regionName: row.region_name || "Unknown", regionCode: row.region_code || "", transport: row.transport,
     revision: row.revision, status: row.profile_status, clientAddress: row.client_address, issuedAt: row.issued_at,
     expiresAt: row.expires_at, updatedAt: row.updated_at, credentialIdentity: row.credential_identity || "",
     lastActivityAt: row.last_activity_at, trafficAttribution: "profile-validity-window", ...numbers(row),
   }));
   const mappedCertificates = certificates.map((row) => ({
-    certificateId: row.id, authorityId: row.authority_id, deviceId: row.device_id, serial: row.serial, subject: row.subject,
+    certificateId: row.id, authorityId: row.authority_id, deviceId: row.device_id, credentialId: row.credential_id, serial: row.serial, subject: row.subject,
     certificatePem: row.certificate_pem, fingerprint: certificateFingerprint(row.certificate_pem), status: row.certificate_status,
     notBefore: row.not_before, notAfter: row.not_after, revokedAt: row.revoked_at, createdAt: row.created_at,
     updatedAt: row.updated_at, authorityRealm: row.authority_realm, authorityStatus: row.authority_status,
@@ -295,10 +393,12 @@ export async function adminUserAccessOverview(userId: string, input: { from?: st
     from, to, updatedAt: currentTime, totals: numbers(totals),
     summary: {
       deviceCount: mappedDevices.length, activeDeviceCount: mappedDevices.filter((item) => item.status === "active").length,
+      credentialCount: credentialOverview.credentials.length,
+      activeCredentialCount: credentialOverview.credentials.filter((item) => item.status === "active").length,
       profileCount: mappedProfiles.length, activeProfileCount: mappedProfiles.filter((item) => ["issued", "active"].includes(item.status)).length,
       certificateCount: mappedCertificates.length, activeCertificateCount: mappedCertificates.filter((item) => item.status === "active").length,
     },
-    devices: mappedDevices, profiles: mappedProfiles, certificates: mappedCertificates,
+    credentials: credentialOverview.credentials, devices: mappedDevices, profiles: mappedProfiles, certificates: mappedCertificates,
   };
 }
 

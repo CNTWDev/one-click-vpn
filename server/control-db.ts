@@ -6,6 +6,7 @@ export type Platform = "web" | "macos" | "ios" | "android" | "windows" | "linux"
 export type Protocol = "wireguard" | "openvpn" | "ikev2";
 export type DeviceStatus = "pending" | "active" | "revoked";
 export type ProfileStatus = "issued" | "active" | "expired" | "revoked";
+export type CredentialStatus = "active" | "revoked" | "expired";
 
 export type Device = {
   id: string;
@@ -17,6 +18,21 @@ export type Device = {
   status: DeviceStatus;
   created_at: string;
   last_seen_at: string | null;
+  updated_at: string;
+};
+
+export type AccessCredential = {
+  id: string;
+  user_id: string;
+  device_id: string;
+  display_name: string;
+  protocol: Protocol;
+  identity_key: string;
+  status: CredentialStatus;
+  expires_at: string | null;
+  revoked_at: string | null;
+  last_seen_at: string | null;
+  created_at: string;
   updated_at: string;
 };
 
@@ -52,6 +68,7 @@ export type VpnService = {
 export type ConnectionProfile = {
   id: string;
   device_id: string;
+  credential_id: string | null;
   node_id: string;
   protocol: Protocol;
   transport: string;
@@ -118,6 +135,7 @@ export type CertificateIssuance = {
   authority_id: string;
   node_id: string | null;
   device_id: string | null;
+  credential_id: string | null;
   purpose: "server" | "client";
   serial: string;
   subject: string;
@@ -160,9 +178,9 @@ export async function createCredentialAuthority(input: Omit<CredentialAuthority,
   return (await dbQuery<CredentialAuthority>("SELECT * FROM credential_authorities WHERE id = $1", [id]))[0]!;
 }
 
-export async function findActiveCertificateIssuance(input: { authorityId: string; nodeId?: string; deviceId?: string; purpose: CertificateIssuance["purpose"] }): Promise<CertificateIssuance | undefined> {
-  const field = input.nodeId ? "node_id" : "device_id";
-  const owner = input.nodeId || input.deviceId;
+export async function findActiveCertificateIssuance(input: { authorityId: string; nodeId?: string; deviceId?: string; credentialId?: string; purpose: CertificateIssuance["purpose"] }): Promise<CertificateIssuance | undefined> {
+  const field = input.nodeId ? "node_id" : input.credentialId ? "credential_id" : "device_id";
+  const owner = input.nodeId || input.credentialId || input.deviceId;
   if (!owner) return undefined;
   return (await dbQuery<CertificateIssuance>(`SELECT * FROM certificate_issuances
     WHERE authority_id = $1 AND ${field} = $2 AND purpose = $3 AND status = 'active'
@@ -173,9 +191,9 @@ export async function createCertificateIssuance(input: Omit<CertificateIssuance,
   const id = `cert_${randomUUID()}`;
   const timestamp = now();
   await dbExec(`INSERT INTO certificate_issuances
-    (id, authority_id, node_id, device_id, purpose, serial, subject, certificate_pem, private_key_secret_id, status, not_before, not_after, revoked_at, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NULL, $13, $13)`, [
-    id, input.authority_id, input.node_id, input.device_id, input.purpose, input.serial, input.subject,
+    (id, authority_id, node_id, device_id, credential_id, purpose, serial, subject, certificate_pem, private_key_secret_id, status, not_before, not_after, revoked_at, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULL, $14, $14)`, [
+    id, input.authority_id, input.node_id, input.device_id, input.credential_id, input.purpose, input.serial, input.subject,
     input.certificate_pem, input.private_key_secret_id, input.status || "active", input.not_before, input.not_after, timestamp,
   ]);
   return (await dbQuery<CertificateIssuance>("SELECT * FROM certificate_issuances WHERE id = $1", [id]))[0]!;
@@ -189,6 +207,11 @@ export async function listRevokedCertificateSerials(authorityId: string): Promis
 export async function revokeCertificateIssuancesForDevice(deviceId: string): Promise<void> {
   await dbExec(`UPDATE certificate_issuances SET status = 'revoked', revoked_at = $1, updated_at = $1
     WHERE device_id = $2 AND status = 'active'`, [now(), deviceId]);
+}
+
+export async function revokeCertificateIssuancesForCredential(credentialId: string): Promise<void> {
+  await dbExec(`UPDATE certificate_issuances SET status = 'revoked', revoked_at = $1, updated_at = $1
+    WHERE credential_id = $2 AND status = 'active'`, [now(), credentialId]);
 }
 
 export async function revokeCertificateIssuance(id: string): Promise<void> {
@@ -223,16 +246,96 @@ export async function findDevice(id: string): Promise<Device | undefined> {
 }
 
 export async function revokeDevice(id: string): Promise<Device | undefined> {
-  await dbExec("UPDATE devices SET status = 'revoked', updated_at = $1 WHERE id = $2", [now(), id]);
-  await dbExec("UPDATE protocol_credentials SET status = 'revoked', revoked_at = $1 WHERE device_id = $2 AND status = 'active'", [now(), id]);
-  await dbExec("UPDATE ip_leases SET status = 'released', released_at = $1 WHERE device_id = $2 AND status = 'active'", [now(), id]);
-  await dbExec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE device_id = $2 AND status IN ('issued', 'active')", [now(), id]);
+  const timestamp = now();
+  await dbExec("UPDATE devices SET status = 'revoked', updated_at = $1 WHERE id = $2", [timestamp, id]);
+  await dbExec("UPDATE access_credentials SET status = 'revoked', revoked_at = $1, updated_at = $1 WHERE device_id = $2 AND status = 'active'", [timestamp, id]);
+  await dbExec("UPDATE protocol_credentials SET status = 'revoked', revoked_at = $1 WHERE device_id = $2 AND status = 'active'", [timestamp, id]);
+  await dbExec("UPDATE ip_leases SET status = 'released', released_at = $1 WHERE device_id = $2 AND status = 'active'", [timestamp, id]);
+  await dbExec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE device_id = $2 AND status IN ('issued', 'active')", [timestamp, id]);
   return findDevice(id);
 }
 
 export async function touchDevice(id: string): Promise<void> {
   const timestamp = now();
   await dbExec("UPDATE devices SET last_seen_at = $1, updated_at = $2 WHERE id = $3", [timestamp, timestamp, id]);
+}
+
+export async function createAccessCredential(input: {
+  userId: string;
+  displayName: string;
+  protocol: Protocol;
+  identityKey: string;
+}): Promise<AccessCredential> {
+  const credentialId = `cred_${randomUUID()}`;
+  const deviceId = `dev_${randomUUID()}`;
+  const timestamp = now();
+  const identityKey = input.protocol === "openvpn" ? `northstar-${credentialId}` : input.identityKey;
+  await dbExec(`INSERT INTO devices
+    (id, user_id, display_name, platform, app_version, public_key, status, created_at, last_seen_at, updated_at)
+    VALUES ($1, $2, $3, 'web', 'credential-1.0.0', $4, 'active', $5, NULL, $5)`, [
+    deviceId, input.userId, input.displayName, identityKey, timestamp,
+  ]);
+  await dbExec(`INSERT INTO access_credentials
+    (id, user_id, device_id, display_name, protocol, identity_key, status, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $7)`, [
+    credentialId, input.userId, deviceId, input.displayName, input.protocol, identityKey, timestamp,
+  ]);
+  return (await findAccessCredential(credentialId))!;
+}
+
+export async function listAccessCredentials(userId?: string): Promise<AccessCredential[]> {
+  return userId
+    ? dbQuery<AccessCredential>("SELECT * FROM access_credentials WHERE user_id = $1 ORDER BY created_at DESC", [userId])
+    : dbQuery<AccessCredential>("SELECT * FROM access_credentials ORDER BY created_at DESC");
+}
+
+export async function findAccessCredential(id: string): Promise<AccessCredential | undefined> {
+  return (await dbQuery<AccessCredential>("SELECT * FROM access_credentials WHERE id = $1", [id]))[0];
+}
+
+export async function findOrCreateAccessCredentialForDevice(device: Device, protocol: Protocol): Promise<AccessCredential> {
+  const existing = (await dbQuery<AccessCredential>(
+    "SELECT * FROM access_credentials WHERE device_id = $1 AND protocol = $2 LIMIT 1", [device.id, protocol],
+  ))[0];
+  if (existing) return existing;
+  const id = `cred_${randomUUID()}`;
+  const timestamp = now();
+  const identityKey = protocol === "openvpn" ? `northstar-${id}` : device.public_key;
+  await dbExec(`INSERT INTO access_credentials
+    (id, user_id, device_id, display_name, protocol, identity_key, status, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)`, [
+    id, device.user_id, device.id, device.display_name, protocol, identityKey,
+    device.status === "revoked" ? "revoked" : "active", timestamp,
+  ]);
+  return (await findAccessCredential(id))!;
+}
+
+export async function renameAccessCredential(id: string, displayName: string): Promise<AccessCredential | undefined> {
+  const timestamp = now();
+  await dbExec("UPDATE access_credentials SET display_name = $1, updated_at = $2 WHERE id = $3", [displayName, timestamp, id]);
+  await dbExec(`UPDATE devices SET display_name = $1, updated_at = $2
+    WHERE id = (SELECT device_id FROM access_credentials WHERE id = $3)`, [displayName, timestamp, id]);
+  return findAccessCredential(id);
+}
+
+export async function updateAccessCredentialMaterial(id: string, identityKey: string, expiresAt?: string | null): Promise<void> {
+  await dbExec(`UPDATE access_credentials SET identity_key = $1, expires_at = COALESCE($2, expires_at), updated_at = $3
+    WHERE id = $4`, [identityKey, expiresAt || null, now(), id]);
+}
+
+export async function revokeAccessCredential(id: string): Promise<AccessCredential | undefined> {
+  const timestamp = now();
+  const credential = await findAccessCredential(id);
+  if (!credential) return undefined;
+  await dbExec("UPDATE access_credentials SET status = 'revoked', revoked_at = $1, updated_at = $1 WHERE id = $2", [timestamp, id]);
+  await dbExec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE credential_id = $2 AND status IN ('issued', 'active')", [timestamp, id]);
+  await dbExec("UPDATE protocol_credentials SET status = 'revoked', revoked_at = $1 WHERE device_id = $2 AND protocol = $3 AND status = 'active'", [timestamp, credential.device_id, credential.protocol]);
+  await dbExec("UPDATE ip_leases SET status = 'released', released_at = $1 WHERE device_id = $2 AND protocol = $3 AND status = 'active'", [timestamp, credential.device_id, credential.protocol]);
+  const otherActive = (await dbQuery<{ count: string }>(
+    "SELECT COUNT(*)::text AS count FROM access_credentials WHERE device_id = $1 AND id <> $2 AND status = 'active'", [credential.device_id, id],
+  ))[0];
+  if (Number(otherActive?.count || 0) === 0) await dbExec("UPDATE devices SET status = 'revoked', updated_at = $1 WHERE id = $2", [timestamp, credential.device_id]);
+  return findAccessCredential(id);
 }
 
 export async function createApiSession(userId: string): Promise<ApiSession> {
@@ -436,7 +539,8 @@ export async function allocateIpLease(nodeId: string, protocol: Protocol, device
 
 function profileFromRow(row: Record<string, unknown>): ConnectionProfile {
   return {
-    id: String(row.id), device_id: String(row.device_id), node_id: String(row.node_id), protocol: row.protocol as Protocol,
+    id: String(row.id), device_id: String(row.device_id), credential_id: row.credential_id ? String(row.credential_id) : null,
+    node_id: String(row.node_id), protocol: row.protocol as Protocol,
     transport: String(row.transport), revision: Number(row.revision), status: row.status as ProfileStatus,
     endpoint: parseJson(String(row.endpoint_json), { host: "", port: 0 }), client_address: row.client_address ? String(row.client_address) : null,
     dns: parseJson(String(row.dns_json), []), allowed_ips: parseJson(String(row.allowed_ips_json), []),
@@ -447,6 +551,7 @@ function profileFromRow(row: Record<string, unknown>): ConnectionProfile {
 
 export async function createConnectionProfile(input: {
   deviceId: string;
+  credentialId: string;
   nodeId: string;
   protocol: Protocol;
   transport: string;
@@ -457,14 +562,14 @@ export async function createConnectionProfile(input: {
   protocolPayload: Record<string, unknown>;
   expiresAt: string;
 }): Promise<ConnectionProfile> {
-  const latest = (await dbQuery<{ revision: number | null }>("SELECT MAX(revision) AS revision FROM connection_profiles WHERE device_id = $1 AND node_id = $2 AND protocol = $3", [input.deviceId, input.nodeId, input.protocol]))[0];
+  const latest = (await dbQuery<{ revision: number | null }>("SELECT MAX(revision) AS revision FROM connection_profiles WHERE credential_id = $1 AND node_id = $2 AND protocol = $3", [input.credentialId, input.nodeId, input.protocol]))[0];
   const revision = Number(latest?.revision || 0) + 1;
   const timestamp = now();
   const id = `prof_${randomUUID()}`;
   await dbExec(`INSERT INTO connection_profiles
-    (id, device_id, node_id, protocol, transport, revision, status, endpoint_json, client_address, dns_json, allowed_ips_json, protocol_payload_json, issued_at, expires_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, 'issued', $7, $8, $9, $10, $11, $12, $13, $14)`, [
-    id, input.deviceId, input.nodeId, input.protocol, input.transport, revision, JSON.stringify(input.endpoint), input.clientAddress || null,
+    (id, device_id, credential_id, node_id, protocol, transport, revision, status, endpoint_json, client_address, dns_json, allowed_ips_json, protocol_payload_json, issued_at, expires_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, 'issued', $8, $9, $10, $11, $12, $13, $14, $15)`, [
+    id, input.deviceId, input.credentialId, input.nodeId, input.protocol, input.transport, revision, JSON.stringify(input.endpoint), input.clientAddress || null,
     JSON.stringify(input.dns), JSON.stringify(input.allowedIps), JSON.stringify(input.protocolPayload), timestamp, input.expiresAt, timestamp,
   ]);
   return (await findConnectionProfile(id))!;
@@ -475,11 +580,12 @@ export async function expireDueConnectionProfiles(): Promise<number> {
     WHERE status IN ('issued', 'active') AND expires_at <= $2`, [now(), now()]);
 }
 
-export async function listConnectionProfiles(filters: { deviceId?: string; status?: ProfileStatus; userId?: string } = {}): Promise<ConnectionProfile[]> {
+export async function listConnectionProfiles(filters: { deviceId?: string; credentialId?: string; status?: ProfileStatus; userId?: string } = {}): Promise<ConnectionProfile[]> {
   await expireDueConnectionProfiles();
   const clauses: string[] = [];
   const values: string[] = [];
   if (filters.deviceId) { clauses.push(`connection_profiles.device_id = $${values.length + 1}`); values.push(filters.deviceId); }
+  if (filters.credentialId) { clauses.push(`connection_profiles.credential_id = $${values.length + 1}`); values.push(filters.credentialId); }
   if (filters.status) { clauses.push(`connection_profiles.status = $${values.length + 1}`); values.push(filters.status); }
   if (filters.userId) { clauses.push(`devices.user_id = $${values.length + 1}`); values.push(filters.userId); }
   const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "";
@@ -506,6 +612,10 @@ export async function expireConnectionProfile(id: string): Promise<void> {
 
 export async function revokeConnectionProfilesForDevice(deviceId: string): Promise<void> {
   await dbExec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE device_id = $2 AND status IN ('issued', 'active')", [now(), deviceId]);
+}
+
+export async function revokeConnectionProfilesForCredential(credentialId: string): Promise<void> {
+  await dbExec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE credential_id = $2 AND status IN ('issued', 'active')", [now(), credentialId]);
 }
 
 export async function upsertDesiredConfig(input: { nodeId: string; protocol: Protocol; payload: Record<string, unknown> }): Promise<DesiredConfig> {

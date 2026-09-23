@@ -13,6 +13,8 @@ export type AdminUser = {
 export type AccessSummary = {
   deviceCount: number;
   activeDeviceCount: number;
+  credentialCount: number;
+  activeCredentialCount: number;
   profileCount: number;
   activeProfileCount: number;
   certificateCount: number;
@@ -30,22 +32,30 @@ export type AccountDeviceAccess = {
 };
 
 export type AccountProfileAccess = {
-  profileId: string; deviceId: string; protocol: string; nodeId: string; nodeName: string; regionName: string; regionCode: string;
+  profileId: string; deviceId: string; credentialId?: string | null; protocol: string; nodeId: string; nodeName: string; regionName: string; regionCode: string;
   transport: string; revision: number; status: string; clientAddress?: string | null; issuedAt: string; expiresAt: string; updatedAt: string;
   credentialIdentity: string; lastActivityAt?: string | null; trafficAttribution: string;
   uploadBytes: number; downloadBytes: number; totalBytes: number;
 };
 
 export type AccountCertificateAccess = {
-  certificateId: string; authorityId: string; deviceId: string; serial: string; subject: string; certificatePem: string; fingerprint: string;
+  certificateId: string; authorityId: string; deviceId: string; credentialId?: string | null; serial: string; subject: string; certificatePem: string; fingerprint: string;
   status: string; notBefore: string; notAfter: string; revokedAt?: string | null; createdAt: string; updatedAt: string;
   authorityRealm: string; authorityStatus: string; lastActivityAt?: string | null; trafficAttribution: string;
   uploadBytes: number; downloadBytes: number; totalBytes: number;
 };
 
+export type AccountCredentialAccess = {
+  id: string; name: string; protocol: string; status: string; state: string; identitySuffix: string;
+  online: boolean; connectionCount: number; lastActivityAt?: string | null; lastObservedAt?: string | null;
+  profileCount: number; activeProfileCount: number; expiresAt?: string | null; revokedAt?: string | null;
+  createdAt: string; updatedAt: string; uploadBytes: number; downloadBytes: number; totalBytes: number;
+};
+
 export type AccountAccessOverview = {
   from: string; to: string; updatedAt: string; totals: { uploadBytes: number; downloadBytes: number; totalBytes: number };
   summary: Omit<AccessSummary, "uploadBytes" | "downloadBytes" | "totalBytes" | "lastActivityAt">;
+  credentials: AccountCredentialAccess[];
   devices: AccountDeviceAccess[];
   profiles: AccountProfileAccess[];
   certificates: AccountCertificateAccess[];

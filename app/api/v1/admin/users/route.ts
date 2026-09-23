@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const users = await listUsers(status || undefined);
   const summaries = await adminUserAccessSummaries();
   return NextResponse.json({ users: users.map((user) => ({ ...publicUser(user), accessSummary: summaries.get(user.id) || {
-    deviceCount: 0, activeDeviceCount: 0, profileCount: 0, activeProfileCount: 0,
+    deviceCount: 0, activeDeviceCount: 0, credentialCount: 0, activeCredentialCount: 0, profileCount: 0, activeProfileCount: 0,
     certificateCount: 0, activeCertificateCount: 0, uploadBytes: 0, downloadBytes: 0, totalBytes: 0, lastActivityAt: null,
   } })) });
 }

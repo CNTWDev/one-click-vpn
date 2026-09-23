@@ -6,7 +6,9 @@ import {
   enqueueReconcileTask,
   findConnectionProfile,
   findDesiredConfig,
+  findAccessCredential,
   findDevice,
+  findOrCreateAccessCredentialForDevice,
   findVpnService,
   listActivePeers,
   listConnectionProfiles,
@@ -14,6 +16,8 @@ import {
   listNodeProtocols,
   listVpnServices,
   revokeCertificateIssuancesForDevice,
+  revokeCertificateIssuancesForCredential,
+  revokeAccessCredential,
   revokeDevice,
   upsertDesiredConfig,
   upsertNodeProtocol,
@@ -49,6 +53,7 @@ export function publicProfile(profile: ConnectionProfile, region?: { code: strin
   return {
     id: profile.id,
     deviceId: profile.device_id,
+    credentialId: profile.credential_id || profile.device_id,
     displayName: device?.display_name || null,
     nodeId: profile.node_id,
     regionCode: region?.code || null,
@@ -200,7 +205,8 @@ export async function issueRegionalConnectionProfiles(input: Omit<Parameters<typ
 
 export async function issueConnectionProfile(input: {
   actorUserId?: string;
-  deviceId: string;
+  deviceId?: string;
+  credentialId?: string;
   nodeId: string;
   protocol: Protocol;
   transport?: string;
@@ -209,8 +215,12 @@ export async function issueConnectionProfile(input: {
   clientPrivateKey?: string;
   regionalEndpoints?: Array<{ nodeId: string; host: string; port: number; transport: string }>;
 }): Promise<ConnectionProfile> {
-  const device = await findDevice(input.deviceId);
+  const requestedCredential = input.credentialId ? await findAccessCredential(input.credentialId) : undefined;
+  const device = await findDevice(requestedCredential?.device_id || input.deviceId || "");
   if (!device || device.status !== "active") throw new Error("Device is not active");
+  const credential = requestedCredential || await findOrCreateAccessCredentialForDevice(device, input.protocol);
+  if (credential.status !== "active") throw new Error("Credential is not active");
+  if (credential.protocol !== input.protocol) throw new Error("Credential protocol does not match the requested profile");
   const node = await findNode(input.nodeId);
   if (!node) throw new Error("Node not found");
   const adapter = getProtocolAdapter(input.protocol);
@@ -224,9 +234,9 @@ export async function issueConnectionProfile(input: {
   }
   const transport = input.transport || adapter.capability.transports[0];
   if (!adapter.capability.transports.includes(transport)) throw new Error("Unsupported protocol transport");
-  const clientAddress = await allocateIpLease(input.nodeId, input.protocol, input.deviceId);
+  const clientAddress = await allocateIpLease(input.nodeId, input.protocol, device.id);
   const openvpnCredential = input.protocol === "openvpn"
-    ? await ensureOpenVpnClientCredential(device.id, input.rotateCredential)
+    ? await ensureOpenVpnClientCredential(credential.id, device.id, input.rotateCredential)
     : undefined;
   const profile = adapter.buildProfile({
     deviceId: device.id,
@@ -248,11 +258,12 @@ export async function issueConnectionProfile(input: {
   if (input.regionalEndpoints?.length) profile.protocolPayload.regionalEndpoints = input.regionalEndpoints;
   if (input.protocol === "wireguard") {
     if (!isWireGuardPrivateKey(input.clientPrivateKey)) throw new Error("A valid WireGuard private key is required to create an exportable profile");
-    const privateKey = await createSecretMaterial({ kind: `wireguard_client_private_key:${device.id}`, value: input.clientPrivateKey });
+    const privateKey = await createSecretMaterial({ kind: `wireguard_client_private_key:${credential.id}`, value: input.clientPrivateKey });
     profile.protocolPayload.clientPrivateKeySecretId = privateKey.id;
   }
   const saved = await createConnectionProfile({
-    deviceId: input.deviceId,
+    deviceId: device.id,
+    credentialId: credential.id,
     nodeId: input.nodeId,
     protocol: input.protocol,
     transport: profile.transport,
@@ -264,7 +275,7 @@ export async function issueConnectionProfile(input: {
     expiresAt: new Date(Date.now() + (input.expiresInSeconds || 24 * 60 * 60) * 1000).toISOString(),
   });
   if (input.protocol === "openvpn" && input.rotateCredential) await reconcileAllOpenVpnNodes();
-  await addAudit({ actorUserId: input.actorUserId, action: "profile.issued", targetType: "profile", targetId: saved.id, metadata: { deviceId: input.deviceId, nodeId: input.nodeId, protocol: input.protocol } });
+  await addAudit({ actorUserId: input.actorUserId, action: "profile.issued", targetType: "profile", targetId: saved.id, metadata: { credentialId: credential.id, deviceId: device.id, nodeId: input.nodeId, protocol: input.protocol } });
   return saved;
 }
 
@@ -318,6 +329,23 @@ export async function revokeDeviceAndReconcile(deviceId: string, actorUserId?: s
   }
   if (hasOpenVpnProfile) await reconcileAllOpenVpnNodes();
   await addAudit({ actorUserId, action: "device.revoked", targetType: "device", targetId: deviceId });
+}
+
+export async function revokeCredentialAndReconcile(credentialId: string, actorUserId?: string): Promise<void> {
+  const credential = await findAccessCredential(credentialId);
+  if (!credential) throw new Error("Credential not found");
+  const profiles = await listConnectionProfiles({ credentialId });
+  await revokeCertificateIssuancesForCredential(credentialId);
+  await deleteSecretMaterialsByKind(`wireguard_client_private_key:${credentialId}`);
+  await revokeAccessCredential(credentialId);
+  const affected = new Set(profiles.map((profile) => `${profile.node_id}:${profile.protocol}`));
+  for (const key of affected) {
+    const [nodeId, protocol] = key.split(":") as [string, Protocol];
+    if (protocol === "openvpn") continue;
+    try { await rebuildDesiredState(nodeId, protocol); } catch { /* offline nodes reconcile after heartbeat */ }
+  }
+  if (credential.protocol === "openvpn") await reconcileAllOpenVpnNodes();
+  await addAudit({ actorUserId, action: "credential.revoked", targetType: "credential", targetId: credentialId });
 }
 
 export function protocolForPlatform(platform: Platform, protocol: Protocol): boolean {

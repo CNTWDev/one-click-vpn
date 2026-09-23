@@ -34,7 +34,7 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(agent, /add\[add\.index\("-C"\)\] = operation/);
   assert.doesNotMatch(agent, /add\[1\] = operation/);
   assert.match(agent, /\/etc\/wireguard\/northstar\.conf/);
-  assert.match(agent, /agent 2\.5\.0/);
+  assert.match(agent, /agent 2\.6\.0/);
   assert.match(agent, /status-version 3/);
   assert.match(agent, /def openvpn_usage_snapshots/);
   assert.match(agent, /wireguard_usage_snapshots\(\) \+ openvpn_usage_snapshots\(\)/);
@@ -42,7 +42,7 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.doesNotMatch(bootstrap, /AmbientCapabilities=CAP_NET_ADMIN/);
   assert.match(bootstrap, /ProtectSystem=strict/);
   assert.match(bootstrap, /ReadWritePaths=\/opt\/northstar-agent \/etc\/wireguard \/etc\/systemd\/system/);
-  assert.match(openVpnPki, /safeCommonName\(`northstar-\$\{deviceId\}`\)/);
+  assert.match(openVpnPki, /safeCommonName\(`northstar-\$\{credentialId\}`\)/);
   assert.doesNotMatch(openVpnPki, /commonName: `northstar-device-\$\{deviceName\}`/);
   assert.match(readFileSync(path.join(root, "server/control-plane.ts"), "utf8"), /displayName: device\?\.display_name \|\| null/);
   assert.match(traffic, /snapshot\.protocol === "wireguard"/);
@@ -54,7 +54,7 @@ test("regional profiles provide protocol-appropriate multi-node behavior", async
   const controlPlane = readFileSync(path.join(root, "server/control-plane.ts"), "utf8");
   const openVpnPki = readFileSync(path.join(root, "server/openvpn-pki.ts"), "utf8");
   const heartbeat = readFileSync(path.join(root, "app/api/v1/agent/heartbeat/route.ts"), "utf8");
-  const portal = readFileSync(path.join(root, "portal-web/src/main.tsx"), "utf8");
+  const portal = readFileSync(path.join(root, "portal-web/src/credential-dashboard.tsx"), "utf8");
   assert.match(controlPlane, /export async function issueRegionalConnectionProfiles/);
   assert.match(controlPlane, /input\.protocol === "wireguard"/);
   assert.match(controlPlane, /regionalEndpoints: regionalCandidates\.map/);
@@ -127,14 +127,32 @@ test("administrator account access exposes certificates, traffic attribution, an
   assert.match(traffic, /certificate-validity-window/);
   assert.match(traffic, /profile-validity-window/);
   assert.match(usersRoute, /accessSummary/);
-  assert.match(credentialsRoute, /revoke-device/);
-  assert.match(credentialsRoute, /revoke-all-devices/);
+  assert.match(credentialsRoute, /revoke-credential/);
+  assert.match(credentialsRoute, /revoke-all-credentials/);
   assert.match(statusRoute, /revokeApiSessionsForUser/);
   assert.match(statusRoute, /deleteSessionsForUser/);
-  assert.match(statusRoute, /revokeDeviceAndReconcile/);
+  assert.match(statusRoute, /revokeCredentialAndReconcile/);
   assert.match(admin, /OpenVPN 公开证书/);
-  assert.match(admin, /撤销全部设备/);
-  assert.match(admin, /有效期窗口流量/);
+  assert.match(admin, /撤销全部凭据/);
+  assert.match(admin, /凭据窗口流量/);
+});
+
+test("user access is credential-first and shared OpenVPN sessions remain separately metered", () => {
+  const migration = readFileSync(path.join(root, "scripts/migrate.mjs"), "utf8");
+  const credentialRoute = readFileSync(path.join(root, "app/api/v1/credentials/route.ts"), "utf8");
+  const portal = readFileSync(path.join(root, "portal-web/src/credential-dashboard.tsx"), "utf8");
+  const agent = readFileSync(path.join(root, "agent/agent.py"), "utf8");
+  const traffic = readFileSync(path.join(root, "server/traffic.ts"), "utf8");
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS access_credentials/);
+  assert.match(migration, /session_key TEXT NOT NULL DEFAULT ''/);
+  assert.match(credentialRoute, /createAccessCredential/);
+  assert.match(portal, /我的连接凭据/);
+  assert.match(portal, /window\.setInterval/);
+  assert.match(agent, /"duplicate-cn"/);
+  assert.match(agent, /"sessionKey": session_key/);
+  assert.match(traffic, /export async function credentialAccessOverview/);
+  assert.match(traffic, /last_traffic_at/);
+  assert.match(traffic, /telemetry-delayed/);
 });
 
 async function waitForServer() {
@@ -240,6 +258,33 @@ test("v1 bearer session can manage a device", integrationOptions, async () => {
   });
   assert.equal(devices.status, 200);
   assert.equal((await devices.json()).devices.length, 1);
+
+  const credential = await fetch(`${base}/api/v1/credentials`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.accessToken}` },
+    body: JSON.stringify({ name: "Shared WireGuard", protocol: "wireguard", publicKey: Buffer.alloc(32, 3).toString("base64") }),
+  });
+  assert.equal(credential.status, 201);
+  const credentialBody = await credential.json();
+  assert.equal(credentialBody.credential.name, "Shared WireGuard");
+  const credentialId = credentialBody.credential.id;
+
+  const credentials = await fetch(`${base}/api/v1/credentials`, { headers: { Authorization: `Bearer ${session.accessToken}` } });
+  assert.equal(credentials.status, 200);
+  assert.equal((await credentials.json()).credentials.some((item) => item.id === credentialId), true);
+
+  const renamed = await fetch(`${base}/api/v1/credentials/${credentialId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.accessToken}` },
+    body: JSON.stringify({ name: "Renamed Credential" }),
+  });
+  assert.equal(renamed.status, 200);
+
+  const revoked = await fetch(`${base}/api/v1/credentials/${credentialId}/revoke`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${session.accessToken}` },
+  });
+  assert.equal(revoked.status, 200);
 
   const me = await fetch(`${base}/api/v1/auth/me`, {
     headers: { Authorization: `Bearer ${session.accessToken}` },

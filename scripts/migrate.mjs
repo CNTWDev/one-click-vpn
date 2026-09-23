@@ -92,6 +92,16 @@ CREATE TABLE IF NOT EXISTS devices (
 );
 CREATE INDEX IF NOT EXISTS devices_user_idx ON devices(user_id, created_at);
 CREATE INDEX IF NOT EXISTS devices_public_key_idx ON devices(public_key);
+CREATE TABLE IF NOT EXISTS access_credentials (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  display_name TEXT NOT NULL, protocol TEXT NOT NULL, identity_key TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active', expires_at TEXT, revoked_at TEXT,
+  last_seen_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE (device_id, protocol)
+);
+CREATE INDEX IF NOT EXISTS access_credentials_user_idx ON access_credentials(user_id, created_at);
+CREATE INDEX IF NOT EXISTS access_credentials_identity_idx ON access_credentials(protocol, identity_key, status);
 CREATE TABLE IF NOT EXISTS node_protocols (
   node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, protocol TEXT NOT NULL,
   transports_json TEXT NOT NULL DEFAULT '[]', platforms_json TEXT NOT NULL DEFAULT '[]',
@@ -153,6 +163,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS credential_authorities_one_active_idx
 CREATE TABLE IF NOT EXISTS certificate_issuances (
   id TEXT PRIMARY KEY, authority_id TEXT NOT NULL REFERENCES credential_authorities(id) ON DELETE CASCADE,
   node_id TEXT REFERENCES nodes(id) ON DELETE CASCADE, device_id TEXT REFERENCES devices(id) ON DELETE CASCADE,
+  credential_id TEXT REFERENCES access_credentials(id) ON DELETE CASCADE,
   purpose TEXT NOT NULL, serial TEXT NOT NULL, subject TEXT NOT NULL,
   certificate_pem TEXT NOT NULL, private_key_secret_id TEXT REFERENCES secret_materials(id),
   status TEXT NOT NULL DEFAULT 'active', not_before TEXT NOT NULL, not_after TEXT NOT NULL,
@@ -161,6 +172,8 @@ CREATE TABLE IF NOT EXISTS certificate_issuances (
 );
 CREATE INDEX IF NOT EXISTS certificate_issuances_node_idx ON certificate_issuances(node_id, purpose, status);
 CREATE INDEX IF NOT EXISTS certificate_issuances_device_idx ON certificate_issuances(device_id, purpose, status);
+ALTER TABLE certificate_issuances ADD COLUMN IF NOT EXISTS credential_id TEXT REFERENCES access_credentials(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS certificate_issuances_credential_idx ON certificate_issuances(credential_id, purpose, status);
 CREATE TABLE IF NOT EXISTS ip_leases (
   id TEXT PRIMARY KEY, node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   protocol TEXT NOT NULL, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
@@ -169,6 +182,7 @@ CREATE TABLE IF NOT EXISTS ip_leases (
 );
 CREATE TABLE IF NOT EXISTS connection_profiles (
   id TEXT PRIMARY KEY, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  credential_id TEXT REFERENCES access_credentials(id) ON DELETE CASCADE,
   node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, protocol TEXT NOT NULL,
   transport TEXT NOT NULL, revision INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'issued',
   endpoint_json TEXT NOT NULL, client_address TEXT, dns_json TEXT NOT NULL DEFAULT '[]',
@@ -176,6 +190,8 @@ CREATE TABLE IF NOT EXISTS connection_profiles (
   issued_at TEXT NOT NULL, expires_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS profiles_device_idx ON connection_profiles(device_id, updated_at);
+ALTER TABLE connection_profiles ADD COLUMN IF NOT EXISTS credential_id TEXT REFERENCES access_credentials(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS profiles_credential_idx ON connection_profiles(credential_id, updated_at);
 CREATE INDEX IF NOT EXISTS profiles_node_idx ON connection_profiles(node_id, protocol, revision);
 CREATE TABLE IF NOT EXISTS desired_configs (
   id TEXT PRIMARY KEY, node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
@@ -213,19 +229,31 @@ CREATE TABLE IF NOT EXISTS traffic_counters (
   node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   protocol TEXT NOT NULL,
   identity_key TEXT NOT NULL,
+  session_key TEXT NOT NULL DEFAULT '',
   device_id TEXT REFERENCES devices(id) ON DELETE SET NULL,
+  credential_id TEXT REFERENCES access_credentials(id) ON DELETE SET NULL,
   observed_rx_bytes BIGINT NOT NULL DEFAULT 0,
   observed_tx_bytes BIGINT NOT NULL DEFAULT 0,
   last_handshake_at TEXT,
+  last_traffic_at TEXT,
+  connected INTEGER NOT NULL DEFAULT 0,
   counter_epoch TEXT NOT NULL DEFAULT '',
   observed_at TEXT NOT NULL,
-  PRIMARY KEY (node_id, protocol, identity_key)
+  PRIMARY KEY (node_id, protocol, identity_key, session_key)
 );
+ALTER TABLE traffic_counters ADD COLUMN IF NOT EXISTS session_key TEXT NOT NULL DEFAULT '';
+ALTER TABLE traffic_counters ADD COLUMN IF NOT EXISTS credential_id TEXT REFERENCES access_credentials(id) ON DELETE SET NULL;
+ALTER TABLE traffic_counters ADD COLUMN IF NOT EXISTS last_traffic_at TEXT;
+ALTER TABLE traffic_counters ADD COLUMN IF NOT EXISTS connected INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE traffic_counters DROP CONSTRAINT IF EXISTS traffic_counters_pkey;
+ALTER TABLE traffic_counters ADD PRIMARY KEY (node_id, protocol, identity_key, session_key);
 CREATE INDEX IF NOT EXISTS traffic_counters_device_idx ON traffic_counters(device_id, observed_at);
+CREATE INDEX IF NOT EXISTS traffic_counters_credential_idx ON traffic_counters(credential_id, observed_at);
 CREATE TABLE IF NOT EXISTS traffic_daily (
   day TEXT NOT NULL,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  credential_id TEXT REFERENCES access_credentials(id) ON DELETE SET NULL,
   node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   protocol TEXT NOT NULL,
   upload_bytes BIGINT NOT NULL DEFAULT 0,
@@ -234,7 +262,37 @@ CREATE TABLE IF NOT EXISTS traffic_daily (
   last_seen_at TEXT NOT NULL,
   PRIMARY KEY (day, device_id, node_id, protocol)
 );
+ALTER TABLE traffic_daily ADD COLUMN IF NOT EXISTS credential_id TEXT REFERENCES access_credentials(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS traffic_daily_user_idx ON traffic_daily(user_id, day);
+CREATE INDEX IF NOT EXISTS traffic_daily_credential_idx ON traffic_daily(credential_id, day);
+
+INSERT INTO access_credentials
+  (id, user_id, device_id, display_name, protocol, identity_key, status, expires_at, revoked_at, last_seen_at, created_at, updated_at)
+SELECT 'cred_' || md5(d.id || ':' || protocols.protocol), d.user_id, d.id, d.display_name, protocols.protocol,
+  CASE WHEN protocols.protocol = 'openvpn' THEN COALESCE(REPLACE(cert.subject, 'CN=', ''), 'northstar-' || d.id) ELSE d.public_key END,
+  CASE WHEN d.status = 'revoked' THEN 'revoked' ELSE 'active' END,
+  cert.not_after, cert.revoked_at, d.last_seen_at, d.created_at, d.updated_at
+FROM devices d
+INNER JOIN (
+  SELECT DISTINCT device_id, protocol FROM connection_profiles
+  UNION
+  SELECT id AS device_id, CASE WHEN public_key LIKE 'openvpn-managed%' THEN 'openvpn' ELSE 'wireguard' END AS protocol
+  FROM devices WHERE NOT EXISTS (SELECT 1 FROM connection_profiles p WHERE p.device_id = devices.id)
+) protocols ON protocols.device_id = d.id
+LEFT JOIN LATERAL (
+  SELECT subject, not_after, revoked_at FROM certificate_issuances c
+  WHERE c.device_id = d.id AND c.purpose = 'client' ORDER BY c.created_at DESC LIMIT 1
+) cert ON protocols.protocol = 'openvpn'
+ON CONFLICT (device_id, protocol) DO NOTHING;
+
+UPDATE connection_profiles p SET credential_id = c.id
+FROM access_credentials c WHERE p.credential_id IS NULL AND c.device_id = p.device_id AND c.protocol = p.protocol;
+UPDATE certificate_issuances cert SET credential_id = c.id
+FROM access_credentials c WHERE cert.credential_id IS NULL AND cert.device_id = c.device_id AND c.protocol = 'openvpn' AND cert.purpose = 'client';
+UPDATE traffic_counters t SET credential_id = c.id
+FROM access_credentials c WHERE t.credential_id IS NULL AND t.device_id = c.device_id AND t.protocol = c.protocol;
+UPDATE traffic_daily t SET credential_id = c.id
+FROM access_credentials c WHERE t.credential_id IS NULL AND t.device_id = c.device_id AND t.protocol = c.protocol;
 `;
 
 try {
