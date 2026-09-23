@@ -3,8 +3,9 @@ import path from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, X509Certificate } from "node:crypto";
 import { promisify } from "node:util";
+import pg from "pg";
 import test, { after, before } from "node:test";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -131,7 +132,7 @@ test("administrator account access exposes certificates, traffic attribution, an
   assert.match(credentialsRoute, /revoke-all-credentials/);
   assert.match(statusRoute, /revokeApiSessionsForUser/);
   assert.match(statusRoute, /deleteSessionsForUser/);
-  assert.match(statusRoute, /revokeCredentialAndReconcile/);
+  assert.match(statusRoute, /reconcileUserAccess/);
   assert.match(admin, /OpenVPN 公开证书/);
   assert.match(admin, /撤销全部凭据/);
   assert.match(admin, /凭据窗口流量/);
@@ -308,4 +309,123 @@ test("v1 agent tasks reject invalid credentials", integrationOptions, async () =
     body: JSON.stringify({ nodeId: "missing", token: "invalid" }),
   });
   assert.equal(response.status, 401);
+});
+
+test("credential controls preserve independent user/admin locks and recoverable account suspension", integrationOptions, async () => {
+  const pool = new pg.Pool({ connectionString: databaseUrl });
+  const login = async (email) => {
+    const response = await fetch(`${base}/api/v1/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password: "test-password-123" }) });
+    assert.equal(response.status, 200);
+    return (await response.json()).accessToken;
+  };
+  const adminToken = await login("owner@example.com");
+  const call = async (path, token, body, method = "POST") => fetch(`${base}${path}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  const email = `controls-${Date.now()}@example.com`;
+  const registration = await call("/api/v1/auth/register", adminToken, { email, password: "test-password-123", displayName: "Access test" });
+  assert.equal(registration.status, 201);
+  const userId = (await registration.json()).user.id;
+  const statusPath = `/api/v1/admin/users/${userId}/status`;
+  assert.equal((await call(statusPath, adminToken, { status: "active" })).status, 200);
+  let token = await login(email);
+  const created = await call("/api/v1/credentials", token, { name: "Reusable", protocol: "wireguard", publicKey: Buffer.alloc(32, 5).toString("base64") });
+  assert.equal(created.status, 201);
+  const id = (await created.json()).credential.id;
+  const path = `/api/v1/credentials/${id}`;
+  const adminPath = `/api/v1/admin/users/${userId}/credentials`;
+  const state = async () => (await (await call("/api/v1/credentials", token, undefined, "GET")).json()).credentials.find((item) => item.id === id);
+  const nodeId = `node_controls_${Date.now()}`;
+  const timestamp = new Date().toISOString();
+  try {
+    const deviceId = (await pool.query("SELECT device_id FROM access_credentials WHERE id=$1", [id])).rows[0].device_id;
+    await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at,server_public_key)
+      VALUES ($1,'Controls','Test','127.0.0.1','root','password','','','',$2,$2,'server-key')`, [nodeId, timestamp]);
+    await pool.query(`INSERT INTO vpn_services (node_id,protocol,enabled,transport,listen_port,subnet,dns_json,status,created_at,updated_at)
+      VALUES ($1,'wireguard',1,'udp',51820,'10.70.0.0/24','[]','healthy',$2,$2)`, [nodeId, timestamp]);
+    await pool.query(`INSERT INTO ip_leases (id,node_id,protocol,device_id,address,status,created_at)
+      VALUES ($1,$2,'wireguard',$3,'10.70.0.2/32','active',$4)`, [`lease_${nodeId}`, nodeId, deviceId, timestamp]);
+    await pool.query(`INSERT INTO connection_profiles (id,device_id,credential_id,node_id,protocol,transport,revision,status,endpoint_json,issued_at,expires_at,updated_at)
+      VALUES ($1,$2,$3,$4,'wireguard','udp',1,'active','{}',$5,'2099-01-01T00:00:00.000Z',$5)`, [`profile_${nodeId}`, deviceId, id, nodeId, timestamp]);
+    await pool.query(`UPDATE nodes SET status='online', last_heartbeat_at=$2, agent_capabilities_json=$3 WHERE id=$1`, [nodeId, timestamp, JSON.stringify({ connectivity: { protocols: { wireguard: { runtimeActive: true, listening: true }, openvpn: { runtimeActive: true, listening: true } } } })]);
+    await pool.query(`INSERT INTO node_protocols (node_id,protocol,updated_at) VALUES ($1,'wireguard',$2),($1,'openvpn',$2)`, [nodeId, timestamp]);
+    const wgIssued = await call("/api/v1/profiles", token, { credentialId: id, protocol: "wireguard", clientPrivateKey: Buffer.alloc(32, 5).toString("base64") });
+    assert.equal(wgIssued.status, 201);
+    const wgProfile = (await wgIssued.json()).profile;
+    const wgCredential = (await pool.query("SELECT * FROM access_credentials WHERE id=$1", [id])).rows[0];
+    assert.equal(wgProfile.expiresAt, wgCredential.expires_at);
+    assert.equal(new Date(wgCredential.expires_at) - new Date(wgCredential.created_at), 365 * 86_400_000);
+    const migrate = () => execFileAsync(process.execPath, [fileURLToPath(new URL("../scripts/migrate.mjs", import.meta.url))], { cwd: root, env: { ...process.env, NORTHSTAR_DATABASE_URL: databaseUrl } });
+    await pool.query("UPDATE connection_profiles SET expires_at=$2 WHERE id=$1", [wgProfile.id, new Date(new Date(wgProfile.issuedAt).getTime() + 86_400_000).toISOString()]);
+    await migrate();
+    await migrate();
+    assert.equal((await pool.query("SELECT expires_at FROM connection_profiles WHERE id=$1", [wgProfile.id])).rows[0].expires_at, wgCredential.expires_at);
+    await pool.query("UPDATE connection_profiles SET status='expired' WHERE id=$1", [wgProfile.id]);
+    await migrate();
+    assert.equal((await pool.query("SELECT status FROM connection_profiles WHERE id=$1", [wgProfile.id])).rows[0].status, "expired");
+    await pool.query("UPDATE access_credentials SET expires_at=$2 WHERE id=$1", [id, new Date(Date.now() + 20 * 86_400_000).toISOString()]);
+    assert.equal((await state()).expiringSoon, true);
+    assert.equal((await state()).daysRemaining, 20);
+    await pool.query("UPDATE access_credentials SET expires_at=$2 WHERE id=$1", [id, wgCredential.expires_at]);
+    const peers = async () => JSON.parse((await pool.query("SELECT payload_json FROM desired_configs WHERE node_id=$1 AND protocol='wireguard'", [nodeId])).rows[0].payload_json).peers;
+    assert.equal((await call(path, token, { action: "disable" }, "PATCH")).status, 200);
+    assert.equal((await state()).state, "disabled");
+    assert.equal((await peers()).length, 0);
+    assert.equal((await state()).syncStatus, "pending");
+    await pool.query("UPDATE reconcile_tasks SET status='succeeded' WHERE node_id=$1", [nodeId]);
+    assert.equal((await state()).syncStatus, "applied");
+    await pool.query("UPDATE reconcile_tasks SET status='failed' WHERE node_id=$1", [nodeId]);
+    assert.equal((await state()).syncStatus, "failed");
+    assert.equal((await call(path, adminToken, { action: "enable" }, "PATCH")).status, 404);
+    assert.equal((await call(adminPath, adminToken, { action: "disable-credential", credentialId: id })).status, 200);
+    assert.equal((await call(path, token, { action: "enable" }, "PATCH")).status, 409);
+    assert.equal((await call(adminPath, adminToken, { action: "enable-credential", credentialId: id })).status, 200);
+    assert.equal((await state()).state, "disabled");
+    assert.equal((await call(path, token, { action: "enable" }, "PATCH")).status, 200);
+    assert.equal((await peers()).length, 1);
+    assert.equal((await call(statusPath, adminToken, { status: "suspended" })).status, 200);
+    assert.equal((await peers()).length, 0);
+    assert.equal((await call("/api/v1/credentials", token, undefined, "GET")).status, 401);
+    assert.equal((await call(statusPath, adminToken, { status: "active" })).status, 200);
+    token = await login(email);
+    assert.equal((await peers()).length, 1);
+    assert.equal((await state()).status, "active");
+    // Exercise OpenVPN's reversible serial deny list through the same real API/service path.
+    const ovCreated = await call("/api/v1/credentials", token, { name: "OpenVPN shared", protocol: "openvpn" });
+    assert.equal(ovCreated.status, 201);
+    const ovId = (await ovCreated.json()).credential.id;
+    await pool.query(`INSERT INTO vpn_services (node_id,protocol,enabled,transport,listen_port,subnet,dns_json,status,created_at,updated_at)
+      VALUES ($1,'openvpn',1,'udp',1194,'10.71.0.0/24','[]','healthy',$2,$2)
+      ON CONFLICT (node_id,protocol) DO UPDATE SET status='healthy'`, [nodeId, timestamp]);
+    const ovIssued = await call("/api/v1/profiles", token, { credentialId: ovId, protocol: "openvpn" });
+    assert.equal(ovIssued.status, 201);
+    const ovProfile = (await ovIssued.json()).profile;
+    const cert = (await pool.query("SELECT * FROM certificate_issuances WHERE credential_id=$1 AND purpose='client'", [ovId])).rows[0];
+    const parsedCert = new X509Certificate(cert.certificate_pem);
+    assert.equal(new Date(parsedCert.validTo) - new Date(parsedCert.validFrom), 365 * 86_400_000);
+    assert.equal(ovProfile.expiresAt, new Date(parsedCert.validTo).toISOString());
+    assert.equal(ovProfile.expiresAt, (await pool.query("SELECT expires_at FROM access_credentials WHERE id=$1", [ovId])).rows[0].expires_at);
+    const ovAction = async (action) => {
+      const response = await call(adminPath, adminToken, { action: `${action}-credential`, credentialId: ovId });
+      assert.equal(response.status, 200);
+      return response.json();
+    };
+    await ovAction("disable");
+    const deniedSerials = async () => JSON.parse((await pool.query("SELECT payload_json FROM desired_configs WHERE node_id=$1 AND protocol='openvpn'", [nodeId])).rows[0].payload_json).revokedSerials;
+    await ovAction("disable");
+    assert.ok((await deniedSerials()).includes(cert.serial));
+    await ovAction("enable");
+    assert.ok(!(await deniedSerials()).includes(cert.serial));
+    assert.equal((await pool.query("SELECT status FROM certificate_issuances WHERE id=$1", [cert.id])).rows[0].status, "active");
+    await ovAction("revoke");
+    assert.ok((await deniedSerials()).includes(cert.serial));
+    assert.equal((await call(adminPath, adminToken, { action: "revoke-credential", credentialId: id })).status, 200);
+    assert.equal((await peers()).length, 0);
+    assert.equal((await call(adminPath, adminToken, { action: "enable-credential", credentialId: id })).status, 400);
+    assert.equal((await call(path, token, { action: "delete" }, "PATCH")).status, 200);
+    assert.equal(await state(), undefined);
+    assert.ok((await pool.query("SELECT deleted_at FROM access_credentials WHERE id=$1", [id])).rows[0].deleted_at);
+    assert.ok((await pool.query("SELECT id FROM audit_logs WHERE target_id=$1", [id])).rowCount > 0);
+  } finally {
+    await pool.query("DELETE FROM nodes WHERE id=$1", [nodeId]);
+    await pool.end();
+  }
 });

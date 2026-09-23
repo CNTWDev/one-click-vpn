@@ -4,7 +4,8 @@ import { cleanText, jsonError, readJson } from "../../../../../../../server/http
 import { requestAdmin } from "../../../../../../../server/request-auth";
 import { adminUserAccessOverview } from "../../../../../../../server/traffic";
 import { findAccessCredential, findDevice, listAccessCredentials, listDevices } from "../../../../../../../server/control-db";
-import { revokeCredentialAndReconcile, revokeDeviceAndReconcile } from "../../../../../../../server/control-plane";
+import { revokeDeviceAndReconcile } from "../../../../../../../server/control-plane";
+import { manageCredentialsAccess, type CredentialAction } from "../../../../../../../server/credential-access";
 
 export const runtime = "nodejs";
 
@@ -28,22 +29,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   try {
     const body = await readJson(request);
     const action = cleanText(body.action, 40);
-    if (action === "revoke-credential") {
-      const credentialId = cleanText(body.credentialId, 128);
-      const credential = await findAccessCredential(credentialId);
-      if (!credential || credential.user_id !== id) return jsonError("Credential not found", 404);
-      if (credential.status !== "revoked") await revokeCredentialAndReconcile(credential.id, admin.id);
-      return NextResponse.json({ ok: true });
-    }
-    if (action === "revoke-all-credentials") {
-      const credentials = await listAccessCredentials(id);
-      let revoked = 0;
-      for (const credential of credentials) {
-        if (credential.status === "revoked") continue;
-        await revokeCredentialAndReconcile(credential.id, admin.id);
-        revoked += 1;
-      }
-      return NextResponse.json({ ok: true, revoked });
+    if (["enable-credential", "disable-credential", "delete-credential", "revoke-credential", "disable-all-credentials", "revoke-all-credentials"].includes(action)) {
+      const credentials = action.includes("-all-")
+        ? (await listAccessCredentials(id)).filter((item) => item.status !== "revoked" && !item.deleted_at && (action.startsWith("revoke") || (item.status === "active" && (!item.expires_at || item.expires_at > new Date().toISOString()))))
+        : [await findAccessCredential(cleanText(body.credentialId, 128))];
+      if (credentials.some((item) => !item || item.user_id !== id)) return jsonError("Credential not found", 404);
+      return NextResponse.json(await manageCredentialsAccess(id, credentials.map((item) => item!.id), action.split("-")[0] as CredentialAction, { id: admin.id, admin: true }));
     }
     if (action === "revoke-device") {
       const deviceId = cleanText(body.deviceId, 128);

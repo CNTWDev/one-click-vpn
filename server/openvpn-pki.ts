@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { randomBytes, X509Certificate } from "node:crypto";
+import { CREDENTIAL_VALIDITY_DAYS } from "./credential-validity";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -61,7 +62,9 @@ async function issueCertificate(input: {
 }): Promise<{ certificatePem: string; privateKeyPem: string; serial: string; notBefore: string; notAfter: string }> {
   const caPrivateKey = await readSecretMaterial(input.authority.private_key_secret_id);
   if (!caPrivateKey) throw new Error("OpenVPN issuer private key is unavailable");
-  const dates = certificateDate(OPENVPN_LEAF_DAYS);
+  const days = Math.min(input.purpose === "client" ? CREDENTIAL_VALIDITY_DAYS : OPENVPN_LEAF_DAYS,
+    Math.floor((new Date(input.authority.not_after).getTime() - Date.now()) / 86_400_000));
+  if (days < 1) throw new Error("OpenVPN issuer expires too soon; renew the CA before issuing certificates");
   return withWorkspace(async (directory) => {
     await Promise.all([
       writeFile(path.join(directory, "ca.crt"), input.authority.certificate_pem, { mode: 0o600 }),
@@ -79,7 +82,7 @@ async function issueCertificate(input: {
     ].join("\n"), { mode: 0o600 });
     await openssl([
       "x509", "-req", "-in", "leaf.csr", "-CA", "ca.crt", "-CAkey", "ca.key", "-CAcreateserial",
-      "-out", "leaf.crt", "-days", String(OPENVPN_LEAF_DAYS), "-sha256", "-extfile", "leaf.ext",
+      "-out", "leaf.crt", "-days", String(days), "-sha256", "-extfile", "leaf.ext",
     ], directory);
     const [certificatePem, privateKeyPem, serialOutput] = await Promise.all([
       readFile(path.join(directory, "leaf.crt"), "utf8"),
@@ -88,7 +91,8 @@ async function issueCertificate(input: {
     ]);
     const serial = serialOutput.trim().replace(/^serial=/i, "").toUpperCase();
     if (!/^[A-F0-9]+$/.test(serial)) throw new Error("OpenVPN certificate serial is invalid");
-    return { certificatePem, privateKeyPem, serial, ...dates };
+    const certificate = new X509Certificate(certificatePem);
+    return { certificatePem, privateKeyPem, serial, notBefore: new Date(certificate.validFrom).toISOString(), notAfter: new Date(certificate.validTo).toISOString() };
   });
 }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { addAudit } from "../../../../server/db";
-import { createAccessCredential, type Protocol } from "../../../../server/control-db";
+import { createAccessCredential, listAccessCredentials, type Protocol } from "../../../../server/control-db";
+import { manageCredentialsAccess } from "../../../../server/credential-access";
 import { cleanText, jsonError, readJson } from "../../../../server/http";
 import { requestUser } from "../../../../server/request-auth";
 import { credentialAccessOverview } from "../../../../server/traffic";
@@ -8,6 +9,18 @@ import { credentialAccessOverview } from "../../../../server/traffic";
 export const runtime = "nodejs";
 
 const protocols = new Set<Protocol>(["wireguard", "openvpn"]);
+
+export async function PATCH(request: Request) {
+  const user = await requestUser(request);
+  if (!user) return jsonError("Authentication required", 401);
+  try {
+    const { action } = await readJson(request);
+    if (action !== "disable" && action !== "revoke") return jsonError("Unsupported bulk action");
+    const credentials = (await listAccessCredentials(user.id)).filter((item) => !item.deleted_at && item.status === "active"
+      && (action === "revoke" || !item.expires_at || item.expires_at > new Date().toISOString()));
+    return NextResponse.json(await manageCredentialsAccess(user.id, credentials.map((item) => item.id), action, { id: user.id, admin: false }));
+  } catch (error) { return jsonError(error instanceof Error ? error.message : "Unable to update credentials", 409); }
+}
 
 export async function GET(request: Request) {
   const user = await requestUser(request);

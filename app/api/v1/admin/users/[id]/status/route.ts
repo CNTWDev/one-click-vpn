@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { addAudit, deleteSessionsForUser, findUserById, updateUserStatus, type DbUser } from "../../../../../../../server/db";
-import { listAccessCredentials, listDevices, revokeApiSessionsForUser } from "../../../../../../../server/control-db";
-import { revokeCredentialAndReconcile, revokeDeviceAndReconcile } from "../../../../../../../server/control-plane";
+import { revokeApiSessionsForUser } from "../../../../../../../server/control-db";
+import { reconcileUserAccess } from "../../../../../../../server/credential-access";
 import { publicUser } from "../../../../../../../server/device-auth";
 import { requestAdmin } from "../../../../../../../server/request-auth";
 import { cleanText, jsonError, readJson } from "../../../../../../../server/http";
@@ -26,18 +26,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!user) return jsonError("User not found", 404);
     if (status !== "active") {
       await Promise.all([deleteSessionsForUser(id), revokeApiSessionsForUser(id)]);
-      const credentials = await listAccessCredentials(id);
-      const credentialDeviceIds = new Set(credentials.map((credential) => credential.device_id));
-      for (const credential of credentials) {
-        if (credential.status !== "revoked") await revokeCredentialAndReconcile(credential.id, admin.id);
-      }
-      const devices = await listDevices(id);
-      for (const device of devices) {
-        if (!credentialDeviceIds.has(device.id) && device.status !== "revoked") await revokeDeviceAndReconcile(device.id, admin.id);
-      }
     }
+    const sync = await reconcileUserAccess(id);
     await addAudit({ actorUserId: admin.id, action: `user.${status}`, targetType: "user", targetId: id, metadata: reason ? { reason } : {} });
-    return NextResponse.json({ user: publicUser(user) });
+    return NextResponse.json({ user: publicUser(user), sync });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to update user");
   }

@@ -38,7 +38,13 @@ export async function reconcileEnabledVpnServices(nodeId: string): Promise<void>
   const capabilities = await listNodeProtocols(nodeId);
   for (const service of await listVpnServices(nodeId)) {
     if (!service.enabled) continue;
-    if (service.status === "healthy" || service.status === "deploying" || service.status === "attention") continue;
+    if (service.status === "healthy") {
+      // Re-evaluate time-based access on heartbeat; unchanged payloads enqueue no work.
+      try { await rebuildDesiredState(nodeId, service.protocol); }
+      catch (error) { await updateVpnServiceState(nodeId, service.protocol, { status: "attention", lastError: error instanceof Error ? error.message : String(error) }); }
+      continue;
+    }
+    if (service.status === "deploying" || service.status === "attention") continue;
     const capability = capabilities.find((item) => item.protocol === service.protocol);
     if (!capability || capability.status !== "enabled") {
       await updateVpnServiceState(nodeId, service.protocol, { status: "unsupported", lastError: "The Agent does not currently advertise this protocol runtime" });

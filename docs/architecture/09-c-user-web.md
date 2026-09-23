@@ -308,8 +308,8 @@ POST /api/v1/admin/users/:id/credentials  { "action": "revoke-all-credentials" }
 WireGuard 流量按凭据公钥归因。OpenVPN 以证书 Common Name 作为凭据身份，并用
 会话标识分别累计同证书并发连接的流量，最终聚合到凭据维度。
 
-账号被停用或拒绝时，Controller 同步清理 Web/API 会话，吊销其全部连接凭据、
-配置与客户端证书，并下发节点收敛任务；恢复账号不会恢复已吊销凭据。
+账号被停用或拒绝时，Controller 清理 Web/API 会话并暂停全部凭据的连接权限，
+下发节点收敛任务。恢复账号只解除账号限制，不解除用户/管理员单独停用或永久撤销。
 ```
 
 管理员审核操作必须写入 AuditEvent。审核通过后不需要为每个节点单独创建授权记录，用户状态是第一版的总开关。
@@ -370,13 +370,45 @@ AccessCredential
 
 ## 9. 权限和安全底线
 
+### 凭据生命周期管理
+
+新凭据默认有效 365 天：WireGuard 从创建时计算；OpenVPN 从首次签发的实际证书计算。
+OpenVPN 到期时间从签名后的 X.509 证书读取，Profile 直接使用同一到期时间，
+不再额外设置 24 小时配置期限。若 CA 剩余期限不足一年，客户端证书不得超过 CA。
+服务端证书与 CA 使用独立的基础设施期限，不计入用户凭据的一年规则。
+已有 OpenVPN 证书保持原始签发期限；已有无期限凭据按创建时间补齐 365 天。
+迁移只修正仍未到期且未被停用/撤销的一天配置，不恢复已过期的配置状态。
+
+两端均展示带年份的连接到期日期，并在剩余 30 天内显示页面提醒。
+个人端“换发新凭据”预填创建表单，生成新的身份和配置；所有使用端需重新导入，
+验证成功后用户自行撤销旧凭据。重新下载不会延长期限，也不支持直接修改证书日期。
+健康节点每次心跳重新计算目标权限，仅变化时下发任务，以执行到期断开和阻止重连。
+
+个人端可对自己的凭据启用、停用、撤销、删除，也可批量停用/撤销。
+管理员在账号详情内可执行相同操作。用户停用 (`user_disabled`) 与管理员停用
+(`admin_disabled`) 独立保存；任一限制存在或账号不是 active，均不允许连接。
+用户不能解除管理员停用；管理员启用只解除管理员开关，不覆盖用户自己的选择。
+过期、永久撤销、已删除的凭据不能重新启用。删除先撤销再设置 `deleted_at`，
+隐藏日常列表，但保留历史流量、证书及审计。
+
+个人接口：`PATCH /api/v1/credentials/:id`，body 为 `{ action: enable|disable|revoke|delete }`。
+批量接口：`PATCH /api/v1/credentials`，body 为 `{ action: disable|revoke }`。
+后台沿用账号 credentials POST，新增 enable-credential、disable-credential、
+delete-credential、disable-all-credentials。旧撤销接口继续有效。
+
+WireGuard 通过移除/恢复 Peer 实施访问限制，停用期间保留 IP Lease 和密钥。
+OpenVPN 通过可恢复的证书 serial 拒绝列表实施停用，永久撤销仍独立保存于证书表。
+配置应用会重启该节点 OpenVPN 服务，因此其他连接可能短暂重连。
+页面的“生效中/已生效/同步失败”以节点任务回执为准；尚未收到回执不可宣称已经断开。
+部署前执行数据库迁移；现有 Agent 2.6.0 已支持更新 serial 拒绝列表，无需更改客户端配置。
+
 - 所有获取 Profile 的接口都必须同时检查 `user.status = active`、凭据归属和凭据状态；
 - C 端只拿到区域/协议/状态，不拿到节点管理信息；
 - 下载响应必须 `Cache-Control: no-store`；
 - Web session 使用 HttpOnly、Secure、SameSite Cookie；
 - API access token 只用于原生客户端，refresh token 必须轮换并可撤销；
 - 注册、登录、下载 Profile 都需要限流并写审计；
-- 账号拒绝/停用后，现有 Credential、Profile 和证书立即失效；
+- 账号拒绝/停用后立即禁止 API 访问，节点应用最新配置后断开 VPN 连接并阻止重连；
 - 不把客户端提交的 `endpoint`、`clientAddress`、`allowedIps` 当作可信输入；这些值全部由 Controller 生成；
 - 不在 Web 页面显示私钥、服务器私钥、Agent token、SSH 凭据或内部日志。
 - 流量统计只接受已认证 Agent 的采样，浏览器不能提交流量数字；

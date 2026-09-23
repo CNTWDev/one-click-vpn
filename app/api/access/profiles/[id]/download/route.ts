@@ -1,4 +1,5 @@
 import { currentUser } from "../../../../../../server/auth";
+import { assertCredentialUsable } from "../../../../../../server/credential-access";
 import { findConnectionProfile, findDevice } from "../../../../../../server/control-db";
 import { renderOpenVpnProfile } from "../../../../../../server/openvpn-pki";
 import { renderWireGuardProfile } from "../../../../../../server/control-plane";
@@ -15,6 +16,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   if (!profile || !device || device.user_id !== user.id) return jsonError("Connection profile not found", 404);
   if (profile.status !== "active") return jsonError("Activate this profile before downloading it", 409);
   try {
+    if (profile.credential_id) await assertCredentialUsable(profile.credential_id);
     const config = profile.protocol === "openvpn"
       ? await renderOpenVpnProfile({ endpoint: profile.endpoint, transport: profile.transport, dns: profile.dns, payload: profile.protocol_payload })
       : await renderWireGuardProfile(profile);

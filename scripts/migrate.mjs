@@ -266,6 +266,11 @@ ALTER TABLE traffic_daily ADD COLUMN IF NOT EXISTS credential_id TEXT REFERENCES
 CREATE INDEX IF NOT EXISTS traffic_daily_user_idx ON traffic_daily(user_id, day);
 CREATE INDEX IF NOT EXISTS traffic_daily_credential_idx ON traffic_daily(credential_id, day);
 
+ALTER TABLE access_credentials ADD COLUMN IF NOT EXISTS user_disabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE access_credentials ADD COLUMN IF NOT EXISTS admin_disabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE access_credentials ADD COLUMN IF NOT EXISTS deleted_at TEXT;
+ALTER TABLE vpn_services ADD COLUMN IF NOT EXISTS access_sync_error TEXT NOT NULL DEFAULT '';
+
 INSERT INTO access_credentials
   (id, user_id, device_id, display_name, protocol, identity_key, status, expires_at, revoked_at, last_seen_at, created_at, updated_at)
 SELECT 'cred_' || md5(d.id || ':' || protocols.protocol), d.user_id, d.id, d.display_name, protocols.protocol,
@@ -293,6 +298,23 @@ UPDATE traffic_counters t SET credential_id = c.id
 FROM access_credentials c WHERE t.credential_id IS NULL AND t.device_id = c.device_id AND t.protocol = c.protocol;
 UPDATE traffic_daily t SET credential_id = c.id
 FROM access_credentials c WHERE t.credential_id IS NULL AND t.device_id = c.device_id AND t.protocol = c.protocol;
+
+-- Existing signed certificates retain their original cryptographic expiry. Never rewrite PEM dates.
+UPDATE access_credentials c SET expires_at = COALESCE(
+  (SELECT ci.not_after FROM certificate_issuances ci WHERE ci.credential_id = c.id AND ci.purpose = 'client'
+    AND ci.status = 'active' ORDER BY ci.created_at DESC LIMIT 1),
+  to_char((c.created_at::timestamptz + interval '365 days') AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+WHERE c.expires_at IS NULL;
+
+-- Correct only still-valid legacy 24-hour profiles. Do not resurrect expired/revoked/disabled access.
+UPDATE connection_profiles p SET expires_at = c.expires_at
+FROM access_credentials c, users u, devices d
+WHERE p.credential_id = c.id AND u.id = c.user_id AND d.id = c.device_id
+  AND p.status IN ('issued', 'active') AND p.expires_at::timestamptz > CURRENT_TIMESTAMP
+  AND c.status = 'active' AND u.status = 'active' AND d.status = 'active'
+  AND NOT c.user_disabled AND NOT c.admin_disabled AND c.deleted_at IS NULL
+  AND c.expires_at::timestamptz > p.expires_at::timestamptz
+  AND EXTRACT(EPOCH FROM (p.expires_at::timestamptz - p.issued_at::timestamptz)) BETWEEN 86399 AND 86401;
 `;
 
 try {

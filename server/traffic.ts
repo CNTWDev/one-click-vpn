@@ -1,5 +1,7 @@
 import { dbExec, dbQuery } from "./db";
 import { X509Certificate } from "node:crypto";
+import { credentialSyncStatus } from "./credential-access";
+import { EXPIRY_WARNING_DAYS } from "./credential-validity";
 
 export type UsageSnapshot = {
   protocol: "wireguard" | "openvpn";
@@ -128,6 +130,7 @@ export async function credentialAccessOverview(userId: string, input: { from?: s
   const wireGuardCutoff = new Date(Date.now() - 180_000).toISOString();
   const rows = await dbQuery<{
     id: string; display_name: string; protocol: string; identity_key: string; credential_status: string;
+    user_disabled: boolean; admin_disabled: boolean; account_status: string;
     expires_at: string | null; revoked_at: string | null; created_at: string; updated_at: string;
     certificate_id: string | null; serial: string | null; subject: string | null; certificate_pem: string | null;
     certificate_not_before: string | null; certificate_not_after: string | null;
@@ -135,7 +138,7 @@ export async function credentialAccessOverview(userId: string, input: { from?: s
     fresh_node_count: string; connection_count: string; last_activity_at: string | null; last_observed_at: string | null;
   }>(`SELECT c.id, c.display_name, c.protocol, c.identity_key,
       CASE WHEN c.status = 'active' AND c.expires_at IS NOT NULL AND c.expires_at <= $6 THEN 'expired' ELSE c.status END AS credential_status,
-      c.expires_at, c.revoked_at, c.created_at, c.updated_at,
+      c.expires_at, c.revoked_at, c.created_at, c.updated_at, c.user_disabled, c.admin_disabled, u.status AS account_status,
       cert.id AS certificate_id, cert.serial, cert.subject, cert.certificate_pem,
       cert.not_before AS certificate_not_before, cert.not_after AS certificate_not_after,
       COALESCE(usage.upload_bytes, 0)::text AS upload_bytes, COALESCE(usage.download_bytes, 0)::text AS download_bytes,
@@ -144,6 +147,7 @@ export async function credentialAccessOverview(userId: string, input: { from?: s
       COALESCE(presence.connection_count, 0)::text AS connection_count,
       presence.last_activity_at, presence.last_observed_at
     FROM access_credentials c
+    INNER JOIN users u ON u.id = c.user_id
     LEFT JOIN LATERAL (
       SELECT ci.id, ci.serial, ci.subject, ci.certificate_pem, ci.not_before, ci.not_after
       FROM certificate_issuances ci WHERE ci.credential_id = c.id AND ci.purpose = 'client'
@@ -168,19 +172,25 @@ export async function credentialAccessOverview(userId: string, input: { from?: s
         MAX(tc.observed_at) AS last_observed_at
       FROM traffic_counters tc INNER JOIN nodes n ON n.id = tc.node_id WHERE tc.credential_id = c.id
     ) presence ON true
-    WHERE c.user_id = $1 ORDER BY c.created_at DESC`, [userId, from, to, onlineCutoff, wireGuardCutoff, currentTime]);
+    WHERE c.user_id = $1 AND c.deleted_at IS NULL ORDER BY c.created_at DESC`, [userId, from, to, onlineCutoff, wireGuardCutoff, currentTime]);
   return {
     from, to, updatedAt: currentTime,
-    credentials: rows.map((row) => {
+    credentials: await Promise.all(rows.map(async (row) => {
       const connectionCount = Number(row.connection_count || 0);
       const activeProfileCount = Number(row.active_profile_count || 0);
       const lastActivityAt = row.last_activity_at || null;
       const state = row.credential_status !== "active" ? row.credential_status
+        : row.account_status !== "active" ? "account-disabled"
+        : row.admin_disabled ? "admin-disabled" : row.user_disabled ? "disabled"
         : connectionCount > 0 ? "online"
           : activeProfileCount > 0 && Number(row.fresh_node_count || 0) === 0 ? "telemetry-delayed"
             : lastActivityAt ? "offline" : "never-connected";
       return {
         id: row.id, name: row.display_name, protocol: row.protocol, status: row.credential_status,
+        expiringSoon: row.credential_status === "active" && Boolean(row.expires_at) && new Date(row.expires_at!).getTime() - Date.now() <= EXPIRY_WARNING_DAYS * 86_400_000,
+        daysRemaining: row.expires_at ? Math.max(0, Math.ceil((new Date(row.expires_at).getTime() - Date.now()) / 86_400_000)) : null,
+        userDisabled: row.user_disabled, adminDisabled: row.admin_disabled, accountStatus: row.account_status,
+        syncStatus: await credentialSyncStatus(row.id, row.protocol),
         identitySuffix: row.identity_key.replaceAll(":", "").slice(-10), expiresAt: row.expires_at,
         revokedAt: row.revoked_at, createdAt: row.created_at, updatedAt: row.updated_at,
         online: connectionCount > 0, state, connectionCount, lastActivityAt, lastObservedAt: row.last_observed_at,
@@ -192,7 +202,7 @@ export async function credentialAccessOverview(userId: string, input: { from?: s
         } : null,
         ...numbers(row),
       };
-    }),
+    })),
   };
 }
 
@@ -262,8 +272,8 @@ export async function adminUserAccessSummaries() {
   }>(`SELECT u.id AS user_id,
       (SELECT COUNT(*)::text FROM devices d WHERE d.user_id = u.id) AS device_count,
       (SELECT COUNT(*)::text FROM devices d WHERE d.user_id = u.id AND d.status = 'active') AS active_device_count,
-      (SELECT COUNT(*)::text FROM access_credentials c WHERE c.user_id = u.id) AS credential_count,
-      (SELECT COUNT(*)::text FROM access_credentials c WHERE c.user_id = u.id AND c.status = 'active' AND (c.expires_at IS NULL OR c.expires_at > $3)) AS active_credential_count,
+      (SELECT COUNT(*)::text FROM access_credentials c WHERE c.user_id = u.id AND c.deleted_at IS NULL) AS credential_count,
+      (SELECT COUNT(*)::text FROM access_credentials c WHERE c.user_id = u.id AND c.deleted_at IS NULL AND NOT c.user_disabled AND NOT c.admin_disabled AND u.status = 'active' AND c.status = 'active' AND (c.expires_at IS NULL OR c.expires_at > $3)) AS active_credential_count,
       (SELECT COUNT(*)::text FROM connection_profiles p INNER JOIN devices d ON d.id = p.device_id WHERE d.user_id = u.id) AS profile_count,
       (SELECT COUNT(*)::text FROM connection_profiles p INNER JOIN devices d ON d.id = p.device_id
         WHERE d.user_id = u.id AND p.status IN ('issued', 'active') AND p.expires_at > $3) AS active_profile_count,
@@ -394,7 +404,7 @@ export async function adminUserAccessOverview(userId: string, input: { from?: st
     summary: {
       deviceCount: mappedDevices.length, activeDeviceCount: mappedDevices.filter((item) => item.status === "active").length,
       credentialCount: credentialOverview.credentials.length,
-      activeCredentialCount: credentialOverview.credentials.filter((item) => item.status === "active").length,
+      activeCredentialCount: credentialOverview.credentials.filter((item) => item.status === "active" && !item.userDisabled && !item.adminDisabled && item.accountStatus === "active").length,
       profileCount: mappedProfiles.length, activeProfileCount: mappedProfiles.filter((item) => ["issued", "active"].includes(item.status)).length,
       certificateCount: mappedCertificates.length, activeCertificateCount: mappedCertificates.filter((item) => item.status === "active").length,
     },

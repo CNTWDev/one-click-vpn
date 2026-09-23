@@ -117,3 +117,10 @@
 .credential-section details summary { cursor: pointer; }
 .credential-section details pre { max-height: 190px; overflow: auto; padding: 11px; border-radius: 8px; background: #162014; color: #dceec1; font-size: 9px; white-space: pre-wrap; word-break: break-all; }
 @media (max-width: 780px) { .certificate-summary { grid-template-columns: 1fr; } }
+.credential-main small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.6; }
+.device-detail-head > .credential-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: 320px; }
+@media (max-width: 600px) {
+  .device-detail-head > .credential-actions { margin-left: 0; }
+  .credential-row { flex-wrap: wrap; }
+  .credential-row .credential-main { flex-basis: calc(100% - 52px); }
+}

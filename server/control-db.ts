@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { dbExec, dbQuery, findUserById, type DbNode, type DbUser } from "./db";
 import { hashToken } from "./crypto";
+import { defaultCredentialExpiry } from "./credential-validity";
 
 export type Platform = "web" | "macos" | "ios" | "android" | "windows" | "linux";
 export type Protocol = "wireguard" | "openvpn" | "ikev2";
@@ -22,6 +23,9 @@ export type Device = {
 };
 
 export type AccessCredential = {
+  user_disabled: boolean;
+  admin_disabled: boolean;
+  deleted_at: string | null;
   id: string;
   user_id: string;
   device_id: string;
@@ -200,7 +204,13 @@ export async function createCertificateIssuance(input: Omit<CertificateIssuance,
 }
 
 export async function listRevokedCertificateSerials(authorityId: string): Promise<string[]> {
-  const rows = await dbQuery<{ serial: string }>("SELECT serial FROM certificate_issuances WHERE authority_id = $1 AND status = 'revoked' ORDER BY revoked_at", [authorityId]);
+  const rows = await dbQuery<{ serial: string }>(`SELECT ci.serial FROM certificate_issuances ci
+    LEFT JOIN access_credentials c ON c.id = ci.credential_id
+    LEFT JOIN users u ON u.id = c.user_id
+    WHERE ci.authority_id = $1 AND (ci.status = 'revoked' OR
+      (ci.purpose = 'client' AND (c.user_disabled OR c.admin_disabled OR c.deleted_at IS NOT NULL
+        OR c.status <> 'active' OR u.status <> 'active' OR c.expires_at <= $2 OR ci.not_after <= $2)))
+    ORDER BY ci.serial`, [authorityId, now()]);
   return rows.map((row) => row.serial);
 }
 
@@ -276,9 +286,9 @@ export async function createAccessCredential(input: {
     deviceId, input.userId, input.displayName, identityKey, timestamp,
   ]);
   await dbExec(`INSERT INTO access_credentials
-    (id, user_id, device_id, display_name, protocol, identity_key, status, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $7)`, [
-    credentialId, input.userId, deviceId, input.displayName, input.protocol, identityKey, timestamp,
+    (id, user_id, device_id, display_name, protocol, identity_key, status, created_at, updated_at, expires_at)
+    VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $7, $8)`, [
+    credentialId, input.userId, deviceId, input.displayName, input.protocol, identityKey, timestamp, defaultCredentialExpiry(new Date(timestamp)),
   ]);
   return (await findAccessCredential(credentialId))!;
 }
@@ -302,10 +312,10 @@ export async function findOrCreateAccessCredentialForDevice(device: Device, prot
   const timestamp = now();
   const identityKey = protocol === "openvpn" ? `northstar-${id}` : device.public_key;
   await dbExec(`INSERT INTO access_credentials
-    (id, user_id, device_id, display_name, protocol, identity_key, status, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)`, [
+    (id, user_id, device_id, display_name, protocol, identity_key, status, created_at, updated_at, expires_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9)`, [
     id, device.user_id, device.id, device.display_name, protocol, identityKey,
-    device.status === "revoked" ? "revoked" : "active", timestamp,
+    device.status === "revoked" ? "revoked" : "active", timestamp, defaultCredentialExpiry(new Date(timestamp)),
   ]);
   return (await findAccessCredential(id))!;
 }
@@ -708,7 +718,11 @@ export async function listActivePeers(nodeId: string, protocol: Protocol): Promi
   const rows = await dbQuery<{ public_key: string; address: string }>(`SELECT d.public_key, l.address
     FROM devices d JOIN ip_leases l ON l.device_id = d.id
     JOIN connection_profiles p ON p.device_id = d.id AND p.node_id = l.node_id AND p.protocol = l.protocol
+    JOIN users u ON u.id = d.user_id
+    LEFT JOIN access_credentials c ON c.id = p.credential_id
     WHERE l.node_id = $1 AND l.protocol = $2 AND l.status = 'active' AND d.status = 'active' AND p.status = 'active'
-    GROUP BY d.id, l.address, d.public_key`, [nodeId, protocol]);
+      AND u.status = 'active' AND (c.id IS NULL OR (c.status = 'active' AND NOT c.user_disabled
+        AND NOT c.admin_disabled AND c.deleted_at IS NULL AND (c.expires_at IS NULL OR c.expires_at > $3)))
+    GROUP BY d.id, l.address, d.public_key`, [nodeId, protocol, now()]);
   return rows.map((row) => ({ publicKey: row.public_key, allowedIps: [row.address], persistentKeepaliveSeconds: 25 }));
 }

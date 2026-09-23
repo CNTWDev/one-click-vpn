@@ -46,6 +46,8 @@ export type AccountCertificateAccess = {
 };
 
 export type AccountCredentialAccess = {
+  expiringSoon: boolean; daysRemaining: number | null;
+  userDisabled: boolean; adminDisabled: boolean; accountStatus: string; syncStatus: string;
   id: string; name: string; protocol: string; status: string; state: string; identitySuffix: string;
   online: boolean; connectionCount: number; lastActivityAt?: string | null; lastObservedAt?: string | null;
   profileCount: number; activeProfileCount: number; expiresAt?: string | null; revokedAt?: string | null;

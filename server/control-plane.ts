@@ -1,4 +1,5 @@
 import { addAudit } from "./db";
+import { assertCredentialUsable } from "./credential-access";
 import {
   activateConnectionProfile,
   allocateIpLease,
@@ -210,7 +211,6 @@ export async function issueConnectionProfile(input: {
   nodeId: string;
   protocol: Protocol;
   transport?: string;
-  expiresInSeconds?: number;
   rotateCredential?: boolean;
   clientPrivateKey?: string;
   regionalEndpoints?: Array<{ nodeId: string; host: string; port: number; transport: string }>;
@@ -220,6 +220,7 @@ export async function issueConnectionProfile(input: {
   if (!device || device.status !== "active") throw new Error("Device is not active");
   const credential = requestedCredential || await findOrCreateAccessCredentialForDevice(device, input.protocol);
   if (credential.status !== "active") throw new Error("Credential is not active");
+  await assertCredentialUsable(credential.id);
   if (credential.protocol !== input.protocol) throw new Error("Credential protocol does not match the requested profile");
   const node = await findNode(input.nodeId);
   if (!node) throw new Error("Node not found");
@@ -272,7 +273,7 @@ export async function issueConnectionProfile(input: {
     dns: profile.dns,
     allowedIps: profile.allowedIps,
     protocolPayload: profile.protocolPayload,
-    expiresAt: new Date(Date.now() + (input.expiresInSeconds || 24 * 60 * 60) * 1000).toISOString(),
+    expiresAt: openvpnCredential?.issuance.not_after || credential.expires_at!,
   });
   if (input.protocol === "openvpn" && input.rotateCredential) await reconcileAllOpenVpnNodes();
   await addAudit({ actorUserId: input.actorUserId, action: "profile.issued", targetType: "profile", targetId: saved.id, metadata: { credentialId: credential.id, deviceId: device.id, nodeId: input.nodeId, protocol: input.protocol } });
@@ -308,6 +309,7 @@ export async function renderWireGuardProfile(profile: ConnectionProfile): Promis
 export async function activateProfile(profileId: string, actorUserId?: string): Promise<ConnectionProfile> {
   const profile = await findConnectionProfile(profileId);
   if (!profile) throw new Error("Profile not found");
+  if (profile.credential_id) await assertCredentialUsable(profile.credential_id);
   const activated = await activateConnectionProfile(profileId);
   if (!activated) throw new Error("Profile could not be activated");
   await rebuildDesiredState(activated.node_id, activated.protocol);
@@ -331,13 +333,14 @@ export async function revokeDeviceAndReconcile(deviceId: string, actorUserId?: s
   await addAudit({ actorUserId, action: "device.revoked", targetType: "device", targetId: deviceId });
 }
 
-export async function revokeCredentialAndReconcile(credentialId: string, actorUserId?: string): Promise<void> {
+export async function revokeCredentialAndReconcile(credentialId: string, actorUserId?: string, deferReconcile = false): Promise<void> {
   const credential = await findAccessCredential(credentialId);
   if (!credential) throw new Error("Credential not found");
   const profiles = await listConnectionProfiles({ credentialId });
   await revokeCertificateIssuancesForCredential(credentialId);
   await deleteSecretMaterialsByKind(`wireguard_client_private_key:${credentialId}`);
   await revokeAccessCredential(credentialId);
+  if (deferReconcile) return;
   const affected = new Set(profiles.map((profile) => `${profile.node_id}:${profile.protocol}`));
   for (const key of affected) {
     const [nodeId, protocol] = key.split(":") as [string, Protocol];

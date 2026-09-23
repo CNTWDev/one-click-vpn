@@ -39,7 +39,8 @@ function PageHeader({ eyebrow, title, description, actions }: { eyebrow: string;
 }
 
 function Pill({ value }: { value: string }) {
-  return <span className={`pill ${value.toLowerCase().replaceAll("_", "-")}`}>{value}</span>;
+  const label = ({ disabled: "已停用", "admin-disabled": "管理员已停用", "account-disabled": "账号已停用", online: "在线", offline: "离线", revoked: "已撤销", expired: "已过期" } as Record<string, string>)[value] || value;
+  return <span className={`pill ${value.toLowerCase().replaceAll("_", "-")}`}>{label}</span>;
 }
 
 function Empty({ children }: { children: ReactNode }) {
@@ -133,7 +134,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
       if (input === null) return;
       reason = input;
     }
-    if (status === "suspended" && !window.confirm(`确定停用 ${user.email} 吗？登录会话、全部连接凭据和配置都将被撤销；恢复账号后需要重新创建凭据。`)) return;
+    if (status === "suspended" && !window.confirm(`确定停用 ${user.email} 吗？登录会话将退出，全部凭据暂停连接；恢复账号不会解除单独停用或撤销的凭据。`)) return;
     setBusy(user.id); setNotice(null);
     try {
       await api(`/api/v1/admin/users/${user.id}/status`, { method: "POST", body: JSON.stringify({ status, reason }) });
@@ -163,17 +164,16 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
     await loadAccess(user, 30);
   }
 
-  async function manageAccess(action: "revoke-credential" | "revoke-all-credentials", credentialId?: string) {
+  async function manageAccess(action: "enable-credential" | "disable-credential" | "delete-credential" | "disable-all-credentials" | "revoke-credential" | "revoke-all-credentials", credentialId?: string) {
     if (!credentialOwner) return;
     const credential = accessOverview?.credentials.find((item) => item.id === credentialId);
-    const confirmed = action === "revoke-all-credentials"
-      ? window.confirm(`确定撤销 ${credentialOwner.email} 的全部连接凭据吗？所有复制出去的配置都会失效，且不可自动恢复。`)
-      : window.confirm(`确定撤销凭据“${credential?.name || credentialId}”吗？它的全部配置副本都将立即失效。`);
+    const label = action.startsWith("enable") ? "启用" : action.startsWith("disable") ? "停用" : action.startsWith("delete") ? "删除" : "撤销";
+    const confirmed = window.confirm(`确定${label}${action.includes("-all-") ? `${credentialOwner.email} 的全部凭据` : `凭据「${credential?.name || credentialId}」`}？${label === "删除" || label === "撤销" ? "所有配置将永久失效，历史流量和审计保留。" : "节点同步后生效；账号和用户自己的停用限制仍保留。"} OpenVPN 同步会使同节点连接短暂重连。`);
     if (!confirmed) return;
     setBusy(action === "revoke-all-credentials" ? credentialOwner.id : credentialId || action); setNotice(null);
     try {
       await api(`/api/v1/admin/users/${credentialOwner.id}/credentials`, { method: "POST", body: JSON.stringify({ action, credentialId }) });
-      setNotice({ tone: "success", message: action === "revoke-all-credentials" ? "该账号的全部连接凭据已撤销。" : "连接凭据及其配置已撤销。" });
+      setNotice({ tone: "success", message: "操作已保存，请查看各凭据的节点同步状态。" });
       await Promise.all([loadAccess(credentialOwner), onRefresh()]);
     } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
     finally { setBusy(""); }
@@ -193,7 +193,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
   }
 
   return <>
-    <PageHeader eyebrow="ACCESS CONTROL" title="账号管理" description="审核账号，查看连接凭据、配置、公开证书和凭据级流量，并撤销访问。" actions={<button className="button ghost" onClick={() => void onRefresh()}>刷新</button>} />
+    <PageHeader eyebrow="ACCESS CONTROL" title="账号管理" description="新凭据默认有效 365 天，旧证书保留原期限。停用或撤销可提前终止使用；换发后需用户重新导入配置。" actions={<button className="button ghost" onClick={() => void onRefresh()}>刷新</button>} />
     <InlineNotice notice={notice} />
     <section className="panel review-panel">
       <div className="panel-head"><div><p className="eyebrow">PENDING REVIEW</p><h2>待审核账号 <span>{pending.length}</span></h2></div></div>
@@ -210,7 +210,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
       </tr>)}</tbody></table></div>
     </section>
     {credentialOwner && <Modal title={`${credentialOwner.displayName} 的访问资产`} description={`${credentialOwner.email} · 公开证书可查看和下载，私钥不会返回管理端。`} onClose={() => { setCredentialOwner(null); setAccessOverview(null); }} wide>
-      <div className="account-access-toolbar"><label>统计周期<select value={rangeDays} onChange={(event) => { const days = Number(event.target.value); setRangeDays(days); void loadAccess(credentialOwner, days); }}><option value={7}>最近 7 天</option><option value={30}>最近 30 天</option><option value={90}>最近 90 天</option></select></label>{Boolean(accessOverview?.summary.activeCredentialCount) && <button className="button danger small" disabled={Boolean(busy)} onClick={() => void manageAccess("revoke-all-credentials")}>撤销全部凭据</button>}</div>
+      <div className="account-access-toolbar"><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void manageAccess("disable-all-credentials")}>停用全部凭据</button><button className="button ghost small" onClick={() => void loadAccess(credentialOwner)}>刷新同步状态</button><label>统计周期<select value={rangeDays} onChange={(event) => { const days = Number(event.target.value); setRangeDays(days); void loadAccess(credentialOwner, days); }}><option value={7}>最近 7 天</option><option value={30}>最近 30 天</option><option value={90}>最近 90 天</option></select></label>{Boolean(accessOverview?.credentials.some((item) => item.status !== "revoked")) && <button className="button danger small" disabled={Boolean(busy)} onClick={() => void manageAccess("revoke-all-credentials")}>撤销全部凭据</button>}</div>
       {credentialsBusy && !accessOverview ? <Empty>正在读取账号访问资产…</Empty> : accessOverview ? <>
         <div className="access-summary-grid"><article><small>连接凭据</small><b>{accessOverview.summary.activeCredentialCount}<em> / {accessOverview.summary.credentialCount}</em></b><span>有效 / 全部</span></article><article><small>连接配置</small><b>{accessOverview.summary.activeProfileCount}<em> / {accessOverview.summary.profileCount}</em></b><span>有效 / 历史</span></article><article><small>OpenVPN 证书</small><b>{accessOverview.summary.activeCertificateCount}<em> / {accessOverview.summary.certificateCount}</em></b><span>有效 / 全部</span></article><article><small>{rangeDays} 天总流量</small><b>{formatBytes(accessOverview.totals.totalBytes)}</b><span>↑ {formatBytes(accessOverview.totals.uploadBytes)} · ↓ {formatBytes(accessOverview.totals.downloadBytes)}</span></article></div>
         {credentialsBusy && <div className="access-refreshing">正在刷新统计…</div>}
@@ -218,10 +218,10 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
           const profiles = accessOverview.profiles.filter((item) => item.credentialId === credential.id);
           const certificates = accessOverview.certificates.filter((item) => item.credentialId === credential.id);
           return <article className="account-device-card" key={credential.id}>
-            <header><span className="credential-protocol">{credential.protocol === "wireguard" ? "WG" : "OV"}</span><div><b>{credential.name}</b><small>{credential.protocol} · 身份 …{credential.identitySuffix} · 创建于 {formatTime(credential.createdAt)}</small></div><Pill value={credential.state} /><span className="device-traffic"><b>{formatBytes(credential.totalBytes)}</b><small>{rangeDays} 天流量 · {credential.connectionCount} 个连接</small></span>{credential.status === "active" && <button className="text-button danger-text" disabled={busy === credential.id} onClick={() => void manageAccess("revoke-credential", credential.id)}>撤销凭据</button>}</header>
+            <header><span className="credential-protocol">{credential.protocol === "wireguard" ? "WG" : "OV"}</span><div><b>{credential.name}</b><small>{credential.protocol} · 身份 …{credential.identitySuffix} · 创建于 {formatTime(credential.createdAt)}<br />连接有效期至 {formatTime(credential.expiresAt)}{credential.expiringSoon ? ` · 将在 ${credential.daysRemaining} 天内到期，请通知用户换发并重新导入` : ""}</small></div><Pill value={credential.state} /><span className="device-traffic"><b>{formatBytes(credential.totalBytes)}</b><small>{rangeDays} 天流量 · {credential.connectionCount} 个连接</small></span><small>节点同步：{({ pending: "生效中", applied: "已生效", failed: "同步失败" } as Record<string, string>)[credential.syncStatus]}</small>{credential.status === "active" && <button className="text-button" disabled={Boolean(busy)} onClick={() => void manageAccess(credential.adminDisabled ? "enable-credential" : "disable-credential", credential.id)}>{credential.adminDisabled ? "启用" : "停用"}</button>}<button className="text-button danger-text" disabled={Boolean(busy)} onClick={() => void manageAccess("delete-credential", credential.id)}>删除</button>{credential.status === "active" && <button className="text-button danger-text" disabled={busy === credential.id} onClick={() => void manageAccess("revoke-credential", credential.id)}>撤销凭据</button>}</header>
             <div className="device-identity"><span><small>连接身份</small><code>…{credential.identitySuffix}</code></span><span><small>最后活动</small><b>{formatTime(credential.lastActivityAt)}</b></span></div>
             <section className="access-subsection"><div className="access-subhead"><b>OpenVPN 公开证书</b><span>{certificates.length} 张</span></div>{certificates.length ? certificates.map((certificate) => <details className="certificate-row" key={certificate.certificateId}><summary><span><b>{certificate.subject}</b><small>序列号 {certificate.serial} · 有效期至 {formatTime(certificate.notAfter)}</small></span><Pill value={certificate.status} /><span><b>{formatBytes(certificate.totalBytes)}</b><small>凭据窗口流量</small></span><i>⌄</i></summary><div className="certificate-detail"><dl><div><dt>SHA-256 指纹</dt><dd><code>{certificate.fingerprint || "—"}</code></dd></div><div><dt>签发机构</dt><dd>{certificate.authorityRealm} · {certificate.authorityStatus}</dd></div><div><dt>生效时间</dt><dd>{formatTime(certificate.notBefore)}</dd></div><div><dt>吊销时间</dt><dd>{formatTime(certificate.revokedAt)}</dd></div><div><dt>最后活动</dt><dd>{formatTime(certificate.lastActivityAt)}</dd></div><div><dt>上传 / 下载</dt><dd>{formatBytes(certificate.uploadBytes)} / {formatBytes(certificate.downloadBytes)}</dd></div></dl><div className="certificate-actions"><button className="button ghost small" onClick={() => void copyCertificate(certificate)}>复制证书</button><button className="button ghost small" onClick={() => downloadCertificate(certificate)}>下载 .crt</button></div><pre>{certificate.certificatePem}</pre><small>平台按连接凭据聚合全部配置副本的会话和流量，不区分实际安装设备。</small></div></details>) : <Empty>该凭据不是 OpenVPN，或尚未签发证书。</Empty>}</section>
-            <section className="access-subsection"><div className="access-subhead"><b>连接配置历史</b><span>{profiles.length} 份</span></div>{profiles.length ? <div className="profile-history">{profiles.map((profile) => <div key={profile.profileId}><span className="credential-protocol">{profile.protocol === "wireguard" ? "WG" : "OV"}</span><span><b>{profile.nodeName} · {profile.regionCode || "—"} {profile.regionName}</b><small>rev {profile.revision} · {profile.transport} · 到期 {formatTime(profile.expiresAt)} · 身份 …{profile.credentialIdentity.replaceAll(":", "").slice(-10) || "—"}</small></span><Pill value={profile.status} /><span className="credential-traffic"><b>{formatBytes(profile.totalBytes)}</b><small>配置有效期窗口</small></span></div>)}</div> : <Empty>该凭据还没有生成连接配置。</Empty>}</section>
+            <section className="access-subsection"><div className="access-subhead"><b>连接配置历史（新配置与凭据到期时间一致）</b><span>{profiles.length} 份</span></div>{profiles.length ? <div className="profile-history">{profiles.map((profile) => <div key={profile.profileId}><span className="credential-protocol">{profile.protocol === "wireguard" ? "WG" : "OV"}</span><span><b>{profile.nodeName} · {profile.regionCode || "—"} {profile.regionName}</b><small>rev {profile.revision} · {profile.transport} · 配置可用至 {formatTime(profile.expiresAt)} · 身份 …{profile.credentialIdentity.replaceAll(":", "").slice(-10) || "—"}</small></span><Pill value={profile.status} /><span className="credential-traffic"><b>{formatBytes(profile.totalBytes)}</b><small>配置有效期窗口</small></span></div>)}</div> : <Empty>该凭据还没有生成连接配置。</Empty>}</section>
           </article>;
         })}</div> : <Empty>该账号还没有创建连接凭据。</Empty>}
       </> : <Empty>无法读取该账号的访问资产。</Empty>}
