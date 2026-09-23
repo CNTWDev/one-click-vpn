@@ -7,6 +7,48 @@ export type AdminUser = {
   approvedAt?: string | null;
   rejectionReason?: string | null;
   createdAt?: string;
+  accessSummary?: AccessSummary;
+};
+
+export type AccessSummary = {
+  deviceCount: number;
+  activeDeviceCount: number;
+  profileCount: number;
+  activeProfileCount: number;
+  certificateCount: number;
+  activeCertificateCount: number;
+  uploadBytes: number;
+  downloadBytes: number;
+  totalBytes: number;
+  lastActivityAt?: string | null;
+};
+
+export type AccountDeviceAccess = {
+  deviceId: string; displayName: string; platform: string; appVersion: string; publicKey: string; status: string;
+  createdAt: string; updatedAt: string; lastSeenAt?: string | null; lastActivityAt?: string | null;
+  uploadBytes: number; downloadBytes: number; totalBytes: number;
+};
+
+export type AccountProfileAccess = {
+  profileId: string; deviceId: string; protocol: string; nodeId: string; nodeName: string; regionName: string; regionCode: string;
+  transport: string; revision: number; status: string; clientAddress?: string | null; issuedAt: string; expiresAt: string; updatedAt: string;
+  credentialIdentity: string; lastActivityAt?: string | null; trafficAttribution: string;
+  uploadBytes: number; downloadBytes: number; totalBytes: number;
+};
+
+export type AccountCertificateAccess = {
+  certificateId: string; authorityId: string; deviceId: string; serial: string; subject: string; certificatePem: string; fingerprint: string;
+  status: string; notBefore: string; notAfter: string; revokedAt?: string | null; createdAt: string; updatedAt: string;
+  authorityRealm: string; authorityStatus: string; lastActivityAt?: string | null; trafficAttribution: string;
+  uploadBytes: number; downloadBytes: number; totalBytes: number;
+};
+
+export type AccountAccessOverview = {
+  from: string; to: string; updatedAt: string; totals: { uploadBytes: number; downloadBytes: number; totalBytes: number };
+  summary: Omit<AccessSummary, "uploadBytes" | "downloadBytes" | "totalBytes" | "lastActivityAt">;
+  devices: AccountDeviceAccess[];
+  profiles: AccountProfileAccess[];
+  certificates: AccountCertificateAccess[];
 };
 
 export type CredentialUsage = {

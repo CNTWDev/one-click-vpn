@@ -293,6 +293,19 @@ GET  /api/v1/admin/users?status=pending
 POST /api/v1/admin/users/:id/status  { "status": "active" }
 POST /api/v1/admin/users/:id/status  { "status": "rejected", "reason": "..." }
 POST /api/v1/admin/users/:id/status  { "status": "suspended" }
+GET  /api/v1/admin/users/:id/credentials?from=YYYY-MM-DD&to=YYYY-MM-DD
+POST /api/v1/admin/users/:id/credentials  { "action": "revoke-device", "deviceId": "..." }
+POST /api/v1/admin/users/:id/credentials  { "action": "revoke-all-devices" }
+
+账号管理详情返回设备、连接配置历史、OpenVPN 客户端公开证书和分层流量统计。
+证书 PEM 属于公开材料，可以由管理员查看、复制和下载；客户端私钥不返回。
+WireGuard 流量按设备公钥、节点和配置有效期归因。OpenVPN Agent 只能从状态文件
+取得 Common Name，无法直接取得证书序列号，因此历史证书流量按设备身份与证书
+有效期窗口归因，并在界面明确标记这一口径，不宣称为精确的序列号级计量。
+
+账号被停用或拒绝时，Controller 同步清理 Web/API 会话，吊销其全部设备、连接
+配置与客户端证书，并下发节点收敛任务；恢复账号不会恢复已吊销凭据，用户需要
+重新注册设备。这使账号状态成为实际的访问总开关，而不只是登录开关。
 ```
 
 管理员审核操作必须写入 AuditEvent。审核通过后不需要为每个节点单独创建授权记录，用户状态是第一版的总开关。

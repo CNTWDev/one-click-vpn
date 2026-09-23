@@ -8,7 +8,8 @@ export function bearerToken(request: Request): string | null {
 
 export async function apiUser(request: Request): Promise<DbUser | null> {
   const token = bearerToken(request);
-  return token ? (await findApiUserByAccessToken(token)) || null : null;
+  const user = token ? (await findApiUserByAccessToken(token)) || null : null;
+  return user?.status === "active" ? user : null;
 }
 
 export async function revokeBearerSession(request: Request): Promise<void> {

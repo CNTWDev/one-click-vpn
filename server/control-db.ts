@@ -263,11 +263,15 @@ export async function rotateApiSession(refreshToken: string): Promise<{ user: Db
   if (!row || new Date(row.refresh_expires_at).getTime() <= Date.now()) return undefined;
   await dbExec("UPDATE device_sessions SET revoked_at = $1 WHERE id = $2", [now(), row.id]);
   const user = await findUserById(row.user_id);
-  return user ? { user, session: await createApiSession(user.id) } : undefined;
+  return user?.status === "active" ? { user, session: await createApiSession(user.id) } : undefined;
 }
 
 export async function revokeApiSession(token: string): Promise<void> {
   await dbExec("UPDATE device_sessions SET revoked_at = $1 WHERE access_token_hash = $2 AND revoked_at IS NULL", [now(), hashToken(token)]);
+}
+
+export async function revokeApiSessionsForUser(userId: string): Promise<void> {
+  await dbExec("UPDATE device_sessions SET revoked_at = $1 WHERE user_id = $2 AND revoked_at IS NULL", [now(), userId]);
 }
 
 export async function listControlNodes(): Promise<Array<DbNode & {

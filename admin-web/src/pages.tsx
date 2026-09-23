@@ -3,7 +3,7 @@ import { api } from "./api";
 import { FleetMap } from "./fleet-map";
 import { countryName, countryOptions, presetGroups, regionPresets } from "./region-catalog";
 import type {
-  AdminUser, ControllerInfo, CredentialUsage, DeploymentPolicyOverview, NodeDiagnostics, NodeRecord,
+  AccountAccessOverview, AccountCertificateAccess, AdminUser, ControllerInfo, DeploymentPolicyOverview, NodeDiagnostics, NodeRecord,
   OperationalLogLine, Region, VpnService,
 } from "./types";
 
@@ -120,7 +120,8 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [credentialOwner, setCredentialOwner] = useState<AdminUser | null>(null);
-  const [credentials, setCredentials] = useState<CredentialUsage[]>([]);
+  const [accessOverview, setAccessOverview] = useState<AccountAccessOverview | null>(null);
+  const [rangeDays, setRangeDays] = useState(30);
   const [credentialsBusy, setCredentialsBusy] = useState(false);
   const visible = filter === "all" ? users : users.filter((user) => user.status === filter);
   const pending = users.filter((user) => user.status === "pending");
@@ -132,7 +133,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
       if (input === null) return;
       reason = input;
     }
-    if (status === "suspended" && !window.confirm(`确定停用 ${user.email} 吗？该账号将无法继续获取 VPN 配置。`)) return;
+    if (status === "suspended" && !window.confirm(`确定停用 ${user.email} 吗？登录会话、全部设备、配置和证书都将被撤销；恢复账号后需要重新注册设备。`)) return;
     setBusy(user.id); setNotice(null);
     try {
       await api(`/api/v1/admin/users/${user.id}/status`, { method: "POST", body: JSON.stringify({ status, reason }) });
@@ -142,17 +143,57 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
     finally { setBusy(""); }
   }
 
-  async function openCredentials(user: AdminUser) {
-    setCredentialOwner(user); setCredentials([]); setCredentialsBusy(true);
+  function accessRange(days: number) {
+    const to = new Date();
+    const from = new Date(to.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+    return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+  }
+
+  async function loadAccess(user: AdminUser, days = rangeDays) {
+    const query = new URLSearchParams(accessRange(days));
+    setCredentialsBusy(true);
     try {
-      const result = await api<{ credentials: CredentialUsage[] }>(`/api/v1/admin/users/${user.id}/credentials`);
-      setCredentials(result.credentials || []);
-    } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); setCredentialOwner(null); }
+      setAccessOverview(await api<AccountAccessOverview>(`/api/v1/admin/users/${user.id}/credentials?${query}`));
+    } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
     finally { setCredentialsBusy(false); }
   }
 
+  async function openCredentials(user: AdminUser) {
+    setCredentialOwner(user); setAccessOverview(null); setRangeDays(30);
+    await loadAccess(user, 30);
+  }
+
+  async function manageAccess(action: "revoke-device" | "revoke-all-devices", deviceId?: string) {
+    if (!credentialOwner) return;
+    const device = accessOverview?.devices.find((item) => item.deviceId === deviceId);
+    const confirmed = action === "revoke-all-devices"
+      ? window.confirm(`确定撤销 ${credentialOwner.email} 的全部设备和 VPN 配置吗？现有连接将失效，且不可自动恢复。`)
+      : window.confirm(`确定撤销设备“${device?.displayName || deviceId}”吗？关联配置和证书将立即失效。`);
+    if (!confirmed) return;
+    setBusy(action === "revoke-all-devices" ? credentialOwner.id : deviceId || action); setNotice(null);
+    try {
+      await api(`/api/v1/admin/users/${credentialOwner.id}/credentials`, { method: "POST", body: JSON.stringify({ action, deviceId }) });
+      setNotice({ tone: "success", message: action === "revoke-all-devices" ? "该账号的全部设备访问已撤销。" : "设备及其 VPN 凭据已撤销。" });
+      await Promise.all([loadAccess(credentialOwner), onRefresh()]);
+    } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
+    finally { setBusy(""); }
+  }
+
+  async function copyCertificate(certificate: AccountCertificateAccess) {
+    try {
+      await navigator.clipboard.writeText(certificate.certificatePem);
+      setNotice({ tone: "success", message: `证书 ${certificate.serial} 已复制。` });
+    } catch { setNotice({ tone: "error", message: "浏览器无法访问剪贴板，请展开证书后手动复制。" }); }
+  }
+
+  function downloadCertificate(certificate: AccountCertificateAccess) {
+    const url = URL.createObjectURL(new Blob([certificate.certificatePem], { type: "application/x-x509-ca-cert" }));
+    const link = document.createElement("a");
+    link.href = url; link.download = `openvpn-${certificate.serial}.crt`; link.click(); URL.revokeObjectURL(url);
+  }
+
   return <>
-    <PageHeader eyebrow="ACCESS CONTROL" title="账号管理" description="审核新账号，并管理现有用户的访问状态。" actions={<button className="button ghost" onClick={() => void onRefresh()}>刷新</button>} />
+    <PageHeader eyebrow="ACCESS CONTROL" title="账号管理" description="审核账号，查看设备、VPN 配置、公开证书和凭据级流量，并撤销访问。" actions={<button className="button ghost" onClick={() => void onRefresh()}>刷新</button>} />
     <InlineNotice notice={notice} />
     <section className="panel review-panel">
       <div className="panel-head"><div><p className="eyebrow">PENDING REVIEW</p><h2>待审核账号 <span>{pending.length}</span></h2></div></div>
@@ -164,17 +205,26 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
     </section>
     <section className="panel">
       <div className="panel-head"><div><p className="eyebrow">USER DIRECTORY</p><h2>全部账号</h2></div><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">全部状态</option><option value="active">已启用</option><option value="pending">待审核</option><option value="suspended">已停用</option><option value="rejected">已拒绝</option></select></div>
-      <div className="table-wrap"><table className="action-table"><thead><tr><th>用户</th><th>角色</th><th>状态</th><th>注册时间</th><th className="align-right">操作</th></tr></thead><tbody>{visible.map((user) => <tr key={user.id}>
-        <td><b>{user.displayName}</b><small>{user.email}</small></td><td>{user.role}</td><td><Pill value={user.status} />{user.rejectionReason && <small>{user.rejectionReason}</small>}</td><td>{formatTime(user.createdAt)}</td><td className="align-right"><button className="text-button" onClick={() => void openCredentials(user)}>凭据 / 流量</button>{user.role !== "owner" && user.status === "active" && <button className="text-button danger-text" disabled={busy === user.id} onClick={() => void update(user, "suspended")}>停用</button>}{user.status === "suspended" && <button className="text-button" disabled={busy === user.id} onClick={() => void update(user, "active")}>恢复</button>}</td>
+      <div className="table-wrap"><table className="action-table"><thead><tr><th>用户</th><th>访问资产</th><th>近 30 天流量</th><th>状态</th><th>注册时间</th><th className="align-right">操作</th></tr></thead><tbody>{visible.map((user) => <tr key={user.id}>
+        <td><b>{user.displayName}</b><small>{user.email} · {user.role}</small></td><td><b>{user.accessSummary?.activeDeviceCount || 0} / {user.accessSummary?.deviceCount || 0} 台设备</b><small>{user.accessSummary?.activeProfileCount || 0} 份有效配置 · {user.accessSummary?.activeCertificateCount || 0} 张有效证书</small></td><td><b>{formatBytes(user.accessSummary?.totalBytes)}</b><small>最后活动 {formatTime(user.accessSummary?.lastActivityAt)}</small></td><td><Pill value={user.status} />{user.rejectionReason && <small>{user.rejectionReason}</small>}</td><td>{formatTime(user.createdAt)}</td><td className="align-right"><button className="text-button" onClick={() => void openCredentials(user)}>访问详情</button>{user.role !== "owner" && user.status === "active" && <button className="text-button danger-text" disabled={busy === user.id} onClick={() => void update(user, "suspended")}>停用</button>}{user.status === "suspended" && <button className="text-button" disabled={busy === user.id} onClick={() => void update(user, "active")}>恢复</button>}</td>
       </tr>)}</tbody></table></div>
     </section>
-    {credentialOwner && <Modal title={`${credentialOwner.displayName} 的 VPN 凭据`} description="查看每份配置当前是否活跃，以及最近 30 天累计流量。" onClose={() => setCredentialOwner(null)} wide>
-      {credentialsBusy ? <Empty>正在读取凭据使用情况…</Empty> : credentials.length ? <div className="credential-usage-list">{credentials.map((item) => <article key={item.profileId}>
-        <span className={`credential-live ${item.online ? "online" : ""}`} />
-        <span className="credential-protocol">{item.protocol === "wireguard" ? "WG" : "OV"}</span>
-        <div><b>{item.displayName} · {item.regionCode || "—"} {item.regionName}</b><small>{item.online ? "正在使用" : item.lastActivityAt ? `最后活动 ${formatTime(item.lastActivityAt)}` : "尚未使用"} · 凭据 …{item.credentialSuffix || "—"}</small></div>
-        <span className="credential-traffic"><b>{formatBytes(item.totalBytes)}</b><small>30 天流量</small></span>
-      </article>)}</div> : <Empty>该账号还没有可用 VPN 凭据。</Empty>}
+    {credentialOwner && <Modal title={`${credentialOwner.displayName} 的访问资产`} description={`${credentialOwner.email} · 公开证书可查看和下载，私钥不会返回管理端。`} onClose={() => { setCredentialOwner(null); setAccessOverview(null); }} wide>
+      <div className="account-access-toolbar"><label>统计周期<select value={rangeDays} onChange={(event) => { const days = Number(event.target.value); setRangeDays(days); void loadAccess(credentialOwner, days); }}><option value={7}>最近 7 天</option><option value={30}>最近 30 天</option><option value={90}>最近 90 天</option></select></label>{Boolean(accessOverview?.summary.activeDeviceCount) && <button className="button danger small" disabled={Boolean(busy)} onClick={() => void manageAccess("revoke-all-devices")}>撤销全部设备</button>}</div>
+      {credentialsBusy && !accessOverview ? <Empty>正在读取账号访问资产…</Empty> : accessOverview ? <>
+        <div className="access-summary-grid"><article><small>设备</small><b>{accessOverview.summary.activeDeviceCount}<em> / {accessOverview.summary.deviceCount}</em></b><span>活跃 / 全部</span></article><article><small>连接配置</small><b>{accessOverview.summary.activeProfileCount}<em> / {accessOverview.summary.profileCount}</em></b><span>有效 / 历史</span></article><article><small>OpenVPN 证书</small><b>{accessOverview.summary.activeCertificateCount}<em> / {accessOverview.summary.certificateCount}</em></b><span>有效 / 全部</span></article><article><small>{rangeDays} 天总流量</small><b>{formatBytes(accessOverview.totals.totalBytes)}</b><span>↑ {formatBytes(accessOverview.totals.uploadBytes)} · ↓ {formatBytes(accessOverview.totals.downloadBytes)}</span></article></div>
+        {credentialsBusy && <div className="access-refreshing">正在刷新统计…</div>}
+        {accessOverview.devices.length ? <div className="account-device-list">{accessOverview.devices.map((device) => {
+          const profiles = accessOverview.profiles.filter((item) => item.deviceId === device.deviceId);
+          const certificates = accessOverview.certificates.filter((item) => item.deviceId === device.deviceId);
+          return <article className="account-device-card" key={device.deviceId}>
+            <header><span className="credential-protocol">{device.platform.slice(0, 2).toUpperCase()}</span><div><b>{device.displayName}</b><small>{device.platform} · App {device.appVersion || "—"} · 创建于 {formatTime(device.createdAt)}</small></div><Pill value={device.status} /><span className="device-traffic"><b>{formatBytes(device.totalBytes)}</b><small>{rangeDays} 天流量</small></span>{device.status === "active" && <button className="text-button danger-text" disabled={busy === device.deviceId} onClick={() => void manageAccess("revoke-device", device.deviceId)}>撤销设备</button>}</header>
+            <div className="device-identity"><span><small>WireGuard 公钥</small><code title={device.publicKey}>{device.publicKey || "—"}</code></span><span><small>最后活动</small><b>{formatTime(device.lastActivityAt || device.lastSeenAt)}</b></span></div>
+            <section className="access-subsection"><div className="access-subhead"><b>OpenVPN 公开证书</b><span>{certificates.length} 张</span></div>{certificates.length ? certificates.map((certificate) => <details className="certificate-row" key={certificate.certificateId}><summary><span><b>{certificate.subject}</b><small>序列号 {certificate.serial} · 有效期至 {formatTime(certificate.notAfter)}</small></span><Pill value={certificate.status} /><span><b>{formatBytes(certificate.totalBytes)}</b><small>有效期窗口流量</small></span><i>⌄</i></summary><div className="certificate-detail"><dl><div><dt>SHA-256 指纹</dt><dd><code>{certificate.fingerprint || "—"}</code></dd></div><div><dt>签发机构</dt><dd>{certificate.authorityRealm} · {certificate.authorityStatus}</dd></div><div><dt>生效时间</dt><dd>{formatTime(certificate.notBefore)}</dd></div><div><dt>吊销时间</dt><dd>{formatTime(certificate.revokedAt)}</dd></div><div><dt>最后活动</dt><dd>{formatTime(certificate.lastActivityAt)}</dd></div><div><dt>上传 / 下载</dt><dd>{formatBytes(certificate.uploadBytes)} / {formatBytes(certificate.downloadBytes)}</dd></div></dl><div className="certificate-actions"><button className="button ghost small" onClick={() => void copyCertificate(certificate)}>复制证书</button><button className="button ghost small" onClick={() => downloadCertificate(certificate)}>下载 .crt</button></div><pre>{certificate.certificatePem}</pre><small>流量按证书有效期与设备 OpenVPN 身份窗口归因；同一天轮换证书时，日级统计可能存在边界重叠。</small></div></details>) : <Empty>该设备没有签发过 OpenVPN 客户端证书。</Empty>}</section>
+            <section className="access-subsection"><div className="access-subhead"><b>连接配置历史</b><span>{profiles.length} 份</span></div>{profiles.length ? <div className="profile-history">{profiles.map((profile) => <div key={profile.profileId}><span className="credential-protocol">{profile.protocol === "wireguard" ? "WG" : "OV"}</span><span><b>{profile.nodeName} · {profile.regionCode || "—"} {profile.regionName}</b><small>rev {profile.revision} · {profile.transport} · 到期 {formatTime(profile.expiresAt)} · 身份 …{profile.credentialIdentity.replaceAll(":", "").slice(-10) || "—"}</small></span><Pill value={profile.status} /><span className="credential-traffic"><b>{formatBytes(profile.totalBytes)}</b><small>配置有效期窗口</small></span></div>)}</div> : <Empty>该设备还没有生成连接配置。</Empty>}</section>
+          </article>;
+        })}</div> : <Empty>该账号还没有注册设备，因此没有证书或 VPN 流量。</Empty>}
+      </> : <Empty>无法读取该账号的访问资产。</Empty>}
     </Modal>}
   </>;
 }
@@ -360,7 +410,7 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
         <section className="deployment-log"><div className="diagnostic-section-head"><div><h3>部署与操作日志</h3><p>Controller 记录的 Bootstrap、Agent 和修复任务事件，最新事件在最上方。</p></div><span>{diagnostics.actionEvents.length} 条事件</span></div>{diagnostics.actionEvents.length ? <div className="event-list">{diagnostics.actionEvents.slice(0, 100).map((event) => <div key={event.id}><time>{formatTime(event.created_at)}</time><Pill value={event.level} /><span><b>{phaseLabel(event.phase)}</b>{event.message}</span></div>)}</div> : <Empty>还没有部署或操作日志。</Empty>}</section>
         <section><h3>VPN 协议运行状态</h3>{diagnostics.connectivity?.protocols.length ? <div className="protocol-grid">{diagnostics.connectivity.protocols.map((protocol) => <article key={protocol.protocol}><div><b>{protocol.protocol}</b><Pill value={protocol.state} /></div><small>{protocol.transport}:{protocol.port} · {protocol.listening ? "正在监听" : "未监听"} · runtime {protocol.runtimeActive ? "active" : "inactive"}</small><small>Host FW: {protocol.hostFirewall} · Cloud FW: {protocol.cloudFirewall}</small>{protocol.lastError && <p>{protocol.lastError}</p>}</article>)}</div> : <Empty>没有 Agent 协议状态。</Empty>}</section>
         <section><h3>配置同步任务</h3>{diagnostics.reconcile.tasks.length ? <div className="action-list">{diagnostics.reconcile.tasks.slice(0, 20).map((task) => <article key={task.id}><div><b>{task.protocol} · {task.taskType}</b><Pill value={task.status} /></div><small>revision {task.desiredRevision} · 尝试 {task.attempts} 次 · {formatTime(task.createdAt)}</small>{task.lastError && <p>{task.lastError}</p>}</article>)}</div> : <Empty>没有待处理的配置同步任务。</Empty>}</section>
-        <section><h3>任务历史与原始输出</h3>{diagnostics.actions.length ? <div className="operation-history-list">{diagnostics.actions.map((action) => <details key={action.id} defaultOpen={action.id === diagnostics.actions[0]?.id && action.status === "failed"}><summary><span><b>{actionLabel(action.action)}</b><small>{phaseLabel(action.current_phase)} · {action.progress || 0}%</small></span><Pill value={action.status} /><time>{formatTime(action.finished_at || action.started_at || action.created_at)}</time><i>⌄</i></summary><div>{action.error && <><b>错误</b><pre className="history-error">{action.error}</pre></>}{action.output && <><b>原始输出</b><pre>{action.output}</pre></>}{!action.error && !action.output && <p>该任务没有保存额外输出。</p>}</div></details>)}</div> : <Empty>没有历史任务。</Empty>}</section>
+        <section><h3>任务历史与原始输出</h3>{diagnostics.actions.length ? <div className="operation-history-list">{diagnostics.actions.map((action) => <details key={action.id} open={action.id === diagnostics.actions[0]?.id && action.status === "failed"}><summary><span><b>{actionLabel(action.action)}</b><small>{phaseLabel(action.current_phase)} · {action.progress || 0}%</small></span><Pill value={action.status} /><time>{formatTime(action.finished_at || action.started_at || action.created_at)}</time><i>⌄</i></summary><div>{action.error && <><b>错误</b><pre className="history-error">{action.error}</pre></>}{action.output && <><b>原始输出</b><pre>{action.output}</pre></>}{!action.error && !action.output && <p>该任务没有保存额外输出。</p>}</div></details>)}</div> : <Empty>没有历史任务。</Empty>}</section>
       </div>}
     </Modal>}
   </>;

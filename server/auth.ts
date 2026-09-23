@@ -13,7 +13,8 @@ async function currentUserForCookie(cookieName: string): Promise<DbUser | null> 
   if (!sessionId) return null;
   const session = await findSession(sessionId);
   if (!session || new Date(session.expires_at).getTime() <= Date.now()) return null;
-  return (await findUserById(session.user_id)) || null;
+  const user = (await findUserById(session.user_id)) || null;
+  return user?.status === "active" ? user : null;
 }
 
 export async function currentUser(): Promise<DbUser | null> {

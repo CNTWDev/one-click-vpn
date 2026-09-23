@@ -115,6 +115,28 @@ test("node onboarding discovers persistent identity and preserves canonical SSH 
   assert.doesNotMatch(admin, /SSH 主机指纹（生产环境必填）/);
 });
 
+test("administrator account access exposes certificates, traffic attribution, and revocation controls", () => {
+  const traffic = readFileSync(path.join(root, "server/traffic.ts"), "utf8");
+  const usersRoute = readFileSync(path.join(root, "app/api/v1/admin/users/route.ts"), "utf8");
+  const credentialsRoute = readFileSync(path.join(root, "app/api/v1/admin/users/[id]/credentials/route.ts"), "utf8");
+  const statusRoute = readFileSync(path.join(root, "app/api/v1/admin/users/[id]/status/route.ts"), "utf8");
+  const admin = readFileSync(path.join(root, "admin-web/src/pages.tsx"), "utf8");
+  assert.match(traffic, /export async function adminUserAccessSummaries/);
+  assert.match(traffic, /export async function adminUserAccessOverview/);
+  assert.match(traffic, /certificate_pem/);
+  assert.match(traffic, /certificate-validity-window/);
+  assert.match(traffic, /profile-validity-window/);
+  assert.match(usersRoute, /accessSummary/);
+  assert.match(credentialsRoute, /revoke-device/);
+  assert.match(credentialsRoute, /revoke-all-devices/);
+  assert.match(statusRoute, /revokeApiSessionsForUser/);
+  assert.match(statusRoute, /deleteSessionsForUser/);
+  assert.match(statusRoute, /revokeDeviceAndReconcile/);
+  assert.match(admin, /OpenVPN 公开证书/);
+  assert.match(admin, /撤销全部设备/);
+  assert.match(admin, /有效期窗口流量/);
+});
+
 async function waitForServer() {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {

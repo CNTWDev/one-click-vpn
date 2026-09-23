@@ -221,6 +221,10 @@ export async function deleteSession(id: string): Promise<void> {
   await dbExec("DELETE FROM sessions WHERE id = $1", [id]);
 }
 
+export async function deleteSessionsForUser(userId: string): Promise<void> {
+  await dbExec("DELETE FROM sessions WHERE user_id = $1", [userId]);
+}
+
 export async function cleanupSessions(): Promise<void> {
   await dbExec("DELETE FROM sessions WHERE expires_at <= $1", [now()]);
 }
