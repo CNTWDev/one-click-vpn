@@ -1,4 +1,43 @@
 /* Comfortable, consistent controls for desktop and touch screens. */
+.simple-stats { grid-template-columns: 1.4fr 1fr 1fr; }
+.client-picker { border: 0; margin: 24px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.client-picker legend { margin-bottom: 10px; font-size: 13px; color: #65705e; }
+.client-picker label { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 6px; padding: 14px 10px; border: 1px solid #d8dfd1; border-radius: 10px; cursor: pointer; }
+.client-picker label.selected { background: #edf5d9; border-color: #8eaf46; }
+.client-picker input { margin: 0; accent-color: #71952a; }
+.client-picker strong { font-size: 14px; }
+.client-picker small { grid-column: 1 / -1; font-size: 11px; color: #65705e; }
+.create-download { width: 100%; margin-top: 22px; }
+.form-footnote { color: #65705e; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.traffic-total { font-size: 34px; font-weight: 750; margin: 24px 0 0; font-variant-numeric: tabular-nums; }
+.traffic-total small { display: block; font-size: 12px; font-weight: 400; color: #65705e; }
+.traffic-card .bars { height: 150px; margin: 20px 0 30px; }
+.traffic-card .bars i { min-height: 0; max-width: 36px; }
+.usage-empty { min-height: 175px; display: grid; align-content: center; justify-items: center; color: #65705e; font-size: 13px; }
+.usage-empty > span { font-size: 30px; color: #94ae63; }
+.connection-symbol { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; background: #edf5df; border-radius: 9px; color: #69832c; }
+.simple-metrics { grid-template-columns: 1.4fr 1fr; }
+.connection-download { display: flex; align-items: end; gap: 12px; margin-top: 20px; }
+.connection-download label { flex: 1; font-size: 12px; color: #65705e; }
+.connection-download select { display: block; width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid #ccd6c3; background: white; border-radius: 8px; margin-top: 8px; color: #293523; }
+.connection-disclosure { border-top: 1px solid #e0e6d9; margin-top: 18px; padding-top: 4px; }
+.connection-disclosure > summary, .network-disclosure > summary { padding: 14px 0; cursor: pointer; font-size: 13px; color: #596d48; }
+.connection-manage { display: flex; gap: 8px; flex-wrap: wrap; }
+.connection-facts { font-size: 12px; }
+.connection-facts > div { display: flex; justify-content: space-between; gap: 16px; margin: 10px 0; }
+.connection-facts dd { margin: 0; overflow-wrap: anywhere; }
+.connection-disclosure pre { max-height: 200px; overflow: auto; padding: 12px; background: #162014; color: #e0efce; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.network-disclosure { max-width: 1240px; margin: 24px auto 0; }
+.device-hub-head-actions small.stale { color: #a45b32; }
+@media (max-width: 600px) {
+  .simple-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .simple-stats > article:first-child { grid-column: 1 / -1; border-bottom: 1px solid #e2e8df; }
+  .client-picker { gap: 6px; }
+  .client-picker label { padding: 12px 8px; }
+  .client-picker strong { font-size: 12px; }
+  .connection-download { flex-wrap: wrap; }
+  .connection-download button { width: 100%; }
+}
 .mihomo-export { margin: 20px 0; padding: 18px; border: 1px solid #cfdcba; border-radius: 10px; background: #f5f9ed; }
 .mihomo-export h4 { margin: 0 0 8px; font-size: 15px; }
 .mihomo-export p { margin: 6px 0; font-size: 12px; color: #65705e; line-height: 1.7; }

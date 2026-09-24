@@ -192,8 +192,22 @@ if command -v curl >/dev/null 2>&1; then
       echo "Warning: $service_name failed its local health check at 127.0.0.1:$port$path." >&2
     fi
   }
+  check_frontend_map() {
+    service_name=$1
+    port=$2
+    map_type=$(curl --fail --silent --show-error --max-time 10 -o /dev/null -w '%{content_type}' "http://127.0.0.1:$port/world-map.webp") || {
+      echo "Error: $service_name map asset is unavailable. Rebuild and redeploy this frontend." >&2
+      exit 1
+    }
+    case "$map_type" in
+      image/webp*) ;;
+      *) echo "Error: $service_name map returned $map_type instead of image/webp. Deployment verification failed." >&2; exit 1 ;;
+    esac
+  }
   case "$service" in
     all)
+      check_frontend_map portal-web 3100
+      check_frontend_map admin-web 3200
       check_endpoint northstar 3000 /api/health
       check_endpoint portal-web 3100 /health
       check_endpoint portal-web 3100 /api/health
@@ -202,10 +216,12 @@ if command -v curl >/dev/null 2>&1; then
       ;;
     northstar) check_endpoint northstar 3000 /api/health ;;
     portal-web)
+      check_frontend_map portal-web 3100
       check_endpoint portal-web 3100 /health
       check_endpoint portal-web 3100 /api/health
       ;;
     admin-web)
+      check_frontend_map admin-web 3200
       check_endpoint admin-web 3200 /health
       check_endpoint admin-web 3200 /api/health
       ;;

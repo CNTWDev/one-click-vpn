@@ -147,7 +147,7 @@ test("user access is credential-first and shared OpenVPN sessions remain separat
   assert.match(migration, /CREATE TABLE IF NOT EXISTS access_credentials/);
   assert.match(migration, /session_key TEXT NOT NULL DEFAULT ''/);
   assert.match(credentialRoute, /createAccessCredential/);
-  assert.match(portal, /我的连接凭据/);
+  assert.match(portal, /我的连接/);
   assert.match(portal, /window\.setInterval/);
   assert.match(agent, /"duplicate-cn"/);
   assert.match(agent, /"sessionKey": session_key/);
