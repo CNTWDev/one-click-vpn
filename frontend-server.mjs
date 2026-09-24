@@ -7,7 +7,7 @@ import { request as requestHttps } from "node:https";
 const root = process.env.STATIC_DIR || join(fileURLToPath(new URL(".", import.meta.url)), "dist");
 const port = Number(process.env.PORT || 3100);
 const apiUpstream = process.env.API_UPSTREAM?.trim().replace(/\/+$/, "") || "";
-const types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json; charset=utf-8", ".png": "image/png", ".ico": "image/x-icon" };
+const types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json; charset=utf-8", ".png": "image/png", ".webp": "image/webp", ".ico": "image/x-icon" };
 const hopByHopHeaders = new Set(["connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade"]);
 
 function proxyApi(request, response) {
@@ -55,7 +55,15 @@ createServer((request, response) => {
   const relative = normalize(pathname).replace(/^([/\\])+/, "");
   let file = join(root, relative);
   if (!file.startsWith(normalize(root))) { response.writeHead(403); response.end("Forbidden"); return; }
-  if (!existsSync(file) || !statSync(file).isFile()) file = join(root, "index.html");
+  if (!existsSync(file) || !statSync(file).isFile()) {
+    // Missing assets must not masquerade as a successful HTML response.
+    if (extname(relative) || relative.startsWith("assets/")) {
+      response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+      response.end("Asset not found");
+      return;
+    }
+    file = join(root, "index.html");
+  }
   if (!existsSync(file)) { response.writeHead(404); response.end("Not found"); return; }
   response.writeHead(200, { "Content-Type": types[extname(file)] || "application/octet-stream", "Cache-Control": extname(file) === ".html" ? "no-cache" : "public, max-age=31536000, immutable" });
   createReadStream(file).pipe(response);
