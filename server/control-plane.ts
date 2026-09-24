@@ -1,4 +1,5 @@
 import { addAudit } from "./db";
+import { renderMihomoWireGuard } from "./protocols/mihomo";
 import { assertCredentialUsable } from "./credential-access";
 import {
   activateConnectionProfile,
@@ -292,12 +293,16 @@ function isWireGuardPrivateKey(value: string | undefined): value is string {
   return Buffer.from(value, "base64").length === 32;
 }
 
-export async function renderWireGuardProfile(profile: ConnectionProfile): Promise<string> {
+export async function renderWireGuardProfile(profile: ConnectionProfile, format: "native" | "mihomo" = "native"): Promise<string> {
   const serverPublicKey = typeof profile.protocol_payload.serverPublicKey === "string" ? profile.protocol_payload.serverPublicKey : "";
   const privateKeySecretId = typeof profile.protocol_payload.clientPrivateKeySecretId === "string" ? profile.protocol_payload.clientPrivateKeySecretId : "";
   const privateKey = privateKeySecretId ? await readSecretMaterial(privateKeySecretId) : undefined;
   if (!serverPublicKey || !privateKey || !profile.client_address) {
     throw new Error("WireGuard client key material is unavailable. Create a new profile for this device.");
+  }
+  if (format === "mihomo") {
+    return renderMihomoWireGuard({ name: `WG-${profile.id}`, endpoint: profile.endpoint, privateKey,
+      serverPublicKey, clientAddress: profile.client_address, dns: profile.dns, allowedIps: profile.allowed_ips });
   }
   return [
     "[Interface]", `PrivateKey = ${privateKey}`, `Address = ${profile.client_address}`, `DNS = ${profile.dns.join(", ")}`,

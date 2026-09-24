@@ -350,6 +350,24 @@ test("credential controls preserve independent user/admin locks and recoverable 
     const wgIssued = await call("/api/v1/profiles", token, { credentialId: id, protocol: "wireguard", clientPrivateKey: Buffer.alloc(32, 5).toString("base64") });
     assert.equal(wgIssued.status, 201);
     const wgProfile = (await wgIssued.json()).profile;
+    const exportPath = `/api/v1/profiles/${wgProfile.id}/download?format=mihomo`;
+    assert.equal((await call(exportPath, adminToken, undefined, "GET")).status, 404);
+    assert.equal((await call(exportPath, token, undefined, "GET")).status, 409);
+    await pool.query("UPDATE connection_profiles SET status='active', protocol_payload_json=$2 WHERE id=$1", [wgProfile.id, JSON.stringify({
+      ...JSON.parse((await pool.query("SELECT protocol_payload_json FROM connection_profiles WHERE id=$1", [wgProfile.id])).rows[0].protocol_payload_json),
+      serverPublicKey: Buffer.alloc(32, 9).toString("base64"),
+    })]);
+    const exported = await call(exportPath, token, undefined, "GET");
+    assert.equal(exported.status, 200);
+    assert.match(exported.headers.get("content-type"), /application\/yaml/);
+    assert.match(exported.headers.get("cache-control"), /no-store/);
+    assert.match(exported.headers.get("content-disposition"), /\.yaml/);
+    assert.match(await exported.text(), /"type":"wireguard"/);
+    assert.equal((await call(`/api/v1/profiles/${wgProfile.id}/download`, token, undefined, "GET")).status, 200);
+    await pool.query("UPDATE connection_profiles SET expires_at='2000-01-01T00:00:00.000Z' WHERE id=$1", [wgProfile.id]);
+    assert.equal((await call(exportPath, token, undefined, "GET")).status, 409);
+    await pool.query("UPDATE connection_profiles SET status='active', expires_at=$2 WHERE id=$1", [wgProfile.id, wgProfile.expiresAt]);
+    assert.equal((await call(`/api/v1/profiles/${wgProfile.id}/download?format=invalid`, token, undefined, "GET")).status, 400);
     const wgCredential = (await pool.query("SELECT * FROM access_credentials WHERE id=$1", [id])).rows[0];
     assert.equal(wgProfile.expiresAt, wgCredential.expires_at);
     assert.equal(new Date(wgCredential.expires_at) - new Date(wgCredential.created_at), 365 * 86_400_000);
@@ -361,6 +379,8 @@ test("credential controls preserve independent user/admin locks and recoverable 
     await pool.query("UPDATE connection_profiles SET status='expired' WHERE id=$1", [wgProfile.id]);
     await migrate();
     assert.equal((await pool.query("SELECT status FROM connection_profiles WHERE id=$1", [wgProfile.id])).rows[0].status, "expired");
+    assert.equal((await call(exportPath, token, undefined, "GET")).status, 409);
+    await pool.query("UPDATE connection_profiles SET status='active' WHERE id=$1", [wgProfile.id]);
     await pool.query("UPDATE access_credentials SET expires_at=$2 WHERE id=$1", [id, new Date(Date.now() + 20 * 86_400_000).toISOString()]);
     assert.equal((await state()).expiringSoon, true);
     assert.equal((await state()).daysRemaining, 20);
@@ -368,6 +388,7 @@ test("credential controls preserve independent user/admin locks and recoverable 
     const peers = async () => JSON.parse((await pool.query("SELECT payload_json FROM desired_configs WHERE node_id=$1 AND protocol='wireguard'", [nodeId])).rows[0].payload_json).peers;
     assert.equal((await call(path, token, { action: "disable" }, "PATCH")).status, 200);
     assert.equal((await state()).state, "disabled");
+    assert.equal((await call(exportPath, token, undefined, "GET")).status, 409);
     assert.equal((await peers()).length, 0);
     assert.equal((await state()).syncStatus, "pending");
     await pool.query("UPDATE reconcile_tasks SET status='succeeded' WHERE node_id=$1", [nodeId]);
