@@ -59,8 +59,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS nodes_node_identity_unique_idx ON nodes(node_i
 CREATE INDEX IF NOT EXISTS nodes_region_idx ON nodes(region_id);
 CREATE TABLE IF NOT EXISTS regions (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, country TEXT NOT NULL, code TEXT NOT NULL,
-  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE (name, country), UNIQUE (code)
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE (name, country)
 );
+-- code identifies the country, not an individual city/region. Upgrade existing installations too.
+ALTER TABLE regions DROP CONSTRAINT IF EXISTS regions_code_key;
 CREATE TABLE IF NOT EXISTS audit_logs (
   id TEXT PRIMARY KEY, actor_user_id TEXT, action TEXT NOT NULL, target_type TEXT,
   target_id TEXT, metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL

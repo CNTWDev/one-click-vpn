@@ -232,7 +232,7 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
     setName(`${selected.name}（换发）`);
     setClient(selectedClient);
     const previous = selectedProfiles[0];
-    const region = regions.find((item) => item.code === previous?.regionCode);
+    const region = regions.find((item) => item.code === previous?.regionCode && item.name === previous?.regionName);
     if (region) setRegionId(region.id);
     setNotice("已填好换发信息，请在上方创建新凭据并下载配置，然后重新导入所有使用端。旧配置保持原到期时间；新配置验证成功后可撤销旧凭据。");
     document.getElementById("credential-create")?.scrollIntoView({ behavior: "smooth", block: "center" });

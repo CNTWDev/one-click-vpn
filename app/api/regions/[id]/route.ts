@@ -22,6 +22,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     await addAudit({ actorUserId: user.id, action: "region.updated", targetType: "region", targetId: id });
     return NextResponse.json({ region });
   } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "23505") {
+      return jsonError("该区域已存在，请编辑已有区域或使用其他区域名称。", 409);
+    }
     return jsonError(error instanceof Error ? error.message : "Unable to update region");
   }
 }

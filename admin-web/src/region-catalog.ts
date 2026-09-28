@@ -19,6 +19,8 @@ export const countryOptions: CountryOption[] = COUNTRY_CODES.map((code) => {
 }).sort((left, right) => left.label.localeCompare(right.label, "zh-CN"));
 
 const presets: Array<[group: string, name: string, label: string, code: string]> = [
+  ["亚洲", "New Delhi", "新德里", "IN"], ["亚洲", "Fukuoka", "福冈", "JP"], ["亚洲", "Kaohsiung", "高雄", "TW"],
+  ["北美洲", "Ohio", "俄亥俄州", "US"], ["北美洲", "Virginia", "弗吉尼亚州", "US"], ["北美洲", "New Jersey", "新泽西州", "US"],
   ["亚洲", "Beijing", "北京", "CN"], ["亚洲", "Shanghai", "上海", "CN"], ["亚洲", "Shenzhen", "深圳", "CN"],
   ["亚洲", "Hong Kong", "香港", "HK"], ["亚洲", "Taipei", "台北", "TW"], ["亚洲", "Tokyo", "东京", "JP"],
   ["亚洲", "Osaka", "大阪", "JP"], ["亚洲", "Seoul", "首尔", "KR"], ["亚洲", "Singapore", "新加坡", "SG"],

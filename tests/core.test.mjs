@@ -190,6 +190,15 @@ before(async () => {
     NORTHSTAR_ADMIN_PASSWORD: "test-password-123",
     NORTHSTAR_PUBLIC_ORIGIN: base,
   };
+  // Exercise upgrades from the legacy country-code uniqueness constraint.
+  const legacyPool = new pg.Pool({ connectionString: databaseUrl });
+  try {
+    await legacyPool.query(`CREATE TABLE IF NOT EXISTS regions (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, country TEXT NOT NULL, code TEXT NOT NULL,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE (name, country), UNIQUE (code)
+    )`);
+  } finally { await legacyPool.end(); }
+  await execFileAsync(process.execPath, [path.join(root, "scripts/migrate.mjs")], { cwd: root, env: testEnv });
   await execFileAsync(process.execPath, [path.join(root, "scripts/migrate.mjs")], { cwd: root, env: testEnv });
   server = spawn(process.execPath, [path.join(root, "node_modules/next/dist/bin/next"), "start", "--hostname", "127.0.0.1", "--port", String(port)], {
     cwd: root,
@@ -233,6 +242,32 @@ test("health endpoint is public", integrationOptions, async () => {
 test("node API requires an authenticated session", integrationOptions, async () => {
   const response = await fetch(`${base}/api/nodes`);
   assert.equal(response.status, 401);
+});
+
+test("regions allow multiple US locations and report duplicate names clearly", integrationOptions, async () => {
+  const login = await fetch(`${base}/api/auth/login`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "owner@example.com", password: "test-password-123" }),
+  });
+  const cookie = login.headers.get("set-cookie")?.split(";", 1)[0];
+  assert.ok(cookie);
+  const call = (url, method, body) => fetch(`${base}${url}`, {
+    method, headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const ohio = { name: "Ohio", country: "United States", code: "US" };
+  const first = await call("/api/regions", "POST", ohio);
+  assert.equal(first.status, 201);
+  const { region } = await first.json();
+  const second = await call("/api/regions", "POST", { ...ohio, name: "Oregon" });
+  assert.equal(second.status, 201);
+  const other = (await second.json()).region;
+  assert.equal((await call(`/api/regions/${other.id}`, "PATCH", { ...ohio, name: "Virginia" })).status, 200);
+  const duplicate = await call("/api/regions", "POST", { ...ohio, id: "another-ohio" });
+  assert.equal(duplicate.status, 409);
+  assert.doesNotMatch(await duplicate.text(), /regions_.*_key|duplicate key/);
+  assert.equal((await call(`/api/regions/${other.id}`, "PATCH", ohio)).status, 409);
+  for (const id of [region.id, other.id]) assert.equal((await call(`/api/regions/${id}`, "DELETE")).status, 200);
 });
 
 test("owner can sign in and read an empty fleet", integrationOptions, async () => {
