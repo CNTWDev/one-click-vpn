@@ -503,11 +503,21 @@ export async function addAudit(input: {
   ]);
 }
 
+export class NodeBusyError extends Error {
+  constructor() {
+    super("This node already has a queued or running action. Wait for it to finish.");
+    this.name = "NodeBusyError";
+  }
+}
+
 export async function addNodeAction(nodeId: string, action: string, status: "queued" | "running" = "queued"): Promise<string> {
   const id = randomUUID();
   const timestamp = now();
-  await dbExec(`INSERT INTO node_actions (id, node_id, action, status, created_at, started_at, current_phase, progress)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, [id, nodeId, action, status, timestamp, status === "running" ? timestamp : null, status === "running" ? "connecting" : "queued", status === "running" ? 5 : 0]);
+  // node_actions_one_active_idx makes the "one active action per node" check atomic across concurrent requests.
+  const inserted = await dbExec(`INSERT INTO node_actions (id, node_id, action, status, created_at, started_at, current_phase, progress)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    ON CONFLICT (node_id) WHERE status IN ('queued', 'running') DO NOTHING`, [id, nodeId, action, status, timestamp, status === "running" ? timestamp : null, status === "running" ? "connecting" : "queued", status === "running" ? 5 : 0]);
+  if (!inserted) throw new NodeBusyError();
   await appendNodeActionEvent(id, { phase: status === "running" ? "connecting" : "queued", message: status === "running" ? "Controller started the remote operation" : "Operation queued by the Controller" });
   return id;
 }

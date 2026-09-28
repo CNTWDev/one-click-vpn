@@ -1,4 +1,4 @@
-import { dbExec, dbQuery } from "./db";
+import { dbQuery, withTransaction } from "./db";
 import { X509Certificate } from "node:crypto";
 import { credentialSyncStatus } from "./credential-access";
 import { EXPIRY_WARNING_DAYS } from "./credential-validity";
@@ -24,67 +24,105 @@ function dayOf(value: string): string {
   return Number.isNaN(parsed.getTime()) ? now().slice(0, 10) : parsed.toISOString().slice(0, 10);
 }
 
+type Owner = { device_id: string; credential_id: string; user_id: string };
+type PreviousCounter = { counter_epoch: string; observed_rx_bytes: string; observed_tx_bytes: string; observed_at: string; last_traffic_at: string | null };
+
+const MAX_SNAPSHOTS = 10000;
+
+function counterKey(protocol: string, identityKey: string, sessionKey: string): string {
+  return `${protocol}\u0000${identityKey}\u0000${sessionKey}`;
+}
+
 export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSnapshot[]): Promise<void> {
   const observedAt = now();
-  await dbExec("UPDATE traffic_counters SET connected = 0 WHERE node_id = $1 AND protocol = 'openvpn'", [nodeId]);
-  for (const snapshot of snapshots.slice(0, 10000)) {
+  const valid = snapshots.slice(0, MAX_SNAPSHOTS).flatMap((snapshot) => {
     const identityKey = typeof snapshot.identityKey === "string" ? snapshot.identityKey.trim().slice(0, 512) : "";
-    if (!identityKey || !["wireguard", "openvpn"].includes(snapshot.protocol)) continue;
+    if (!identityKey || !["wireguard", "openvpn"].includes(snapshot.protocol)) return [];
     const sessionKey = snapshot.protocol === "openvpn" && typeof snapshot.sessionKey === "string" ? snapshot.sessionKey.trim().slice(0, 512) : "";
-    const rxBytes = validBytes(snapshot.rxBytes);
-    const txBytes = validBytes(snapshot.txBytes);
-    const epoch = (snapshot.counterEpoch || "").trim().slice(0, 128);
-    const previous = (await dbQuery<{ device_id: string | null; credential_id: string | null; counter_epoch: string; observed_rx_bytes: string; observed_tx_bytes: string; observed_at: string; last_traffic_at: string | null }>(
-      "SELECT device_id, credential_id, counter_epoch, observed_rx_bytes, observed_tx_bytes, observed_at, last_traffic_at FROM traffic_counters WHERE node_id = $1 AND protocol = $2 AND identity_key = $3 AND session_key = $4",
-      [nodeId, snapshot.protocol, identityKey, sessionKey],
-    ))[0];
-    if (previous && new Date(previous.observed_at).getTime() >= new Date(observedAt).getTime()) continue;
-    const sameCounter = previous && previous.counter_epoch === epoch;
-    const uploadDelta = sameCounter ? Math.max(0, rxBytes - Number(previous.observed_rx_bytes)) : rxBytes;
-    const downloadDelta = sameCounter ? Math.max(0, txBytes - Number(previous.observed_tx_bytes)) : txBytes;
-    const owner = snapshot.protocol === "wireguard"
-      ? (await dbQuery<{ device_id: string; credential_id: string; user_id: string }>(
-        `SELECT c.device_id, c.id AS credential_id, c.user_id FROM access_credentials c
-         WHERE c.protocol = 'wireguard' AND c.identity_key = $1 AND c.status = 'active' LIMIT 1`, [identityKey],
-      ))[0]
-      : (await dbQuery<{ device_id: string; credential_id: string; user_id: string }>(`SELECT ac.device_id, ac.id AS credential_id, ac.user_id FROM certificate_issuances c
-          INNER JOIN access_credentials ac ON ac.id = c.credential_id
-          WHERE c.subject = $1 AND c.purpose = 'client' AND c.status = 'active' AND ac.status = 'active'
-          ORDER BY c.created_at DESC LIMIT 1`, [`CN=${identityKey}`]))[0];
-    const hasTraffic = uploadDelta > 0 || downloadDelta > 0;
-    const handshakeTime = snapshot.lastHandshakeAt ? new Date(snapshot.lastHandshakeAt).getTime() : 0;
-    const connected = snapshot.protocol === "openvpn" || (Number.isFinite(handshakeTime) && handshakeTime >= Date.now() - 180_000);
-    const lastTrafficAt = hasTraffic ? observedAt : previous?.last_traffic_at || null;
-    await dbExec(`INSERT INTO traffic_counters
-      (node_id, protocol, identity_key, session_key, device_id, credential_id, observed_rx_bytes, observed_tx_bytes, last_handshake_at, last_traffic_at, connected, counter_epoch, observed_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      ON CONFLICT(node_id, protocol, identity_key, session_key) DO UPDATE SET
-        device_id = excluded.device_id, credential_id = excluded.credential_id, observed_rx_bytes = excluded.observed_rx_bytes,
-        observed_tx_bytes = excluded.observed_tx_bytes, last_handshake_at = excluded.last_handshake_at,
-        last_traffic_at = excluded.last_traffic_at, connected = excluded.connected,
-        counter_epoch = excluded.counter_epoch, observed_at = excluded.observed_at`, [
-      nodeId, snapshot.protocol, identityKey, sessionKey, owner?.device_id || null, owner?.credential_id || null,
-      String(rxBytes), String(txBytes), snapshot.lastHandshakeAt || null, lastTrafficAt, connected ? 1 : 0, epoch, observedAt,
-    ]);
-    if (owner && (connected || hasTraffic)) {
-      await Promise.all([
-        dbExec("UPDATE access_credentials SET last_seen_at = $1, updated_at = GREATEST(updated_at, $1) WHERE id = $2", [observedAt, owner.credential_id]),
-        dbExec("UPDATE devices SET last_seen_at = $1 WHERE id = $2", [observedAt, owner.device_id]),
+    return [{ snapshot, identityKey, sessionKey }];
+  });
+
+  // Load previous counters and owners in three queries instead of several per snapshot.
+  const previousRows = await dbQuery<PreviousCounter & { protocol: string; identity_key: string; session_key: string }>(
+    `SELECT protocol, identity_key, session_key, counter_epoch, observed_rx_bytes, observed_tx_bytes, observed_at, last_traffic_at
+     FROM traffic_counters WHERE node_id = $1`, [nodeId],
+  );
+  const previousByKey = new Map<string, PreviousCounter>(previousRows.map((row) => [counterKey(row.protocol, row.identity_key, row.session_key), row]));
+  const wireguardKeys = [...new Set(valid.filter((item) => item.snapshot.protocol === "wireguard").map((item) => item.identityKey))];
+  const openvpnSubjects = [...new Set(valid.filter((item) => item.snapshot.protocol === "openvpn").map((item) => `CN=${item.identityKey}`))];
+  const wireguardOwners = new Map<string, Owner>();
+  if (wireguardKeys.length) {
+    const rows = await dbQuery<Owner & { identity_key: string }>(
+      `SELECT DISTINCT ON (c.identity_key) c.identity_key, c.device_id, c.id AS credential_id, c.user_id FROM access_credentials c
+       WHERE c.protocol = 'wireguard' AND c.identity_key = ANY($1::text[]) AND c.status = 'active'
+       ORDER BY c.identity_key, c.created_at DESC`, [wireguardKeys],
+    );
+    for (const row of rows) wireguardOwners.set(row.identity_key, row);
+  }
+  const openvpnOwners = new Map<string, Owner>();
+  if (openvpnSubjects.length) {
+    const rows = await dbQuery<Owner & { subject: string }>(
+      `SELECT DISTINCT ON (c.subject) c.subject, ac.device_id, ac.id AS credential_id, ac.user_id FROM certificate_issuances c
+       INNER JOIN access_credentials ac ON ac.id = c.credential_id
+       WHERE c.subject = ANY($1::text[]) AND c.purpose = 'client' AND c.status = 'active' AND ac.status = 'active'
+       ORDER BY c.subject, c.created_at DESC`, [openvpnSubjects],
+    );
+    for (const row of rows) openvpnOwners.set(row.subject, row);
+  }
+
+  const seenCredentials = new Set<string>();
+  const seenDevices = new Set<string>();
+  await withTransaction(async (exec) => {
+    await exec("UPDATE traffic_counters SET connected = 0 WHERE node_id = $1 AND protocol = 'openvpn'", [nodeId]);
+    for (const { snapshot, identityKey, sessionKey } of valid) {
+      const rxBytes = validBytes(snapshot.rxBytes);
+      const txBytes = validBytes(snapshot.txBytes);
+      const epoch = (snapshot.counterEpoch || "").trim().slice(0, 128);
+      const key = counterKey(snapshot.protocol, identityKey, sessionKey);
+      const previous = previousByKey.get(key);
+      if (previous && new Date(previous.observed_at).getTime() >= new Date(observedAt).getTime()) continue;
+      const sameCounter = previous && previous.counter_epoch === epoch;
+      const uploadDelta = sameCounter ? Math.max(0, rxBytes - Number(previous.observed_rx_bytes)) : rxBytes;
+      const downloadDelta = sameCounter ? Math.max(0, txBytes - Number(previous.observed_tx_bytes)) : txBytes;
+      const owner = snapshot.protocol === "wireguard" ? wireguardOwners.get(identityKey) : openvpnOwners.get(`CN=${identityKey}`);
+      const hasTraffic = uploadDelta > 0 || downloadDelta > 0;
+      const handshakeTime = snapshot.lastHandshakeAt ? new Date(snapshot.lastHandshakeAt).getTime() : 0;
+      const connected = snapshot.protocol === "openvpn" || (Number.isFinite(handshakeTime) && handshakeTime >= Date.now() - 180_000);
+      const lastTrafficAt = hasTraffic ? observedAt : previous?.last_traffic_at || null;
+      await exec(`INSERT INTO traffic_counters
+        (node_id, protocol, identity_key, session_key, device_id, credential_id, observed_rx_bytes, observed_tx_bytes, last_handshake_at, last_traffic_at, connected, counter_epoch, observed_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT(node_id, protocol, identity_key, session_key) DO UPDATE SET
+          device_id = excluded.device_id, credential_id = excluded.credential_id, observed_rx_bytes = excluded.observed_rx_bytes,
+          observed_tx_bytes = excluded.observed_tx_bytes, last_handshake_at = excluded.last_handshake_at,
+          last_traffic_at = excluded.last_traffic_at, connected = excluded.connected,
+          counter_epoch = excluded.counter_epoch, observed_at = excluded.observed_at`, [
+        nodeId, snapshot.protocol, identityKey, sessionKey, owner?.device_id || null, owner?.credential_id || null,
+        String(rxBytes), String(txBytes), snapshot.lastHandshakeAt || null, lastTrafficAt, connected ? 1 : 0, epoch, observedAt,
+      ]);
+      // Guard against duplicate snapshots for the same key within one heartbeat.
+      previousByKey.set(key, { counter_epoch: epoch, observed_rx_bytes: String(rxBytes), observed_tx_bytes: String(txBytes), observed_at: observedAt, last_traffic_at: lastTrafficAt });
+      if (owner && (connected || hasTraffic)) {
+        seenCredentials.add(owner.credential_id);
+        seenDevices.add(owner.device_id);
+      }
+      if (!owner || !hasTraffic) continue;
+      await exec(`INSERT INTO traffic_daily
+        (day, user_id, device_id, credential_id, node_id, protocol, upload_bytes, download_bytes, first_seen_at, last_seen_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+        ON CONFLICT(day, device_id, node_id, protocol) DO UPDATE SET
+          credential_id = excluded.credential_id,
+          upload_bytes = traffic_daily.upload_bytes + excluded.upload_bytes,
+          download_bytes = traffic_daily.download_bytes + excluded.download_bytes,
+          last_seen_at = excluded.last_seen_at`, [
+        dayOf(observedAt), owner.user_id, owner.device_id, owner.credential_id, nodeId, snapshot.protocol, String(uploadDelta), String(downloadDelta), observedAt,
       ]);
     }
-    if (!owner || !hasTraffic) continue;
-    const day = dayOf(observedAt);
-    await dbExec(`INSERT INTO traffic_daily
-      (day, user_id, device_id, credential_id, node_id, protocol, upload_bytes, download_bytes, first_seen_at, last_seen_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
-      ON CONFLICT(day, device_id, node_id, protocol) DO UPDATE SET
-        credential_id = excluded.credential_id,
-        upload_bytes = traffic_daily.upload_bytes + excluded.upload_bytes,
-        download_bytes = traffic_daily.download_bytes + excluded.download_bytes,
-        last_seen_at = excluded.last_seen_at`, [
-      day, owner.user_id, owner.device_id, owner.credential_id, nodeId, snapshot.protocol, String(uploadDelta), String(downloadDelta), observedAt,
-    ]);
-  }
+    if (seenCredentials.size) {
+      await exec("UPDATE access_credentials SET last_seen_at = $1, updated_at = GREATEST(updated_at, $1) WHERE id = ANY($2::text[])", [observedAt, [...seenCredentials]]);
+    }
+    if (seenDevices.size) await exec("UPDATE devices SET last_seen_at = $1 WHERE id = ANY($2::text[])", [observedAt, [...seenDevices]]);
+  });
 }
 
 function range(input: { from?: string; to?: string }): { from: string; to: string } {

@@ -1,14 +1,22 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { api, isUnauthorized, setUnauthorizedHandler } from "./api";
-import {
-  ControllerPage, LogsPage, NodesPage, OverviewPage, RegionsPage, ServicesPage, TopologyPage, UsersPage,
-} from "./pages";
+import { ConfirmProvider } from "./confirm-dialog";
 import type { AdminUser, ControllerInfo, NodeRecord, Region } from "./types";
 import "./styles.css";
 import "./credential-usage.css";
 import "./ui-refinements.css";
+
+// Each console page is its own chunk, fetched the first time it is opened.
+const OverviewPage = lazy(() => import("./pages/overview").then((module) => ({ default: module.OverviewPage })));
+const TopologyPage = lazy(() => import("./pages/topology").then((module) => ({ default: module.TopologyPage })));
+const UsersPage = lazy(() => import("./pages/users").then((module) => ({ default: module.UsersPage })));
+const NodesPage = lazy(() => import("./pages/nodes").then((module) => ({ default: module.NodesPage })));
+const ServicesPage = lazy(() => import("./pages/services").then((module) => ({ default: module.ServicesPage })));
+const RegionsPage = lazy(() => import("./pages/regions").then((module) => ({ default: module.RegionsPage })));
+const ControllerPage = lazy(() => import("./pages/controller").then((module) => ({ default: module.ControllerPage })));
+const LogsPage = lazy(() => import("./pages/logs").then((module) => ({ default: module.LogsPage })));
 
 type PageId = "overview" | "topology" | "users" | "nodes" | "services" | "regions" | "controller" | "logs";
 const navigation: Array<{ id: PageId; icon: string; label: string; description: string }> = [
@@ -116,17 +124,19 @@ function App() {
       <header className="topbar"><button className="icon-button mobile-only" onClick={() => setMenuOpen(true)}>☰</button><div><small>Northstar Console</small><b>{current.label}</b></div><span>{dataLoading ? "正在同步…" : `${nodes.filter((node) => node.status === "online").length}/${nodes.length} 节点在线`}</span></header>
       <div className="content">
         {error && <div className="inline-notice error" role="alert">{error}<button className="text-button" onClick={() => void refreshCore()}>重试</button></div>}
-        {page === "overview" && <OverviewPage users={users} nodes={nodes} regions={regions} controllerSettings={controllerSettings} onNavigate={navigate} onRefresh={refreshCore} />}
-        {page === "topology" && <TopologyPage nodes={nodes} regions={regions} controllerSettings={controllerSettings} onNavigate={navigate} onRefresh={refreshCore} />}
-        {page === "users" && <UsersPage users={users} onRefresh={refreshCore} />}
-        {page === "nodes" && <NodesPage nodes={nodes} regions={regions} onRefresh={refreshCore} />}
-        {page === "services" && <ServicesPage nodes={nodes} />}
-        {page === "regions" && <RegionsPage regions={regions} nodes={nodes} onRefresh={refreshCore} />}
-        {page === "controller" && <ControllerPage onSettingsChange={setControllerSettings} />}
-        {page === "logs" && <LogsPage nodes={nodes} />}
+        <Suspense fallback={<div className="page-loading" role="status">正在加载页面…</div>}>
+          {page === "overview" && <OverviewPage users={users} nodes={nodes} regions={regions} controllerSettings={controllerSettings} onNavigate={navigate} onRefresh={refreshCore} />}
+          {page === "topology" && <TopologyPage nodes={nodes} regions={regions} controllerSettings={controllerSettings} onNavigate={navigate} onRefresh={refreshCore} />}
+          {page === "users" && <UsersPage users={users} onRefresh={refreshCore} />}
+          {page === "nodes" && <NodesPage nodes={nodes} regions={regions} onRefresh={refreshCore} />}
+          {page === "services" && <ServicesPage nodes={nodes} />}
+          {page === "regions" && <RegionsPage regions={regions} nodes={nodes} onRefresh={refreshCore} />}
+          {page === "controller" && <ControllerPage onSettingsChange={setControllerSettings} />}
+          {page === "logs" && <LogsPage nodes={nodes} />}
+        </Suspense>
       </div>
     </section>
   </main>;
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(<ConfirmProvider><App /></ConfirmProvider>);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "../../../../server/auth";
-import { addAudit, countRunningNodeActions, findNode } from "../../../../server/db";
+import { addAudit, countRunningNodeActions, findNode, NodeBusyError } from "../../../../server/db";
 import { queueNodeAction, queueNodeBootstrap } from "../../../../server/bootstrap";
 import { cleanText, jsonError, readJson } from "../../../../server/http";
 
@@ -25,8 +25,14 @@ export async function POST(request: Request) {
         skipped.push(nodeId);
         continue;
       }
-      if (action === "bootstrap") await queueNodeBootstrap(nodeId, user.id);
-      else await queueNodeAction(nodeId, action as "status-agent" | "restart-agent", user.id);
+      try {
+        if (action === "bootstrap") await queueNodeBootstrap(nodeId, user.id);
+        else await queueNodeAction(nodeId, action as "status-agent" | "restart-agent", user.id);
+      } catch (error) {
+        if (!(error instanceof NodeBusyError)) throw error;
+        skipped.push(nodeId);
+        continue;
+      }
       accepted.push(nodeId);
     }
     await addAudit({ actorUserId: user.id, action: `nodes.batch.${action}.queued`, targetType: "node_fleet", metadata: { accepted, skipped } });

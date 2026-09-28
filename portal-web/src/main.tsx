@@ -34,10 +34,13 @@ function Auth({ mode, onMode, onUser }: {
     setBusy(true);
     setError("");
     try {
-      const result = await api<{ user: User; message?: string }>(
-        mode === "login" ? "/api/v1/auth/web-login" : "/api/v1/auth/register",
-        { method: "POST", body: JSON.stringify(form) },
-      );
+      if (mode === "register") {
+        // Registration never says whether the email already exists, so show the review screen for this address.
+        await api<{ status: string }>("/api/v1/auth/register", { method: "POST", body: JSON.stringify(form) });
+        onUser({ id: "", email: form.email.trim().toLowerCase(), displayName: form.displayName, role: "user", status: "pending" });
+        return;
+      }
+      const result = await api<{ user: User; message?: string }>("/api/v1/auth/web-login", { method: "POST", body: JSON.stringify(form) });
       if (!result.user?.id) throw new Error("登录接口返回异常，请检查 Portal 的 /api/ 反向代理。");
       onUser(result.user);
     } catch (caught) {
@@ -77,6 +80,7 @@ function Pending({ user, onLogout }: { user: User; onLogout: () => void }) {
     <p className="kicker">APPLICATION RECEIVED</p>
     <h1>等待管理员审核</h1>
     <p>账号 <b>{user.email}</b> 已提交。审核通过后即可登录并创建 VPN 连接凭据。</p>
+    {!user.id && <p className="muted">如果这个邮箱之前已经注册过，请直接返回登录。</p>}
     {user.status === "rejected" && <p className="error">申请未通过：{user.rejectionReason || "请联系管理员"}</p>}
     <button className="secondary" onClick={onLogout}>返回</button>
   </div></main>;
