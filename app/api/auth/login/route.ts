@@ -3,31 +3,18 @@ import { addAudit, findUserByEmail } from "../../../../server/db";
 import { createLoginSession, sessionCookie } from "../../../../server/auth";
 import { verifyPassword } from "../../../../server/password";
 import { jsonError, readJson, cleanText } from "../../../../server/http";
+import { allowLoginAttempt } from "../../../../server/rate-limit";
 
 export const runtime = "nodejs";
 
-const attempts = new Map<string, { count: number; resetAt: number }>();
-
-function allowed(request: Request): boolean {
-  const address = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  const now = Date.now();
-  const current = attempts.get(address);
-  if (!current || current.resetAt <= now) {
-    attempts.set(address, { count: 1, resetAt: now + 15 * 60 * 1000 });
-    return true;
-  }
-  current.count += 1;
-  return current.count <= 20;
-}
-
 export async function POST(request: Request) {
   try {
-    if (!allowed(request)) return jsonError("Too many login attempts", 429);
     const body = await readJson(request);
     const email = cleanText(body.email, 320).toLowerCase();
     const password = typeof body.password === "string" ? body.password : "";
+    if (!allowLoginAttempt(request, email)) return jsonError("Too many login attempts", 429);
     const user = await findUserByEmail(email);
-    if (!user || !verifyPassword(password, user.password_hash)) {
+    if (!(await verifyPassword(password, user?.password_hash)) || !user) {
       await addAudit({ action: "auth.login.failed", metadata: { email } });
       return jsonError("Invalid email or password", 401);
     }
@@ -35,7 +22,7 @@ export async function POST(request: Request) {
       await addAudit({ actorUserId: user.id, action: "auth.login.blocked", metadata: { status: user.status, role: user.role } });
       return NextResponse.json({ error: "This account is not allowed to access the administrator console", code: `USER_${user.status.toUpperCase()}`, status: user.status }, { status: 403 });
     }
-    const session = await createLoginSession(user.id);
+    const session = await createLoginSession(user.id, "admin");
     await addAudit({ actorUserId: user.id, action: "auth.login.succeeded" });
     const response = NextResponse.json({
       user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role, status: user.status },

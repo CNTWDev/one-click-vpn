@@ -4,6 +4,7 @@ import { createApiSession } from "../../../../../server/control-db";
 import { publicUser } from "../../../../../server/device-auth";
 import { verifyPassword } from "../../../../../server/password";
 import { cleanText, jsonError, readJson } from "../../../../../server/http";
+import { allowLoginAttempt } from "../../../../../server/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,8 +13,9 @@ export async function POST(request: Request) {
     const body = await readJson(request);
     const email = cleanText(body.email, 320).toLowerCase();
     const password = typeof body.password === "string" ? body.password : "";
+    if (!allowLoginAttempt(request, email)) return jsonError("Too many login attempts", 429);
     const user = await findUserByEmail(email);
-    if (!user || !verifyPassword(password, user.password_hash)) {
+    if (!(await verifyPassword(password, user?.password_hash)) || !user) {
       await addAudit({ action: "api.auth.login.failed", metadata: { email } });
       return jsonError("Invalid email or password", 401);
     }

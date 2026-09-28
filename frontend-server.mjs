@@ -17,7 +17,9 @@ function proxyApi(request, response) {
     return;
   }
 
-  const target = new URL(request.url || "/api", `${apiUpstream}/`);
+  // Never resolve the raw request URL against the upstream: "//host/api" would be treated as protocol-relative.
+  const incoming = new URL(request.url || "/api", "http://localhost");
+  const target = new URL(`${apiUpstream}${incoming.pathname}${incoming.search}`);
   const headers = {};
   for (const [name, value] of Object.entries(request.headers)) {
     if (!hopByHopHeaders.has(name.toLowerCase()) && value !== undefined) headers[name] = value;
@@ -49,6 +51,11 @@ function proxyApi(request, response) {
 }
 
 createServer((request, response) => {
+  if (!request.url || !request.url.startsWith("/") || request.url.startsWith("//")) {
+    response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+    response.end("Bad request");
+    return;
+  }
   const pathname = new URL(request.url || "/", "http://localhost").pathname;
   if (pathname === "/health") { response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ status: "ok" })); return; }
   if (pathname === "/api" || pathname.startsWith("/api/")) { proxyApi(request, response); return; }

@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { createPendingUser, findUserByEmail, addAudit } from "../../../../../server/db";
-import { hashPassword } from "../../../../../server/password";
+import { hashPasswordAsync } from "../../../../../server/password";
 import { publicUser } from "../../../../../server/device-auth";
 import { cleanText, jsonError, readJson } from "../../../../../server/http";
+import { allowRegistration } from "../../../../../server/rate-limit";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
+    if (!allowRegistration(request)) return jsonError("Too many registration attempts", 429);
     const body = await readJson(request);
     const email = cleanText(body.email, 320).toLowerCase();
     const displayName = cleanText(body.displayName, 120);
@@ -16,7 +18,7 @@ export async function POST(request: Request) {
     if (displayName.length < 2) return jsonError("A display name is required");
     if (password.length < 12) return jsonError("Password must be at least 12 characters");
     if (await findUserByEmail(email)) return jsonError("An account with this email already exists", 409);
-    const user = await createPendingUser({ email, displayName, passwordHash: hashPassword(password) });
+    const user = await createPendingUser({ email, displayName, passwordHash: await hashPasswordAsync(password) });
     await addAudit({ actorUserId: user.id, action: "auth.registered", targetType: "user", targetId: user.id });
     return NextResponse.json({ user: publicUser(user), message: "Registration received. An administrator must approve the account before VPN access is available." }, { status: 201 });
   } catch (error) {

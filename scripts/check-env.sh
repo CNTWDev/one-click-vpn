@@ -132,7 +132,8 @@ case "$(uname -s)" in
       mode=$(stat -f '%Lp' .env)
     fi
     case "$mode" in
-      ???[0-9]|??[1-7][0-9]|?[1-7][0-9][0-9]|[1-7][0-9][0-9][0-9])
+      600|400|0600|0400) ;;
+      *)
         echo "Warning: .env permissions are broader than 0600; run chmod 600 .env." >&2
         ;;
     esac

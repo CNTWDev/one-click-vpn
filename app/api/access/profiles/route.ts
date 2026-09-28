@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "../../../../server/auth";
 import { findDevice, listConnectionProfiles, type Protocol } from "../../../../server/control-db";
-import { issueScheduledConnectionProfile, publicProfile } from "../../../../server/control-plane";
+import { issueScheduledConnectionProfile, protocolForPlatform, publicProfile } from "../../../../server/control-plane";
 import { cleanText, jsonError, readJson } from "../../../../server/http";
 
 export const runtime = "nodejs";
@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     if (!device || device.user_id !== user.id) return jsonError("Access device not found", 404);
     const protocol = cleanText(body.protocol, 32) as Protocol || "wireguard";
     if (protocol !== "wireguard" && protocol !== "openvpn") return jsonError("Unsupported access protocol");
+    if (!protocolForPlatform(device.platform, protocol)) return jsonError("Protocol is not supported by the device platform");
     const clientPrivateKey = cleanText(body.clientPrivateKey, 128) || undefined;
     const profile = await issueScheduledConnectionProfile({ actorUserId: user.id, deviceId, regionId, protocol, transport: "udp", clientPrivateKey });
     return NextResponse.json({ profile: publicProfile(profile) }, { status: 201 });

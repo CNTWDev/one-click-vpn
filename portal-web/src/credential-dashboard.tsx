@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { x25519 } from "@noble/curves/ed25519.js";
 import { useActionDialog } from "./action-dialog";
+import { api, fetchText, isUnauthorized } from "./api";
 import { clientOptions, clientProtocol, clientFormat, clientName, usableCredential, type ClientChoice } from "./client-options";
 import { RegionMap } from "./region-map";
 import { createZipBlob } from "./zip";
@@ -52,13 +53,6 @@ function profileFilename(profile: Profile) {
   const node = (profile.regionalNodeCount || 0) > 1 ? `${profile.regionalNodeCount}nodes` : filenamePart(profile.nodeName, "node", 12);
   return `${filenamePart(profile.regionCode?.toUpperCase(), "AUTO", 8)}-${filenamePart(profile.displayName, "credential")}-${protocolCode}-${node}.${extension}`;
 }
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, { ...init, credentials: "include", cache: "no-store", headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
-  const text = await response.text();
-  const body = text && response.headers.get("content-type")?.includes("application/json") ? JSON.parse(text) as Record<string, unknown> : {};
-  if (!response.ok) throw new Error(typeof body.error === "string" ? body.error : text || `请求失败（HTTP ${response.status}）`);
-  return body as T;
-}
 function saveBlob(name: string, blob: Blob) {
   const url = URL.createObjectURL(blob); const link = document.createElement("a");
   link.href = url; link.download = name; document.body.appendChild(link); link.click(); link.remove();
@@ -99,6 +93,11 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
   const recentTotal = recentDays.reduce((sum, day) => sum + day.totalBytes, 0);
   const maxDay = Math.max(...recentDays.map((item) => item.totalBytes), 1);
 
+  function fail(caught: unknown) {
+    if (isUnauthorized(caught)) onLogout();
+    else setError((caught as Error).message);
+  }
+
   async function refresh(silent = false) {
     if (!silent) setRefreshing(true);
     try {
@@ -108,11 +107,16 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
         api<{ profiles: Profile[] }>("/api/v1/profiles"),
         api<Usage>("/api/v1/usage/summary"),
       ]);
-      setRegions(availability.regions); setCredentials(credentialResult.credentials || []); setProfiles(profileResult.profiles || []); setUsage(usageResult);
+      const nextRegions = availability.regions || [];
+      const nextCredentials = credentialResult.credentials || [];
+      setRegions(nextRegions); setCredentials(nextCredentials); setProfiles(profileResult.profiles || []); setUsage(usageResult);
       setUpdatedAt(new Date().toISOString()); setStale(false);
-      setSelectedId((current) => credentialResult.credentials.some((item) => item.id === current) ? current : credentialResult.credentials[0]?.id || "");
-      setRegionId((current) => current && !availability.regions.some((item) => item.id === current) ? "" : current);
-    } catch (caught) { setStale(true); if (!silent) setError((caught as Error).message); }
+      setSelectedId((current) => nextCredentials.some((item) => item.id === current) ? current : nextCredentials[0]?.id || "");
+      setRegionId((current) => current && !nextRegions.some((item) => item.id === current) ? "" : current);
+    } catch (caught) {
+      if (isUnauthorized(caught)) { onLogout(); return; }
+      setStale(true); if (!silent) setError((caught as Error).message);
+    }
     finally { if (!silent) setRefreshing(false); }
   }
 
@@ -147,8 +151,7 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
       const issuedProfiles = issued.profiles?.length ? issued.profiles : [issued.profile];
       const activated = await Promise.all(issuedProfiles.map(async (item) => ({ ...(await api<{ profile: Profile }>(`/api/v1/profiles/${item.id}/activate`, { method: "POST" })).profile, displayName: name })));
       const files = await Promise.all(activated.map(async (item) => {
-        const response = await fetch(`/api/v1/profiles/${item.id}/download${clientFormat(client) === "mihomo" ? "?format=mihomo" : ""}`, { credentials: "include", cache: "no-store" });
-        const text = await response.text(); if (!response.ok) throw new Error(text || "配置下载失败");
+        const text = await fetchText(`/api/v1/profiles/${item.id}/download${clientFormat(client) === "mihomo" ? "?format=mihomo" : ""}`);
         return { name: client === "clash" ? profileFilename(item).replace(/\.conf$/, `-${item.id}-Clash.yaml`) : profileFilename(item), text };
       }));
       const prepared: Download = files.length === 1 ? { ...files[0], client } : { name: `${filenamePart(name, "credential")}-${clientName(client)}.zip`, files, client };
@@ -161,7 +164,7 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
       await refresh(true);
     } catch (caught) {
       if (createdCredentialId && !profileIssued) await api(`/api/v1/credentials/${createdCredentialId}/revoke`, { method: "POST" }).catch(() => undefined);
-      setError((caught as Error).message);
+      fail(caught);
       await refresh(true);
     }
     finally { setBusy(false); }
@@ -173,15 +176,14 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
     try {
       const targets = selected.protocol === "wireguard" ? currentProfiles : [currentProfiles[0]];
       const files = await Promise.all(targets.map(async (profile) => {
-        const response = await fetch(`/api/v1/profiles/${profile.id}/download${format === "mihomo" ? "?format=mihomo" : ""}`, { credentials: "include", cache: "no-store" });
-        const text = await response.text(); if (!response.ok) throw new Error(text || "配置下载失败");
+        const text = await fetchText(`/api/v1/profiles/${profile.id}/download${format === "mihomo" ? "?format=mihomo" : ""}`);
         const filename = profileFilename({ ...profile, displayName: selected.name });
         return { name: format === "mihomo" ? filename.replace(/\.conf$/, `-${profile.id}-Mihomo.yaml`) : filename, text };
       }));
       if (files.length === 1) saveText(files[0].name, files[0].text);
       else saveBlob(`${filenamePart(selected.name, "credential")}-${format === "mihomo" ? "Mihomo" : selected.protocol === "wireguard" ? "WG" : "OV"}.zip`, createZipBlob(files));
       setNotice(format === "mihomo" ? "Mihomo 配置下载已开始。多节点压缩包请先解压，再选择一份 YAML 作为本地配置导入。" : "配置下载已开始。");
-    } catch (caught) { setError((caught as Error).message); }
+    } catch (caught) { fail(caught); }
     finally { setBusy(false); }
   }
 
@@ -191,7 +193,7 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
     if (!next || next === selected.name) return;
     setBusy(true); setError(""); setNotice("");
     try { await api(`/api/v1/credentials/${selected.id}`, { method: "PATCH", body: JSON.stringify({ name: next }) }); await refresh(true); setNotice("连接名称已更新，不会影响现有配置。"); }
-    catch (caught) { setError((caught as Error).message); }
+    catch (caught) { fail(caught); }
     finally { setBusy(false); }
   }
 
@@ -199,7 +201,7 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
     if (!selected || !await ask({ title: `撤销「${selected.name}」？`, description: "节点同步后，所有复制出去的配置都会永久失效。此操作不可恢复；如需暂时停止使用，请选择停用。", confirmLabel: "确认撤销", danger: true })) return;
     setBusy(true); setError(""); setNotice("");
     try { await api(`/api/v1/credentials/${selected.id}/revoke`, { method: "POST" }); await refresh(true); setDownload(null); setNotice("连接已撤销，节点同步后全部配置失效。"); }
-    catch (caught) { setError((caught as Error).message); }
+    catch (caught) { fail(caught); }
     finally { setBusy(false); }
   }
 
@@ -211,7 +213,7 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
       setDownload(null);
       setNotice(result.sync.status === "failed" ? "状态已保存，但节点同步失败，请联系管理员重试。" : "操作已保存，请查看节点同步状态。管理员限制只能由管理员解除。");
       await refresh(true);
-    } catch (caught) { setError((caught as Error).message); }
+    } catch (caught) { fail(caught); }
     finally { setBusy(false); }
   }
 
@@ -221,7 +223,7 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
     try {
       await api("/api/v1/credentials", { method: "PATCH", body: JSON.stringify({ action }) });
       setDownload(null); setNotice("批量操作已保存，请查看节点同步状态。"); await refresh(true);
-    } catch (caught) { setError((caught as Error).message); }
+    } catch (caught) { fail(caught); }
     finally { setBusy(false); }
   }
 

@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at TEXT NOT NULL, created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
+-- Sessions created before kinds existed cannot be attributed safely; they stop validating and users sign in again.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'legacy';
 CREATE TABLE IF NOT EXISTS nodes (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, place TEXT NOT NULL, region_id TEXT,
   ip TEXT NOT NULL, ssh_user TEXT NOT NULL, ssh_port INTEGER NOT NULL DEFAULT 22,
@@ -245,8 +247,17 @@ ALTER TABLE traffic_counters ADD COLUMN IF NOT EXISTS session_key TEXT NOT NULL 
 ALTER TABLE traffic_counters ADD COLUMN IF NOT EXISTS credential_id TEXT REFERENCES access_credentials(id) ON DELETE SET NULL;
 ALTER TABLE traffic_counters ADD COLUMN IF NOT EXISTS last_traffic_at TEXT;
 ALTER TABLE traffic_counters ADD COLUMN IF NOT EXISTS connected INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE traffic_counters DROP CONSTRAINT IF EXISTS traffic_counters_pkey;
-ALTER TABLE traffic_counters ADD PRIMARY KEY (node_id, protocol, identity_key, session_key);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'traffic_counters'::regclass AND contype = 'p'
+      AND pg_get_constraintdef(oid) = 'PRIMARY KEY (node_id, protocol, identity_key, session_key)'
+  ) THEN
+    ALTER TABLE traffic_counters DROP CONSTRAINT IF EXISTS traffic_counters_pkey;
+    ALTER TABLE traffic_counters ADD PRIMARY KEY (node_id, protocol, identity_key, session_key);
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS traffic_counters_device_idx ON traffic_counters(device_id, observed_at);
 CREATE INDEX IF NOT EXISTS traffic_counters_credential_idx ON traffic_counters(credential_id, observed_at);
 CREATE TABLE IF NOT EXISTS traffic_daily (

@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { FleetMap } from "./fleet-map";
 import { countryName, countryOptions, presetGroups, regionPresets } from "./region-catalog";
@@ -273,6 +273,8 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
   const [diagnosticNode, setDiagnosticNode] = useState<NodeRecord | null>(null);
   const [diagnostics, setDiagnostics] = useState<NodeDiagnostics | null>(null);
   const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
+  // Id of the node whose diagnostics modal is open; responses for any other id (or after close) are stale.
+  const diagnosticRequestRef = useRef<string | null>(null);
   const [testedFingerprint, setTestedFingerprint] = useState("");
 
   function openCreate() {
@@ -302,7 +304,9 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
   async function loadPrivateKey(file: File | undefined) {
     if (!file) return;
     if (file.size > 60 * 1024) { setNotice({ tone: "error", message: "SSH 私钥文件不能超过 60 KB。" }); return; }
-    const secret = await file.text();
+    let secret: string;
+    try { secret = await file.text(); }
+    catch { setNotice({ tone: "error", message: "无法读取 SSH 私钥文件。" }); return; }
     setForm((current) => ({ ...current, credentialType: "private_key", secret }));
     setTestedFingerprint("");
   }
@@ -321,14 +325,21 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
   }
 
   async function loadDiagnostics(node: NodeRecord) {
+    diagnosticRequestRef.current = node.id;
     setDiagnosticNode(node); setDiagnostics(null); setDiagnosticsBusy(true);
     try {
       const result = await api<NodeDiagnostics>(`/api/nodes/${node.id}`);
+      if (diagnosticRequestRef.current !== node.id) return;
       setDiagnostics(result);
       if (result.node) setDiagnosticNode(result.node);
     }
-    catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
-    finally { setDiagnosticsBusy(false); }
+    catch (error) { if (diagnosticRequestRef.current === node.id) setNotice({ tone: "error", message: (error as Error).message }); }
+    finally { if (diagnosticRequestRef.current === node.id) setDiagnosticsBusy(false); }
+  }
+
+  function closeDiagnostics() {
+    diagnosticRequestRef.current = null;
+    setDiagnosticNode(null); setDiagnostics(null); setDiagnosticsBusy(false);
   }
 
   const diagnosticNodeId = diagnosticNode?.id;
@@ -336,6 +347,7 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
     if (!diagnosticNodeId) return;
     const timer = window.setInterval(() => {
       void api<NodeDiagnostics>(`/api/nodes/${diagnosticNodeId}`).then((result) => {
+        if (diagnosticRequestRef.current !== diagnosticNodeId) return;
         setDiagnostics(result);
         if (result.node) setDiagnosticNode(result.node);
       }).catch(() => undefined);
@@ -359,7 +371,10 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
       setNotice({ tone: "success", message: action === "delete" ? "节点已删除。" : "操作已加入队列，可在节点诊断中跟踪进度。" });
       setOperationNode(null);
       await onRefresh();
-      if (diagnosticNode?.id === node.id && action !== "delete") await loadDiagnostics(node);
+      if (diagnosticRequestRef.current === node.id) {
+        if (action === "delete") closeDiagnostics();
+        else await loadDiagnostics(node);
+      }
     } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
     finally { setBusy(""); }
   }
@@ -423,7 +438,7 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
       <div className="form-actions operation-footer"><button className="button ghost" onClick={() => setOperationNode(null)}>关闭</button></div>
     </Modal>}
 
-    {diagnosticNode && <Modal wide title={`${diagnosticNode.name} · 节点详情`} description="部署进度、操作日志、Agent 连通性和 VPN 协议运行状态。" onClose={() => { setDiagnosticNode(null); setDiagnostics(null); }}>
+    {diagnosticNode && <Modal wide title={`${diagnosticNode.name} · 节点详情`} description="部署进度、操作日志、Agent 连通性和 VPN 协议运行状态。" onClose={closeDiagnostics}>
       <div className="diagnostic-toolbar"><span><i className="live-mark" /> 每 5 秒自动刷新</span><button className="button ghost small" disabled={diagnosticsBusy} onClick={() => void loadDiagnostics(diagnosticNode)}>立即刷新</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "status-agent")}>检查 Agent</button><button className="button warning small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "bootstrap")}>重新安装 / 修复</button></div>
       {diagnosticsBusy && !diagnostics ? <Empty>正在读取诊断信息…</Empty> : diagnostics && <div className="diagnostics">
         {diagnostics.actions[0] ? <section className={`current-job ${diagnostics.actions[0].status}`}>

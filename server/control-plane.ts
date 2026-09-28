@@ -1,3 +1,4 @@
+import { x25519 } from "@noble/curves/ed25519.js";
 import { addAudit } from "./db";
 import { renderMihomoWireGuard } from "./protocols/mihomo";
 import { assertCredentialUsable } from "./credential-access";
@@ -15,6 +16,7 @@ import {
   listActivePeers,
   listConnectionProfiles,
   listControlNodes,
+  listCredentialIdsForDevice,
   listNodeProtocols,
   listVpnServices,
   revokeCertificateIssuancesForDevice,
@@ -260,6 +262,9 @@ export async function issueConnectionProfile(input: {
   if (input.regionalEndpoints?.length) profile.protocolPayload.regionalEndpoints = input.regionalEndpoints;
   if (input.protocol === "wireguard") {
     if (!isWireGuardPrivateKey(input.clientPrivateKey)) throw new Error("A valid WireGuard private key is required to create an exportable profile");
+    if (Buffer.from(x25519.getPublicKey(Buffer.from(input.clientPrivateKey, "base64"))).toString("base64") !== device.public_key) {
+      throw new Error("The WireGuard private key does not match this credential's public key");
+    }
     const privateKey = await createSecretMaterial({ kind: `wireguard_client_private_key:${credential.id}`, value: input.clientPrivateKey });
     profile.protocolPayload.clientPrivateKeySecretId = privateKey.id;
   }
@@ -316,7 +321,7 @@ export async function activateProfile(profileId: string, actorUserId?: string): 
   if (!profile) throw new Error("Profile not found");
   if (profile.credential_id) await assertCredentialUsable(profile.credential_id);
   const activated = await activateConnectionProfile(profileId);
-  if (!activated) throw new Error("Profile could not be activated");
+  if (!activated || activated.status !== "active") throw new Error("Profile could not be activated");
   await rebuildDesiredState(activated.node_id, activated.protocol);
   await addAudit({ actorUserId, action: "profile.activated", targetType: "profile", targetId: profileId });
   return activated;
@@ -326,7 +331,10 @@ export async function revokeDeviceAndReconcile(deviceId: string, actorUserId?: s
   const profiles = await listConnectionProfiles({ deviceId });
   const hasOpenVpnProfile = profiles.some((profile) => profile.protocol === "openvpn");
   await revokeCertificateIssuancesForDevice(deviceId);
-  await deleteSecretMaterialsByKind(`wireguard_client_private_key:${deviceId}`);
+  // Client private keys are stored per credential, not per device.
+  for (const credentialId of await listCredentialIdsForDevice(deviceId)) {
+    await deleteSecretMaterialsByKind(`wireguard_client_private_key:${credentialId}`);
+  }
   await revokeDevice(deviceId);
   const affected = new Set(profiles.map((profile) => `${profile.node_id}:${profile.protocol}`));
   for (const key of affected) {

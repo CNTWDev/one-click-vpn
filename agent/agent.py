@@ -9,6 +9,7 @@ remote command execution is deliberately not part of this channel.
 
 import base64
 import hashlib
+import ipaddress
 import json
 import os
 import re
@@ -16,6 +17,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -108,6 +110,71 @@ def request_node_secret(secret_id):
     return value
 
 
+def atomic_write(path, text, mode=0o600):
+    """Replace a file atomically so a crash never leaves a truncated config or key."""
+    path = Path(path)
+    descriptor, temporary = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.")
+    try:
+        with os.fdopen(descriptor, "w") as handle:
+            os.fchmod(handle.fileno(), mode)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
+
+
+def has_control_characters(value):
+    return any(ord(character) < 32 or ord(character) == 127 for character in value)
+
+
+def valid_network(value):
+    if not isinstance(value, str) or len(value) > 64 or has_control_characters(value):
+        return False
+    try:
+        ipaddress.ip_network(value.strip(), strict=False)
+    except ValueError:
+        return False
+    return value == value.strip()
+
+
+def valid_address(value):
+    if not isinstance(value, str) or len(value) > 64 or has_control_characters(value):
+        return False
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    return True
+
+
+def replace_input_rule(comment, old_listener, new_listener):
+    """Keep exactly one managed INPUT rule for the current listener.
+
+    wg-quick PostUp and the OpenVPN setup only add rules, so a listen-port change
+    would otherwise leave the old port open and, for WireGuard syncconf, never
+    open the new one.
+    """
+    if shutil.which("iptables") is None:
+        return
+    def rule(operation, listener):
+        transport, port = listener
+        return ["iptables", operation, "INPUT", "-p", transport, "--dport", str(port), "-m", "comment", "--comment", comment, "-j", "ACCEPT"]
+    if old_listener is not None and old_listener != new_listener:
+        while run_optional(rule("-D", old_listener)).returncode == 0:
+            pass
+    if run_optional(rule("-C", new_listener)).returncode != 0:
+        try:
+            run_fixed(rule("-I", new_listener))
+        except subprocess.CalledProcessError as error:
+            raise RuntimeError("firewall configuration failed: " + command_failure_detail(error)) from error
+
+
 def run_fixed(command, *, input_text=None):
     return subprocess.run(
         command,
@@ -167,8 +234,7 @@ def ensure_wireguard_key():
         private_key = run_fixed(["wg", "genkey"]).stdout.strip()
         if not validate_key(private_key):
             raise RuntimeError("wg genkey returned an invalid key")
-        WIREGUARD_KEY.write_text(private_key + "\n")
-        os.chmod(WIREGUARD_KEY, 0o600)
+        atomic_write(WIREGUARD_KEY, private_key + "\n")
     return WIREGUARD_KEY.read_text().strip()
 
 
@@ -209,7 +275,7 @@ def wireguard_sync_config(desired):
         if not isinstance(peer, dict) or not validate_key(peer.get("publicKey")):
             raise ValueError("invalid WireGuard peer public key")
         allowed_ips = peer.get("allowedIps", [])
-        if not isinstance(allowed_ips, list) or not allowed_ips or any(not isinstance(item, str) or len(item) > 64 for item in allowed_ips):
+        if not isinstance(allowed_ips, list) or not allowed_ips or len(allowed_ips) > 64 or not all(valid_network(item) for item in allowed_ips):
             raise ValueError("invalid WireGuard peer allowed IPs")
         keepalive = int(peer.get("persistentKeepaliveSeconds", 25))
         if keepalive < 0 or keepalive > 65535:
@@ -224,12 +290,16 @@ def wireguard_sync_config(desired):
         full_lines.extend(peer_lines + [""])
         sync_lines.extend(peer_lines + [""])
 
-    WIREGUARD_CONFIG.write_text("\n".join(full_lines))
-    os.chmod(WIREGUARD_CONFIG, 0o600)
+    previous_listener = configured_listener(WIREGUARD_CONFIG, 51820, "udp") if WIREGUARD_CONFIG.exists() else None
+    atomic_write(WIREGUARD_CONFIG, "\n".join(full_lines))
     try:
         run_fixed(["wg", "show", "northstar"])
         run_fixed(["wg", "syncconf", "northstar", "/dev/stdin"], input_text="\n".join(sync_lines))
+        # syncconf never runs PostUp/PostDown, so move the managed INPUT rule here.
+        replace_input_rule("northstar-wireguard", previous_listener, ("udp", listen_port))
     except subprocess.CalledProcessError:
+        if previous_listener is not None and previous_listener != ("udp", listen_port):
+            replace_input_rule("northstar-wireguard", previous_listener, ("udp", listen_port))
         try:
             run_fixed(["wg-quick", "up", str(WIREGUARD_CONFIG)])
         except subprocess.CalledProcessError as error:
@@ -272,6 +342,8 @@ def openvpn_sync_config(desired):
     required = ("caCertificate", "serverCertificate", "serverPrivateKey", "tlsCryptKey")
     if not all(isinstance(bundle.get(key), str) and bundle[key] for key in required):
         raise ValueError("OpenVPN server bundle is incomplete")
+    if any(re.search(r"[^\x20-\x7e\r\n\t]", bundle[key]) for key in required):
+        raise ValueError("OpenVPN server bundle contains unexpected characters")
     if shutil.which("openvpn") is None:
         raise RuntimeError("openvpn is not installed")
     transport = desired.get("transport", "udp")
@@ -283,7 +355,7 @@ def openvpn_sync_config(desired):
     if desired.get("subnet", "10.71.0.0/24") != "10.71.0.0/24":
         raise ValueError("unsupported OpenVPN subnet")
     dns = desired.get("dns", ["1.1.1.1"])
-    if not isinstance(dns, list) or any(not isinstance(item, str) or len(item) > 64 for item in dns):
+    if not isinstance(dns, list) or len(dns) > 8 or not all(valid_address(item) for item in dns):
         raise ValueError("invalid OpenVPN DNS configuration")
     revoked = desired.get("revokedSerials", [])
     if not isinstance(revoked, list) or len(revoked) > 100000:
@@ -297,8 +369,9 @@ def openvpn_sync_config(desired):
             item.unlink()
     for serial in serials:
         (OPENVPN_REVOKED_DIR / serial).touch(mode=0o600, exist_ok=True)
+    previous_listener = configured_listener(OPENVPN_CONFIG, 1194, "udp") if OPENVPN_CONFIG.exists() else None
+    replace_input_rule("northstar-openvpn", previous_listener, (transport, listen_port))
     firewall_rules = [
-        (["iptables", "-C", "INPUT", "-p", transport, "--dport", str(listen_port), "-m", "comment", "--comment", "northstar-openvpn", "-j", "ACCEPT"], "-I"),
         ["iptables", "-C", "FORWARD", "-s", "10.71.0.0/24", "-j", "ACCEPT"],
         ["iptables", "-C", "FORWARD", "-d", "10.71.0.0/24", "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"],
         ["iptables", "-t", "nat", "-C", "POSTROUTING", "-s", "10.71.0.0/24", "-o", egress_interface, "-j", "MASQUERADE"],
@@ -318,9 +391,7 @@ def openvpn_sync_config(desired):
         "ca.crt": bundle["caCertificate"], "server.crt": bundle["serverCertificate"],
         "server.key": bundle["serverPrivateKey"], "tls-crypt.key": bundle["tlsCryptKey"],
     }.items():
-        target = OPENVPN_DIR / name
-        target.write_text(value if value.endswith("\n") else value + "\n")
-        os.chmod(target, 0o600)
+        atomic_write(OPENVPN_DIR / name, value if value.endswith("\n") else value + "\n")
     proto = "tcp-server" if transport == "tcp" else "udp"
     push_lines = ["push \"redirect-gateway def1 bypass-dhcp\""] + [f"push \"dhcp-option DNS {item}\"" for item in dns]
     config_lines = [
@@ -330,8 +401,7 @@ def openvpn_sync_config(desired):
         "auth SHA256", "data-ciphers AES-256-GCM:CHACHA20-POLY1305", "data-ciphers-fallback AES-256-GCM", "keepalive 10 120",
         "persist-key", "persist-tun", "duplicate-cn", "explicit-exit-notify 1", f"status {OPENVPN_STATUS} 30", "status-version 3", "verb 3", *push_lines, "",
     ]
-    OPENVPN_CONFIG.write_text("\n".join(config_lines))
-    os.chmod(OPENVPN_CONFIG, 0o600)
+    atomic_write(OPENVPN_CONFIG, "\n".join(config_lines))
     openvpn_path = shutil.which("openvpn")
     unit = f"""[Unit]
 Description=Northstar managed OpenVPN server
@@ -350,7 +420,7 @@ NoNewPrivileges=true
 [Install]
 WantedBy=multi-user.target
 """
-    Path("/etc/systemd/system/northstar-openvpn.service").write_text(unit)
+    atomic_write(Path("/etc/systemd/system/northstar-openvpn.service"), unit, 0o644)
     run_fixed(["systemctl", "daemon-reload"])
     run_fixed(["systemctl", "enable", "northstar-openvpn"])
     run_fixed(["systemctl", "restart", "northstar-openvpn"])
@@ -695,24 +765,21 @@ def poll_tasks():
     for task in response.get("tasks", []):
         try:
             result = apply_task(task)
-            request_json("/api/v1/agent/reconcile-result", {
-                "nodeId": NODE_ID,
-                "token": TOKEN,
+            outcome = {
                 "taskId": task["id"],
                 "status": "succeeded",
                 "observedRevision": task.get("desiredRevision", 0),
                 "observedHash": result.get("observedHash", ""),
                 "observedStatus": result.get("observedStatus", "applied"),
-            })
+            }
         except Exception as error:
             detail = command_failure_detail(error)
-            request_json("/api/v1/agent/reconcile-result", {
-                "nodeId": NODE_ID,
-                "token": TOKEN,
-                "taskId": task.get("id", ""),
-                "status": "failed",
-                "error": detail[-4000:],
-            })
+            outcome = {"taskId": task.get("id", ""), "status": "failed", "error": detail[-4000:]}
+        # Report each task independently so one failed post does not drop the rest.
+        try:
+            request_json("/api/v1/agent/reconcile-result", {"nodeId": NODE_ID, "token": TOKEN, **outcome})
+        except Exception as error:
+            log_failure("reconcile result", error)
 
 
 def restore_wireguard():
@@ -733,12 +800,12 @@ def main():
     STATE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     try:
         restore_wireguard()
-    except Exception:
-        pass
+    except Exception as error:
+        log_failure("WireGuard restore", command_failure_detail(error))
     try:
         restore_openvpn()
-    except Exception:
-        pass
+    except Exception as error:
+        log_failure("OpenVPN restore", command_failure_detail(error))
     last_heartbeat_attempt = 0
     last_task_poll = 0
     request_backoff_until = 0

@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { api } from "./api";
+import { api, isUnauthorized, setUnauthorizedHandler } from "./api";
 import {
   ControllerPage, LogsPage, NodesPage, OverviewPage, RegionsPage, ServicesPage, TopologyPage, UsersPage,
 } from "./pages";
@@ -74,9 +74,17 @@ function App() {
         api<ControllerInfo>("/api/controller"),
       ]);
       setUsers(userResult.users || []); setNodes(nodeResult.nodes || []); setRegions(regionResult.regions || []); setControllerSettings(controllerResult.settings);
-    } catch (reason) { setError((reason as Error).message); }
+    } catch (reason) { if (!isUnauthorized(reason)) setError((reason as Error).message); }
     finally { setDataLoading(false); }
   }, []);
+
+  const clearSession = useCallback(() => {
+    setUser(null); setUsers([]); setNodes([]); setRegions([]); setControllerSettings(null); setPage("overview"); setMenuOpen(false); setError("");
+  }, []);
+  useEffect(() => {
+    setUnauthorizedHandler(clearSession);
+    return () => setUnauthorizedHandler(null);
+  }, [clearSession]);
 
   useEffect(() => {
     api<{ user: AdminUser }>("/api/auth/me")
@@ -88,7 +96,7 @@ function App() {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => undefined);
-    setUser(null); setUsers([]); setNodes([]); setRegions([]); setControllerSettings(null); setPage("overview");
+    clearSession();
   }
   function navigate(next: string) { setPage(next as PageId); setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }
 

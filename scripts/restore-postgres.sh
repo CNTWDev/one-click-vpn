@@ -20,7 +20,19 @@ if [ "$confirmation" != "RESTORE" ]; then
   exit 1
 fi
 
-compose exec -T db pg_restore \
+echo "Stopping application services before restore..."
+compose stop northstar portal-web admin-web
+
+if ! compose exec -T db pg_restore \
   --clean --if-exists --no-owner --no-privileges \
-  -U northstar -d northstar < "$1"
+  --single-transaction --exit-on-error \
+  -U northstar -d northstar < "$1"; then
+  echo "PostgreSQL restore failed; the transaction was rolled back and the database is unchanged." >&2
+  echo "Application services are still stopped. Fix the problem and rerun, or start them with:" >&2
+  echo "  docker compose start northstar portal-web admin-web" >&2
+  exit 1
+fi
 echo "PostgreSQL restore completed."
+
+echo "Starting application services..."
+compose start northstar portal-web admin-web

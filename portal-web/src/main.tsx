@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { api } from "./api";
 import { CredentialDashboard } from "./credential-dashboard";
 import "./styles.css";
 import "./profile-actions.css";
@@ -14,27 +15,6 @@ type User = {
   status: string;
   rejectionReason?: string | null;
 };
-
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-  });
-  const contentType = response.headers.get("content-type") || "";
-  const text = await response.text();
-  if (!contentType.includes("application/json")) {
-    throw new Error(`API 返回了非 JSON 响应（HTTP ${response.status}），请检查 Portal 的 /api/ 反向代理。`);
-  }
-  const body = text ? JSON.parse(text) as Record<string, unknown> : {};
-  if (!response.ok) {
-    throw Object.assign(
-      new Error(typeof body.error === "string" ? body.error : `请求失败（HTTP ${response.status}）`),
-      { body, status: response.status },
-    );
-  }
-  return body as T;
-}
 
 function Brand() {
   return <div className="brand"><span className="brand-mark"><i /><i /><i /></span><span>NORTHSTAR <em>VPN</em></span></div>;
@@ -118,7 +98,7 @@ export default function App() {
   }, []);
 
   async function logout() {
-    await fetch("/api/v1/auth/web-logout", { method: "POST", credentials: "include" });
+    await fetch("/api/v1/auth/web-logout", { method: "POST", credentials: "include" }).catch(() => undefined);
     setUser(null);
     setMode("login");
   }

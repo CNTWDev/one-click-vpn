@@ -6,23 +6,37 @@ import { sessionTtlSeconds } from "./config";
 export const SESSION_COOKIE = "northstar_session";
 export const PORTAL_SESSION_COOKIE = "northstar_portal_session";
 
-async function currentUserForCookie(cookieName: string): Promise<DbUser | null> {
+export type SessionKind = "admin" | "portal";
+
+const CLEANUP_INTERVAL_MS = 60_000;
+let lastCleanupAt = 0;
+
+async function maybeCleanupSessions(): Promise<void> {
+  const now = Date.now();
+  if (now - lastCleanupAt < CLEANUP_INTERVAL_MS) return;
+  lastCleanupAt = now;
   await cleanupSessions();
+}
+
+async function currentUserForCookie(cookieName: string, kind: SessionKind): Promise<DbUser | null> {
+  await maybeCleanupSessions();
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(cookieName)?.value;
   if (!sessionId) return null;
-  const session = await findSession(sessionId);
+  const session = await findSession(sessionId, kind);
   if (!session || new Date(session.expires_at).getTime() <= Date.now()) return null;
   const user = (await findUserById(session.user_id)) || null;
   return user?.status === "active" ? user : null;
 }
 
+/** Administrator console session: only admin-kind sessions held by an owner or admin qualify. */
 export async function currentUser(): Promise<DbUser | null> {
-  return currentUserForCookie(SESSION_COOKIE);
+  const user = await currentUserForCookie(SESSION_COOKIE, "admin");
+  return user && ["owner", "admin"].includes(user.role) ? user : null;
 }
 
 export async function currentPortalUser(): Promise<DbUser | null> {
-  return currentUserForCookie(PORTAL_SESSION_COOKIE);
+  return currentUserForCookie(PORTAL_SESSION_COOKIE, "portal");
 }
 
 export async function requireUser(): Promise<DbUser> {
@@ -31,10 +45,10 @@ export async function requireUser(): Promise<DbUser> {
   return user;
 }
 
-export async function createLoginSession(userId: string): Promise<{ id: string; expires: Date }> {
+export async function createLoginSession(userId: string, kind: SessionKind): Promise<{ id: string; expires: Date }> {
   const id = randomBytes(32).toString("base64url");
   const expires = new Date(Date.now() + sessionTtlSeconds() * 1000);
-  await createSession(userId, expires.toISOString(), id);
+  await createSession(userId, expires.toISOString(), id, kind);
   return { id, expires };
 }
 

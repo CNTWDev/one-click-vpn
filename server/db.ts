@@ -153,6 +153,23 @@ export async function dbExec(text: string, values: unknown[] = []): Promise<numb
   return (await getDb().query(text, values)).rowCount || 0;
 }
 
+/** Runs `work` in one transaction; `exec` has the same contract as dbExec but uses the transaction's client. */
+export async function withTransaction<T>(work: (exec: (text: string, values?: unknown[]) => Promise<number>) => Promise<T>): Promise<T> {
+  await ensureReady();
+  const client = await getDb().connect();
+  try {
+    await client.query("BEGIN");
+    const result = await work(async (text, values = []) => (await client.query(text, values)).rowCount || 0);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function closeDb(): Promise<void> {
   if (!pool) return;
   await pool.end();
@@ -207,13 +224,13 @@ export async function updateUserStatus(id: string, status: DbUser["status"], act
   return findUserById(id);
 }
 
-export async function createSession(userId: string, expiresAt: string, id: string = randomUUID()): Promise<string> {
-  await dbExec("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ($1, $2, $3, $4)", [id, userId, expiresAt, now()]);
+export async function createSession(userId: string, expiresAt: string, id: string = randomUUID(), kind: "admin" | "portal" = "admin"): Promise<string> {
+  await dbExec("INSERT INTO sessions (id, user_id, expires_at, created_at, kind) VALUES ($1, $2, $3, $4, $5)", [id, userId, expiresAt, now(), kind]);
   return id;
 }
 
-export async function findSession(id: string): Promise<{ user_id: string; expires_at: string } | undefined> {
-  const rows = await dbQuery<{ user_id: string; expires_at: string }>("SELECT user_id, expires_at FROM sessions WHERE id = $1", [id]);
+export async function findSession(id: string, kind: "admin" | "portal"): Promise<{ user_id: string; expires_at: string } | undefined> {
+  const rows = await dbQuery<{ user_id: string; expires_at: string }>("SELECT user_id, expires_at FROM sessions WHERE id = $1 AND kind = $2", [id, kind]);
   return rows[0];
 }
 
