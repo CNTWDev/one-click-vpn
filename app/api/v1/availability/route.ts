@@ -11,6 +11,8 @@ export async function GET(request: Request) {
   if (!user) return jsonError("Active user authentication required", 403);
   const [regions, nodes, services] = await Promise.all([listRegions(), listControlNodes(), listVpnServices()]);
   const onlineNodes = nodes.filter((node) => node.status === "online" && node.last_heartbeat_at && Date.now() - new Date(node.last_heartbeat_at).getTime() < 90_000);
+  // One protocol lookup per online node, not one per node × service.
+  const nodeProtocols = new Map(await Promise.all(onlineNodes.map(async (node) => [node.id, await listNodeProtocols(node.id)] as const)));
   const available = [];
   for (const region of regions) {
     const regionNodes = onlineNodes.filter((node) => node.region_id === region.id);
@@ -20,7 +22,7 @@ export async function GET(request: Request) {
     for (const node of regionNodes) {
       const healthy = services.filter((service) => service.node_id === node.id && service.enabled && service.status === "healthy");
       for (const service of healthy) {
-        const capability = (await listNodeProtocols(node.id)).find((item) => item.protocol === service.protocol);
+        const capability = (nodeProtocols.get(node.id) || []).find((item) => item.protocol === service.protocol);
         const connectivity = node.capabilities.connectivity as { protocols?: Record<string, { runtimeActive?: boolean; interfaceActive?: boolean; serviceActive?: boolean; listening?: boolean }> } | undefined;
         const observed = connectivity?.protocols?.[service.protocol];
         const active = observed?.runtimeActive ?? observed?.interfaceActive ?? observed?.serviceActive;

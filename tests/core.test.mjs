@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createHash, X509Certificate } from "node:crypto";
 import { promisify } from "node:util";
 import pg from "pg";
@@ -18,6 +18,12 @@ const integrationOptions = databaseUrl
   ? {}
   : { skip: "Set NORTHSTAR_TEST_DATABASE_URL to a disposable PostgreSQL database to run integration tests." };
 const execFileAsync = promisify(execFile);
+
+// Admin pages live in one file per page; source assertions search all of them.
+function adminPagesSource() {
+  const directory = path.join(root, "admin-web/src/pages");
+  return readdirSync(directory).filter((name) => name.endsWith(".tsx")).sort().map((name) => readFileSync(path.join(directory, name), "utf8")).join("\n");
+}
 
 test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   const migration = readFileSync(path.join(root, "scripts/migrate.mjs"), "utf8");
@@ -79,7 +85,7 @@ test("regional profiles provide protocol-appropriate multi-node behavior", async
 test("SSH access supports parsed private keys and a shared privilege boundary", async () => {
   const migration = readFileSync(path.join(root, "scripts/migrate.mjs"), "utf8");
   const bootstrap = readFileSync(path.join(root, "server/bootstrap.ts"), "utf8");
-  const admin = readFileSync(path.join(root, "admin-web/src/pages.tsx"), "utf8");
+  const admin = adminPagesSource();
   assert.match(migration, /ssh_privilege_mode TEXT NOT NULL DEFAULT 'auto'/);
   assert.match(bootstrap, /executeRemoteCommand/);
   assert.doesNotMatch(bootstrap, /privateKey: secret/);
@@ -100,7 +106,7 @@ test("node onboarding discovers persistent identity and preserves canonical SSH 
   const migration = readFileSync(path.join(root, "scripts/migrate.mjs"), "utf8");
   const bootstrap = readFileSync(path.join(root, "server/bootstrap.ts"), "utf8");
   const createRoute = readFileSync(path.join(root, "app/api/nodes/route.ts"), "utf8");
-  const admin = readFileSync(path.join(root, "admin-web/src/pages.tsx"), "utf8");
+  const admin = adminPagesSource();
   const fingerprint = await import("../server/ssh-fingerprint.js");
   const key = Buffer.from("case-sensitive-host-key");
   const expected = createHash("sha256").update(key).digest("base64").replace(/=+$/, "");
@@ -122,7 +128,7 @@ test("administrator account access exposes certificates, traffic attribution, an
   const usersRoute = readFileSync(path.join(root, "app/api/v1/admin/users/route.ts"), "utf8");
   const credentialsRoute = readFileSync(path.join(root, "app/api/v1/admin/users/[id]/credentials/route.ts"), "utf8");
   const statusRoute = readFileSync(path.join(root, "app/api/v1/admin/users/[id]/status/route.ts"), "utf8");
-  const admin = readFileSync(path.join(root, "admin-web/src/pages.tsx"), "utf8");
+  const admin = adminPagesSource();
   assert.match(traffic, /export async function adminUserAccessSummaries/);
   assert.match(traffic, /export async function adminUserAccessOverview/);
   assert.match(traffic, /certificate_pem/);
@@ -197,6 +203,27 @@ after(async () => {
   server?.kill("SIGTERM");
 });
 
+async function userIdFor(email, adminToken) {
+  const response = await fetch(`${base}/api/v1/admin/users`, { headers: { Authorization: `Bearer ${adminToken}` } });
+  assert.equal(response.status, 200);
+  const user = (await response.json()).users.find((item) => item.email === email);
+  assert.ok(user, `registered user ${email} not found`);
+  return user.id;
+}
+
+test("registration does not reveal whether an email is already registered", integrationOptions, async () => {
+  const json = { "Content-Type": "application/json" };
+  const register = (email) => fetch(`${base}/api/v1/auth/register`, { method: "POST", headers: json, body: JSON.stringify({ email, password: "test-password-123", displayName: "Probe" }) });
+  const fresh = await register(`probe-${Date.now()}@example.com`);
+  const existing = await register("owner@example.com");
+  assert.equal(fresh.status, 202);
+  assert.equal(existing.status, 202);
+  const freshBody = await fresh.json();
+  const existingBody = await existing.json();
+  assert.deepEqual(Object.keys(freshBody).sort(), Object.keys(existingBody).sort());
+  assert.equal(freshBody.user, undefined);
+});
+
 test("health endpoint is public", integrationOptions, async () => {
   const response = await fetch(`${base}/api/health`);
   assert.equal(response.status, 200);
@@ -233,8 +260,8 @@ test("portal sessions cannot be replayed against administrator routes", integrat
   const adminToken = (await ownerLogin.json()).accessToken;
   const email = `portal-${Date.now()}@example.com`;
   const registration = await fetch(`${base}/api/v1/auth/register`, { method: "POST", headers: json, body: JSON.stringify({ email, password: "test-password-123", displayName: "Portal user" }) });
-  assert.equal(registration.status, 201);
-  const userId = (await registration.json()).user.id;
+  assert.equal(registration.status, 202);
+  const userId = await userIdFor(email, adminToken);
   const approved = await fetch(`${base}/api/v1/admin/users/${userId}/status`, { method: "POST", headers: { ...json, Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ status: "active" }) });
   assert.equal(approved.status, 200);
   const portalLogin = await fetch(`${base}/api/v1/auth/web-login`, { method: "POST", headers: json, body: JSON.stringify({ email, password: "test-password-123" }) });
@@ -245,6 +272,49 @@ test("portal sessions cannot be replayed against administrator routes", integrat
   assert.equal(portalMe.status, 200);
   const replayed = await fetch(`${base}/api/nodes`, { headers: { Cookie: `northstar_session=${portalSession}` } });
   assert.equal(replayed.status, 401);
+});
+
+test("agent heartbeats attribute traffic deltas to the owning credential", integrationOptions, async () => {
+  const pool = new pg.Pool({ connectionString: databaseUrl });
+  const json = { "Content-Type": "application/json" };
+  const login = await fetch(`${base}/api/v1/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ email: "owner@example.com", password: "test-password-123" }) });
+  const token = (await login.json()).accessToken;
+  const identityKey = Buffer.from(x25519.getPublicKey(x25519.utils.randomSecretKey())).toString("base64");
+  const created = await fetch(`${base}/api/v1/credentials`, { method: "POST", headers: { ...json, Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: "Metered", protocol: "wireguard", publicKey: identityKey }) });
+  assert.equal(created.status, 201);
+  const credentialId = (await created.json()).credential.id;
+  const duplicate = await fetch(`${base}/api/v1/credentials`, { method: "POST", headers: { ...json, Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: "Copy", protocol: "wireguard", publicKey: identityKey }) });
+  assert.equal(duplicate.status, 409);
+  const nodeId = `node_traffic_${Date.now()}`;
+  const agentToken = `agent-${Date.now()}`;
+  const timestamp = new Date().toISOString();
+  try {
+    await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at,agent_token_hash)
+      VALUES ($1,'Traffic','Test','127.0.0.2','root','password','','','',$2,$2,$3)`, [nodeId, timestamp, createHash("sha256").update(agentToken).digest("hex")]);
+    const beat = (rxBytes, txBytes) => fetch(`${base}/api/v1/agent/heartbeat`, { method: "POST", headers: json, body: JSON.stringify({
+      nodeId, token: agentToken, version: "agent test",
+      usageSnapshots: [
+        { protocol: "wireguard", identityKey, rxBytes, txBytes, lastHandshakeAt: new Date().toISOString(), counterEpoch: "boot-1" },
+        { protocol: "wireguard", identityKey: "unknown-peer", rxBytes: 5, txBytes: 5, counterEpoch: "boot-1" },
+      ],
+    }) });
+    assert.equal((await beat(100, 1000)).status, 200);
+    assert.equal((await beat(250, 1600)).status, 200);
+    const daily = (await pool.query("SELECT upload_bytes::text, download_bytes::text FROM traffic_daily WHERE credential_id = $1 AND node_id = $2", [credentialId, nodeId])).rows;
+    assert.deepEqual(daily, [{ upload_bytes: "250", download_bytes: "1600" }]);
+    const counters = (await pool.query("SELECT identity_key, credential_id FROM traffic_counters WHERE node_id = $1 ORDER BY identity_key", [nodeId])).rows;
+    assert.equal(counters.length, 2);
+    assert.equal(counters.find((row) => row.identity_key === identityKey).credential_id, credentialId);
+    const seen = (await pool.query("SELECT last_seen_at FROM access_credentials WHERE id = $1", [credentialId])).rows[0];
+    assert.ok(seen.last_seen_at);
+  } finally {
+    await pool.query("DELETE FROM traffic_daily WHERE node_id = $1", [nodeId]);
+    await pool.query("DELETE FROM nodes WHERE id = $1", [nodeId]);
+    // Later tests count the owner's credentials, so leave none behind.
+    const deviceId = (await pool.query("DELETE FROM access_credentials WHERE id = $1 RETURNING device_id", [credentialId])).rows[0]?.device_id;
+    if (deviceId) await pool.query("DELETE FROM devices WHERE id = $1", [deviceId]);
+    await pool.end();
+  }
 });
 
 test("v1 bearer session can manage a device", integrationOptions, async () => {
@@ -343,8 +413,8 @@ test("credential controls preserve independent user/admin locks and recoverable 
   const call = async (path, token, body, method = "POST") => fetch(`${base}${path}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
   const email = `controls-${Date.now()}@example.com`;
   const registration = await call("/api/v1/auth/register", adminToken, { email, password: "test-password-123", displayName: "Access test" });
-  assert.equal(registration.status, 201);
-  const userId = (await registration.json()).user.id;
+  assert.equal(registration.status, 202);
+  const userId = await userIdFor(email, adminToken);
   const statusPath = `/api/v1/admin/users/${userId}/status`;
   assert.equal((await call(statusPath, adminToken, { status: "active" })).status, 200);
   let token = await login(email);

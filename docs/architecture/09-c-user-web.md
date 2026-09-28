@@ -271,7 +271,7 @@ API route 只负责鉴权、输入校验和响应映射，账号审核、Credent
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| `POST` | `/api/v1/auth/register` | 创建 `pending` 用户，不直接发放 VPN 权限 |
+| `POST` | `/api/v1/auth/register` | 创建 `pending` 用户，不直接发放 VPN 权限；无论邮箱是否已存在都返回相同的 `202`，避免被用来探测账号 |
 | `POST` | `/api/v1/auth/login` | 登录；同时校验用户审核状态 |
 | `POST` | `/api/v1/auth/refresh` | 刷新原生客户端 access token |
 | `POST` | `/api/v1/auth/logout` | 注销当前会话/token |

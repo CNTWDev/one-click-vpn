@@ -80,6 +80,12 @@ CREATE TABLE IF NOT EXISTS node_actions (
 ALTER TABLE node_actions ADD COLUMN IF NOT EXISTS started_at TEXT;
 ALTER TABLE node_actions ADD COLUMN IF NOT EXISTS current_phase TEXT NOT NULL DEFAULT 'queued';
 ALTER TABLE node_actions ADD COLUMN IF NOT EXISTS progress INTEGER NOT NULL DEFAULT 0;
+-- Remote actions live in the Controller's in-memory queue, so any still queued or running at startup were lost
+-- with the previous process. Close them so the node is not blocked forever and the uniqueness guard below holds.
+UPDATE node_actions SET status = 'failed', current_phase = 'failed', finished_at = COALESCE(finished_at, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+  error = CASE WHEN error = '' THEN 'Interrupted by a Controller restart' ELSE error END
+  WHERE status IN ('queued', 'running');
+CREATE UNIQUE INDEX IF NOT EXISTS node_actions_one_active_idx ON node_actions(node_id) WHERE status IN ('queued', 'running');
 CREATE TABLE IF NOT EXISTS node_action_events (
   id TEXT PRIMARY KEY, action_id TEXT NOT NULL REFERENCES node_actions(id) ON DELETE CASCADE,
   sequence INTEGER NOT NULL, level TEXT NOT NULL DEFAULT 'info', phase TEXT NOT NULL DEFAULT 'execution',

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "../../../../../server/auth";
-import { countRunningNodeActions, findNode } from "../../../../../server/db";
+import { countRunningNodeActions, findNode, NodeBusyError } from "../../../../../server/db";
 import { jsonError } from "../../../../../server/http";
 import { queueNodeAction } from "../../../../../server/bootstrap";
 
@@ -19,6 +19,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const actionId = await queueNodeAction(id, action, user.id);
     return NextResponse.json({ ok: true, actionId, status: "queued" }, { status: 202 });
   } catch (error) {
-    return jsonError(error instanceof Error ? error.message : "Node action failed", 502);
+    return jsonError(error instanceof Error ? error.message : "Node action failed", error instanceof NodeBusyError ? 409 : 502);
   }
 }

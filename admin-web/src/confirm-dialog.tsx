@@ -1,0 +1,96 @@
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+
+export type ConfirmInput = { label: string; placeholder?: string; required?: boolean };
+export type ConfirmOptions = { title: string; message: string; confirmLabel?: string; danger?: boolean; input?: ConfirmInput };
+
+type ConfirmFn = {
+  (options: ConfirmOptions & { input: ConfirmInput }): Promise<string | null>;
+  (options: ConfirmOptions & { input?: undefined }): Promise<boolean>;
+};
+
+const ConfirmContext = createContext<ConfirmFn | null>(null);
+
+/** Native <dialog> provides focus trapping, Escape handling and background inertness. */
+export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const [request, setRequest] = useState<ConfirmOptions | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const resolver = useRef<((value: string | null) => void) | null>(null);
+  const trigger = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!request) return;
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [request]);
+  useEffect(() => () => { resolver.current?.(null); }, []);
+
+  function finish(value: string | null) {
+    dialogRef.current?.close();
+    resolver.current?.(value);
+    resolver.current = null;
+    setRequest(null);
+    trigger.current?.focus();
+  }
+
+  const ask = useCallback((options: ConfirmOptions): Promise<string | null> => {
+    resolver.current?.(null);
+    trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setRequest(options);
+    return new Promise((resolve) => { resolver.current = resolve; });
+  }, []);
+
+  const confirm = useMemo(() => ((options: ConfirmOptions) => ask(options).then((value) => (
+    options.input ? value : value !== null
+  ))) as ConfirmFn, [ask]);
+
+  return <ConfirmContext.Provider value={confirm}>
+    {children}
+    {request && <dialog
+      ref={dialogRef}
+      className={`confirm-dialog ${request.danger ? "danger" : ""}`}
+      aria-labelledby="confirm-dialog-title"
+      aria-describedby="confirm-dialog-message"
+      onCancel={(event) => { event.preventDefault(); finish(null); }}
+      onKeyDown={(event) => {
+        // Keep Escape from also reaching window listeners (e.g. an underlying Modal).
+        if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); finish(null); }
+      }}
+    >
+      <form onSubmit={(event) => {
+        event.preventDefault();
+        if (!request.input) { finish("confirmed"); return; }
+        const value = String(new FormData(event.currentTarget).get("value") ?? "");
+        if (request.input.required && !value.trim()) return;
+        finish(value);
+      }}>
+        <p className="eyebrow">{request.danger ? "危险操作" : "操作确认"}</p>
+        <h2 id="confirm-dialog-title">{request.title}</h2>
+        <p id="confirm-dialog-message">{request.message}</p>
+        {request.input && <label>
+          {request.input.label}
+          <input
+            name="value"
+            required={request.input.required}
+            pattern={request.input.required ? ".*\\S.*" : undefined}
+            placeholder={request.input.placeholder}
+            autoComplete="off"
+            autoFocus
+          />
+        </label>}
+        <div className="form-actions">
+          <button type="button" className="button ghost" autoFocus={!request.input} onClick={() => finish(null)}>取消</button>
+          <button type="submit" className={`button ${request.danger ? "danger" : "primary"}`}>{request.confirmLabel || "确认"}</button>
+        </div>
+      </form>
+    </dialog>}
+  </ConfirmContext.Provider>;
+}
+
+export function useConfirm(): ConfirmFn {
+  const confirm = useContext(ConfirmContext);
+  if (!confirm) throw new Error("useConfirm must be used inside <ConfirmProvider>");
+  return confirm;
+}
