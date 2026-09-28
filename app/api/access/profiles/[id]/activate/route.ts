@@ -14,6 +14,10 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   if (!profile) return jsonError("Connection profile not found", 404);
   const device = await findDevice(profile.device_id);
   if (!device || device.user_id !== user.id) return jsonError("Connection profile not found", 404);
-  const activated = await activateProfile(id, user.id);
-  return NextResponse.json({ profile: publicProfile(activated) });
+  try {
+    const activated = await activateProfile(id, user.id);
+    return NextResponse.json({ profile: publicProfile(activated) });
+  } catch (error) {
+    return jsonError(error instanceof Error ? error.message : "Unable to activate connection profile", 409);
+  }
 }

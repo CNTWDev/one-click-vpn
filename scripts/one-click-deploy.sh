@@ -107,7 +107,17 @@ else
     echo "openssl is required to generate the master key." >&2
     exit 1
   fi
-  master_key=$(openssl rand -base64 32 | tr -d '\n')
+  # Secrets tied to encrypted data and the existing Postgres volume must survive --yes.
+  existing_value() {
+    [ -f "$APP_DIR/.env" ] || return 0
+    awk -F= -v wanted="$1" '$1 == wanted { sub(/^[^=]*=/, ""); print; exit }' "$APP_DIR/.env"
+  }
+  master_key=$(existing_value NORTHSTAR_MASTER_KEY)
+  [ -n "$master_key" ] || master_key=$(openssl rand -base64 32 | tr -d '\n')
+  db_password=$(existing_value NORTHSTAR_DB_PASSWORD)
+  [ -n "$db_password" ] || db_password=$(openssl rand -hex 24)
+  log_storage_password=$(existing_value NORTHSTAR_LOG_STORAGE_PASSWORD)
+  [ -n "$log_storage_password" ] || log_storage_password=$(openssl rand -hex 24)
   umask 077
   {
     echo "NODE_ENV=production"
@@ -121,8 +131,8 @@ else
     echo "NORTHSTAR_PUBLIC_ORIGIN=https://$portal_domain"
     echo "NORTHSTAR_API_ORIGIN=https://$api_domain"
     echo "NORTHSTAR_AGENT_ORIGIN=https://$api_domain"
-    echo "NORTHSTAR_DB_PASSWORD=$(openssl rand -hex 24)"
-    echo "NORTHSTAR_LOG_STORAGE_PASSWORD=$(openssl rand -hex 24)"
+    echo "NORTHSTAR_DB_PASSWORD=$db_password"
+    echo "NORTHSTAR_LOG_STORAGE_PASSWORD=$log_storage_password"
     echo "NORTHSTAR_ADMIN_NAME=Owner"
     echo "NORTHSTAR_SESSION_TTL_SECONDS=43200"
     echo "NORTHSTAR_ALLOW_TOFU_HOST_KEYS=false"

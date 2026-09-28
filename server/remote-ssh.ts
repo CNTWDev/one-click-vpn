@@ -42,14 +42,21 @@ export function validateSshCredential(type: SshCredentialType, rawSecret: string
   return secret;
 }
 
-function privilegedCommand(command: string, mode: SshPrivilegeMode): string {
+// The script is delivered on stdin (never in argv) so secrets such as agent tokens stay out of the remote process list.
+function privilegedLauncher(mode: SshPrivilegeMode): string {
   if (mode === "sudo") {
     return `command -v sudo >/dev/null 2>&1 || { echo 'Northstar requires sudo for this SSH user.' >&2; exit 126; }
 sudo -n true >/dev/null 2>&1 || { echo 'Northstar requires passwordless sudo for this SSH user.' >&2; exit 126; }
-sudo -n sh -c ${shellQuote(command)}`;
+exec sudo -n sh -s`;
   }
   return `[ "$(id -u)" -eq 0 ] || { echo 'Northstar root mode requires an SSH user with uid 0.' >&2; exit 126; }
-${command}`;
+exec sh -s`;
+}
+
+// Wrap in a brace group so sh parses the whole script before running it, and detach the
+// commands' stdin so nothing inside the script can consume the remaining script text.
+function stdinScript(command: string): string {
+  return `{\n${command}\n} </dev/null\n`;
 }
 
 function connectConfig(node: RemoteNodeAccess, secret: string): ConnectConfig {
@@ -87,11 +94,12 @@ export function executeRemoteCommand(
     const expectedFingerprint = node.host_fingerprint;
     const expected = expectedFingerprint ? normalizeFingerprint(expectedFingerprint) : "";
     client.on("ready", () => {
-      client.exec(privilegedCommand(command, privilegeMode(node.ssh_privilege_mode, node.ssh_user)), (error, stream) => {
+      client.exec(privilegedLauncher(privilegeMode(node.ssh_privilege_mode, node.ssh_user)), (error, stream) => {
         if (error) {
           finish(error);
           return;
         }
+        stream.end(stdinScript(command));
         stream.on("data", (chunk: Buffer) => { const text = chunk.toString(); output += text; onOutput?.(text); });
         stream.stderr.on("data", (chunk: Buffer) => { const text = chunk.toString(); output += text; onOutput?.(text); });
         stream.on("close", (code: number | null) => {

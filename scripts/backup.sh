@@ -6,9 +6,16 @@ APP_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 . "$SCRIPT_DIR/common.sh"
 
 cd "$APP_DIR"
+umask 077
 backup_dir=${1:-./backups}
 mkdir -p "$backup_dir"
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
-compose exec -T db pg_dump -U northstar -d northstar -Fc > "$backup_dir/northstar-$timestamp.dump"
-chmod 600 "$backup_dir/northstar-$timestamp.dump"
-echo "PostgreSQL backup written to $backup_dir/northstar-$timestamp.dump"
+target="$backup_dir/northstar-$timestamp.dump"
+tmp="$target.tmp"
+trap 'rm -f "$tmp"' EXIT
+compose exec -T db pg_dump -U northstar -d northstar -Fc > "$tmp"
+chmod 600 "$tmp"
+mv "$tmp" "$target"
+trap - EXIT
+echo "PostgreSQL backup written to $target"
+echo "Reminder: encrypted fields need NORTHSTAR_MASTER_KEY from .env, which is NOT in this dump. Back it up separately and securely." >&2

@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { createHash, X509Certificate } from "node:crypto";
 import { promisify } from "node:util";
 import pg from "pg";
+import { x25519 } from "@noble/curves/ed25519.js";
 import test, { after, before } from "node:test";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -226,6 +227,26 @@ test("owner can sign in and read an empty fleet", integrationOptions, async () =
   assert.deepEqual((await nodes.json()).nodes, []);
 });
 
+test("portal sessions cannot be replayed against administrator routes", integrationOptions, async () => {
+  const json = { "Content-Type": "application/json" };
+  const ownerLogin = await fetch(`${base}/api/v1/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ email: "owner@example.com", password: "test-password-123" }) });
+  const adminToken = (await ownerLogin.json()).accessToken;
+  const email = `portal-${Date.now()}@example.com`;
+  const registration = await fetch(`${base}/api/v1/auth/register`, { method: "POST", headers: json, body: JSON.stringify({ email, password: "test-password-123", displayName: "Portal user" }) });
+  assert.equal(registration.status, 201);
+  const userId = (await registration.json()).user.id;
+  const approved = await fetch(`${base}/api/v1/admin/users/${userId}/status`, { method: "POST", headers: { ...json, Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ status: "active" }) });
+  assert.equal(approved.status, 200);
+  const portalLogin = await fetch(`${base}/api/v1/auth/web-login`, { method: "POST", headers: json, body: JSON.stringify({ email, password: "test-password-123" }) });
+  assert.equal(portalLogin.status, 200);
+  const portalSession = portalLogin.headers.get("set-cookie")?.split(";", 1)[0].split("=")[1];
+  assert.ok(portalSession);
+  const portalMe = await fetch(`${base}/api/v1/auth/me`, { headers: { Cookie: `northstar_portal_session=${portalSession}` } });
+  assert.equal(portalMe.status, 200);
+  const replayed = await fetch(`${base}/api/nodes`, { headers: { Cookie: `northstar_session=${portalSession}` } });
+  assert.equal(replayed.status, 401);
+});
+
 test("v1 bearer session can manage a device", integrationOptions, async () => {
   const login = await fetch(`${base}/api/v1/auth/login`, {
     method: "POST",
@@ -327,7 +348,8 @@ test("credential controls preserve independent user/admin locks and recoverable 
   const statusPath = `/api/v1/admin/users/${userId}/status`;
   assert.equal((await call(statusPath, adminToken, { status: "active" })).status, 200);
   let token = await login(email);
-  const created = await call("/api/v1/credentials", token, { name: "Reusable", protocol: "wireguard", publicKey: Buffer.alloc(32, 5).toString("base64") });
+  const clientPrivateKey = Buffer.from(x25519.utils.randomSecretKey());
+  const created = await call("/api/v1/credentials", token, { name: "Reusable", protocol: "wireguard", publicKey: Buffer.from(x25519.getPublicKey(clientPrivateKey)).toString("base64") });
   assert.equal(created.status, 201);
   const id = (await created.json()).credential.id;
   const path = `/api/v1/credentials/${id}`;
@@ -347,7 +369,7 @@ test("credential controls preserve independent user/admin locks and recoverable 
       VALUES ($1,$2,$3,$4,'wireguard','udp',1,'active','{}',$5,'2099-01-01T00:00:00.000Z',$5)`, [`profile_${nodeId}`, deviceId, id, nodeId, timestamp]);
     await pool.query(`UPDATE nodes SET status='online', last_heartbeat_at=$2, agent_capabilities_json=$3 WHERE id=$1`, [nodeId, timestamp, JSON.stringify({ connectivity: { protocols: { wireguard: { runtimeActive: true, listening: true }, openvpn: { runtimeActive: true, listening: true } } } })]);
     await pool.query(`INSERT INTO node_protocols (node_id,protocol,updated_at) VALUES ($1,'wireguard',$2),($1,'openvpn',$2)`, [nodeId, timestamp]);
-    const wgIssued = await call("/api/v1/profiles", token, { credentialId: id, protocol: "wireguard", clientPrivateKey: Buffer.alloc(32, 5).toString("base64") });
+    const wgIssued = await call("/api/v1/profiles", token, { credentialId: id, protocol: "wireguard", clientPrivateKey: clientPrivateKey.toString("base64") });
     assert.equal(wgIssued.status, 201);
     const wgProfile = (await wgIssued.json()).profile;
     const exportPath = `/api/v1/profiles/${wgProfile.id}/download?format=mihomo`;

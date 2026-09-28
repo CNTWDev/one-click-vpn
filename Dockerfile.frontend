@@ -20,6 +20,7 @@ ENV PORT=$PORT
 WORKDIR /app
 COPY --from=portal-build /app/dist/portal-web ./dist
 COPY frontend-server.mjs ./frontend-server.mjs
+USER node
 EXPOSE $PORT
 CMD ["node", "frontend-server.mjs"]
 
@@ -30,5 +31,6 @@ ENV PORT=$PORT
 WORKDIR /app
 COPY --from=admin-build /app/dist/admin-web ./dist
 COPY frontend-server.mjs ./frontend-server.mjs
+USER node
 EXPOSE $PORT
 CMD ["node", "frontend-server.mjs"]

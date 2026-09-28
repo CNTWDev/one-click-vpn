@@ -54,14 +54,14 @@ function requestBrowserLocation(setLocation: (state: LocationState) => void) {
     setLocation({ status: "error", message: "当前浏览器不支持定位。" });
     return;
   }
-  setLocation({ status: "locating", message: "正在自动获取浏览器位置…" });
+  setLocation({ status: "locating", message: "正在获取浏览器位置…" });
   navigator.geolocation.getCurrentPosition(
-    (position) => setLocation({ status: "located", latitude: position.coords.latitude, longitude: position.coords.longitude, message: "已自动使用浏览器位置" }),
+    (position) => setLocation({ status: "located", latitude: position.coords.latitude, longitude: position.coords.longitude, message: "已使用浏览器位置" }),
     (error) => {
       const message = error.code === error.PERMISSION_DENIED
         ? "未获得定位权限，可点击按钮重试。"
         : error.code === error.TIMEOUT
-          ? "自动定位超时，可点击按钮重试。"
+          ? "定位超时，可点击按钮重试。"
           : "无法获取当前位置，请检查系统定位服务。";
       setLocation({ status: "error", message });
     },
@@ -101,7 +101,14 @@ export function RegionMap({ regions, selectedRegionId, onSelect }: {
   const hasLocation = location.status === "located" && location.latitude !== undefined && location.longitude !== undefined;
   const origin = hasLocation ? projectGeoPoint(location.latitude!, location.longitude!) : { x: 505, y: 606 };
 
-  useEffect(() => { requestBrowserLocation(setLocation); }, []);
+  // Never trigger the permission prompt on page load; only auto-locate when permission was already granted.
+  useEffect(() => {
+    let cancelled = false;
+    navigator.permissions?.query({ name: "geolocation" as PermissionName })
+      .then((status) => { if (!cancelled && status.state === "granted") requestBrowserLocation(setLocation); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
 
   function locateUser() { requestBrowserLocation(setLocation); }
 

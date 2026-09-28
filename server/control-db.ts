@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { dbExec, dbQuery, findUserById, type DbNode, type DbUser } from "./db";
+import { dbExec, dbQuery, findUserById, withTransaction, type DbNode, type DbUser } from "./db";
 import { hashToken } from "./crypto";
 import { defaultCredentialExpiry } from "./credential-validity";
 
@@ -229,6 +229,15 @@ export async function revokeCertificateIssuance(id: string): Promise<void> {
     WHERE id = $2 AND status = 'active'`, [now(), id]);
 }
 
+const WIREGUARD_KEY_PATTERN = /^[A-Za-z0-9+/]{43}=$/;
+
+// Two active peers with the same key would collide on the node and misattribute traffic.
+async function assertWireGuardKeyAvailable(publicKey: string): Promise<void> {
+  if (!WIREGUARD_KEY_PATTERN.test(publicKey)) return;
+  const rows = await dbQuery<{ id: string }>("SELECT id FROM devices WHERE public_key = $1 AND status = 'active' LIMIT 1", [publicKey]);
+  if (rows.length) throw new Error("This WireGuard public key is already registered");
+}
+
 export async function createDevice(input: {
   userId: string;
   displayName: string;
@@ -236,6 +245,7 @@ export async function createDevice(input: {
   appVersion: string;
   publicKey: string;
 }): Promise<Device> {
+  await assertWireGuardKeyAvailable(input.publicKey);
   const id = `dev_${randomUUID()}`;
   const timestamp = now();
   await dbExec(`INSERT INTO devices
@@ -257,11 +267,13 @@ export async function findDevice(id: string): Promise<Device | undefined> {
 
 export async function revokeDevice(id: string): Promise<Device | undefined> {
   const timestamp = now();
-  await dbExec("UPDATE devices SET status = 'revoked', updated_at = $1 WHERE id = $2", [timestamp, id]);
-  await dbExec("UPDATE access_credentials SET status = 'revoked', revoked_at = $1, updated_at = $1 WHERE device_id = $2 AND status = 'active'", [timestamp, id]);
-  await dbExec("UPDATE protocol_credentials SET status = 'revoked', revoked_at = $1 WHERE device_id = $2 AND status = 'active'", [timestamp, id]);
-  await dbExec("UPDATE ip_leases SET status = 'released', released_at = $1 WHERE device_id = $2 AND status = 'active'", [timestamp, id]);
-  await dbExec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE device_id = $2 AND status IN ('issued', 'active')", [timestamp, id]);
+  await withTransaction(async (exec) => {
+    await exec("UPDATE devices SET status = 'revoked', updated_at = $1 WHERE id = $2", [timestamp, id]);
+    await exec("UPDATE access_credentials SET status = 'revoked', revoked_at = $1, updated_at = $1 WHERE device_id = $2 AND status = 'active'", [timestamp, id]);
+    await exec("UPDATE protocol_credentials SET status = 'revoked', revoked_at = $1 WHERE device_id = $2 AND status = 'active'", [timestamp, id]);
+    await exec("UPDATE ip_leases SET status = 'released', released_at = $1 WHERE device_id = $2 AND status = 'active'", [timestamp, id]);
+    await exec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE device_id = $2 AND status IN ('issued', 'active')", [timestamp, id]);
+  });
   return findDevice(id);
 }
 
@@ -280,6 +292,7 @@ export async function createAccessCredential(input: {
   const deviceId = `dev_${randomUUID()}`;
   const timestamp = now();
   const identityKey = input.protocol === "openvpn" ? `northstar-${credentialId}` : input.identityKey;
+  await assertWireGuardKeyAvailable(identityKey);
   await dbExec(`INSERT INTO devices
     (id, user_id, display_name, platform, app_version, public_key, status, created_at, last_seen_at, updated_at)
     VALUES ($1, $2, $3, 'web', 'credential-1.0.0', $4, 'active', $5, NULL, $5)`, [
@@ -291,6 +304,10 @@ export async function createAccessCredential(input: {
     credentialId, input.userId, deviceId, input.displayName, input.protocol, identityKey, timestamp, defaultCredentialExpiry(new Date(timestamp)),
   ]);
   return (await findAccessCredential(credentialId))!;
+}
+
+export async function listCredentialIdsForDevice(deviceId: string): Promise<string[]> {
+  return (await dbQuery<{ id: string }>("SELECT id FROM access_credentials WHERE device_id = $1", [deviceId])).map((row) => row.id);
 }
 
 export async function listAccessCredentials(userId?: string): Promise<AccessCredential[]> {
@@ -337,14 +354,14 @@ export async function revokeAccessCredential(id: string): Promise<AccessCredenti
   const timestamp = now();
   const credential = await findAccessCredential(id);
   if (!credential) return undefined;
-  await dbExec("UPDATE access_credentials SET status = 'revoked', revoked_at = $1, updated_at = $1 WHERE id = $2", [timestamp, id]);
-  await dbExec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE credential_id = $2 AND status IN ('issued', 'active')", [timestamp, id]);
-  await dbExec("UPDATE protocol_credentials SET status = 'revoked', revoked_at = $1 WHERE device_id = $2 AND protocol = $3 AND status = 'active'", [timestamp, credential.device_id, credential.protocol]);
-  await dbExec("UPDATE ip_leases SET status = 'released', released_at = $1 WHERE device_id = $2 AND protocol = $3 AND status = 'active'", [timestamp, credential.device_id, credential.protocol]);
-  const otherActive = (await dbQuery<{ count: string }>(
-    "SELECT COUNT(*)::text AS count FROM access_credentials WHERE device_id = $1 AND id <> $2 AND status = 'active'", [credential.device_id, id],
-  ))[0];
-  if (Number(otherActive?.count || 0) === 0) await dbExec("UPDATE devices SET status = 'revoked', updated_at = $1 WHERE id = $2", [timestamp, credential.device_id]);
+  await withTransaction(async (exec) => {
+    await exec("UPDATE access_credentials SET status = 'revoked', revoked_at = $1, updated_at = $1 WHERE id = $2", [timestamp, id]);
+    await exec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE credential_id = $2 AND status IN ('issued', 'active')", [timestamp, id]);
+    await exec("UPDATE protocol_credentials SET status = 'revoked', revoked_at = $1 WHERE device_id = $2 AND protocol = $3 AND status = 'active'", [timestamp, credential.device_id, credential.protocol]);
+    await exec("UPDATE ip_leases SET status = 'released', released_at = $1 WHERE device_id = $2 AND protocol = $3 AND status = 'active'", [timestamp, credential.device_id, credential.protocol]);
+    await exec(`UPDATE devices SET status = 'revoked', updated_at = $1 WHERE id = $2
+      AND NOT EXISTS (SELECT 1 FROM access_credentials WHERE device_id = $2 AND id <> $3 AND status = 'active')`, [timestamp, credential.device_id, id]);
+  });
   return findAccessCredential(id);
 }
 
@@ -370,11 +387,12 @@ export async function findApiUserByAccessToken(token: string): Promise<DbUser | 
 }
 
 export async function rotateApiSession(refreshToken: string): Promise<{ user: DbUser; session: ApiSession } | undefined> {
-  const rows = await dbQuery<{ id: string; user_id: string; refresh_expires_at: string }>(`SELECT id, user_id, refresh_expires_at FROM device_sessions
-    WHERE refresh_token_hash = $1 AND revoked_at IS NULL`, [hashToken(refreshToken)]);
+  // Claim the refresh token atomically so two concurrent refreshes cannot both mint a session.
+  const rows = await dbQuery<{ id: string; user_id: string; refresh_expires_at: string }>(`UPDATE device_sessions SET revoked_at = $1
+    WHERE refresh_token_hash = $2 AND revoked_at IS NULL
+    RETURNING id, user_id, refresh_expires_at`, [now(), hashToken(refreshToken)]);
   const row = rows[0];
   if (!row || new Date(row.refresh_expires_at).getTime() <= Date.now()) return undefined;
-  await dbExec("UPDATE device_sessions SET revoked_at = $1 WHERE id = $2", [now(), row.id]);
   const user = await findUserById(row.user_id);
   return user?.status === "active" ? { user, session: await createApiSession(user.id) } : undefined;
 }
@@ -706,9 +724,9 @@ export async function finishReconcileTask(input: {
   }
   if (input.observedRevision !== undefined && input.observedHash !== undefined) {
     await dbExec(`INSERT INTO observed_configs (node_id, protocol, applied_revision, observed_hash, status, last_error, updated_at)
-      SELECT node_id, protocol, $1, $2, $3, $4, $5 FROM reconcile_tasks WHERE id = $6
+      SELECT node_id, protocol, $1, $2, $3, $4, $5 FROM reconcile_tasks WHERE id = $6 AND node_id = $7
       ON CONFLICT(node_id, protocol) DO UPDATE SET applied_revision = excluded.applied_revision, observed_hash = excluded.observed_hash, status = excluded.status, last_error = excluded.last_error, updated_at = excluded.updated_at`, [
-      input.observedRevision, input.observedHash, input.observedStatus || input.status, input.error || "", timestamp, input.taskId,
+      input.observedRevision, input.observedHash, input.observedStatus || input.status, input.error || "", timestamp, input.taskId, input.nodeId,
     ]);
   }
 }

@@ -22,6 +22,12 @@ export async function POST(request: Request) {
     const storedSecret = savedNode && !suppliedSecret
       ? decryptSecret({ ciphertext: savedNode.credential_ciphertext, iv: savedNode.credential_iv, tag: savedNode.credential_tag })
       : "";
+    const sshPort = isValidPort(body.sshPort || savedNode?.ssh_port);
+    // A stored credential may only be sent to the host it was saved for; otherwise an edited IP
+    // or a blanked fingerprint would hand the node's root credential to an arbitrary server.
+    if (storedSecret && savedNode && (ip !== savedNode.ip || sshPort !== savedNode.ssh_port || sshUser !== savedNode.ssh_user)) {
+      return jsonError("Re-enter the SSH credential to test a changed address, port or user", 409);
+    }
     const rawSecret = suppliedSecret || storedSecret;
     const type = suppliedSecret
       ? resolveCredentialType(body.credentialType, suppliedSecret)
@@ -31,12 +37,14 @@ export async function POST(request: Request) {
       ? body.sshPrivilegeMode
       : savedNode?.ssh_privilege_mode;
     const mode = privilegeMode(requestedMode, sshUser);
-    const hostFingerprint = typeof body.hostFingerprint === "string"
-      ? cleanText(body.hostFingerprint, 256) || null
-      : savedNode?.host_fingerprint || null;
+    const hostFingerprint = storedSecret
+      ? savedNode?.host_fingerprint || null
+      : typeof body.hostFingerprint === "string"
+        ? cleanText(body.hostFingerprint, 256) || null
+        : savedNode?.host_fingerprint || null;
     const result = await testRemoteAccess({
       ip,
-      ssh_port: isValidPort(body.sshPort || savedNode?.ssh_port),
+      ssh_port: sshPort,
       ssh_user: sshUser,
       ssh_privilege_mode: mode,
       credential_type: type,

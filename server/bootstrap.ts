@@ -216,6 +216,7 @@ install_openvpn
 progress networking 50 'Configuring packet forwarding and firewall prerequisites'
 if ! command -v iptables >/dev/null 2>&1; then
   if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y
     DEBIAN_FRONTEND=noninteractive apt-get install -y iptables
   elif command -v dnf >/dev/null 2>&1; then
     dnf install -y iptables
@@ -302,7 +303,7 @@ RestartSec=5
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/northstar-agent /etc/wireguard /etc/systemd/system
+ReadWritePaths=/opt/northstar-agent /etc/wireguard /etc/systemd/system /run
 
 [Install]
 WantedBy=multi-user.target
