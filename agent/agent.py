@@ -683,15 +683,18 @@ def wireguard_usage_snapshots():
     if result.returncode != 0:
         return []
     snapshots = []
-    epoch = counter_epoch()
+    # Suffix resets server-side deltas once, since older agents stored misaligned wg dump columns.
+    epoch = counter_epoch() + ":wg2"
     for line in result.stdout.splitlines()[1:]:
         fields = line.split("\t")
         if len(fields) < 8 or not validate_key(fields[0]):
             continue
+        # Peer rows: public-key, preshared-key, endpoint, allowed-ips,
+        # latest-handshake, transfer-rx, transfer-tx, persistent-keepalive.
         try:
-            handshake = int(fields[5] or 0)
-            received = max(0, int(fields[6] or 0))
-            transmitted = max(0, int(fields[7] or 0))
+            handshake = int(fields[4] or 0)
+            received = max(0, int(fields[5] or 0))
+            transmitted = max(0, int(fields[6] or 0))
         except ValueError:
             continue
         snapshots.append({

@@ -19,6 +19,15 @@ function validBytes(value: unknown): number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
 }
 
+// Agents before the wg dump column fix reported byte counts as handshake seconds (dates around 1970-1971).
+const MIN_PLAUSIBLE_HANDSHAKE_MS = Date.UTC(2020, 0, 1);
+
+function validHandshake(value: unknown): string | null {
+  if (typeof value !== "string" || !value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) && time >= MIN_PLAUSIBLE_HANDSHAKE_MS ? value : null;
+}
+
 function dayOf(value: string): string {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? now().slice(0, 10) : parsed.toISOString().slice(0, 10);
@@ -86,7 +95,8 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
       const downloadDelta = sameCounter ? Math.max(0, txBytes - Number(previous.observed_tx_bytes)) : txBytes;
       const owner = snapshot.protocol === "wireguard" ? wireguardOwners.get(identityKey) : openvpnOwners.get(`CN=${identityKey}`);
       const hasTraffic = uploadDelta > 0 || downloadDelta > 0;
-      const handshakeTime = snapshot.lastHandshakeAt ? new Date(snapshot.lastHandshakeAt).getTime() : 0;
+      const lastHandshakeAt = validHandshake(snapshot.lastHandshakeAt);
+      const handshakeTime = lastHandshakeAt ? new Date(lastHandshakeAt).getTime() : 0;
       const connected = snapshot.protocol === "openvpn" || (Number.isFinite(handshakeTime) && handshakeTime >= Date.now() - 180_000);
       const lastTrafficAt = hasTraffic ? observedAt : previous?.last_traffic_at || null;
       await exec(`INSERT INTO traffic_counters
@@ -98,7 +108,7 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
           last_traffic_at = excluded.last_traffic_at, connected = excluded.connected,
           counter_epoch = excluded.counter_epoch, observed_at = excluded.observed_at`, [
         nodeId, snapshot.protocol, identityKey, sessionKey, owner?.device_id || null, owner?.credential_id || null,
-        String(rxBytes), String(txBytes), snapshot.lastHandshakeAt || null, lastTrafficAt, connected ? 1 : 0, epoch, observedAt,
+        String(rxBytes), String(txBytes), lastHandshakeAt, lastTrafficAt, connected ? 1 : 0, epoch, observedAt,
       ]);
       // Guard against duplicate snapshots for the same key within one heartbeat.
       previousByKey.set(key, { counter_epoch: epoch, observed_rx_bytes: String(rxBytes), observed_tx_bytes: String(txBytes), observed_at: observedAt, last_traffic_at: lastTrafficAt });
