@@ -7,6 +7,7 @@ import type { AdminUser, ControllerInfo, NodeRecord, Region } from "./types";
 import "./styles.css";
 import "./credential-usage.css";
 import "./ui-refinements.css";
+import { SubscriptionPanel } from "../../shared/subscription-panel";
 
 // Each console page is its own chunk, fetched the first time it is opened.
 const OverviewPage = lazy(() => import("./pages/overview").then((module) => ({ default: module.OverviewPage })));
@@ -18,11 +19,12 @@ const RegionsPage = lazy(() => import("./pages/regions").then((module) => ({ def
 const ControllerPage = lazy(() => import("./pages/controller").then((module) => ({ default: module.ControllerPage })));
 const LogsPage = lazy(() => import("./pages/logs").then((module) => ({ default: module.LogsPage })));
 
-type PageId = "overview" | "topology" | "users" | "nodes" | "services" | "regions" | "controller" | "logs";
+type PageId = "overview" | "topology" | "users" | "subscriptions" | "nodes" | "services" | "regions" | "controller" | "logs";
 const navigation: Array<{ id: PageId; icon: string; label: string; description: string }> = [
   { id: "overview", icon: "⌂", label: "运维总览", description: "状态与待处理" },
   { id: "topology", icon: "G", label: "全球拓扑", description: "节点分布与管理通道" },
   { id: "users", icon: "U", label: "账号管理", description: "审核与访问控制" },
+  { id: "subscriptions", icon: "S", label: "订阅管理", description: "访问权限与节点同步" },
   { id: "nodes", icon: "N", label: "节点运维", description: "部署、修复与诊断" },
   { id: "services", icon: "V", label: "VPN 服务", description: "协议与部署策略" },
   { id: "regions", icon: "R", label: "区域管理", description: "节点区域目录" },
@@ -128,6 +130,7 @@ function App() {
           {page === "overview" && <OverviewPage users={users} nodes={nodes} regions={regions} controllerSettings={controllerSettings} onNavigate={navigate} onRefresh={refreshCore} />}
           {page === "topology" && <TopologyPage nodes={nodes} regions={regions} controllerSettings={controllerSettings} onNavigate={navigate} onRefresh={refreshCore} />}
           {page === "users" && <UsersPage users={users} onRefresh={refreshCore} />}
+          {page === "subscriptions" && <SubscriptionPanel api={api} admin />}
           {page === "nodes" && <NodesPage nodes={nodes} regions={regions} onRefresh={refreshCore} />}
           {page === "services" && <ServicesPage nodes={nodes} />}
           {page === "regions" && <RegionsPage regions={regions} nodes={nodes} onRefresh={refreshCore} />}

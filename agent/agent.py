@@ -10,6 +10,7 @@ remote command execution is deliberately not part of this channel.
 import base64
 import hashlib
 import ipaddress
+import io
 import json
 import os
 import re
@@ -19,6 +20,9 @@ import subprocess
 import sys
 import tempfile
 import time
+import ssl
+import platform
+import zipfile
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -35,6 +39,8 @@ OPENVPN_DIR = STATE_DIR / "openvpn"
 OPENVPN_CONFIG = OPENVPN_DIR / "server.conf"
 OPENVPN_STATUS = OPENVPN_DIR / "status.tsv"
 OPENVPN_REVOKED_DIR = OPENVPN_DIR / "revoked"
+VLESS_CONFIG = STATE_DIR / "vless.json"
+XRAY_PATH = Path("/opt/northstar-agent/bin/xray")
 KEY_PATTERN = re.compile(r"^[A-Za-z0-9+/]{43}=$")
 VPN_PORTS = {
     "wireguard": {"transport": "udp", "port": 51820, "comment": "northstar-wireguard"},
@@ -168,7 +174,7 @@ def replace_input_rule(comment, old_listener, new_listener):
     if old_listener is not None and old_listener != new_listener:
         while run_optional(rule("-D", old_listener)).returncode == 0:
             pass
-    if run_optional(rule("-C", new_listener)).returncode != 0:
+    if new_listener is not None and run_optional(rule("-C", new_listener)).returncode != 0:
         try:
             run_fixed(rule("-I", new_listener))
         except subprocess.CalledProcessError as error:
@@ -464,9 +470,167 @@ def restart_openvpn(desired):
     return {"observedHash": digest, "observedStatus": "applied"}
 
 
+def ensure_xray():
+    if XRAY_PATH.exists():
+        return
+    releases = {
+        "x86_64": ("64", "23cd9af937744d97776ee35ecad4972cf4b2109d1e0fe6be9930467608f7c8ae"),
+        "aarch64": ("arm64-v8a", "4d30283ae614e3057f730f67cd088a42be6fdf91f8639d82cb69e48cde80413c"),
+        "arm64": ("arm64-v8a", "4d30283ae614e3057f730f67cd088a42be6fdf91f8639d82cb69e48cde80413c"),
+    }
+    if platform.system() != "Linux" or platform.machine() not in releases:
+        raise RuntimeError("VLESS requires Linux amd64 or arm64")
+    arch, checksum = releases[platform.machine()]
+    url = f"https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-{arch}.zip"
+    with urllib.request.urlopen(url, timeout=60) as response:
+        archive = response.read(64 * 1024 * 1024 + 1)
+    if len(archive) > 64 * 1024 * 1024 or hashlib.sha256(archive).hexdigest() != checksum:
+        raise RuntimeError("Xray release checksum verification failed")
+    # Extract only the pinned executable, never archive paths or shell installers.
+    with zipfile.ZipFile(io.BytesIO(archive)) as package:
+        binary = package.read("xray")
+    XRAY_PATH.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with tempfile.NamedTemporaryFile(dir=XRAY_PATH.parent, delete=False) as temporary:
+        temporary.write(binary)
+        temp_path = Path(temporary.name)
+    temp_path.chmod(0o700)
+    temp_path.replace(XRAY_PATH)
+
+
+def reality_destination(server_name):
+    if not isinstance(server_name, str) or len(server_name) > 253 or not re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}", server_name):
+        raise ValueError("invalid REALITY target hostname")
+    addresses = [row[4][0] for row in socket.getaddrinfo(server_name, 443, type=socket.SOCK_STREAM)]
+    if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
+        raise ValueError("REALITY target must resolve exclusively to public addresses")
+    # Pin the validated IP in the server config (avoids a later DNS rebinding into private networks).
+    address = addresses[0]
+    context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_3
+    context.set_alpn_protocols(["h2"])
+    with socket.create_connection((address, 443), timeout=10) as connection:
+        with context.wrap_socket(connection, server_hostname=server_name) as tls:
+            if tls.selected_alpn_protocol() != "h2":
+                raise ValueError("REALITY target must support TLS 1.3 and HTTP/2")
+    return f"[{address}]:443" if ":" in address else f"{address}:443"
+
+
+def vless_config(desired, bundle, target):
+    port = desired.get("listenPort", 443)
+    users = desired.get("users", [])
+    if not isinstance(port, int) or port < 1 or port > 65535 or port == 10085:
+        raise ValueError("invalid VLESS listen port")
+    if not isinstance(users, list) or len(users) > 4096:
+        raise ValueError("invalid VLESS users")
+    clients = []
+    for user in users:
+        identity = user.get("id", "")
+        if not isinstance(identity, str) or not re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", identity):
+            raise ValueError("invalid VLESS user UUID")
+        email = user.get("email", identity)
+        if not isinstance(email, str) or not re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", email):
+            raise ValueError("invalid VLESS telemetry identity")
+        clients.append({"id": identity, "email": email, "level": 0, "flow": "xtls-rprx-vision"})
+    if not re.fullmatch(r"[A-Za-z0-9_-]{43}", bundle.get("privateKey", "")) or not re.fullmatch(r"[0-9a-f]{16}", bundle.get("shortId", "")):
+        raise ValueError("invalid REALITY server keys")
+    return {
+        "log": {"loglevel": "warning", "access": "none"},
+        "api": {"tag": "api", "services": ["StatsService"]}, "stats": {},
+        "policy": {"levels": {"0": {"statsUserUplink": True, "statsUserDownlink": True}}},
+        "inbounds": [
+            {"tag": "vless", "listen": "0.0.0.0", "port": port, "protocol": "vless",
+             "settings": {"clients": clients, "decryption": "none"},
+             "streamSettings": {"network": "tcp", "security": "reality", "realitySettings": {
+                 "show": False, "target": target, "xver": 0, "serverNames": [bundle["serverName"]],
+                 "privateKey": bundle["privateKey"], "shortIds": [bundle["shortId"]]}}},
+            {"tag": "api", "listen": "127.0.0.1", "port": 10085, "protocol": "dokodemo-door", "settings": {"address": "127.0.0.1"}},
+        ],
+        "outbounds": [{"tag": "direct", "protocol": "freedom"}, {"tag": "blocked", "protocol": "blackhole"}],
+        "routing": {"domainStrategy": "IPOnDemand", "rules": [
+            {"type": "field", "inboundTag": ["api"], "outboundTag": "api"},
+            {"type": "field", "ip": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "169.254.0.0/16", "100.64.0.0/10", "0.0.0.0/8", "224.0.0.0/4", "::1/128", "fc00::/7", "fe80::/10"], "outboundTag": "blocked"},
+        ]},
+    }
+
+
+def vless_sync_config(desired):
+    bundle = json.loads(request_node_secret(desired.get("serverBundleSecretId")))
+    ensure_xray()
+    old = json.loads(VLESS_CONFIG.read_text()) if VLESS_CONFIG.exists() else None
+    # Once verified, keep the destination stable across access-list refreshes.
+    previous_reality = old["inbounds"][0]["streamSettings"]["realitySettings"] if old else None
+    target = previous_reality["target"] if previous_reality and previous_reality["serverNames"] == [bundle.get("serverName")] else reality_destination(bundle.get("serverName"))
+    users = json.loads(request_node_secret(desired.get("usersSecretId")))
+    config = vless_config({**desired, "users": users}, bundle, target)
+    port = config["inbounds"][0]["port"]
+    if (not old or old["inbounds"][0]["port"] != port) and socket_listening("tcp", port):
+        raise RuntimeError("VLESS port is occupied; choose another port")
+    if not old and socket_listening("tcp", 10085):
+        raise RuntimeError("VLESS local statistics port 10085 is occupied")
+    candidate = STATE_DIR / "vless-candidate.json"
+    atomic_write(candidate, json.dumps(config))
+    try:
+        run_fixed([str(XRAY_PATH), "run", "-test", "-config", str(candidate)])
+    finally:
+        candidate.unlink(missing_ok=True)
+    # Restarting closes sessions removed by disable/revoke as well as removing their credentials.
+    atomic_write(VLESS_CONFIG, json.dumps(config))
+    unit = f"""[Unit]
+Description=Northstar VLESS REALITY
+After=network-online.target
+[Service]
+ExecStart={XRAY_PATH} run -config {VLESS_CONFIG}
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+[Install]
+WantedBy=multi-user.target
+"""
+    atomic_write(Path("/etc/systemd/system/northstar-vless.service"), unit, 0o644)
+    run_fixed(["systemctl", "daemon-reload"])
+    run_fixed(["systemctl", "enable", "northstar-vless"])
+    run_fixed(["systemctl", "restart", "northstar-vless"])
+    run_fixed(["systemctl", "is-active", "--quiet", "northstar-vless"])
+    replace_input_rule("northstar-vless", ("tcp", old["inbounds"][0]["port"]) if old else None, ("tcp", port))
+    return {"observedHash": hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest(), "observedStatus": "applied"}
+
+
+def vless_usage_snapshots():
+    if not XRAY_PATH.exists() or not VLESS_CONFIG.exists():
+        return []
+    result = run_optional([str(XRAY_PATH), "api", "statsquery", "--server=127.0.0.1:10085", "-pattern", "user>>>"])
+    if result.returncode != 0:
+        return []
+    try:
+        stats = json.loads(result.stdout).get("stat", [])
+    except (ValueError, TypeError):
+        return []
+    users = {}
+    for item in stats:
+        parts = item.get("name", "").split(">>>")
+        if len(parts) != 4 or parts[0] != "user" or parts[2] != "traffic" or parts[3] not in ("uplink", "downlink"):
+            continue
+        user = users.setdefault(parts[1], {"protocol": "vless", "identityKey": parts[1], "rxBytes": 0, "txBytes": 0})
+        user["rxBytes" if parts[3] == "uplink" else "txBytes"] = int(item.get("value", 0))
+    epoch = run_optional(["systemctl", "show", "northstar-vless", "--property=InvocationID", "--value"]).stdout.strip()
+    return [{**user, "counterEpoch": epoch} for user in users.values()]
+
+
 def apply_task(task):
     task_type = task.get("taskType")
     payload = task.get("payload") or {}
+    if task_type in ("ApplyVlessServer", "RestartVless"):
+        return vless_sync_config(payload)
+    if task_type == "DisableVless":
+        run_optional(["systemctl", "disable", "--now", "northstar-vless"])
+        if VLESS_CONFIG.exists():
+            old = json.loads(VLESS_CONFIG.read_text())
+            replace_input_rule("northstar-vless", ("tcp", old["inbounds"][0]["port"]), None)
+            VLESS_CONFIG.unlink()
+        return {"observedHash": hashlib.sha256(b"vless-disabled").hexdigest(), "observedStatus": "disabled"}
     if task_type == "ApplyWireGuardPeers":
         return wireguard_sync_config(payload)
     if task_type == "ApplyOpenVpnServer":
@@ -491,6 +655,10 @@ def capabilities():
     if shutil.which("openvpn") is not None:
         protocols.append("openvpn")
         transports["openvpn"] = ["udp", "tcp"]
+    # This agent can install its pinned runtime on explicit ApplyVlessServer, even before installation.
+    if platform.system() == "Linux" and platform.machine() in ("x86_64", "aarch64", "arm64"):
+        protocols.append("vless")
+        transports["vless"] = ["tcp"]
     return {
         "protocols": protocols,
         "transports": transports,
@@ -565,17 +733,24 @@ def firewall_snapshot(protocol_specs):
 
 
 def connectivity_snapshot():
+    try:
+        vless_port = json.loads(VLESS_CONFIG.read_text())["inbounds"][0]["port"] if VLESS_CONFIG.exists() else 443
+    except (ValueError, KeyError, IndexError):
+        vless_port = 443
     wireguard_ready = shutil.which("wg") is not None and shutil.which("wg-quick") is not None
     openvpn_ready = shutil.which("openvpn") is not None
     wireguard_transport, wireguard_port = configured_listener(WIREGUARD_CONFIG, 51820, "udp")
     openvpn_transport, openvpn_port = configured_listener(OPENVPN_CONFIG, 1194, "udp")
     protocol_specs = {
+        "vless": {"transport": "tcp", "port": vless_port, "comment": "northstar-vless"},
         "wireguard": {"transport": wireguard_transport, "port": wireguard_port, "comment": VPN_PORTS["wireguard"]["comment"]},
         "openvpn": {"transport": openvpn_transport, "port": openvpn_port, "comment": VPN_PORTS["openvpn"]["comment"]},
     }
     return {
         "firewall": firewall_snapshot(protocol_specs),
         "protocols": {
+            "vless": {"installed": XRAY_PATH.exists(), "runtimeActive": command_succeeds(["systemctl", "is-active", "--quiet", "northstar-vless"]) if XRAY_PATH.exists() else False,
+                      "listening": socket_listening("tcp", vless_port), "port": vless_port, "transport": "tcp"},
             "wireguard": {
                 "installed": wireguard_ready,
                 "interfaceActive": command_succeeds(["wg", "show", "northstar"]) if wireguard_ready else False,
@@ -755,11 +930,11 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.6.0",
+        "version": "agent 2.7.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
-        "usageSnapshots": wireguard_usage_snapshots() + openvpn_usage_snapshots(),
+        "usageSnapshots": wireguard_usage_snapshots() + openvpn_usage_snapshots() + vless_usage_snapshots(),
     })
 
 

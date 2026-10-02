@@ -111,3 +111,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   .account small { max-width: 145px; overflow: hidden; text-overflow: ellipsis; }
 }
 @media (prefers-reduced-motion: reduce) { .refresh-icon.spinning { animation: none; } }
+.dashboard > .subscription-panel { max-width: 1240px; margin: 24px auto; }
+.legacy-connections { max-width: 1240px; margin: 24px auto; }
+.legacy-connections > summary { padding: 18px; border: 1px solid #d5dfcd; border-radius: 12px; background: #fbfcf8; cursor: pointer; font-weight: 600; }
+.legacy-connections[open] > summary { margin-bottom: 18px; }

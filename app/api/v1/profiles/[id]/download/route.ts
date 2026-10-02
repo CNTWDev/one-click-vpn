@@ -15,6 +15,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const device = profile ? await findDevice(profile.device_id) : undefined;
   if (!profile || !device || device.user_id !== user.id) return jsonError("Profile not found", 404);
   if (profile.status !== "active") return jsonError("Activate this profile before downloading it", 409);
+  if (profile.protocol === "vless") return jsonError("VLESS 连接请使用动态订阅导入", 400);
   const format = new URL(request.url).searchParams.get("format") || "native";
   if (format !== "native" && format !== "mihomo") return jsonError("Unsupported export format", 400);
   if (format === "mihomo" && profile.protocol !== "wireguard") return jsonError("Mihomo export currently supports WireGuard only", 400);

@@ -8,6 +8,8 @@ import { ensureDefaultNodeProtocols } from "./control-plane";
 import { reconcileEnabledVpnServices } from "./vpn-services";
 import { writeOperationalLog } from "./operational-logs";
 import { discoverRemoteNode, executeRemoteCommand } from "./remote-ssh";
+import { dbExec } from "./db";
+import { agentUpgradeCommand } from "./agent-upgrade";
 
 const maximumConcurrentRemoteActions = 3;
 const remoteActionQueue: Array<() => Promise<void>> = [];
@@ -26,8 +28,14 @@ function processRemoteActionQueue(): void {
   }
 }
 
-function enqueueRemoteAction(action: () => Promise<void>): void {
-  remoteActionQueue.push(action);
+function enqueueRemoteAction(actionId: string, action: () => Promise<void>): void {
+  const renew = () => dbExec("UPDATE node_actions SET lease_updated_at = $2 WHERE id = $1 AND status IN ('queued', 'running')", [actionId, new Date().toISOString()]);
+  const timer = setInterval(() => { void renew().catch(() => undefined); }, 30_000);
+  timer.unref();
+  remoteActionQueue.push(async () => {
+    try { if (await renew()) await action(); }
+    finally { clearInterval(timer); }
+  });
   processRemoteActionQueue();
 }
 
@@ -41,12 +49,12 @@ function hasFreshAgentHeartbeat(node: Awaited<ReturnType<typeof findNode>>, maxi
   return Number.isFinite(heartbeatAt) && Date.now() - heartbeatAt <= maximumAgeMilliseconds;
 }
 
-async function waitForAgentHeartbeat(nodeId: string, notBefore: number, timeoutMilliseconds: number = 25_000): Promise<boolean> {
+async function waitForAgentHeartbeat(nodeId: string, notBefore: number, timeoutMilliseconds: number = 25_000, expectedVersion?: string): Promise<boolean> {
   const deadline = Date.now() + timeoutMilliseconds;
   while (Date.now() < deadline) {
     const node = await findNode(nodeId);
     const heartbeatAt = node?.last_heartbeat_at ? new Date(node.last_heartbeat_at).getTime() : 0;
-    if (heartbeatAt >= notBefore) return true;
+    if (heartbeatAt >= notBefore && (!expectedVersion || node?.version === expectedVersion)) return true;
     await pause(1_000);
   }
   return false;
@@ -58,6 +66,12 @@ function shellQuote(value: string): string {
 
 function agentSource(): string {
   return readFileSync(path.join(process.cwd(), "agent", "agent.py"), "utf8");
+}
+
+export function agentReleaseVersion(): string {
+  const version = agentSource().match(/"version":\s*"(agent [\d.]+)"/)?.[1];
+  if (!version) throw new Error("Controller Agent release version is unavailable");
+  return version;
 }
 
 class ActionOutputRecorder {
@@ -94,13 +108,13 @@ class ActionOutputRecorder {
 
 export async function queueNodeBootstrap(nodeId: string, actorUserId?: string): Promise<string> {
   const actionId = await addNodeAction(nodeId, "bootstrap");
-  enqueueRemoteAction(() => bootstrapNode(nodeId, actorUserId, actionId));
+  enqueueRemoteAction(actionId, () => bootstrapNode(nodeId, actorUserId, actionId));
   return actionId;
 }
 
-export async function queueNodeAction(nodeId: string, action: "restart-agent" | "status-agent", actorUserId?: string): Promise<string> {
+export async function queueNodeAction(nodeId: string, action: "restart-agent" | "status-agent" | "upgrade-agent", actorUserId?: string): Promise<string> {
   const actionId = await addNodeAction(nodeId, action);
-  enqueueRemoteAction(async () => {
+  enqueueRemoteAction(actionId, async () => {
     try {
       await runNodeAction(nodeId, action, actorUserId, actionId);
     } catch (error) {
@@ -337,7 +351,7 @@ fi
 systemctl --no-pager --full status northstar-agent
 printf 'NORTHSTAR_PROGRESS|heartbeat|96|Agent is active; waiting for its first Controller heartbeat\\n'
 `;
-    const startResult = await executeRemoteCommand(node, secret, startCommand, (chunk) => outputRecorder.write(chunk));
+    const startResult = await executeRemoteCommand(node, secret, startCommand, (chunk) => outputRecorder.write(chunk), 60_000);
     await outputRecorder.flush();
     const combinedOutput = `${result.output}\n${startResult.output}`;
     if (!(await waitForAgentHeartbeat(nodeId, heartbeatNotBefore))) {
@@ -370,7 +384,7 @@ printf 'NORTHSTAR_PROGRESS|heartbeat|96|Agent is active; waiting for its first C
   }
 }
 
-export async function runNodeAction(nodeId: string, action: "restart-agent" | "status-agent", actorUserId?: string, queuedActionId?: string): Promise<string> {
+export async function runNodeAction(nodeId: string, action: "restart-agent" | "status-agent" | "upgrade-agent", actorUserId?: string, queuedActionId?: string): Promise<string> {
   const node = await findNode(nodeId);
   if (!node) throw new Error("Node not found");
   const actionId = queuedActionId || await addNodeAction(nodeId, action, "running");
@@ -379,7 +393,7 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
   let recorder: ActionOutputRecorder | undefined;
   try {
     const secret = decryptSecret({ ciphertext: node.credential_ciphertext, iv: node.credential_iv, tag: node.credential_tag });
-    const command = action === "restart-agent"
+    const command = action === "upgrade-agent" ? agentUpgradeCommand(agentSource()) : action === "restart-agent"
       ? "printf 'NORTHSTAR_PROGRESS|restart|30|Requesting a managed Agent restart\\n'; systemctl restart northstar-agent; printf 'NORTHSTAR_PROGRESS|verify|75|Checking service status after restart\\n'; systemctl --no-pager --full status northstar-agent; printf 'NORTHSTAR_PROGRESS|complete|100|Agent restart completed\\n'"
       : "printf 'NORTHSTAR_PROGRESS|check|25|Reading Agent service state\\n'; systemctl is-active --quiet northstar-agent; service_status=$?; systemctl --no-pager --full status northstar-agent || true; printf 'NORTHSTAR_PROGRESS|journal|60|Collecting the latest Agent journal entries\\n'; journalctl -u northstar-agent -n 80 --no-pager || true; if [ $service_status -ne 0 ]; then printf 'NORTHSTAR_PROGRESS|failed|100|Agent service is not active\\n'; exit $service_status; fi; printf 'NORTHSTAR_PROGRESS|complete|100|Agent check completed\\n'";
     const outputRecorder = new ActionOutputRecorder(actionId, nodeId);
@@ -388,9 +402,14 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
     const result = await executeRemoteCommand(node, secret, command, (chunk) => outputRecorder.write(chunk));
     await outputRecorder.flush();
     const output = result.output.slice(-12000);
-    if (action === "restart-agent") {
-      if (!(await waitForAgentHeartbeat(nodeId, actionStartedAt, 35_000))) {
-        throw new Error("Agent service restarted, but no authenticated heartbeat reached the Controller. Use Reinstall / repair agent if the node journal reports HTTP 401 Unauthorized.");
+    if (action === "restart-agent" || action === "upgrade-agent") {
+      if (!(await waitForAgentHeartbeat(nodeId, actionStartedAt, 35_000, action === "upgrade-agent" ? agentReleaseVersion() : undefined))) {
+        throw new Error(action === "upgrade-agent"
+          ? "Agent 已上传并重启，但未收到目标版本的认证心跳。请查看节点日志；若出现 HTTP 401，请执行重新安装 / 修复。"
+          : "Agent service restarted, but no authenticated heartbeat reached the Controller. Use Reinstall / repair agent if the node journal reports HTTP 401 Unauthorized.");
+      }
+      if (action === "upgrade-agent" && (await findNode(nodeId))?.version !== agentReleaseVersion()) {
+        throw new Error("Agent 已上传，但心跳版本与目标版本不一致，请查看节点日志或执行重新安装 / 修复。");
       }
     } else {
       const inspectedNode = await findNode(nodeId);

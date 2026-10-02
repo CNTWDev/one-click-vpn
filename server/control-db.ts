@@ -4,7 +4,7 @@ import { hashToken } from "./crypto";
 import { defaultCredentialExpiry } from "./credential-validity";
 
 export type Platform = "web" | "macos" | "ios" | "android" | "windows" | "linux";
-export type Protocol = "wireguard" | "openvpn" | "ikev2";
+export type Protocol = "wireguard" | "openvpn" | "ikev2" | "vless";
 export type DeviceStatus = "pending" | "active" | "revoked";
 export type ProfileStatus = "issued" | "active" | "expired" | "revoked";
 export type CredentialStatus = "active" | "revoked" | "expired";
@@ -511,6 +511,7 @@ export async function upsertVpnService(input: {
   const timestamp = now();
   const defaults = input.protocol === "wireguard"
     ? { port: 51820, subnet: "10.70.0.0/24" }
+    : input.protocol === "vless" ? { port: 443, subnet: "" }
     : { port: 1194, subnet: "10.71.0.0/24" };
   await dbExec(`INSERT INTO vpn_services
     (node_id, protocol, enabled, transport, listen_port, subnet, dns_json, status, last_error, created_at, updated_at)
@@ -518,7 +519,7 @@ export async function upsertVpnService(input: {
     ON CONFLICT(node_id, protocol) DO UPDATE SET enabled = excluded.enabled, transport = excluded.transport,
       listen_port = excluded.listen_port, subnet = excluded.subnet, dns_json = excluded.dns_json,
       status = excluded.status, last_error = excluded.last_error, updated_at = excluded.updated_at`, [
-    input.nodeId, input.protocol, input.enabled ? 1 : 0, input.transport || "udp", input.listenPort || defaults.port,
+    input.nodeId, input.protocol, input.enabled ? 1 : 0, input.transport || (input.protocol === "vless" ? "tcp" : "udp"), input.listenPort || defaults.port,
     input.subnet || defaults.subnet, JSON.stringify(input.dns || ["1.1.1.1"]),
     input.status || (input.enabled ? "pending" : "disabled"), input.lastError || "", timestamp,
   ]);

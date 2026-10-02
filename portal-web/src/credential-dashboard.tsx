@@ -5,11 +5,13 @@ import { api, fetchText, isUnauthorized } from "./api";
 import { clientOptions, clientProtocol, clientFormat, clientName, usableCredential, type ClientChoice } from "./client-options";
 import { RegionMap } from "./region-map";
 import { createZipBlob } from "./zip";
+import { SubscriptionPanel } from "../../shared/subscription-panel";
 
 type User = { email: string; displayName: string };
 type Region = { id: string; name: string; country: string; code: string; protocols: string[]; status: string; protocolNodeCounts?: Record<string, number> };
 type Profile = { id: string; credentialId?: string | null; displayName?: string | null; nodeName?: string | null; regionalNodeCount?: number; regionCode?: string | null; regionName?: string | null; protocol: string; status: string; issuedAt: string; expiresAt: string };
 type Credential = {
+  subscriptionId?: string | null;
   expiringSoon: boolean; daysRemaining: number | null;
   userDisabled: boolean; adminDisabled: boolean; accountStatus: string; syncStatus: string;
   id: string; name: string; protocol: string; status: string; state: string; identitySuffix: string;
@@ -64,6 +66,7 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
   const { ask, dialog } = useActionDialog();
   const [regions, setRegions] = useState<Region[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [allCredentials, setAllCredentials] = useState<Credential[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [selectedId, setSelectedId] = useState("");
@@ -85,8 +88,8 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
   const selectedProfiles = useMemo(() => profiles.filter((item) => item.credentialId === selected?.id), [profiles, selected?.id]);
   const currentProfiles = selectedProfiles.filter((item) => item.status === "active" || item.status === "issued");
   const historyProfiles = selectedProfiles.filter((item) => item.status !== "active" && item.status !== "issued");
-  const onlineCount = credentials.filter((item) => item.online).length;
-  const usableCount = credentials.filter((item) => usableCredential(item)).length;
+  const onlineCount = allCredentials.filter((item) => item.online).length;
+  const usableCount = allCredentials.filter((item) => usableCredential(item)).length;
   const selectedClient = selected?.protocol === "openvpn" ? "openvpn" : downloadChoices[selected?.id] || "clash";
   const canDownload = !!selected && usableCredential(selected) && currentProfiles.length > 0;
   const recentDays = (usage?.daily || []).slice(-14);
@@ -108,7 +111,8 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
         api<Usage>("/api/v1/usage/summary"),
       ]);
       const nextRegions = availability.regions || [];
-      const nextCredentials = credentialResult.credentials || [];
+      const nextCredentials = (credentialResult.credentials || []).filter((item) => !item.subscriptionId);
+      setAllCredentials(credentialResult.credentials || []);
       setRegions(nextRegions); setCredentials(nextCredentials); setProfiles(profileResult.profiles || []); setUsage(usageResult);
       setUpdatedAt(new Date().toISOString()); setStale(false);
       setSelectedId((current) => nextCredentials.some((item) => item.id === current) ? current : nextCredentials[0]?.id || "");
@@ -248,14 +252,16 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
     {dialog}
     {(error || notice || busy) && <div className={`action-feedback ${error ? "error" : ""}`} role={error ? "alert" : "status"}><span>{error || (busy ? "正在处理，请稍候…" : notice)}</span>{!busy && <button type="button" aria-label="关闭提示" onClick={() => { setError(""); setNotice(""); }}>×</button>}</div>}
     <header><div className="brand"><span className="brand-mark"><i /><i /><i /></span><span>NORTHSTAR <em>VPN</em></span></div><div className="account"><span>{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b><small>{user.email}</small></div><button onClick={onLogout}>退出</button></div></header>
-    <section className="welcome"><div><p className="kicker">MY CONNECTIONS</p><h1>你好，{user.displayName}。</h1><p>选择你使用的客户端，下载后导入，就可以连接。</p></div><span className="active-badge">● 账号已开通</span></section>
+    <section className="welcome"><div><p className="kicker">MY CONNECTIONS</p><h1>你好，{user.displayName}。</h1><p>创建订阅，一次导入全部可用节点；原有客户端也可继续下载配置。</p></div><span className="active-badge">● 账号已开通</span></section>
     <section className="stats simple-stats" aria-label="使用概览">
       <article><small>近 30 天总流量</small><strong>{usage ? formatBytes(usage.totals.totalBytes) : "—"}</strong><span>上传 {usage ? formatBytes(usage.totals.uploadBytes) : "—"} · 下载 {usage ? formatBytes(usage.totals.downloadBytes) : "—"}</span></article>
-      <article><small>正在使用</small><strong>{updatedAt ? onlineCount : "—"}</strong><span>{stale ? "更新中断，显示上次结果" : "有活动的连接"}</span></article>
-      <article><small>可用连接</small><strong>{updatedAt ? usableCount : "—"}</strong><span>{credentials.length} 份连接 · 已停用或到期的不计入</span></article>
+      <article><small>最近活跃</small><strong>{updatedAt ? onlineCount : "—"}</strong><span>{stale ? "更新中断，显示上次结果" : "包含订阅与文件连接，不代表设备数"}</span></article>
+      <article><small>可用连接</small><strong>{updatedAt ? usableCount : "—"}</strong><span>{allCredentials.length} 份连接 · 已停用或到期的不计入</span></article>
     </section>
+    <SubscriptionPanel api={api} />
+    <details className="legacy-connections"><summary>原有连接与单独配置 · WireGuard / OpenVPN</summary>
     <div className="grid simple-create-grid">
-      <section className="card"><div className="card-head"><div><p className="kicker">GET CONNECTED</p><h2 id="credential-create">创建连接</h2></div><span className="muted">有效期 1 年</span></div>
+      <section className="card"><div className="card-head"><div><p className="kicker">GET CONNECTED</p><h2 id="credential-create">下载单独配置</h2></div><span className="muted">有效期 1 年</span></div>
         <form onSubmit={createCredential}>
           <fieldset className="client-picker" disabled={busy}><legend>你使用哪个客户端？</legend>{clientOptions.map((option) => <label className={client === option.id ? "selected" : ""} key={option.id}><input type="radio" name="client" value={option.id} checked={client === option.id} onChange={() => setClient(option.id)} /><strong>{option.name}</strong><small>{option.description}</small></label>)}</fieldset>
           <div className="form-grid"><label>连接名称<input required disabled={busy} value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：我的连接" /></label><label>连接区域<select disabled={busy} value={regionId} onChange={(event) => selectRegion(event.target.value)}><option value="">自动选择</option>{regions.map((region) => <option key={region.id} value={region.id} disabled={region.status !== "available" || !region.protocols.includes(protocol)}>{region.name}{region.status !== "available" || !region.protocols.includes(protocol) ? "（当前客户端不可用）" : ""}</option>)}</select></label></div>
@@ -290,6 +296,7 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
       </div>
       {credentials.length > 0 && <details className="connection-disclosure account-bulk"><summary>全部连接管理</summary><p className="form-footnote">以下操作会影响账号下的全部连接。</p><div className="connection-manage"><button className="secondary" disabled={busy} onClick={() => void bulkAccess("disable")}>停用全部</button><button className="danger-link" disabled={busy} onClick={() => void bulkAccess("revoke")}>永久撤销全部</button></div></details>}
     </section>
+    </details>
     <details className="network-disclosure"><summary>查看可用区域地图</summary><RegionMap regions={regions} selectedRegionId={regionId} onSelect={selectRegion} /></details>
     <footer>Northstar · 配置仅供本人使用，请勿分享或上传第三方转换网站。</footer>
   </main>;

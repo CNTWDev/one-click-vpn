@@ -1,4 +1,6 @@
 import { x25519 } from "@noble/curves/ed25519.js";
+import { realitySettings, realityUsersSecret, realityClientSecretId } from "./reality";
+import { withReconcileLock } from "./reconcile-lock";
 import { addAudit } from "./db";
 import { renderMihomoWireGuard } from "./protocols/mihomo";
 import { assertCredentialUsable } from "./credential-access";
@@ -54,6 +56,7 @@ export function publicProfile(profile: ConnectionProfile, region?: { code: strin
     delete protocolPayload.tlsCryptSecretId;
   }
   if (profile.protocol === "wireguard") delete protocolPayload.clientPrivateKeySecretId;
+  if (profile.protocol === "vless") delete protocolPayload.clientUuidSecretId;
   return {
     id: profile.id,
     deviceId: profile.device_id,
@@ -95,6 +98,10 @@ export async function ensureDefaultNodeProtocols(nodeId: string): Promise<void> 
 }
 
 export async function rebuildDesiredState(nodeId: string, protocol: Protocol, options: { force?: boolean } = {}) {
+  return withReconcileLock(nodeId, protocol, () => buildDesiredStateLocked(nodeId, protocol, options));
+}
+
+async function buildDesiredStateLocked(nodeId: string, protocol: Protocol, options: { force?: boolean }) {
   const node = await findNode(nodeId);
   if (!node) throw new Error("Node not found");
   const adapter = getProtocolAdapter(protocol);
@@ -112,7 +119,8 @@ export async function rebuildDesiredState(nodeId: string, protocol: Protocol, op
   const desiredPayload = adapter.buildDesiredState({
     nodeId,
     serverPublicKey: node.server_public_key,
-    listenPort: protocol === "wireguard" ? service.listen_port : undefined,
+    listenPort: service.listen_port,
+    reality: protocol === "vless" ? { serverBundleSecretId: (await realitySettings(nodeId))?.secret_id || "", usersSecretId: await realityUsersSecret(nodeId) } : undefined,
     peers: await listActivePeers(nodeId, protocol),
     openvpn,
   });
@@ -238,13 +246,15 @@ export async function issueConnectionProfile(input: {
   }
   const transport = input.transport || adapter.capability.transports[0];
   if (!adapter.capability.transports.includes(transport)) throw new Error("Unsupported protocol transport");
-  const clientAddress = await allocateIpLease(input.nodeId, input.protocol, device.id);
+  const clientAddress = input.protocol === "vless" ? null : await allocateIpLease(input.nodeId, input.protocol, device.id);
+  const reality = input.protocol === "vless" ? await realitySettings(node.id) : undefined;
   const openvpnCredential = input.protocol === "openvpn"
     ? await ensureOpenVpnClientCredential(credential.id, device.id, input.rotateCredential)
     : undefined;
   const profile = adapter.buildProfile({
     deviceId: device.id,
     devicePublicKey: device.public_key,
+    reality: reality ? { clientUuidSecretId: await realityClientSecretId(credential.id), publicKey: reality.public_key, serverName: reality.server_name, shortId: reality.short_id } : undefined,
     nodeId: node.id,
     endpoint: { host: node.public_endpoint || node.ip, port: service.listen_port },
     serverPublicKey: node.server_public_key,

@@ -6,6 +6,7 @@ import { listNodeProtocols, upsertNodeProtocol, type Platform, type Protocol } f
 import { getProtocolAdapter, listProtocolAdapters } from "../../../../../server/protocols/registry";
 import { reconcileEnabledVpnServices } from "../../../../../server/vpn-services";
 import { recordTrafficSnapshots, type UsageSnapshot } from "../../../../../server/traffic";
+import { dbExec } from "../../../../../server/db";
 
 export const runtime = "nodejs";
 
@@ -48,6 +49,11 @@ export async function POST(request: Request) {
       activeUsers: activeSessionCount(usageSnapshots),
     });
     await recordTrafficSnapshots(nodeId, usageSnapshots);
+    await dbExec(`UPDATE nodes SET users=$2+(SELECT COUNT(DISTINCT tc.identity_key) FROM traffic_counters tc
+      JOIN access_credentials c ON c.id=tc.credential_id JOIN users u ON u.id=c.user_id
+      WHERE tc.node_id=$1 AND tc.protocol='vless' AND tc.last_traffic_at>$3 AND c.status='active'
+      AND NOT c.user_disabled AND NOT c.admin_disabled AND c.deleted_at IS NULL AND u.status='active') WHERE id=$1`,
+      [nodeId,activeSessionCount(usageSnapshots),new Date(Date.now()-90_000).toISOString()]);
     const protocols = Array.isArray(capabilities.protocols) ? capabilities.protocols.filter((value): value is Protocol => typeof value === "string" && supportedProtocols.has(value as Protocol)) : [];
     if (!protocols.length) {
       const knownProtocols = await listNodeProtocols(nodeId);

@@ -4,12 +4,15 @@ import { listVpnServices, type Protocol } from "../../../../../server/control-db
 import { cleanText, jsonError, readJson } from "../../../../../server/http";
 import { configureVpnService } from "../../../../../server/vpn-services";
 import { listProtocolAdapters } from "../../../../../server/protocols/registry";
+import { configureReality, realitySettings } from "../../../../../server/reality";
 
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await currentUser())) return jsonError("Authentication required", 401);
-  return NextResponse.json({ services: await listVpnServices((await params).id) });
+  const id = (await params).id;
+  const reality = await realitySettings(id);
+  return NextResponse.json({ services: await listVpnServices(id), reality: reality ? { serverName: reality.server_name } : null });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -26,8 +29,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (transport && !adapter.capability.transports.includes(transport)) return jsonError("Unsupported transport for this protocol");
     const requestedPort = body.listenPort === undefined ? undefined : Number(body.listenPort);
     if (requestedPort !== undefined && (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 65535)) return jsonError("listenPort must be between 1 and 65535");
+    const nodeId = (await params).id;
+    if (protocol === "vless" && ["enable", "redeploy"].includes(action) && (body.serverName || !(await realitySettings(nodeId)))) {
+      await configureReality(nodeId, cleanText(body.serverName, 253));
+    }
     const service = await configureVpnService({
-      nodeId: (await params).id, protocol, action, actorUserId: user.id,
+      nodeId, protocol, action, actorUserId: user.id,
       transport,
       listenPort: requestedPort,
     });

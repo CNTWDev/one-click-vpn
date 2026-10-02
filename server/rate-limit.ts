@@ -37,3 +37,8 @@ export function allowLoginAttempt(request: Request, email: string): boolean {
 export function allowRegistration(request: Request): boolean {
   return hit(`register:${clientAddress(request)}`, 10, Date.now());
 }
+
+export function allowSubscriptionFetch(request: Request, tokenHash: string): boolean {
+  return hit(`subscription-ip:${clientAddress(request)}`, 300, Date.now())
+    && hit(`subscription-token:${tokenHash}`, 60, Date.now());
+}

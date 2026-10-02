@@ -5,7 +5,7 @@ import type { NodeDiagnostics, NodeRecord, Region } from "../types";
 import { Empty, formatBytes, formatTime, InlineNotice, Modal, type Notice, PageHeader, Pill } from "./shared";
 
 function actionLabel(value: string): string {
-  return ({ bootstrap: "安装 / 修复 Agent", "status-agent": "检查 Agent", "restart-agent": "重启 Agent" } as Record<string, string>)[value] || value.replaceAll("-", " ");
+  return ({ bootstrap: "安装 / 修复 Agent", "upgrade-agent": "升级 Agent", "status-agent": "检查 Agent", "restart-agent": "重启 Agent" } as Record<string, string>)[value] || value.replaceAll("-", " ");
 }
 
 function phaseLabel(value?: string): string {
@@ -34,7 +34,13 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
   // Id of the node whose diagnostics modal is open; responses for any other id (or after close) are stale.
   const diagnosticRequestRef = useRef<string | null>(null);
   const [testedFingerprint, setTestedFingerprint] = useState("");
+  const [targetVersion, setTargetVersion] = useState("");
+  const [batchResults, setBatchResults] = useState<Array<{ nodeId: string; status: string; reason?: string }>>([]);
   const confirm = useConfirm();
+  useEffect(() => {
+    void api<{ version: string }>("/api/nodes/agent-release").then((result) => setTargetVersion(result.version))
+      .catch((error: Error) => setNotice({ tone: "error", message: `无法读取 Agent 目标版本：${error.message}` }));
+  }, []);
 
   function openCreate() {
     setEditing(null); setForm({ ...blankNodeForm, regionId: regions[0]?.id || "" }); setTestedFingerprint(""); setShowForm(true);
@@ -114,14 +120,15 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
     return () => window.clearInterval(timer);
   }, [diagnosticNodeId]);
 
-  async function operate(node: NodeRecord, action: "status-agent" | "restart-agent" | "bootstrap" | "delete") {
+  async function operate(node: NodeRecord, action: "status-agent" | "restart-agent" | "upgrade-agent" | "bootstrap" | "delete") {
     const descriptions = {
+      "upgrade-agent": `将 ${node.name} 从 ${node.version || "未知版本"} 升级至 ${targetVersion}。通过 SSH 更新程序并重启 Agent，保留身份和 VPN 配置。`,
       "restart-agent": `确定重启 ${node.name} 的 Agent 吗？`,
       bootstrap: `确定重新安装/修复 ${node.name} 吗？这会通过已验证的 SSH 凭据重新部署 Agent。`,
       delete: `确定删除节点 ${node.name} 吗？此操作不会自动销毁云服务器。`,
       "status-agent": "",
     };
-    const titles = { "restart-agent": "重启 Agent", bootstrap: "重新安装 / 修复", delete: "删除节点", "status-agent": "" };
+    const titles = { "upgrade-agent": "升级 Agent", "restart-agent": "重启 Agent", bootstrap: "重新安装 / 修复", delete: "删除节点", "status-agent": "" };
     if (action !== "status-agent" && !await confirm({
       title: titles[action],
       message: descriptions[action],
@@ -144,20 +151,21 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
     finally { setBusy(""); }
   }
 
-  async function batch(action: "status-agent" | "restart-agent" | "bootstrap") {
+  async function batch(action: "status-agent" | "restart-agent" | "upgrade-agent" | "bootstrap") {
     const ids = [...selected];
     if (!ids.length) return;
-    const batchLabel = action === "bootstrap" ? "重新安装/修复" : "重启 Agent";
+    const batchLabel = action === "upgrade-agent" ? `升级 Agent 至 ${targetVersion}` : action === "bootstrap" ? "重新安装/修复" : "重启 Agent";
     if (action !== "status-agent" && !await confirm({
       title: `批量${batchLabel}`,
       message: `确定对选中的 ${ids.length} 个节点执行“${batchLabel}”吗？`,
       confirmLabel: "确认执行",
     })) return;
-    setBusy(`batch:${action}`); setNotice(null);
+    setBusy(`batch:${action}`); setNotice(null); setBatchResults([]);
     try {
-      const result = await api<{ accepted: string[]; skipped: string[]; queued: number }>("/api/nodes/batch-actions", { method: "POST", body: JSON.stringify({ action, nodeIds: ids }) });
-      setNotice({ tone: result.skipped.length ? "info" : "success", message: `已加入队列 ${result.queued} 个，跳过 ${result.skipped.length} 个正在执行任务或不存在的节点。` });
-      setSelected(new Set()); await onRefresh();
+      const result = await api<{ accepted: string[]; skipped: string[]; queued: number; results: Array<{ nodeId: string; status: string; reason?: string }> }>("/api/nodes/batch-actions", { method: "POST", body: JSON.stringify({ action, nodeIds: ids }) });
+      setBatchResults(result.results || []);
+      setNotice({ tone: result.skipped.length ? "info" : "success", message: `已加入队列 ${result.queued} 个，未提交 ${result.skipped.length} 个；请查看逐台结果。` });
+      setSelected(new Set(result.skipped)); await onRefresh();
     } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
     finally { setBusy(""); }
   }
@@ -167,7 +175,9 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
     <PageHeader eyebrow="EDGE FLEET" title="节点运维" description="部署、修复和诊断 Agent，并对节点执行批量运维操作。" actions={<><button className="button ghost" onClick={() => void onRefresh()}>刷新</button><button className="button primary" onClick={openCreate} disabled={!regions.length}>+ 添加节点</button></>} />
     {!regions.length && <InlineNotice notice={{ tone: "info", message: "添加节点前，请先在“区域”中创建至少一个区域。" }} />}
     <InlineNotice notice={notice} />
-    {selected.size > 0 && <div className="batch-bar"><b>已选择 {selected.size} 个节点</b><span><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void batch("status-agent")}>检查 Agent</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void batch("restart-agent")}>重启 Agent</button><button className="button warning small" disabled={Boolean(busy)} onClick={() => void batch("bootstrap")}>批量修复</button></span></div>}
+    <section className="panel"><h2>Agent 程序升级</h2><p>当前 Controller 提供：<b>{targetVersion || "版本读取中…"}</b>。勾选节点后可批量升级；升级保留身份和 VPN 配置。VPN 协议重新部署请到“VPN 服务”。</p><p>任务详情显示实际执行结果。Controller 中断后的任务会在最后续租 60 分钟后解锁，避免与仍在执行的 SSH 操作冲突。</p></section>
+    {batchResults.length > 0 && <section className="panel"><h3>逐台提交结果</h3><div className="compact-list">{batchResults.map((result) => <div key={result.nodeId}><span><b>{nodes.find((node) => node.id === result.nodeId)?.name || result.nodeId}</b><small>{result.reason || "已排队，不代表升级完成；请查看详情 / 进度。"}</small></span><button className="button ghost" onClick={() => { const node = nodes.find((item) => item.id === result.nodeId); if (node) void loadDiagnostics(node); }}>查看进度</button></div>)}</div></section>}
+    {selected.size > 0 && <div className="batch-bar"><b>已选择 {selected.size} 个节点</b><span><button className="button primary" disabled={Boolean(busy) || !targetVersion} onClick={() => void batch("upgrade-agent")}>批量升级 Agent</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void batch("status-agent")}>检查 Agent</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void batch("restart-agent")}>重启 Agent</button><button className="button warning small" disabled={Boolean(busy)} onClick={() => void batch("bootstrap")}>批量重新安装 / 修复</button></span></div>}
     <section className="panel flush">
       <div className="table-wrap"><table className="node-table action-table"><thead><tr><th className="check"><input type="checkbox" aria-label="选择全部节点" checked={allSelected} onChange={(event) => setSelected(event.target.checked ? new Set(nodes.map((node) => node.id)) : new Set())} /></th><th>节点</th><th>状态</th><th>Agent</th><th>负载</th><th>策略</th><th className="align-right">操作</th></tr></thead><tbody>{nodes.map((node) => <tr key={node.id}>
         <td className="check"><input type="checkbox" aria-label={`选择 ${node.name}`} checked={selected.has(node.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(node.id); else next.delete(node.id); return next; })} /></td>
@@ -198,8 +208,10 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
     </Modal>}
 
     {operationNode && <Modal title="节点操作" description={`${operationNode.name} · ${operationNode.ip}`} onClose={() => setOperationNode(null)}>
+      <InlineNotice notice={notice} />
       <div className="node-operation-summary"><span className={`state-dot ${operationNode.status}`} /><span><b>{operationNode.name}</b><small>{operationNode.place} · {operationNode.version}</small></span><Pill value={operationNode.status} /></div>
       <div className="operation-grid">
+        <button disabled={Boolean(busy) || !targetVersion} onClick={() => void operate(operationNode, "upgrade-agent")}><span className="operation-symbol">↑</span><span><b>升级 Agent</b><small>{operationNode.version || "未知版本"} → {targetVersion || "读取中"}，保留身份与 VPN 配置。</small></span><em>需确认</em></button>
         <button disabled={Boolean(busy)} onClick={() => void operate(operationNode, "status-agent")}><span className="operation-symbol">✓</span><span><b>检查 Agent</b><small>读取服务状态并记录诊断结果，不会重启服务。</small></span><em>安全</em></button>
         <button disabled={Boolean(busy)} onClick={() => void operate(operationNode, "restart-agent")}><span className="operation-symbol">↻</span><span><b>重启 Agent</b><small>重启远端 Agent 服务，短时间内会中断状态上报。</small></span><em>需确认</em></button>
         <button className="warning-operation" disabled={Boolean(busy)} onClick={() => void operate(operationNode, "bootstrap")}><span className="operation-symbol">⇧</span><span><b>重新安装 / 修复</b><small>通过已保存的 SSH 凭据重新部署并同步 Agent 身份。</small></span><em>需确认</em></button>
@@ -209,6 +221,8 @@ export function NodesPage({ nodes, regions, onRefresh }: { nodes: NodeRecord[]; 
     </Modal>}
 
     {diagnosticNode && <Modal wide title={`${diagnosticNode.name} · 节点详情`} description="部署进度、操作日志、Agent 连通性和 VPN 协议运行状态。" onClose={closeDiagnostics}>
+      <InlineNotice notice={notice} />
+      <button className="button primary" disabled={Boolean(busy) || !targetVersion} onClick={() => void operate(diagnosticNode, "upgrade-agent")}>升级 Agent 至 {targetVersion || "…"}</button>
       <div className="diagnostic-toolbar"><span><i className="live-mark" /> 每 5 秒自动刷新</span><button className="button ghost small" disabled={diagnosticsBusy} onClick={() => void loadDiagnostics(diagnosticNode)}>立即刷新</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "status-agent")}>检查 Agent</button><button className="button warning small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "bootstrap")}>重新安装 / 修复</button></div>
       {diagnosticsBusy && !diagnostics ? <Empty>正在读取诊断信息…</Empty> : diagnostics && <div className="diagnostics">
         {diagnostics.actions[0] ? <section className={`current-job ${diagnostics.actions[0].status}`}>

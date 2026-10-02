@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addAudit, countRunningNodeActions, NodeBusyError, deleteNode, findNode, findRegion, listNodeActionEvents, listNodeActions, NodeIdentityConflictError, publicNode, updateNode, updateNodeConfig } from "../../../../server/db";
+import { addAudit, countRunningNodeActions, NodeBusyError, deleteNode, findNode, findRegion, listNodeActionEvents, listNodeActions, NodeIdentityConflictError, publicNode, updateNodeConfig } from "../../../../server/db";
 import { currentUser } from "../../../../server/auth";
 import { cleanText, isValidIp, isValidPort, jsonError, readJson } from "../../../../server/http";
 import { queueNodeBootstrap } from "../../../../server/bootstrap";
@@ -28,8 +28,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
   const action = typeof body.action === "string" ? body.action : "";
   if (action !== "bootstrap") return jsonError("Only bootstrap is available from this endpoint");
-  if (await countRunningNodeActions(id) > 0) return jsonError("This node already has a queued or running action. Wait for it to finish.", 409);
-  await updateNode(id, { status: "provisioning", version: "bootstrap queued" });
+  if (await countRunningNodeActions(id) > 0) return jsonError(new NodeBusyError().message, 409);
   let actionId: string;
   try {
     actionId = await queueNodeBootstrap(id, user.id);

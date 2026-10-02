@@ -4,7 +4,7 @@ import { credentialSyncStatus } from "./credential-access";
 import { EXPIRY_WARNING_DAYS } from "./credential-validity";
 
 export type UsageSnapshot = {
-  protocol: "wireguard" | "openvpn";
+  protocol: "wireguard" | "openvpn" | "vless";
   identityKey: string;
   sessionKey?: string;
   rxBytes: number;
@@ -46,7 +46,7 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
   const observedAt = now();
   const valid = snapshots.slice(0, MAX_SNAPSHOTS).flatMap((snapshot) => {
     const identityKey = typeof snapshot.identityKey === "string" ? snapshot.identityKey.trim().slice(0, 512) : "";
-    if (!identityKey || !["wireguard", "openvpn"].includes(snapshot.protocol)) return [];
+    if (!identityKey || !["wireguard", "openvpn", "vless"].includes(snapshot.protocol)) return [];
     const sessionKey = snapshot.protocol === "openvpn" && typeof snapshot.sessionKey === "string" ? snapshot.sessionKey.trim().slice(0, 512) : "";
     return [{ snapshot, identityKey, sessionKey }];
   });
@@ -57,13 +57,13 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
      FROM traffic_counters WHERE node_id = $1`, [nodeId],
   );
   const previousByKey = new Map<string, PreviousCounter>(previousRows.map((row) => [counterKey(row.protocol, row.identity_key, row.session_key), row]));
-  const wireguardKeys = [...new Set(valid.filter((item) => item.snapshot.protocol === "wireguard").map((item) => item.identityKey))];
+  const wireguardKeys = [...new Set(valid.filter((item) => item.snapshot.protocol === "wireguard" || item.snapshot.protocol === "vless").map((item) => item.identityKey))];
   const openvpnSubjects = [...new Set(valid.filter((item) => item.snapshot.protocol === "openvpn").map((item) => `CN=${item.identityKey}`))];
   const wireguardOwners = new Map<string, Owner>();
   if (wireguardKeys.length) {
     const rows = await dbQuery<Owner & { identity_key: string }>(
       `SELECT DISTINCT ON (c.identity_key) c.identity_key, c.device_id, c.id AS credential_id, c.user_id FROM access_credentials c
-       WHERE c.protocol = 'wireguard' AND c.identity_key = ANY($1::text[]) AND c.status = 'active'
+       WHERE c.protocol IN ('wireguard', 'vless') AND c.identity_key = ANY($1::text[]) AND c.status = 'active'
        ORDER BY c.identity_key, c.created_at DESC`, [wireguardKeys],
     );
     for (const row of rows) wireguardOwners.set(row.identity_key, row);
@@ -93,7 +93,7 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
       const sameCounter = previous && previous.counter_epoch === epoch;
       const uploadDelta = sameCounter ? Math.max(0, rxBytes - Number(previous.observed_rx_bytes)) : rxBytes;
       const downloadDelta = sameCounter ? Math.max(0, txBytes - Number(previous.observed_tx_bytes)) : txBytes;
-      const owner = snapshot.protocol === "wireguard" ? wireguardOwners.get(identityKey) : openvpnOwners.get(`CN=${identityKey}`);
+      const owner = snapshot.protocol !== "openvpn" ? wireguardOwners.get(identityKey) : openvpnOwners.get(`CN=${identityKey}`);
       const hasTraffic = uploadDelta > 0 || downloadDelta > 0;
       const lastHandshakeAt = validHandshake(snapshot.lastHandshakeAt);
       const handshakeTime = lastHandshakeAt ? new Date(lastHandshakeAt).getTime() : 0;
@@ -172,6 +172,7 @@ export async function usageByDevices(userId: string, input: { from?: string; to?
 }
 
 export async function credentialAccessOverview(userId: string, input: { from?: string; to?: string } = {}) {
+  const subscriptions = await dbQuery<{ id: string; credential_id: string }>("SELECT s.id,s.credential_id FROM subscriptions s JOIN access_credentials c ON c.id=s.credential_id WHERE c.user_id=$1", [userId]);
   const { from, to } = range(input);
   const currentTime = now();
   const onlineCutoff = new Date(Date.now() - 90_000).toISOString();
@@ -214,7 +215,8 @@ export async function credentialAccessOverview(userId: string, input: { from?: s
     LEFT JOIN LATERAL (
       SELECT COUNT(*) FILTER (WHERE n.last_heartbeat_at > $4 AND (
           (tc.protocol = 'openvpn' AND tc.connected = 1 AND tc.observed_at > $4) OR
-          (tc.protocol = 'wireguard' AND (tc.last_handshake_at > $5 OR tc.last_traffic_at > $4))
+          (tc.protocol = 'wireguard' AND (tc.last_handshake_at > $5 OR tc.last_traffic_at > $4)) OR
+          (tc.protocol = 'vless' AND tc.last_traffic_at > $4)
         )) AS connection_count,
         MAX(NULLIF(GREATEST(COALESCE(tc.last_handshake_at, ''), COALESCE(tc.last_traffic_at, '')), '')) AS last_activity_at,
         MAX(tc.observed_at) AS last_observed_at
@@ -235,6 +237,7 @@ export async function credentialAccessOverview(userId: string, input: { from?: s
             : lastActivityAt ? "offline" : "never-connected";
       return {
         id: row.id, name: row.display_name, protocol: row.protocol, status: row.credential_status,
+        subscriptionId: subscriptions.find((s) => s.credential_id === row.id)?.id || null,
         expiringSoon: row.credential_status === "active" && Boolean(row.expires_at) && new Date(row.expires_at!).getTime() - Date.now() <= EXPIRY_WARNING_DAYS * 86_400_000,
         daysRemaining: row.expires_at ? Math.max(0, Math.ceil((new Date(row.expires_at).getTime() - Date.now()) / 86_400_000)) : null,
         userDisabled: row.user_disabled, adminDisabled: row.admin_disabled, accountStatus: row.account_status,

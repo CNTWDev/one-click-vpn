@@ -200,8 +200,23 @@ only when the old database, secrets, and configuration must be unrecoverable.
 Run `sudo ./one-click-uninstall.sh --check` first to verify the resolved project
 path and Compose configuration without removing anything.
 
-After upgrading Controller code, use the Admin node action **Reinstall agent** to
-upgrade an Edge Agent. Existing VPN configuration is retained.
+After upgrading Controller code and running migrations, use **节点运维 → 升级 Agent**
+(or select nodes and choose **批量升级 Agent**). The target version is read from the
+Controller's bundled source, not from the Internet. This replaces only the Agent
+program and restarts it, preserving its token and VPN configuration. Success requires
+a fresh authenticated heartbeat reporting the target version. The previous source is
+kept as `agent.py.previous`; immediate service restart failures restore it automatically.
+A missing installation or rejected Agent identity requires **重新安装 / 修复** instead.
+That operation reinstalls dependencies and re-registers the Agent identity via saved SSH.
+
+Batch results report submission per node; queued does not mean successfully upgraded.
+Open **详情 / 进度** for execution results. Failed submissions remain selected for retry.
+Active operations renew a database lease every 30 seconds, including while waiting in
+the Controller queue. Lost operations are marked failed after 60 minutes without renewal
+when their node is inspected or another operation is submitted. They are never automatically
+replayed. Migrations also respect live leases during rolling deployments. Check remote
+service state before retrying an interrupted operation. **VPN 服务 → 批量同步策略** and
+**重新部署 VPN** only affect protocol configuration, not the Agent program.
 
 After upgrading to Agent 2.5, redeploy OpenVPN once from **VPN Services** to
 enable per-credential online status and traffic counters. This status file stays
@@ -249,7 +264,68 @@ The Agent reports health, resource usage, VPN service state, and traffic counter
 WireGuard normally uses UDP `51820`; OpenVPN normally uses UDP `1194`. Open those
 ports in the Edge Node firewall/security group separately from the Controller.
 
-## Local development
+## Dynamic subscriptions and VLESS + REALITY
+
+The Portal now offers named subscriptions alongside the existing WireGuard/OpenVPN
+file downloads. A subscription contains all currently eligible, synchronized nodes
+for its selected protocol (WireGuard or VLESS + REALITY). It is not a mixed-protocol
+bundle. Clients can select a node or use the automatic latency-selection group.
+
+- Supported target formats: Mihomo/Clash Meta YAML (JSON-compatible YAML).
+  Use **Clash Verge Rev** on macOS/Windows/Linux, or **Hiddify** on
+  iOS/Android/macOS/Windows/Linux. Import the personal URL as a remote subscription,
+  not as a local file. Actual support depends on the installed client/core version.
+  Official WireGuard/OpenVPN clients continue using the existing file-download flow.
+- The response requests hourly refresh; the actual schedule is client-dependent,
+  especially on iOS in the background. Manual refresh remains available. Updating
+  the node list does not guarantee seamless migration of existing TCP sessions.
+- Initial import may need a retry after Agent acknowledgement (typically tens of
+  seconds). A 503 response preserves clients' last successful configuration instead
+  of publishing an empty list. New nodes enter on the next successful refresh after
+  access provisioning; offline, disabled or unsynchronized services are excluded.
+- Links are bearer secrets, displayed only at creation/reset, stored as hashes and
+  delivered with `no-store`. Configure every reverse proxy/CDN to suppress query
+  strings for `/api/subscription`; the supplied Nginx example disables access logs
+  for this path. Do not use public subscription converters. Resetting a link only
+  invalidates future downloads; revoke the subscription if credentials were exposed.
+- User/admin disable controls are independent. Revocation, deletion, account
+  suspension and credential expiry propagate to node access lists. Offline nodes
+  cannot acknowledge revocation until they reconnect. Historical traffic is retained.
+- WireGuard simultaneous installations need separate named subscriptions/identities.
+  No device tracking is required. Subscription traffic contributes to account totals;
+  VLESS presence is based on recent traffic, not an exact count of installed devices.
+
+### Deploying the upgrade
+
+Back up PostgreSQL, deploy all three services with `./scripts/deploy.sh deploy --service all`,
+and update the Nginx subscription logging rule above. Docker runs the idempotent schema
+migration automatically. Existing credentials and the standard WG/OpenVPN policy stay intact.
+
+For VLESS, update each selected Linux amd64/arm64 node to **Agent 2.7+** using the
+Console's upgrade Agent action, then open **VPN services → Enable VLESS + REALITY**.
+Choose an unused TCP port (default 443) and a publicly reachable target hostname that
+supports TLS 1.3 and HTTP/2. The node validates the target and pins its resolved public
+address; targets cannot change while the node has valid VLESS profiles. A failed initial
+setup with no valid profiles can be corrected and redeployed without changing keys. Select
+and maintain the target deliberately; a target IP becoming unavailable needs operator attention.
+Open that TCP port in the cloud security group as well as the host firewall. Do not
+expose the local statistics API on TCP 10085.
+
+The Agent downloads **Xray v26.3.27** from the official XTLS release and checks the
+pinned SHA-256 for its architecture; no remote shell installer is executed. Node
+egress needs HTTPS access to GitHub releases, the selected REALITY target, and normal
+user traffic destinations. A failed download/preflight stays visible as a service error.
+VLESS is opt-in and is not installed by changing the standard deployment policy.
+Access-list changes restart only the managed VLESS service to terminate removed users'
+sessions; other VLESS users can experience a brief reconnect. Traffic is sampled on
+heartbeats, so bytes since the last sample may be lost on a restart.
+
+For validation, `npm test` covers unit and integration hooks. Supply a disposable
+`NORTHSTAR_TEST_DATABASE_URL` to run PostgreSQL/API tests, and optionally
+`NORTHSTAR_TEST_XRAY` / `NORTHSTAR_TEST_MIHOMO` paths to validate generated configs
+with real binaries. These checks do not replace iPhone/Android and live-node acceptance tests.
+
+## Local development setup
 
 Node.js 22 or newer is required. Start PostgreSQL, configure `.env`, then run:
 

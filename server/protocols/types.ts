@@ -21,6 +21,7 @@ export type ProfileBuildInput = {
   transport: string;
   dns: string[];
   allowedIps: string[];
+  reality?: { clientUuidSecretId: string; publicKey: string; serverName: string; shortId: string };
   openvpn?: {
     clientCertificate: string;
     clientKeySecretId: string;
@@ -36,6 +37,7 @@ export type PeerState = {
 };
 
 export type DesiredStateInput = {
+  reality?: { serverBundleSecretId: string; usersSecretId: string };
   nodeId: string;
   serverPublicKey?: string | null;
   listenPort?: number;

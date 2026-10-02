@@ -82,11 +82,12 @@ CREATE TABLE IF NOT EXISTS node_actions (
 ALTER TABLE node_actions ADD COLUMN IF NOT EXISTS started_at TEXT;
 ALTER TABLE node_actions ADD COLUMN IF NOT EXISTS current_phase TEXT NOT NULL DEFAULT 'queued';
 ALTER TABLE node_actions ADD COLUMN IF NOT EXISTS progress INTEGER NOT NULL DEFAULT 0;
--- Remote actions live in the Controller's in-memory queue, so any still queued or running at startup were lost
--- with the previous process. Close them so the node is not blocked forever and the uniqueness guard below holds.
+ALTER TABLE node_actions ADD COLUMN IF NOT EXISTS lease_updated_at TEXT;
+-- Do not interrupt another live Controller worker during a rolling deployment.
+-- Only expired leases may be closed; runtime access performs the same recovery.
 UPDATE node_actions SET status = 'failed', current_phase = 'failed', finished_at = COALESCE(finished_at, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
   error = CASE WHEN error = '' THEN 'Interrupted by a Controller restart' ELSE error END
-  WHERE status IN ('queued', 'running');
+  WHERE status IN ('queued', 'running') AND COALESCE(lease_updated_at, started_at, created_at)::timestamptz < now() - interval '60 minutes';
 CREATE UNIQUE INDEX IF NOT EXISTS node_actions_one_active_idx ON node_actions(node_id) WHERE status IN ('queued', 'running');
 CREATE TABLE IF NOT EXISTS node_action_events (
   id TEXT PRIMARY KEY, action_id TEXT NOT NULL REFERENCES node_actions(id) ON DELETE CASCADE,
@@ -184,6 +185,16 @@ CREATE INDEX IF NOT EXISTS certificate_issuances_node_idx ON certificate_issuanc
 CREATE INDEX IF NOT EXISTS certificate_issuances_device_idx ON certificate_issuances(device_id, purpose, status);
 ALTER TABLE certificate_issuances ADD COLUMN IF NOT EXISTS credential_id TEXT REFERENCES access_credentials(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS certificate_issuances_credential_idx ON certificate_issuances(credential_id, purpose, status);
+CREATE TABLE IF NOT EXISTS reality_settings (
+  node_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE,
+  server_name TEXT NOT NULL, public_key TEXT NOT NULL, short_id TEXT NOT NULL,
+  secret_id TEXT NOT NULL REFERENCES secret_materials(id)
+);
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id TEXT PRIMARY KEY, credential_id TEXT NOT NULL UNIQUE REFERENCES access_credentials(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE, private_key_secret_id TEXT REFERENCES secret_materials(id),
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_fetched_at TEXT
+);
 CREATE TABLE IF NOT EXISTS ip_leases (
   id TEXT PRIMARY KEY, node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   protocol TEXT NOT NULL, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,

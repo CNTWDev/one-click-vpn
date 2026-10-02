@@ -42,7 +42,7 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(agent, /add\[add\.index\("-C"\)\] = operation/);
   assert.doesNotMatch(agent, /add\[1\] = operation/);
   assert.match(agent, /\/etc\/wireguard\/northstar\.conf/);
-  assert.match(agent, /agent 2\.6\.0/);
+  assert.match(agent, /agent 2\.7\.0/);
   assert.match(agent, /status-version 3/);
   assert.match(agent, /def openvpn_usage_snapshots/);
   assert.match(agent, /wireguard_usage_snapshots\(\) \+ openvpn_usage_snapshots\(\)/);
@@ -219,6 +219,43 @@ async function userIdFor(email, adminToken) {
   assert.ok(user, `registered user ${email} not found`);
   return user.id;
 }
+
+test("Agent operations expose release, recover expired tasks and preserve live tasks", integrationOptions, async () => {
+  const pool = new pg.Pool({ connectionString: databaseUrl });
+  const nodeId = `ops_${Date.now()}`;
+  const json = { "Content-Type": "application/json" };
+  const login = await fetch(`${base}/api/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ email: "owner@example.com", password: "test-password-123" }) });
+  assert.equal(login.status, 200);
+  const headers = { ...json, Cookie: login.headers.get("set-cookie").split(";")[0] };
+  try {
+    assert.equal((await fetch(`${base}/api/nodes/agent-release`)).status, 401);
+    const release = await fetch(`${base}/api/nodes/agent-release`, { headers });
+    assert.equal(release.status, 200);
+    assert.equal((await release.json()).version, "agent 2.7.0");
+    const timestamp = new Date().toISOString();
+    await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at)
+      VALUES ($1,'Operations','Test','127.0.0.9','root','password','','','',$2,$2)`, [nodeId,timestamp]);
+    await pool.query(`INSERT INTO node_actions (id,node_id,action,status,created_at) VALUES ($1,$2,'bootstrap','running',$3)`, [`${nodeId}_expired`,nodeId,new Date(Date.now()-61*60_000).toISOString()]);
+    const detail = await fetch(`${base}/api/nodes/${nodeId}`, { headers });
+    assert.equal(detail.status, 200);
+    assert.equal((await detail.json()).actions[0].status, "failed");
+    await pool.query(`INSERT INTO node_actions (id,node_id,action,status,created_at,lease_updated_at) VALUES ($1,$2,'upgrade-agent','running',$3,$4)`, [`${nodeId}_live`,nodeId,new Date(Date.now()-120*60_000).toISOString(),timestamp]);
+    await execFileAsync(process.execPath, [path.join(root, "scripts/migrate.mjs")], { cwd: root, env: { ...process.env, NORTHSTAR_DATABASE_URL: databaseUrl } });
+    const upgrade = await fetch(`${base}/api/nodes/${nodeId}/actions`, { method: "POST", headers, body: JSON.stringify({ action: "upgrade-agent" }) });
+    assert.equal(upgrade.status, 409);
+    const batch = await fetch(`${base}/api/nodes/batch-actions`, { method: "POST", headers, body: JSON.stringify({ action: "upgrade-agent", nodeIds: [nodeId,"missing-ops-node",nodeId] }) });
+    assert.equal(batch.status, 200);
+    const result = await batch.json();
+    assert.equal(result.queued, 0);
+    assert.equal(result.results.length, 2);
+    assert.equal(result.results[0].status, "busy");
+    assert.equal(result.results[1].status, "failed");
+    assert.equal((await pool.query("SELECT status FROM node_actions WHERE id=$1", [`${nodeId}_live`])).rows[0].status, "running");
+  } finally {
+    await pool.query("DELETE FROM nodes WHERE id=$1", [nodeId]);
+    await pool.end();
+  }
+});
 
 test("registration does not reveal whether an email is already registered", integrationOptions, async () => {
   const json = { "Content-Type": "application/json" };
@@ -426,6 +463,130 @@ test("v1 bearer session can manage a device", integrationOptions, async () => {
   });
   assert.equal(refresh.status, 200);
   assert.ok((await refresh.json()).accessToken);
+});
+
+test("subscriptions provision stable multi-node WG/VLESS profiles and enforce access", integrationOptions, async () => {
+  const parseConfig = (text) => Object.fromEntries(text.trim().split("\n").map((line) => [line.slice(0,line.indexOf(":")),JSON.parse(line.slice(line.indexOf(":")+1))]));
+  const pool = new pg.Pool({ connectionString: databaseUrl });
+  const json = { "Content-Type": "application/json" };
+  const login = await fetch(`${base}/api/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ email: "owner@example.com", password: "test-password-123" }) });
+  const cookie = login.headers.get("set-cookie")?.split(";", 1)[0];
+  assert.ok(cookie);
+  const userId = `sub-user-${Date.now()}`, email = `${userId}@example.com`, timestamp = new Date().toISOString();
+  await pool.query(`INSERT INTO users (id,email,display_name,password_hash,role,status,created_at,updated_at)
+    SELECT $1,$2,'Subscription user',password_hash,'member','active',$3,$3 FROM users WHERE email='owner@example.com'`, [userId,email,timestamp]);
+  const userLogin = await fetch(`${base}/api/v1/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ email, password: "test-password-123" }) });
+  const token = (await userLogin.json()).accessToken;
+  assert.ok(token);
+  const call = (path, body, admin = false) => fetch(`${base}${path}`, { method: body ? "POST" : "GET", headers: { ...json, ...(admin ? { Cookie: cookie } : { Authorization: `Bearer ${token}` }) }, body: body ? JSON.stringify(body) : undefined });
+  const patch = (id, action, admin = false) => fetch(`${base}/api/v1/${admin ? "admin/" : ""}subscriptions`, { method: "PATCH", headers: { ...json, ...(admin ? { Cookie: cookie } : { Authorization: `Bearer ${token}` }) }, body: JSON.stringify({ id, action }) });
+  const nodes = [`sub-node-a-${Date.now()}`, `sub-node-b-${Date.now()}`];
+  const addNode = async (id) => {
+    await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at,server_public_key,status,last_heartbeat_at,agent_capabilities_json)
+      VALUES ($1,$1,'Test','192.0.2.10','root','password','','','',$2,$2,$3,'online',$2,$4)`, [id,timestamp,Buffer.alloc(32,9).toString("base64"),JSON.stringify({ connectivity: { protocols: { wireguard: { runtimeActive: true, listening: true }, vless: { runtimeActive: true, listening: true } } } })]);
+    await pool.query(`INSERT INTO vpn_services (node_id,protocol,enabled,transport,listen_port,subnet,dns_json,status,created_at,updated_at)
+      VALUES ($1,'wireguard',1,'udp',51820,'10.70.0.0/24','["1.1.1.1"]','healthy',$2,$2)`, [id,timestamp]);
+    await pool.query(`INSERT INTO node_protocols (node_id,protocol,status,updated_at) VALUES ($1,'wireguard','enabled',$2),($1,'vless','enabled',$2)`, [id,timestamp]);
+  };
+  const ack = async () => {
+    await pool.query(`INSERT INTO observed_configs (node_id,protocol,applied_revision,observed_hash,status,last_error,updated_at)
+      SELECT node_id,protocol,revision,'python-json-hash','applied','',$1 FROM desired_configs WHERE node_id=ANY($2::text[])
+      ON CONFLICT(node_id,protocol) DO UPDATE SET applied_revision=excluded.applied_revision,status='applied'`, [timestamp,nodes]);
+    await pool.query("UPDATE vpn_services SET status='healthy' WHERE node_id=ANY($1::text[])", [nodes]);
+  };
+  try {
+    await addNode(nodes[0]);
+    const created = await call("/api/v1/subscriptions", { name: "All nodes", protocol: "wireguard" });
+    assert.equal(created.status,201);
+    const sub = await created.json();
+    let url = `${base}/api/subscription?token=${sub.token}`;
+    assert.equal((await fetch(url)).status,503, "never publish unacknowledged peers");
+    await ack();
+    let response = await fetch(url);
+    assert.equal(response.status,200);
+    assert.match(response.headers.get("cache-control"),/no-store/);
+    let config = parseConfig(await response.text());
+    assert.equal(config.proxies.length,1);
+    assert.equal(config.proxies[0].type,"wireguard");
+    const originalKey = config.proxies[0]["private-key"];
+    const count = async () => Number((await pool.query("SELECT COUNT(*) FROM connection_profiles WHERE credential_id=$1", [sub.credentialId])).rows[0].count);
+    assert.equal(await count(),1);
+    await fetch(url); assert.equal(await count(),1, "refresh must not rotate identity or append duplicate profiles");
+    await addNode(nodes[1]);
+    assert.equal((await fetch(url)).status,200, "retain ready node while new node synchronizes");
+    await ack();
+    config = parseConfig(await (await fetch(url)).text());
+    assert.equal(config.proxies.length,2);
+    assert.ok(config.proxies.every((p) => p["private-key"] === originalKey));
+    const reset = await patch(sub.id,"reset-link");
+    assert.equal(reset.status,200);
+    assert.equal((await fetch(url)).status,503);
+    url = `${base}/api/subscription?token=${(await reset.json()).token}`;
+    assert.equal((await fetch(url)).status,200);
+    assert.equal((await call("/api/v1/admin/subscriptions")).status,403);
+    assert.equal((await patch(sub.id,"disable",true)).status,200);
+    assert.equal((await fetch(url)).status,503);
+    assert.equal((await patch(sub.id,"enable")).status,409);
+    assert.equal((await patch(sub.id,"enable",true)).status,200);
+    const service = await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "enable", serverName: "www.example.com" },true);
+    assert.equal(service.status,200,await service.text());
+    assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.cloudflare.com" },true)).status,200,"initial target can be corrected before issuing profiles");
+    assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.example.com" },true)).status,200);
+    await ack();
+    const vless = await call("/api/v1/subscriptions", { name: "TCP connection", protocol: "vless" });
+    assert.equal(vless.status,201);
+    const vsub = await vless.json();
+    await ack();
+    response = await fetch(`${base}/api/subscription?token=${vsub.token}`);
+    assert.equal(response.status,200);
+    config = parseConfig(await response.text());
+    assert.equal(config.proxies[0].type,"vless");
+    assert.match(config.proxies[0].uuid,/^[a-f0-9-]{36}$/);
+    assert.equal(config.proxies[0].servername,"www.example.com");
+    assert.ok(config.proxies[0]["reality-opts"]["public-key"]);
+    assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.cloudflare.com" },true)).status,409,"do not silently invalidate issued profiles by changing their SNI");
+    assert.doesNotMatch(JSON.stringify(config),/serverBundleSecretId|privateKey|secret_/);
+    const agentToken = "subscription-test-agent";
+    const telemetryId = (await pool.query("SELECT identity_key FROM access_credentials WHERE id=$1", [vsub.credentialId])).rows[0].identity_key;
+    assert.notEqual(telemetryId,config.proxies[0].uuid,"telemetry must not reveal the VLESS authorization secret");
+    await pool.query("UPDATE nodes SET agent_token_hash=$1 WHERE id=$2", [createHash("sha256").update(agentToken).digest("hex"),nodes[0]]);
+    const beat = await fetch(`${base}/api/v1/agent/heartbeat`, { method: "POST", headers: json, body: JSON.stringify({
+      nodeId: nodes[0], token: agentToken, version: "agent 2.7.0",
+      capabilities: { protocols: ["wireguard", "vless"], connectivity: { protocols: { wireguard: { runtimeActive: true, listening: true }, vless: { runtimeActive: true, listening: true } } } },
+      usageSnapshots: [{ protocol: "vless", identityKey: telemetryId, rxBytes: 123, txBytes: 456, counterEpoch: "process-1" }],
+    }) });
+    assert.equal(beat.status,200);
+    const overview = await (await call("/api/v1/credentials")).json();
+    const usage = overview.credentials.find((c) => c.id === vsub.credentialId);
+    assert.equal(usage.totalBytes,579);
+    assert.equal(usage.subscriptionId,vsub.id);
+    assert.equal(usage.online,true);
+    await pool.query("UPDATE users SET status='suspended' WHERE id=$1", [userId]);
+    assert.equal((await fetch(`${base}/api/subscription?token=${vsub.token}`)).status,503);
+    await pool.query("UPDATE users SET status='active' WHERE id=$1", [userId]);
+    const desiredUsers = async () => {
+      const payload = JSON.parse((await pool.query("SELECT payload_json FROM desired_configs WHERE node_id=$1 AND protocol='vless'", [nodes[0]])).rows[0].payload_json);
+      assert.equal(payload.users,undefined,"task payload must not store plaintext authorization UUIDs");
+      const response = await fetch(`${base}/api/v1/agent/secrets/pull`, { method: "POST", headers: json, body: JSON.stringify({ nodeId: nodes[0], token: agentToken, secretId: payload.usersSecretId }) });
+      assert.equal(response.status,200);
+      return JSON.parse((await response.json()).value);
+    };
+    assert.equal((await desiredUsers()).length,1);
+    assert.equal((await patch(vsub.id,"revoke",true)).status,200);
+    assert.equal((await desiredUsers()).length,0, "revocation removes server authorization");
+    assert.equal((await fetch(`${base}/api/subscription?token=${vsub.token}`)).status,503);
+    const list = await (await call("/api/v1/subscriptions")).json();
+    assert.equal(list.subscriptions.length,2);
+    assert.doesNotMatch(JSON.stringify(list),/token_hash|private_key_secret_id/);
+    await pool.query("UPDATE access_credentials SET expires_at='2000-01-01T00:00:00.000Z' WHERE id=$1", [sub.credentialId]);
+    assert.equal((await fetch(url)).status,503,"expired subscriptions cannot download cached keys");
+    assert.equal((await patch(sub.id,"delete")).status,200);
+    assert.equal((await fetch(url)).status,503);
+  } finally {
+    await pool.query("DELETE FROM nodes WHERE id=ANY($1::text[])", [nodes]);
+    await pool.query("DELETE FROM users WHERE id=$1", [userId]);
+    await pool.end();
+  }
 });
 
 test("v1 agent tasks reject invalid credentials", integrationOptions, async () => {

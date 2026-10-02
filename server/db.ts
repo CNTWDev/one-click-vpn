@@ -479,7 +479,17 @@ export async function updateNodeConfig(id: string, values: {
   }
 }
 
+// Conservative grace exceeds the combined bounded SSH operations in bootstrap.
+export async function recoverExpiredNodeActions(nodeId: string): Promise<void> {
+  const expired = await dbQuery<{ id: string }>(`UPDATE node_actions SET status = 'failed', current_phase = 'failed',
+    finished_at = $2, error = '运维任务已中断或超时，请检查远端服务状态后重试。'
+    WHERE node_id = $1 AND status IN ('queued', 'running')
+    AND COALESCE(lease_updated_at, started_at, created_at)::timestamptz < now() - interval '60 minutes' RETURNING id`, [nodeId, now()]);
+  for (const action of expired) await appendNodeActionEvent(action.id, { level: "error", phase: "interrupted", message: "Controller recovered an expired operation lease; manual retry is available." });
+}
+
 export async function countRunningNodeActions(nodeId: string, excludeActionId?: string): Promise<number> {
+  await recoverExpiredNodeActions(nodeId);
   const rows = await dbQuery<{ count: string }>(`SELECT COUNT(*)::text AS count FROM node_actions
     WHERE node_id = $1 AND status IN ('queued', 'running')${excludeActionId ? " AND id <> $2" : ""}`, excludeActionId ? [nodeId, excludeActionId] : [nodeId]);
   return Number(rows[0]?.count || 0);
@@ -505,12 +515,13 @@ export async function addAudit(input: {
 
 export class NodeBusyError extends Error {
   constructor() {
-    super("This node already has a queued or running action. Wait for it to finish.");
+    super("节点已有排队或运行中的任务，请在“详情 / 进度”查看；中断任务在租约过期后可重试（最长约 60 分钟）。");
     this.name = "NodeBusyError";
   }
 }
 
 export async function addNodeAction(nodeId: string, action: string, status: "queued" | "running" = "queued"): Promise<string> {
+  await recoverExpiredNodeActions(nodeId);
   const id = randomUUID();
   const timestamp = now();
   // node_actions_one_active_idx makes the "one active action per node" check atomic across concurrent requests.
@@ -596,6 +607,7 @@ export async function listNodeActionEvents(nodeId: string, limit = 250): Promise
 }
 
 export async function listNodeActions(nodeId: string, limit = 20): Promise<DbNodeAction[]> {
+  await recoverExpiredNodeActions(nodeId);
   const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 50);
   return dbQuery<DbNodeAction>(`SELECT id, node_id, action, status, output, error, created_at, started_at, finished_at, current_phase, progress
     FROM node_actions WHERE node_id = $1 ORDER BY created_at DESC LIMIT $2`, [nodeId, safeLimit]);

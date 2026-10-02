@@ -24,6 +24,8 @@ server {
     client_max_body_size 10m;
 
     # Portal proxies /api to http://northstar:3000 over the Docker network.
+    # Subscription URLs contain bearer secrets. Do not log their query string.
+    location = /api/subscription { access_log off; proxy_pass http://northstar_controller; include /etc/nginx/snippets/northstar-proxy.conf; }
     location / { proxy_pass http://northstar_portal; include /etc/nginx/snippets/northstar-proxy.conf; }
 }
 
@@ -38,6 +40,7 @@ server {
     client_max_body_size 10m;
 
     # Admin proxies /api to http://northstar:3000 over the Docker network.
+    location = /api/subscription { access_log off; proxy_pass http://northstar_controller; include /etc/nginx/snippets/northstar-proxy.conf; }
     location / { proxy_pass http://northstar_admin; include /etc/nginx/snippets/northstar-proxy.conf; }
 }
 
@@ -45,6 +48,7 @@ server {
     listen 443 ssl;
     listen [::]:443 ssl;
     server_name api.example.com;
+    location = /api/subscription { access_log off; proxy_pass http://northstar_controller; include /etc/nginx/snippets/northstar-proxy.conf; }
 
     ssl_certificate     /etc/nginx/ssl/api.example.com/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/api.example.com/privkey.pem;
