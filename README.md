@@ -266,8 +266,19 @@ ports in the Edge Node firewall/security group separately from the Controller.
 
 ## Dynamic subscriptions and VLESS + REALITY
 
-The Portal now offers named subscriptions alongside the existing WireGuard/OpenVPN
-file downloads. A subscription contains all currently eligible, synchronized nodes
+The Portal uses **新建连接 → 订阅 / 指定节点**, with subscriptions recommended by
+default. **我的连接** manages both types together, with type filters and the same
+rename/disable/revoke/delete controls. The account view in the admin console also
+filters both types. Flow totals default to the same last-30-days UTC window; VLESS
+reports recent activity rather than claiming an exact live connection count.
+
+**指定节点** selects exactly one healthy node and generates one profile; it never
+silently substitutes another node. Compatible clients are filtered by node capabilities,
+and advanced settings allow WireGuard or VLESS selection for Hiddify/Mihomo. OpenVPN
+uses its native client format. Existing regional/multi-node files remain usable and are
+labelled as legacy regional configurations; they are not converted automatically.
+
+A subscription contains all currently eligible, synchronized nodes
 for its selected protocol (WireGuard or VLESS + REALITY). It is not a mixed-protocol
 bundle. Clients can select a node or use the automatic latency-selection group.
 
@@ -283,8 +294,13 @@ bundle. Clients can select a node or use the automatic latency-selection group.
   seconds). A 503 response preserves clients' last successful configuration instead
   of publishing an empty list. New nodes enter on the next successful refresh after
   access provisioning; offline, disabled or unsynchronized services are excluded.
-- Links are bearer secrets, displayed only at creation/reset, stored as hashes and
-  delivered with `no-store`. Configure every reverse proxy/CDN to suppress query
+- Links are bearer secrets. They are indexed by hash and additionally stored encrypted
+  using the Controller master key so their owner can retrieve the same link after
+  verifying their login password. Retrieval/reset is rate-limited and audited; list
+  responses and admin endpoints never expose links. Legacy hash-only links remain
+  valid but cannot be recovered: users may keep their saved URL, or explicitly reset
+  it once and reimport. Never automatically rotate an existing link during upgrade.
+  Links are delivered with `no-store`. Configure every reverse proxy/CDN to suppress query
   strings for `/api/subscription`; the supplied Nginx example disables access logs
   for this path. Do not use public subscription converters. Resetting a link only
   invalidates future downloads; revoke the subscription if credentials were exposed.

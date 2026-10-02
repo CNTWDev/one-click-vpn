@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { requestUser } from "../../../../server/request-auth";
 import { cleanText, jsonError, readJson } from "../../../../server/http";
 import { createSubscription, downloadSubscription, listSubscriptions, manageSubscription } from "../../../../server/subscriptions";
+import { findUserByEmail } from "../../../../server/db";
+import { verifyPassword } from "../../../../server/password";
+import { allowLoginAttempt } from "../../../../server/rate-limit";
 
 export const runtime = "nodejs";
 const headers = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" };
@@ -27,6 +30,11 @@ export async function PATCH(request: Request) {
   if (!user) return jsonError("Authentication required", 401);
   try {
     const body = await readJson(request);
+    if (["reveal-link", "reset-link"].includes(String(body.action))) {
+      if (!allowLoginAttempt(request, user.email)) return jsonError("验证次数过多，请稍后重试", 429);
+      const account = await findUserByEmail(user.email);
+      if (!(await verifyPassword(typeof body.password === "string" ? body.password : "", account?.password_hash))) return jsonError("登录密码不正确", 403);
+    }
     return NextResponse.json(await manageSubscription(cleanText(body.id,128),cleanText(body.action,32),{ id: user.id, admin: false }), { headers });
   } catch (error) { return jsonError(error instanceof Error ? error.message : "操作失败", 409); }
 }

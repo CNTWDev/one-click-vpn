@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { clientFormat, clientProtocol, clientOptions, usableCredential } from "../portal-web/src/client-options.ts";
 
 test("client choice separates user-facing app from server protocol and download format", () => {
-  assert.equal(clientOptions.length, 3);
+  assert.equal(clientOptions.length, 4);
+  assert.equal(clientProtocol("hiddify"), "wireguard");
+  assert.equal(clientFormat("hiddify"), "mihomo");
   assert.equal(clientProtocol("clash"), "wireguard");
   assert.equal(clientFormat("clash"), "mihomo");
   assert.equal(clientProtocol("wireguard"), "wireguard");

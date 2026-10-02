@@ -244,8 +244,9 @@ export async function issueConnectionProfile(input: {
   if (input.protocol === "wireguard" && !node.server_public_key) {
     throw new Error("This node is online but has not reported its WireGuard server key. Reinstall or restart the Agent, then wait for a heartbeat.");
   }
-  const transport = input.transport || adapter.capability.transports[0];
+  const transport = input.transport || service.transport;
   if (!adapter.capability.transports.includes(transport)) throw new Error("Unsupported protocol transport");
+  if (transport !== service.transport) throw new Error("Requested transport does not match this node's deployed service");
   const clientAddress = input.protocol === "vless" ? null : await allocateIpLease(input.nodeId, input.protocol, device.id);
   const reality = input.protocol === "vless" ? await realitySettings(node.id) : undefined;
   const openvpnCredential = input.protocol === "openvpn"

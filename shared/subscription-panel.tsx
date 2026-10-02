@@ -10,10 +10,11 @@ const clients = [
 const bytes = (value: string) => { const n = Number(value); return n >= 1073741824 ? `${(n/1073741824).toFixed(2)} GB` : `${(n/1048576).toFixed(1)} MB`; };
 const date = (value: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "尚未拉取";
 
-export function SubscriptionPanel({ api, admin = false }: { api: Api; admin?: boolean }) {
+export function SubscriptionPanel({ api, admin = false, createOnly = false, availableProtocols = ["wireguard", "vless"], onCreated }: { api: Api; admin?: boolean; createOnly?: boolean; availableProtocols?: string[]; onCreated?: (credentialId: string) => void }) {
   const endpoint = admin ? "/api/v1/admin/subscriptions" : "/api/v1/subscriptions";
   const [items, setItems] = useState<Item[]>([]), [name, setName] = useState("我的订阅");
   const [protocol, setProtocol] = useState("wireguard"), [client, setClient] = useState("hiddify");
+  const effectiveProtocol = availableProtocols.includes(protocol) ? protocol : availableProtocols.find((p) => ["wireguard", "vless"].includes(p)) || "";
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [link, setLink] = useState(""), [confirm, setConfirm] = useState<{ item: Item; action: string } | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -39,8 +40,8 @@ export function SubscriptionPanel({ api, admin = false }: { api: Api; admin?: bo
   async function create(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError(""); setNotice("");
     try {
-      const result = await api<{ token: string }>(endpoint, { method: "POST", body: JSON.stringify({ name, protocol }) });
-      showLink(result.token); setNotice("订阅已创建。首次节点权限同步通常需要几十秒；看到已同步节点后再导入。链接只显示这一次，请妥善保存。"); await refresh();
+      const result = await api<{ token: string; credentialId: string }>(endpoint, { method: "POST", body: JSON.stringify({ name, protocol: effectiveProtocol }) });
+      showLink(result.token); setNotice("订阅已创建。首次节点权限同步通常需要几十秒；看到已同步节点后再导入。以后可在“我的连接”验证登录密码后再次获取链接。"); await refresh(); onCreated?.(result.credentialId);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   async function action(item: Item, action: string) {
@@ -62,21 +63,21 @@ export function SubscriptionPanel({ api, admin = false }: { api: Api; admin?: bo
     {!admin && <div className="subscription-setup"><form onSubmit={create}>
       <label>给订阅取个名字<input required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：日常使用" /></label>
       <label>使用的客户端<select value={client} onChange={(e) => setClient(e.target.value)}>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-      <details><summary>连接方式</summary><label>底层协议<select value={protocol} onChange={(e) => setProtocol(e.target.value)}><option value="wireguard">WireGuard · 现有节点</option><option value="vless">VLESS + REALITY · 新服务</option></select></label><small>订阅包含该方式下的全部可用节点。新服务须管理员先部署。WireGuard 多端同时使用请各建一份订阅。</small></details>
-      <button className="subscription-primary" disabled={busy}>{busy ? "处理中…" : "创建订阅"}</button>
-    </form><aside><h3>三步开始使用</h3><ol><li>安装 <a href={selected.url} target="_blank" rel="noreferrer">{selected.name}</a><small>{selected.platform}</small></li><li>创建订阅，复制链接并在客户端添加订阅。</li><li>打开连接，选择「自动选择」或手动切换节点。</li></ol><p>支持订阅更新；手机后台刷新由客户端和系统决定。建议开启客户端自动更新，新增节点未出现时手动刷新。</p><p>官方 WireGuard / OpenVPN 客户端请使用下方文件下载入口，不支持此订阅格式。</p></aside></div>}
+      <details><summary>连接方式</summary><label>底层协议<select value={effectiveProtocol} onChange={(e) => setProtocol(e.target.value)}>{availableProtocols.includes("wireguard") && <option value="wireguard">WireGuard</option>}{availableProtocols.includes("vless") && <option value="vless">VLESS + REALITY</option>}</select></label><small>订阅包含该方式下的全部可用节点。新服务须管理员先部署。WireGuard 多端同时使用请各建一份订阅。</small></details>
+      <button className="subscription-primary" disabled={busy || !effectiveProtocol}>{busy ? "处理中…" : effectiveProtocol ? "创建订阅" : "暂无可用节点"}</button>
+    </form><aside><h3>三步开始使用</h3><ol><li>安装 <a href={selected.url} target="_blank" rel="noreferrer">{selected.name}</a><small>{selected.platform}</small></li><li>创建订阅，复制链接并在客户端添加订阅。</li><li>打开连接，选择「自动选择」或手动切换节点。</li></ol><p>支持订阅更新；手机后台刷新由客户端和系统决定。建议开启客户端自动更新，新增节点未出现时手动刷新。</p><p>官方 WireGuard / OpenVPN 客户端请切换到“指定节点”，下载配置文件。</p></aside></div>}
     {link && <div className="subscription-link"><b>个人订阅链接 · 请勿分享或上传转换网站</b><input readOnly aria-label="订阅链接" value={link} onFocus={(e) => e.target.select()} /><div className="subscription-actions"><button onClick={() => void copy()}>复制链接</button><a className="subscription-import" href={importUrl}>尝试导入 {selected.name}</a><button onClick={() => setLink("")}>隐藏链接</button></div><small>若客户端没有打开，请使用复制链接导入。刷新失败时先检查节点同步状态。</small></div>}
-    <div className="subscription-list">{items.map((item) => {
+    {!createOnly && <div className="subscription-list">{items.map((item) => {
       const expired = new Date(item.expires_at).getTime() <= Date.now();
       const usable = item.status === "active" && !expired;
       const state = !usable ? (item.status === "revoked" ? "已撤销" : "已到期") : item.account_status !== "active" ? "账号已停用" : item.admin_disabled ? "管理员停用" : item.user_disabled ? "本人停用" : "有效";
-      return <article key={item.id}><div className="subscription-row"><div><h3>{item.display_name}</h3><small>{admin ? `${item.email} · ` : ""}{item.protocol === "vless" ? "VLESS + REALITY" : "WireGuard"} · {state}</small></div><b>{bytes(item.total_bytes)}<small>累计流量</small></b></div><p>{item.synced_nodes} 个节点已同步 · 到期 {date(item.expires_at)}</p><small>上次成功拉取：{date(item.last_fetched_at)}</small><div className="subscription-actions">
+      return <article key={item.id}><div className="subscription-row"><div><h3>{item.display_name}</h3><small>{admin ? `${item.email} · ` : ""}{item.protocol === "vless" ? "VLESS + REALITY" : "WireGuard"} · {state}</small></div><b>{bytes(item.total_bytes)}<small>近 30 天流量</small></b></div><p>{item.synced_nodes} 个节点已同步 · 到期 {date(item.expires_at)}</p><small>上次成功拉取：{date(item.last_fetched_at)}</small><div className="subscription-actions">
         {usable && <button disabled={busy || (!admin && item.admin_disabled)} onClick={() => setConfirm({ item, action: (admin ? item.admin_disabled : item.user_disabled) ? "enable" : "disable" })}>{(admin ? item.admin_disabled : item.user_disabled) ? "启用" : "停用"}</button>}
         {!admin && usable && !item.admin_disabled && !item.user_disabled && <button disabled={busy} onClick={() => setConfirm({ item, action: "reset-link" })}>重置链接</button>}
         {item.status === "active" && <button className="subscription-danger" disabled={busy} onClick={() => setConfirm({ item, action: "revoke" })}>撤销访问</button>}
         <button className="subscription-danger" disabled={busy} onClick={() => setConfirm({ item, action: "delete" })}>删除</button>
       </div></article>;
-    })}{!items.length && <p className="subscription-empty">{admin ? "暂无订阅。用户创建后会显示在这里。" : "还没有订阅。创建后，无需逐个下载节点。"}</p>}</div>
+    })}{!items.length && <p className="subscription-empty">{admin ? "暂无订阅。用户创建后会显示在这里。" : "还没有订阅。创建后，无需逐个下载节点。"}</p>}</div>}
     {confirm && <div ref={dialogRef} className="subscription-confirm" role="alertdialog" aria-modal="true" aria-label="确认订阅操作"><div><h3>确认操作：{confirm.item.display_name}</h3><p>{confirm.action === "reset-link" ? "旧订阅链接将失效，需要重新导入；已有配置仍可连接。泄露时请撤销整个订阅。" : ["revoke", "delete"].includes(confirm.action) ? "将撤销该订阅在各节点的访问权限，无法恢复原凭据。删除后保留审计和历史流量。" : "将更新该订阅的节点访问权限。权限同步存在延迟，离线节点需恢复后才能生效。"}</p><div className="subscription-actions"><button onClick={() => setConfirm(null)}>取消</button><button className="subscription-primary" onClick={() => void action(confirm.item,confirm.action)}>确认</button></div></div></div>}
   </section>;
 }

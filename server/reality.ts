@@ -42,8 +42,9 @@ export async function configureReality(nodeId: string, serverName: string) {
 }
 
 export async function realityUsers(nodeId: string) {
-  const rows = await dbQuery<{ secret_id: string; email: string }>(`SELECT DISTINCT s.private_key_secret_id AS secret_id, c.identity_key AS email FROM access_credentials c
-    JOIN subscriptions s ON s.credential_id=c.id
+  const rows = await dbQuery<{ secret_id: string; email: string }>(`SELECT DISTINCT COALESCE(s.private_key_secret_id, k.id) AS secret_id, c.identity_key AS email FROM access_credentials c
+    LEFT JOIN subscriptions s ON s.credential_id=c.id
+    LEFT JOIN secret_materials k ON k.kind='vless_client:' || c.id AND k.owner_node_id IS NULL
     JOIN users u ON u.id=c.user_id JOIN connection_profiles p ON p.credential_id=c.id
     WHERE p.node_id=$1 AND p.protocol='vless' AND p.status='active' AND p.expires_at>$2
     AND c.status='active' AND NOT c.user_disabled AND NOT c.admin_disabled AND c.deleted_at IS NULL
@@ -56,8 +57,9 @@ export async function realityUsers(nodeId: string) {
 }
 
 export async function realityClientSecretId(credentialId: string) {
-  const row = (await dbQuery<{ private_key_secret_id: string }>("SELECT private_key_secret_id FROM subscriptions WHERE credential_id=$1", [credentialId]))[0];
-  if (!row?.private_key_secret_id) throw new Error("VLESS subscription secret unavailable");
+  const row = (await dbQuery<{ private_key_secret_id: string }>(`SELECT private_key_secret_id FROM subscriptions WHERE credential_id=$1
+    UNION ALL SELECT id FROM secret_materials WHERE kind='vless_client:' || $1 AND owner_node_id IS NULL LIMIT 1`, [credentialId]))[0];
+  if (!row?.private_key_secret_id) throw new Error("VLESS client secret unavailable");
   return row.private_key_secret_id;
 }
 

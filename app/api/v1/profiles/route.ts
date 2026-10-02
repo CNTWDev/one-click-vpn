@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requestUser } from "../../../../server/request-auth";
 import { findAccessCredential, findDevice, listAccessCredentials, listConnectionProfiles, listDevices, type ConnectionProfile, type Protocol } from "../../../../server/control-db";
-import { issueRegionalConnectionProfiles, publicProfile, protocolForPlatform } from "../../../../server/control-plane";
+import { issueConnectionProfile, issueRegionalConnectionProfiles, selectVpnServices, publicProfile, protocolForPlatform } from "../../../../server/control-plane";
 import { listNodes, listRegions } from "../../../../server/db";
 import { cleanText, jsonError, readJson } from "../../../../server/http";
 import { listProtocolAdapters } from "../../../../server/protocols/registry";
@@ -52,6 +52,7 @@ export async function POST(request: Request) {
     const deviceId = cleanText(body.deviceId, 128);
     const credentialId = cleanText(body.credentialId, 128);
     const regionId = cleanText(body.regionId, 128) || undefined;
+    const nodeId = cleanText(body.nodeId, 128) || undefined;
     const protocol = cleanText(body.protocol, 32) as Protocol;
     const transport = cleanText(body.transport, 32) || undefined;
     const clientPrivateKey = cleanText(body.clientPrivateKey, 128) || undefined;
@@ -60,7 +61,10 @@ export async function POST(request: Request) {
     if (!device || device.user_id !== user.id || (!credentialId && !deviceId) || !protocols.has(protocol)) return jsonError("credentialId and a supported protocol are required");
     if (credential && (credential.user_id !== user.id || credential.status !== "active" || credential.protocol !== protocol)) return jsonError("Credential is not available", 409);
     if (!protocolForPlatform(device.platform, protocol)) return jsonError("Protocol is not supported by the device platform");
-    const profiles = await issueRegionalConnectionProfiles({ actorUserId: user.id, credentialId: credential?.id, deviceId: device.id, regionId, protocol, transport, clientPrivateKey });
+    if (nodeId && !(await selectVpnServices({ protocol, regionId })).some(({ node }) => node.id === nodeId)) return jsonError("所选节点当前不可用或不支持此协议，请刷新后选择其他节点。", 409);
+    const profiles = nodeId
+      ? [await issueConnectionProfile({ actorUserId: user.id, credentialId: credential?.id, deviceId: device.id, nodeId, protocol, transport, clientPrivateKey })]
+      : await issueRegionalConnectionProfiles({ actorUserId: user.id, credentialId: credential?.id, deviceId: device.id, regionId, protocol, transport, clientPrivateKey });
     const publicProfiles = await profilesWithRegions(profiles, user.id);
     return NextResponse.json({ profile: publicProfiles[0], profiles: publicProfiles }, { status: 201 });
   } catch (error) {

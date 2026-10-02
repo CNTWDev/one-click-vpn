@@ -115,3 +115,35 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .legacy-connections { max-width: 1240px; margin: 24px auto; }
 .legacy-connections > summary { padding: 18px; border: 1px solid #d5dfcd; border-radius: 12px; background: #fbfcf8; cursor: pointer; font-weight: 600; }
 .legacy-connections[open] > summary { margin-bottom: 18px; }
+.mode-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px; }
+.mode-switch button { min-height: 88px; text-align: left; border: 1px solid #d8dfd1; background: #f8faf5; color: #293523; border-radius: 12px; padding: 16px; cursor: pointer; }
+.mode-switch button[aria-pressed="true"], .connection-filters button[aria-pressed="true"] { border-color: #8eaf46; background: #edf5d9; color: #405820; }
+.mode-switch b, .mode-switch small { display: block; }
+.mode-switch small { margin-top: 8px; color: #65705e; line-height: 1.5; }
+.connection-filters { display: flex; gap: 8px; margin: 0 0 20px; flex-wrap: wrap; }
+.connection-filters button { min-height: 44px; padding: 10px 22px; border: 1px solid #d8dfd1; border-radius: 9px; background: #fff; color: #40513c; cursor: pointer; }
+.connection-mode-label { color: #65705e; font-size: 13px; line-height: 1.6; }
+.simple-create-grid { grid-template-columns: minmax(0, 1fr); }
+.connection-creator .subscription-panel { margin: 0; padding: 0; border: 0; }
+.connection-creator .subscription-panel { background: transparent; color: #293523; }
+.connection-creator .subscription-panel p, .connection-creator .subscription-panel small, .connection-creator .subscription-panel summary { color: #65705e; }
+.connection-creator .subscription-panel input, .connection-creator .subscription-panel select { background: #fff; color: #293523; border-color: #ccd6c3; }
+.connection-creator .subscription-panel aside { background: #f3f6ec; }
+.connection-creator .subscription-panel a { color: #57791d; }
+.connection-creator .subscription-panel button, .connection-creator .subscription-import { background: #fff; color: #40513c; border-color: #ccd6c3; }
+.connection-creator .subscription-panel .subscription-primary { background: #7b9d25; color: #fff; border-color: #7b9d25; }
+.connection-creator .subscription-kicker { color: #70931d !important; }
+.subscription-access input { display: block; margin-top: 8px; padding: 10px 12px; border: 1px solid #ccd6c3; border-radius: 8px; color: #293523; background: #fff; }
+.subscription-access :focus-visible, .mode-switch :focus-visible, .connection-filters :focus-visible { outline: 2px solid #71952a; outline-offset: 3px; }
+.subscription-access { display: grid !important; gap: 14px; }
+.subscription-access form, .subscription-access .download-box { display: grid; gap: 14px; }
+.subscription-access p { font-size: 13px; color: #65705e; line-height: 1.7; overflow-wrap: anywhere; }
+.subscription-access input, .subscription-access select { width: 100%; min-width: 0; min-height: 44px; }
+.subscription-access .connection-manage { flex-wrap: wrap; gap: 10px; }
+.connection-creator .client-picker { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+@media (max-width: 600px) {
+  .mode-switch { gap: 8px; }
+  .mode-switch button { padding: 12px; }
+  .connection-creator .subscription-setup { grid-template-columns: minmax(0, 1fr); }
+  .connection-filters button { flex: 1; padding-inline: 14px; }
+}

@@ -195,6 +195,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   token_hash TEXT NOT NULL UNIQUE, private_key_secret_id TEXT REFERENCES secret_materials(id),
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_fetched_at TEXT
 );
+ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS token_secret_id TEXT REFERENCES secret_materials(id);
 CREATE TABLE IF NOT EXISTS ip_leases (
   id TEXT PRIMARY KEY, node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   protocol TEXT NOT NULL, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,

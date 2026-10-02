@@ -479,7 +479,7 @@ test("subscriptions provision stable multi-node WG/VLESS profiles and enforce ac
   const token = (await userLogin.json()).accessToken;
   assert.ok(token);
   const call = (path, body, admin = false) => fetch(`${base}${path}`, { method: body ? "POST" : "GET", headers: { ...json, ...(admin ? { Cookie: cookie } : { Authorization: `Bearer ${token}` }) }, body: body ? JSON.stringify(body) : undefined });
-  const patch = (id, action, admin = false) => fetch(`${base}/api/v1/${admin ? "admin/" : ""}subscriptions`, { method: "PATCH", headers: { ...json, ...(admin ? { Cookie: cookie } : { Authorization: `Bearer ${token}` }) }, body: JSON.stringify({ id, action }) });
+  const patch = (id, action, admin = false, password = "test-password-123") => fetch(`${base}/api/v1/${admin ? "admin/" : ""}subscriptions`, { method: "PATCH", headers: { ...json, ...(admin ? { Cookie: cookie } : { Authorization: `Bearer ${token}` }) }, body: JSON.stringify({ id, action, password }) });
   const nodes = [`sub-node-a-${Date.now()}`, `sub-node-b-${Date.now()}`];
   const addNode = async (id) => {
     await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at,server_public_key,status,last_heartbeat_at,agent_capabilities_json)
@@ -487,6 +487,7 @@ test("subscriptions provision stable multi-node WG/VLESS profiles and enforce ac
     await pool.query(`INSERT INTO vpn_services (node_id,protocol,enabled,transport,listen_port,subnet,dns_json,status,created_at,updated_at)
       VALUES ($1,'wireguard',1,'udp',51820,'10.70.0.0/24','["1.1.1.1"]','healthy',$2,$2)`, [id,timestamp]);
     await pool.query(`INSERT INTO node_protocols (node_id,protocol,status,updated_at) VALUES ($1,'wireguard','enabled',$2),($1,'vless','enabled',$2)`, [id,timestamp]);
+    await pool.query("UPDATE nodes SET region_id=(SELECT id FROM regions ORDER BY id LIMIT 1) WHERE id=$1",[id]);
   };
   const ack = async () => {
     await pool.query(`INSERT INTO observed_configs (node_id,protocol,applied_revision,observed_hash,status,last_error,updated_at)
@@ -496,9 +497,22 @@ test("subscriptions provision stable multi-node WG/VLESS profiles and enforce ac
   };
   try {
     await addNode(nodes[0]);
+    const availability = await (await call("/api/v1/availability")).json();
+    assert.ok(availability.nodes.some((n) => n.id===nodes[0] && n.protocols.includes("wireguard")));
+    assert.doesNotMatch(JSON.stringify(availability),/credential_ciphertext|agent_token_hash/);
     const created = await call("/api/v1/subscriptions", { name: "All nodes", protocol: "wireguard" });
     assert.equal(created.status,201);
     const sub = await created.json();
+    assert.equal((await patch(sub.id,"reveal-link",false,"wrong-password")).status,403);
+    const revealed = await patch(sub.id,"reveal-link");
+    assert.equal(revealed.status,200);
+    assert.equal((await revealed.json()).token,sub.token,"retrieving a link must not rotate it");
+    assert.equal((await patch(sub.id,"reveal-link",true)).status,400,"admins cannot retrieve private links");
+    const otherUserReveal = await fetch(`${base}/api/v1/subscriptions`,{method:"PATCH",headers:{...json,Cookie:cookie},body:JSON.stringify({id:sub.id,action:"reveal-link",password:"test-password-123"})});
+    assert.equal(otherUserReveal.status,409,"an authenticated different owner cannot retrieve the link");
+    const encryptedLink = (await pool.query("SELECT k.ciphertext FROM subscriptions s JOIN secret_materials k ON k.id=s.token_secret_id WHERE s.id=$1",[sub.id])).rows[0];
+    assert.ok(encryptedLink.ciphertext);
+    assert.notEqual(encryptedLink.ciphertext,sub.token);
     let url = `${base}/api/subscription?token=${sub.token}`;
     assert.equal((await fetch(url)).status,503, "never publish unacknowledged peers");
     await ack();
@@ -528,6 +542,16 @@ test("subscriptions provision stable multi-node WG/VLESS profiles and enforce ac
     assert.equal((await fetch(url)).status,503);
     assert.equal((await patch(sub.id,"enable")).status,409);
     assert.equal((await patch(sub.id,"enable",true)).status,200);
+    await ack();
+    const fixedKey = x25519.utils.randomSecretKey();
+    const fixed = await call("/api/v1/credentials",{name:"Fixed node",protocol:"wireguard",publicKey:Buffer.from(x25519.getPublicKey(fixedKey)).toString("base64")});
+    const fixedCredential = (await fixed.json()).credential;
+    const single = await call("/api/v1/profiles",{credentialId:fixedCredential.id,nodeId:nodes[1],protocol:"wireguard",clientPrivateKey:Buffer.from(fixedKey).toString("base64")});
+    assert.equal(single.status,201, single.status === 201 ? "" : await single.text());
+    const fixedProfiles = (await single.json()).profiles;
+    assert.equal(fixedProfiles.length,1);
+    assert.equal(fixedProfiles[0].nodeId,nodes[1]);
+    assert.equal((await call("/api/v1/profiles",{credentialId:fixedCredential.id,nodeId:"missing-node",protocol:"wireguard"})).status,409);
     const service = await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "enable", serverName: "www.example.com" },true);
     assert.equal(service.status,200,await service.text());
     assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.cloudflare.com" },true)).status,200,"initial target can be corrected before issuing profiles");
@@ -577,7 +601,29 @@ test("subscriptions provision stable multi-node WG/VLESS profiles and enforce ac
     assert.equal((await fetch(`${base}/api/subscription?token=${vsub.token}`)).status,503);
     const list = await (await call("/api/v1/subscriptions")).json();
     assert.equal(list.subscriptions.length,2);
-    assert.doesNotMatch(JSON.stringify(list),/token_hash|private_key_secret_id/);
+    assert.doesNotMatch(JSON.stringify(list),/token_hash|private_key_secret_id|token_secret_id/);
+    await ack();
+    const standalone = await call("/api/v1/credentials",{name:"Fixed REALITY",protocol:"vless"});
+    assert.equal(standalone.status,201);
+    const vc = (await standalone.json()).credential;
+    const vpResponse = await call("/api/v1/profiles",{credentialId:vc.id,nodeId:nodes[0],protocol:"vless"});
+    assert.equal(vpResponse.status,201);
+    const vp = (await vpResponse.json()).profile;
+    assert.equal((await call(`/api/v1/profiles/${vp.id}/activate`,{})).status,200);
+    const exported = await call(`/api/v1/profiles/${vp.id}/download?format=mihomo`);
+    assert.equal(exported.status,200);
+    const singleConfig = parseConfig(await exported.text());
+    assert.equal(singleConfig.proxies.length,1);
+    assert.equal(singleConfig.proxies[0].type,"vless");
+    assert.equal((await desiredUsers()).length,1,"standalone VLESS authorizes on the selected node");
+    assert.equal((await call(`/api/v1/profiles/${vp.id}/download?format=mihomo`,undefined,true)).status,404);
+    assert.equal((await call(`/api/v1/credentials/${vc.id}/revoke`,{})).status,200);
+    assert.equal((await desiredUsers()).length,0);
+    assert.equal((await call(`/api/v1/profiles/${vp.id}/download?format=mihomo`)).status,409);
+    await pool.query("UPDATE subscriptions SET token_secret_id=NULL WHERE id=$1",[sub.id]);
+    const legacyReveal = await patch(sub.id,"reveal-link");
+    assert.equal(legacyReveal.status,409);
+    assert.match((await legacyReveal.json()).error,/旧订阅/);
     await pool.query("UPDATE access_credentials SET expires_at='2000-01-01T00:00:00.000Z' WHERE id=$1", [sub.credentialId]);
     assert.equal((await fetch(url)).status,503,"expired subscriptions cannot download cached keys");
     assert.equal((await patch(sub.id,"delete")).status,200);

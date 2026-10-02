@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { x25519 } from "@noble/curves/ed25519.js";
 import { useActionDialog } from "./action-dialog";
 import { api, fetchText, isUnauthorized } from "./api";
@@ -6,10 +6,12 @@ import { clientOptions, clientProtocol, clientFormat, clientName, usableCredenti
 import { RegionMap } from "./region-map";
 import { createZipBlob } from "./zip";
 import { SubscriptionPanel } from "../../shared/subscription-panel";
+import { SubscriptionAccess } from "./subscription-access";
 
 type User = { email: string; displayName: string };
 type Region = { id: string; name: string; country: string; code: string; protocols: string[]; status: string; protocolNodeCounts?: Record<string, number> };
-type Profile = { id: string; credentialId?: string | null; displayName?: string | null; nodeName?: string | null; regionalNodeCount?: number; regionCode?: string | null; regionName?: string | null; protocol: string; status: string; issuedAt: string; expiresAt: string };
+type AvailableNode = { id: string; name: string; regionId: string; regionName: string; protocols: string[] };
+type Profile = { nodeId?: string; id: string; credentialId?: string | null; displayName?: string | null; nodeName?: string | null; regionalNodeCount?: number; regionCode?: string | null; regionName?: string | null; protocol: string; status: string; issuedAt: string; expiresAt: string };
 type Credential = {
   subscriptionId?: string | null;
   expiringSoon: boolean; daysRemaining: number | null;
@@ -24,7 +26,7 @@ type Usage = { totals: { uploadBytes: number; downloadBytes: number; totalBytes:
 type Download = { client: ClientChoice; name: string; text?: string; files?: Array<{ name: string; text: string }> };
 
 const base64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
-const protocolLabel = (value: string) => value === "wireguard" ? "WireGuard" : value === "openvpn" ? "OpenVPN" : value;
+const protocolLabel = (value: string) => value === "wireguard" ? "WireGuard" : value === "openvpn" ? "OpenVPN" : value === "vless" ? "VLESS + REALITY" : value;
 const stateLabel = (value: string) => ({ disabled: "已停用", "admin-disabled": "管理员已停用", "account-disabled": "账号已停用", online: "在线", offline: "离线", "never-connected": "尚未连接", "telemetry-delayed": "状态未知", revoked: "已撤销", expired: "已过期" } as Record<string, string>)[value] || value;
 const statusLabel = (value: string) => ({ active: "有效", issued: "待启用", revoked: "已撤销", expired: "已过期" } as Record<string, string>)[value] || value;
 const formatBytes = (bytes = 0) => {
@@ -50,8 +52,8 @@ function filenamePart(value: string | null | undefined, fallback: string, maxLen
   return (value || "").normalize("NFKC").trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-").replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, maxLength) || fallback;
 }
 function profileFilename(profile: Profile) {
-  const extension = profile.protocol === "openvpn" ? "ovpn" : "conf";
-  const protocolCode = profile.protocol === "openvpn" ? "OV" : "WG";
+  const extension = profile.protocol === "vless" ? "yaml" : profile.protocol === "openvpn" ? "ovpn" : "conf";
+  const protocolCode = profile.protocol === "vless" ? "VL" : profile.protocol === "openvpn" ? "OV" : "WG";
   const node = (profile.regionalNodeCount || 0) > 1 ? `${profile.regionalNodeCount}nodes` : filenamePart(profile.nodeName, "node", 12);
   return `${filenamePart(profile.regionCode?.toUpperCase(), "AUTO", 8)}-${filenamePart(profile.displayName, "credential")}-${protocolCode}-${node}.${extension}`;
 }
@@ -65,16 +67,21 @@ function saveText(name: string, text: string) { saveBlob(name, new Blob([text], 
 export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const { ask, dialog } = useActionDialog();
   const [regions, setRegions] = useState<Region[]>([]);
+  const [nodes, setNodes] = useState<AvailableNode[]>([]);
+  const [nodeId, setNodeId] = useState("");
+  const [mode, setMode] = useState<"subscription" | "single">("subscription");
+  const [creating, setCreating] = useState(false);
+  const [connectionFilter, setConnectionFilter] = useState("all");
+  const [advancedProtocol, setAdvancedProtocol] = useState("");
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [allCredentials, setAllCredentials] = useState<Credential[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [selectedId, setSelectedId] = useState("");
   const [name, setName] = useState("我的 VPN");
-  const [client, setClient] = useState<ClientChoice>("clash");
+  const [preferredClient, setClient] = useState<ClientChoice>("hiddify");
   const [downloadChoices, setDownloadChoices] = useState<Record<string, ClientChoice>>({});
   const [stale, setStale] = useState(false);
-  const protocol = clientProtocol(client);
   const [regionId, setRegionId] = useState("");
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,14 +90,22 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
   const [download, setDownload] = useState<Download | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
-  const canCreate = regions.some((item) => (!regionId || item.id === regionId) && item.status === "available" && item.protocols.includes(protocol));
-  const selected = credentials.find((item) => item.id === selectedId) || credentials[0];
-  const selectedProfiles = useMemo(() => profiles.filter((item) => item.credentialId === selected?.id), [profiles, selected?.id]);
+  const regionNodes = nodes.filter((item) => !regionId || item.regionId === regionId);
+  const chosenNode = nodeId ? regionNodes.find((item) => item.id === nodeId) : regionNodes[0];
+  const availableClients = clientOptions.filter((option) => ["clash", "hiddify"].includes(option.id)
+    ? chosenNode?.protocols.some((p) => ["wireguard", "vless"].includes(p)) : chosenNode?.protocols.includes(clientProtocol(option.id)));
+  const client = availableClients.find((item) => item.id === preferredClient)?.id || availableClients[0]?.id || preferredClient;
+  const flexibleClient = client === "clash" || client === "hiddify";
+  const protocol = flexibleClient ? (advancedProtocol || (chosenNode?.protocols.includes("wireguard") ? "wireguard" : "vless")) : clientProtocol(client);
+  const canCreate = !!chosenNode && chosenNode.protocols.includes(protocol) && availableClients.some((item) => item.id === client);
+  const visibleCredentials = credentials.filter((item) => connectionFilter === "all" || (connectionFilter === "subscription" ? !!item.subscriptionId : !item.subscriptionId));
+  const selected = visibleCredentials.find((item) => item.id === selectedId) || visibleCredentials[0];
+  const selectedProfiles = profiles.filter((item) => item.credentialId === selected?.id);
   const currentProfiles = selectedProfiles.filter((item) => item.status === "active" || item.status === "issued");
   const historyProfiles = selectedProfiles.filter((item) => item.status !== "active" && item.status !== "issued");
   const onlineCount = allCredentials.filter((item) => item.online).length;
   const usableCount = allCredentials.filter((item) => usableCredential(item)).length;
-  const selectedClient = selected?.protocol === "openvpn" ? "openvpn" : downloadChoices[selected?.id] || "clash";
+  const selectedClient = selected?.protocol === "openvpn" ? "openvpn" : downloadChoices[selected?.id] || "hiddify";
   const canDownload = !!selected && usableCredential(selected) && currentProfiles.length > 0;
   const recentDays = (usage?.daily || []).slice(-14);
   const recentTotal = recentDays.reduce((sum, day) => sum + day.totalBytes, 0);
@@ -101,17 +116,18 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
     else setError((caught as Error).message);
   }
 
-  async function refresh(silent = false) {
+  const refresh = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
     try {
       const [availability, credentialResult, profileResult, usageResult] = await Promise.all([
-        api<{ regions: Region[] }>("/api/v1/availability"),
+        api<{ regions: Region[]; nodes: AvailableNode[] }>("/api/v1/availability"),
         api<{ credentials: Credential[] }>("/api/v1/credentials"),
         api<{ profiles: Profile[] }>("/api/v1/profiles"),
         api<Usage>("/api/v1/usage/summary"),
       ]);
       const nextRegions = availability.regions || [];
-      const nextCredentials = (credentialResult.credentials || []).filter((item) => !item.subscriptionId);
+      const nextCredentials = credentialResult.credentials || [];
+      setNodes(availability.nodes || []);
       setAllCredentials(credentialResult.credentials || []);
       setRegions(nextRegions); setCredentials(nextCredentials); setProfiles(profileResult.profiles || []); setUsage(usageResult);
       setUpdatedAt(new Date().toISOString()); setStale(false);
@@ -122,7 +138,7 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
       setStale(true); if (!silent) setError((caught as Error).message);
     }
     finally { if (!silent) setRefreshing(false); }
-  }
+  }, [onLogout]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => { void refresh(); }, 0);
@@ -130,10 +146,10 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
     const onVisible = () => { if (!document.hidden) void refresh(true); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { window.clearTimeout(initial); window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
-  }, []);
+  }, [refresh]);
 
   function selectRegion(nextRegionId: string) {
-    setRegionId(nextRegionId);
+    setRegionId(nextRegionId); setNodeId(""); setAdvancedProtocol("");
 
   }
 
@@ -150,20 +166,20 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
       const publicKey = privateBytes ? base64(x25519.getPublicKey(privateBytes)) : undefined;
       const created = await api<{ credential: Credential }>("/api/v1/credentials", { method: "POST", body: JSON.stringify({ name: name.trim(), protocol, publicKey }) });
       createdCredentialId = created.credential.id;
-      const issued = await api<{ profile: Profile; profiles?: Profile[] }>("/api/v1/profiles", { method: "POST", body: JSON.stringify({ credentialId: created.credential.id, regionId: regionId || undefined, protocol, clientPrivateKey }) });
+      const issued = await api<{ profile: Profile; profiles?: Profile[] }>("/api/v1/profiles", { method: "POST", body: JSON.stringify({ credentialId: created.credential.id, nodeId: chosenNode!.id, protocol, clientPrivateKey }) });
       profileIssued = true;
       const issuedProfiles = issued.profiles?.length ? issued.profiles : [issued.profile];
       const activated = await Promise.all(issuedProfiles.map(async (item) => ({ ...(await api<{ profile: Profile }>(`/api/v1/profiles/${item.id}/activate`, { method: "POST" })).profile, displayName: name })));
       const files = await Promise.all(activated.map(async (item) => {
         const text = await fetchText(`/api/v1/profiles/${item.id}/download${clientFormat(client) === "mihomo" ? "?format=mihomo" : ""}`);
-        return { name: client === "clash" ? profileFilename(item).replace(/\.conf$/, `-${item.id}-Clash.yaml`) : profileFilename(item), text };
+        return { name: clientFormat(client) === "mihomo" ? profileFilename(item).replace(/\.conf$/, `-${item.id}-Clash.yaml`) : profileFilename(item), text };
       }));
       const prepared: Download = files.length === 1 ? { ...files[0], client } : { name: `${filenamePart(name, "credential")}-${clientName(client)}.zip`, files, client };
       setDownload(prepared);
       if (prepared.text) saveText(prepared.name, prepared.text);
       else if (prepared.files) saveBlob(prepared.name, createZipBlob(prepared.files));
       setDownloadChoices((choices) => ({ ...choices, [created.credential.id]: client }));
-      setSelectedId(created.credential.id);
+      setSelectedId(created.credential.id); setConnectionFilter("all");
       setNotice(`「${name}」已创建，${clientName(client)} 配置下载已开始。若浏览器未保存，可点击「重新下载」。`);
       await refresh(true);
     } catch (caught) {
@@ -233,11 +249,13 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
 
   function prepareReplacement() {
     if (!selected) return;
+    setCreating(true); setMode(selected.subscriptionId ? "subscription" : "single");
     setName(`${selected.name}（换发）`);
     setClient(selectedClient);
     const previous = selectedProfiles[0];
     const region = regions.find((item) => item.code === previous?.regionCode && item.name === previous?.regionName);
     if (region) setRegionId(region.id);
+    setNodeId(previous?.nodeId || "");
     setNotice("已填好换发信息，请在上方创建新凭据并下载配置，然后重新导入所有使用端。旧配置保持原到期时间；新配置验证成功后可撤销旧凭据。");
     document.getElementById("credential-create")?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -252,40 +270,45 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
     {dialog}
     {(error || notice || busy) && <div className={`action-feedback ${error ? "error" : ""}`} role={error ? "alert" : "status"}><span>{error || (busy ? "正在处理，请稍候…" : notice)}</span>{!busy && <button type="button" aria-label="关闭提示" onClick={() => { setError(""); setNotice(""); }}>×</button>}</div>}
     <header><div className="brand"><span className="brand-mark"><i /><i /><i /></span><span>NORTHSTAR <em>VPN</em></span></div><div className="account"><span>{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b><small>{user.email}</small></div><button onClick={onLogout}>退出</button></div></header>
-    <section className="welcome"><div><p className="kicker">MY CONNECTIONS</p><h1>你好，{user.displayName}。</h1><p>创建订阅，一次导入全部可用节点；原有客户端也可继续下载配置。</p></div><span className="active-badge">● 账号已开通</span></section>
+    <section className="welcome"><div><p className="kicker">MY CONNECTIONS</p><h1>我的连接</h1><p>订阅随时换节点，独立配置固定连接。所有使用情况在这里统一管理。</p></div><button className="primary" onClick={() => { setCreating(!creating); setDownload(null); }}>{creating ? "收起创建" : "＋ 新建连接"}</button></section>
     <section className="stats simple-stats" aria-label="使用概览">
       <article><small>近 30 天总流量</small><strong>{usage ? formatBytes(usage.totals.totalBytes) : "—"}</strong><span>上传 {usage ? formatBytes(usage.totals.uploadBytes) : "—"} · 下载 {usage ? formatBytes(usage.totals.downloadBytes) : "—"}</span></article>
       <article><small>最近活跃</small><strong>{updatedAt ? onlineCount : "—"}</strong><span>{stale ? "更新中断，显示上次结果" : "包含订阅与文件连接，不代表设备数"}</span></article>
       <article><small>可用连接</small><strong>{updatedAt ? usableCount : "—"}</strong><span>{allCredentials.length} 份连接 · 已停用或到期的不计入</span></article>
     </section>
-    <SubscriptionPanel api={api} />
-    <details className="legacy-connections"><summary>原有连接与单独配置 · WireGuard / OpenVPN</summary>
     <div className="grid simple-create-grid">
-      <section className="card"><div className="card-head"><div><p className="kicker">GET CONNECTED</p><h2 id="credential-create">下载单独配置</h2></div><span className="muted">有效期 1 年</span></div>
+      {creating && <section className="card connection-creator"><div className="card-head"><div><p className="kicker">NEW CONNECTION</p><h2 id="credential-create">新建连接</h2></div><span className="muted">有效期 1 年</span></div>
+        <div className="mode-switch" role="group" aria-label="连接模式"><button type="button" aria-pressed={mode === "subscription"} onClick={() => setMode("subscription")}><b>订阅 · 推荐</b><small>一次导入，自动更新可用节点</small></button><button type="button" aria-pressed={mode === "single"} onClick={() => setMode("single")}><b>指定节点</b><small>固定一个节点，下载独立配置</small></button></div>
+        {mode === "subscription" ? <SubscriptionPanel api={api} createOnly availableProtocols={[...new Set(nodes.flatMap((item) => item.protocols))]} onCreated={(id) => { setSelectedId(id); setConnectionFilter("all"); void refresh(true); }} /> : <>
         <form onSubmit={createCredential}>
-          <fieldset className="client-picker" disabled={busy}><legend>你使用哪个客户端？</legend>{clientOptions.map((option) => <label className={client === option.id ? "selected" : ""} key={option.id}><input type="radio" name="client" value={option.id} checked={client === option.id} onChange={() => setClient(option.id)} /><strong>{option.name}</strong><small>{option.description}</small></label>)}</fieldset>
-          <div className="form-grid"><label>连接名称<input required disabled={busy} value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：我的连接" /></label><label>连接区域<select disabled={busy} value={regionId} onChange={(event) => selectRegion(event.target.value)}><option value="">自动选择</option>{regions.map((region) => <option key={region.id} value={region.id} disabled={region.status !== "available" || !region.protocols.includes(protocol)}>{region.name}{region.status !== "available" || !region.protocols.includes(protocol) ? "（当前客户端不可用）" : ""}</option>)}</select></label></div>
-          {!canCreate && updatedAt && <p className="error" role="status">当前区域暂不支持这个客户端，请更换区域或客户端。</p>}
+          <div className="form-grid"><label>区域<select disabled={busy} value={regionId} onChange={(event) => selectRegion(event.target.value)}><option value="">全部区域</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select></label><label>指定节点<select disabled={busy} value={nodeId} onChange={(event) => { setNodeId(event.target.value); setAdvancedProtocol(""); }}><option value="">{chosenNode && !nodeId ? `推荐：${chosenNode.name}` : "选择节点"}</option>{regionNodes.map((node) => <option value={node.id} key={node.id}>{node.regionName} · {node.name}</option>)}</select></label></div>
+          <fieldset className="client-picker" disabled={busy}><legend>你使用哪个客户端？</legend>{availableClients.map((option) => <label className={client === option.id ? "selected" : ""} key={option.id}><input type="radio" name="client" value={option.id} checked={client === option.id} onChange={() => setClient(option.id)} /><strong>{option.name}</strong><small>{option.description}</small></label>)}</fieldset>
+          <div className="form-grid"><label>连接名称<input required disabled={busy} value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：我的连接" /></label></div>
+          {flexibleClient && chosenNode && <details className="connection-disclosure"><summary>高级设置</summary><label>连接协议<select value={advancedProtocol} disabled={busy} onChange={(e) => setAdvancedProtocol(e.target.value)}><option value="">自动匹配</option>{chosenNode.protocols.filter((p) => ["wireguard", "vless"].includes(p)).map((p) => <option key={p} value={p}>{protocolLabel(p)}</option>)}</select></label></details>}
+          <p className="form-footnote">仅生成所选节点的配置，不会自动加入其他节点。节点变化时请重新生成。</p>
+          {!canCreate && updatedAt && <p className="error" role="status">当前节点或客户端不可用，请选择可用节点和客户端。</p>}
           <button className="primary create-download" disabled={busy || !canCreate}>{busy ? "处理中…" : "创建并下载"}<span aria-hidden="true">↓</span></button>
           <p className="form-footnote">{client === "clash" ? "支持 Mihomo 内核的 Clash 客户端，不适用于旧版 Clash。" : `下载后导入 ${clientName(client)} 客户端。`} 配置仅供本人使用。</p>
         </form>
-        {download && <div className="download-box" role="status"><b>已准备好，下一步导入 {clientName(download.client)}</b><p>{download.files ? "先解压下载的 ZIP，再选择一份配置文件导入。" : "在客户端中选择「导入配置」或「从文件导入」，打开刚下载的文件。"}{download.client === "clash" ? " 启用配置后，打开客户端的系统代理或 TUN。" : " 导入后开启连接。"}{download.client !== "openvpn" ? " 同一份连接请勿在多个客户端同时开启。" : ""}</p><button type="button" className="secondary" onClick={saveDownload}>重新下载</button></div>}
-      </section>
-      <section className="card traffic-card"><div className="card-head"><div><p className="kicker">USAGE</p><h2>流量趋势</h2></div><span className="muted">近 14 天 · UTC</span></div><div className="traffic-total">{usage ? formatBytes(recentTotal) : "—"}<small>期间累计</small></div>
-        {recentTotal > 0 ? <div className="bars" role="img" aria-label={`近 14 天流量，累计 ${formatBytes(recentTotal)}`}>{recentDays.map((day) => <div key={day.day} title={`${day.day} · ${formatBytes(day.totalBytes)}`}><i style={{ height: `${day.totalBytes > 0 ? Math.max(2, day.totalBytes / maxDay * 100) : 0}%` }} /><small>{day.day.slice(5)}</small></div>)}</div> : <div className="usage-empty"><span>↗</span><p>{usage ? "开始连接后，这里会显示流量趋势。" : "正在读取流量…"}</p></div>}
-        <p className="form-footnote">流量按连接汇总，不区分安装在哪台设备。</p>
-      </section>
+        {download && <div className="download-box" role="status"><b>已准备好，下一步导入 {clientName(download.client)}</b><p>{download.files ? "先解压下载的 ZIP，再选择一份配置文件导入。" : "在客户端中选择「导入配置」或「从文件导入」，打开刚下载的文件。"}{download.client === "clash" ? " 启用配置后，打开客户端的系统代理或 TUN。" : " 导入后开启连接。"}{protocol === "wireguard" ? " 同一份连接请勿在多个客户端同时开启。" : ""}</p><button type="button" className="secondary" onClick={saveDownload}>重新下载</button></div>}
+      </>}
+      </section>}
+
     </div>
-    <section className="device-hub"><div className="device-hub-head"><div><p className="kicker">YOUR CONNECTIONS</p><h2>我的连接</h2><p>查看使用情况，或重新下载配置。</p></div><div className="device-hub-head-actions"><button type="button" className="refresh-button" disabled={refreshing} onClick={() => void refresh()}>{refreshing ? "刷新中…" : "刷新状态"}</button><small className={stale ? "stale" : ""}>{stale ? "暂时无法更新，以下为上次结果" : updatedAt ? `更新于 ${dateLabel(updatedAt)} · 自动刷新` : "正在读取…"}</small></div></div>
-      <div className="device-hub-layout"><div className="device-list">{credentials.length ? credentials.map((credential) => <button type="button" aria-pressed={selected?.id === credential.id} className={`device-card ${selected?.id === credential.id ? "selected" : ""}`} key={credential.id} onClick={() => setSelectedId(credential.id)}><span className="connection-symbol" aria-hidden="true">↗</span><span className="device-card-main"><strong>{credential.name}</strong><small>{stateLabel(credential.state)} · 30 天 {formatBytes(credential.totalBytes)}</small></span><span className={`presence-dot ${credential.online ? "online" : ""}`} /></button>) : <p className="empty">还没有连接，在上方创建第一份即可。</p>}</div>
+    <section className="device-hub"><div className="device-hub-head"><div><p className="kicker">YOUR CONNECTIONS</p><h2>我的连接</h2><p>订阅和节点配置统一管理，不区分实际安装设备。</p></div><div className="device-hub-head-actions"><button type="button" className="refresh-button" disabled={refreshing} onClick={() => void refresh()}>{refreshing ? "刷新中…" : "刷新状态"}</button><small className={stale ? "stale" : ""}>{stale ? "暂时无法更新，以下为上次结果" : updatedAt ? `更新于 ${dateLabel(updatedAt)} · 自动刷新` : "正在读取…"}</small></div></div>
+      <div className="connection-filters" role="group" aria-label="筛选连接">{[["all", "全部"], ["subscription", "订阅"], ["single", "节点配置"]].map(([value, label]) => <button key={value} aria-pressed={connectionFilter === value} onClick={() => setConnectionFilter(value)}>{label}</button>)}</div>
+      <div className="device-hub-layout"><div className="device-list">{visibleCredentials.length ? visibleCredentials.map((credential) => <button type="button" aria-pressed={selected?.id === credential.id} className={`device-card ${selected?.id === credential.id ? "selected" : ""}`} key={credential.id} onClick={() => setSelectedId(credential.id)}><span className="connection-symbol" aria-hidden="true">↗</span><span className="device-card-main"><strong>{credential.name}</strong><small>{credential.subscriptionId ? "订阅" : "节点配置"} · {credential.protocol === "vless" && credential.online ? "最近活跃" : stateLabel(credential.state)} · 30 天 {formatBytes(credential.totalBytes)}</small></span><span className={`presence-dot ${credential.online ? "online" : ""}`} /></button>) : <p className="empty">暂无此类连接。点击“新建连接”开始。</p>}</div>
       {selected ? <article className="device-detail" key={selected.id}>
-        <div className="device-detail-head"><div className="device-title-line"><h3>{selected.name}</h3><span className={`status-pill ${selected.state}`}>{stateLabel(selected.state)}</span></div><p>有效期至 {dateLabel(selected.expiresAt)} · 最近活动 {activityLabel(selected.lastActivityAt)}</p></div>
+        <div className="device-detail-head"><div className="device-title-line"><h3>{selected.name}</h3><span className={`status-pill ${selected.state}`}>{selected.protocol === "vless" && selected.online ? "最近活跃" : stateLabel(selected.state)}</span></div><p>有效期至 {dateLabel(selected.expiresAt)} · 最近活动 {activityLabel(selected.lastActivityAt)}</p></div>
+        <p className="connection-mode-label">{selected.subscriptionId ? `动态订阅 · 已生成 ${currentProfiles.length} 个节点配置，更新后获取可用节点` : currentProfiles.length > 1 || currentProfiles.some((p) => (p.regionalNodeCount || 0) > 1) ? "原有区域配置 · 保留原使用方式" : `指定节点 · ${currentProfiles[0]?.nodeName || "尚未生成配置"}`}</p>
         {selected.syncStatus !== "applied" && <p className="credential-warning" role="status">{selected.syncStatus === "failed" ? "更改尚未成功同步，请联系管理员。" : "更改正在生效，请稍候。"}</p>}
         {(selected.expiringSoon || selected.status === "expired") && <div className="credential-warning"><p>{selected.status === "expired" ? "连接已到期，请换发后重新导入。" : `还有 ${selected.daysRemaining} 天到期，请提前换发。`}</p>{!selected.adminDisabled && !selected.userDisabled && <button className="text-link" disabled={busy} onClick={prepareReplacement}>换发连接</button>}</div>}
-        <div className="device-metrics simple-metrics"><div><small>近 30 天流量</small><strong>{formatBytes(selected.totalBytes)}</strong><span>↑ {formatBytes(selected.uploadBytes)} · ↓ {formatBytes(selected.downloadBytes)}</span></div><div><small>当前连接</small><strong>{selected.connectionCount}</strong><span>{selected.state === "telemetry-delayed" ? "状态暂未更新" : selected.online ? "正在使用" : "暂未观测到连接"}</span></div></div>
-        <section className="connection-download"><label>下载到哪个客户端？<select disabled={busy} value={selectedClient} onChange={(event) => setDownloadChoices((choices) => ({ ...choices, [selected.id]: event.target.value as ClientChoice }))}>{clientOptions.filter((item) => clientProtocol(item.id) === selected.protocol).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><button className="primary" disabled={busy || !canDownload} onClick={() => void downloadProfiles(clientFormat(selectedClient))}>下载配置{currentProfiles.length > 1 && selected.protocol !== "openvpn" ? "包" : ""}</button></section>
+        <div className="device-metrics simple-metrics"><div><small>近 30 天流量</small><strong>{formatBytes(selected.totalBytes)}</strong><span>↑ {formatBytes(selected.uploadBytes)} · ↓ {formatBytes(selected.downloadBytes)}</span></div><div><small>{selected.protocol === "vless" ? "使用状态" : "当前连接"}</small><strong>{selected.protocol === "vless" ? selected.online ? "最近活跃" : "暂无活动" : selected.connectionCount}</strong><span>{selected.state === "telemetry-delayed" ? "状态暂未更新" : selected.online ? "正在使用" : "暂未观测到连接"}</span></div></div>
+        {selected.subscriptionId ? <SubscriptionAccess key={selected.subscriptionId} id={selected.subscriptionId} disabled={!usableCredential(selected)} onChanged={() => void refresh(true)} /> : <>
+        <section className="connection-download"><label>下载到哪个客户端？<select disabled={busy} value={selectedClient} onChange={(event) => setDownloadChoices((choices) => ({ ...choices, [selected.id]: event.target.value as ClientChoice }))}>{clientOptions.filter((item) => selected.protocol === "vless" ? ["hiddify", "clash"].includes(item.id) : clientProtocol(item.id) === selected.protocol).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><button className="primary" disabled={busy || !canDownload} onClick={() => void downloadProfiles(clientFormat(selectedClient))}>下载配置{currentProfiles.length > 1 && selected.protocol !== "openvpn" ? "包" : ""}</button></section>
         <p className="form-footnote">{!usableCredential(selected) ? "当前连接不可用，恢复后才能下载；管理员限制请联系管理员解除。" : selectedClient === "clash" ? "适用于 Mihomo 内核。下载后从文件导入，再开启系统代理或 TUN。" : `下载后导入 ${clientName(selectedClient)}。`}{selected.protocol === "wireguard" && " 同一份连接请勿在多个客户端同时开启。"}</p>
-        <details className="connection-disclosure"><summary>管理连接</summary><div className="connection-manage"><button className="text-link" disabled={busy} onClick={() => void renameCredential()}>改名</button>{selected.status === "active" && <button className="text-link" disabled={busy || selected.adminDisabled} onClick={() => void changeAccess(selected.userDisabled ? "enable" : "disable")}>{selected.userDisabled ? "启用" : "停用"}</button>}{selected.status === "active" && <button className="danger-link" disabled={busy} onClick={() => void revokeCredential()}>永久撤销</button>}<button className="danger-link" disabled={busy} onClick={() => void changeAccess("delete")}>删除</button></div><p className="form-footnote">停用可以恢复；撤销或删除会永久作废全部配置副本。</p></details>
+        </>}
+        <details className="connection-disclosure"><summary>更多操作</summary><div className="connection-manage"><button className="text-link" disabled={busy} onClick={() => void renameCredential()}>改名</button>{selected.status === "active" && <button className="text-link" disabled={busy || selected.adminDisabled} onClick={() => void changeAccess(selected.userDisabled ? "enable" : "disable")}>{selected.userDisabled ? "启用" : "停用"}</button>}{selected.status === "active" && <button className="danger-link" disabled={busy} onClick={() => void revokeCredential()}>永久撤销</button>}<button className="danger-link" disabled={busy} onClick={() => void changeAccess("delete")}>删除</button></div><p className="form-footnote">停用可以恢复；撤销或删除会永久作废全部配置副本。</p></details>
         <details className="connection-disclosure"><summary>证书与配置详情</summary>
           <dl className="connection-facts"><div><dt>底层协议</dt><dd>{protocolLabel(selected.protocol)}</dd></div><div><dt>创建时间</dt><dd>{dateLabel(selected.createdAt)}</dd></div><div><dt>连接身份</dt><dd>…{selected.identitySuffix}</dd></div></dl>
           {selected.certificate && <div className="certificate-summary"><span><small>证书到期时间</small><b>{dateLabel(selected.certificate.notAfter)}</b></span><span><small>序列号</small><code>{selected.certificate.serial || "—"}</code></span><span><small>SHA-256 指纹</small><code>{selected.certificate.fingerprint || "—"}</code></span><details><summary>查看公开证书</summary><pre>{selected.certificate.pem}</pre></details></div>}
@@ -296,7 +319,10 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
       </div>
       {credentials.length > 0 && <details className="connection-disclosure account-bulk"><summary>全部连接管理</summary><p className="form-footnote">以下操作会影响账号下的全部连接。</p><div className="connection-manage"><button className="secondary" disabled={busy} onClick={() => void bulkAccess("disable")}>停用全部</button><button className="danger-link" disabled={busy} onClick={() => void bulkAccess("revoke")}>永久撤销全部</button></div></details>}
     </section>
-    </details>
+    <details className="network-disclosure"><summary>查看流量趋势 · 近 14 天</summary>      <section className="card traffic-card"><div className="card-head"><div><p className="kicker">USAGE</p><h2>流量趋势</h2></div><span className="muted">近 14 天 · UTC</span></div><div className="traffic-total">{usage ? formatBytes(recentTotal) : "—"}<small>期间累计</small></div>
+        {recentTotal > 0 ? <div className="bars" role="img" aria-label={`近 14 天流量，累计 ${formatBytes(recentTotal)}`}>{recentDays.map((day) => <div key={day.day} title={`${day.day} · ${formatBytes(day.totalBytes)}`}><i style={{ height: `${day.totalBytes > 0 ? Math.max(2, day.totalBytes / maxDay * 100) : 0}%` }} /><small>{day.day.slice(5)}</small></div>)}</div> : <div className="usage-empty"><span>↗</span><p>{usage ? "开始连接后，这里会显示流量趋势。" : "正在读取流量…"}</p></div>}
+        <p className="form-footnote">流量按连接汇总，不区分安装在哪台设备。</p>
+      </section></details>
     <details className="network-disclosure"><summary>查看可用区域地图</summary><RegionMap regions={regions} selectedRegionId={regionId} onSelect={selectRegion} /></details>
     <footer>Northstar · 配置仅供本人使用，请勿分享或上传第三方转换网站。</footer>
   </main>;

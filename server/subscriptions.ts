@@ -9,13 +9,13 @@ import { assertCredentialUsable, manageCredentialAccess } from "./credential-acc
 import { createSecretMaterial, readSecretMaterial } from "./secret-materials";
 import { renderSubscription, type SubscriptionProxy } from "./subscription-format";
 
-type Subscription = { id: string; credential_id: string; token_hash: string; private_key_secret_id: string | null; created_at: string; updated_at: string; last_fetched_at: string | null };
+type Subscription = { id: string; credential_id: string; token_hash: string; token_secret_id: string | null; private_key_secret_id: string | null; created_at: string; updated_at: string; last_fetched_at: string | null };
 let lockPool: Pool | undefined;
 export async function listSubscriptions(userId?: string) {
   return dbQuery<Subscription & { user_id: string; display_name: string; protocol: string; status: string; user_disabled: boolean; admin_disabled: boolean; expires_at: string; email: string }>(
     `SELECT s.id,s.credential_id,s.created_at,s.updated_at,s.last_fetched_at,c.user_id,c.display_name,c.protocol,c.status,
       c.user_disabled,c.admin_disabled,c.expires_at,u.email,u.status AS account_status,
-      COALESCE((SELECT SUM(t.upload_bytes+t.download_bytes) FROM traffic_daily t WHERE t.credential_id=c.id),0)::text AS total_bytes,
+      COALESCE((SELECT SUM(t.upload_bytes+t.download_bytes) FROM traffic_daily t WHERE t.credential_id=c.id AND t.day BETWEEN to_char((now() AT TIME ZONE 'UTC') - interval '29 days','YYYY-MM-DD') AND to_char(now() AT TIME ZONE 'UTC','YYYY-MM-DD')),0)::text AS total_bytes,
       (SELECT COUNT(DISTINCT p.node_id) FROM connection_profiles p JOIN vpn_services v ON v.node_id=p.node_id AND v.protocol=p.protocol
         JOIN desired_configs d ON d.node_id=p.node_id AND d.protocol=p.protocol
         JOIN observed_configs o ON o.node_id=p.node_id AND o.protocol=p.protocol AND o.applied_revision=d.revision
@@ -54,8 +54,9 @@ export async function createSubscription(userId: string, name: string, protocol:
     // VLESS authorization UUID is distinct from its public telemetry identity and encrypted at rest.
     const secret = await createSecretMaterial({ kind: `subscription_key:${credential.id}`, value: key ? key.toString("base64") : randomUUID() });
     const token = randomBytes(32).toString("base64url"), id = `sub_${randomUUID()}`, timestamp = new Date().toISOString();
-    await dbExec(`INSERT INTO subscriptions (id,credential_id,token_hash,private_key_secret_id,created_at,updated_at)
-      VALUES ($1,$2,$3,$4,$5,$5)`, [id,credential.id,hashToken(token),secret?.id || null,timestamp]);
+    const linkSecret = await createSecretMaterial({ kind: `subscription_link:${id}`, value: token });
+    await dbExec(`INSERT INTO subscriptions (id,credential_id,token_hash,private_key_secret_id,created_at,updated_at,token_secret_id)
+      VALUES ($1,$2,$3,$4,$5,$5,$6)`, [id,credential.id,hashToken(token),secret?.id || null,timestamp,linkSecret.id]);
     await addAudit({ actorUserId: userId, action: "subscription.created", targetType: "subscription", targetId: id });
     return { id, credentialId: credential.id, token };
   });
@@ -65,10 +66,20 @@ export async function manageSubscription(id: string, action: string, actor: { id
   return locked(`subscription:${id}`, async () => {
     const sub = (await listSubscriptions(actor.admin ? undefined : actor.id)).find((s) => s.id === id);
     if (!sub) throw new Error("订阅不存在");
+    if (["reveal-link", "reset-link"].includes(action) && actor.admin) throw new Error("订阅链接仅本人可获取");
+    if (action === "reveal-link") {
+      await assertCredentialUsable(sub.credential_id);
+      const stored = (await dbQuery<Subscription>("SELECT * FROM subscriptions WHERE id=$1", [id]))[0];
+      const token = stored?.token_secret_id ? await readSecretMaterial(stored.token_secret_id) : undefined;
+      if (!token) throw new Error("旧订阅未保存可恢复的链接，请在更多操作中重置一次；已有配置不会因此撤销。");
+      await addAudit({ actorUserId: actor.id, action: "subscription.link-revealed", targetType: "subscription", targetId: id });
+      return { token };
+    }
     if (action === "reset-link") {
       await assertCredentialUsable(sub.credential_id);
       const token = randomBytes(32).toString("base64url");
-      await dbExec("UPDATE subscriptions SET token_hash=$1,updated_at=$2 WHERE id=$3", [hashToken(token),new Date().toISOString(),id]);
+      const linkSecret = await createSecretMaterial({ kind: `subscription_link:${id}`, value: token });
+      await dbExec("UPDATE subscriptions SET token_hash=$1,updated_at=$2,token_secret_id=$4 WHERE id=$3", [hashToken(token),new Date().toISOString(),id,linkSecret.id]);
       await addAudit({ actorUserId: actor.id, action: "subscription.link-reset", targetType: "subscription", targetId: id });
       return { token };
     }

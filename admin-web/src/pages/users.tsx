@@ -12,6 +12,8 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
   const [accessOverview, setAccessOverview] = useState<AccountAccessOverview | null>(null);
   const [rangeDays, setRangeDays] = useState(30);
   const [credentialsBusy, setCredentialsBusy] = useState(false);
+  const [connectionFilter, setConnectionFilter] = useState("all");
+  const visibleConnections = (accessOverview?.credentials || []).filter((item) => connectionFilter === "all" || (connectionFilter === "subscription" ? !!item.subscriptionId : !item.subscriptionId));
   const visible = filter === "all" ? users : users.filter((user) => user.status === filter);
   const pending = users.filter((user) => user.status === "pending");
   const confirm = useConfirm();
@@ -60,7 +62,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
   }
 
   async function openCredentials(user: AdminUser) {
-    setCredentialOwner(user); setAccessOverview(null); setRangeDays(30);
+    setCredentialOwner(user); setAccessOverview(null); setRangeDays(30); setConnectionFilter("all");
     await loadAccess(user, 30);
   }
 
@@ -130,17 +132,18 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
       {credentialsBusy && !accessOverview ? <Empty>正在读取账号访问资产…</Empty> : accessOverview ? <>
         <div className="access-summary-grid"><article><small>连接凭据</small><b>{accessOverview.summary.activeCredentialCount}<em> / {accessOverview.summary.credentialCount}</em></b><span>有效 / 全部</span></article><article><small>连接配置</small><b>{accessOverview.summary.activeProfileCount}<em> / {accessOverview.summary.profileCount}</em></b><span>有效 / 历史</span></article><article><small>OpenVPN 证书</small><b>{accessOverview.summary.activeCertificateCount}<em> / {accessOverview.summary.certificateCount}</em></b><span>有效 / 全部</span></article><article><small>{rangeDays} 天总流量</small><b>{formatBytes(accessOverview.totals.totalBytes)}</b><span>↑ {formatBytes(accessOverview.totals.uploadBytes)} · ↓ {formatBytes(accessOverview.totals.downloadBytes)}</span></article></div>
         {credentialsBusy && <div className="access-refreshing">正在刷新统计…</div>}
-        {accessOverview.credentials.length ? <div className="account-device-list">{accessOverview.credentials.map((credential) => {
+        <div className="row-actions" role="group" aria-label="连接类型">{[["all", "全部连接"], ["subscription", "订阅"], ["single", "节点配置"]].map(([value, label]) => <button className={`button ${connectionFilter === value ? "primary" : "ghost"}`} aria-pressed={connectionFilter === value} key={value} onClick={() => setConnectionFilter(value)}>{label}</button>)}</div>
+        {visibleConnections.length ? <div className="account-device-list">{visibleConnections.map((credential) => {
           const profiles = accessOverview.profiles.filter((item) => item.credentialId === credential.id);
           const certificates = accessOverview.certificates.filter((item) => item.credentialId === credential.id);
           return <article className="account-device-card" key={credential.id}>
             <header className="access-card-head">
-              <div className="access-card-title"><span className="credential-protocol">{credential.protocol === "wireguard" ? "WG" : credential.protocol === "vless" ? "VL" : "OV"}</span><div><h3>{credential.name}</h3><p>{credential.protocol === "wireguard" ? "WireGuard" : credential.protocol === "vless" ? "VLESS + REALITY" : "OpenVPN"} · 创建于 {formatTime(credential.createdAt)}</p></div></div>
-              <div className="access-card-status"><Pill value={credential.state} /><span className={`sync-label ${credential.syncStatus}`}>同步{({ pending: "中", applied: "完成", failed: "失败" } as Record<string, string>)[credential.syncStatus] || "待确认"}</span></div>
+              <div className="access-card-title"><span className="credential-protocol">{credential.protocol === "wireguard" ? "WG" : credential.protocol === "vless" ? "VL" : "OV"}</span><div><h3>{credential.name}</h3><p>{credential.subscriptionId ? "订阅" : "节点配置"} · {credential.protocol === "wireguard" ? "WireGuard" : credential.protocol === "vless" ? "VLESS + REALITY" : "OpenVPN"} · 创建于 {formatTime(credential.createdAt)}</p></div></div>
+              <div className="access-card-status"><Pill value={credential.protocol === "vless" && credential.online ? "最近活跃" : credential.state} /><span className={`sync-label ${credential.syncStatus}`}>同步{({ pending: "中", applied: "完成", failed: "失败" } as Record<string, string>)[credential.syncStatus] || "待确认"}</span></div>
             </header>
             <div className="access-card-facts">
               <div><small>{rangeDays} 天流量</small><strong>{formatBytes(credential.totalBytes)}</strong><span>↑ {formatBytes(credential.uploadBytes)} · ↓ {formatBytes(credential.downloadBytes)}</span></div>
-              <div><small>当前连接</small><strong>{credential.connectionCount}<em> 条</em></strong><span>最近活动 {formatTime(credential.lastActivityAt)}</span></div>
+              <div><small>{credential.protocol === "vless" ? "使用状态" : "当前连接"}</small><strong>{credential.protocol === "vless" ? credential.online ? "最近活跃" : "暂无活动" : credential.connectionCount}{credential.protocol !== "vless" && <em> 条</em>}</strong><span>最近活动 {formatTime(credential.lastActivityAt)}</span></div>
               <div><small>连接有效期至</small><b>{formatTime(credential.expiresAt)}</b><span>{credential.expiringSoon ? `剩余 ${credential.daysRemaining} 天，请通知用户换发` : "停用或撤销可提前终止访问"}</span></div>
               <div><small>连接身份</small><code>…{credential.identitySuffix}</code><span>用于区分凭据，不代表设备</span></div>
             </div>
@@ -155,7 +158,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
             {credential.protocol === "openvpn" && <section className="access-subsection"><div className="access-subhead"><b>OpenVPN 公开证书</b><span>{certificates.length} 张</span></div>{certificates.length ? certificates.map((certificate) => <details className="certificate-row" key={certificate.certificateId}><summary><span><b>{certificate.subject}</b><small>序列号 {certificate.serial} · 有效期至 {formatTime(certificate.notAfter)}</small></span><Pill value={certificate.status} /><span><b>{formatBytes(certificate.totalBytes)}</b><small>凭据窗口流量</small></span><i>⌄</i></summary><div className="certificate-detail"><dl><div><dt>SHA-256 指纹</dt><dd><code>{certificate.fingerprint || "—"}</code></dd></div><div><dt>签发机构</dt><dd>{certificate.authorityRealm} · {certificate.authorityStatus}</dd></div><div><dt>生效时间</dt><dd>{formatTime(certificate.notBefore)}</dd></div><div><dt>吊销时间</dt><dd>{formatTime(certificate.revokedAt)}</dd></div><div><dt>最后活动</dt><dd>{formatTime(certificate.lastActivityAt)}</dd></div><div><dt>上传 / 下载</dt><dd>{formatBytes(certificate.uploadBytes)} / {formatBytes(certificate.downloadBytes)}</dd></div></dl><div className="certificate-actions"><button className="button ghost small" onClick={() => void copyCertificate(certificate)}>复制证书</button><button className="button ghost small" onClick={() => downloadCertificate(certificate)}>下载 .crt</button></div><pre>{certificate.certificatePem}</pre><small>平台按连接凭据聚合全部配置副本的会话和流量，不区分实际安装设备。</small></div></details>) : <p className="access-empty-inline">尚未签发证书。生成 OpenVPN 配置后，公开证书会显示在这里。</p>}</section>}
             <section className="access-subsection"><div className="access-subhead"><b>连接配置</b><span>{profiles.length} 份</span></div>{profiles.length ? <div className="profile-history">{profiles.map((profile) => <div key={profile.profileId}><span className="credential-protocol">{profile.protocol === "wireguard" ? "WG" : profile.protocol === "vless" ? "VL" : "OV"}</span><span><b>{profile.nodeName} · {profile.regionCode || "—"} {profile.regionName}</b><small>rev {profile.revision} · {profile.transport} · 配置可用至 {formatTime(profile.expiresAt)} · 身份 …{profile.credentialIdentity.replaceAll(":", "").slice(-10) || "—"}</small></span><Pill value={profile.status} /><span className="credential-traffic"><b>{formatBytes(profile.totalBytes)}</b><small>配置有效期窗口</small></span></div>)}</div> : <Empty>该凭据还没有生成连接配置。</Empty>}</section>
           </article>;
-        })}</div> : <Empty>该账号还没有创建连接凭据。</Empty>}
+        })}</div> : <Empty>{connectionFilter === "all" ? "该账号还没有创建连接凭据。" : "该账号暂无此类连接，可切换到全部连接查看。"}</Empty>}
       </> : <Empty>无法读取该账号的访问资产。</Empty>}
     </Modal>}
   </>;

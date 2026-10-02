@@ -13,7 +13,7 @@ export async function PATCH(request: Request) {
   try {
     const body = await readJson(request);
     // The console manages access; private subscription links are only handed to their owner.
-    if (body.action === "reset-link") return jsonError("请由用户在个人平台重置订阅链接");
+    if (["reset-link", "reveal-link"].includes(String(body.action))) return jsonError("请由用户在个人平台获取或重置订阅链接");
     return NextResponse.json(await manageSubscription(cleanText(body.id,128),cleanText(body.action,32),{ id: user.id, admin: true }));
   } catch (error) { return jsonError(error instanceof Error ? error.message : "操作失败", 409); }
 }

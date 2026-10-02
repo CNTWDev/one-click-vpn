@@ -5,10 +5,12 @@ import { manageCredentialsAccess } from "../../../../server/credential-access";
 import { cleanText, jsonError, readJson } from "../../../../server/http";
 import { requestUser } from "../../../../server/request-auth";
 import { credentialAccessOverview } from "../../../../server/traffic";
+import { randomUUID } from "node:crypto";
+import { createSecretMaterial } from "../../../../server/secret-materials";
 
 export const runtime = "nodejs";
 
-const protocols = new Set<Protocol>(["wireguard", "openvpn"]);
+const protocols = new Set<Protocol>(["wireguard", "openvpn", "vless"]);
 
 export async function PATCH(request: Request) {
   const user = await requestUser(request);
@@ -42,7 +44,8 @@ export async function POST(request: Request) {
     const publicKey = cleanText(body.publicKey, 512);
     if (!displayName || !protocols.has(protocol)) return jsonError("name and a supported protocol are required");
     if (protocol === "wireguard" && !/^[A-Za-z0-9+/]{43}=$/.test(publicKey)) return jsonError("A valid WireGuard public key is required");
-    const credential = await createAccessCredential({ userId: user.id, displayName, protocol, identityKey: publicKey });
+    const credential = await createAccessCredential({ userId: user.id, displayName, protocol, identityKey: protocol === "vless" ? randomUUID() : publicKey });
+    if (protocol === "vless") await createSecretMaterial({ kind: `vless_client:${credential.id}`, value: randomUUID() });
     await addAudit({ actorUserId: user.id, action: "credential.created", targetType: "credential", targetId: credential.id, metadata: { protocol } });
     return NextResponse.json({ credential: {
       id: credential.id, name: credential.display_name, protocol: credential.protocol, status: credential.status,
