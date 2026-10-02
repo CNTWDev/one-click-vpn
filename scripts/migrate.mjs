@@ -87,7 +87,7 @@ ALTER TABLE node_actions ADD COLUMN IF NOT EXISTS lease_updated_at TEXT;
 -- Only expired leases may be closed; runtime access performs the same recovery.
 UPDATE node_actions SET status = 'failed', current_phase = 'failed', finished_at = COALESCE(finished_at, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
   error = CASE WHEN error = '' THEN 'Interrupted by a Controller restart' ELSE error END
-  WHERE status IN ('queued', 'running') AND COALESCE(lease_updated_at, started_at, created_at)::timestamptz < now() - interval '60 minutes';
+  WHERE status IN ('queued', 'running') AND COALESCE(lease_updated_at, started_at, created_at)::timestamptz < now() - interval '5 minutes';
 CREATE UNIQUE INDEX IF NOT EXISTS node_actions_one_active_idx ON node_actions(node_id) WHERE status IN ('queued', 'running');
 CREATE TABLE IF NOT EXISTS node_action_events (
   id TEXT PRIMARY KEY, action_id TEXT NOT NULL REFERENCES node_actions(id) ON DELETE CASCADE,

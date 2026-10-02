@@ -29,12 +29,13 @@ export async function PATCH(request: Request) {
   const user = await requestUser(request);
   if (!user) return jsonError("Authentication required", 401);
   try {
-    const body = await readJson(request);
-    if (["reveal-link", "reset-link"].includes(String(body.action))) {
+    const body = await readJson(request), action = cleanText(body.action, 32);
+    // Normalise once: checking the raw value let "reveal-link " skip the password check.
+    if (["reveal-link", "reset-link"].includes(action)) {
       if (!allowLoginAttempt(request, user.email)) return jsonError("验证次数过多，请稍后重试", 429);
       const account = await findUserByEmail(user.email);
       if (!(await verifyPassword(typeof body.password === "string" ? body.password : "", account?.password_hash))) return jsonError("登录密码不正确", 403);
     }
-    return NextResponse.json(await manageSubscription(cleanText(body.id,128),cleanText(body.action,32),{ id: user.id, admin: false }), { headers });
+    return NextResponse.json(await manageSubscription(cleanText(body.id,128),action,{ id: user.id, admin: false }), { headers });
   } catch (error) { return jsonError(error instanceof Error ? error.message : "操作失败", 409); }
 }

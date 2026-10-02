@@ -479,12 +479,12 @@ export async function updateNodeConfig(id: string, values: {
   }
 }
 
-// Conservative grace exceeds the combined bounded SSH operations in bootstrap.
+// Live actions renew their lease every 30 s, so a lease silent for 5 minutes belongs to a dead Controller.
 export async function recoverExpiredNodeActions(nodeId: string): Promise<void> {
   const expired = await dbQuery<{ id: string }>(`UPDATE node_actions SET status = 'failed', current_phase = 'failed',
     finished_at = $2, error = '运维任务已中断或超时，请检查远端服务状态后重试。'
     WHERE node_id = $1 AND status IN ('queued', 'running')
-    AND COALESCE(lease_updated_at, started_at, created_at)::timestamptz < now() - interval '60 minutes' RETURNING id`, [nodeId, now()]);
+    AND COALESCE(lease_updated_at, started_at, created_at)::timestamptz < now() - interval '5 minutes' RETURNING id`, [nodeId, now()]);
   for (const action of expired) await appendNodeActionEvent(action.id, { level: "error", phase: "interrupted", message: "Controller recovered an expired operation lease; manual retry is available." });
 }
 
