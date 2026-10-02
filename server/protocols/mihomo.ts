@@ -27,7 +27,7 @@ export function renderMihomoWireGuard(input: WireGuardExport): string {
     name: input.name, type: "wireguard", server: input.endpoint.host, port: input.endpoint.port,
     ip, "private-key": input.privateKey, "public-key": input.serverPublicKey,
     "allowed-ips": input.allowedIps, "persistent-keepalive": 25,
-    udp: true, "remote-dns-resolve": true, dns,
+    udp: true, "remote-dns-resolve": true, dns, mtu: 1280,
   };
   return [
     "# Northstar · WireGuard for Mihomo (not legacy Clash)",

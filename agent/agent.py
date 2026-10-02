@@ -181,6 +181,39 @@ def replace_input_rule(comment, old_listener, new_listener):
             raise RuntimeError("firewall configuration failed: " + command_failure_detail(error)) from error
 
 
+WIREGUARD_TCP_MSS = 1240  # 1280-byte client MTU minus IPv4 and TCP headers
+
+
+def wireguard_mss_rules(operation):
+    """Cap TCP MSS through the tunnel so older profiles without an MTU line do not
+    push 1420-byte packets into paths that silently drop fragments (common on mobile)."""
+    return [
+        ["iptables", "-t", "mangle", operation, "FORWARD", direction, "northstar", "-p", "tcp",
+         "--tcp-flags", "SYN,RST", "SYN", "-m", "comment", "--comment", "northstar-wireguard-mss",
+         "-j", "TCPMSS", "--set-mss", str(WIREGUARD_TCP_MSS)]
+        for direction in ("-i", "-o")
+    ]
+
+
+def ensure_wireguard_mss_clamp():
+    if shutil.which("iptables") is None:
+        return
+    for check in wireguard_mss_rules("-C"):
+        if run_optional(check).returncode != 0:
+            add = check.copy()
+            add[add.index("-C")] = "-A"
+            # Best effort: a kernel without xt_TCPMSS must not take the tunnel down.
+            run_optional(add)
+
+
+def remove_wireguard_mss_clamp():
+    if shutil.which("iptables") is None:
+        return
+    for rule in wireguard_mss_rules("-D"):
+        while run_optional(rule).returncode == 0:
+            pass
+
+
 def run_fixed(command, *, input_text=None):
     return subprocess.run(
         command,
@@ -310,6 +343,7 @@ def wireguard_sync_config(desired):
             run_fixed(["wg-quick", "up", str(WIREGUARD_CONFIG)])
         except subprocess.CalledProcessError as error:
             raise RuntimeError("WireGuard activation failed: " + command_failure_detail(error)) from error
+    ensure_wireguard_mss_clamp()
     digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
     return {"observedHash": digest, "observedStatus": "applied", "serverPublicKey": wireguard_public_key()}
 
@@ -317,6 +351,7 @@ def wireguard_sync_config(desired):
 def disable_wireguard():
     if WIREGUARD_CONFIG.exists() and shutil.which("wg-quick") is not None:
         run_optional(["wg-quick", "down", str(WIREGUARD_CONFIG)])
+    remove_wireguard_mss_clamp()
     WIREGUARD_CONFIG.unlink(missing_ok=True)
     return {"observedHash": hashlib.sha256(b"wireguard-disabled").hexdigest(), "observedStatus": "disabled"}
 
@@ -329,6 +364,7 @@ def restart_wireguard(desired):
         run_fixed(["wg-quick", "up", str(WIREGUARD_CONFIG)])
     except subprocess.CalledProcessError as error:
         raise RuntimeError("WireGuard restart failed: " + command_failure_detail(error)) from error
+    ensure_wireguard_mss_clamp()
     digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
     return {"observedHash": digest, "observedStatus": "applied", "serverPublicKey": wireguard_public_key()}
 

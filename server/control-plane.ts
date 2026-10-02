@@ -3,6 +3,7 @@ import { realitySettings, realityUsersSecret, realityClientSecretId } from "./re
 import { withReconcileLock } from "./reconcile-lock";
 import { addAudit } from "./db";
 import { renderMihomoWireGuard } from "./protocols/mihomo";
+import { WIREGUARD_CLIENT_MTU, nativeWireGuardAllowedIps } from "./protocols/wireguard";
 import { assertCredentialUsable } from "./credential-access";
 import {
   activateConnectionProfile,
@@ -322,8 +323,9 @@ export async function renderWireGuardProfile(profile: ConnectionProfile, format:
   }
   return [
     "[Interface]", `PrivateKey = ${privateKey}`, `Address = ${profile.client_address}`, `DNS = ${profile.dns.join(", ")}`,
+    `MTU = ${WIREGUARD_CLIENT_MTU}`,
     "", "[Peer]", `PublicKey = ${serverPublicKey}`, `Endpoint = ${profile.endpoint.host}:${profile.endpoint.port}`,
-    `AllowedIPs = ${profile.allowed_ips.join(", ")}`, "PersistentKeepalive = 25", "",
+    `AllowedIPs = ${nativeWireGuardAllowedIps(profile.allowed_ips).join(", ")}`, "PersistentKeepalive = 25", "",
   ].join("\n");
 }
 

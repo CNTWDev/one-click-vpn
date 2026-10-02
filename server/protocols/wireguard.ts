@@ -1,5 +1,19 @@
 import type { ProtocolAdapter, ProtocolCapability } from "./types";
 
+// Fits mobile/PPPoE paths that cannot carry 1420-byte tunnel packets without fragmentation.
+export const WIREGUARD_CLIENT_MTU = 1280;
+
+/**
+ * The tunnel is IPv4-only, but a full-tunnel profile must still claim ::/0. Otherwise Android
+ * (and any dual-stack network) sends IPv6 straight out of the carrier, so YouTube sees a different
+ * country than the IPv4 tunnel and refuses playback. Claiming ::/0 without an IPv6 address makes
+ * IPv6 fail fast and apps fall back to IPv4 inside the tunnel. Applied at render time so profiles
+ * that were already issued are fixed on their next download.
+ */
+export function nativeWireGuardAllowedIps(allowedIps: string[]): string[] {
+  return allowedIps.includes("0.0.0.0/0") && !allowedIps.includes("::/0") ? [...allowedIps, "::/0"] : allowedIps;
+}
+
 const baseCapability: ProtocolCapability = {
   protocol: "wireguard" as const,
   transports: ["udp"],

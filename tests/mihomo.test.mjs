@@ -43,3 +43,7 @@ test('fails closed for missing keys or unsupported address/route/DNS', () => {
     assert.throws(() => renderMihomoWireGuard({ ...input, ...change }));
   }
 });
+
+test('Mihomo WireGuard export pins a mobile-safe MTU', () => {
+  assert.equal(proxy(renderMihomoWireGuard(input)).mtu, 1280);
+});
