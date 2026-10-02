@@ -4,6 +4,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY public/favicon.svg ./public/favicon.svg
 COPY scripts/check-frontend-assets.mjs ./scripts/check-frontend-assets.mjs
+COPY shared ./shared
 
 FROM dependencies AS portal-build
 COPY portal-web ./portal-web
