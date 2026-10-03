@@ -315,15 +315,25 @@ bundle. Clients can select a node or use the automatic latency-selection group.
 
 Back up PostgreSQL, deploy all three services with `./scripts/deploy.sh deploy --service all`,
 and update the Nginx subscription logging rule above. Docker runs the idempotent schema
-migration automatically. Existing credentials and the standard WG/OpenVPN policy stay intact.
+migration automatically. Existing credentials stay intact; updating the Controller alone
+does not immediately open new protocol listeners on old nodes.
 
-For VLESS, update each selected Linux amd64/arm64 node to **Agent 2.7+** using the
-Console's upgrade Agent action, then open **VPN services → Enable VLESS + REALITY**.
-Choose an unused TCP port (default 443) and a publicly reachable target hostname that
-supports TLS 1.3 and HTTP/2. The node validates the target and pins its resolved public
-address; targets cannot change while the node has valid VLESS profiles. A failed initial
-setup with no valid profiles can be corrected and redeployed without changing keys. Select
-and maintain the target deliberately; a target IP becoming unavailable needs operator attention.
+Configure **VPN services → Default REALITY target** once for the platform, using an
+independent static HTTPS site with TLS 1.3 and HTTP/2. The bundled static service and
+`scripts/setup-reality-target.sh` support a separate domain on the management host;
+see [deployment instructions](docs/architecture/06-deployment.md).
+Standard policy **v2** automatically installs WireGuard, OpenVPN and VLESS on new nodes.
+Older standard nodes gain missing protocols through the existing **Reinstall / repair**
+or standard-policy canary/batch rollout; VLESS requires Linux amd64/arm64 and Agent 2.7+.
+Reinstall / repair installs the current Agent. Custom and Agent-only templates are preserved.
+There is no separate per-node VLESS onboarding workflow. Missing target configuration
+blocks only VLESS; after target setup, already-created services retry on heartbeat.
+The node validates the target and pins its resolved public address. Repeated deployments
+retain existing keys, ports and targets; changing the global default does not invalidate
+downloaded profiles. Use the generic advanced service settings only for exceptions such
+as TCP/443 already being occupied. Those overrides mark the node as custom-managed.
+Targets cannot change while the node has valid VLESS profiles. A failed initial setup
+with no valid profiles can be corrected and redeployed without changing keys.
 Open that TCP port in the cloud security group as well as the host firewall. Do not
 expose the local statistics API on TCP 10085.
 
@@ -331,7 +341,7 @@ The Agent downloads **Xray v26.3.27** from the official XTLS release and checks 
 pinned SHA-256 for its architecture; no remote shell installer is executed. Node
 egress needs HTTPS access to GitHub releases, the selected REALITY target, and normal
 user traffic destinations. A failed download/preflight stays visible as a service error.
-VLESS is opt-in and is not installed by changing the standard deployment policy.
+The Agent checks occupied ports and never displaces existing web or VPN listeners.
 Access-list changes restart only the managed VLESS service to terminate removed users'
 sessions; other VLESS users can experience a brief reconnect. Traffic is sampled on
 heartbeats, so bytes since the last sample may be lost on a restart.
@@ -376,3 +386,29 @@ therefore keep the Portal/Admin dependency and build layers cached.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) and
 [docs/architecture](docs/architecture/README.md) for detailed design notes.
+
+### Agent 2.8 reliability and routing update
+
+Deploy the Controller and run `npm run db:migrate`, then use **升级 Agent** on each
+node. A confirmed upgrade queues a fresh apply for every enabled VPN service, so
+existing nodes receive the routing changes without rotating credentials.
+
+- Upgrades remain provisional until an authenticated target-version heartbeat
+  arrives. A node-local 90-second watchdog restores the pre-upgrade source if the
+  Controller or SSH connection disappears; `.previous` changes only on confirmation.
+- The default WireGuard pool grows from `10.70.0.0/24` to `10.70.0.0/20` (4093 client
+  addresses). Existing leases stay valid. Agents older than 2.8 remain limited to
+  the first /24 until upgraded. Native full-tunnel clients capture IPv6 and use MTU
+  1280; re-download and re-import existing files to receive those client changes.
+- OpenVPN assigns an internal IPv6 address and pushes IPv6 routing; the server
+  rejects IPv6 with `block-ipv6`, preventing it from bypassing the IPv4 VPN. This
+  requires clients supporting IPv6 (the existing cipher configuration already
+  requires modern OpenVPN). Verify Android/iOS clients after deployment.
+- REALITY revalidates public DNS destinations and TLS/HTTP2 every five minutes.
+  A failed validation keeps the last working configuration and reports an Agent
+  error. A changed destination restarts Xray. Added users use its local API;
+  revocation still restarts Xray to terminate established sessions.
+- Unchanged subscriptions reuse desired state. VLESS heartbeat reconciliation
+  compares encrypted-material fingerprints before decrypting UUIDs. Superseded
+  bundles are removed after a one-day grace period once no desired or retryable
+  task references them.

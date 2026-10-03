@@ -13,6 +13,10 @@ function hashPassword(password) {
 }
 
 const schema = `
+CREATE TABLE IF NOT EXISTS reality_defaults (
+  id TEXT PRIMARY KEY CHECK (id = 'primary'), server_name TEXT NOT NULL,
+  checked_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL,
   password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'owner',
@@ -351,6 +355,8 @@ WHERE p.credential_id = c.id AND u.id = c.user_id AND d.id = c.device_id
 try {
   await pool.query("SELECT 1");
   await pool.query(schema);
+  await pool.query("ALTER TABLE secret_materials ADD COLUMN IF NOT EXISTS source_fingerprint TEXT");
+  await pool.query("UPDATE vpn_services SET subnet='10.70.0.0/20' WHERE protocol='wireguard' AND subnet='10.70.0.0/24'");
   const timestamp = new Date().toISOString();
   const regions = [
     ["tokyo-jp", "Tokyo", "Japan", "JP"],
@@ -368,7 +374,7 @@ try {
     FROM regions WHERE nodes.region_id IS NULL AND nodes.place = regions.name || ' · ' || regions.country`);
   await pool.query(`INSERT INTO vpn_services
     (node_id, protocol, enabled, transport, listen_port, subnet, dns_json, status, created_at, updated_at)
-    SELECT id, 'wireguard', 1, 'udp', 51820, '10.70.0.0/24', '["1.1.1.1"]', 'pending', $1, $1 FROM nodes
+    SELECT id, 'wireguard', 1, 'udp', 51820, '10.70.0.0/20', '["1.1.1.1"]', 'pending', $1, $1 FROM nodes
     ON CONFLICT (node_id, protocol) DO NOTHING`, [timestamp]);
   await pool.query(`INSERT INTO vpn_services
     (node_id, protocol, enabled, transport, listen_port, subnet, dns_json, status, created_at, updated_at)

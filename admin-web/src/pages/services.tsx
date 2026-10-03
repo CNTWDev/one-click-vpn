@@ -3,30 +3,34 @@ import { api } from "../api";
 import { useConfirm } from "../confirm-dialog";
 import type { DeploymentPolicyOverview, NodeRecord, VpnService } from "../types";
 import { Empty, formatTime, InlineNotice, type Notice, PageHeader, Pill } from "./shared";
+import { RealityTargetSetup, type RealityDefaults } from "./reality-target-setup";
 
 export function ServicesPage({ nodes }: { nodes: NodeRecord[] }) {
   const [services, setServices] = useState<VpnService[]>([]);
   const [policy, setPolicy] = useState<DeploymentPolicyOverview | null>(null);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [realityNode, setRealityNode] = useState("");
+  const [editingService, setEditingService] = useState<VpnService | null>(null);
   const [serverName, setServerName] = useState("");
   const [realityPort, setRealityPort] = useState(443);
+  const [defaults, setDefaults] = useState<RealityDefaults | null>(null);
   const confirm = useConfirm();
   const nodeMap = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
   async function refresh() {
     try {
-      const [serviceResult, policyResult] = await Promise.all([api<{ services: VpnService[] }>("/api/vpn-services"), api<DeploymentPolicyOverview>("/api/deployment-policy")]);
-      setServices(serviceResult.services || []); setPolicy(policyResult);
+      const [serviceResult, policyResult, defaultResult] = await Promise.all([api<{ services: VpnService[] }>("/api/vpn-services"), api<DeploymentPolicyOverview>("/api/deployment-policy"), api<RealityDefaults>("/api/reality-defaults")]);
+      setServices(serviceResult.services || []); setPolicy(policyResult); setDefaults(defaultResult);
     } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
   }
   useEffect(() => {
     void Promise.all([
       api<{ services: VpnService[] }>("/api/vpn-services"),
       api<DeploymentPolicyOverview>("/api/deployment-policy"),
-    ]).then(([serviceResult, policyResult]) => {
+      api<RealityDefaults>("/api/reality-defaults"),
+    ]).then(([serviceResult, policyResult, defaultResult]) => {
       setServices(serviceResult.services || []); setPolicy(policyResult);
+      setDefaults(defaultResult);
     }).catch((error: Error) => setNotice({ tone: "error", message: error.message }));
   }, []);
 
@@ -61,21 +65,32 @@ export function ServicesPage({ nodes }: { nodes: NodeRecord[] }) {
     finally { setBusy(""); }
   }
 
-  async function enableReality(event: React.FormEvent) {
+  async function saveService(event: React.FormEvent) {
     event.preventDefault();
-    if (!await confirm({ title: "部署 VLESS + REALITY", message: "将下载校验过的 Xray 内核并部署新服务。请确保目标支持 TLS 1.3 / HTTP/2、端口未占用，并在云安全组放行 TCP 端口。已有服务不会自动迁移。", confirmLabel: "部署" })) return;
-    setBusy("reality"); setNotice(null);
+    if (!editingService) return;
+    if (!await confirm({ title: "修改单节点协议配置", message: "此操作属于高级例外设置，会重新部署该协议，并将节点标记为自定义策略。修改端口后需重新获取客户端配置，已有连接可能短暂中断。", confirmLabel: "保存并部署" })) return;
+    setBusy("service-settings"); setNotice(null);
     try {
-      await api(`/api/nodes/${realityNode}/services`, { method: "POST", body: JSON.stringify({ protocol: "vless", action: "enable", transport: "tcp", listenPort: realityPort, serverName }) });
-      setNotice({ tone: "success", message: "已提交部署，请查看下方服务状态。旧 Agent 请先在节点运维中升级 Agent。" }); await refresh();
+      await api(`/api/nodes/${editingService.node_id}/services`, { method: "POST", body: JSON.stringify({ protocol: editingService.protocol, action: "redeploy", customize: true, listenPort: realityPort, ...(editingService.protocol === "vless" ? { serverName } : {}) }) });
+      setNotice({ tone: "success", message: "单节点协议配置已提交，请查看服务同步状态。" }); await refresh();
     } catch (e) { setNotice({ tone: "error", message: (e as Error).message }); } finally { setBusy(""); }
   }
 
   return <>
     <PageHeader eyebrow="VPN SERVICES" title="VPN 服务" description="管理每个节点的协议服务，并以灰度或批量方式修复 Standard 策略漂移。" actions={<button className="button ghost" onClick={() => void refresh()}>刷新</button>} />
     <InlineNotice notice={notice} />
-    <p className="inline-notice info">这里仅管理 VPN 协议与策略，不更新 Agent 程序。Agent 升级请到“节点运维”。{policy && !policy.counts.eligibleNodes ? " 当前没有可同步的策略差异；离线或能力不足的节点需先恢复 Agent。" : ""}</p>
-    <section className="panel"><div className="panel-head"><div><p className="eyebrow">SUBSCRIPTION PROTOCOL</p><h2>启用 VLESS + REALITY</h2><p>需 Agent 2.7+、Linux amd64/arm64。需显式启用；请选择空闲端口。启用后该节点按自定义策略管理。</p></div></div><form className="stack-form" onSubmit={enableReality}><label>节点<select required value={realityNode} onChange={(e) => setRealityNode(e.target.value)}><option value="">选择节点</option>{nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label>REALITY 公网目标域名<input required value={serverName} onChange={(e) => setServerName(e.target.value)} placeholder="支持 TLS 1.3 / HTTP/2 的域名，不含 https://" /></label><label>TCP 监听端口<input type="number" min={1} max={65535} required value={realityPort} onChange={(e) => setRealityPort(Number(e.target.value))} /></label><p>目标会在节点上校验；无有效配置的节点可修正目标后重试；已有有效配置时不能直接更换目标。配置权限变化会重启此协议服务，现有连接可能短暂重连。</p><button className="button primary" disabled={Boolean(busy)}>部署新服务</button></form></section>
+    <p className="inline-notice info">这里仅管理 VPN 协议与策略，不更新 Agent 程序。Agent 升级请到“节点运维”。{policy && !policy.counts.eligibleNodes ? policy.counts.driftedNodes ? " 有待补齐的协议，请先处理下方阻塞原因。" : " 当前标准节点已无策略差异。" : ""}</p>
+    <p className="inline-notice info">标准模板自动部署 WireGuard、OpenVPN 和 VLESS，无需逐个协议启用。老标准节点可在“节点运维”重新安装 / 修复，或使用下方“批量同步策略”补齐。自定义及仅 Agent 节点不会被自动覆盖。默认需放行 UDP 51820、UDP 1194、TCP 443。</p>
+    {defaults && <RealityTargetSetup key={defaults.serverName} defaults={defaults} onSaved={(value) => { setDefaults(value); void refresh(); }} />}
+    <details className="panel"><summary>高级：单节点协议配置（通常无需修改）</summary>
+      <form className="stack-form" onSubmit={saveService}>
+        <label>协议服务<select required value={editingService ? `${editingService.node_id}:${editingService.protocol}` : ""} onChange={(event) => { const service = services.find((item) => `${item.node_id}:${item.protocol}` === event.target.value) || null; setEditingService(service); setRealityPort(service?.listen_port || 443); setServerName(""); }}><option value="">选择已有协议服务</option>{services.map((service) => <option key={`${service.node_id}:${service.protocol}`} value={`${service.node_id}:${service.protocol}`}>{nodeMap.get(service.node_id)?.name || service.node_id} · {service.protocol}</option>)}</select></label>
+        {editingService && <><label>监听端口<input type="number" min={1} max={65535} required value={realityPort} onChange={(e) => setRealityPort(Number(e.target.value))} /></label>
+          {editingService.protocol === "vless" && <label>覆盖目标域名<input maxLength={253} value={serverName} onChange={(e) => setServerName(e.target.value)} placeholder="留空保留已有目标或使用平台默认值" /></label>}
+          <p>仅在端口冲突等特殊情况下修改；不会占用或关闭其他服务的端口。请同步调整安全组规则。已有有效 VLESS 配置不能直接更换目标。</p>
+          <div><button className="button primary" disabled={Boolean(busy)}>保存并部署</button></div></>}
+      </form>
+    </details>
     {policy && <section className="policy-banner"><div><p className="eyebrow">STANDARD POLICY V{policy.standard.version}</p><h2>标准部署策略</h2><p>{policy.standard.protocols.map((item) => `${item.protocol} ${item.transport}:${item.listenPort}`).join(" · ") || "当前没有启用的标准协议"}</p></div><div className="policy-counts"><span><b>{policy.counts.standardNodes}</b>标准节点</span><span><b>{policy.counts.driftedNodes}</b>策略漂移</span><span><b>{policy.counts.blockedNodes}</b>暂不可更新</span></div><div className="policy-actions"><button className="button ghost" disabled={Boolean(busy) || !policy.counts.eligibleNodes} onClick={() => void rollout("canary")}>灰度 1 台</button><button className="button primary" disabled={Boolean(busy) || !policy.counts.eligibleNodes} onClick={() => void rollout("batch")}>批量同步策略</button></div></section>}
     {policy?.driftedNodes.length ? <section className="panel"><div className="panel-head"><div><p className="eyebrow">POLICY DRIFT</p><h2>待同步节点</h2></div></div><div className="compact-list">{policy.driftedNodes.map((node) => <div key={node.id}><span className={`state-dot ${node.eligible ? "online" : "attention"}`} /><span><b>{node.name}</b><small>缺少：{node.missingProtocols.join(", ") || "策略版本"} · {node.reason}</small></span><Pill value={node.eligible ? "eligible" : "blocked"} /></div>)}</div></section> : null}
     <section className="panel flush">

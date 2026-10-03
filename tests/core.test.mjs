@@ -42,7 +42,7 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(agent, /add\[add\.index\("-C"\)\] = operation/);
   assert.doesNotMatch(agent, /add\[1\] = operation/);
   assert.match(agent, /\/etc\/wireguard\/northstar\.conf/);
-  assert.match(agent, /agent 2\.7\.0/);
+  assert.match(agent, /agent 2\.8\.0/);
   assert.match(agent, /status-version 3/);
   assert.match(agent, /def openvpn_usage_snapshots/);
   assert.match(agent, /wireguard_usage_snapshots\(\) \+ openvpn_usage_snapshots\(\)/);
@@ -231,7 +231,7 @@ test("Agent operations expose release, recover expired tasks and preserve live t
     assert.equal((await fetch(`${base}/api/nodes/agent-release`)).status, 401);
     const release = await fetch(`${base}/api/nodes/agent-release`, { headers });
     assert.equal(release.status, 200);
-    assert.equal((await release.json()).version, "agent 2.7.0");
+    assert.equal((await release.json()).version, "agent 2.8.0");
     const timestamp = new Date().toISOString();
     await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at)
       VALUES ($1,'Operations','Test','127.0.0.9','root','password','','','',$2,$2)`, [nodeId,timestamp]);
@@ -575,11 +575,39 @@ test("subscriptions provision stable multi-node WG/VLESS profiles and enforce ac
     assert.notEqual(telemetryId,config.proxies[0].uuid,"telemetry must not reveal the VLESS authorization secret");
     await pool.query("UPDATE nodes SET agent_token_hash=$1 WHERE id=$2", [createHash("sha256").update(agentToken).digest("hex"),nodes[0]]);
     const beat = await fetch(`${base}/api/v1/agent/heartbeat`, { method: "POST", headers: json, body: JSON.stringify({
-      nodeId: nodes[0], token: agentToken, version: "agent 2.7.0",
+      nodeId: nodes[0], token: agentToken, version: "agent 2.8.0",
       capabilities: { protocols: ["wireguard", "vless"], connectivity: { protocols: { wireguard: { runtimeActive: true, listening: true }, vless: { runtimeActive: true, listening: true } } } },
       usageSnapshots: [{ protocol: "vless", identityKey: telemetryId, rxBytes: 123, txBytes: 456, counterEpoch: "process-1" }],
     }) });
     assert.equal(beat.status,200);
+    const heartbeatAgain = () => fetch(`${base}/api/v1/agent/heartbeat`, { method: "POST", headers: json, body: JSON.stringify({
+      nodeId: nodes[0], token: agentToken, version: "agent 2.8.0",
+      capabilities: { protocols: ["wireguard", "vless"], connectivity: { protocols: { wireguard: { runtimeActive: true, listening: true }, vless: { runtimeActive: true, listening: true } } } },
+    }) });
+    const originalSecret = (await pool.query("SELECT ciphertext,id FROM secret_materials WHERE id=(SELECT private_key_secret_id FROM subscriptions WHERE id=$1)", [vsub.id])).rows[0];
+    const bundleCount = async () => Number((await pool.query("SELECT COUNT(*) FROM secret_materials WHERE kind='vless_users_bundle' AND owner_node_id=$1", [nodes[0]])).rows[0].count);
+    const initialBundleCount = await bundleCount();
+    // Unchanged fingerprints avoid decrypting every client UUID on every heartbeat.
+    await pool.query("UPDATE secret_materials SET ciphertext='invalid' WHERE id=$1", [originalSecret.id]);
+    try {
+      await pool.query("UPDATE vpn_services SET status='attention' WHERE node_id=$1 AND protocol='vless'", [nodes[0]]);
+      assert.equal((await heartbeatAgain()).status,200);
+      const state = (await pool.query("SELECT status FROM vpn_services WHERE node_id=$1 AND protocol='vless'", [nodes[0]])).rows[0];
+      assert.equal(state.status,"healthy", "acknowledged runtime recovers after controller-side contention");
+      assert.equal(await bundleCount(),initialBundleCount);
+    } finally { await pool.query("UPDATE secret_materials SET ciphertext=$1 WHERE id=$2", [originalSecret.ciphertext,originalSecret.id]); }
+    const oldBundleId = `secret_old_${nodes[0]}`;
+    await pool.query(`INSERT INTO secret_materials (id,kind,owner_node_id,ciphertext,iv,tag,fingerprint,created_at,updated_at)
+      SELECT $1,kind,owner_node_id,ciphertext,iv,tag,fingerprint,'2000-01-01T00:00:00.000Z',updated_at
+      FROM secret_materials WHERE owner_node_id=$2 AND kind='vless_users_bundle' LIMIT 1`, [oldBundleId,nodes[0]]);
+    const protectedTask = `task_bundle_${nodes[0]}`;
+    await pool.query(`INSERT INTO reconcile_tasks (id,node_id,protocol,task_type,desired_revision,payload_json,status,created_at)
+      VALUES ($1,$2,'vless','ApplyVlessServer',1,$3,'pending',$4)`, [protectedTask,nodes[0],JSON.stringify({usersSecretId:oldBundleId}),timestamp]);
+    await heartbeatAgain();
+    assert.equal((await pool.query("SELECT id FROM secret_materials WHERE id=$1", [oldBundleId])).rowCount,1,"queued tasks keep their bundles");
+    await pool.query("UPDATE reconcile_tasks SET status='succeeded' WHERE id=$1", [protectedTask]);
+    await heartbeatAgain();
+    assert.equal((await pool.query("SELECT id FROM secret_materials WHERE id=$1", [oldBundleId])).rowCount,0,"unreferenced old bundles are collected");
     const overview = await (await call("/api/v1/credentials")).json();
     const usage = overview.credentials.find((c) => c.id === vsub.credentialId);
     assert.equal(usage.totalBytes,579);
@@ -620,6 +648,26 @@ test("subscriptions provision stable multi-node WG/VLESS profiles and enforce ac
     assert.equal((await call(`/api/v1/credentials/${vc.id}/revoke`,{})).status,200);
     assert.equal((await desiredUsers()).length,0);
     assert.equal((await call(`/api/v1/profiles/${vp.id}/download?format=mihomo`)).status,409);
+    // Exhaust the legacy /24, then verify the Agent version gate and expanded allocator.
+    await pool.query("UPDATE vpn_services SET subnet='10.70.0.0/20' WHERE node_id=$1 AND protocol='wireguard'", [nodes[0]]);
+    await pool.query(`INSERT INTO devices (id,user_id,display_name,platform,app_version,public_key,created_at,updated_at)
+      SELECT $1 || '-pool-' || i,$2,'Pool test','web','1.0','unused',$3,$3 FROM generate_series(2,254) i
+      WHERE NOT EXISTS (SELECT 1 FROM ip_leases WHERE node_id=$1 AND protocol='wireguard' AND address='10.70.0.' || i || '/32')`, [nodes[0],userId,timestamp]);
+    await pool.query(`INSERT INTO ip_leases (id,node_id,protocol,device_id,address,status,created_at)
+      SELECT id,$1,'wireguard',id,'10.70.0.' || split_part(id,'-pool-',2) || '/32','active',$2
+      FROM devices WHERE id LIKE $1 || '-pool-%'`, [nodes[0],timestamp]);
+    const expandedKey = Buffer.from(x25519.utils.randomSecretKey());
+    const expandedCredentialResponse = await call("/api/v1/credentials", {name:"Expanded pool",protocol:"wireguard",publicKey:Buffer.from(x25519.getPublicKey(expandedKey)).toString("base64")});
+    assert.equal(expandedCredentialResponse.status,201);
+    const expandedCredential = (await expandedCredentialResponse.json()).credential;
+    const expandedRequest = {credentialId:expandedCredential.id,nodeId:nodes[0],protocol:"wireguard",clientPrivateKey:expandedKey.toString("base64")};
+    await pool.query("UPDATE nodes SET version='agent 2.7.0' WHERE id=$1", [nodes[0]]);
+    assert.equal((await call("/api/v1/profiles",expandedRequest)).status,409,"old Agent cannot allocate outside its /24");
+    await pool.query("UPDATE nodes SET version='agent 2.8.0' WHERE id=$1", [nodes[0]]);
+    const expandedProfile = await call("/api/v1/profiles",expandedRequest);
+    assert.equal(expandedProfile.status,201);
+    assert.equal((await expandedProfile.json()).profile.clientAddress,"10.70.0.255/32");
+    await pool.query("DELETE FROM devices WHERE id LIKE $1 || '-pool-%'", [nodes[0]]);
     await pool.query("UPDATE subscriptions SET token_secret_id=NULL WHERE id=$1",[sub.id]);
     const legacyReveal = await patch(sub.id,"reveal-link");
     assert.equal(legacyReveal.status,409);

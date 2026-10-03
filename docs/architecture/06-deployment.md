@@ -134,3 +134,41 @@ sudo cp deploy/nginx/snippets/northstar-proxy.conf /etc/nginx/snippets/northstar
 sudo cp deploy/nginx/northstar.conf.example /etc/nginx/sites-available/northstar.conf
 sudo nginx -t && sudo systemctl reload nginx
 ```
+
+## 独立 REALITY 目标站点（首次配置一次）
+
+REALITY 目标与 VPN 节点入口是两个概念。100 个节点可以共用一个目标域名；这个域名只解析到静态站点主机，用户仍连接各自 VPN 节点。正常代理业务流量不经目标站点转发，但目标可用性影响 REALITY 的握手与回落。不要直接使用 APP、Console 或 API 域名。
+
+全量部署现在也启动 `reality-target`：一个独立、只读、非 root 的静态容器，仅监听宿主机 `127.0.0.1:3300`，使用独立内部网络，不挂载密钥、数据库或 Docker socket，也不转发任何业务 API。公网 TLS 仍由主机 Nginx 负责。网站只有公开首页与 `/health`；其他路径返回 404，写请求拒绝。
+
+首次初始化：
+
+1. 选择一个独立域名，例如 `www.example.com`，添加指向管理服务器的 DNS A 记录。如果添加 AAAA，必须同时确保服务器 IPv6 和入站防火墙可用。不要启用 CDN 代理，也不要解析到所有 VPN 节点。
+2. 主机准备 Linux/systemd、Docker Compose、Nginx（支持 TLS 1.3 和 HTTP/2）、Certbot、OpenSSL、curl、flock；放行 TCP 80/443。脚本不替换现有 Nginx 安装，避免破坏宝塔等面板环境。
+3. 在管理服务器项目目录执行（替换域名、邮箱）：
+
+   ```bash
+   sudo sh scripts/setup-reality-target.sh --domain www.example.com --email ops@example.com
+   ```
+
+   默认使用 `/etc/nginx/conf.d/*.conf`。面板或自定义安装需通过 `--nginx-config-dir` 指定当前 Nginx 实际 include 的目录，并确保 PATH 中的 `nginx` 就是正在提供网站的那个可执行文件。脚本会检查活动配置；不会覆盖其他站点或不同域名的既有托管配置。
+
+4. 后台 → VPN 服务 → 默认 REALITY 目标，填写域名，点击“检测并保存”。初始化命令也可以在这里生成。后端检查公网 DNS、证书、TLS 1.3 和 HTTP/2，成功才保存。显示的检测时间是历史记录，不代表持续实时健康监控。
+5. 添加节点时保持“标准：全部可用协议”模板，WireGuard、OpenVPN、VLESS 会走同一自动部署链路，无需额外启用 VLESS。目标尚未配置时仅 VLESS 显示等待/异常，其他协议继续部署；设置好目标后随心跳自动重试。各节点还会独立检测实际连接路径，控制端检测通过不等于所有地区都能访问。
+
+标准策略版本为 v2。老标准节点可通过节点运维中的“重新安装 / 修复”（支持原批量入口）补齐缺少的协议，也可使用 VPN 服务中的标准策略灰度/批量同步，无需逐台创建 VLESS 服务。Controller 更新本身不立即给全部老节点新增监听端口。旧 Agent 未声明 VLESS 能力时会提示先升级；重新安装 / 修复会部署当前 Agent。自定义模板、仅 Agent 节点，以及人为停用后已标记为自定义的节点，不会被标准策略强制接管。
+
+初始化与修复只补缺失服务，保留已有服务的端口、传输方式、密钥和 REALITY 目标。改变全局默认值不会重写已签发配置。单节点特殊情况（例如网站已占用 443）使用统一的“高级：单节点协议配置”，不再为每种协议增加独立部署流程；高级配置会将节点标记为自定义策略。Agent 部署完成不代表协议全部就绪，任务日志与 VPN 服务状态会显示仍在同步或阻塞的协议。
+
+初始化脚本将构建静态容器，通过 HTTP-01 申请受信任证书，并配置专用 systemd 定时器 `northstar-reality-renew.timer` 每天检查两次。续期后先 `nginx -t` 再平滑 reload；80 端口和 DNS 必须持续可用。初始化过程中 Nginx 配置检测、证书或 TLS 检测失败，会恢复本次修改前的目标站点配置；已签发证书和临时诊断目录保留。重复执行同一域名安全，不能用它直接替换已使用的域名。
+
+```bash
+systemctl status northstar-reality-renew.timer
+journalctl -u northstar-reality-renew.service
+sudo certbot renew --cert-name northstar-reality-www.example.com --dry-run
+docker compose logs --tail=100 reality-target
+```
+
+默认目标保存在 PostgreSQL 的 `reality_defaults` 表，随 Controller 启动迁移自动创建；无需手工 SQL。可选环境变量 `NORTHSTAR_REALITY_TARGET` 仅作为未保存后台设置时的初始默认值，环境值未检测时界面会明确提示。部署命令本身不修改后台设置。
+
+同主机部署只提供服务隔离，不提供主机级故障隔离。域名与平台的关联仍可被观察；这不是隐蔽性保证。规模扩大后可将站点迁到独立主机，迁移前需验证各节点网络和 Agent 的 DNS 重新检测能力。管理主机如果也作为 VPN 节点，REALITY 不得与 Nginx 共用同一个 443 监听入口，且不能回指自己；应使用独立节点，或指定空闲 TCP 端口并放行对应安全组规则。

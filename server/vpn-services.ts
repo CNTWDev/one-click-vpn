@@ -1,15 +1,17 @@
-import { addAudit } from "./db";
+import { dbQuery, addAudit } from "./db";
 import {
   enqueueReconcileTask,
   findDesiredConfig,
   findVpnService,
   listNodeProtocols,
+  listControlNodes,
   listVpnServices,
   updateVpnServiceState,
   upsertVpnService,
   type Protocol,
   type VpnService,
 } from "./control-db";
+import { isReconcileLockBusy } from "./reconcile-lock";
 import { rebuildDesiredState } from "./control-plane";
 import { getProtocolAdapter, listProtocolAdapters } from "./protocols/registry";
 import { setNodeDeploymentPolicy, STANDARD_POLICY_VERSION } from "./deployment-policy";
@@ -23,10 +25,12 @@ export function protocolsForTemplate(template: DeploymentTemplate): Protocol[] {
 }
 
 export async function initializeVpnServices(nodeId: string, template: DeploymentTemplate = "standard"): Promise<VpnService[]> {
+  const existing = await listVpnServices(nodeId);
   for (const protocol of protocolsForTemplate(template)) {
+    if (existing.some((service) => service.protocol === protocol)) continue;
     const service = getProtocolAdapter(protocol).service;
     await upsertVpnService({
-      nodeId, protocol, enabled: true, status: "pending", transport: service.defaultTransport,
+      nodeId, protocol, enabled: true, status: "pending", transport: service.defaultTransport, onlyIfMissing: true,
       listenPort: service.defaultListenPort, subnet: service.defaultSubnet, dns: service.defaultDns,
     });
   }
@@ -34,17 +38,35 @@ export async function initializeVpnServices(nodeId: string, template: Deployment
   return listVpnServices(nodeId);
 }
 
+/** Explicit bootstrap/rollout only: an ordinary heartbeat must not enroll old custom nodes. */
+export async function ensureStandardVpnServices(nodeId: string): Promise<void> {
+  const node = (await listControlNodes()).find((item) => item.id === nodeId);
+  if (node && (node.deployment_policy || "standard") === "standard") await initializeVpnServices(nodeId, "standard");
+}
+
 export async function reconcileEnabledVpnServices(nodeId: string): Promise<void> {
   const capabilities = await listNodeProtocols(nodeId);
   for (const service of await listVpnServices(nodeId)) {
     if (!service.enabled) continue;
-    if (service.status === "healthy") {
+    if (service.status === "healthy" || service.status === "attention") {
       // Re-evaluate time-based access on heartbeat; unchanged payloads enqueue no work.
-      try { await rebuildDesiredState(nodeId, service.protocol); }
-      catch (error) { await updateVpnServiceState(nodeId, service.protocol, { status: "attention", lastError: error instanceof Error ? error.message : String(error) }); }
+      try {
+        await rebuildDesiredState(nodeId, service.protocol);
+        if (service.status === "attention") {
+          const desired = await findDesiredConfig(nodeId, service.protocol);
+          // Restore eligibility only after the Agent has acknowledged the current revision.
+          const observed = await dbQuery<{ applied_revision: number; status: string }>("SELECT applied_revision,status FROM observed_configs WHERE node_id=$1 AND protocol=$2", [nodeId, service.protocol]);
+          const node = (await listControlNodes()).find((item) => item.id === nodeId);
+          const connectivity = node?.capabilities.connectivity as { protocols?: Record<string, { runtimeActive?: boolean; interfaceActive?: boolean; serviceActive?: boolean; listening?: boolean }> } | undefined;
+          const runtime = connectivity?.protocols?.[service.protocol];
+          const active = runtime?.runtimeActive ?? runtime?.interfaceActive ?? runtime?.serviceActive;
+          if (active === true && runtime?.listening === true && desired && observed[0]?.applied_revision === desired.revision && observed[0]?.status === "applied") await updateVpnServiceState(nodeId, service.protocol, { status: "healthy" });
+        }
+      }
+      catch (error) { if (!isReconcileLockBusy(error)) await updateVpnServiceState(nodeId, service.protocol, { status: "attention", lastError: error instanceof Error ? error.message : String(error) }); }
       continue;
     }
-    if (service.status === "deploying" || service.status === "attention") continue;
+    if (service.status === "deploying") continue;
     const capability = capabilities.find((item) => item.protocol === service.protocol);
     if (!capability || capability.status !== "enabled") {
       await updateVpnServiceState(nodeId, service.protocol, { status: "unsupported", lastError: "The Agent does not currently advertise this protocol runtime" });

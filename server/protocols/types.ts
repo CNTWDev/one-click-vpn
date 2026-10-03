@@ -37,6 +37,7 @@ export type PeerState = {
 };
 
 export type DesiredStateInput = {
+  subnet?: string;
   reality?: { serverBundleSecretId: string; usersSecretId: string };
   nodeId: string;
   serverPublicKey?: string | null;

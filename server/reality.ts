@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { x25519 } from "@noble/curves/ed25519.js";
-import { dbQuery, withTransaction } from "./db";
+import { dbExec, dbQuery, withTransaction } from "./db";
 import { encryptSecret } from "./crypto";
 import { createHash, randomUUID } from "node:crypto";
 import { readSecretMaterial, createSecretMaterial, findSecretMaterialByKind } from "./secret-materials";
@@ -11,7 +11,7 @@ export async function realitySettings(nodeId: string) {
   return (await dbQuery<RealitySettings>("SELECT * FROM reality_settings WHERE node_id = $1", [nodeId]))[0];
 }
 
-export async function configureReality(nodeId: string, serverName: string) {
+export async function configureReality(nodeId: string, serverName: string, options: { onlyIfMissing?: boolean } = {}) {
   // A DNS name, not a URL or arbitrary dial address. The node independently validates the resolved destination.
   const name = serverName.trim().toLowerCase();
   if (name.length > 253 || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(name)) throw new Error("REALITY 目标必须是有效的公网域名");
@@ -19,6 +19,7 @@ export async function configureReality(nodeId: string, serverName: string) {
     await exec("SELECT pg_advisory_xact_lock(hashtext($1))", [`reality:${nodeId}`]);
     const existing = await realitySettings(nodeId);
     if (existing) {
+      if (options.onlyIfMissing) return;
       if (existing.server_name === name) return;
       const inUse = await exec("SELECT id FROM connection_profiles WHERE node_id=$1 AND protocol='vless' AND status IN ('issued','active') AND expires_at>$2", [nodeId,new Date().toISOString()]);
       if (inUse) throw new Error("节点已有有效 VLESS 配置，不能直接更换目标域名。请先撤销相关连接或使用新节点。");
@@ -41,20 +42,26 @@ export async function configureReality(nodeId: string, serverName: string) {
   });
 }
 
-export async function realityUsers(nodeId: string) {
-  const rows = await dbQuery<{ secret_id: string; email: string }>(`SELECT DISTINCT COALESCE(s.private_key_secret_id, k.id) AS secret_id, c.identity_key AS email FROM access_credentials c
+async function realityUserRows(nodeId: string) {
+  return dbQuery<{ secret_id: string; email: string; fingerprint: string }>(`SELECT DISTINCT COALESCE(s.private_key_secret_id, k.id) AS secret_id, c.identity_key AS email, material.fingerprint FROM access_credentials c
     LEFT JOIN subscriptions s ON s.credential_id=c.id
     LEFT JOIN secret_materials k ON k.kind='vless_client:' || c.id AND k.owner_node_id IS NULL
+    JOIN secret_materials material ON material.id=COALESCE(s.private_key_secret_id, k.id)
     JOIN users u ON u.id=c.user_id JOIN connection_profiles p ON p.credential_id=c.id
     WHERE p.node_id=$1 AND p.protocol='vless' AND p.status='active' AND p.expires_at>$2
     AND c.status='active' AND NOT c.user_disabled AND NOT c.admin_disabled AND c.deleted_at IS NULL
     AND (c.expires_at IS NULL OR c.expires_at>$2) AND u.status='active' ORDER BY c.identity_key`, [nodeId,new Date().toISOString()]);
+}
+
+async function decryptUsers(rows: Awaited<ReturnType<typeof realityUserRows>>) {
   return Promise.all(rows.map(async (row) => {
     const id = await readSecretMaterial(row.secret_id);
     if (!id) throw new Error("VLESS client secret unavailable");
     return { id, email: row.email };
   }));
 }
+
+export async function realityUsers(nodeId: string) { return decryptUsers(await realityUserRows(nodeId)); }
 
 export async function realityClientSecretId(credentialId: string) {
   const row = (await dbQuery<{ private_key_secret_id: string }>(`SELECT private_key_secret_id FROM subscriptions WHERE credential_id=$1
@@ -64,8 +71,25 @@ export async function realityClientSecretId(credentialId: string) {
 }
 
 export async function realityUsersSecret(nodeId: string) {
-  const value = JSON.stringify(await realityUsers(nodeId));
+  const rows = await realityUserRows(nodeId);
+  const sourceFingerprint = hashToken(JSON.stringify(rows));
   const previous = await findSecretMaterialByKind("vless_users_bundle", nodeId);
-  if (previous?.fingerprint === hashToken(value)) return previous.id;
-  return (await createSecretMaterial({ kind: "vless_users_bundle", ownerNodeId: nodeId, value })).id;
+  if (previous?.source_fingerprint === sourceFingerprint) {
+    await cleanRealityBundles(nodeId, previous.id);
+    return previous.id;
+  }
+  const value = JSON.stringify(await decryptUsers(rows));
+  const material = previous?.fingerprint === hashToken(value) ? previous : await createSecretMaterial({ kind: "vless_users_bundle", ownerNodeId: nodeId, value });
+  await dbExec("UPDATE secret_materials SET source_fingerprint=$1 WHERE id=$2", [sourceFingerprint, material.id]);
+  await cleanRealityBundles(nodeId, material.id);
+  return material.id;
+}
+async function cleanRealityBundles(nodeId: string, keepId: string) {
+  // Keep queued and in-flight revisions readable; completed bundles have a one-day grace period.
+  await dbExec(`DELETE FROM secret_materials s WHERE s.kind='vless_users_bundle' AND s.owner_node_id=$1
+    AND s.id<>$2 AND s.created_at<$3
+    AND NOT EXISTS (SELECT 1 FROM desired_configs d WHERE d.node_id=$1 AND d.payload_json::jsonb->>'usersSecretId'=s.id)
+    AND NOT EXISTS (SELECT 1 FROM reconcile_tasks t WHERE t.node_id=$1
+      AND (t.status IN ('pending','running') OR (t.status='failed' AND t.attempts<5))
+      AND t.payload_json::jsonb->>'usersSecretId'=s.id)`, [nodeId, keepId, new Date(Date.now()-86400000).toISOString()]);
 }

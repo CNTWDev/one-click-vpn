@@ -10,8 +10,9 @@ import {
 } from "./control-db";
 import { rebuildDesiredState } from "./control-plane";
 import { listProtocolAdapters } from "./protocols/registry";
+import { realityDefaults } from "./reality-defaults";
 
-export const STANDARD_POLICY_VERSION = 1;
+export const STANDARD_POLICY_VERSION = 2;
 export type DeploymentPolicy = "standard" | "custom" | "agent-only";
 
 function now(): string {
@@ -30,6 +31,8 @@ async function standardPolicyDrift() {
   const protocols = standardProtocolAdapters().map((adapter) => adapter.id);
   const services = await listVpnServices();
   const capabilities = await listNodeProtocols();
+  const defaults = await realityDefaults();
+  const configured = new Set((await dbQuery<{ node_id: string }>("SELECT node_id FROM reality_settings")).map((row) => row.node_id));
   return (await listControlNodes()).flatMap((node) => {
     if ((node.deployment_policy || "standard") !== "standard") return [];
     const missingProtocols = protocols.filter((protocol) => !services.some((service) => service.node_id === node.id && service.protocol === protocol && service.enabled && service.status === "healthy"));
@@ -37,9 +40,11 @@ async function standardPolicyDrift() {
     const heartbeatAt = node.last_heartbeat_at ? new Date(node.last_heartbeat_at).getTime() : 0;
     const fresh = node.status === "online" && heartbeatAt > 0 && Date.now() - heartbeatAt < 90_000;
     const unsupported = protocols.filter((protocol) => !capabilities.some((capability) => capability.node_id === node.id && capability.protocol === protocol && capability.status === "enabled"));
-    const reason = !fresh ? "A fresh authenticated Agent heartbeat is required"
-      : unsupported.length ? `Agent runtime does not advertise: ${unsupported.join(", ")}` : "Ready";
-    return [{ node, missingProtocols, eligible: fresh && !unsupported.length, reason }];
+    const missingTarget = protocols.includes("vless") && !defaults.serverName && !configured.has(node.id);
+    const reason = !fresh ? "需要节点在线并上报最新 Agent 心跳"
+      : unsupported.length ? `请先通过节点运维升级 Agent，缺少能力：${unsupported.join(", ")}`
+      : missingTarget ? "请先完成一次平台默认 REALITY 目标设置" : "可自动同步";
+    return [{ node, missingProtocols, eligible: fresh && !unsupported.length && !missingTarget, reason }];
   });
 }
 
@@ -139,6 +144,7 @@ export async function rolloutStandardPolicy(input: { actorUserId: string; mode: 
     await dbExec("INSERT INTO policy_rollout_targets (rollout_id, node_id, status, updated_at) VALUES ($1, $2, 'running', $3)", [rolloutId, node.id, now()]);
     try {
       const capabilities = await listNodeProtocols(node.id);
+      const serviceErrors: string[] = [];
       for (const adapter of adapters) {
         const existing = (await listVpnServices(node.id)).find((service) => service.protocol === adapter.id);
         const needsApply = !existing?.enabled || existing.status !== "healthy";
@@ -156,9 +162,16 @@ export async function rolloutStandardPolicy(input: { actorUserId: string; mode: 
           await updateVpnServiceState(node.id, adapter.id, { status: "unsupported", lastError: "Upgrade or repair the Agent before retrying this policy rollout" });
           continue;
         }
-        await updateVpnServiceState(node.id, adapter.id, { status: "deploying" });
-        await rebuildDesiredState(node.id, adapter.id, { force: true });
+        try {
+          await updateVpnServiceState(node.id, adapter.id, { status: "deploying" });
+          await rebuildDesiredState(node.id, adapter.id, { force: true });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          await updateVpnServiceState(node.id, adapter.id, { status: "attention", lastError: message });
+          serviceErrors.push(`${adapter.id}: ${message}`);
+        }
       }
+      if (serviceErrors.length) throw new Error(serviceErrors.join("; "));
       await setNodeDeploymentPolicy(node.id, "standard", STANDARD_POLICY_VERSION);
       await dbExec("UPDATE policy_rollout_targets SET status = 'queued', updated_at = $1 WHERE rollout_id = $2 AND node_id = $3", [now(), rolloutId, node.id]);
       queued += 1;

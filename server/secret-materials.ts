@@ -10,6 +10,7 @@ export type SecretMaterial = {
   iv: string;
   tag: string;
   fingerprint: string;
+  source_fingerprint?: string | null;
   created_at: string;
   updated_at: string;
 };

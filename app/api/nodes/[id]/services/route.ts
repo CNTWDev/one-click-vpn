@@ -5,6 +5,11 @@ import { cleanText, jsonError, readJson } from "../../../../../server/http";
 import { configureVpnService } from "../../../../../server/vpn-services";
 import { listProtocolAdapters } from "../../../../../server/protocols/registry";
 import { configureReality, realitySettings } from "../../../../../server/reality";
+import { realityDefaults } from "../../../../../server/reality-defaults";
+import { selectTarget, targetAddresses } from "../../../../../server/reality-target-check.mjs";
+import { dbQuery } from "../../../../../server/db";
+import { lookup } from "node:dns/promises";
+import { setNodeDeploymentPolicy } from "../../../../../server/deployment-policy";
 
 export const runtime = "nodejs";
 
@@ -30,14 +35,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const requestedPort = body.listenPort === undefined ? undefined : Number(body.listenPort);
     if (requestedPort !== undefined && (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 65535)) return jsonError("listenPort must be between 1 and 65535");
     const nodeId = (await params).id;
-    if (protocol === "vless" && ["enable", "redeploy"].includes(action) && (body.serverName || !(await realitySettings(nodeId)))) {
-      await configureReality(nodeId, cleanText(body.serverName, 253));
+    if (protocol === "vless" && ["enable", "redeploy"].includes(action)) {
+      const existing = await realitySettings(nodeId);
+      const selected = selectTarget(cleanText(body.serverName, 253), existing?.server_name, (await realityDefaults()).serverName);
+      // A management host can also be a VPN node, but never its own REALITY target on :443.
+      const node = (await dbQuery<{ ip: string; public_endpoint: string | null }>("SELECT ip,public_endpoint FROM nodes WHERE id=$1", [nodeId]))[0];
+      if (!node) return jsonError("Node not found", 404);
+      const current = (await listVpnServices(nodeId)).find((service) => service.protocol === "vless");
+      if ((requestedPort || current?.listen_port || 443) === 443) {
+        const addresses = await targetAddresses(selected);
+        const endpoints = [...new Set([node.ip, node.public_endpoint].filter((value): value is string => Boolean(value)))];
+        const nodeAddresses = (await Promise.all(endpoints.map((host) => lookup(host, { all: true })))).flat().map((row) => row.address);
+        if (nodeAddresses.some((address) => addresses.includes(address))) return jsonError("目标站点与节点是同一台服务器，不能同时使用 443。请使用独立 VPN 节点，或在高级设置中改用空闲端口。");
+      }
+      await configureReality(nodeId, selected);
     }
     const service = await configureVpnService({
       nodeId, protocol, action, actorUserId: user.id,
       transport,
       listenPort: requestedPort,
     });
+    if (body.customize === true) await setNodeDeploymentPolicy(nodeId, "custom", 0);
     return NextResponse.json({ service });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to configure VPN service", 409);

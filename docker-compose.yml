@@ -1,4 +1,24 @@
 services:
+  # Static-only site. No controller routes, credentials, database or Docker socket.
+  reality-target:
+    build:
+      context: .
+      dockerfile: deploy/reality-target/Dockerfile
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.5
+    networks: [reality-site]
+    ports:
+      - "127.0.0.1:3300:3300"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3300/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   db:
     image: postgres:17-alpine
     restart: unless-stopped
@@ -137,3 +157,7 @@ volumes:
   northstar-postgres:
   northstar-minio:
   northstar-loki:
+
+networks:
+  reality-site:
+    internal: true

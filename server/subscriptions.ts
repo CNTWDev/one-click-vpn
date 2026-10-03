@@ -4,7 +4,7 @@ import { Pool } from "pg";
 import { addAudit, dbExec, dbQuery, getDb } from "./db";
 import { hashToken } from "./crypto";
 import { createAccessCredential, findDesiredConfig, listConnectionProfiles } from "./control-db";
-import { activateProfile, issueConnectionProfile, rebuildDesiredState, selectVpnServices } from "./control-plane";
+import { activateProfile, issueConnectionProfile, selectVpnServices } from "./control-plane";
 import { assertCredentialUsable, manageCredentialAccess } from "./credential-access";
 import { createSecretMaterial, readSecretMaterial } from "./secret-materials";
 import { renderSubscription, type SubscriptionProxy } from "./subscription-format";
@@ -104,10 +104,9 @@ export async function downloadSubscription(token: string) {
     for (const { node, service } of candidates) {
       try {
       let profile = profiles.find((p) => p.node_id === node.id && ["issued", "active"].includes(p.status)
-        && p.endpoint.host === (node.public_endpoint || node.ip) && p.endpoint.port === service.listen_port);
+        && new Date(p.expires_at).getTime() > Date.now() && p.endpoint.host === (node.public_endpoint || node.ip) && p.endpoint.port === service.listen_port);
       if (!profile) profile = await issueConnectionProfile({ credentialId: credential.id, nodeId: node.id, protocol: credential.protocol, clientPrivateKey: key });
       if (profile.status === "issued") profile = await activateProfile(profile.id, credential.user_id);
-      else await rebuildDesiredState(node.id, credential.protocol);
       const desired = await findDesiredConfig(node.id, credential.protocol);
       const applied = (await dbQuery<{ applied_revision: number; observed_hash: string; status: string }>(
         "SELECT applied_revision,observed_hash,status FROM observed_configs WHERE node_id=$1 AND protocol=$2", [node.id,credential.protocol]))[0];

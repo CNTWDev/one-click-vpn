@@ -41,7 +41,7 @@ if [ "$mode" = "deploy" ] && [ "$service_explicit" = "no" ] && [ -t 0 ] && [ -t 
   echo ""
   echo "Northstar deployment wizard"
   echo "Choose what you want to update:"
-  echo "  1) all         Controller + Portal + Admin (recommended for releases)"
+  echo "  1) all         Controller + Portal + Admin + static target (recommended for releases)"
   echo "  2) northstar   Controller/API only"
   echo "  3) portal-web  Portal only"
   echo "  4) admin-web   Admin only"
@@ -149,8 +149,8 @@ fi
 compose up -d loki
 
 if [ "$service" = "all" ]; then
-  build_targets="northstar portal-web admin-web"
-  up_targets="northstar portal-web admin-web"
+  build_targets="northstar portal-web admin-web reality-target"
+  up_targets="northstar portal-web admin-web reality-target"
 else
   build_targets="$service"
   up_targets="$service"
@@ -179,6 +179,7 @@ if [ "$service" = "all" ]; then
   wait_for_healthy northstar
   wait_for_healthy portal-web
   wait_for_healthy admin-web
+  wait_for_healthy reality-target
 else
   wait_for_healthy "$service"
 fi
@@ -233,4 +234,5 @@ echo "Northstar deployment is healthy (service: $service)."
 echo "Controller: http://127.0.0.1:3000"
 echo "Portal: http://127.0.0.1:3100"
 echo "Admin: http://127.0.0.1:3200"
+echo "Static target: http://127.0.0.1:3300 (public HTTPS requires one-time setup)"
 echo "Logs: ./scripts/deploy.sh logs"

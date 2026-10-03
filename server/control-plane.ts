@@ -1,5 +1,6 @@
 import { x25519 } from "@noble/curves/ed25519.js";
 import { realitySettings, realityUsersSecret, realityClientSecretId } from "./reality";
+import { ensureRealityService } from "./service-prerequisites";
 import { withReconcileLock } from "./reconcile-lock";
 import { addAudit } from "./db";
 import { renderMihomoWireGuard } from "./protocols/mihomo";
@@ -121,7 +122,8 @@ async function buildDesiredStateLocked(nodeId: string, protocol: Protocol, optio
     nodeId,
     serverPublicKey: node.server_public_key,
     listenPort: service.listen_port,
-    reality: protocol === "vless" ? { serverBundleSecretId: (await realitySettings(nodeId))?.secret_id || "", usersSecretId: await realityUsersSecret(nodeId) } : undefined,
+    subnet: service.subnet,
+    reality: protocol === "vless" ? { serverBundleSecretId: (await ensureRealityService(nodeId, service.listen_port)).secret_id, usersSecretId: await realityUsersSecret(nodeId) } : undefined,
     peers: await listActivePeers(nodeId, protocol),
     openvpn,
   });

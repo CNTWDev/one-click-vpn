@@ -4,12 +4,13 @@ import { randomBytes } from "node:crypto";
 import { agentOrigin } from "./config";
 import { decryptSecret, hashToken } from "./crypto";
 import { addAudit, addNodeAction, appendNodeActionEvent, bindNodeIdentity, countRunningNodeActions, findNode, finishNodeAction, startNodeAction, updateNode, updateNodeActionProgress } from "./db";
-import { ensureDefaultNodeProtocols } from "./control-plane";
-import { reconcileEnabledVpnServices } from "./vpn-services";
+import { ensureDefaultNodeProtocols, rebuildDesiredState } from "./control-plane";
+import { ensureStandardVpnServices, reconcileEnabledVpnServices } from "./vpn-services";
 import { writeOperationalLog } from "./operational-logs";
 import { discoverRemoteNode, executeRemoteCommand } from "./remote-ssh";
 import { dbExec } from "./db";
-import { agentUpgradeCommand } from "./agent-upgrade";
+import { listVpnServices, updateVpnServiceState } from "./control-db";
+import { agentUpgradeCommand, agentRollbackCommand, agentUpgradeFinalizeCommand } from "./agent-upgrade";
 
 const maximumConcurrentRemoteActions = 3;
 const remoteActionQueue: Array<() => Promise<void>> = [];
@@ -371,7 +372,10 @@ printf 'NORTHSTAR_PROGRESS|heartbeat|96|Agent is active; waiting for its first C
       return;
     }
     await ensureDefaultNodeProtocols(nodeId);
+    await ensureStandardVpnServices(nodeId);
     await reconcileEnabledVpnServices(nodeId);
+    const pendingServices = (await listVpnServices(nodeId)).filter((service) => service.enabled && service.status !== "healthy");
+    if (pendingServices.length) await appendNodeActionEvent(actionId, { level: "warning", phase: "vpn-services", message: `Agent 部署完成；协议仍在同步或等待配置：${pendingServices.map((service) => `${service.protocol}: ${service.last_error || service.status}`).join("；")}。请查看 VPN 服务状态，勿将 Agent 成功视为全部协议已就绪。` });
     await finishNodeAction(actionId, "succeeded", combinedOutput.slice(-12000));
     await addAudit({ actorUserId, action: "node.bootstrap.succeeded", targetType: "node", targetId: nodeId });
   } catch (error) {
@@ -391,6 +395,7 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
   if (await countRunningNodeActions(nodeId, actionId) > 0) throw new Error("This node already has a queued or running action. Wait for it to finish.");
   await startNodeAction(actionId);
   let recorder: ActionOutputRecorder | undefined;
+  let upgradeConfirmed = false;
   try {
     const secret = decryptSecret({ ciphertext: node.credential_ciphertext, iv: node.credential_iv, tag: node.credential_tag });
     const command = action === "upgrade-agent" ? agentUpgradeCommand(agentSource()) : action === "restart-agent"
@@ -398,18 +403,31 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
       : "printf 'NORTHSTAR_PROGRESS|check|25|Reading Agent service state\\n'; systemctl is-active --quiet northstar-agent; service_status=$?; systemctl --no-pager --full status northstar-agent || true; printf 'NORTHSTAR_PROGRESS|journal|60|Collecting the latest Agent journal entries\\n'; journalctl -u northstar-agent -n 80 --no-pager || true; if [ $service_status -ne 0 ]; then printf 'NORTHSTAR_PROGRESS|failed|100|Agent service is not active\\n'; exit $service_status; fi; printf 'NORTHSTAR_PROGRESS|complete|100|Agent check completed\\n'";
     const outputRecorder = new ActionOutputRecorder(actionId, nodeId);
     recorder = outputRecorder;
-    const actionStartedAt = Date.now();
     const result = await executeRemoteCommand(node, secret, command, (chunk) => outputRecorder.write(chunk));
     await outputRecorder.flush();
     const output = result.output.slice(-12000);
     if (action === "restart-agent" || action === "upgrade-agent") {
-      if (!(await waitForAgentHeartbeat(nodeId, actionStartedAt, 35_000, action === "upgrade-agent" ? agentReleaseVersion() : undefined))) {
+      if (!(await waitForAgentHeartbeat(nodeId, Date.now(), 35_000, action === "upgrade-agent" ? agentReleaseVersion() : undefined))) {
         throw new Error(action === "upgrade-agent"
           ? "Agent 已上传并重启，但未收到目标版本的认证心跳。请查看节点日志；若出现 HTTP 401，请执行重新安装 / 修复。"
           : "Agent service restarted, but no authenticated heartbeat reached the Controller. Use Reinstall / repair agent if the node journal reports HTTP 401 Unauthorized.");
       }
       if (action === "upgrade-agent" && (await findNode(nodeId))?.version !== agentReleaseVersion()) {
         throw new Error("Agent 已上传，但心跳版本与目标版本不一致，请查看节点日志或执行重新安装 / 修复。");
+      }
+      if (action === "upgrade-agent") {
+        await executeRemoteCommand(node, secret, agentUpgradeFinalizeCommand(), (chunk) => outputRecorder.write(chunk));
+        upgradeConfirmed = true;
+        // Source changes can alter runtime configuration even when desired data is unchanged.
+        for (const service of await listVpnServices(nodeId)) {
+          if (!service.enabled) continue;
+          try { await rebuildDesiredState(nodeId, service.protocol, { force: true }); }
+          catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            await updateVpnServiceState(nodeId, service.protocol, { status: "attention", lastError: message });
+            await appendNodeActionEvent(actionId, { level: "warning", phase: "vpn-services", message: `Agent 已升级，${service.protocol} 等待修复：${message}` });
+          }
+        }
       }
     } else {
       const inspectedNode = await findNode(nodeId);
@@ -424,7 +442,14 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
     await addAudit({ actorUserId, action: `node.${action}.succeeded`, targetType: "node", targetId: nodeId });
     return output;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    let message = error instanceof Error ? error.message : String(error);
+    if (action === "upgrade-agent" && !upgradeConfirmed) {
+      try {
+        const secret = decryptSecret({ ciphertext: node.credential_ciphertext, iv: node.credential_iv, tag: node.credential_tag });
+        await executeRemoteCommand(node, secret, agentRollbackCommand());
+        message += "；未验证的升级已回滚。";
+      } catch { message += "；SSH 回滚未完成，节点本地回滚定时器将恢复旧版本。"; }
+    }
     await recorder?.flush();
     await appendNodeActionEvent(actionId, { level: "error", phase: "failed", message: message.slice(-4000) });
     await finishNodeAction(actionId, "failed", "", message.slice(-4000));

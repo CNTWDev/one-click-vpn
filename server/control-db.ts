@@ -1,3 +1,4 @@
+import { ipv4Pool, ipv4Address } from "./ipv4-pool";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { dbExec, dbQuery, findUserById, withTransaction, type DbNode, type DbUser } from "./db";
 import { hashToken } from "./crypto";
@@ -506,19 +507,19 @@ export async function findVpnService(nodeId: string, protocol: Protocol): Promis
 
 export async function upsertVpnService(input: {
   nodeId: string; protocol: Protocol; enabled: boolean; transport?: string; listenPort?: number;
-  subnet?: string; dns?: string[]; status?: VpnServiceStatus; lastError?: string;
+  subnet?: string; dns?: string[]; status?: VpnServiceStatus; lastError?: string; onlyIfMissing?: boolean;
 }): Promise<VpnService> {
   const timestamp = now();
   const defaults = input.protocol === "wireguard"
-    ? { port: 51820, subnet: "10.70.0.0/24" }
+    ? { port: 51820, subnet: "10.70.0.0/20" }
     : input.protocol === "vless" ? { port: 443, subnet: "" }
     : { port: 1194, subnet: "10.71.0.0/24" };
   await dbExec(`INSERT INTO vpn_services
     (node_id, protocol, enabled, transport, listen_port, subnet, dns_json, status, last_error, created_at, updated_at)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
-    ON CONFLICT(node_id, protocol) DO UPDATE SET enabled = excluded.enabled, transport = excluded.transport,
+    ON CONFLICT(node_id, protocol) DO ${input.onlyIfMissing ? "NOTHING" : `UPDATE SET enabled = excluded.enabled, transport = excluded.transport,
       listen_port = excluded.listen_port, subnet = excluded.subnet, dns_json = excluded.dns_json,
-      status = excluded.status, last_error = excluded.last_error, updated_at = excluded.updated_at`, [
+      status = excluded.status, last_error = excluded.last_error, updated_at = excluded.updated_at`}`, [
     input.nodeId, input.protocol, input.enabled ? 1 : 0, input.transport || (input.protocol === "vless" ? "tcp" : "udp"), input.listenPort || defaults.port,
     input.subnet || defaults.subnet, JSON.stringify(input.dns || ["1.1.1.1"]),
     input.status || (input.enabled ? "pending" : "disabled"), input.lastError || "", timestamp,
@@ -549,11 +550,15 @@ export async function allocateIpLease(nodeId: string, protocol: Protocol, device
 
   const occupied = new Set((await dbQuery<{ address: string }>("SELECT address FROM ip_leases WHERE node_id = $1 AND protocol = $2", [nodeId, protocol])).map((row) => row.address));
   const service = await findVpnService(nodeId, protocol);
-  const subnetMatch = service?.subnet.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d+\/24$/);
-  if (!subnetMatch) throw new Error("This protocol service requires a supported IPv4 /24 address pool");
-  const network = subnetMatch[1];
-  for (let index = 2; index < 255; index += 1) {
-    const address = `${network}.${index}/32`;
+  if (!service) throw new Error("VPN service unavailable");
+  const pool = ipv4Pool(service.subnet);
+  // Older Agents hard-code a /24 interface. Keep their leases inside that range until upgraded.
+  const version = (await dbQuery<{ version: string }>("SELECT version FROM nodes WHERE id=$1", [nodeId]))[0]?.version || "";
+  const release = version.match(/^agent (\d+)\.(\d+)\./);
+  const expanded = release && (Number(release[1]) > 2 || (Number(release[1]) === 2 && Number(release[2]) >= 8));
+  const size = protocol === "wireguard" && !expanded ? Math.min(pool.size, 256) : pool.size;
+  for (let index = 2; index < size - 1; index += 1) {
+    const address = `${ipv4Address(pool.network + index)}/32`;
     if (occupied.has(address)) continue;
     try {
       await dbExec(`INSERT INTO ip_leases (id, node_id, protocol, device_id, address, status, created_at)

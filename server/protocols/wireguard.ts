@@ -30,7 +30,7 @@ export const wireguardAdapter: ProtocolAdapter = {
   capability: baseCapability,
   service: {
     standard: true, defaultTransport: "udp", defaultListenPort: 51820,
-    defaultSubnet: "10.70.0.0/24", defaultDns: ["1.1.1.1"],
+    defaultSubnet: "10.70.0.0/20", defaultDns: ["1.1.1.1"],
     applyTask: "ApplyWireGuardPeers", restartTask: "RestartWireGuard", disableTask: "DisableWireGuard",
   },
   buildProfile(input) {
@@ -53,6 +53,7 @@ export const wireguardAdapter: ProtocolAdapter = {
     return {
       schemaVersion: 1,
       interface: "northstar",
+      subnet: input.subnet || "10.70.0.0/20",
       listenPort: input.listenPort || 51820,
       serverPublicKey: input.serverPublicKey || null,
       peers: input.peers.map((peer) => ({
