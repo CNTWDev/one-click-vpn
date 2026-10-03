@@ -35,11 +35,11 @@ export function useActionDialog() {
       const value = request.initialValue === undefined ? "confirmed" : String(new FormData(event.currentTarget).get("name") || "").trim();
       if (value) finish(value);
     }}>
-      <span className={`dialog-kicker ${request.danger ? "danger" : ""}`}>{request.danger ? "请确认操作影响" : "连接管理"}</span>
+      {request.danger && <span className="dialog-kicker danger-text">此操作不可恢复</span>}
       <h2 id="action-title">{request.title}</h2>
       <p id="action-description">{request.description}</p>
       {request.initialValue !== undefined && <label>连接名称<input name="name" required pattern={".*\\S.*"} defaultValue={request.initialValue} autoFocus /></label>}
-      <div className="dialog-actions"><button type="button" className="secondary" autoFocus={request.initialValue === undefined} onClick={() => finish(null)}>取消</button><button className={request.danger ? "danger-link" : "primary"} type="submit">{request.confirmLabel}</button></div>
+      <div className="dialog-actions"><button type="button" className="secondary" autoFocus={request.initialValue === undefined} onClick={() => finish(null)}>取消</button><button className={request.danger ? "danger" : "primary"} type="submit">{request.confirmLabel}</button></div>
     </form>
   </dialog>;
   return { ask, dialog };

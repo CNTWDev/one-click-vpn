@@ -1,2 +1,55 @@
-.subscription-panel{margin:24px 0;padding:28px;border:1px solid #344036;border-radius:20px;background:#111a14;color:#e8eee9}.subscription-panel *{box-sizing:border-box}.subscription-panel h2{font-size:26px;margin:4px 0 10px}.subscription-panel h3{margin:0 0 8px;font-size:18px}.subscription-panel p,.subscription-panel small{color:#aab7ac;line-height:1.6}.subscription-kicker{font-size:11px;letter-spacing:2px;color:#b7df83!important}.subscription-heading,.subscription-row{display:flex;justify-content:space-between;align-items:center;gap:20px}.subscription-panel button,.subscription-import{min-height:42px;border:1px solid #465345;border-radius:9px;padding:10px 16px;background:#1d2a20;color:#edf5e9;font:inherit;font-size:14px;cursor:pointer;text-decoration:none}.subscription-panel button:disabled{opacity:.45;cursor:not-allowed}.subscription-panel .subscription-primary{background:#c0e58e;color:#15220f;border-color:#c0e58e;font-weight:700}.subscription-setup{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin:22px 0}.subscription-setup form{display:grid;gap:16px;align-content:start}.subscription-panel label{display:grid;gap:8px;font-size:14px}.subscription-panel input,.subscription-panel select{width:100%;min-height:44px;padding:10px 12px;border-radius:9px;border:1px solid #455146;background:#0c130f;color:#e8eee9;font:inherit}.subscription-panel details summary{cursor:pointer;padding:8px 0;color:#b0bdae}.subscription-panel details label{margin:12px 0}.subscription-panel aside{padding:22px;background:#18221a;border-radius:14px}.subscription-panel ol{padding-left:22px;line-height:1.8}.subscription-panel li{margin-bottom:12px}.subscription-panel li small,.subscription-row b small{display:block;font-weight:400;font-size:12px}.subscription-panel a{color:#c0e58e}.subscription-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.subscription-panel .subscription-danger{color:#f5b39d}.subscription-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px}.subscription-list article{padding:20px;border:1px solid #344036;border-radius:14px;min-width:0}.subscription-list h3{overflow-wrap:anywhere}.subscription-row b{white-space:nowrap;text-align:right}.subscription-link{padding:20px;border:1px solid #819f60;border-radius:12px;margin:20px 0}.subscription-link input{margin:12px 0}.subscription-error{padding:12px;background:#43271e;color:#ffccba!important;border-radius:8px}.subscription-notice{padding:12px;background:#293921;color:#d6e9c5!important;border-radius:8px}.subscription-empty{padding:22px;text-align:center}.subscription-confirm{position:fixed;inset:0;background:#000a;z-index:1000;display:grid;place-items:center;padding:20px}.subscription-confirm>div{width:min(480px,100%);padding:26px;background:#152019;border:1px solid #506047;border-radius:16px}.subscription-panel :focus-visible{outline:2px solid #c0e58e;outline-offset:3px}@media(max-width:700px){.subscription-panel{padding:18px;margin:18px 0}.subscription-heading{align-items:flex-start}.subscription-heading h2{font-size:22px}.subscription-heading>button{flex-shrink:0}.subscription-setup{grid-template-columns:1fr;gap:18px}.subscription-actions>button,.subscription-actions>a{flex:1;text-align:center}.subscription-panel aside{padding:16px}}
-@media(max-width:700px){.subscription-heading{display:block}.subscription-heading>button{margin:4px 0 12px}.subscription-heading h2{font-size:22px}.subscription-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.subscription-actions>button,.subscription-actions>a{white-space:nowrap;padding:10px 8px}.subscription-confirm>div{max-height:90dvh;overflow:auto}}
+/* Shared by Portal and Console. Reads the host app's design tokens; fallbacks reproduce the dark Console look. */
+.subscription-panel{--sp-accent:var(--accent,#c0e58e);--sp-accent-contrast:var(--accent-contrast,#15220f);--sp-surface:var(--surface,#111a14);--sp-surface-2:var(--surface-2,#18221a);--sp-border:var(--border,#344036);--sp-text:var(--text,#e8eee9);--sp-text-2:var(--text-2,#aab7ac);--sp-danger:var(--danger,#f08a76);--sp-success:var(--success,#9fd36b);--sp-radius:var(--radius,16px);--sp-radius-sm:var(--radius-sm,10px)}
+.subscription-panel{margin:24px 0;padding:28px;border:1px solid var(--sp-border);border-radius:var(--sp-radius);background:var(--sp-surface);color:var(--sp-text);font-size:14px}
+.subscription-panel *{box-sizing:border-box}
+.subscription-panel h2{font-size:22px;font-weight:700;letter-spacing:0;margin:4px 0 8px}
+.subscription-panel h3{margin:0 0 8px;font-size:16px;font-weight:700;letter-spacing:0}
+.subscription-panel p,.subscription-panel small{color:var(--sp-text-2);line-height:1.65}
+.subscription-kicker{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--sp-accent)}
+.subscription-heading,.subscription-row{display:flex;justify-content:space-between;align-items:center;gap:20px}
+.subscription-panel button,.subscription-import{display:inline-flex;align-items:center;justify-content:center;min-height:42px;border:1px solid var(--sp-border);border-radius:var(--sp-radius-sm);padding:9px 16px;background:var(--sp-surface-2);color:var(--sp-text);font:inherit;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none}
+.subscription-panel button:hover,.subscription-import:hover{border-color:color-mix(in srgb,var(--sp-accent) 55%,var(--sp-border))}
+.subscription-panel button:disabled{opacity:.45;cursor:not-allowed}
+.subscription-panel .subscription-primary{background:var(--sp-accent);color:var(--sp-accent-contrast);border-color:var(--sp-accent);font-weight:700}
+.subscription-panel .subscription-danger{color:var(--sp-danger)}
+.subscription-panel .subscription-danger-solid,.subscription-confirm .subscription-danger-solid{background:var(--sp-danger);border-color:var(--sp-danger);color:var(--danger-contrast,#fff);font-weight:700}
+.subscription-setup{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin:22px 0}
+.subscription-setup form{display:grid;gap:16px;align-content:start}
+.subscription-panel label{display:grid;gap:8px;font-size:14px;font-weight:600}
+.subscription-panel input,.subscription-panel select{width:100%;min-height:44px;padding:10px 12px;border-radius:var(--sp-radius-sm);border:1px solid var(--sp-border);background:var(--sp-surface);color:var(--sp-text);font:inherit;font-weight:400}
+.subscription-panel details{border:1px solid var(--sp-border);border-radius:var(--sp-radius-sm);padding:0 14px}
+.subscription-panel details summary{list-style:none;display:flex;align-items:center;justify-content:space-between;min-height:44px;cursor:pointer;color:var(--sp-text-2);font-weight:600}
+.subscription-panel details summary::-webkit-details-marker{display:none}
+.subscription-panel details summary::after{content:"";width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);transition:transform .15s}
+.subscription-panel details[open] summary::after{transform:rotate(-135deg) translateY(-2px)}
+.subscription-panel details label{margin:4px 0 12px}
+.subscription-panel aside{padding:22px;background:var(--sp-surface-2);border-radius:var(--sp-radius-sm)}
+.subscription-panel ol{padding-left:22px;line-height:1.8;margin:0 0 12px}
+.subscription-panel li{margin-bottom:10px}
+.subscription-panel li small,.subscription-row b small{display:block;font-weight:400;font-size:12px}
+.subscription-panel a{color:var(--sp-accent);font-weight:600}
+.subscription-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.subscription-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px}
+.subscription-list article{padding:20px;border:1px solid var(--sp-border);border-radius:var(--sp-radius-sm);min-width:0}
+.subscription-list h3{overflow-wrap:anywhere}
+.subscription-row b{white-space:nowrap;text-align:right}
+.subscription-link{padding:20px;border:1px solid var(--sp-accent);border-radius:var(--sp-radius-sm);margin:20px 0}
+.subscription-link input{margin:12px 0}
+.subscription-error{padding:12px 14px;background:color-mix(in srgb,var(--sp-danger) 14%,transparent);color:var(--sp-danger)!important;border-radius:var(--sp-radius-sm)}
+.subscription-notice{padding:12px 14px;background:color-mix(in srgb,var(--sp-success) 14%,transparent);color:var(--sp-text)!important;border-radius:var(--sp-radius-sm)}
+.subscription-empty{padding:22px;text-align:center}
+.subscription-confirm{position:fixed;inset:0;background:rgb(0 0 0 / .55);z-index:1000;display:grid;place-items:center;padding:20px}
+.subscription-confirm>div{width:min(480px,100%);padding:26px;background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:var(--sp-radius);box-shadow:var(--shadow,0 24px 80px rgb(0 0 0 / .4))}
+.subscription-confirm .subscription-actions{justify-content:flex-end}
+.subscription-panel :focus-visible{outline:2px solid var(--sp-accent);outline-offset:3px}
+@media(max-width:700px){
+  .subscription-panel{padding:18px;margin:18px 0}
+  .subscription-heading{display:block}
+  .subscription-heading>button{margin:4px 0 12px}
+  .subscription-heading h2{font-size:20px}
+  .subscription-setup{grid-template-columns:minmax(0,1fr);gap:18px}
+  .subscription-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .subscription-actions>button,.subscription-actions>a{white-space:nowrap;padding:10px 8px}
+  .subscription-panel aside{padding:16px}
+  .subscription-confirm>div{max-height:90dvh;overflow:auto}
+}
