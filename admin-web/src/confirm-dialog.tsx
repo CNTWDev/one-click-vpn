@@ -1,7 +1,8 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 export type ConfirmInput = { label: string; placeholder?: string; required?: boolean };
-export type ConfirmOptions = { title: string; message: string; confirmLabel?: string; danger?: boolean; input?: ConfirmInput };
+/** confirmText: irreversible actions require typing this exact text (e.g. the node name) before the button enables. */
+export type ConfirmOptions = { title: string; message: string; confirmLabel?: string; danger?: boolean; input?: ConfirmInput; confirmText?: string };
 
 type ConfirmFn = {
   (options: ConfirmOptions & { input: ConfirmInput }): Promise<string | null>;
@@ -13,6 +14,7 @@ const ConfirmContext = createContext<ConfirmFn | null>(null);
 /** Native <dialog> provides focus trapping, Escape handling and background inertness. */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [request, setRequest] = useState<ConfirmOptions | null>(null);
+  const [typed, setTyped] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const resolver = useRef<((value: string | null) => void) | null>(null);
   const trigger = useRef<HTMLElement | null>(null);
@@ -38,7 +40,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const ask = useCallback((options: ConfirmOptions): Promise<string | null> => {
     resolver.current?.(null);
     trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setRequest(options);
+    setTyped(""); setRequest(options);
     return new Promise((resolve) => { resolver.current = resolve; });
   }, []);
 
@@ -61,6 +63,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     >
       <form onSubmit={(event) => {
         event.preventDefault();
+        if (request.confirmText !== undefined) { if (typed.trim() === request.confirmText) finish("confirmed"); return; }
         if (!request.input) { finish("confirmed"); return; }
         const value = String(new FormData(event.currentTarget).get("value") ?? "");
         if (request.input.required && !value.trim()) return;
@@ -69,6 +72,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         <p className="eyebrow">{request.danger ? "危险操作" : "操作确认"}</p>
         <h2 id="confirm-dialog-title">{request.title}</h2>
         <p id="confirm-dialog-message">{request.message}</p>
+        {request.confirmText !== undefined && <label>
+          <span>请输入 <code>{request.confirmText}</code> 以确认</span>
+          <input name="confirm-text" value={typed} onChange={(event) => setTyped(event.target.value)} placeholder={request.confirmText} autoComplete="off" spellCheck={false} autoFocus />
+        </label>}
         {request.input && <label>
           {request.input.label}
           <input
@@ -81,8 +88,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           />
         </label>}
         <div className="form-actions">
-          <button type="button" className="button ghost" autoFocus={!request.input} onClick={() => finish(null)}>取消</button>
-          <button type="submit" className={`button ${request.danger ? "danger" : "primary"}`}>{request.confirmLabel || "确认"}</button>
+          <button type="button" className="button ghost" autoFocus={!request.input && request.confirmText === undefined} onClick={() => finish(null)}>取消</button>
+          <button type="submit" className={`button ${request.danger ? "danger solid" : "primary"}`} disabled={request.confirmText !== undefined && typed.trim() !== request.confirmText}>{request.confirmLabel || "确认"}</button>
         </div>
       </form>
     </dialog>}

@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { countryMapPoints } from "./country-map-points";
+import { href, navigate } from "./router";
+import { statusLabel } from "./status";
 import type { NodeRecord, Region } from "./types";
 
 type MapPoint = { x: number; y: number };
-type RegionCluster = { region: Region; nodes: NodeRecord[]; status: "online" | "provisioning" | "attention" };
+type RegionCluster = { region: Region; nodes: NodeRecord[]; status: "online" | "provisioning" | "attention" | "offline" };
 export type ControllerMapLocation = {
   display_name: string;
   location_label: string;
@@ -37,12 +39,19 @@ const coverageTargets = [
 ];
 
 function clusterStatus(nodes: NodeRecord[]): RegionCluster["status"] {
+  if (nodes.some((node) => node.status === "offline")) return "offline";
   if (nodes.some((node) => node.status === "provisioning")) return "provisioning";
   if (nodes.every((node) => node.status === "online")) return "online";
   return "attention";
 }
 
-export function FleetMap({ nodes, regions, controller, onNavigate }: { nodes: NodeRecord[]; regions: Region[]; controller?: ControllerMapLocation | null; onNavigate: (page: string) => void }) {
+// A marker opens the detail of its node (the first one needing attention when a region has several).
+function openCluster(cluster: RegionCluster) {
+  const target = cluster.nodes.find((node) => node.status !== "online") || cluster.nodes[0];
+  navigate("nodes", { focus: target.id });
+}
+
+export function FleetMap({ nodes, regions, controller, compact = false }: { nodes: NodeRecord[]; regions: Region[]; controller?: ControllerMapLocation | null; compact?: boolean }) {
   const [mapFailed, setMapFailed] = useState(false);
   const [mapRetry, setMapRetry] = useState(0);
   const regionMap = useMemo(() => new Map(regions.map((region) => [region.id, region])), [regions]);
@@ -84,8 +93,8 @@ export function FleetMap({ nodes, regions, controller, onNavigate }: { nodes: No
   const controlMapLabel = controlLabel.length > 24 ? `${controlLabel.slice(0, 23)}…` : controlLabel;
   const controlLabelOnLeft = control.x > 790;
 
-  return <section className="fleet-map-panel">
-    <div className="fleet-map-head"><div><p className="eyebrow">GLOBAL FABRIC</p><h2>全球节点态势</h2><p>按区域聚合 Edge Node，点击节点标记进入运维。</p></div><div className="fleet-map-stats"><span><b>{clusters.length}</b>覆盖区域</span><span><b>{online}/{nodes.length}</b>节点在线</span><span><b>{hasControllerGps ? controlLabel : "未设置"}</b>Controller GPS</span><button className="text-button" onClick={() => onNavigate("regions")}>管理区域 →</button></div></div>
+  return <section className={`fleet-map-panel ${compact ? "compact" : ""}`}>
+    {!compact && <div className="fleet-map-head"><div><h2>全球节点态势</h2><p>按区域聚合 Edge Node，点击节点标记查看节点详情。</p></div><div className="fleet-map-stats"><span><b>{clusters.length}</b>覆盖区域</span><span><b>{online}/{nodes.length}</b>节点在线</span><span><b>{hasControllerGps ? controlLabel : "未设置"}</b>Controller GPS</span><a className="text-button" href={href("regions")}>管理区域 →</a></div></div>}
     <div className="fleet-map-stage">
       <div className="fleet-map-scan" />
       <svg viewBox="0 0 1010 666" role="img" aria-label="Northstar 全球 VPN 节点分布图">
@@ -96,11 +105,11 @@ export function FleetMap({ nodes, regions, controller, onNavigate }: { nodes: No
         <rect className="fleet-map-ocean" x="0" y="0" width="1010" height="666" />
         <image className="fleet-map-base" href={`/world-map.webp${mapRetry ? `?retry=${mapRetry}` : ""}`} onError={() => setMapFailed(true)} onLoad={() => setMapFailed(false)} x="0" y="0" width="1010" height="666" />
         <g className="fleet-map-routes">{visibleClusters.map((cluster, index) => { const point = points[cluster.region.id]; const bend = Math.min(control.y, point.y) - 24 - (index % 3) * 8; return <path key={`route-${cluster.region.id}`} className={cluster.status} d={`M${control.x} ${control.y} Q ${(control.x + point.x) / 2} ${bend} ${point.x} ${point.y}`} />; })}</g>
-        <g className="fleet-map-markers">{visibleClusters.map((cluster) => { const point = points[cluster.region.id]; const onlineCount = cluster.nodes.filter((node) => node.status === "online").length; const labelOnLeft = point.x > 780; return <g key={cluster.region.id} className={`fleet-map-marker ${cluster.status}`} transform={`translate(${point.x} ${point.y})`} role="button" tabIndex={0} aria-label={`${cluster.region.name}，${cluster.nodes.length} 个节点，${onlineCount} 个在线`} onClick={() => onNavigate("nodes")} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onNavigate("nodes"); }}><title>{`${cluster.region.name} · ${cluster.region.country}\n${cluster.nodes.map((node) => `${node.name}: ${node.status}`).join("\n")}`}</title><circle className="marker-pulse" r="13" /><circle className="marker-ring" r="8" /><circle className="marker-core" r="3.2" />{cluster.nodes.length > 1 && <><circle className="marker-count-bg" cx="8" cy="-8" r="6" /><text className="marker-count" x="8" y="-5.6" textAnchor="middle">{cluster.nodes.length}</text></>}<text className="marker-label" x={labelOnLeft ? -13 : 13} y="4" textAnchor={labelOnLeft ? "end" : "start"}>{cluster.region.name}</text></g>; })}</g>
+        <g className="fleet-map-markers">{visibleClusters.map((cluster) => { const point = points[cluster.region.id]; const onlineCount = cluster.nodes.filter((node) => node.status === "online").length; const labelOnLeft = point.x > 780; return <g key={cluster.region.id} className={`fleet-map-marker ${cluster.status}`} transform={`translate(${point.x} ${point.y})`} role="button" tabIndex={0} aria-label={`${cluster.region.name}，${cluster.nodes.length} 个节点，${onlineCount} 个在线`} onClick={() => openCluster(cluster)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCluster(cluster); } }}><title>{`${cluster.region.name} · ${cluster.region.country}\n${cluster.nodes.map((node) => `${node.name}: ${statusLabel(node.status)}`).join("\n")}`}</title><circle className="marker-pulse" r="13" /><circle className="marker-ring" r="8" /><circle className="marker-core" r="3.2" />{cluster.nodes.length > 1 && <><circle className="marker-count-bg" cx="8" cy="-8" r="6" /><text className="marker-count" x="8" y="-5.6" textAnchor="middle">{cluster.nodes.length}</text></>}<text className="marker-label" x={labelOnLeft ? -13 : 13} y="4" textAnchor={labelOnLeft ? "end" : "start"}>{cluster.region.name}</text></g>; })}</g>
         <g className={`fleet-map-control ${hasControllerGps ? "positioned" : "unset"}`} transform={`translate(${control.x} ${control.y})`}>
           <title>{hasControllerGps ? `${controller?.display_name}\n${controlLabel}\n${controller?.latitude}, ${controller?.longitude}` : "Controller GPS 尚未设置"}</title>
           <circle className="control-halo" r="14" /><circle className="control-ring" r="7" /><path className="control-core" d="M0 -4.8 L4.8 0 L0 4.8 L-4.8 0 Z" />
-          <text x={controlLabelOnLeft ? -18 : 18} y="4" textAnchor={controlLabelOnLeft ? "end" : "start"}>{hasControllerGps ? controlMapLabel : "CONTROL PLANE · GPS UNSET"}</text>
+          <text x={controlLabelOnLeft ? -18 : 18} y="4" textAnchor={controlLabelOnLeft ? "end" : "start"}>{hasControllerGps ? controlMapLabel : "Controller · 未设置位置"}</text>
         </g>
       </svg>
       {!visibleClusters.length && <div className="fleet-map-empty">创建区域并部署节点后，全球分布会显示在这里。</div>}
@@ -108,6 +117,6 @@ export function FleetMap({ nodes, regions, controller, onNavigate }: { nodes: No
       <div className="fleet-map-caption"><span>{hasControllerGps ? "动态连线：Controller GPS → Agent 区域" : "动态连线：Agent 管理通道（Controller GPS 未设置）"}</span><small>不代表用户 VPN 流量路径</small></div>
       <div className="fleet-map-attribution">Map data · @svg-maps/world · CC BY 4.0</div>
     </div>
-    <div className="fleet-map-footer"><div className="fleet-map-legend"><span><i className="online" />在线</span><span><i className="provisioning" />部署中</span><span><i className="attention" />需关注</span></div><div className="coverage-gaps"><b>{gaps.length ? "基础覆盖空白" : "基础全球覆盖已齐备"}</b>{gaps.length ? gaps.map((gap) => <button key={gap.name} onClick={() => onNavigate("regions")}><span>＋ {gap.name}</span><small>{gap.detail}</small></button>) : <small>可结合用户位置与延迟继续扩容。</small>}</div></div>
+    {!compact && <div className="fleet-map-footer"><div className="fleet-map-legend"><span><i className="online" />在线</span><span><i className="provisioning" />部署中</span><span><i className="attention" />需关注</span><span><i className="offline" />离线</span></div><div className="coverage-gaps"><b>{gaps.length ? "基础覆盖空白" : "基础全球覆盖已齐备"}</b>{gaps.length ? gaps.map((gap) => <button key={gap.name} onClick={() => navigate("regions")}><span>＋ {gap.name}</span><small>{gap.detail}</small></button>) : <small>可结合用户位置与延迟继续扩容。</small>}</div></div>}
   </section>;
 }

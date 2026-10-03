@@ -1,33 +1,48 @@
+import { useState } from "react";
 import { FleetMap } from "../fleet-map";
+import { Icon } from "../icons";
+import { href } from "../router";
 import type { AdminUser, ControllerInfo, NodeRecord, Region } from "../types";
-import { Empty, formatTime, PageHeader, Pill } from "./shared";
+import { Empty, PageHeader, Pill, StateDot, Time } from "./shared";
 
-export function OverviewPage({ users, nodes, regions, controllerSettings, onNavigate, onRefresh }: {
-  users: AdminUser[]; nodes: NodeRecord[]; regions: Region[]; controllerSettings?: ControllerInfo["settings"] | null; onNavigate: (page: string) => void; onRefresh: () => Promise<void>;
+const MAP_KEY = "northstar-console-overview-map";
+function readMapOpen() { try { return window.localStorage.getItem(MAP_KEY) !== "closed"; } catch { return true; } }
+
+export function OverviewPage({ users, nodes, regions, controllerSettings, onRefresh }: {
+  users: AdminUser[]; nodes: NodeRecord[]; regions: Region[]; controllerSettings?: ControllerInfo["settings"] | null; onRefresh: () => Promise<void>;
 }) {
+  const [mapOpen, setMapOpen] = useState(readMapOpen);
   const pending = users.filter((user) => user.status === "pending");
   const attention = nodes.filter((node) => node.status !== "online");
+  const online = nodes.length - attention.length;
+  function toggleMap() {
+    const next = !mapOpen; setMapOpen(next);
+    try { window.localStorage.setItem(MAP_KEY, next ? "open" : "closed"); } catch { /* remembered for this tab only */ }
+  }
   return <>
-    <PageHeader eyebrow="CONTROL PLANE" title="运维总览" description="从账号准入到边缘节点，集中查看当前需要处理的事项。" actions={<button className="button ghost" onClick={() => void onRefresh()}>刷新数据</button>} />
+    <PageHeader title="运维总览" description="从账号准入到边缘节点，集中查看当前需要处理的事项。" actions={<button className="button ghost" onClick={() => void onRefresh()}><Icon name="refresh" size={16} />刷新</button>} />
     <section className="metric-grid">
-      <button onClick={() => onNavigate("users")}><small>待审核账号</small><b>{pending.length}</b><span>进入账号管理 →</span></button>
-      <button onClick={() => onNavigate("nodes")}><small>在线节点</small><b>{nodes.filter((node) => node.status === "online").length}<em> / {nodes.length}</em></b><span>进入节点运维 →</span></button>
-      <button onClick={() => onNavigate("services")}><small>需关注节点</small><b>{attention.length}</b><span>检查服务状态 →</span></button>
-      <button onClick={() => onNavigate("logs")}><small>当前用户</small><b>{users.filter((user) => user.status === "active").length}</b><span>查看运行日志 →</span></button>
+      <a href={href("users", { filter: "pending" })} className={pending.length ? "warn" : ""}><small>待审核账号</small><b>{pending.length}</b><span>去审核 →</span></a>
+      <a href={href("nodes", { filter: "online" })}><small>在线节点</small><b>{online}<em> / {nodes.length}</em></b><span>查看节点 →</span></a>
+      <a href={href("nodes", { filter: "attention" })} className={attention.length ? "danger" : ""}><small>需关注节点</small><b>{attention.length}</b><span>查看需关注节点 →</span></a>
+      <a href={href("users", { filter: "active" })}><small>已启用账号</small><b>{users.filter((user) => user.status === "active").length}</b><span>查看账号 →</span></a>
     </section>
-    <FleetMap nodes={nodes} regions={regions} controller={controllerSettings} onNavigate={onNavigate} />
     <div className="two-column">
       <section className="panel">
-        <div className="panel-head"><div><p className="eyebrow">ATTENTION</p><h2>需要处理</h2></div></div>
+        <div className="panel-head"><h2>需要处理</h2>{pending.length + attention.length > 0 && <span className="count-badge">{pending.length + attention.length}</span>}</div>
         {!pending.length && !attention.length ? <Empty>当前没有待处理事项。</Empty> : <div className="attention-list">
-          {pending.slice(0, 5).map((user) => <button key={user.id} onClick={() => onNavigate("users")}><span className="attention-icon">U</span><span><b>{user.displayName} 等待账号审核</b><small>{user.email} · {formatTime(user.createdAt)}</small></span><em>审核</em></button>)}
-          {attention.slice(0, 6).map((node) => <button key={node.id} onClick={() => onNavigate("nodes")}><span className="attention-icon node">N</span><span><b>{node.name} 状态为 {node.status}</b><small>{node.ip} · {node.last_seen}</small></span><em>诊断</em></button>)}
+          {pending.slice(0, 5).map((user) => <a key={user.id} href={href("users", { filter: "pending", q: user.email })}><span className="attention-icon warning"><Icon name="user" size={16} /></span><span><b>{user.displayName} 等待账号审核</b><small>{user.email} · <Time value={user.createdAt} /></small></span><em>审核 →</em></a>)}
+          {attention.slice(0, 6).map((node) => <a key={node.id} href={href("nodes", { focus: node.id })}><span className={`attention-icon ${node.status === "provisioning" ? "progress" : "danger"}`}><Icon name="nodes" size={16} /></span><span><b>{node.name}</b><small>{node.ip} · {node.last_seen}</small></span><Pill value={node.status} /><em>诊断 →</em></a>)}
         </div>}
       </section>
       <section className="panel">
-        <div className="panel-head"><div><p className="eyebrow">FLEET</p><h2>节点状态</h2></div><button className="text-button" onClick={() => onNavigate("nodes")}>全部节点</button></div>
-        {nodes.length ? <div className="compact-list">{nodes.slice(0, 8).map((node) => <div key={node.id}><span className={`state-dot ${node.status}`} /><span><b>{node.name}</b><small>{node.place} · {node.latency}</small></span><Pill value={node.status} /></div>)}</div> : <Empty>尚未部署节点。</Empty>}
+        <div className="panel-head"><h2>节点状态</h2><a className="text-button" href={href("nodes")}>全部节点 →</a></div>
+        {nodes.length ? <div className="compact-list">{nodes.slice(0, 8).map((node) => <a key={node.id} href={href("nodes", { focus: node.id })}><StateDot value={node.status} /><span><b>{node.name}</b><small>{node.place} · {node.latency}</small></span><Pill value={node.status} /></a>)}</div> : <Empty action={<a className="button primary" href={href("nodes")}>添加节点</a>}>尚未部署节点。</Empty>}
       </section>
     </div>
+    <section className={`overview-map ${mapOpen ? "" : "collapsed"}`}>
+      <div className="overview-map-head"><button className="overview-map-toggle" aria-expanded={mapOpen} onClick={toggleMap}><Icon name="chevron" /><b>全球节点分布</b><small>{regions.length} 个区域 · {online}/{nodes.length} 在线</small></button><a className="text-button" href={href("topology")}>完整拓扑 →</a></div>
+      {mapOpen && <FleetMap compact nodes={nodes} regions={regions} controller={controllerSettings} />}
+    </section>
   </>;
 }
