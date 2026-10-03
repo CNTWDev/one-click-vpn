@@ -318,22 +318,27 @@ and update the Nginx subscription logging rule above. Docker runs the idempotent
 migration automatically. Existing credentials stay intact; updating the Controller alone
 does not immediately open new protocol listeners on old nodes.
 
-Configure **VPN services → Default REALITY target** once for the platform, using an
-independent static HTTPS site with TLS 1.3 and HTTP/2. The bundled static service and
-`scripts/setup-reality-target.sh` support a separate domain on the management host;
-see [deployment instructions](docs/architecture/06-deployment.md).
+REALITY targets need no configuration by default (**自动选择**): every Agent probes a
+built-in pool of large public TLS 1.3 + HTTP/2 sites and the Controller gives each node
+a fast target it verified itself, so the fleet does not share one fingerprintable
+domain and the management host is never exposed through SNI. **VPN services → REALITY
+设置 → 自建目标** remains available for an operator-run static site; the bundled static
+service and `scripts/setup-reality-target.sh` support it, see
+[deployment instructions](docs/architecture/06-deployment.md).
 Standard policy **v2** automatically installs WireGuard, OpenVPN and VLESS on new nodes.
 Older standard nodes gain missing protocols through the existing **Reinstall / repair**
 or standard-policy canary/batch rollout; VLESS requires Linux amd64/arm64 and Agent 2.7+.
 Reinstall / repair installs the current Agent. Custom and Agent-only templates are preserved.
-There is no separate per-node VLESS onboarding workflow. Missing target configuration
-blocks only VLESS; after target setup, already-created services retry on heartbeat.
-The node validates the target and pins its resolved public address. Repeated deployments
-retain existing keys, ports and targets; changing the global default does not invalidate
-downloaded profiles. Use the generic advanced service settings only for exceptions such
-as TCP/443 already being occupied. Those overrides mark the node as custom-managed.
-Targets cannot change while the node has valid VLESS profiles. A failed initial setup
-with no valid profiles can be corrected and redeployed without changing keys.
+There is no separate per-node VLESS onboarding workflow. A node waiting for its target
+blocks only VLESS; standard rollouts still apply the other protocols and VLESS retries
+on heartbeat. The node validates the target and pins its resolved public address.
+Repeated deployments retain existing keys, ports and targets; changing the global default
+does not touch existing nodes. Use the generic advanced service settings only for
+exceptions such as TCP/443 already being occupied; they override that one protocol and
+keep the node on the standard policy.
+Changing a node's target is a smooth switch: keys stay, the previous names remain
+accepted (up to three), and issued profiles move to the new name, so subscribers pick it
+up on their next refresh and fixed-node users re-download once.
 Open that TCP port in the cloud security group as well as the host firewall. Do not
 expose the local statistics API on TCP 10085.
 
@@ -342,14 +347,24 @@ pinned SHA-256 for its architecture; no remote shell installer is executed. Node
 egress needs HTTPS access to GitHub releases, the selected REALITY target, and normal
 user traffic destinations. A failed download/preflight stays visible as a service error.
 The Agent checks occupied ports and never displaces existing web or VPN listeners.
-Access-list changes restart only the managed VLESS service to terminate removed users'
-sessions; other VLESS users can experience a brief reconnect. Traffic is sampled on
-heartbeats, so bytes since the last sample may be lost on a restart.
+Access changes go through Xray's local API: added users work immediately and removed
+users are rejected immediately, without disconnecting anyone. To also close sessions that
+removed users already had open, the Agent restarts Xray once 60 seconds later, coalescing
+all revocations in that window. Traffic is sampled on heartbeats, so bytes since the last
+sample may be lost on a restart.
+
+Subscription links serve Clash/Mihomo YAML by default and a base64 `vless://` list
+(`format=v2ray`) for Shadowrocket, v2rayN/v2rayNG and similar clients; the format is also
+picked from the client's User-Agent. Routing defaults to `mode=smart` (private networks and
+mainland China direct via GEOSITE/GEOIP rules, everything else through Northstar);
+`mode=global` sends everything except private networks through the tunnel. Node names
+read `🇯🇵 Tokyo · node-name` and stay stable when nodes are added. Fixed-node VLESS
+profiles also export a single share link (`/api/v1/profiles/{id}/download?format=uri`).
 
 For validation, `npm test` covers unit and integration hooks. Supply a disposable
 `NORTHSTAR_TEST_DATABASE_URL` to run PostgreSQL/API tests, and optionally
 `NORTHSTAR_TEST_XRAY` / `NORTHSTAR_TEST_MIHOMO` paths to validate generated configs
-with real binaries. These checks do not replace iPhone/Android and live-node acceptance tests.
+with real binaries (`NORTHSTAR_TEST_MIHOMO_GEODATA` adds the smart-routing rules check). These checks do not replace iPhone/Android and live-node acceptance tests.
 
 ## Local development setup
 
@@ -412,3 +427,24 @@ existing nodes receive the routing changes without rotating credentials.
   compares encrypted-material fingerprints before decrypting UUIDs. Superseded
   bundles are removed after a one-day grace period once no desired or retryable
   task references them.
+
+### Agent 2.9 update
+
+Deploy the Controller (migrations run automatically), then **升级 Agent** on each node.
+
+- OpenVPN picks its IPv6 handling per node: OpenVPN 2.5+ with kernel IPv6 keeps
+  server-side `block-ipv6`; OpenVPN 2.4 (Ubuntu 20.04, Debian 10, CentOS 7) or kernels
+  with IPv6 disabled push the client-side `block-ipv6` instead, so the server always
+  starts. If OpenVPN still rejects a new configuration, the Agent restores the previous
+  one and reports the error instead of leaving a crash loop.
+- The new Agent confirms its own upgrade after its first authenticated heartbeat; the
+  Controller waits up to 65 seconds for the target version and its SSH confirmation is
+  now idempotent. WireGuard leases beyond the first /24 are used only after the upgrade
+  is confirmed.
+- Each Agent probes the REALITY candidate pool at start and every six hours and reports
+  the results in its heartbeat. Pinned target addresses are kept while they still
+  handshake, even when CDN DNS answers rotate, so Xray is not restarted needlessly.
+- Subscriptions include a node as soon as the Agent applied a revision containing that
+  user, so unrelated access changes no longer hide nodes for a few seconds. The
+  subscription lock pool is configurable (`NORTHSTAR_SUBSCRIPTION_LOCK_POOL_MAX`, default
+  10) and concurrent refreshes of one link wait instead of failing.

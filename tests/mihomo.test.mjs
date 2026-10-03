@@ -7,7 +7,8 @@ const input = {
   privateKey: Buffer.alloc(32, 1).toString('base64'), serverPublicKey: Buffer.alloc(32, 2).toString('base64'),
   clientAddress: '10.70.0.2/32', dns: ['1.1.1.1'], allowedIps: ['0.0.0.0/0'],
 };
-const proxy = (text) => JSON.parse(text.split('proxies:\n  - ')[1].split('\n')[0]);
+const config = (text) => Object.fromEntries(text.trim().split('\n').filter((line) => !line.startsWith('#')).map((line) => [line.slice(0, line.indexOf(':')), JSON.parse(line.slice(line.indexOf(':') + 1))]));
+const proxy = (text) => config(text).proxies[0];
 test('Mihomo export reuses WireGuard identity, endpoint and routes', () => {
   const text = renderMihomoWireGuard(input);
   const p = proxy(text);
@@ -22,7 +23,7 @@ test('Mihomo export reuses WireGuard identity, endpoint and routes', () => {
   assert.match(text, /allow-lan: false/);
   assert.match(text, /MATCH,Northstar/);
   assert.doesNotMatch(text, /external-controller|tun:/);
-  const dns = JSON.parse(text.split('\n').find(line => line.startsWith('dns: ')).slice(5));
+  const dns = config(text).dns;
   assert.equal(dns['respect-rules'], true);
   assert.ok(dns['proxy-server-nameserver'].length);
 });
@@ -30,7 +31,8 @@ test('YAML data cannot inject extra configuration', () => {
   const name = 'x"\nrules:\n  - MATCH,DIRECT #';
   const text = renderMihomoWireGuard({ ...input, name });
   assert.equal(proxy(text).name, name);
-  assert.equal(text.split('\n').filter(line => line === 'rules:').length, 1);
+  assert.equal(text.split('\n').filter(line => line.startsWith('rules:')).length, 1);
+  assert.equal(config(text).rules.at(-1), 'MATCH,Northstar');
 });
 test('preserves split routes, supplies DNS fallback and supports IPv6 endpoints', () => {
   const p = proxy(renderMihomoWireGuard({ ...input, endpoint: { host: '2001:db8::1', port: 51820 }, allowedIps: ['10.0.0.0/8'], dns: [] }));

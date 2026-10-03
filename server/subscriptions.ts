@@ -7,7 +7,8 @@ import { createAccessCredential, findDesiredConfig, listConnectionProfiles } fro
 import { activateProfile, issueConnectionProfile, selectVpnServices } from "./control-plane";
 import { assertCredentialUsable, manageCredentialAccess } from "./credential-access";
 import { createSecretMaterial, readSecretMaterial } from "./secret-materials";
-import { renderSubscription, type SubscriptionProxy } from "./subscription-format";
+import { proxyName, renderSubscription, renderV2raySubscription, type RoutingMode, type SubscriptionFormat, type SubscriptionProxy } from "./subscription-format";
+import { realityUserIdentities } from "./reality";
 
 type Subscription = { id: string; credential_id: string; token_hash: string; token_secret_id: string | null; private_key_secret_id: string | null; created_at: string; updated_at: string; last_fetched_at: string | null };
 let lockPool: Pool | undefined;
@@ -26,22 +27,36 @@ export async function listSubscriptions(userId?: string) {
 }
 
 // A session advisory lock serializes provisioning across controller workers without nesting existing DB transactions.
+// Same-process callers queue in memory first, so two devices refreshing one subscription wait instead of failing.
+const lockQueues = new Map<string, Promise<unknown>>();
 async function locked<T>(key: string, work: () => Promise<T>): Promise<T> {
-  // Dedicated bounded pool: holding locks must never exhaust the query pool needed by work().
+  const previous = lockQueues.get(key) || Promise.resolve();
+  const pending = previous.catch(() => undefined).then(() => lockAndRun(key, work));
+  lockQueues.set(key, pending);
+  try { return await pending; }
+  finally { if (lockQueues.get(key) === pending) lockQueues.delete(key); }
+}
+async function lockAndRun<T>(key: string, work: () => Promise<T>): Promise<T> {
+  // Dedicated bounded pool, separate from the reconcile lock pool that work() itself may need.
   if (!lockPool) {
     getDb(); // Validate the configured database before creating another pool.
-    lockPool = new Pool({ connectionString: process.env.NORTHSTAR_DATABASE_URL, max: 2, connectionTimeoutMillis: 5000, idleTimeoutMillis: 10000 });
+    lockPool = new Pool({ connectionString: process.env.NORTHSTAR_DATABASE_URL, max: Number(process.env.NORTHSTAR_SUBSCRIPTION_LOCK_POOL_MAX || 10), connectionTimeoutMillis: 15000, idleTimeoutMillis: 10000 });
     lockPool.on("error", () => console.error("Subscription lock connection failed"));
   }
-  const client = await lockPool.connect();
+  const client = await lockPool.connect().catch(() => { throw new Error("订阅服务繁忙，请稍后重试"); });
   let held = false;
   try {
-    held = (await client.query("SELECT pg_try_advisory_lock(hashtext($1)) AS held", [key])).rows[0].held;
-    if (!held) throw new Error("订阅正在更新，请稍后重试");
+    try {
+      await client.query("SET lock_timeout='15s'");
+      await client.query("SELECT pg_advisory_lock(hashtext($1))", [key]);
+      held = true;
+    } catch { throw new Error("订阅正在更新，请稍后重试"); }
     return await work();
   } finally {
+    let discard = false;
     try { if (held) await client.query("SELECT pg_advisory_unlock(hashtext($1))", [key]); }
-    finally { client.release(); }
+    catch { discard = true; }
+    finally { client.release(discard || !held); }
   }
 }
 
@@ -88,7 +103,26 @@ export async function manageSubscription(id: string, action: string, actor: { id
   });
 }
 
-export async function downloadSubscription(token: string) {
+/** Has the Agent applied a revision that contains this credential? Later unrelated revisions don't matter. */
+async function accessApplied(profileId: string, nodeId: string, protocol: "wireguard" | "vless", identityKey: string) {
+  const desired = await findDesiredConfig(nodeId, protocol);
+  const applied = (await dbQuery<{ applied_revision: number; status: string }>(
+    "SELECT applied_revision,status FROM observed_configs WHERE node_id=$1 AND protocol=$2", [nodeId,protocol]))[0];
+  if (!desired || !applied || !["applied", "succeeded"].includes(applied.status)) return false;
+  const member = protocol === "wireguard"
+    ? ((desired.payload.peers || []) as Array<{ publicKey?: string }>).some((peer) => peer.publicKey === identityKey)
+    : (await realityUserIdentities(nodeId)).has(identityKey);
+  if (!member) {
+    await dbExec("UPDATE connection_profiles SET included_revision=NULL WHERE id=$1", [profileId]);
+    return false;
+  }
+  // Legacy agents hash sorted Python JSON, whereas the controller hashes JS JSON; revisions are the shared contract.
+  const row = (await dbQuery<{ included_revision: number | null }>(
+    "UPDATE connection_profiles SET included_revision=COALESCE(included_revision,$2) WHERE id=$1 RETURNING included_revision", [profileId,desired.revision]))[0];
+  return applied.applied_revision >= Number(row?.included_revision ?? desired.revision);
+}
+
+export async function downloadSubscription(token: string, options: { format?: SubscriptionFormat; mode?: RoutingMode } = {}) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("订阅不可用");
   const initial = (await dbQuery<Subscription>("SELECT * FROM subscriptions WHERE token_hash=$1", [hashToken(token)]))[0];
   if (!initial) throw new Error("订阅不可用");
@@ -101,19 +135,18 @@ export async function downloadSubscription(token: string) {
     const candidates = await selectVpnServices({ protocol: credential.protocol });
     const profiles = await listConnectionProfiles({ credentialId: credential.id });
     const proxies: SubscriptionProxy[] = [];
+    const regions = new Map((await dbQuery<{ id: string; name: string; code: string }>("SELECT id,name,code FROM regions")).map((row) => [row.id, row]));
+    const usedNames = new Set<string>();
     for (const { node, service } of candidates) {
       try {
       let profile = profiles.find((p) => p.node_id === node.id && ["issued", "active"].includes(p.status)
         && new Date(p.expires_at).getTime() > Date.now() && p.endpoint.host === (node.public_endpoint || node.ip) && p.endpoint.port === service.listen_port);
       if (!profile) profile = await issueConnectionProfile({ credentialId: credential.id, nodeId: node.id, protocol: credential.protocol, clientPrivateKey: key });
       if (profile.status === "issued") profile = await activateProfile(profile.id, credential.user_id);
-      const desired = await findDesiredConfig(node.id, credential.protocol);
-      const applied = (await dbQuery<{ applied_revision: number; observed_hash: string; status: string }>(
-        "SELECT applied_revision,observed_hash,status FROM observed_configs WHERE node_id=$1 AND protocol=$2", [node.id,credential.protocol]))[0];
       // A healthy process alone doesn't prove that THIS user's access has reached the node.
-      // Legacy agents hash sorted Python JSON, whereas the controller hashes JS JSON; revisions are the shared contract.
-      if (!desired || !applied || applied.applied_revision !== desired.revision || !["applied", "succeeded"].includes(applied.status)) continue;
-      const name = `${node.region || node.name} · ${node.name} · ${node.id.slice(-8)} · ${credential.protocol === "vless" ? "VL" : "WG"}`;
+      if (!(await accessApplied(profile.id, node.id, credential.protocol, credential.identity_key))) continue;
+      const region = node.region_id ? regions.get(node.region_id) : undefined;
+      const name = proxyName({ countryCode: region?.code, region: region?.name, nodeName: node.name, nodeId: node.id }, usedNames);
       const payload = profile.protocol_payload;
       if (credential.protocol === "wireguard") {
         if (!key || !profile.client_address || !node.server_public_key) continue;
@@ -134,8 +167,9 @@ export async function downloadSubscription(token: string) {
     }
     // Re-check revocations that may have arrived through the legacy credential/account management endpoints.
     await assertCredentialUsable(credential.id);
-    const content = renderSubscription(proxies);
+    const format = options.format || "clash";
+    const content = format === "v2ray" ? renderV2raySubscription(proxies) : renderSubscription(proxies, { mode: options.mode });
     await dbExec("UPDATE subscriptions SET last_fetched_at=$1 WHERE id=$2", [new Date().toISOString(),sub.id]);
-    return { content, count: proxies.length, expiresAt: credential.expires_at };
+    return { content, format, count: proxies.length, expiresAt: credential.expires_at };
   });
 }

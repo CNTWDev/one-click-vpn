@@ -553,9 +553,11 @@ export async function allocateIpLease(nodeId: string, protocol: Protocol, device
   if (!service) throw new Error("VPN service unavailable");
   const pool = ipv4Pool(service.subnet);
   // Older Agents hard-code a /24 interface. Keep their leases inside that range until upgraded.
-  const version = (await dbQuery<{ version: string }>("SELECT version FROM nodes WHERE id=$1", [nodeId]))[0]?.version || "";
-  const release = version.match(/^agent (\d+)\.(\d+)\./);
-  const expanded = release && (Number(release[1]) > 2 || (Number(release[1]) === 2 && Number(release[2]) >= 8));
+  const agent = (await dbQuery<{ version: string | null; agent_capabilities_json: string | null }>("SELECT version, agent_capabilities_json FROM nodes WHERE id=$1", [nodeId]))[0];
+  const release = (agent?.version || "").match(/^agent (\d+)\.(\d+)\./);
+  // An unconfirmed upgrade can still roll back to a /24-only Agent, so wait for the confirmation.
+  const pending = parseJson<{ upgradePending?: unknown }>(String(agent?.agent_capabilities_json || "{}"), {}).upgradePending === true;
+  const expanded = !pending && release && (Number(release[1]) > 2 || (Number(release[1]) === 2 && Number(release[2]) >= 8));
   const size = protocol === "wireguard" && !expanded ? Math.min(pool.size, 256) : pool.size;
   for (let index = 2; index < size - 1; index += 1) {
     const address = `${ipv4Address(pool.network + index)}/32`;

@@ -103,6 +103,12 @@ export async function rebuildDesiredState(nodeId: string, protocol: Protocol, op
   return withReconcileLock(nodeId, protocol, () => buildDesiredStateLocked(nodeId, protocol, options));
 }
 
+async function vlessDesiredReality(nodeId: string, listenPort: number) {
+  const settings = await ensureRealityService(nodeId, listenPort);
+  // serverName is public; carrying it makes a target switch a new revision for the Agent.
+  return { serverBundleSecretId: settings.secret_id, usersSecretId: await realityUsersSecret(nodeId), serverName: settings.server_name };
+}
+
 async function buildDesiredStateLocked(nodeId: string, protocol: Protocol, options: { force?: boolean }) {
   const node = await findNode(nodeId);
   if (!node) throw new Error("Node not found");
@@ -123,7 +129,7 @@ async function buildDesiredStateLocked(nodeId: string, protocol: Protocol, optio
     serverPublicKey: node.server_public_key,
     listenPort: service.listen_port,
     subnet: service.subnet,
-    reality: protocol === "vless" ? { serverBundleSecretId: (await ensureRealityService(nodeId, service.listen_port)).secret_id, usersSecretId: await realityUsersSecret(nodeId) } : undefined,
+    reality: protocol === "vless" ? await vlessDesiredReality(nodeId, service.listen_port) : undefined,
     peers: await listActivePeers(nodeId, protocol),
     openvpn,
   });

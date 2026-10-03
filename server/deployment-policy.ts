@@ -10,7 +10,7 @@ import {
 } from "./control-db";
 import { rebuildDesiredState } from "./control-plane";
 import { listProtocolAdapters } from "./protocols/registry";
-import { realityDefaults } from "./reality-defaults";
+import { defaultRealityTarget } from "./service-prerequisites";
 
 export const STANDARD_POLICY_VERSION = 2;
 export type DeploymentPolicy = "standard" | "custom" | "agent-only";
@@ -31,21 +31,25 @@ async function standardPolicyDrift() {
   const protocols = standardProtocolAdapters().map((adapter) => adapter.id);
   const services = await listVpnServices();
   const capabilities = await listNodeProtocols();
-  const defaults = await realityDefaults();
   const configured = new Set((await dbQuery<{ node_id: string }>("SELECT node_id FROM reality_settings")).map((row) => row.node_id));
-  return (await listControlNodes()).flatMap((node) => {
-    if ((node.deployment_policy || "standard") !== "standard") return [];
+  const drift = [];
+  for (const node of await listControlNodes()) {
+    if ((node.deployment_policy || "standard") !== "standard") continue;
     const missingProtocols = protocols.filter((protocol) => !services.some((service) => service.node_id === node.id && service.protocol === protocol && service.enabled && service.status === "healthy"));
-    if (Number(node.policy_version || 0) >= STANDARD_POLICY_VERSION && !missingProtocols.length) return [];
+    if (Number(node.policy_version || 0) >= STANDARD_POLICY_VERSION && !missingProtocols.length) continue;
     const heartbeatAt = node.last_heartbeat_at ? new Date(node.last_heartbeat_at).getTime() : 0;
     const fresh = node.status === "online" && heartbeatAt > 0 && Date.now() - heartbeatAt < 90_000;
     const unsupported = protocols.filter((protocol) => !capabilities.some((capability) => capability.node_id === node.id && capability.protocol === protocol && capability.status === "enabled"));
-    const missingTarget = protocols.includes("vless") && !defaults.serverName && !configured.has(node.id);
+    // A missing REALITY target only holds back VLESS; the other protocols still roll out.
+    const targetWait = missingProtocols.includes("vless") && !configured.has(node.id) ? (await defaultRealityTarget(node.id)).reason : undefined;
+    const actionable = missingProtocols.filter((protocol) => protocol !== "vless" || !targetWait);
     const reason = !fresh ? "需要节点在线并上报最新 Agent 心跳"
       : unsupported.length ? `请先通过节点运维升级 Agent，缺少能力：${unsupported.join(", ")}`
-      : missingTarget ? "请先完成一次平台默认 REALITY 目标设置" : "可自动同步";
-    return [{ node, missingProtocols, eligible: fresh && !unsupported.length && !missingTarget, reason }];
-  });
+      : targetWait ? (actionable.length ? `可同步其他协议；VLESS：${targetWait}` : `VLESS：${targetWait}`) : "可自动同步";
+    const versionOnly = !missingProtocols.length;
+    drift.push({ node, missingProtocols, eligible: fresh && !unsupported.length && (versionOnly || actionable.length > 0), reason });
+  }
+  return drift;
 }
 
 export async function deploymentPolicyOverview() {
@@ -171,9 +175,10 @@ export async function rolloutStandardPolicy(input: { actorUserId: string; mode: 
           serviceErrors.push(`${adapter.id}: ${message}`);
         }
       }
-      if (serviceErrors.length) throw new Error(serviceErrors.join("; "));
+      // Per-protocol outcome: one blocked protocol (e.g. VLESS waiting for a target) must not fail the node.
+      if (serviceErrors.length && serviceErrors.length >= adapters.length) throw new Error(serviceErrors.join("; "));
       await setNodeDeploymentPolicy(node.id, "standard", STANDARD_POLICY_VERSION);
-      await dbExec("UPDATE policy_rollout_targets SET status = 'queued', updated_at = $1 WHERE rollout_id = $2 AND node_id = $3", [now(), rolloutId, node.id]);
+      await dbExec("UPDATE policy_rollout_targets SET status = 'queued', error = $1, updated_at = $2 WHERE rollout_id = $3 AND node_id = $4", [serviceErrors.length ? `部分协议待处理：${serviceErrors.join("; ")}`.slice(-2000) : "", now(), rolloutId, node.id]);
       queued += 1;
     } catch (error) {
       failed += 1;

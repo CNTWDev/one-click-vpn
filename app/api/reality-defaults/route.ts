@@ -13,7 +13,7 @@ export async function PUT(request: Request) {
   if (!user) return jsonError("Authentication required", 401);
   try {
     const body = await readJson(request);
-    if (typeof body.serverName !== "string") return jsonError("请填写目标域名");
-    return NextResponse.json(await saveRealityDefaults(body.serverName, user.id));
+    if (body.mode !== "auto" && typeof body.serverName !== "string") return jsonError("请填写目标域名");
+    return NextResponse.json(await saveRealityDefaults({ mode: body.mode === "auto" ? "auto" : "custom", serverName: body.serverName }, user.id));
   } catch (error) { return jsonError(error instanceof Error ? error.message : "无法保存默认目标", 400); }
 }
