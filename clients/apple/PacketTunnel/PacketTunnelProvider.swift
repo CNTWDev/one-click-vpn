@@ -37,7 +37,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             var refresh=Date().addingTimeInterval(90)
             while !Task.isCancelled {
                 do {try await Task.sleep(nanoseconds:5_000_000_000)} catch {return}
-                if woke {woke=false;refresh=.distantPast;graceUntil=Date().addingTimeInterval(45)}
+                if woke {woke=false;refresh=Date.distantPast;graceUntil=Date().addingTimeInterval(45)}
                 // An expired lease (e.g. after sleep) gets one renewal attempt before the tunnel closes.
                 if Date()>=refresh || Date()>=deadline {
                     do {_ = try await acquire();refresh=Date().addingTimeInterval(90);graceUntil=max(graceUntil,Date().addingTimeInterval(45))}
