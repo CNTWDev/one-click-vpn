@@ -6,7 +6,7 @@ import { href } from "../router";
 import type { AdminUser, ControllerInfo, NodeRecord, Region } from "../types";
 import { Empty, PageHeader, Pill, StateDot, Time } from "./shared";
 
-const MAP_KEY = "northstar-console-overview-map";
+const MAP_KEY = "veilbird-console-overview-map";
 function readMapOpen() { try { return window.localStorage.getItem(MAP_KEY) !== "closed"; } catch { return true; } }
 
 export function OverviewPage({ users, nodes, regions, controllerSettings, onRefresh }: {

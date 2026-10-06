@@ -25,7 +25,7 @@ services:
     environment:
       POSTGRES_DB: northstar
       POSTGRES_USER: northstar
-      POSTGRES_PASSWORD: ${NORTHSTAR_DB_PASSWORD:?NORTHSTAR_DB_PASSWORD is required}
+      POSTGRES_PASSWORD: ${VEILBIRD_DB_PASSWORD:?VEILBIRD_DB_PASSWORD is required}
     volumes:
       - northstar-postgres:/var/lib/postgresql/data
     healthcheck:
@@ -34,11 +34,11 @@ services:
       timeout: 5s
       retries: 20
 
-  northstar:
+  veilbird:
     build:
       context: .
       args:
-        NORTHSTAR_BUILD_REV: ${NORTHSTAR_BUILD_REV:-unknown}
+        VEILBIRD_BUILD_REV: ${VEILBIRD_BUILD_REV:-unknown}
     restart: unless-stopped
     depends_on:
       db:
@@ -47,17 +47,17 @@ services:
         condition: service_started
     env_file: .env
     environment:
-      NORTHSTAR_DATABASE_URL: postgresql://northstar:${NORTHSTAR_DB_PASSWORD:?NORTHSTAR_DB_PASSWORD is required}@db:5432/northstar
-      NORTHSTAR_BUILD_REV: ${NORTHSTAR_BUILD_REV:-unknown}
+      VEILBIRD_DATABASE_URL: postgresql://northstar:${VEILBIRD_DB_PASSWORD:?VEILBIRD_DB_PASSWORD is required}@db:5432/northstar
+      VEILBIRD_BUILD_REV: ${VEILBIRD_BUILD_REV:-unknown}
       HOSTNAME: 0.0.0.0
       PORT: 3000
-      NORTHSTAR_LOKI_URL: http://loki:3100
+      VEILBIRD_LOKI_URL: http://loki:3100
     # HTTPS and the public hostname are managed by the host's Nginx.
     # Keep the controller reachable only from this ECS host.
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
-      # Client installers uploaded from Console (NORTHSTAR_RELEASE_STORAGE=local, the default).
+      # Client installers uploaded from Console (VEILBIRD_RELEASE_STORAGE=local, the default).
       - northstar-client-releases:/app/data/client-releases
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
@@ -75,11 +75,11 @@ services:
         PORT: 3100
     restart: unless-stopped
     depends_on:
-      northstar:
+      veilbird:
         condition: service_healthy
     environment:
       PORT: 3100
-      API_UPSTREAM: http://northstar:3000
+      API_UPSTREAM: http://veilbird:3000
     ports:
       - "127.0.0.1:3100:3100"
     healthcheck:
@@ -97,11 +97,11 @@ services:
         PORT: 3200
     restart: unless-stopped
     depends_on:
-      northstar:
+      veilbird:
         condition: service_healthy
     environment:
       PORT: 3200
-      API_UPSTREAM: http://northstar:3000
+      API_UPSTREAM: http://veilbird:3000
     ports:
       - "127.0.0.1:3200:3200"
     healthcheck:
@@ -116,7 +116,7 @@ services:
     command: server /data --console-address :9001
     environment:
       MINIO_ROOT_USER: northstar
-      MINIO_ROOT_PASSWORD: ${NORTHSTAR_LOG_STORAGE_PASSWORD:?NORTHSTAR_LOG_STORAGE_PASSWORD is required}
+      MINIO_ROOT_PASSWORD: ${VEILBIRD_LOG_STORAGE_PASSWORD:?VEILBIRD_LOG_STORAGE_PASSWORD is required}
     volumes:
       - northstar-minio:/data
 
@@ -127,7 +127,7 @@ services:
       minio:
         condition: service_started
     environment:
-      MINIO_ROOT_PASSWORD: ${NORTHSTAR_LOG_STORAGE_PASSWORD:?NORTHSTAR_LOG_STORAGE_PASSWORD is required}
+      MINIO_ROOT_PASSWORD: ${VEILBIRD_LOG_STORAGE_PASSWORD:?VEILBIRD_LOG_STORAGE_PASSWORD is required}
     entrypoint: ["/bin/sh", "-ec"]
     command: |
       attempts=0
@@ -151,7 +151,7 @@ services:
         condition: service_completed_successfully
     command: -config.file=/etc/loki/loki.yml -config.expand-env=true
     environment:
-      NORTHSTAR_LOG_STORAGE_PASSWORD: ${NORTHSTAR_LOG_STORAGE_PASSWORD:?NORTHSTAR_LOG_STORAGE_PASSWORD is required}
+      VEILBIRD_LOG_STORAGE_PASSWORD: ${VEILBIRD_LOG_STORAGE_PASSWORD:?VEILBIRD_LOG_STORAGE_PASSWORD is required}
     volumes:
       - ./deploy/loki/loki.yml:/etc/loki/loki.yml:ro
       - northstar-loki:/loki

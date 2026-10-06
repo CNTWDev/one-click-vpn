@@ -101,8 +101,8 @@ export function FleetMap({ nodes, regions, controller, compact = false }: { node
       <div className="fleet-map-scan" />
       <svg viewBox="0 0 1010 666" role="img" aria-label={t("Veilbird 全球 VPN 节点分布图")}>
         <defs>
-          <linearGradient id="northstar-route-online" x1="0" x2="1"><stop offset="0" stopColor="#5f83ff" /><stop offset="1" stopColor="#b9ef69" /></linearGradient>
-          <filter id="northstar-glow" x="-200%" y="-200%" width="400%" height="400%"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          <linearGradient id="veilbird-route-online" x1="0" x2="1"><stop offset="0" stopColor="#5f83ff" /><stop offset="1" stopColor="#b9ef69" /></linearGradient>
+          <filter id="veilbird-glow" x="-200%" y="-200%" width="400%" height="400%"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
         </defs>
         <rect className="fleet-map-ocean" x="0" y="0" width="1010" height="666" />
         <image className="fleet-map-base" href={`/world-map.webp${mapRetry ? `?retry=${mapRetry}` : ""}`} onError={() => setMapFailed(true)} onLoad={() => setMapFailed(false)} x="0" y="0" width="1010" height="666" />

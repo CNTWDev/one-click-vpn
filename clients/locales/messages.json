@@ -79,7 +79,7 @@
     "en": "Connect with ease.",
     "ru": "Подключайтесь легко."
   },
-  "choose_a_location_northstar_takes_care_of_the_rest": {
+  "choose_a_location_veilbird_takes_care_of_the_rest": {
     "zh": "选好位置，剩下的交给 Veilbird。",
     "en": "Choose a location. Veilbird takes care of the rest.",
     "ru": "Выберите локацию. Остальное сделает Veilbird."
@@ -99,7 +99,7 @@
     "en": "Your world.\nOne tap away.",
     "ru": "Весь мир.\nВ одно касание."
   },
-  "sign_in_to_northstar_no_imports_or_configuration_needed": {
+  "sign_in_to_veilbird_no_imports_or_configuration_needed": {
     "zh": "登录 Veilbird，无需导入或配置。",
     "en": "Sign in to Veilbird. No imports or configuration needed.",
     "ru": "Войдите в Veilbird. Импорт и настройка не нужны."
@@ -184,7 +184,7 @@
     "en": "Disconnect before selecting another location.",
     "ru": "Отключитесь перед выбором другой локации."
   },
-  "my_northstar": {
+  "my_veilbird": {
     "zh": "我的 Veilbird",
     "en": "My Veilbird",
     "ru": "Мой Veilbird"
@@ -289,7 +289,7 @@
     "en": "Your account is not active. Contact your administrator.",
     "ru": "Аккаунт не активен. Обратитесь к администратору."
   },
-  "ask_your_administrator_to_enable_northstar_client_access": {
+  "ask_your_administrator_to_enable_veilbird_client_access": {
     "zh": "请联系管理员开通 Veilbird 客户端访问。",
     "en": "Ask your administrator to enable Veilbird client access.",
     "ru": "Попросите администратора включить доступ через клиент Veilbird."

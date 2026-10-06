@@ -40,7 +40,7 @@ async function lockAndRun<T>(key: string, work: () => Promise<T>): Promise<T> {
   // Dedicated bounded pool, separate from the reconcile lock pool that work() itself may need.
   if (!lockPool) {
     getDb(); // Validate the configured database before creating another pool.
-    lockPool = new Pool({ connectionString: process.env.NORTHSTAR_DATABASE_URL, max: Number(process.env.NORTHSTAR_SUBSCRIPTION_LOCK_POOL_MAX || 10), connectionTimeoutMillis: 15000, idleTimeoutMillis: 10000 });
+    lockPool = new Pool({ connectionString: process.env.VEILBIRD_DATABASE_URL, max: Number(process.env.VEILBIRD_SUBSCRIPTION_LOCK_POOL_MAX || 10), connectionTimeoutMillis: 15000, idleTimeoutMillis: 10000 });
     lockPool.on("error", () => console.error("Subscription lock connection failed"));
   }
   const client = await lockPool.connect().catch(() => { throw new Error("订阅服务繁忙，请稍后重试"); });

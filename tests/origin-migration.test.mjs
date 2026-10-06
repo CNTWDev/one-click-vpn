@@ -22,9 +22,9 @@ test("legacy service origins migrate atomically without changing secrets", async
   const root = await fixture([
     "NODE_ENV=production",
     "APP_DOMAIN=vpn.oiihub.com",
-    "NORTHSTAR_PUBLIC_ORIGIN=https://vpn.oiihub.com",
-    "NORTHSTAR_ADMIN_PASSWORD=keep-this-secret",
-    "NORTHSTAR_MASTER_KEY=keep-this-master-key",
+    "VEILBIRD_PUBLIC_ORIGIN=https://vpn.oiihub.com",
+    "VEILBIRD_ADMIN_PASSWORD=keep-this-secret",
+    "VEILBIRD_MASTER_KEY=keep-this-master-key",
     "",
   ].join("\n"));
   const script = join(root, "scripts/ensure-service-origins.sh");
@@ -33,15 +33,15 @@ test("legacy service origins migrate atomically without changing secrets", async
 
   const env = await readFile(join(root, ".env"), "utf8");
   assert.match(env, /^APP_DOMAIN=app\.oiihub\.com$/m);
-  assert.match(env, /^NORTHSTAR_PORTAL_DOMAIN=app\.oiihub\.com$/m);
-  assert.match(env, /^NORTHSTAR_ADMIN_DOMAIN=console\.oiihub\.com$/m);
-  assert.match(env, /^NORTHSTAR_API_DOMAIN=api\.oiihub\.com$/m);
-  assert.match(env, /^NORTHSTAR_PUBLIC_ORIGIN=https:\/\/app\.oiihub\.com$/m);
-  assert.match(env, /^NORTHSTAR_API_ORIGIN=https:\/\/api\.oiihub\.com$/m);
-  assert.match(env, /^NORTHSTAR_AGENT_ORIGIN=https:\/\/api\.oiihub\.com$/m);
-  assert.match(env, /^NORTHSTAR_ADMIN_PASSWORD=keep-this-secret$/m);
-  assert.match(env, /^NORTHSTAR_MASTER_KEY=keep-this-master-key$/m);
-  assert.equal((env.match(/^NORTHSTAR_AGENT_ORIGIN=/gm) || []).length, 1);
+  assert.match(env, /^VEILBIRD_PORTAL_DOMAIN=app\.oiihub\.com$/m);
+  assert.match(env, /^VEILBIRD_ADMIN_DOMAIN=console\.oiihub\.com$/m);
+  assert.match(env, /^VEILBIRD_API_DOMAIN=api\.oiihub\.com$/m);
+  assert.match(env, /^VEILBIRD_PUBLIC_ORIGIN=https:\/\/app\.oiihub\.com$/m);
+  assert.match(env, /^VEILBIRD_API_ORIGIN=https:\/\/api\.oiihub\.com$/m);
+  assert.match(env, /^VEILBIRD_AGENT_ORIGIN=https:\/\/api\.oiihub\.com$/m);
+  assert.match(env, /^VEILBIRD_ADMIN_PASSWORD=keep-this-secret$/m);
+  assert.match(env, /^VEILBIRD_MASTER_KEY=keep-this-master-key$/m);
+  assert.equal((env.match(/^VEILBIRD_AGENT_ORIGIN=/gm) || []).length, 1);
 
   const firstBackups = (await readdir(root)).filter((name) => name.startsWith(".env.backup.origins."));
   assert.equal(firstBackups.length, 1);

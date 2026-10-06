@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-test("Portal i18n: system language, persistence, auth, both connection modes and mobile", { skip: !process.env.NORTHSTAR_TEST_PLAYWRIGHT }, async () => {
-  const { chromium } = await import(process.env.NORTHSTAR_TEST_PLAYWRIGHT);
+test("Portal i18n: system language, persistence, auth, both connection modes and mobile", { skip: !process.env.VEILBIRD_TEST_PLAYWRIGHT }, async () => {
+  const { chromium } = await import(process.env.VEILBIRD_TEST_PLAYWRIGHT);
   const port = 3394, base = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ["frontend-server.mjs"], { env: { ...process.env, STATIC_DIR: path.resolve("dist/portal-web"), PORT: String(port) }, stdio: "ignore" });
   let browser;
@@ -15,7 +15,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
       if (await fetch(`${base}/health`).then((r) => r.ok).catch(() => false)) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    browser = await chromium.launch({ headless: true, ...(process.env.NORTHSTAR_TEST_BROWSER ? { executablePath: process.env.NORTHSTAR_TEST_BROWSER } : {}) });
+    browser = await chromium.launch({ headless: true, ...(process.env.VEILBIRD_TEST_BROWSER ? { executablePath: process.env.VEILBIRD_TEST_BROWSER } : {}) });
     const context = await browser.newContext({ locale: "ru-RU", viewport: { width: 1440, height: 1000 } });
     context.setDefaultTimeout(10000);
     const page = await context.newPage(), errors = [];
@@ -135,7 +135,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     // A second same-origin tab updates the stored preference; the first tab follows.
     const secondPage = await context.newPage();
     await secondPage.goto(`${base}/health`);
-    await secondPage.evaluate(() => localStorage.setItem("northstar.portal.language", "ru"));
+    await secondPage.evaluate(() => localStorage.setItem("veilbird.portal.language", "ru"));
     await page.getByRole("heading", { name: "Мои подключения", level: 2 }).waitFor();
     await secondPage.close();
     await picker().selectOption("en");

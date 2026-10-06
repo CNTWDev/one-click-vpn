@@ -9,9 +9,9 @@ import { createTargetServer } from "../deploy/reality-target/server.mjs";
 test("REALITY accepts public DNS names only and never reuses app/admin/API", () => {
   assert.equal(targetHostname(" WWW.Example.com "), "www.example.com");
   for (const name of ["localhost", "https://a.example.com", "example.com:443", "x.example.com/path", "x.example.com;id", "127.0.0.1", "a".repeat(64)+".com", null]) assert.throws(() => targetHostname(name));
-  assert.throws(() => assertIndependentTarget("app.example.com", { NORTHSTAR_PUBLIC_ORIGIN: "https://app.example.com/" }));
-  assert.throws(() => assertIndependentTarget("console.example.com", { NORTHSTAR_ADMIN_DOMAIN: "console.example.com" }));
-  assert.doesNotThrow(() => assertIndependentTarget("www.example.com", { NORTHSTAR_PUBLIC_ORIGIN: "https://app.example.com" }));
+  assert.throws(() => assertIndependentTarget("app.example.com", { VEILBIRD_PUBLIC_ORIGIN: "https://app.example.com/" }));
+  assert.throws(() => assertIndependentTarget("console.example.com", { VEILBIRD_ADMIN_DOMAIN: "console.example.com" }));
+  assert.doesNotThrow(() => assertIndependentTarget("www.example.com", { VEILBIRD_PUBLIC_ORIGIN: "https://app.example.com" }));
 });
 
 test("private, special-purpose and mixed DNS answers are rejected before TLS", async () => {

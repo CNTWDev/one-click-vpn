@@ -5,11 +5,11 @@ name: Client release
 # Trigger: push a tag like client-v1.2.0 (the version must match clients/version.json),
 # or run manually. The build number is this workflow's run number.
 #
-# Repository variables: NORTHSTAR_RELEASE_API (Controller origin), NORTHSTAR_API_ORIGIN
-#   (origin baked into prod apps), NORTHSTAR_RELEASE_WINDOWS ('true' to also ship Windows).
-# Secrets: NORTHSTAR_RELEASE_TOKEN, NORTHSTAR_ANDROID_KEYSTORE_BASE64,
-#   NORTHSTAR_ANDROID_KEYSTORE_PASSWORD, NORTHSTAR_ANDROID_KEY_ALIAS, NORTHSTAR_ANDROID_KEY_PASSWORD.
-# The Controller needs NORTHSTAR_RELEASE_STORAGE=s3 so CI can upload installers.
+# Repository variables: VEILBIRD_RELEASE_API (Controller origin), VEILBIRD_API_ORIGIN
+#   (origin baked into prod apps), VEILBIRD_RELEASE_WINDOWS ('true' to also ship Windows).
+# Secrets: VEILBIRD_RELEASE_TOKEN, VEILBIRD_ANDROID_KEYSTORE_BASE64,
+#   VEILBIRD_ANDROID_KEYSTORE_PASSWORD, VEILBIRD_ANDROID_KEY_ALIAS, VEILBIRD_ANDROID_KEY_PASSWORD.
+# The Controller needs VEILBIRD_RELEASE_STORAGE=s3 so CI can upload installers.
 on:
   push:
     tags: ['client-v*']
@@ -25,9 +25,9 @@ concurrency:
   group: client-release
   cancel-in-progress: false
 env:
-  NORTHSTAR_BUILD_NUMBER: ${{ github.run_number }}
-  NORTHSTAR_RELEASE_API: ${{ vars.NORTHSTAR_RELEASE_API }}
-  NORTHSTAR_RELEASE_TOKEN: ${{ secrets.NORTHSTAR_RELEASE_TOKEN }}
+  VEILBIRD_BUILD_NUMBER: ${{ github.run_number }}
+  VEILBIRD_RELEASE_API: ${{ vars.VEILBIRD_RELEASE_API }}
+  VEILBIRD_RELEASE_TOKEN: ${{ secrets.VEILBIRD_RELEASE_TOKEN }}
 jobs:
   prepare:
     runs-on: ubuntu-latest
@@ -47,18 +47,18 @@ jobs:
           if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "client-v$version" ]]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match clients/version.json ($version)"; exit 1
           fi
-          if [[ -z "$NORTHSTAR_RELEASE_API" || -z "$NORTHSTAR_RELEASE_TOKEN" ]]; then
-            echo "::error::Set the NORTHSTAR_RELEASE_API variable and NORTHSTAR_RELEASE_TOKEN secret"; exit 1
+          if [[ -z "$VEILBIRD_RELEASE_API" || -z "$VEILBIRD_RELEASE_TOKEN" ]]; then
+            echo "::error::Set the VEILBIRD_RELEASE_API variable and VEILBIRD_RELEASE_TOKEN secret"; exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
   android:
     needs: prepare
     runs-on: ubuntu-latest
     env:
-      NORTHSTAR_API_ORIGIN: ${{ vars.NORTHSTAR_API_ORIGIN }}
-      NORTHSTAR_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.NORTHSTAR_ANDROID_KEYSTORE_PASSWORD }}
-      NORTHSTAR_ANDROID_KEY_ALIAS: ${{ secrets.NORTHSTAR_ANDROID_KEY_ALIAS }}
-      NORTHSTAR_ANDROID_KEY_PASSWORD: ${{ secrets.NORTHSTAR_ANDROID_KEY_PASSWORD }}
+      VEILBIRD_API_ORIGIN: ${{ vars.VEILBIRD_API_ORIGIN }}
+      VEILBIRD_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.VEILBIRD_ANDROID_KEYSTORE_PASSWORD }}
+      VEILBIRD_ANDROID_KEY_ALIAS: ${{ secrets.VEILBIRD_ANDROID_KEY_ALIAS }}
+      VEILBIRD_ANDROID_KEY_PASSWORD: ${{ secrets.VEILBIRD_ANDROID_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -75,31 +75,31 @@ jobs:
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Restore signing key
         env:
-          KEYSTORE: ${{ secrets.NORTHSTAR_ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE: ${{ secrets.VEILBIRD_ANDROID_KEYSTORE_BASE64 }}
         run: |
-          if [[ -z "$KEYSTORE" ]]; then echo "::error::NORTHSTAR_ANDROID_KEYSTORE_BASE64 is not set"; exit 1; fi
+          if [[ -z "$KEYSTORE" ]]; then echo "::error::VEILBIRD_ANDROID_KEYSTORE_BASE64 is not set"; exit 1; fi
           echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
-          echo "NORTHSTAR_ANDROID_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          echo "VEILBIRD_ANDROID_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
       - run: gradle -p clients/android :app:assembleProdRelease
       - name: Verify signature
         run: |
           apk=clients/android/app/build/outputs/apk/prod/release/app-prod-release.apk
           "$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --print-certs "$apk"
-          mv "$apk" "NORTHSTAR-${{ needs.prepare.outputs.version }}-$NORTHSTAR_BUILD_NUMBER.apk"
+          mv "$apk" "Veilbird-${{ needs.prepare.outputs.version }}-$VEILBIRD_BUILD_NUMBER.apk"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Publish to beta
         run: >-
           node scripts/release-client.mjs --platform android --arch universal --channel beta --publish
-          --version "${{ needs.prepare.outputs.version }}" --build "$NORTHSTAR_BUILD_NUMBER" --min-os "Android 8.0"
+          --version "${{ needs.prepare.outputs.version }}" --build "$VEILBIRD_BUILD_NUMBER" --min-os "Android 8.0"
           --notes "${{ github.ref_name }} (${{ github.sha }})"
-          --file "NORTHSTAR-${{ needs.prepare.outputs.version }}-$NORTHSTAR_BUILD_NUMBER.apk"
+          --file "Veilbird-${{ needs.prepare.outputs.version }}-$VEILBIRD_BUILD_NUMBER.apk"
       - run: rm -f "$RUNNER_TEMP/release.jks"
         if: always()
   windows:
     needs: prepare
-    if: inputs.windows || vars.NORTHSTAR_RELEASE_WINDOWS == 'true'
+    if: inputs.windows || vars.VEILBIRD_RELEASE_WINDOWS == 'true'
     runs-on: windows-latest
     strategy:
       matrix:
@@ -117,10 +117,10 @@ jobs:
         with:
           node-version: '22'
       - shell: pwsh
-        run: ./clients/windows/build.ps1 -Runtime ${{ matrix.runtime }} -Version ${{ needs.prepare.outputs.version }} -Build $env:NORTHSTAR_BUILD_NUMBER
+        run: ./clients/windows/build.ps1 -Runtime ${{ matrix.runtime }} -Version ${{ needs.prepare.outputs.version }} -Build $env:VEILBIRD_BUILD_NUMBER
       - shell: pwsh
         run: >-
           node scripts/release-client.mjs --platform windows --arch ${{ matrix.arch }} --channel beta --publish
-          --version "${{ needs.prepare.outputs.version }}" --build "$env:NORTHSTAR_BUILD_NUMBER" --min-os "Windows 10"
+          --version "${{ needs.prepare.outputs.version }}" --build "$env:VEILBIRD_BUILD_NUMBER" --min-os "Windows 10"
           --notes "${{ github.ref_name }} (${{ github.sha }})"
-          --file "clients/windows/artifacts/NORTHSTAR-${{ needs.prepare.outputs.version }}-$env:NORTHSTAR_BUILD_NUMBER-${{ matrix.runtime }}.zip"
+          --file "clients/windows/artifacts/Veilbird-${{ needs.prepare.outputs.version }}-$env:VEILBIRD_BUILD_NUMBER-${{ matrix.runtime }}.zip"

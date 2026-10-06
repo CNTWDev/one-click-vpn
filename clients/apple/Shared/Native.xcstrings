@@ -208,7 +208,7 @@
         }
       }
     },
-    "ask_your_administrator_to_enable_northstar_client_access": {
+    "ask_your_administrator_to_enable_veilbird_client_access": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -392,29 +392,6 @@
         }
       }
     },
-    "choose_a_location_northstar_takes_care_of_the_rest": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choose a location. Veilbird takes care of the rest."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选好位置，剩下的交给 Veilbird。"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Выберите локацию. Остальное сделает Veilbird."
-          }
-        }
-      }
-    },
     "choose_a_location_then_connect_from_the_home_screen": {
       "extractionState": "manual",
       "localizations": {
@@ -457,6 +434,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Выберите локацию и вернитесь к подключению."
+          }
+        }
+      }
+    },
+    "choose_a_location_veilbird_takes_care_of_the_rest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a location. Veilbird takes care of the rest."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选好位置，剩下的交给 Veilbird。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите локацию. Остальное сделает Veilbird."
           }
         }
       }
@@ -1634,7 +1634,7 @@
         }
       }
     },
-    "my_northstar": {
+    "my_veilbird": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2163,7 +2163,7 @@
         }
       }
     },
-    "sign_in_to_northstar_no_imports_or_configuration_needed": {
+    "sign_in_to_veilbird_no_imports_or_configuration_needed": {
       "extractionState": "manual",
       "localizations": {
         "en": {

@@ -4,7 +4,7 @@ export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 bridge="$SRCROOT/.dependencies/wireguard-apple/Sources/WireGuardKitGo"
 [[ -f "$bridge/Makefile" ]] || { echo 'WireGuard package not resolved' >&2; exit 1; }
 # Upstream Make rules cannot parse a build directory containing spaces.
-bridge_tmp=$(mktemp -d /private/tmp/northstar-bridge.XXXXXX)
+bridge_tmp=$(mktemp -d /private/tmp/veilbird-bridge.XXXXXX)
 trap 'rm -rf "$bridge_tmp"' EXIT
 if [[ "$PLATFORM_NAME" == iphonesimulator ]]; then
   make -C "$bridge" GOOS_iphonesimulator=ios BUILDDIR="$bridge_tmp/build" DESTDIR="$bridge_tmp/out"

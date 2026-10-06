@@ -12,7 +12,7 @@
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>Allow the system VPN permission to connect.</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>Allow VPN access on your first connection</value></data>
   <data name="announcement" xml:space="preserve"><value>Announcement</value></data>
-  <data name="ask_your_administrator_to_enable_northstar_client_access" xml:space="preserve"><value>Ask your administrator to enable Veilbird client access.</value></data>
+  <data name="ask_your_administrator_to_enable_veilbird_client_access" xml:space="preserve"><value>Ask your administrator to enable Veilbird client access.</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>Authorized devices</value></data>
   <data name="authorizing_and_connecting" xml:space="preserve"><value>Authorizing and connecting…</value></data>
   <data name="automatic" xml:space="preserve"><value>Automatic</value></data>
@@ -20,9 +20,9 @@
   <data name="available_location" xml:space="preserve"><value>Available location</value></data>
   <data name="cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="change_location" xml:space="preserve"><value>Change location  ›</value></data>
-  <data name="choose_a_location_northstar_takes_care_of_the_rest" xml:space="preserve"><value>Choose a location. Veilbird takes care of the rest.</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>Choose a location, then connect from the home screen.</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>Choose a location, then return to Connect.</value></data>
+  <data name="choose_a_location_veilbird_takes_care_of_the_rest" xml:space="preserve"><value>Choose a location. Veilbird takes care of the rest.</value></data>
   <data name="choose_location_then_connect_hint" xml:space="preserve"><value>Choose a location, then connect from the home screen.</value></data>
   <data name="client_access_is_not_enabled_on_the_server" xml:space="preserve"><value>Client access is not enabled on the server.</value></data>
   <data name="client_access_is_not_enabled_on_the_server_contact" xml:space="preserve"><value>Client access is not enabled on the server. Contact your administrator.</value></data>
@@ -74,7 +74,7 @@
   <data name="locations" xml:space="preserve"><value>Locations</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>Your access has expired. Contact your administrator to renew it.</value></data>
   <data name="my_account" xml:space="preserve"><value>My account</value></data>
-  <data name="my_northstar" xml:space="preserve"><value>My Veilbird</value></data>
+  <data name="my_veilbird" xml:space="preserve"><value>My Veilbird</value></data>
   <data name="new_devices_are_added_on_their_first_connection_when" xml:space="preserve"><value>New devices are added on their first connection when a slot is available.</value></data>
   <data name="no_authorized_devices_yet_they_appear_after_their_first" xml:space="preserve"><value>No authorized devices yet. They appear after their first connection.</value></data>
   <data name="no_expiry" xml:space="preserve"><value>No expiry</value></data>
@@ -97,7 +97,7 @@
   <data name="server_address" xml:space="preserve"><value>Server address</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Server address https://…</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>Sign in and start</value></data>
-  <data name="sign_in_to_northstar_no_imports_or_configuration_needed" xml:space="preserve"><value>Sign in to Veilbird. No imports or configuration needed.</value></data>
+  <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Sign in to Veilbird. No imports or configuration needed.</value></data>
   <data name="sign_out" xml:space="preserve"><value>Sign out</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Simulator build · Verify VPN connections on a signed physical-device build</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>The simulator is for UI testing only. Test the VPN on a signed physical-device build.</value></data>

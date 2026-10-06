@@ -99,7 +99,7 @@ async function issueCertificate(input: {
 export async function ensureOpenVpnAuthority(): Promise<CredentialAuthority> {
   const existing = await findActiveCredentialAuthority(OPENVPN_REALM, OPENVPN_PROTOCOL);
   if (existing) return existing;
-  if (!process.env.NORTHSTAR_MASTER_KEY) throw new Error("NORTHSTAR_MASTER_KEY is required before creating OpenVPN credentials");
+  if (!process.env.VEILBIRD_MASTER_KEY) throw new Error("VEILBIRD_MASTER_KEY is required before creating OpenVPN credentials");
   const dates = certificateDate(OPENVPN_CA_DAYS);
   const material = await withWorkspace(async (directory) => {
     await openssl(["genrsa", "-out", "ca.key", "3072"], directory);

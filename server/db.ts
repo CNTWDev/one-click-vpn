@@ -100,10 +100,10 @@ function parseMetrics(value: string | null | undefined): NodeMetrics | null {
 
 export function getDb(): Pool {
   if (pool) return pool;
-  const connectionString = process.env.NORTHSTAR_DATABASE_URL?.trim();
-  if (!connectionString) throw new Error("NORTHSTAR_DATABASE_URL is required");
-  pool = new Pool({ connectionString, max: Number(process.env.NORTHSTAR_DB_POOL_MAX || 10), idleTimeoutMillis: 30_000 });
-  pool.on("error", (error) => console.error("Northstar PostgreSQL pool error", error));
+  const connectionString = process.env.VEILBIRD_DATABASE_URL?.trim();
+  if (!connectionString) throw new Error("VEILBIRD_DATABASE_URL is required");
+  pool = new Pool({ connectionString, max: Number(process.env.VEILBIRD_DB_POOL_MAX || 10), idleTimeoutMillis: 30_000 });
+  pool.on("error", (error) => console.error("Veilbird PostgreSQL pool error", error));
   return pool;
 }
 
@@ -256,14 +256,14 @@ function configuredCoordinate(name: string, minimum: number, maximum: number): n
 }
 
 export async function getControllerSettings(): Promise<ControllerSettings> {
-  const latitude = configuredCoordinate("NORTHSTAR_CONTROLLER_LATITUDE", -90, 90);
-  const longitude = configuredCoordinate("NORTHSTAR_CONTROLLER_LONGITUDE", -180, 180);
-  const locationLabel = process.env.NORTHSTAR_CONTROLLER_LOCATION?.trim() || "";
+  const latitude = configuredCoordinate("VEILBIRD_CONTROLLER_LATITUDE", -90, 90);
+  const longitude = configuredCoordinate("VEILBIRD_CONTROLLER_LONGITUDE", -180, 180);
+  const locationLabel = process.env.VEILBIRD_CONTROLLER_LOCATION?.trim() || "";
   const source = latitude !== null && longitude !== null ? "environment" : "unset";
   const timestamp = now();
   await dbExec(`INSERT INTO controller_settings
     (id, display_name, location_label, latitude, longitude, location_source, created_at, updated_at)
-    VALUES ('primary', 'Northstar Controller', $1, $2, $3, $4, $5, $5)
+    VALUES ('primary', 'Veilbird Controller', $1, $2, $3, $4, $5, $5)
     ON CONFLICT (id) DO NOTHING`, [locationLabel, latitude, longitude, source, timestamp]);
   return (await dbQuery<ControllerSettings>("SELECT * FROM controller_settings WHERE id = 'primary'"))[0]!;
 }

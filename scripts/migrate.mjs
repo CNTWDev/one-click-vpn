@@ -1,8 +1,8 @@
 import { randomBytes, randomUUID, scryptSync } from "node:crypto";
 import { Pool } from "pg";
 
-const connectionString = process.env.NORTHSTAR_DATABASE_URL;
-if (!connectionString) throw new Error("NORTHSTAR_DATABASE_URL is required");
+const connectionString = process.env.VEILBIRD_DATABASE_URL;
+if (!connectionString) throw new Error("VEILBIRD_DATABASE_URL is required");
 
 const pool = new Pool({ connectionString });
 
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 CREATE INDEX IF NOT EXISTS audit_created_idx ON audit_logs(created_at);
 CREATE TABLE IF NOT EXISTS controller_settings (
-  id TEXT PRIMARY KEY, display_name TEXT NOT NULL DEFAULT 'Northstar Controller',
+  id TEXT PRIMARY KEY, display_name TEXT NOT NULL DEFAULT 'Veilbird Controller',
   location_label TEXT NOT NULL DEFAULT '', latitude DOUBLE PRECISION, longitude DOUBLE PRECISION,
   location_source TEXT NOT NULL DEFAULT 'unset', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
@@ -416,7 +416,7 @@ try {
     DECLARE managed BOOLEAN;
     BEGIN
       SELECT u.native_only INTO managed FROM users u JOIN devices d ON d.user_id=u.id WHERE d.id=NEW.device_id FOR UPDATE OF u;
-      IF managed THEN RAISE EXCEPTION 'Please connect using the NORTHSTAR app'; END IF;
+      IF managed THEN RAISE EXCEPTION 'Please connect using the Veilbird app'; END IF;
       RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
@@ -452,16 +452,16 @@ try {
     (node_id, protocol, enabled, transport, listen_port, subnet, dns_json, status, created_at, updated_at)
     SELECT id, 'openvpn', 1, 'udp', 1194, '10.71.0.0/24', '["1.1.1.1"]', 'pending', $1, $1 FROM nodes
     ON CONFLICT (node_id, protocol) DO NOTHING`, [timestamp]);
-  const email = process.env.NORTHSTAR_ADMIN_EMAIL?.trim().toLowerCase();
-  const password = process.env.NORTHSTAR_ADMIN_PASSWORD;
+  const email = process.env.VEILBIRD_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.VEILBIRD_ADMIN_PASSWORD;
   if (email && password) {
     await pool.query(
       `INSERT INTO users (id, email, display_name, password_hash, role, status, approved_at, created_at, updated_at)
        VALUES ($1, $2, $3, $4, 'owner', 'active', $5, $5, $5) ON CONFLICT (email) DO NOTHING`,
-      [randomUUID(), email, process.env.NORTHSTAR_ADMIN_NAME?.trim() || "Owner", hashPassword(password), timestamp],
+      [randomUUID(), email, process.env.VEILBIRD_ADMIN_NAME?.trim() || "Owner", hashPassword(password), timestamp],
     );
   }
-  console.log("Northstar PostgreSQL database ready");
+  console.log("Veilbird PostgreSQL database ready");
 } finally {
   await pool.end();
 }

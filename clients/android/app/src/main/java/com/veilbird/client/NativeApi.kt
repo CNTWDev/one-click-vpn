@@ -1,4 +1,4 @@
-package com.northstar.client
+package com.veilbird.client
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
@@ -20,9 +20,9 @@ import javax.net.ssl.HttpsURLConnection
 
 class ApiFailure(val code: String) : Exception(code)
 class NativeApi(context: Context) {
-    private val prefs = context.getSharedPreferences("northstar", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("veilbird", Context.MODE_PRIVATE)
     private val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-    private val alias = "northstar-device-v1"
+    private val alias = "veilbird-device-v1"
     var origin: String
         get() = BuildConfig.API_ORIGIN.ifEmpty { prefs.getString("origin", "")!! }
         set(value) {
@@ -34,8 +34,8 @@ class NativeApi(context: Context) {
         if (!store.containsAlias(alias)) KeyPairGenerator.getInstance("EC", "AndroidKeyStore").apply {
             initialize(KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_SIGN).setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1")).setDigests(KeyProperties.DIGEST_SHA256).build())
         }.generateKeyPair()
-        if (!store.containsAlias("northstar-storage")) KeyGenerator.getInstance("AES", "AndroidKeyStore").apply {
-            init(KeyGenParameterSpec.Builder("northstar-storage", KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT).setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build())
+        if (!store.containsAlias("veilbird-storage")) KeyGenerator.getInstance("AES", "AndroidKeyStore").apply {
+            init(KeyGenParameterSpec.Builder("veilbird-storage", KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT).setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build())
         }.generateKey()
     }
     private fun b64(value: ByteArray) = Base64.encodeToString(value, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
@@ -43,14 +43,14 @@ class NativeApi(context: Context) {
         try {
             val parts = it.split('.')
             Cipher.getInstance("AES/GCM/NoPadding").run {
-                init(Cipher.DECRYPT_MODE, store.getKey("northstar-storage", null) as SecretKey, GCMParameterSpec(128, Base64.decode(parts[0], Base64.URL_SAFE)))
+                init(Cipher.DECRYPT_MODE, store.getKey("veilbird-storage", null) as SecretKey, GCMParameterSpec(128, Base64.decode(parts[0], Base64.URL_SAFE)))
                 String(doFinal(Base64.decode(parts[1], Base64.URL_SAFE)), Charsets.UTF_8)
             }
         } catch (_: Exception) { prefs.edit().remove(name).apply(); null }
     }
     fun saveSecret(name: String, value: String?) {
         if (value == null) { prefs.edit().remove(name).apply(); return }
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, store.getKey("northstar-storage", null)) }
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, store.getKey("veilbird-storage", null)) }
         prefs.edit().putString(name, b64(cipher.iv) + "." + b64(cipher.doFinal(value.toByteArray()))).apply()
     }
     fun request(path: String, body: JSONObject? = null): JSONObject {
@@ -59,7 +59,7 @@ class NativeApi(context: Context) {
         connection.connectTimeout = 10000; connection.readTimeout = 10000; connection.instanceFollowRedirects = false
         connection.setRequestProperty("Accept", "application/json")
         // Lets the server require an upgrade (CLIENT_UPDATE_REQUIRED) and track version adoption.
-        connection.setRequestProperty("X-Northstar-Client", "android/${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}")
+        connection.setRequestProperty("X-Veilbird-Client", "android/${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}")
         if (path != "login") secret("token")?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
         try {
             if (body != null) {
@@ -123,7 +123,7 @@ fun friendlyResource(error: Throwable): Int = when ((error as? ApiFailure)?.code
     "AUTH_REQUIRED" -> R.string.your_session_has_expired_sign_in_again
     "MEMBERSHIP_EXPIRED" -> R.string.your_access_has_expired_contact_your_administrator_to_renew
     "ACCOUNT_UNAVAILABLE" -> R.string.your_account_is_not_active_contact_your_administrator
-    "MANAGED_ACCESS_REQUIRED" -> R.string.ask_your_administrator_to_enable_northstar_client_access
+    "MANAGED_ACCESS_REQUIRED" -> R.string.ask_your_administrator_to_enable_veilbird_client_access
     "NODE_UNAVAILABLE", "NODE_FULL" -> R.string.this_location_is_unavailable_choose_another_or_use_automatic
     "CLIENT_ACCESS_NOT_ENABLED" -> R.string.client_access_is_not_enabled_on_the_server_contact
     "SERVER_REQUIRED" -> R.string.enter_an_https_server_address_first

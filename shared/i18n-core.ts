@@ -2,7 +2,7 @@ import { catalog } from "./i18n-catalog";
 
 export type Locale = "zh" | "en" | "ru";
 export type LanguagePreference = Locale | "system";
-export const languageStorageKey = "northstar.portal.language";
+export const languageStorageKey = "veilbird.portal.language";
 export const intlLocales: Record<Locale, string> = { zh: "zh-CN", en: "en-US", ru: "ru-RU" };
 export const isPreference = (value: unknown): value is LanguagePreference => ["system", "zh", "en", "ru"].includes(String(value));
 export function resolveLocale(preference: LanguagePreference, languages: readonly string[]): Locale {

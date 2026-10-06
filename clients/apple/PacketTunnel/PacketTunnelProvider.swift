@@ -86,7 +86,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         guard ready else {throw AccessFailure.code("NODE_UNAVAILABLE")}
         var interface=InterfaceConfiguration(privateKey:privateKey);interface.addresses=[range];interface.mtu=1280;interface.dns=dns.compactMap {DNSServer(from:$0)}
         var peer=PeerConfiguration(publicKey:publicKey);peer.endpoint=remote;peer.allowedIPs=[IPAddressRange(from:"0.0.0.0/0")!,IPAddressRange(from:"::/0")!];peer.persistentKeepAlive=25
-        return TunnelConfiguration(name:"NORTHSTAR",interface:interface,peers:[peer])
+        return TunnelConfiguration(name:"Veilbird",interface:interface,peers:[peer])
     }
     // Renew immediately after sleep instead of waiting out a stale refresh timer.
     override func wake() {woke=true}

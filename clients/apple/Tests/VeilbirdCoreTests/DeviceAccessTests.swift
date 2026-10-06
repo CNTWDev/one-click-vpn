@@ -1,5 +1,5 @@
 import XCTest
-@testable import NorthstarCore
+@testable import VeilbirdCore
 
 @MainActor
 final class DeviceAccessTests: XCTestCase {

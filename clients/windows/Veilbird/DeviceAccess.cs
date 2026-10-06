@@ -1,4 +1,4 @@
-namespace Northstar;
+namespace Veilbird;
 
 public sealed record Enrollment(string Id, string Status, long AuthorizationVersion);
 public sealed record AccessLease(string Id, string EnrollmentId, DateTimeOffset ExpiresAt, long AuthorizationVersion);

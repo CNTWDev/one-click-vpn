@@ -4,7 +4,7 @@ import { useMemo, useSyncExternalStore } from "react";
 export type Route = { page: string; query: URLSearchParams };
 type Params = Record<string, string | null | undefined>;
 
-const ROUTE_EVENT = "northstar:route";
+const ROUTE_EVENT = "veilbird:route";
 function subscribe(callback: () => void) {
   window.addEventListener("hashchange", callback);
   window.addEventListener(ROUTE_EVENT, callback);

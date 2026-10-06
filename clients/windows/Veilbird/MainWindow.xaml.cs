@@ -3,7 +3,7 @@ using System.Windows.Controls;
 using System.Text.Json.Nodes;
 using System.Windows.Media;
 using System.Windows.Automation;
-namespace Northstar;
+namespace Veilbird;
 public partial class MainWindow : Window {
     private readonly NativeApi api=new();
     private string page="connect",nodeName="";
@@ -49,7 +49,7 @@ public partial class MainWindow : Window {
         if(!api.SignedIn) {Login();return;}
         foreach(var (id,name) in new[]{("connect",L10n.Text("connect_tab")),("nodes",L10n.Text("locations")),("account",L10n.Text("account"))}) {var b=new Button {Content=name,MinHeight=52,Margin=new Thickness(4),Background=Brush(page==id?"#E2F7F0":"#FFFFFF")};AutomationProperties.SetName(b,name+(page==id?L10n.Text("current_page"):""));b.Click+=(_,_)=>{if(!busy){page=id;Render();}};NavigationPanel.Children.Add(b);}
         if(page=="connect") {
-            Text(L10n.Text("connect_with_ease"),32);Text(L10n.Text("choose_a_location_northstar_takes_care_of_the_rest"));
+            Text(L10n.Text("connect_with_ease"),32);Text(L10n.Text("choose_a_location_veilbird_takes_care_of_the_rest"));
             Card(L10n.Text("connection_not_available_yet"),L10n.Text("windows_development_build_vpn_service_integration_in_progress"));
             Button(L10n.Text("connection_unavailable"),()=>{},false);
             Text(L10n.Text("development_build_the_windows_tunnel_service_is_not_integrated"));
@@ -65,7 +65,7 @@ public partial class MainWindow : Window {
             } Filter();search.TextChanged+=(_,_)=>Filter();Button(L10n.Text("refresh_locations"),()=>Render());
         });
         else Work(async()=>{
-            Text(L10n.Text("my_northstar"),30);Text(L10n.Text("your_account_usage_and_devices_in_one_place"));
+            Text(L10n.Text("my_veilbird"),30);Text(L10n.Text("your_account_usage_and_devices_in_one_place"));
             var account=await api.Request("account");Card(account["name"]!.GetValue<string>(),account["email"]!.GetValue<string>()+L10n.Text("valid_until")+L10n.Date(account["expiresAt"]?.GetValue<string>()));
             var traffic=account["traffic"];Card(L10n.Text("traffic_30_days"),$"↑ {Bytes(traffic?["uploadBytes"])}    ↓ {Bytes(traffic?["downloadBytes"])}");
             Text(L10n.Text("account_device_quota",account["used"]?.ToString()??"0",account["limit"]?.ToString()??"0"),22);Text(L10n.Text("new_devices_are_added_on_their_first_connection_when"),14);
@@ -79,7 +79,7 @@ public partial class MainWindow : Window {
         });
     }
     private void Login() {
-        Text(L10n.Text("your_world_one_tap_away"),36);Text(L10n.Text("sign_in_to_northstar_no_imports_or_configuration_needed"));
+        Text(L10n.Text("your_world_one_tap_away"),36);Text(L10n.Text("sign_in_to_veilbird_no_imports_or_configuration_needed"));
         Card(L10n.Text("your_location_your_connection"),L10n.Text("connect_automatically_or_choose_your_own_location"));
         Text(L10n.Text("server_address"));var origin=new TextBox {Text=api.Origin,MinHeight=36};ContentPanel.Children.Add(origin);
         Text(L10n.Text("email"));var email=new TextBox {MinHeight=36};ContentPanel.Children.Add(email);

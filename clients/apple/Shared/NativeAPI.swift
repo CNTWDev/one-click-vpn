@@ -10,7 +10,7 @@ enum AccessFailure: LocalizedError {
                 "DEVICE_REVOKED":L10n.text("access_for_this_device_has_been_revoked_contact_your"),
                 "AUTH_REQUIRED":L10n.text("your_session_has_expired_sign_in_again"), "INVALID_CREDENTIALS":L10n.text("incorrect_email_or_password"),
                 "NODE_UNAVAILABLE":L10n.text("this_location_is_unavailable_try_another"), "MEMBERSHIP_EXPIRED":L10n.text("membership_expired_hint"),
-                "MANAGED_ACCESS_REQUIRED":L10n.text("ask_your_administrator_to_enable_northstar_client_access"),
+                "MANAGED_ACCESS_REQUIRED":L10n.text("ask_your_administrator_to_enable_veilbird_client_access"),
                 "CLIENT_ACCESS_NOT_ENABLED":L10n.text("client_access_is_not_enabled_on_the_server"),
                 "KEYCHAIN_UNAVAILABLE":L10n.text("secure_storage_is_unavailable_unlock_your_device_and_try"),
                 "KEYCHAIN_SIGNATURE_REQUIRED":L10n.text("this_development_build_lacks_signing_entitlements_configure_your_developer"),
@@ -23,9 +23,9 @@ enum AccessFailure: LocalizedError {
 
 enum SecureStorage {
     static func query(_ name: String) -> [String:Any] {
-        var q:[String:Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:"northstar-native-v1",kSecAttrAccount as String:name]
+        var q:[String:Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:"veilbird-native-v1",kSecAttrAccount as String:name]
         #if !targetEnvironment(simulator)
-        if let group=Bundle.main.object(forInfoDictionaryKey:"NorthstarKeychainGroup") as? String, !group.isEmpty { q[kSecAttrAccessGroup as String]=group }
+        if let group=Bundle.main.object(forInfoDictionaryKey:"VeilbirdKeychainGroup") as? String, !group.isEmpty { q[kSecAttrAccessGroup as String]=group }
         #endif
         return q
     }
@@ -59,7 +59,7 @@ final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func request(_ path:String,_ body:[String:Any]?=nil) async throws -> [String:Any] {
         var request=URLRequest(url:URL(string:"\(origin)/api/v2/native/\(path)")!);request.timeoutInterval=15
         request.setValue("application/json",forHTTPHeaderField:"Accept")
-        request.setValue(Self.clientAgent,forHTTPHeaderField:"X-Northstar-Client")
+        request.setValue(Self.clientAgent,forHTTPHeaderField:"X-Veilbird-Client")
         if path != "login",let token=try SecureStorage.read("token").flatMap({String(data:$0,encoding:.utf8)}) {request.setValue("Bearer \(token)",forHTTPHeaderField:"Authorization")}
         if let body {request.httpMethod="POST";request.setValue("application/json",forHTTPHeaderField:"Content-Type");request.httpBody=try JSONSerialization.data(withJSONObject:body)}
         let session=URLSession(configuration:.ephemeral,delegate:self,delegateQueue:nil)

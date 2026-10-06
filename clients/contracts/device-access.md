@@ -1,6 +1,6 @@
 # Veilbird 设备接入协议 v2（开发试点，默认关闭）
 
-本目录记录当前实现及后续目标。设置 `NORTHSTAR_NATIVE_ACCESS_ENABLED=1` 才启用原生 API；现有 `/api/v1/auth/login`、`/api/v1/devices` 不能代替设备签名准入。仅 Android / Apple 的 WireGuard 数据面已接入，仍待真机及故障验收。
+本目录记录当前实现及后续目标。设置 `VEILBIRD_NATIVE_ACCESS_ENABLED=1` 才启用原生 API；现有 `/api/v1/auth/login`、`/api/v1/devices` 不能代替设备签名准入。仅 Android / Apple 的 WireGuard 数据面已接入，仍待真机及故障验收。
 
 ## 身份与计数
 
@@ -15,7 +15,7 @@
 
 | 路由 | 用途 |
 | --- | --- |
-| POST `/api/v2/native/login` | email/password/identityKey/platform/deviceName；返回滑动会话（默认 30 天，`NORTHSTAR_NATIVE_SESSION_DAYS`），不占额度 |
+| POST `/api/v2/native/login` | email/password/identityKey/platform/deviceName；返回滑动会话（默认 30 天，`VEILBIRD_NATIVE_SESSION_DAYS`），不占额度 |
 | POST `/api/v2/native/challenge` | action + request；返回 id/payload/expiresAt，60 秒有效 |
 | POST `/api/v2/native/connect` | challengeId/signature/request；request 包含 publicKey 和可选 nodeId；登记、签发或续租 |
 | GET `/api/v2/native/account` | 自己的账号、设备、额度、有效期、近 30 天流量 |
@@ -39,6 +39,6 @@
 
 ## 会员与旁路
 
-当前权益：账号覆盖 > `NORTHSTAR_NATIVE_DEVICE_LIMIT` 默认 3；`membership_expires_at` 为账号到期时间。管理员不可将额度降低到已授权数以下，先解除设备再保存。套餐表、支付事件和宽限降级仍待实现。
+当前权益：账号覆盖 > `VEILBIRD_NATIVE_DEVICE_LIMIT` 默认 3；`membership_expires_at` 为账号到期时间。管理员不可将额度降低到已授权数以下，先解除设备再保存。套餐表、支付事件和宽限降级仍待实现。
 
 账号 `native_only` 默认 false，保留第三方客户端。试点只允许从未导出 Profile 的账号开启。managed 模式阻止传统凭据使用、配置签发/下载、订阅生成，并在数据库 Profile 写入处加账号锁下的检查。旧账号迁移需要换发、节点收敛和回滚方案，当前明确拒绝直接切换。短期 WireGuard 私钥仍有可复制窗口，Apple/Windows 当前保护的是加密存储，并非不可导出硬件证明；不能声称抵抗 root、管理员或被攻陷的客户端。

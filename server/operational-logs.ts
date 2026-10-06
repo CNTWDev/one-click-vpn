@@ -10,7 +10,7 @@ export type OperationalLogInput = {
 };
 
 function lokiUrl(): string | null {
-  const value = process.env.NORTHSTAR_LOKI_URL?.trim();
+  const value = process.env.VEILBIRD_LOKI_URL?.trim();
   return value ? value.replace(/\/$/, "") : null;
 }
 

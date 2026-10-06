@@ -31,9 +31,9 @@ test("Apple store URLs must be official and TestFlight cannot masquerade as stab
 test("native builds do not publish artifacts or fake a connected tunnel", async () => {
   const apple = await readFile("clients/apple/PacketTunnel/PacketTunnelProvider.swift", "utf8");
   assert.match(apple, /last_handshake_time_sec/);
-  const android = await readFile("clients/android/app/src/main/java/com/northstar/client/MainActivity.kt", "utf8");
+  const android = await readFile("clients/android/app/src/main/java/com/veilbird/client/MainActivity.kt", "utf8");
   assert.match(android, /GoBackend.VpnService.prepare/);
-  const windows = await readFile("clients/windows/Northstar/MainWindow.xaml.cs", "utf8");
+  const windows = await readFile("clients/windows/Veilbird/MainWindow.xaml.cs", "utf8");
   assert.match(windows, /Button\(L10n.Text\("connection_unavailable"\),\(\)=>\{\},false\)/);
   const messages = JSON.parse(await readFile("clients/locales/messages.json", "utf8"));
   assert.match(messages.connection_unavailable.en, /unavailable/i);
@@ -69,9 +69,9 @@ test("S3 presigning matches the AWS SigV4 reference vector; object keys are immu
   assert.equal(releaseObjectKey({ platform: "android", arch: "universal", version: "1.2.0", build: 12, fileName: "../NORTHSTAR 1.2.apk" }), "clients/android/universal/1.2.0+12/NORTHSTAR-1.2.apk");
   assert.throws(() => releaseObjectKey({ platform: "android", arch: "universal", version: "1.2.0", build: 12, fileName: "run.sh" }));
   assert.equal(releaseStorage({}).mode, "local");
-  assert.equal(releaseStorage({ NORTHSTAR_RELEASE_STORAGE: "external", NORTHSTAR_RELEASE_LOCAL_DIR: "/srv/r" }).dir, "/srv/r", "external is the old name for local");
-  assert.throws(() => releaseStorage({ NORTHSTAR_RELEASE_STORAGE: "s3" }), /ENDPOINT/);
-  assert.throws(() => releaseStorage({ NORTHSTAR_RELEASE_STORAGE: "s3", NORTHSTAR_RELEASE_S3_ENDPOINT: "http://minio:9000", NORTHSTAR_RELEASE_S3_BUCKET: "b", NORTHSTAR_RELEASE_S3_ACCESS_KEY_ID: "a", NORTHSTAR_RELEASE_S3_SECRET_ACCESS_KEY: "s", NORTHSTAR_RELEASE_PUBLIC_BASE_URL: "https://d.example.com" }), /HTTPS/);
+  assert.equal(releaseStorage({ VEILBIRD_RELEASE_STORAGE: "external", VEILBIRD_RELEASE_LOCAL_DIR: "/srv/r" }).dir, "/srv/r", "external is the old name for local");
+  assert.throws(() => releaseStorage({ VEILBIRD_RELEASE_STORAGE: "s3" }), /ENDPOINT/);
+  assert.throws(() => releaseStorage({ VEILBIRD_RELEASE_STORAGE: "s3", VEILBIRD_RELEASE_S3_ENDPOINT: "http://minio:9000", VEILBIRD_RELEASE_S3_BUCKET: "b", VEILBIRD_RELEASE_S3_ACCESS_KEY_ID: "a", VEILBIRD_RELEASE_S3_SECRET_ACCESS_KEY: "s", VEILBIRD_RELEASE_PUBLIC_BASE_URL: "https://d.example.com" }), /HTTPS/);
 });
 test("artifact inspection records what the URL serves and refuses redirects or empty files", async () => {
   const { inspectArtifact } = await import("../server/release-storage.ts");
@@ -90,7 +90,7 @@ test("local storage: ordered chunks, immutable keys and verified digests", async
   const { mkdtempSync, readFileSync } = await import("node:fs");
   const { tmpdir } = await import("node:os");
   const { createHash, randomUUID } = await import("node:crypto");
-  const storage = releaseStorage({ NORTHSTAR_RELEASE_LOCAL_DIR: mkdtempSync(`${tmpdir()}/veilbird-releases-`) });
+  const storage = releaseStorage({ VEILBIRD_RELEASE_LOCAL_DIR: mkdtempSync(`${tmpdir()}/veilbird-releases-`) });
   const key = "clients/android/universal/1.2.0+12/Veilbird-1.2.0.apk", upload = randomUUID();
   const web = (text) => new Response(text).body;
   assert.deepEqual(await appendLocalArtifact(storage, key, { id: upload, offset: 0, final: false }, web("hello ")), { received: 6, complete: false });

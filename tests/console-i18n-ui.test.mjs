@@ -5,14 +5,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-test("Console locales: all routes, persisted choice, forms and mobile layout", { skip: !process.env.NORTHSTAR_TEST_PLAYWRIGHT }, async () => {
-  const { chromium } = await import(process.env.NORTHSTAR_TEST_PLAYWRIGHT);
+test("Console locales: all routes, persisted choice, forms and mobile layout", { skip: !process.env.VEILBIRD_TEST_PLAYWRIGHT }, async () => {
+  const { chromium } = await import(process.env.VEILBIRD_TEST_PLAYWRIGHT);
   const port = 3401, base = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ["frontend-server.mjs"], { env: { ...process.env, STATIC_DIR: path.resolve("dist/admin-web"), PORT: String(port) }, stdio: "ignore" });
   let browser;
   try {
     for (let n = 0; n < 60; n++) { if (await fetch(`${base}/health`).then(r => r.ok).catch(() => false)) break; await new Promise(r => setTimeout(r, 100)); }
-    browser = await chromium.launch({ headless: true, ...(process.env.NORTHSTAR_TEST_BROWSER ? { executablePath: process.env.NORTHSTAR_TEST_BROWSER } : {}) });
+    browser = await chromium.launch({ headless: true, ...(process.env.VEILBIRD_TEST_BROWSER ? { executablePath: process.env.VEILBIRD_TEST_BROWSER } : {}) });
     const context = await browser.newContext({ locale: "ru-RU", viewport: { width: 1440, height: 1000 } });
     context.setDefaultTimeout(10000);
     const page = await context.newPage(), errors = [];
@@ -70,7 +70,7 @@ test("Console locales: all routes, persisted choice, forms and mobile layout", {
     await page.getByRole("button", { name: "Сохранить регион", exact: true }).click();
     await page.waitForTimeout(200);
     assert.deepEqual(region, { name: "我的 Ohio", country: "United States", code: "US" });
-    const directory = await mkdtemp(path.join(tmpdir(), "northstar-console-i18n-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "veilbird-console-i18n-"));
     await page.screenshot({ path: path.join(directory, "russian-desktop.png"), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     for (const route of routes) {

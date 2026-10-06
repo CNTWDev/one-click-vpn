@@ -4,10 +4,10 @@ import { randomUUID } from "node:crypto";
 import { dbExec, dbQuery } from "./db";
 import { digest, NativeError } from "./native-proof";
 
-export const clientHeader = "x-northstar-client";
+export const clientHeader = "x-veilbird-client";
 
 /**
- * Reads `X-Northstar-Client: <platform>/<version>+<build>` and blocks builds below the configured minimum.
+ * Reads `X-Veilbird-Client: <platform>/<version>+<build>` and blocks builds below the configured minimum.
  * A missing or mismatched header counts as build 0, so clients that predate the header are blocked too
  * once an administrator sets a minimum (no minimum is set by default).
  */

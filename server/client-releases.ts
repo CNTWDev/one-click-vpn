@@ -18,7 +18,7 @@ export type ReleaseActor = { kind: "admin"; userId: string } | { kind: "ci" };
 
 const digest = (value: string) => createHash("sha256").update(value).digest();
 export async function releaseActor(request: Request): Promise<ReleaseActor | null> {
-  const configured = process.env.NORTHSTAR_RELEASE_TOKEN?.trim();
+  const configured = process.env.VEILBIRD_RELEASE_TOKEN?.trim();
   const token = request.headers.get("authorization")?.match(/^Bearer (\S+)$/)?.[1];
   if (configured && configured.length >= 32 && token && timingSafeEqual(digest(token), digest(configured))) return { kind: "ci" };
   const admin = await requestAdmin(request);
@@ -58,9 +58,9 @@ export function rolloutBucket(releaseId: string, installation: string) {
 }
 export const validInstallation = (value: string | null | undefined) => !!value && /^[A-Za-z0-9-]{8,64}$/.test(value);
 
-/** Published database releases plus the legacy read-only NORTHSTAR_CLIENT_RELEASES_JSON manifest. */
+/** Published database releases plus the legacy read-only VEILBIRD_CLIENT_RELEASES_JSON manifest. */
 export async function publicReleases(installation?: string): Promise<ClientRelease[]> {
-  const legacy = parseClientReleases(process.env.NORTHSTAR_CLIENT_RELEASES_JSON || "[]");
+  const legacy = parseClientReleases(process.env.VEILBIRD_CLIENT_RELEASES_JSON || "[]");
   const rows = await dbQuery<ReleaseRow>("SELECT * FROM client_releases WHERE status='published'");
   const visible = rows.filter((row) => Number(row.rollout_percent ?? 100) >= 100
     || (validInstallation(installation) && rolloutBucket(row.id, installation!) < Number(row.rollout_percent)));
@@ -244,7 +244,7 @@ export async function transitionRelease(actor: ReleaseActor, id: string, action:
 
 async function stableBuildAtLeast(platform: ClientPlatform, build: number) {
   return (await dbQuery("SELECT id FROM client_releases WHERE platform=$1 AND channel='stable' AND status='published' AND rollout_percent=100 AND build>=$2 LIMIT 1", [platform, build])).length > 0
-    || parseClientReleases(process.env.NORTHSTAR_CLIENT_RELEASES_JSON || "[]").some((item) => item.platform === platform && item.channel === "stable" && item.status === "published" && item.build >= build);
+    || parseClientReleases(process.env.VEILBIRD_CLIENT_RELEASES_JSON || "[]").some((item) => item.platform === platform && item.channel === "stable" && item.status === "published" && item.build >= build);
 }
 
 export async function setMinimumBuild(actor: ReleaseActor, body: Record<string, unknown>) {
@@ -280,6 +280,6 @@ export async function releaseOverview() {
     adoption: adoption.map((row) => ({ platform: row.platform, version: row.client_version, build: row.client_build, devices: row.devices })),
     diagnostics: diagnostics.map((row) => ({ platform: row.platform, build: row.client_build, code: row.code, events: row.events, users: row.users, lastAt: iso(row.last_at) })),
     storage: storage.mode === "s3" ? { mode: storage.mode, publicBaseUrl: storage.publicBaseUrl } : { mode: storage.mode, maxBytes: maxInstallerBytes, chunkBytes: uploadChunkBytes },
-    ciTokenConfigured: (process.env.NORTHSTAR_RELEASE_TOKEN?.trim().length || 0) >= 32,
+    ciTokenConfigured: (process.env.VEILBIRD_RELEASE_TOKEN?.trim().length || 0) >= 32,
   };
 }

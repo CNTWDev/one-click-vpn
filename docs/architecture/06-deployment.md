@@ -40,7 +40,7 @@ Veilbird 中的持久身份；host key 只表示 SSH 端点身份。数据库在
 在执行安装命令前重新验证这两种身份，防止 IP 回收、重复配置或镜像克隆导致
 操作落到错误服务器。
 
-Portal/Admin 不通过公网域名回调 Controller。两个前端容器统一使用 Docker DNS 地址 `http://northstar:3000` 转发 `/api`。宿主机 Nginx 只负责 TLS 和站点入口；独立 API 域名仅供原生客户端与远程 Agent 使用。
+Portal/Admin 不通过公网域名回调 Controller。两个前端容器统一使用 Docker DNS 地址 `http://veilbird:3000` 转发 `/api`。宿主机 Nginx 只负责 TLS 和站点入口；独立 API 域名仅供原生客户端与远程 Agent 使用。
 
 Edge Node：
 
@@ -108,7 +108,7 @@ Portal Web、Admin Web 和 Controller/API 是独立 Docker 服务：
 首次部署（`--domain` 是基础域名，脚本默认生成 `app/console/api` 三个子域名）：
 sudo ./scripts/one-click-deploy.sh --domain example.com --admin-email owner@your-domain.example
 
-它负责主机前置依赖、生产配置初始化、密钥生成、Docker Compose 构建 Controller、Portal 和 Admin、迁移、健康等待和公网健康检查。NORTHSTAR_MASTER_KEY 只在首次生成时写入 .env；更新时脚本默认复用既有配置。
+它负责主机前置依赖、生产配置初始化、密钥生成、Docker Compose 构建 Controller、Portal 和 Admin、迁移、健康等待和公网健康检查。VEILBIRD_MASTER_KEY 只在首次生成时写入 .env；更新时脚本默认复用既有配置。
 
 更新代码后执行：
 git pull --ff-only
@@ -117,7 +117,7 @@ git pull --ff-only
 Controller、Portal、Admin 会随本次部署升级；Edge Agent 不会被 Docker 自动覆盖。需要升级 Agent 时，在 Admin 的节点操作中重新执行一次 Bootstrap，让 Controller 重新写入 Agent 文件并等待新的 heartbeat；Agent 升级失败不会影响已有 VPN 数据面配置。
 
 脚本会校验：
-- APP_DOMAIN 与 NORTHSTAR_PUBLIC_ORIGIN 必须指向 Portal 域名；`NORTHSTAR_API_ORIGIN` 和 `NORTHSTAR_AGENT_ORIGIN` 必须指向 API 域名；旧单域名 `.env` 会在部署时经过一次交互式迁移并自动备份，避免把已废弃域名继续写入 Edge Agent；
+- APP_DOMAIN 与 VEILBIRD_PUBLIC_ORIGIN 必须指向 Portal 域名；`VEILBIRD_API_ORIGIN` 和 `VEILBIRD_AGENT_ORIGIN` 必须指向 API 域名；旧单域名 `.env` 会在部署时经过一次交互式迁移并自动备份，避免把已废弃域名继续写入 Edge Agent；
 - 生产环境必须使用 HTTPS；
 - 管理员密码至少 16 个字符；
 - 主密钥必须解码为 32 字节；
@@ -130,8 +130,8 @@ Nginx 需要为 `app.example.com`、`console.example.com` 和 `api.example.com` 
 
 ```bash
 sudo mkdir -p /etc/nginx/snippets
-sudo cp deploy/nginx/snippets/northstar-proxy.conf /etc/nginx/snippets/northstar-proxy.conf
-sudo cp deploy/nginx/northstar.conf.example /etc/nginx/sites-available/northstar.conf
+sudo cp deploy/nginx/snippets/veilbird-proxy.conf /etc/nginx/snippets/veilbird-proxy.conf
+sudo cp deploy/nginx/veilbird.conf.example /etc/nginx/sites-available/veilbird.conf
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -175,6 +175,6 @@ sudo certbot renew --cert-name northstar-reality-www.example.com --dry-run
 docker compose logs --tail=100 reality-target
 ```
 
-默认目标保存在 PostgreSQL 的 `reality_defaults` 表，随 Controller 启动迁移自动创建；无需手工 SQL。可选环境变量 `NORTHSTAR_REALITY_TARGET` 仅作为未保存后台设置时的初始默认值，环境值未检测时界面会明确提示。部署命令本身不修改后台设置。
+默认目标保存在 PostgreSQL 的 `reality_defaults` 表，随 Controller 启动迁移自动创建；无需手工 SQL。可选环境变量 `VEILBIRD_REALITY_TARGET` 仅作为未保存后台设置时的初始默认值，环境值未检测时界面会明确提示。部署命令本身不修改后台设置。
 
 同主机部署只提供服务隔离，不提供主机级故障隔离。域名与平台的关联仍可被观察；这不是隐蔽性保证。规模扩大后可将站点迁到独立主机，迁移前需验证各节点网络和 Agent 的 DNS 重新检测能力。管理主机如果也作为 VPN 节点，REALITY 不得与 Nginx 共用同一个 443 监听入口，且不能回指自己；应使用独立节点，或指定空闲 TCP 端口并放行对应安全组规则。

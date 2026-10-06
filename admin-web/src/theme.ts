@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 export type ThemeChoice = "system" | "light" | "dark";
-const KEY = "northstar-console-theme";
+const KEY = "veilbird-console-theme";
 
 function read(): ThemeChoice {
   try {

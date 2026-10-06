@@ -18,11 +18,11 @@ while [ "$#" -gt 0 ]; do
     --service) service=${2:-}; service_explicit="yes"; shift 2 ;;
     --no-cache) no_cache="yes"; shift ;;
     -h|--help)
-      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|northstar|portal-web|admin-web] [--no-cache]"
+      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|veilbird|portal-web|admin-web] [--no-cache]"
       exit 0
       ;;
     *)
-      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|northstar|portal-web|admin-web] [--no-cache]" >&2
+      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|veilbird|portal-web|admin-web] [--no-cache]" >&2
       exit 2
       ;;
   esac
@@ -30,26 +30,26 @@ done
 
 case "$service" in
   all) ;;
-  controller|northstar) service="northstar" ;;
+  controller|veilbird|northstar) service="veilbird" ;;
   portal) service="portal-web" ;;
   admin) service="admin-web" ;;
   portal-web|admin-web) ;;
-  *) echo "Unknown service: $service. Use all, northstar, portal-web, or admin-web." >&2; exit 2 ;;
+  *) echo "Unknown service: $service. Use all, veilbird, portal-web, or admin-web." >&2; exit 2 ;;
 esac
 
 if [ "$mode" = "deploy" ] && [ "$service_explicit" = "no" ] && [ -t 0 ] && [ -t 1 ]; then
   echo ""
-  echo "Northstar deployment wizard"
+  echo "Veilbird deployment wizard"
   echo "Choose what you want to update:"
   echo "  1) all         Controller + Portal + Admin + static target (recommended for releases)"
-  echo "  2) northstar   Controller/API only"
+  echo "  2) veilbird    Controller/API only"
   echo "  3) portal-web  Portal only"
   echo "  4) admin-web   Admin only"
   printf "Select [1]: "
   read -r choice
   case "${choice:-1}" in
     1) service="all" ;;
-    2) service="northstar" ;;
+    2) service="veilbird" ;;
     3) service="portal-web" ;;
     4) service="admin-web" ;;
     *) echo "Invalid selection: $choice" >&2; exit 2 ;;
@@ -72,8 +72,8 @@ esac
 "$SCRIPT_DIR/ensure-service-origins.sh"
 "$SCRIPT_DIR/check-env.sh"
 
-export NORTHSTAR_BUILD_REV=$(git rev-parse --short HEAD)
-echo "Deploying build $NORTHSTAR_BUILD_REV (service: $service)"
+export VEILBIRD_BUILD_REV=$(git rev-parse --short HEAD)
+echo "Deploying build $VEILBIRD_BUILD_REV (service: $service)"
 
 echo "Starting PostgreSQL and waiting for it to become healthy..."
 compose up -d db
@@ -149,15 +149,15 @@ fi
 compose up -d loki
 
 if [ "$service" = "all" ]; then
-  build_targets="northstar portal-web admin-web reality-target"
-  up_targets="northstar portal-web admin-web reality-target"
+  build_targets="veilbird portal-web admin-web reality-target"
+  up_targets="veilbird portal-web admin-web reality-target"
 else
   build_targets="$service"
   up_targets="$service"
-  if [ "$service" != "northstar" ]; then
+  if [ "$service" != "veilbird" ]; then
     # A frontend needs a healthy Controller, but does not recreate it.
-    compose up -d northstar
-    wait_for_healthy northstar
+    compose up -d --remove-orphans veilbird
+    wait_for_healthy veilbird
   fi
 fi
 
@@ -169,14 +169,11 @@ else
 fi
 
 echo "Starting: $up_targets"
-if [ "$service" = "all" ]; then
-  compose up -d --force-recreate --remove-orphans --no-deps $up_targets
-else
-  compose up -d --force-recreate --no-deps $up_targets
-fi
+# --remove-orphans also retires the pre-rename "northstar" container that held port 3000.
+compose up -d --force-recreate --remove-orphans --no-deps $up_targets
 
 if [ "$service" = "all" ]; then
-  wait_for_healthy northstar
+  wait_for_healthy veilbird
   wait_for_healthy portal-web
   wait_for_healthy admin-web
   wait_for_healthy reality-target
@@ -209,13 +206,13 @@ if command -v curl >/dev/null 2>&1; then
     all)
       check_frontend_map portal-web 3100
       check_frontend_map admin-web 3200
-      check_endpoint northstar 3000 /api/health
+      check_endpoint veilbird 3000 /api/health
       check_endpoint portal-web 3100 /health
       check_endpoint portal-web 3100 /api/health
       check_endpoint admin-web 3200 /health
       check_endpoint admin-web 3200 /api/health
       ;;
-    northstar) check_endpoint northstar 3000 /api/health ;;
+    veilbird) check_endpoint veilbird 3000 /api/health ;;
     portal-web)
       check_frontend_map portal-web 3100
       check_endpoint portal-web 3100 /health

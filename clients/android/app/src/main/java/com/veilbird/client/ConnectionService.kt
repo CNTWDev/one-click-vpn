@@ -1,4 +1,4 @@
-package com.northstar.client
+package com.veilbird.client
 
 import android.app.*
 import android.content.Intent
@@ -30,7 +30,7 @@ class ConnectionService : Service(), Tunnel {
     private var renewAt = 0L
     private var stopping = false
     private var startedAt = 0L
-    override fun getName() = "northstar"
+    override fun getName() = "veilbird"
     override fun onStateChange(state: Tunnel.State) { if (state == Tunnel.State.DOWN) ConnectionStateStore.active = false }
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onCreate() {

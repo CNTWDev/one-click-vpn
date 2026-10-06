@@ -8,7 +8,7 @@ import path from "node:path";
 import test from "node:test";
 import pg from "pg";
 
-const database = process.env.NORTHSTAR_RELEASE_TEST_DATABASE_URL || process.env.NORTHSTAR_NATIVE_TEST_DATABASE_URL;
+const database = process.env.VEILBIRD_RELEASE_TEST_DATABASE_URL || process.env.VEILBIRD_NATIVE_TEST_DATABASE_URL;
 const token = "t".repeat(40);
 
 async function withServer(env, port, check) {
@@ -41,9 +41,9 @@ function artifactServer(files) {
 test("client releases: CI drafts, verified artifacts, promotion, permanent links and minimum builds", { skip: !database, timeout: 120000 }, async () => {
   const installer = Buffer.from("northstar-msix-v2"), cdn = await artifactServer({ "/v2.msix": installer, "/v3.msix": Buffer.from("northstar-msix-v3"), "/v4.msix": Buffer.from("northstar-msix-v4") });
   const admin = { email: `release_${Date.now()}@example.com`, password: "release-admin-password-1" };
-  const env = { NORTHSTAR_DATABASE_URL: database, NORTHSTAR_MASTER_KEY: Buffer.alloc(32, 7).toString("base64"), NORTHSTAR_RELEASE_TOKEN: token,
-    NORTHSTAR_ADMIN_EMAIL: admin.email, NORTHSTAR_ADMIN_PASSWORD: admin.password, NORTHSTAR_NATIVE_ACCESS_ENABLED: "1", NODE_EXTRA_CA_CERTS: cdn.ca,
-    NORTHSTAR_CLIENT_RELEASES_JSON: "[]", NORTHSTAR_PUBLIC_ORIGIN: "https://app.example.com", NORTHSTAR_RELEASE_LOCAL_DIR: mkdtempSync(path.join(tmpdir(), "veilbird-local-")) };
+  const env = { VEILBIRD_DATABASE_URL: database, VEILBIRD_MASTER_KEY: Buffer.alloc(32, 7).toString("base64"), VEILBIRD_RELEASE_TOKEN: token,
+    VEILBIRD_ADMIN_EMAIL: admin.email, VEILBIRD_ADMIN_PASSWORD: admin.password, VEILBIRD_NATIVE_ACCESS_ENABLED: "1", NODE_EXTRA_CA_CERTS: cdn.ca,
+    VEILBIRD_CLIENT_RELEASES_JSON: "[]", VEILBIRD_PUBLIC_ORIGIN: "https://app.example.com", VEILBIRD_RELEASE_LOCAL_DIR: mkdtempSync(path.join(tmpdir(), "veilbird-local-")) };
   execFileSync(process.execPath, ["scripts/migrate.mjs"], { env: { ...process.env, ...env }, stdio: "pipe" });
   const pool = new pg.Pool({ connectionString: database });
   await pool.query("DELETE FROM client_releases WHERE platform IN ('windows','android')");
@@ -114,7 +114,7 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
       assert.deepEqual([check.latest.build, check.updateAvailable, check.mandatory, check.downloadPath], [200, true, false, "/download/windows/x64"]);
 
       assert.equal((await asAdmin("/api/v1/admin/client-policy", "PUT", { platform: "windows", minBuild: 200 })).status, 200);
-      const nativeLogin = (header) => fetch(`${base}/api/v2/native/login`, { method: "POST", headers: { "Content-Type": "application/json", ...(header ? { "X-Northstar-Client": header } : {}) },
+      const nativeLogin = (header) => fetch(`${base}/api/v2/native/login`, { method: "POST", headers: { "Content-Type": "application/json", ...(header ? { "X-Veilbird-Client": header } : {}) },
         body: JSON.stringify({ email: "nobody@example.com", password: "x", platform: "windows", identityKey: {} }) });
       for (const header of [undefined, "windows/1.0.0+199", "ios/9.0.0+999"]) {
         const blocked = await nativeLogin(header);
@@ -163,7 +163,7 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
       assert.equal((await fetch(`${base}/api/v1/admin/client-releases`, { headers: { Authorization: `Bearer ${token}` } })).status, 403, "the release token cannot read the admin overview");
     });
 
-    await withServer({ ...env, NORTHSTAR_CLIENT_RELEASES_JSON: '{"privateSigningKey":"SECRET"}' }, 3396, async (base) => {
+    await withServer({ ...env, VEILBIRD_CLIENT_RELEASES_JSON: '{"privateSigningKey":"SECRET"}' }, 3396, async (base) => {
       const response = await fetch(`${base}/api/v1/client-releases`);
       assert.equal(response.status, 503);
       assert.deepEqual(await response.json(), { code: "CLIENT_RELEASES_UNAVAILABLE" }, "invalid legacy manifest fails closed without leaking");

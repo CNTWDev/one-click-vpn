@@ -6,6 +6,8 @@ import path from "node:path";
 
 const root=fileURLToPath(new URL("../",import.meta.url));
 const env={...process.env};
+// Builds read VEILBIRD_* (e.g. VEILBIRD_API_ORIGIN); accept pre-rename NORTHSTAR_* exports as a fallback.
+for(const [key,value] of Object.entries(process.env))if(key.startsWith("NORTHSTAR_")&&env[`VEILBIRD_${key.slice(10)}`]===undefined)env[`VEILBIRD_${key.slice(10)}`]=value;
 const localDotnet=path.join(root,"clients/.dependencies/dotnet");
 const dotnet=existsSync(path.join(localDotnet,"dotnet"))?path.join(localDotnet,"dotnet"):"dotnet";
 if(dotnet!=="dotnet")env.DOTNET_ROOT=localDotnet;
@@ -37,7 +39,7 @@ try {
       if(process.platform!=='darwin')throw new Error('Apple builds require macOS + Xcode');
       run('bash',['clients/apple/scripts/build.sh','ios']);run('bash',['clients/apple/scripts/build.sh','macos']);
     }
-    if(platform==='all'||platform==='windows')for(const runtime of ['win-x64','win-arm64'])run(dotnet,['publish','clients/windows/Northstar/Northstar.csproj','-c','Release','-r',runtime,'--self-contained','true','-o',`clients/windows/artifacts/${runtime}`]);
+    if(platform==='all'||platform==='windows')for(const runtime of ['win-x64','win-arm64'])run(dotnet,['publish','clients/windows/Veilbird/Veilbird.csproj','-c','Release','-r',runtime,'--self-contained','true','-o',`clients/windows/artifacts/${runtime}`]);
     console.log('Development build complete. Nothing was uploaded, published or deployed. Do not add these artifacts to the public download catalog.');
   } else throw new Error('Usage: node scripts/clients.mjs doctor | build [all|android|apple|windows]');
 } catch(error) {console.error(error.message);process.exitCode=1;}

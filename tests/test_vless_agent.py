@@ -195,18 +195,18 @@ class VlessTests(unittest.TestCase):
             self.assertEqual(agent.validated_reality_target("www.example.com"), "8.8.8.8:443")
         agent.reality_target_cache.clear()
 
-    @unittest.skipUnless(os.environ.get("NORTHSTAR_TEST_XRAY"), "optional pinned Xray binary")
+    @unittest.skipUnless(os.environ.get("VEILBIRD_TEST_XRAY"), "optional pinned Xray binary")
     def test_real_xray_accepts_generated_config(self):
         config = agent.vless_config({"listenPort": 18443, "users": [{"id": USER}]}, BUNDLE, "93.184.215.14:443")
         with tempfile.TemporaryDirectory(prefix="northstar-xray-test-") as directory:
             path = Path(directory) / "config.json"
             path.write_text(json.dumps(config))
-            result = subprocess.run([os.environ["NORTHSTAR_TEST_XRAY"], "run", "-test", "-config", str(path)], capture_output=True, text=True)
+            result = subprocess.run([os.environ["VEILBIRD_TEST_XRAY"], "run", "-test", "-config", str(path)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    @unittest.skipUnless(os.environ.get("NORTHSTAR_TEST_XRAY"), "optional pinned Xray binary")
+    @unittest.skipUnless(os.environ.get("VEILBIRD_TEST_XRAY"), "optional pinned Xray binary")
     def test_real_xray_adds_users_without_process_restart(self):
-        binary = os.environ["NORTHSTAR_TEST_XRAY"]
+        binary = os.environ["VEILBIRD_TEST_XRAY"]
         config = agent.vless_config({"listenPort": 18443, "users": []}, BUNDLE, "93.184.215.14:443")
         with tempfile.TemporaryDirectory(prefix="northstar-xray-api-") as directory:
             path = Path(directory) / "config.json"
@@ -235,9 +235,9 @@ class VlessTests(unittest.TestCase):
                 process.terminate()
                 process.wait(timeout=5)
 
-    @unittest.skipUnless(os.environ.get("NORTHSTAR_TEST_REALITY_E2E") and os.environ.get("NORTHSTAR_TEST_XRAY") and os.environ.get("NORTHSTAR_TEST_MIHOMO"), "optional public-network REALITY handshake test")
+    @unittest.skipUnless(os.environ.get("VEILBIRD_TEST_REALITY_E2E") and os.environ.get("VEILBIRD_TEST_XRAY") and os.environ.get("VEILBIRD_TEST_MIHOMO"), "optional public-network REALITY handshake test")
     def test_mihomo_connects_through_real_xray(self):
-        key_result = subprocess.run([os.environ["NORTHSTAR_TEST_XRAY"], "x25519", "-i", BUNDLE["privateKey"]], capture_output=True, text=True, check=True)
+        key_result = subprocess.run([os.environ["VEILBIRD_TEST_XRAY"], "x25519", "-i", BUNDLE["privateKey"]], capture_output=True, text=True, check=True)
         fields = dict(line.split(": ", 1) for line in key_result.stdout.splitlines() if ": " in line)
         public_key = fields.get("Password (PublicKey)") or fields.get("Password") or fields.get("PublicKey") or fields.get("Public key")
         self.assertTrue(public_key)
@@ -254,8 +254,8 @@ class VlessTests(unittest.TestCase):
             server_path.write_text(json.dumps(server_config)); client_path.write_text(json.dumps(client_config))
             processes = []
             try:
-                processes.append(subprocess.Popen([os.environ["NORTHSTAR_TEST_XRAY"], "run", "-config", str(server_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-                processes.append(subprocess.Popen([os.environ["NORTHSTAR_TEST_MIHOMO"], "-d", directory, "-f", str(client_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+                processes.append(subprocess.Popen([os.environ["VEILBIRD_TEST_XRAY"], "run", "-config", str(server_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+                processes.append(subprocess.Popen([os.environ["VEILBIRD_TEST_MIHOMO"], "-d", directory, "-f", str(client_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
                 for _ in range(30):
                     try:
                         with agent.socket.create_connection(("127.0.0.1",18080),timeout=.2): break
@@ -263,7 +263,7 @@ class VlessTests(unittest.TestCase):
                 response = subprocess.run(["curl", "-fsS", "--noproxy", "", "--proxy", "http://127.0.0.1:18080", "--connect-timeout", "10", "--max-time", "25", "https://example.com/"], capture_output=True, text=True)
                 self.assertEqual(response.returncode,0,response.stderr)
                 self.assertIn("Example Domain",response.stdout)
-                stats = subprocess.run([os.environ["NORTHSTAR_TEST_XRAY"], "api", "statsquery", "--server=127.0.0.1:10085", "-pattern", "user>>>"], capture_output=True, text=True, check=True)
+                stats = subprocess.run([os.environ["VEILBIRD_TEST_XRAY"], "api", "statsquery", "--server=127.0.0.1:10085", "-pattern", "user>>>"], capture_output=True, text=True, check=True)
                 self.assertTrue(any(int(item.get("value",0))>0 for item in json.loads(stats.stdout).get("stat",[])))
             finally:
                 for process in processes: process.terminate()

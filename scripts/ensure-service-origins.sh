@@ -28,12 +28,12 @@ if [ ! -f "$APP_DIR/.env" ]; then
 fi
 
 current_app=$(env_value APP_DOMAIN)
-current_public=$(env_value NORTHSTAR_PUBLIC_ORIGIN)
-current_api_origin=$(env_value NORTHSTAR_API_ORIGIN)
-current_agent_origin=$(env_value NORTHSTAR_AGENT_ORIGIN)
-portal_domain=${portal_arg:-$(env_value NORTHSTAR_PORTAL_DOMAIN)}
-admin_domain=${admin_arg:-$(env_value NORTHSTAR_ADMIN_DOMAIN)}
-api_domain=${api_arg:-$(env_value NORTHSTAR_API_DOMAIN)}
+current_public=$(env_value VEILBIRD_PUBLIC_ORIGIN)
+current_api_origin=$(env_value VEILBIRD_API_ORIGIN)
+current_agent_origin=$(env_value VEILBIRD_AGENT_ORIGIN)
+portal_domain=${portal_arg:-$(env_value VEILBIRD_PORTAL_DOMAIN)}
+admin_domain=${admin_arg:-$(env_value VEILBIRD_ADMIN_DOMAIN)}
+api_domain=${api_arg:-$(env_value VEILBIRD_API_DOMAIN)}
 
 if [ -n "$portal_domain" ] && [ -n "$admin_domain" ] && [ -n "$api_domain" ] &&
    [ "$current_app" = "$portal_domain" ] &&
@@ -59,7 +59,7 @@ if [ -z "$portal_domain" ] || [ -z "$admin_domain" ] || [ -z "$api_domain" ]; th
   default_api="api.$base_domain"
 
   echo ""
-  echo "Northstar service-domain migration"
+  echo "Veilbird service-domain migration"
   echo "The current .env still uses the legacy single-domain layout: ${current_app:-unset}"
   printf "Portal domain [%s]: " "$default_portal"
   read -r portal_domain
@@ -91,22 +91,22 @@ awk \
   -v api="$api_domain" '
   function replacement(key) {
     if (key == "APP_DOMAIN") return app
-    if (key == "NORTHSTAR_PORTAL_DOMAIN") return portal
-    if (key == "NORTHSTAR_ADMIN_DOMAIN") return admin
-    if (key == "NORTHSTAR_API_DOMAIN") return api
-    if (key == "NORTHSTAR_PUBLIC_ORIGIN") return "https://" portal
-    if (key == "NORTHSTAR_API_ORIGIN") return "https://" api
-    if (key == "NORTHSTAR_AGENT_ORIGIN") return "https://" api
+    if (key == "VEILBIRD_PORTAL_DOMAIN") return portal
+    if (key == "VEILBIRD_ADMIN_DOMAIN") return admin
+    if (key == "VEILBIRD_API_DOMAIN") return api
+    if (key == "VEILBIRD_PUBLIC_ORIGIN") return "https://" portal
+    if (key == "VEILBIRD_API_ORIGIN") return "https://" api
+    if (key == "VEILBIRD_AGENT_ORIGIN") return "https://" api
     return ""
   }
   BEGIN {
     managed["APP_DOMAIN"] = 1
-    managed["NORTHSTAR_PORTAL_DOMAIN"] = 1
-    managed["NORTHSTAR_ADMIN_DOMAIN"] = 1
-    managed["NORTHSTAR_API_DOMAIN"] = 1
-    managed["NORTHSTAR_PUBLIC_ORIGIN"] = 1
-    managed["NORTHSTAR_API_ORIGIN"] = 1
-    managed["NORTHSTAR_AGENT_ORIGIN"] = 1
+    managed["VEILBIRD_PORTAL_DOMAIN"] = 1
+    managed["VEILBIRD_ADMIN_DOMAIN"] = 1
+    managed["VEILBIRD_API_DOMAIN"] = 1
+    managed["VEILBIRD_PUBLIC_ORIGIN"] = 1
+    managed["VEILBIRD_API_ORIGIN"] = 1
+    managed["VEILBIRD_AGENT_ORIGIN"] = 1
   }
   {
     separator = index($0, "=")
@@ -120,12 +120,12 @@ awk \
   }
   END {
     if (!("APP_DOMAIN" in seen)) print "APP_DOMAIN=" app
-    if (!("NORTHSTAR_PORTAL_DOMAIN" in seen)) print "NORTHSTAR_PORTAL_DOMAIN=" portal
-    if (!("NORTHSTAR_ADMIN_DOMAIN" in seen)) print "NORTHSTAR_ADMIN_DOMAIN=" admin
-    if (!("NORTHSTAR_API_DOMAIN" in seen)) print "NORTHSTAR_API_DOMAIN=" api
-    if (!("NORTHSTAR_PUBLIC_ORIGIN" in seen)) print "NORTHSTAR_PUBLIC_ORIGIN=https://" portal
-    if (!("NORTHSTAR_API_ORIGIN" in seen)) print "NORTHSTAR_API_ORIGIN=https://" api
-    if (!("NORTHSTAR_AGENT_ORIGIN" in seen)) print "NORTHSTAR_AGENT_ORIGIN=https://" api
+    if (!("VEILBIRD_PORTAL_DOMAIN" in seen)) print "VEILBIRD_PORTAL_DOMAIN=" portal
+    if (!("VEILBIRD_ADMIN_DOMAIN" in seen)) print "VEILBIRD_ADMIN_DOMAIN=" admin
+    if (!("VEILBIRD_API_DOMAIN" in seen)) print "VEILBIRD_API_DOMAIN=" api
+    if (!("VEILBIRD_PUBLIC_ORIGIN" in seen)) print "VEILBIRD_PUBLIC_ORIGIN=https://" portal
+    if (!("VEILBIRD_API_ORIGIN" in seen)) print "VEILBIRD_API_ORIGIN=https://" api
+    if (!("VEILBIRD_AGENT_ORIGIN" in seen)) print "VEILBIRD_AGENT_ORIGIN=https://" api
   }
 ' "$APP_DIR/.env" > "$env_tmp"
 chmod 600 "$env_tmp"

@@ -22,7 +22,7 @@ export function targetHostname(value) {
 }
 
 export function assertIndependentTarget(name, env = process.env) {
-  const keys = ["APP_DOMAIN", "NORTHSTAR_PORTAL_DOMAIN", "NORTHSTAR_ADMIN_DOMAIN", "NORTHSTAR_API_DOMAIN", "NORTHSTAR_PUBLIC_ORIGIN", "NORTHSTAR_API_ORIGIN", "NORTHSTAR_AGENT_ORIGIN"];
+  const keys = ["APP_DOMAIN", "VEILBIRD_PORTAL_DOMAIN", "VEILBIRD_ADMIN_DOMAIN", "VEILBIRD_API_DOMAIN", "VEILBIRD_PUBLIC_ORIGIN", "VEILBIRD_API_ORIGIN", "VEILBIRD_AGENT_ORIGIN"];
   for (const key of keys) {
     const value = env[key]?.trim();
     if (!value) continue;

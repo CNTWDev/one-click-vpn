@@ -5,7 +5,7 @@ import { accountDevices, updateNativeAccess } from "../../../../../../../server/
 import { NativeError } from "../../../../../../../server/native-proof";
 export const runtime="nodejs";
 async function handle(request:Request,context:{params:Promise<{id:string}>}) {
-  if (process.env.NORTHSTAR_NATIVE_ACCESS_ENABLED!=="1") return NextResponse.json({error:"原生设备授权尚未启用"},{status:503});
+  if (process.env.VEILBIRD_NATIVE_ACCESS_ENABLED!=="1") return NextResponse.json({error:"原生设备授权尚未启用"},{status:503});
   const admin=await requestAdmin(request);
   if (!admin) return NextResponse.json({error:"Administrator authentication required"},{status:403});
   try {

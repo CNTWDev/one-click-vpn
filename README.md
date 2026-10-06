@@ -9,7 +9,7 @@ Node Agent. The current data plane supports WireGuard and OpenVPN.
 ```text
 Browser:  app.example.com       -> Portal  :3100
           console.example.com   -> Admin   :3200
-          Portal/Admin /api/*    -> northstar:3000 (Docker network)
+          Portal/Admin /api/*    -> veilbird:3000 (Docker network)
 
 Native:   api.example.com       -> API     :3000
 Agent:    outbound HTTPS        -> api.example.com/api/v1/agent/*
@@ -17,7 +17,7 @@ Agent:    outbound HTTPS        -> api.example.com/api/v1/agent/*
 
 The Controller, Portal, and Admin run as independent Docker services. Host Nginx
 terminates HTTPS and forwards each site to its loopback port. Portal/Admin proxy
-`/api` internally to `http://northstar:3000`; only native clients and remote Agents
+`/api` internally to `http://veilbird:3000`; only native clients and remote Agents
 use the public API hostname. SSH is used only for node bootstrap and repair.
 
 ## Requirements
@@ -34,8 +34,8 @@ use the public API hostname. SSH is used only for node bootstrap and repair.
 Clone the project:
 
 ```bash
-sudo git clone YOUR_REPOSITORY_URL /opt/northstar
-cd /opt/northstar
+sudo git clone YOUR_REPOSITORY_URL /opt/veilbird
+cd /opt/veilbird
 ```
 
 Run the installer. It generates `.env`, secrets, database configuration, and the
@@ -77,12 +77,12 @@ then edit the hostnames and certificate paths in the template:
 sudo apt-get update
 sudo apt-get install -y nginx
 sudo mkdir -p /etc/nginx/snippets
-sudo cp deploy/nginx/snippets/northstar-proxy.conf \
-  /etc/nginx/snippets/northstar-proxy.conf
-sudo cp deploy/nginx/northstar.conf.example \
-  /etc/nginx/sites-available/northstar.conf
-sudo ln -s /etc/nginx/sites-available/northstar.conf \
-  /etc/nginx/sites-enabled/northstar.conf
+sudo cp deploy/nginx/snippets/veilbird-proxy.conf \
+  /etc/nginx/snippets/veilbird-proxy.conf
+sudo cp deploy/nginx/veilbird.conf.example \
+  /etc/nginx/sites-available/veilbird.conf
+sudo ln -s /etc/nginx/sites-available/veilbird.conf \
+  /etc/nginx/sites-enabled/veilbird.conf
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -133,6 +133,12 @@ of them at a time. Revoking the device invalidates the complete generated group.
 
 ## Upgrade
 
+Upgrading an install from before the Veilbird rename needs no manual steps:
+`NORTHSTAR_*` keys in `.env` are renamed to `VEILBIRD_*` (backup in
+`.env.before-veilbird`), the `northstar` container is replaced by `veilbird`,
+and data volumes, the database and Edge Nodes stay as they are. Portal and
+Console users sign in once more because the session cookies were renamed.
+
 Recommended upgrade, including a PostgreSQL backup:
 
 ```bash
@@ -140,7 +146,7 @@ sudo ./one-click-update.sh
 ```
 
 You can also run the deployment script directly. In an interactive terminal it
-opens a guided menu for `all`, `northstar`, `portal-web`, or `admin-web`:
+opens a guided menu for `all`, `veilbird`, `portal-web`, or `admin-web`:
 
 ```bash
 sudo ./scripts/deploy.sh
@@ -151,7 +157,7 @@ When called by automation or with an explicit `--service`, it stays non-interact
 For a small, isolated change, update only the affected service:
 
 ```bash
-sudo ./one-click-update.sh --service northstar    # Controller/API
+sudo ./one-click-update.sh --service veilbird     # Controller/API
 sudo ./one-click-update.sh --service portal-web   # Portal
 sudo ./one-click-update.sh --service admin-web    # Admin
 ```
@@ -159,7 +165,7 @@ sudo ./one-click-update.sh --service admin-web    # Admin
 Regional multi-node profiles change both the Controller and Portal, so deploy them
 together with `sudo ./one-click-update.sh --service all`.
 
-`northstar` and `all` create a database backup. Frontend-only updates skip the
+`veilbird` and `all` create a database backup. Frontend-only updates skip the
 database backup and do not restart the Controller. Use the full update when a
 change touches dependencies, migrations, Compose configuration, or shared code.
 
@@ -362,9 +368,9 @@ read `🇯🇵 Tokyo · node-name` and stay stable when nodes are added. Fixed-n
 profiles also export a single share link (`/api/v1/profiles/{id}/download?format=uri`).
 
 For validation, `npm test` covers unit and integration hooks. Supply a disposable
-`NORTHSTAR_TEST_DATABASE_URL` to run PostgreSQL/API tests, and optionally
-`NORTHSTAR_TEST_XRAY` / `NORTHSTAR_TEST_MIHOMO` paths to validate generated configs
-with real binaries (`NORTHSTAR_TEST_MIHOMO_GEODATA` adds the smart-routing rules check). These checks do not replace iPhone/Android and live-node acceptance tests.
+`VEILBIRD_TEST_DATABASE_URL` to run PostgreSQL/API tests, and optionally
+`VEILBIRD_TEST_XRAY` / `VEILBIRD_TEST_MIHOMO` paths to validate generated configs
+with real binaries (`VEILBIRD_TEST_MIHOMO_GEODATA` adds the smart-routing rules check). These checks do not replace iPhone/Android and live-node acceptance tests.
 
 ## Local development setup
 
@@ -437,15 +443,15 @@ the native-lease Agent formerly labelled 2.9.0 on the client branch.
 - Console → 客户端 → 客户端发布 registers, publishes, promotes and withdraws native clients.
   Permanent links `/download/{platform}` always redirect to the newest stable build.
 - `npm run release:client` uploads an installer (S3-compatible storage such as R2) and
-  registers a draft with `NORTHSTAR_RELEASE_TOKEN`; see `clients/README.md` and `.env.example`.
-- Native clients send `X-Northstar-Client`; a per-platform minimum build returns
+  registers a draft with `VEILBIRD_RELEASE_TOKEN`; see `clients/README.md` and `.env.example`.
+- Native clients send `X-Veilbird-Client`; a per-platform minimum build returns
   `426 CLIENT_UPDATE_REQUIRED` at sign-in and connect. No minimum is set by default.
 - Tag `client-v<version>` (matching `clients/version.json`) to have GitHub Actions build a
   signed Android APK and publish it to beta; promote it, stage a rollout percentage, set a
   client announcement and read connection-failure reports in the same Console page.
 - Agent 2.10 applies lease renewals from its task poll, so a renewing client no longer
   triggers a node-wide WireGuard reconcile. Native sessions slide for
-  `NORTHSTAR_NATIVE_SESSION_DAYS` (default 30) instead of 12 hours.
+  `VEILBIRD_NATIVE_SESSION_DAYS` (default 30) instead of 12 hours.
 
 ### Agent 2.9 update
 
@@ -465,5 +471,5 @@ Deploy the Controller (migrations run automatically), then **升级 Agent** on e
   handshake, even when CDN DNS answers rotate, so Xray is not restarted needlessly.
 - Subscriptions include a node as soon as the Agent applied a revision containing that
   user, so unrelated access changes no longer hide nodes for a few seconds. The
-  subscription lock pool is configurable (`NORTHSTAR_SUBSCRIPTION_LOCK_POOL_MAX`, default
+  subscription lock pool is configurable (`VEILBIRD_SUBSCRIPTION_LOCK_POOL_MAX`, default
   10) and concurrent refreshes of one link wait instead of failing.

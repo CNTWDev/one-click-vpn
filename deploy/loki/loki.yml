@@ -14,7 +14,7 @@ common:
       endpoint: minio:9000
       bucketnames: northstar-logs
       access_key_id: northstar
-      secret_access_key: ${NORTHSTAR_LOG_STORAGE_PASSWORD}
+      secret_access_key: ${VEILBIRD_LOG_STORAGE_PASSWORD}
       s3forcepathstyle: true
       insecure: true
 

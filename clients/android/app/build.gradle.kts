@@ -5,19 +5,19 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 // One marketing version for every client (clients/version.json); CI supplies a
 // monotonically increasing build number, which is what update checks compare.
 val clientVersion = (JsonSlurper().parse(rootProject.file("../version.json")) as Map<*, *>)["version"] as String
-val buildNumber = (System.getenv("NORTHSTAR_BUILD_NUMBER") ?: "1").toInt()
-val releaseKeystore = System.getenv("NORTHSTAR_ANDROID_KEYSTORE")
+val buildNumber = (System.getenv("VEILBIRD_BUILD_NUMBER") ?: "1").toInt()
+val releaseKeystore = System.getenv("VEILBIRD_ANDROID_KEYSTORE")
 
 android {
-    namespace = "com.northstar.client"
+    namespace = "com.veilbird.client"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.northstar.client"
+        applicationId = "com.veilbird.client"
         minSdk = 26
         targetSdk = 35
         versionCode = buildNumber
         versionName = clientVersion
-        buildConfigField("String", "API_ORIGIN", "\"${System.getenv("NORTHSTAR_API_ORIGIN") ?: ""}\"")
+        buildConfigField("String", "API_ORIGIN", "\"${System.getenv("VEILBIRD_API_ORIGIN") ?: ""}\"")
     }
     flavorDimensions += "environment"
     productFlavors {
@@ -39,9 +39,9 @@ android {
         // Release signing only from the environment (CI secrets); never committed.
         if (releaseKeystore != null) create("release") {
             storeFile = file(releaseKeystore)
-            storePassword = System.getenv("NORTHSTAR_ANDROID_KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("NORTHSTAR_ANDROID_KEY_ALIAS")
-            keyPassword = System.getenv("NORTHSTAR_ANDROID_KEY_PASSWORD")
+            storePassword = System.getenv("VEILBIRD_ANDROID_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("VEILBIRD_ANDROID_KEY_ALIAS")
+            keyPassword = System.getenv("VEILBIRD_ANDROID_KEY_PASSWORD")
         }
     }
     buildTypes {

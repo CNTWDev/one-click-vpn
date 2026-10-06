@@ -18,4 +18,4 @@ chmod 600 "$tmp"
 mv "$tmp" "$target"
 trap - EXIT
 echo "PostgreSQL backup written to $target"
-echo "Reminder: encrypted fields need NORTHSTAR_MASTER_KEY from .env, which is NOT in this dump. Back it up separately and securely." >&2
+echo "Reminder: encrypted fields need VEILBIRD_MASTER_KEY from .env, which is NOT in this dump. Back it up separately and securely." >&2

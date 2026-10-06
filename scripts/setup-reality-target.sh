@@ -32,7 +32,7 @@ case "$nginx_bin:$certbot_bin:$config_dir" in *[!a-zA-Z0-9_./:-]*) echo "Unsuppo
 [ -d "$config_dir" ] && [ -d /run/systemd/system ] || { echo "A systemd host and an existing Nginx include directory are required." >&2; exit 1; }
 exec 9>/run/lock/northstar-reality-target.lock
 flock -n 9 || { echo "Another target setup is running." >&2; exit 1; }
-for key in APP_DOMAIN NORTHSTAR_PORTAL_DOMAIN NORTHSTAR_ADMIN_DOMAIN NORTHSTAR_API_DOMAIN NORTHSTAR_PUBLIC_ORIGIN NORTHSTAR_API_ORIGIN NORTHSTAR_AGENT_ORIGIN; do
+for key in APP_DOMAIN VEILBIRD_PORTAL_DOMAIN VEILBIRD_ADMIN_DOMAIN VEILBIRD_API_DOMAIN VEILBIRD_PUBLIC_ORIGIN VEILBIRD_API_ORIGIN VEILBIRD_AGENT_ORIGIN; do
   value=$(env_value "$key" | sed -e 's|^[a-z]*://||' -e 's|/.*$||' -e 's|:.*$||')
   [ "$domain" != "$value" ] || { echo "Use a dedicated domain, not the APP/Console/API hostname." >&2; exit 2; }
 done
