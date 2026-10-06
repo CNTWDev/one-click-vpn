@@ -151,7 +151,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     catalogUnavailable = false;
     await page.getByRole("button", { name: "Retry", exact: true }).click();
     await page.getByRole("link", { name: "Download installer", exact: true }).waitFor();
-    assert.equal(await page.getByRole("link", { name: "Download installer", exact: true }).getAttribute("href"), "https://downloads.example.com/northstar.exe");
+    assert.equal(await page.getByRole("link", { name: "Download installer", exact: true }).getAttribute("href"), "/download/windows/x64", "permanent link, so a cached page never serves a stale installer");
     await page.setViewportSize({ width: 390, height: 844 });
     await noOverflow();
     await picker().selectOption("ru");

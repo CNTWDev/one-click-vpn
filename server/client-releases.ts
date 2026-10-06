@@ -30,7 +30,7 @@ type ReleaseRow = {
   id: string; platform: ClientPlatform; arch: ClientArch; channel: ClientChannel; version: string; build: number;
   status: ClientRelease["status"]; distribution: ClientRelease["distribution"]; url: string; sha256: string | null; size_bytes: string | null;
   min_os: string; notes: string; storage_key: string | null; verified_at: Date | null; published_at: Date | null;
-  created_by: string | null; created_at: Date; updated_at: Date;
+  created_by: string | null; created_at: Date; updated_at: Date; rollout_percent: number;
 };
 const iso = (value: Date | null) => value ? new Date(value).toISOString() : null;
 
@@ -43,23 +43,39 @@ function toRelease(row: ReleaseRow): ClientRelease {
 }
 function adminRelease(row: ReleaseRow) {
   return { ...toRelease(row), id: row.id, notes: row.notes, storageKey: row.storage_key, verifiedAt: iso(row.verified_at),
-    publishedAt: iso(row.published_at), createdAt: iso(row.created_at), updatedAt: iso(row.updated_at), createdBy: row.created_by };
+    publishedAt: iso(row.published_at), createdAt: iso(row.created_at), updatedAt: iso(row.updated_at), createdBy: row.created_by,
+    rolloutPercent: Number(row.rollout_percent ?? 100) };
 }
 
+/**
+ * Staged rollout: an installation sees a partially rolled-out release only when its
+ * per-release bucket (0-99) is below the percentage. Anonymous downloads see only full releases.
+ */
+export function rolloutBucket(releaseId: string, installation: string) {
+  return createHash("sha256").update(`${releaseId}:${installation}`).digest().readUInt32BE(0) % 100;
+}
+export const validInstallation = (value: string | null | undefined) => !!value && /^[A-Za-z0-9-]{8,64}$/.test(value);
+
 /** Published database releases plus the legacy read-only NORTHSTAR_CLIENT_RELEASES_JSON manifest. */
-export async function publicReleases(): Promise<ClientRelease[]> {
+export async function publicReleases(installation?: string): Promise<ClientRelease[]> {
   const legacy = parseClientReleases(process.env.NORTHSTAR_CLIENT_RELEASES_JSON || "[]");
   const rows = await dbQuery<ReleaseRow>("SELECT * FROM client_releases WHERE status='published'");
-  return [...legacy, ...rows.map(toRelease)];
+  const visible = rows.filter((row) => Number(row.rollout_percent ?? 100) >= 100
+    || (validInstallation(installation) && rolloutBucket(row.id, installation!) < Number(row.rollout_percent)));
+  return [...legacy, ...visible.map(toRelease)];
+}
+
+export async function clientAnnouncement(platform: ClientPlatform): Promise<string> {
+  return (await dbQuery<{ announcement: string }>("SELECT announcement FROM client_policies WHERE platform=$1", [platform]))[0]?.announcement || "";
 }
 
 export async function minimumBuild(platform: ClientPlatform): Promise<number> {
   return (await dbQuery<{ min_build: number }>("SELECT min_build FROM client_policies WHERE platform=$1", [platform]))[0]?.min_build || 0;
 }
 
-export async function updateCheck(input: { platform: ClientPlatform; arch?: ClientArch; channel: ClientChannel; build: number | null }) {
-  const latest = releaseFor(await publicReleases(), input.platform, input.arch, input.channel);
-  return updateDecision(latest, await minimumBuild(input.platform), input.build);
+export async function updateCheck(input: { platform: ClientPlatform; arch?: ClientArch; channel: ClientChannel; build: number | null; installation?: string }) {
+  const latest = releaseFor(await publicReleases(input.installation), input.platform, input.arch, input.channel);
+  return { ...updateDecision(latest, await minimumBuild(input.platform), input.build), announcement: await clientAnnouncement(input.platform) };
 }
 
 export function downloadPath(platform: ClientPlatform, arch?: ClientArch) {
@@ -131,7 +147,7 @@ async function findRelease(id: string) {
   return adminRelease(row);
 }
 
-export async function transitionRelease(actor: ReleaseActor, id: string, action: unknown) {
+export async function transitionRelease(actor: ReleaseActor, id: string, action: unknown, extra?: Record<string, unknown>) {
   const release = await findRelease(id);
   let changed = 0;
   if (action === "publish") {
@@ -144,52 +160,66 @@ export async function transitionRelease(actor: ReleaseActor, id: string, action:
   } else if (action === "withdraw") {
     requireAdmin(actor);
     changed = await dbExec("UPDATE client_releases SET status='withdrawn',updated_at=now() WHERE id=$1 AND status='published'", [id]);
+  } else if (action === "rollout") {
+    requireAdmin(actor);
+    const percent = Number(extra?.percent);
+    if (!Number.isInteger(percent) || percent < 1 || percent > 100) throw new ReleaseError("INVALID_ROLLOUT");
+    changed = await dbExec("UPDATE client_releases SET rollout_percent=$2,updated_at=now() WHERE id=$1 AND status<>'withdrawn'", [id, percent]);
   } else if (action === "delete") {
     requireAdmin(actor);
     changed = await dbExec("DELETE FROM client_releases WHERE id=$1 AND status='draft'", [id]);
   } else throw new ReleaseError("INVALID_ACTION");
   if (!changed) throw new ReleaseError("INVALID_RELEASE_STATE", 409);
-  if (action === "withdraw") {
-    // Never strand users: a minimum build must stay reachable from a published stable release.
+  if (action === "withdraw" || action === "rollout") {
+    // Never strand users: a minimum build must stay reachable from a fully rolled-out stable release.
     const minBuild = await minimumBuild(release.platform);
     if (minBuild > 0 && !(await stableBuildAtLeast(release.platform, minBuild))) {
-      await dbExec("UPDATE client_releases SET status='published',updated_at=now() WHERE id=$1", [id]);
+      await dbExec("UPDATE client_releases SET status='published',rollout_percent=$2,updated_at=now() WHERE id=$1", [id, release.rolloutPercent]);
       throw new ReleaseError("LOWER_MINIMUM_BUILD_FIRST", 409);
     }
   }
-  await addAudit({ actorUserId: actorId(actor), action: `client_release.${action}`, targetType: "client_release", targetId: id, metadata: { actor: actorLabel(actor) } });
+  await addAudit({ actorUserId: actorId(actor), action: `client_release.${action}`, targetType: "client_release", targetId: id,
+    metadata: { actor: actorLabel(actor), ...(action === "rollout" ? { percent: extra?.percent } : {}) } });
   return action === "delete" ? { id, deleted: true } : findRelease(id);
 }
 
 async function stableBuildAtLeast(platform: ClientPlatform, build: number) {
-  return (await dbQuery("SELECT id FROM client_releases WHERE platform=$1 AND channel='stable' AND status='published' AND build>=$2 LIMIT 1", [platform, build])).length > 0
+  return (await dbQuery("SELECT id FROM client_releases WHERE platform=$1 AND channel='stable' AND status='published' AND rollout_percent=100 AND build>=$2 LIMIT 1", [platform, build])).length > 0
     || parseClientReleases(process.env.NORTHSTAR_CLIENT_RELEASES_JSON || "[]").some((item) => item.platform === platform && item.channel === "stable" && item.status === "published" && item.build >= build);
 }
 
 export async function setMinimumBuild(actor: ReleaseActor, body: Record<string, unknown>) {
   requireAdmin(actor);
   const platform = member(body.platform, clientPlatforms, "INVALID_PLATFORM");
-  const minBuild = Number(body.minBuild);
+  const current = (await dbQuery<{ min_build: number; announcement: string }>("SELECT min_build,announcement FROM client_policies WHERE platform=$1", [platform]))[0];
+  const minBuild = body.minBuild === undefined ? current?.min_build ?? 0 : Number(body.minBuild);
   if (!Number.isSafeInteger(minBuild) || minBuild < 0) throw new ReleaseError("INVALID_MIN_BUILD");
-  if (minBuild > 0 && !(await stableBuildAtLeast(platform, minBuild))) throw new ReleaseError("MIN_BUILD_WITHOUT_RELEASE", 409);
-  await dbExec(`INSERT INTO client_policies (platform,min_build,updated_by,updated_at) VALUES ($1,$2,$3,now())
-    ON CONFLICT (platform) DO UPDATE SET min_build=excluded.min_build,updated_by=excluded.updated_by,updated_at=now()`, [platform, minBuild, actorLabel(actor)]);
-  await addAudit({ actorUserId: actorId(actor), action: "client_policy.update", targetType: "client_policy", targetId: platform, metadata: { minBuild } });
+  if (minBuild > (current?.min_build ?? 0) && !(await stableBuildAtLeast(platform, minBuild))) throw new ReleaseError("MIN_BUILD_WITHOUT_RELEASE", 409);
+  if (body.announcement !== undefined && (typeof body.announcement !== "string" || body.announcement.length > 500)) throw new ReleaseError("INVALID_ANNOUNCEMENT");
+  const announcement = typeof body.announcement === "string" ? body.announcement.trim() : current?.announcement ?? "";
+  await dbExec(`INSERT INTO client_policies (platform,min_build,announcement,updated_by,updated_at) VALUES ($1,$2,$3,$4,now())
+    ON CONFLICT (platform) DO UPDATE SET min_build=excluded.min_build,announcement=excluded.announcement,updated_by=excluded.updated_by,updated_at=now()`, [platform, minBuild, announcement, actorLabel(actor)]);
+  await addAudit({ actorUserId: actorId(actor), action: "client_policy.update", targetType: "client_policy", targetId: platform, metadata: { minBuild, announcement: !!announcement } });
   return releaseOverview();
 }
 
 export async function releaseOverview() {
   const storage = releaseStorage();
-  const [rows, policies, adoption] = await Promise.all([
+  const [rows, policies, adoption, diagnostics] = await Promise.all([
     dbQuery<ReleaseRow>("SELECT * FROM client_releases ORDER BY platform, build DESC, arch LIMIT 500"),
-    dbQuery<{ platform: ClientPlatform; min_build: number; updated_at: Date }>("SELECT platform,min_build,updated_at FROM client_policies"),
+    dbQuery<{ platform: ClientPlatform; min_build: number; announcement: string; updated_at: Date }>("SELECT platform,min_build,announcement,updated_at FROM client_policies"),
     dbQuery<{ platform: string; client_version: string | null; client_build: number | null; devices: number }>(`SELECT platform,client_version,client_build,COUNT(*)::int AS devices
       FROM native_enrollments WHERE status='active' GROUP BY platform,client_version,client_build ORDER BY platform,client_build DESC NULLS LAST`),
+    dbQuery<{ platform: string; client_build: number | null; code: string; events: number; users: number; last_at: Date }>(`SELECT platform,client_build,code,COUNT(*)::int AS events,
+      COUNT(DISTINCT user_id)::int AS users,MAX(occurred_at) AS last_at FROM native_diagnostics WHERE created_at>now()-interval '7 days'
+      GROUP BY platform,client_build,code ORDER BY events DESC LIMIT 50`),
   ]);
   return {
     releases: rows.map(adminRelease),
-    policies: clientPlatforms.map((platform) => ({ platform, minBuild: policies.find((p) => p.platform === platform)?.min_build || 0, downloadPath: downloadPath(platform) })),
+    policies: clientPlatforms.map((platform) => { const policy = policies.find((p) => p.platform === platform);
+      return { platform, minBuild: policy?.min_build || 0, announcement: policy?.announcement || "", downloadPath: downloadPath(platform) }; }),
     adoption: adoption.map((row) => ({ platform: row.platform, version: row.client_version, build: row.client_build, devices: row.devices })),
+    diagnostics: diagnostics.map((row) => ({ platform: row.platform, build: row.client_build, code: row.code, events: row.events, users: row.users, lastAt: iso(row.last_at) })),
     storage: storage.mode === "s3" ? { mode: storage.mode, publicBaseUrl: storage.publicBaseUrl } : { mode: storage.mode },
     ciTokenConfigured: (process.env.NORTHSTAR_RELEASE_TOKEN?.trim().length || 0) >= 32,
   };

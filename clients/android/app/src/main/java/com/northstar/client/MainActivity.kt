@@ -28,6 +28,9 @@ import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private lateinit var api: NativeApi
+    private lateinit var updater: Updater
+    private var update: UpdateInfo? = null
+    private var announcement = ""
     private lateinit var content: LinearLayout
     private val executor = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
@@ -52,10 +55,10 @@ class MainActivity : Activity() {
         }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState); api = NativeApi(this)
+        super.onCreate(savedInstanceState); api = NativeApi(this); updater = Updater(this, api)
         val settings = getSharedPreferences("preferences", MODE_PRIVATE)
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", L10n.text(R.string.automatic_recommended))!!
-        render()
+        render(); checkForUpdate()
     }
     override fun onResume() { super.onResume(); visible = true; handler.post(refresh) }
     override fun onPause() { visible = false; handler.removeCallbacks(refresh); super.onPause() }
@@ -108,6 +111,11 @@ class MainActivity : Activity() {
         }
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { isIndeterminate = true; indeterminateTintList = ColorStateList.valueOf(teal); visibility = if (busy) View.VISIBLE else View.GONE }
         content.addView(progress, LinearLayout.LayoutParams(-1, 4.dp))
+        if (announcement.isNotBlank()) content.addView(label(announcement, 15f).apply { setTextColor(ink); background = rounded(mint, 18); setPadding(18.dp, 14.dp, 18.dp, 14.dp) }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12.dp })
+        update?.let { available ->
+            card(L10n.text(R.string.update_available, available.version), L10n.text(if (available.mandatory) R.string.update_required_detail else R.string.update_available_detail))
+            button(L10n.text(R.string.update_now)) { installUpdate(available) }
+        }
         if (api.secret("token") == null) { login(); return }
         val nav = LinearLayout(this).apply { setPadding(12.dp, 10.dp, 12.dp, 10.dp); setBackgroundColor(Color.WHITE) }
         for ((tab, title) in listOf("connect" to L10n.text(R.string.connect_tab), "nodes" to L10n.text(R.string.locations), "account" to L10n.text(R.string.account))) nav.addView(styleButton(Button(this)).apply {
@@ -122,7 +130,7 @@ class MainActivity : Activity() {
                 content.addView(label(L10n.text(R.string.choose_a_location_northstar_takes_care_of_the_rest)))
                 content.addView(label("⏻", 64f).apply { gravity = Gravity.CENTER; setTextColor(teal); background = rounded(mint, 80); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(144.dp, 144.dp).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = 24.dp; bottomMargin = 16.dp })
                 status = label(ConnectionStateStore.message, 20f).apply { gravity = Gravity.CENTER; background = rounded(Color.WHITE, 24); setPadding(18.dp, 22.dp, 18.dp, 22.dp) }.also { content.addView(it, LinearLayout.LayoutParams(-1, -2)) }
-                connectButton = button(if (ConnectionStateStore.active) L10n.text(R.string.disconnect_action) else L10n.text(R.string.connect_action)) {
+                if (update?.mandatory != true || ConnectionStateStore.active) connectButton = button(if (ConnectionStateStore.active) L10n.text(R.string.disconnect_action) else L10n.text(R.string.connect_action)) {
                     if (ConnectionStateStore.active) startService(Intent(this, ConnectionService::class.java).setAction("disconnect"))
                     else { val consent = GoBackend.VpnService.prepare(this); if (consent != null) startActivityForResult(consent, 10) else startConnection() }
                 }
@@ -142,7 +150,7 @@ class MainActivity : Activity() {
         button(L10n.text(R.string.sign_in_and_start)) {
             val origin = server?.text?.toString(); val address = email.text.toString(); val secret = password.text.toString()
             if (address.isBlank() || secret.isEmpty()) { alert(L10n.text(R.string.enter_your_email_and_password)); return@button }
-            work({ if (origin != null) api.origin = origin; api.login(address, secret) }) { password.setText(""); render() }
+            work({ if (origin != null) api.origin = origin; api.login(address, secret) }) { password.setText(""); render(); checkForUpdate() }
         }
     }
     private fun nodes() {
@@ -223,8 +231,22 @@ class MainActivity : Activity() {
         progress?.visibility = View.VISIBLE
         executor.execute {
             try { val result = task(); runOnUiThread { busy = false; progress?.visibility = View.GONE; if (!isDestroyed) success(result) } }
-            catch (e: Exception) { runOnUiThread { busy = false; progress?.visibility = View.GONE; if (!isDestroyed) { if ((e as? ApiFailure)?.code == "AUTH_REQUIRED") { api.saveSecret("token", null); render() }; alert(friendly(e)) } } }
+            catch (e: Exception) { runOnUiThread { busy = false; progress?.visibility = View.GONE; if (!isDestroyed) { if ((e as? ApiFailure)?.code == "AUTH_REQUIRED") { api.saveSecret("token", null); render() }; if ((e as? ApiFailure)?.code == "CLIENT_UPDATE_REQUIRED") checkForUpdate(); alert(friendly(e)) } } }
         }
+    }
+    /** Background check; failures are silent because the next launch checks again. */
+    private fun checkForUpdate() {
+        Thread {
+            val found = try { updater.check() } catch (_: Exception) { null } ?: return@Thread
+            runOnUiThread {
+                if (!isDestroyed && (found.update?.build != update?.build || found.announcement != announcement)) { update = found.update; announcement = found.announcement; if (!busy) render() }
+            }
+        }.start()
+    }
+    private fun installUpdate(available: UpdateInfo) {
+        if (!updater.canInstall()) { alert(L10n.text(R.string.update_allow_installs)); startActivity(updater.installPermissionIntent()); return }
+        status?.text = L10n.text(R.string.update_downloading)
+        work({ updater.downloadAndInstall(available) }) {}
     }
     private fun alert(message: String) { AlertDialog.Builder(this).setTitle("NORTHSTAR").setMessage(message).setPositiveButton(L10n.text(R.string.got_it), null).show() }
     private fun startConnection() { startForegroundService(Intent(this, ConnectionService::class.java).putExtra("nodeId", selectedId)) }

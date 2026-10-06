@@ -11,6 +11,7 @@
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>首次连接时，请允许系统添加 VPN。授权设备可在「我的」中管理。</value></data>
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>允许系统 VPN 权限后才能连接。</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>首次连接需要允许系统 VPN 权限</value></data>
+  <data name="announcement" xml:space="preserve"><value>公告</value></data>
   <data name="ask_your_administrator_to_enable_northstar_client_access" xml:space="preserve"><value>请联系管理员开通 NORTHSTAR 客户端访问。</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>授权设备</value></data>
   <data name="authorizing_and_connecting" xml:space="preserve"><value>正在授权并连接…</value></data>
@@ -114,6 +115,14 @@
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>暂时无法连接，请检查网络后重试。</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>暂时无法连接服务，请检查网络后重试。</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>暂时无法连接服务，请检查网络或联系管理员。</value></data>
+  <data name="update_allow_installs" xml:space="preserve"><value>请允许 NORTHSTAR 安装更新，然后返回再点一次“立即更新”。</value></data>
+  <data name="update_available" xml:space="preserve"><value>新版本 {0} 已发布</value></data>
+  <data name="update_available_detail" xml:space="preserve"><value>更新后可获得最新的功能和修复。</value></data>
+  <data name="update_downloading" xml:space="preserve"><value>正在下载并校验更新…</value></data>
+  <data name="update_failed" xml:space="preserve"><value>更新下载或校验失败，请稍后再试。</value></data>
+  <data name="update_now" xml:space="preserve"><value>立即更新</value></data>
+  <data name="update_open_download" xml:space="preserve"><value>前往下载</value></data>
+  <data name="update_required_detail" xml:space="preserve"><value>当前版本已停止支持，更新后才能继续连接。</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 有效期 · </value></data>
   <data name="vpn_connection" xml:space="preserve"><value>VPN 连接</value></data>

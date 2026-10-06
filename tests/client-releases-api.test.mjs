@@ -39,7 +39,7 @@ function artifactServer(files) {
 }
 
 test("client releases: CI drafts, verified artifacts, promotion, permanent links and minimum builds", { skip: !database, timeout: 120000 }, async () => {
-  const installer = Buffer.from("northstar-msix-v2"), cdn = await artifactServer({ "/v2.msix": installer, "/v3.msix": Buffer.from("northstar-msix-v3") });
+  const installer = Buffer.from("northstar-msix-v2"), cdn = await artifactServer({ "/v2.msix": installer, "/v3.msix": Buffer.from("northstar-msix-v3"), "/v4.msix": Buffer.from("northstar-msix-v4") });
   const admin = { email: `release_${Date.now()}@example.com`, password: "release-admin-password-1" };
   const env = { NORTHSTAR_DATABASE_URL: database, NORTHSTAR_MASTER_KEY: Buffer.alloc(32, 7).toString("base64"), NORTHSTAR_RELEASE_TOKEN: token,
     NORTHSTAR_ADMIN_EMAIL: admin.email, NORTHSTAR_ADMIN_PASSWORD: admin.password, NORTHSTAR_NATIVE_ACCESS_ENABLED: "1", NODE_EXTRA_CA_CERTS: cdn.ca,
@@ -105,7 +105,31 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
       assert.equal((await asAdmin(`/api/v1/admin/client-releases/${next.id}`, "POST", { action: "withdraw" })).status, 200);
       assert.equal((await fetch(`${base}/download/windows`, { redirect: "manual" })).headers.get("location"), `${cdn.origin}/v2.msix`, "withdrawing falls back to the previous build");
 
+      // Staged rollout: only installations in the first N% buckets are offered the new stable build.
+      const staged = await (await ci("/api/v1/admin/client-releases", { ...draft, version: "4.0.0", build: 400, url: `${cdn.origin}/v4.msix`, channel: "stable" })).json();
+      assert.equal((await asAdmin(`/api/v1/admin/client-releases/${staged.id}`, "POST", { action: "rollout", percent: 0 })).status, 400);
+      assert.equal((await ci(`/api/v1/admin/client-releases/${staged.id}`, { action: "rollout", percent: 5 })).status, 403);
+      assert.equal((await asAdmin(`/api/v1/admin/client-releases/${staged.id}`, "POST", { action: "rollout", percent: 5 })).status, 200);
+      assert.equal((await asAdmin(`/api/v1/admin/client-releases/${staged.id}`, "POST", { action: "publish" })).status, 200);
+      const bucket = (installation) => createHash("sha256").update(`${staged.id}:${installation}`).digest().readUInt32BE(0) % 100;
+      const ids = Array.from({ length: 400 }, (_, i) => `install-${i}-test`), inside = ids.find((id) => bucket(id) < 5), outside = ids.find((id) => bucket(id) >= 5);
+      const offered = async (installation) => (await (await fetch(`${base}/api/v1/client-releases/latest?platform=windows&build=200&installation=${installation}`)).json()).latest.build;
+      assert.equal(await offered(inside), 400);
+      assert.equal(await offered(outside), 200);
+      assert.equal((await fetch(`${base}/api/v1/client-releases/latest?platform=windows&installation=bad!`)).status, 400);
+      assert.equal((await fetch(`${base}/download/windows`, { redirect: "manual" })).headers.get("location"), `${cdn.origin}/v2.msix`, "anonymous downloads only see full rollouts");
+      assert.equal((await asAdmin("/api/v1/admin/client-policy", "PUT", { platform: "windows", minBuild: 400 })).status, 409, "a staged release cannot satisfy a minimum build");
+      assert.equal((await asAdmin(`/api/v1/admin/client-releases/${staged.id}`, "POST", { action: "rollout", percent: 100 })).status, 200);
+      assert.equal(await offered(outside), 400);
+
+      assert.equal((await asAdmin("/api/v1/admin/client-policy", "PUT", { platform: "windows", announcement: "x".repeat(501) })).status, 400);
+      assert.equal((await asAdmin("/api/v1/admin/client-policy", "PUT", { platform: "windows", announcement: " 今晚 23:00 维护 " })).status, 200);
+      const announced = await (await fetch(`${base}/api/v1/client-releases/latest?platform=windows&build=400`)).json();
+      assert.deepEqual([announced.announcement, announced.minBuild, announced.updateAvailable], ["今晚 23:00 维护", 200, false], "announcement-only edits keep the minimum");
+
       const overview = await (await asAdmin("/api/v1/admin/client-releases", "GET")).json();
+      assert.equal(overview.releases.find((r) => r.id === staged.id).rolloutPercent, 100);
+      assert.ok(Array.isArray(overview.diagnostics));
       assert.equal(overview.policies.find((p) => p.platform === "windows").minBuild, 200);
       assert.equal(overview.ciTokenConfigured, true);
       assert.equal((await fetch(`${base}/api/v1/admin/client-releases`, { headers: { Authorization: `Bearer ${token}` } })).status, 403, "the release token cannot read the admin overview");

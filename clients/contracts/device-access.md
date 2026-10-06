@@ -15,7 +15,7 @@
 
 | 路由 | 用途 |
 | --- | --- |
-| POST `/api/v2/native/login` | email/password/identityKey/platform/deviceName；返回 12 小时会话，不占额度 |
+| POST `/api/v2/native/login` | email/password/identityKey/platform/deviceName；返回滑动会话（默认 30 天，`NORTHSTAR_NATIVE_SESSION_DAYS`），不占额度 |
 | POST `/api/v2/native/challenge` | action + request；返回 id/payload/expiresAt，60 秒有效 |
 | POST `/api/v2/native/connect` | challengeId/signature/request；request 包含 publicKey 和可选 nodeId；登记、签发或续租 |
 | GET `/api/v2/native/account` | 自己的账号、设备、额度、有效期、近 30 天流量 |

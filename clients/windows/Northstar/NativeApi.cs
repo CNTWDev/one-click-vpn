@@ -57,6 +57,21 @@ public sealed class NativeApi : IDisposable {
         if(!response.IsSuccessStatusCode) throw new AccessFailure(json["code"]?.GetValue<string>()??"SERVICE_UNAVAILABLE");
         return json;
     }
+    /// Public release catalog: the operator's announcement, and a newer build for this install if one is published.
+    public async Task<(string Announcement,(string Version,bool Mandatory,Uri Download)? Update)?> LatestRelease() {
+        if(!Uri.TryCreate(Origin,UriKind.Absolute,out var origin)||origin.Scheme!="https") return null;
+        var installation=Read("installation") is { } saved?Encoding.UTF8.GetString(saved):Guid.NewGuid().ToString();Save("installation",Encoding.UTF8.GetBytes(installation));
+        var build=ClientAgent[(ClientAgent.IndexOf('+')+1)..];
+        using var response=await client.GetAsync(new Uri(origin,$"/api/v1/client-releases/latest?platform=windows&arch={(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture==System.Runtime.InteropServices.Architecture.Arm64?"arm64":"x64")}&build={build}&installation={installation}"));
+        if(!response.IsSuccessStatusCode) return null;
+        await response.Content.LoadIntoBufferAsync(65536);
+        var json=JsonNode.Parse(await response.Content.ReadAsStringAsync()) as JsonObject;
+        if(json is null) return null;
+        var announcement=json["announcement"]?.GetValue<string>() is { } text?text[..Math.Min(text.Length,500)]:"";
+        if(json["updateAvailable"]?.GetValue<bool>()!=true||json["latest"]?["version"]?.GetValue<string>() is not { } version) return (announcement,null);
+        // The permanent link always resolves to the current stable installer.
+        return (announcement,(version,json["mandatory"]?.GetValue<bool>()==true,new Uri(origin,json["downloadPath"]?.GetValue<string>()??"/download/windows")));
+    }
     /// windows/0.1.0+1 (the fourth assembly version field is the build number; CI sets it per release).
     private static readonly string ClientAgent=typeof(NativeApi).Assembly.GetName().Version is { } v?$"windows/{v.Major}.{v.Minor}.{Math.Max(0,v.Build)}+{Math.Max(1,v.Revision)}":"windows/0.0.0+1";
     private static string B64(byte[] bytes)=>Convert.ToBase64String(bytes).TrimEnd('=').Replace('+','-').Replace('/','_');

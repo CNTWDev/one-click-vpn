@@ -80,6 +80,18 @@ class NativeApi(context: Context) {
             return data
         } finally { connection.disconnect() }
     }
+    /**
+     * Queues a connection failure code (no keys, addresses or traffic) and sends the
+     * queue when the service is reachable; the network is often what just failed.
+     */
+    @Synchronized fun report(code: String, nodeId: String = "") {
+        val queue = try { org.json.JSONArray(prefs.getString("diagnostics", "[]")) } catch (_: Exception) { org.json.JSONArray() }
+        if (code.isNotEmpty()) queue.put(JSONObject().put("code", code).put("at", java.time.Instant.now().toString()).apply { if (nodeId.isNotEmpty()) put("nodeId", nodeId) })
+        while (queue.length() > 20) queue.remove(0)
+        prefs.edit().putString("diagnostics", queue.toString()).apply()
+        if (queue.length() == 0 || secret("token") == null) return
+        try { request("diagnostics", JSONObject().put("events", queue)); prefs.edit().remove("diagnostics").apply() } catch (_: Exception) { }
+    }
     fun login(email: String, password: String) {
         val pub = store.getCertificate(alias).publicKey as ECPublicKey
         fun fixed(bytes: ByteArray) = ByteArray(32 - bytes.takeLast(32).size) + bytes.takeLast(32).toByteArray()
@@ -117,5 +129,6 @@ fun friendlyResource(error: Throwable): Int = when ((error as? ApiFailure)?.code
     "SERVER_REQUIRED" -> R.string.enter_an_https_server_address_first
     "RATE_LIMITED" -> R.string.too_many_attempts_try_again_later
     "CLIENT_UPDATE_REQUIRED" -> R.string.client_update_required
+    "UPDATE_FAILED" -> R.string.update_failed
     else -> R.string.unable_to_reach_the_service_check_your_network_and
 }

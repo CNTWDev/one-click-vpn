@@ -10,11 +10,12 @@ type Platform = "android" | "ios" | "macos" | "windows";
 type Release = {
   id: string; platform: Platform; arch: string; channel: "stable" | "beta"; version: string; build: number;
   status: "draft" | "published" | "withdrawn"; distribution: string; url: string; sha256?: string; sizeBytes?: number;
-  minOs: string; notes: string; publishedAt: string | null; createdAt: string; createdBy: string | null;
+  minOs: string; notes: string; publishedAt: string | null; createdAt: string; createdBy: string | null; rolloutPercent: number;
 };
 type Overview = {
-  releases: Release[]; policies: Array<{ platform: Platform; minBuild: number; downloadPath: string }>;
+  releases: Release[]; policies: Array<{ platform: Platform; minBuild: number; announcement: string; downloadPath: string }>;
   adoption: Array<{ platform: string; version: string | null; build: number | null; devices: number }>;
+  diagnostics: Array<{ platform: string; build: number | null; code: string; events: number; users: number; lastAt: string | null }>;
   storage: { mode: "external" | "s3"; publicBaseUrl?: string }; ciTokenConfigured: boolean;
 };
 const platformNames: Record<Platform, string> = { android: "Android", ios: "iPhone / iPad", macos: "macOS", windows: "Windows" };
@@ -30,6 +31,8 @@ const errors: Record<string, string> = {
   MIN_BUILD_WITHOUT_RELEASE: "没有已发布的正式版达到该构建号，用户将无法升级。请先发布正式版。",
   LOWER_MINIMUM_BUILD_FIRST: "撤回后将没有满足最低版本要求的正式版，请先调低最低版本。",
   INVALID_MIN_BUILD: "最低构建号必须是不小于 0 的整数。",
+  INVALID_ROLLOUT: "灰度比例必须是 1 到 100 之间的整数。",
+  INVALID_ANNOUNCEMENT: "公告最多 500 个字符。",
 };
 const errorText = (error: unknown) => { const code = (error as Error).message.split(":")[0]; return errors[code] ? t(errors[code]) : (error as Error).message; };
 
@@ -39,6 +42,8 @@ export function ReleasesPage() {
   const [busy, setBusy] = useState(true);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [minBuilds, setMinBuilds] = useState<Record<string, string>>({});
+  const [announcements, setAnnouncements] = useState<Record<string, string>>({});
+  const [rollouts, setRollouts] = useState<Record<string, string>>({});
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -48,6 +53,8 @@ export function ReleasesPage() {
       const result = await api<Overview>("/api/v1/admin/client-releases");
       setData(result);
       setMinBuilds(Object.fromEntries(result.policies.map((policy) => [policy.platform, String(policy.minBuild)])));
+      setAnnouncements(Object.fromEntries(result.policies.map((policy) => [policy.platform, policy.announcement])));
+      setRollouts(Object.fromEntries(result.releases.map((release) => [release.id, String(release.rolloutPercent)])));
     } catch (error) { setNotice({ tone: "error", message: errorText(error) }); }
     finally { setBusy(false); }
   }, []);
@@ -73,6 +80,13 @@ export function ReleasesPage() {
     if (minBuild > 0 && !(await confirm({ title: t("设置最低版本"), message: t("构建号低于 {0} 的 {1} 客户端将无法登录和连接，并提示下载新版。", [minBuild, platformNames[platform]]), confirmLabel: t("保存"), danger: true }))) return;
     await run(() => api("/api/v1/admin/client-policy", { method: "PUT", body: JSON.stringify({ platform, minBuild }) }), t("已保存"));
   }
+  async function saveAnnouncement(platform: Platform) {
+    await run(() => api("/api/v1/admin/client-policy", { method: "PUT", body: JSON.stringify({ platform, announcement: announcements[platform] || "" }) }), t("已保存"));
+  }
+  async function saveRollout(release: Release) {
+    const percent = Number(rollouts[release.id]);
+    await run(() => api(`/api/v1/admin/client-releases/${release.id}`, { method: "POST", body: JSON.stringify({ action: "rollout", percent }) }), t("已更新"));
+  }
   async function register(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget), value = (name: string) => String(form.get(name) || "").trim();
@@ -93,20 +107,23 @@ export function ReleasesPage() {
         data.ciTokenConfigured ? t("发布令牌已配置：CI 或本地脚本可以上传、登记草稿并发布到测试版。") : t("发布令牌未配置：只能在这里手动登记版本。"),
       ].join(" ") }} />
       <section className="panel flush"><div className="panel-head padded"><h2>{t("下载链接与最低版本")}</h2></div>
-        <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("平台")}</th><th>{t("固定下载链接")}</th><th>{t("当前正式版")}</th><th>{t("最低构建号")}</th></tr></thead><tbody>{data.policies.map((policy) => {
+        <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("平台")}</th><th>{t("固定下载链接")}</th><th>{t("当前正式版")}</th><th>{t("最低构建号")}</th><th>{t("客户端公告")}</th></tr></thead><tbody>{data.policies.map((policy) => {
           const stable = data.releases.filter((item) => item.platform === policy.platform && item.channel === "stable" && item.status === "published").sort((a, b) => b.build - a.build)[0];
           return <tr key={policy.platform}><td>{platformNames[policy.platform]}</td>
             <td><div className="row-actions"><code>{policy.downloadPath}</code><button className="button ghost small" onClick={() => copy(policy.downloadPath)}>{t("复制")}</button></div></td>
             <td>{stable ? `${stable.version} (${stable.build})` : t("尚未发布")}</td>
-            <td><div className="row-actions"><input type="number" min={0} style={{ width: 110 }} aria-label={t("最低构建号")} value={minBuilds[policy.platform] ?? "0"} onChange={(event) => setMinBuilds({ ...minBuilds, [policy.platform]: event.target.value })} /><button className="button ghost small" disabled={busy || String(policy.minBuild) === (minBuilds[policy.platform] ?? "0")} onClick={() => void saveMinimum(policy.platform)}>{t("保存")}</button></div></td></tr>;
+            <td><div className="row-actions"><input type="number" min={0} style={{ width: 110 }} aria-label={t("最低构建号")} value={minBuilds[policy.platform] ?? "0"} onChange={(event) => setMinBuilds({ ...minBuilds, [policy.platform]: event.target.value })} /><button className="button ghost small" disabled={busy || String(policy.minBuild) === (minBuilds[policy.platform] ?? "0")} onClick={() => void saveMinimum(policy.platform)}>{t("保存")}</button></div></td>
+            <td><div className="row-actions"><input maxLength={500} style={{ minWidth: 180 }} aria-label={t("客户端公告")} placeholder={t("留空则不显示")} value={announcements[policy.platform] ?? ""} onChange={(event) => setAnnouncements({ ...announcements, [policy.platform]: event.target.value })} /><button className="button ghost small" disabled={busy || policy.announcement === (announcements[policy.platform] ?? "")} onClick={() => void saveAnnouncement(policy.platform)}>{t("保存")}</button></div></td></tr>;
         })}</tbody></table></div>
       </section>
       <section className="panel flush"><div className="panel-head padded"><h2>{t("版本")}</h2></div>
-        {data.releases.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("版本")}</th><th>{t("平台")}</th><th>{t("渠道")}</th><th>{t("状态")}</th><th>{t("安装包")}</th><th>{t("发布时间")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{data.releases.map((release) => <tr key={release.id}>
+        {data.releases.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("版本")}</th><th>{t("平台")}</th><th>{t("渠道")}</th><th>{t("状态")}</th><th>{t("灰度")}</th><th>{t("安装包")}</th><th>{t("发布时间")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{data.releases.map((release) => <tr key={release.id}>
           <td><b>{release.version}</b><small> · {t("构建 {0}", [release.build])}</small>{release.notes && <small><br />{release.notes}</small>}</td>
           <td>{platformNames[release.platform]} · {release.arch}<small><br />{release.minOs}</small></td>
           <td><Pill value={release.channel} label={release.channel === "stable" ? t("正式版") : t("测试版")} tone={release.channel === "stable" ? "success" : "progress"} /></td>
           <td><Pill value={release.status} label={release.status === "published" ? t("已发布") : release.status === "draft" ? t("草稿") : t("已撤回")} tone={release.status === "published" ? "success" : release.status === "draft" ? "neutral" : "warning"} /></td>
+          <td>{release.status !== "withdrawn" && <div className="row-actions"><input type="number" min={1} max={100} style={{ width: 80 }} aria-label={t("灰度比例 (%)")} title={t("灰度比例 (%)")} value={rollouts[release.id] ?? "100"} onChange={(event) => setRollouts({ ...rollouts, [release.id]: event.target.value })} /><small>%</small>
+              <button className="button ghost small" disabled={busy || String(release.rolloutPercent) === (rollouts[release.id] ?? "100")} onClick={() => void saveRollout(release)}>{t("保存")}</button></div>}</td>
           <td><a href={release.url} target="_blank" rel="noopener noreferrer">{release.distribution === "direct" ? formatBytes(release.sizeBytes) : release.distribution}</a>{release.sha256 && <small><br /><code title={release.sha256}>{release.sha256.slice(0, 12)}…</code></small>}</td>
           <td>{release.publishedAt ? formatTime(release.publishedAt) : "—"}</td>
           <td className="align-right cell-actions"><div className="row-actions">
@@ -136,6 +153,10 @@ export function ReleasesPage() {
       <section className="panel flush"><div className="panel-head padded"><h2>{t("版本分布")}</h2></div>
         {data.adoption.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("平台")}</th><th>{t("版本")}</th><th>{t("授权设备")}</th></tr></thead><tbody>{data.adoption.map((row) => <tr key={`${row.platform}:${row.version}:${row.build}`}><td>{platformNames[row.platform as Platform] || row.platform}</td><td>{row.version ? `${row.version} (${row.build})` : t("未上报")}</td><td>{row.devices}</td></tr>)}</tbody></table></div>
           : <Empty>{t("还没有授权设备上报版本。")}</Empty>}
+      </section>
+      <section className="panel flush"><div className="panel-head padded"><h2>{t("连接失败上报（近 7 天）")}</h2></div>
+        {data.diagnostics.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("平台")}</th><th>{t("构建号")}</th><th>{t("错误代码")}</th><th>{t("次数")}</th><th>{t("用户数")}</th><th>{t("最近一次")}</th></tr></thead><tbody>{data.diagnostics.map((row) => <tr key={`${row.platform}:${row.build}:${row.code}`}><td>{platformNames[row.platform as Platform] || row.platform}</td><td>{row.build ?? t("未上报")}</td><td><code>{row.code}</code></td><td>{row.events}</td><td>{row.users}</td><td>{row.lastAt ? formatTime(row.lastAt) : "—"}</td></tr>)}</tbody></table></div>
+          : <Empty>{t("近 7 天没有客户端上报连接失败。")}</Empty>}
       </section>
     </>}
   </>;

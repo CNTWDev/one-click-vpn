@@ -38,22 +38,33 @@ Portal、Console 和三类原生客户端支持中文、英文、俄语，默认
 
 流程：
 
-1. 构建并签名安装包（开发包不要登记为 stable）。
-2. 上传并登记草稿：`NORTHSTAR_RELEASE_API=https://api.example.com NORTHSTAR_RELEASE_TOKEN=… npm run release:client -- --platform android --version 1.2.0 --build 12 --min-os "Android 8.0" --file app-release.apk --publish`。`--file` 通过预签名 URL 直传对象存储（需要 `NORTHSTAR_RELEASE_STORAGE=s3`）；也可以用 `--url` 登记已经托管在别处的 HTTPS 地址，或在控制台手动登记。
-3. Controller 下载一次安装包，记录**实际**的 SHA-256 和大小，不采信上传方提供的值。构建号对同一平台/架构不可重复。
-4. 发布令牌只能上传、登记草稿和发布到测试版（beta）；晋升正式版、撤回和设置最低版本只能在控制台操作。
+1. 改版本：编辑 `clients/version.json` 的 `version`（三端共用的对外版本号）。构建号由 CI 运行序号提供，更新检查只比较构建号。
+2. 推送标签 `client-v<version>`（或手动运行 Actions「Client release」）：CI 构建签名的 Android prod APK（以及勾选时的 Windows x64/arm64），上传并**发布到测试版**。所需变量和密钥列在 `.github/workflows/client-release.yml` 顶部；Controller 需要 `NORTHSTAR_RELEASE_STORAGE=s3`。
+3. 在控制台「客户端发布」先给测试版设置灰度比例（1–100%，默认 100），再点「晋升正式版」；已安装的客户端按安装随机 ID 分桶，只有落在比例内的才会收到更新提示，匿名的固定下载链接始终给全量正式版。确认没问题后把比例调到 100%。
+4. 需要强制升级时设置最低构建号（只能指向全量发布的正式版）。
+
+本地手动发布同样可用：`NORTHSTAR_RELEASE_API=https://api.example.com NORTHSTAR_RELEASE_TOKEN=… npm run release:client -- --platform android --version 1.2.0 --build 12 --min-os "Android 8.0" --file app-release.apk --publish`。`--file` 通过预签名 URL 直传对象存储（需要 `NORTHSTAR_RELEASE_STORAGE=s3`）；也可以用 `--url` 登记已经托管在别处的 HTTPS 地址，或在控制台手动登记。
+
+Controller 下载一次安装包，记录**实际**的 SHA-256 和大小，不采信上传方提供的值。构建号对同一平台/架构不可重复。
+
+发布令牌只能上传、登记草稿和发布到测试版（beta）；晋升正式版、灰度、撤回、最低版本和公告只能在控制台操作。
 
 | 接口 | 用途 |
 | --- | --- |
 | `/download/{platform}[/{arch}]` | 固定下载链接，302 到最新已发布的正式版（`?channel=beta` 取测试版）；门户和 API 域名都可用 |
-| `GET /api/v1/client-releases/latest?platform=&arch=&build=&channel=` | 客户端更新检查：`latest`、`updateAvailable`、`mandatory`、`minBuild` |
+| `GET /api/v1/client-releases/latest?platform=&arch=&build=&channel=&installation=` | 客户端更新检查：`latest`、`updateAvailable`、`mandatory`、`minBuild`、`announcement`（灰度按 `installation` 分桶） |
 | `GET /api/v1/client-releases` | 门户下载列表 |
-| `POST /api/v1/admin/client-releases`、`…/uploads`、`…/{id}` | 登记草稿、申请上传 URL、publish / promote / withdraw / delete |
-| `PUT /api/v1/admin/client-policy` | 设置平台最低构建号 |
+| `POST /api/v1/admin/client-releases`、`…/uploads`、`…/{id}` | 登记草稿、申请上传 URL、publish / promote / rollout / withdraw / delete |
+| `PUT /api/v1/admin/client-policy` | 设置平台最低构建号和客户端公告 |
+| `POST /api/v2/native/diagnostics` | 客户端上报连接失败代码（不含密钥、地址或流量），控制台汇总近 7 天，保留 30 天 |
 
 **版本上报与强制升级**：三端每个请求都带 `X-Northstar-Client: <platform>/<version>+<build>`。设置最低构建号后，低于该构建号（或不带此请求头）的客户端在登录和连接时收到 `426 CLIENT_UPDATE_REQUIRED`（附带 `minBuild` 和 `downloadPath`）。最低构建号必须有已发布的正式版满足，撤回版本时也会检查，避免用户无版本可升。默认不限制。
 
-清单校验不能代替二进制签名验证。iPhone / iPad 只登记 App Store / TestFlight 链接。客户端内的自动下载安装（Android PackageInstaller、macOS Sparkle、Windows App Installer）尚未实现。
+**客户端内更新**：Android prod 包启动时检查更新，下载后校验 SHA-256 和包名，交给系统安装器（系统同时校验签名一致，用户确认一次）；必须升级时隐藏连接按钮。dev 包（`com.northstar.client.dev`）不自更新。iOS / macOS / Windows 显示新版本提示并打开 App Store 或固定下载链接；macOS Sparkle 和 Windows 静默安装尚未实现。
+
+Android 构建：`prod` / `dev` 两个 flavor；发布签名只从环境变量读取（`NORTHSTAR_ANDROID_KEYSTORE`、`…_KEYSTORE_PASSWORD`、`…_KEY_ALIAS`、`…_KEY_PASSWORD`），`NORTHSTAR_BUILD_NUMBER` 决定 versionCode。签名密钥丢失后已安装用户无法升级，务必离线备份。
+
+清单校验不能代替二进制签名验证。iPhone / iPad 只登记 App Store / TestFlight 链接。
 
 ## 服务端试点与上线门槛
 
@@ -63,7 +74,7 @@ Portal、Console 和三类原生客户端支持中文、英文、俄语，默认
 4. 后台账号「访问详情 → 客户端授权设备与会员额度」为**未曾导出连接配置的新测试账号**启用 NORTHSTAR 模式，可设置设备上限和有效期。旧账号切换明确拒绝，尚未实现安全迁移流程。
 5. 真机测试首次系统权限、实际出口 IP、IPv4/IPv6/DNS 防泄漏、锁屏后台续租、网络切换、断网恢复、撤销/停用/到期、Agent 停止与重启、跨端并发额度及安装升级卸载。普通终端重装会被视为新身份；当前实现不提供抗 root/管理员复制私钥的硬件证明。
 
-当前租约 300 秒、客户端约 90 秒续租；通过设备签名及权益校验的连接/续租延长会话 12 小时，闲置超过 12 小时需重新登录。撤销后等待旧租约截止加 20 秒才释放名额，不能承诺“即时全网下线”。节点先安装内核 UTC 截止时间规则，再启用 peer；即使 Agent/watchdog 卡住，内核仍阻断过期流量。独立 watchdog 负责清理 live peer 和持久化配置，重启先恢复防火墙再拉起隧道。只有已经使用原生租约的节点启用这组规则，legacy-only 节点不改变防火墙。修改节点规则、回拨系统时间等不在保证边界内；必须完成 Linux 真机故障注入后才能制定 SLA。启用原生访问的节点不要回退旧 Agent：旧版本新增的 peer 会被保留的默认拒绝规则阻断。
+当前租约 300 秒、客户端约 90 秒续租；通过设备签名及权益校验的连接/续租把会话滑动延长 `NORTHSTAR_NATIVE_SESSION_DAYS` 天（默认 30），闲置超过该天数才需重新登录；Agent 2.10 起续租只通过任务轮询下发截止时间，不再触发整节点重配。撤销后等待旧租约截止加 20 秒才释放名额，不能承诺“即时全网下线”。节点先安装内核 UTC 截止时间规则，再启用 peer；即使 Agent/watchdog 卡住，内核仍阻断过期流量。独立 watchdog 负责清理 live peer 和持久化配置，重启先恢复防火墙再拉起隧道。只有已经使用原生租约的节点启用这组规则，legacy-only 节点不改变防火墙。修改节点规则、回拨系统时间等不在保证边界内；必须完成 Linux 真机故障注入后才能制定 SLA。启用原生访问的节点不要回退旧 Agent：旧版本新增的 peer 会被保留的默认拒绝规则阻断。
 
 未完成的发布门槛：Windows 隧道服务及安装器、三端生产签名、Apple Developer 团队/描述文件、生产 API 地址、真机端到端验收、自动发布与回滚、第三方许可证随包核验。现有开发包不可进入门户 stable 下载列表。
 

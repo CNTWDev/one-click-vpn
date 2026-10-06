@@ -440,6 +440,12 @@ the native-lease Agent formerly labelled 2.9.0 on the client branch.
   registers a draft with `NORTHSTAR_RELEASE_TOKEN`; see `clients/README.md` and `.env.example`.
 - Native clients send `X-Northstar-Client`; a per-platform minimum build returns
   `426 CLIENT_UPDATE_REQUIRED` at sign-in and connect. No minimum is set by default.
+- Tag `client-v<version>` (matching `clients/version.json`) to have GitHub Actions build a
+  signed Android APK and publish it to beta; promote it, stage a rollout percentage, set a
+  client announcement and read connection-failure reports in the same Console page.
+- Agent 2.10 applies lease renewals from its task poll, so a renewing client no longer
+  triggers a node-wide WireGuard reconcile. Native sessions slide for
+  `NORTHSTAR_NATIVE_SESSION_DAYS` (default 30) instead of 12 hours.
 
 ### Agent 2.9 update
 

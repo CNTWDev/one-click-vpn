@@ -400,6 +400,13 @@ ALTER TABLE native_sessions ADD COLUMN IF NOT EXISTS client_version TEXT;
 ALTER TABLE native_sessions ADD COLUMN IF NOT EXISTS client_build INTEGER;
 ALTER TABLE native_enrollments ADD COLUMN IF NOT EXISTS client_version TEXT;
 ALTER TABLE native_enrollments ADD COLUMN IF NOT EXISTS client_build INTEGER;
+ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS rollout_percent INTEGER NOT NULL DEFAULT 100 CHECK (rollout_percent BETWEEN 1 AND 100);
+ALTER TABLE client_policies ADD COLUMN IF NOT EXISTS announcement TEXT NOT NULL DEFAULT '';
+CREATE TABLE IF NOT EXISTS native_diagnostics (
+  id TEXT PRIMARY KEY, user_id TEXT REFERENCES users(id) ON DELETE CASCADE, platform TEXT NOT NULL, client_version TEXT, client_build INTEGER,
+  code TEXT NOT NULL, node_id TEXT, occurred_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS native_diagnostics_recent ON native_diagnostics(created_at DESC);
 `;
 
 try {

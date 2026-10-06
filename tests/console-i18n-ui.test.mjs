@@ -34,8 +34,9 @@ test("Console locales: all routes, persisted choice, forms and mobile layout", {
       else if (url.pathname === "/api/logs") body = { logs: [], available: true };
       else if (url.pathname.endsWith("/subscriptions")) body = { subscriptions: [], nodes: [] };
       else if (url.pathname.includes("agent-release")) body = { version: "test", revision: "test" };
-      else if (url.pathname === "/api/v1/admin/client-releases") body = { releases: [{ id: "rel_1", platform: "android", arch: "universal", channel: "beta", version: "1.2.0", build: 12, status: "published", distribution: "direct", url: "https://downloads.example.com/a.apk", sha256: "a".repeat(64), sizeBytes: 12345678, minOs: "Android 8.0", notes: "", publishedAt: "2026-10-06T00:00:00Z", createdAt: "2026-10-06T00:00:00Z", createdBy: "release-token" }],
-        policies: ["android", "ios", "macos", "windows"].map((platform) => ({ platform, minBuild: 0, downloadPath: `/download/${platform}` })), adoption: [{ platform: "android", version: "1.2.0", build: 12, devices: 2 }], storage: { mode: "external" }, ciTokenConfigured: false };
+      else if (url.pathname === "/api/v1/admin/client-releases") body = { releases: [{ id: "rel_1", platform: "android", arch: "universal", channel: "beta", version: "1.2.0", build: 12, status: "published", distribution: "direct", url: "https://downloads.example.com/a.apk", sha256: "a".repeat(64), sizeBytes: 12345678, minOs: "Android 8.0", notes: "", publishedAt: "2026-10-06T00:00:00Z", createdAt: "2026-10-06T00:00:00Z", createdBy: "release-token", rolloutPercent: 20 }],
+        policies: ["android", "ios", "macos", "windows"].map((platform) => ({ platform, minBuild: 0, announcement: "", downloadPath: `/download/${platform}` })), adoption: [{ platform: "android", version: "1.2.0", build: 12, devices: 2 }],
+        diagnostics: [{ platform: "android", build: 12, code: "HANDSHAKE_TIMEOUT", events: 3, users: 2, lastAt: "2026-10-06T00:00:00Z" }], storage: { mode: "external" }, ciTokenConfigured: false };
       await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     });
     await page.goto(base);

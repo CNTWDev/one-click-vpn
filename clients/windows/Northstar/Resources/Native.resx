@@ -11,6 +11,7 @@
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>Allow the system to add a VPN on first connection. Manage authorized devices in Account.</value></data>
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>Allow the system VPN permission to connect.</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>Allow VPN access on your first connection</value></data>
+  <data name="announcement" xml:space="preserve"><value>Announcement</value></data>
   <data name="ask_your_administrator_to_enable_northstar_client_access" xml:space="preserve"><value>Ask your administrator to enable NORTHSTAR client access.</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>Authorized devices</value></data>
   <data name="authorizing_and_connecting" xml:space="preserve"><value>Authorizing and connecting…</value></data>
@@ -114,6 +115,14 @@
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>Unable to connect. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>Unable to reach the service. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>Unable to reach the service. Check your network or contact your administrator.</value></data>
+  <data name="update_allow_installs" xml:space="preserve"><value>Allow NORTHSTAR to install updates, then come back and tap Update now again.</value></data>
+  <data name="update_available" xml:space="preserve"><value>Version {0} is available</value></data>
+  <data name="update_available_detail" xml:space="preserve"><value>Update to get the latest features and fixes.</value></data>
+  <data name="update_downloading" xml:space="preserve"><value>Downloading and verifying the update…</value></data>
+  <data name="update_failed" xml:space="preserve"><value>The update could not be downloaded or verified. Try again later.</value></data>
+  <data name="update_now" xml:space="preserve"><value>Update now</value></data>
+  <data name="update_open_download" xml:space="preserve"><value>Download</value></data>
+  <data name="update_required_detail" xml:space="preserve"><value>This version is no longer supported. Update to keep connecting.</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 Valid until · </value></data>
   <data name="vpn_connection" xml:space="preserve"><value>VPN connection</value></data>

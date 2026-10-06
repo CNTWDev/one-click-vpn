@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { readJson } from "../../../../../server/http";
 import { NativeError } from "../../../../../server/native-proof";
-import { recordEnrollmentClient,recordSessionClient,requireSupportedClient } from "../../../../../server/native-clients";
-import type { ClientPlatform } from "../../../../../shared/client-releases";
+import { clientHeader,recordDiagnostics,recordEnrollmentClient,recordSessionClient,requireSupportedClient } from "../../../../../server/native-clients";
+import { parseClientAgent,type ClientPlatform } from "../../../../../shared/client-releases";
 import { nativeAccount,nativeChallenge,nativeConnect,nativeEnd,nativeLogin,nativeLogout,nativeNodes,nativeSession,nativeStatus } from "../../../../../server/native-access";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -32,6 +32,10 @@ async function handle(request:Request) {
         result=lease;
       }
       else if(request.method==="POST"&&(path==="disconnect"||path==="revoke")) result=await nativeEnd(session,path,body);
+      else if(request.method==="POST"&&path==="diagnostics") {
+        const agent=parseClientAgent(request.headers.get(clientHeader));
+        result=await recordDiagnostics(session,agent?.platform===session.platform?agent:null,body);
+      }
       else if(request.method==="POST"&&path==="logout") result=await nativeLogout(session);
       else throw new NativeError("NOT_FOUND",404);
     }

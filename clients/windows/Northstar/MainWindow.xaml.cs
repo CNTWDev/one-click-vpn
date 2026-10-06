@@ -8,8 +8,16 @@ public partial class MainWindow : Window {
     private readonly NativeApi api=new();
     private string page="connect",nodeName="";
     private bool busy;
+    private (string Version,bool Mandatory,Uri Download)? update;
+    private string announcement="";
     private static Brush Brush(string hex)=>(Brush)new BrushConverter().ConvertFromString(hex)!;
-    public MainWindow() {L10n.Initialize();InitializeComponent();api.Origin=api.SavedOrigin;Render();Closed+=(_,_)=>api.Dispose();}
+    public MainWindow() {L10n.Initialize();InitializeComponent();api.Origin=api.SavedOrigin;Render();Closed+=(_,_)=>api.Dispose();CheckForUpdate();}
+    private async void CheckForUpdate() {
+        try {
+            if(await api.LatestRelease() is not { } found) return;
+            if(found.Update?.Version!=update?.Version||found.Announcement!=announcement){update=found.Update;announcement=found.Announcement;if(!busy)Render();}
+        } catch {/* checked again on next launch */}
+    }
     private void Text(string value,int size=16)=>ContentPanel.Children.Add(new TextBlock {Text=value,FontSize=size,FontWeight=size>=22?FontWeights.Bold:FontWeights.Normal,Foreground=Brush(size>=22?"#182731":"#5B6970"),TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,8,0,16)});
     private void Card(string title,string detail) {
         var body=new StackPanel();body.Children.Add(new TextBlock {Text=title,FontSize=22,FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,0,10)});
@@ -20,7 +28,7 @@ public partial class MainWindow : Window {
     private async void Work(Func<Task> action) {
         if(busy)return;busy=true;ContentPanel.IsEnabled=false;NavigationPanel.IsEnabled=false;BusyBanner.Visibility=Visibility.Visible;
         try {await action();}
-        catch(Exception error) {MessageBox.Show(error is AccessFailure?error.Message:L10n.Text("unable_to_reach_the_service_check_your_network_and"),"NORTHSTAR");}
+        catch(Exception error) {if(error is AccessFailure {Code:"CLIENT_UPDATE_REQUIRED"})CheckForUpdate();MessageBox.Show(error is AccessFailure?error.Message:L10n.Text("unable_to_reach_the_service_check_your_network_and"),"NORTHSTAR");}
         finally {busy=false;ContentPanel.IsEnabled=true;NavigationPanel.IsEnabled=true;BusyBanner.Visibility=Visibility.Collapsed;}
     }
     private void Render() {
@@ -32,6 +40,11 @@ public partial class MainWindow : Window {
         AutomationProperties.SetName(picker,L10n.Text("language"));
         picker.SelectionChanged+=(_,_)=>{if(!busy&&picker.SelectedIndex>=0){L10n.Select(languages[picker.SelectedIndex]);Render();}};
         ContentPanel.Children.Add(picker);
+        if(announcement.Length>0) Card(L10n.Text("announcement"),announcement);
+        if(update is { } available) {
+            Card(L10n.Text("update_available",available.Version),L10n.Text(available.Mandatory?"update_required_detail":"update_available_detail"));
+            Button(L10n.Text("update_open_download"),()=>System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(available.Download.AbsoluteUri) {UseShellExecute=true}));
+        }
         NavigationPanel.Visibility=api.SignedIn?Visibility.Visible:Visibility.Collapsed;
         if(!api.SignedIn) {Login();return;}
         foreach(var (id,name) in new[]{("connect",L10n.Text("connect_tab")),("nodes",L10n.Text("locations")),("account",L10n.Text("account"))}) {var b=new Button {Content=name,MinHeight=52,Margin=new Thickness(4),Background=Brush(page==id?"#E2F7F0":"#FFFFFF")};AutomationProperties.SetName(b,name+(page==id?L10n.Text("current_page"):""));b.Click+=(_,_)=>{if(!busy){page=id;Render();}};NavigationPanel.Children.Add(b);}
@@ -72,7 +85,7 @@ public partial class MainWindow : Window {
         Text(L10n.Text("email"));var email=new TextBox {MinHeight=36};ContentPanel.Children.Add(email);
         Text(L10n.Text("password"));var password=new PasswordBox {MinHeight=36};ContentPanel.Children.Add(password);
         AutomationProperties.SetName(origin,L10n.Text("server_address"));AutomationProperties.SetName(email,L10n.Text("email"));AutomationProperties.SetName(password,L10n.Text("password"));
-        var login=Button(L10n.Text("sign_in_and_start"),()=>{if(string.IsNullOrWhiteSpace(email.Text)||password.Password.Length==0){MessageBox.Show(L10n.Text("enter_your_email_and_password"),"NORTHSTAR");return;}Work(async()=>{api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password.Password);password.Clear();page="connect";Render();});});login.Background=Brush("#007A64");login.Foreground=Brush("#FFFFFF");login.IsDefault=true;
+        var login=Button(L10n.Text("sign_in_and_start"),()=>{if(string.IsNullOrWhiteSpace(email.Text)||password.Password.Length==0){MessageBox.Show(L10n.Text("enter_your_email_and_password"),"NORTHSTAR");return;}Work(async()=>{api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password.Password);password.Clear();page="connect";Render();CheckForUpdate();});});login.Background=Brush("#007A64");login.Foreground=Brush("#FFFFFF");login.IsDefault=true;
     }
     private static string Bytes(JsonNode? value) {double.TryParse(value?.ToString(),out var bytes);string[] units={"B","KB","MB","GB","TB"};var i=0;while(bytes>=1024&&i<units.Length-1){bytes/=1024;i++;}return $"{bytes:0.#} {units[i]}";}
 }

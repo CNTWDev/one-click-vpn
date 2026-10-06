@@ -134,7 +134,12 @@ async function buildDesiredStateLocked(nodeId: string, protocol: Protocol, optio
     openvpn,
   });
   const previous = await findDesiredConfig(nodeId, protocol);
-  const desired = await upsertDesiredConfig({ nodeId, protocol, payload: desiredPayload });
+  // Agents with in-place renewal receive deadlines on every task poll, so a lease
+  // renewal must not cost a node-wide reconcile. Peer membership still does.
+  const hashPayload = protocol === "wireguard" && node.capabilities.nativeLeaseRenewal === 1 && Array.isArray(desiredPayload.peers)
+    ? { ...desiredPayload, peers: (desiredPayload.peers as Array<Record<string, unknown>>).map((peer) => ({ ...peer, expiresAt: undefined })) }
+    : undefined;
+  const desired = await upsertDesiredConfig({ nodeId, protocol, payload: desiredPayload, hashPayload });
   if (options.force || !previous || previous.config_hash !== desired.config_hash) {
     await enqueueReconcileTask({
       nodeId,

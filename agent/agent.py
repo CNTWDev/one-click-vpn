@@ -148,6 +148,61 @@ def restore_native_kernel_guard():
     native_kernel_guard(peers)
 
 
+def refresh_native_peers(peers):
+    """Apply renewed native deadlines in place, without a node-wide reconcile.
+
+    Only peers already carrying a deadline marker are touched. A still-valid
+    lease whose peer the watchdog removed (e.g. after a missed poll) is restored.
+    """
+    if not isinstance(peers, list) or not native_watchdog_ready:
+        return
+    now = time.time()
+    wanted = {}
+    for peer in peers:
+        if not isinstance(peer, dict) or not validate_key(peer.get("publicKey")):
+            continue
+        deadline, allowed = peer.get("expiresAt"), peer.get("allowedIps")
+        if not isinstance(deadline, int) or isinstance(deadline, bool) or deadline <= now or deadline > now + 310:
+            continue
+        if not isinstance(allowed, list) or len(allowed) != 1 or not valid_network(allowed[0]) or not allowed[0].endswith("/32"):
+            continue
+        wanted[peer["publicKey"]] = (deadline, allowed[0])
+    if not wanted:
+        return
+    with wireguard_lock():
+        if not WIREGUARD_CONFIG.exists():
+            return
+        text = WIREGUARD_CONFIG.read_text()
+        blocks = re.split(r"(?m)^\[Peer\]\s*$", text)
+        present, changed, added = set(), False, []
+        for index, block in enumerate(blocks[1:], 1):
+            key = re.search(r"(?m)^PublicKey\s*=\s*(\S+)\s*$", block)
+            if not key:
+                continue
+            present.add(key[1])
+            stamp = re.search(r"(?m)^# NorthstarExpiresAt=(\S+)$", block)
+            # Legacy peers (no marker) are never converted into native ones here.
+            if key[1] in wanted and stamp and stamp[1] != str(wanted[key[1]][0]):
+                blocks[index] = block[:stamp.start(1)] + str(wanted[key[1]][0]) + block[stamp.end(1):]
+                changed = True
+        for key, (deadline, address) in wanted.items():
+            if key in present or re.search(r"(?m)^AllowedIPs\s*=.*(?<![\d.])" + re.escape(address), text):
+                continue
+            if not blocks[-1].endswith("\n"):
+                blocks[-1] += "\n"
+            blocks.append(f"\nPublicKey = {key}\nAllowedIPs = {address}\nPersistentKeepalive = 25\n# NorthstarExpiresAt={deadline}\n\n")
+            added.append(key)
+            changed = True
+        if not changed:
+            return
+        atomic_write(WIREGUARD_CONFIG, "[Peer]".join(blocks))
+        # Extend the kernel deadline before a restored peer becomes live.
+        restore_native_kernel_guard()
+        if added and command_succeeds(["wg", "show", "northstar"]):
+            for key in added:
+                run_fixed(["wg", "set", "northstar", "peer", key, "allowed-ips", wanted[key][1], "persistent-keepalive", "25"])
+
+
 def install_native_watchdog():
     global native_watchdog_ready
     if Path(__file__).resolve() != Path("/opt/northstar-agent/agent.py"):
@@ -1059,11 +1114,14 @@ def capabilities():
     if platform.system() == "Linux" and platform.machine() in ("x86_64", "aarch64", "arm64"):
         protocols.append("vless")
         transports["vless"] = ["tcp"]
+    native_enforcement = 1 if native_watchdog_ready and command_succeeds(["systemctl", "is-active", "northstar-native-expiry.timer"]) and not command_succeeds(["systemctl", "is-failed", "northstar-native-expiry.service"]) else 0
     return {
         "protocols": protocols,
         "transports": transports,
         "routing": ["full", "split"],
-        "nativeLeaseEnforcement": 1 if native_watchdog_ready and command_succeeds(["systemctl", "is-active", "northstar-native-expiry.timer"]) and not command_succeeds(["systemctl", "is-failed", "northstar-native-expiry.service"]) else 0,
+        "nativeLeaseEnforcement": native_enforcement,
+        # Renewed deadlines arrive with each task poll instead of as reconcile tasks.
+        "nativeLeaseRenewal": native_enforcement,
         "runtime": {
             "wireguardTools": "wireguard" in protocols,
             "openvpn": "openvpn" in protocols,
@@ -1369,8 +1427,18 @@ def heartbeat():
 
 
 def poll_tasks():
-    response = request_json("/api/v1/agent/tasks/pull", {"nodeId": NODE_ID, "token": TOKEN, "limit": 10})
-    for task in response.get("tasks", []):
+    response = request_json("/api/v1/agent/tasks/pull", {"nodeId": NODE_ID, "token": TOKEN, "limit": 10, "nativePeers": True})
+    try:
+        apply_pulled_tasks(response.get("tasks", []))
+    finally:
+        try:
+            refresh_native_peers(response.get("nativePeers"))
+        except Exception as error:
+            log_failure("native lease renewal", error)
+
+
+def apply_pulled_tasks(tasks):
+    for task in tasks:
         try:
             result = apply_task(task)
             outcome = {
