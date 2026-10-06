@@ -1,4 +1,4 @@
-package com.northstar.client
+package com.veilbird.client
 
 /** UI/session boundary only. No fake registration or local quota enforcement. */
 interface DeviceAccess {

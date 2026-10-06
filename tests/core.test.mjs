@@ -13,10 +13,10 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const port = 3187;
 const base = `http://127.0.0.1:${port}`;
 let server;
-const databaseUrl = process.env.NORTHSTAR_TEST_DATABASE_URL;
+const databaseUrl = process.env.VEILBIRD_TEST_DATABASE_URL;
 const integrationOptions = databaseUrl
   ? {}
-  : { skip: "Set NORTHSTAR_TEST_DATABASE_URL to a disposable PostgreSQL database to run integration tests." };
+  : { skip: "Set VEILBIRD_TEST_DATABASE_URL to a disposable PostgreSQL database to run integration tests." };
 const execFileAsync = promisify(execFile);
 
 // Admin pages live in one file per page; source assertions search all of them.
@@ -185,11 +185,11 @@ before(async () => {
   const testEnv = {
     ...process.env,
     NODE_ENV: "production",
-    NORTHSTAR_DATABASE_URL: databaseUrl,
-    NORTHSTAR_MASTER_KEY: Buffer.alloc(32, 7).toString("base64"),
-    NORTHSTAR_ADMIN_EMAIL: "owner@example.com",
-    NORTHSTAR_ADMIN_PASSWORD: "test-password-123",
-    NORTHSTAR_PUBLIC_ORIGIN: base,
+    VEILBIRD_DATABASE_URL: databaseUrl,
+    VEILBIRD_MASTER_KEY: Buffer.alloc(32, 7).toString("base64"),
+    VEILBIRD_ADMIN_EMAIL: "owner@example.com",
+    VEILBIRD_ADMIN_PASSWORD: "test-password-123",
+    VEILBIRD_PUBLIC_ORIGIN: base,
   };
   // Exercise upgrades from the legacy country-code uniqueness constraint.
   const legacyPool = new pg.Pool({ connectionString: databaseUrl });
@@ -241,7 +241,7 @@ test("Agent operations expose release, recover expired tasks and preserve live t
     assert.equal(detail.status, 200);
     assert.equal((await detail.json()).actions[0].status, "failed");
     await pool.query(`INSERT INTO node_actions (id,node_id,action,status,created_at,lease_updated_at) VALUES ($1,$2,'upgrade-agent','running',$3,$4)`, [`${nodeId}_live`,nodeId,new Date(Date.now()-120*60_000).toISOString(),timestamp]);
-    await execFileAsync(process.execPath, [path.join(root, "scripts/migrate.mjs")], { cwd: root, env: { ...process.env, NORTHSTAR_DATABASE_URL: databaseUrl } });
+    await execFileAsync(process.execPath, [path.join(root, "scripts/migrate.mjs")], { cwd: root, env: { ...process.env, VEILBIRD_DATABASE_URL: databaseUrl } });
     const upgrade = await fetch(`${base}/api/nodes/${nodeId}/actions`, { method: "POST", headers, body: JSON.stringify({ action: "upgrade-agent" }) });
     assert.equal(upgrade.status, 409);
     const batch = await fetch(`${base}/api/nodes/batch-actions`, { method: "POST", headers, body: JSON.stringify({ action: "upgrade-agent", nodeIds: [nodeId,"missing-ops-node",nodeId] }) });
@@ -341,9 +341,9 @@ test("portal sessions cannot be replayed against administrator routes", integrat
   assert.equal(portalLogin.status, 200);
   const portalSession = portalLogin.headers.get("set-cookie")?.split(";", 1)[0].split("=")[1];
   assert.ok(portalSession);
-  const portalMe = await fetch(`${base}/api/v1/auth/me`, { headers: { Cookie: `northstar_portal_session=${portalSession}` } });
+  const portalMe = await fetch(`${base}/api/v1/auth/me`, { headers: { Cookie: `veilbird_portal_session=${portalSession}` } });
   assert.equal(portalMe.status, 200);
-  const replayed = await fetch(`${base}/api/nodes`, { headers: { Cookie: `northstar_session=${portalSession}` } });
+  const replayed = await fetch(`${base}/api/nodes`, { headers: { Cookie: `veilbird_session=${portalSession}` } });
   assert.equal(replayed.status, 401);
 });
 
@@ -763,7 +763,7 @@ test("credential controls preserve independent user/admin locks and recoverable 
     const wgCredential = (await pool.query("SELECT * FROM access_credentials WHERE id=$1", [id])).rows[0];
     assert.equal(wgProfile.expiresAt, wgCredential.expires_at);
     assert.equal(new Date(wgCredential.expires_at) - new Date(wgCredential.created_at), 365 * 86_400_000);
-    const migrate = () => execFileAsync(process.execPath, [fileURLToPath(new URL("../scripts/migrate.mjs", import.meta.url))], { cwd: root, env: { ...process.env, NORTHSTAR_DATABASE_URL: databaseUrl } });
+    const migrate = () => execFileAsync(process.execPath, [fileURLToPath(new URL("../scripts/migrate.mjs", import.meta.url))], { cwd: root, env: { ...process.env, VEILBIRD_DATABASE_URL: databaseUrl } });
     await pool.query("UPDATE connection_profiles SET expires_at=$2 WHERE id=$1", [wgProfile.id, new Date(new Date(wgProfile.issuedAt).getTime() + 86_400_000).toISOString()]);
     await migrate();
     await migrate();

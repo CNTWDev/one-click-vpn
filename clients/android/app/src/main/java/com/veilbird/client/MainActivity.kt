@@ -1,4 +1,4 @@
-package com.northstar.client
+package com.veilbird.client
 
 import android.app.Activity
 import android.app.AlertDialog
@@ -127,7 +127,7 @@ class MainActivity : Activity() {
         when (page) {
             "connect" -> {
                 content.addView(label(L10n.text(R.string.connect_with_ease), 30f))
-                content.addView(label(L10n.text(R.string.choose_a_location_northstar_takes_care_of_the_rest)))
+                content.addView(label(L10n.text(R.string.choose_a_location_veilbird_takes_care_of_the_rest)))
                 content.addView(label("⏻", 64f).apply { gravity = Gravity.CENTER; setTextColor(teal); background = rounded(mint, 80); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(144.dp, 144.dp).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = 24.dp; bottomMargin = 16.dp })
                 status = label(ConnectionStateStore.message, 20f).apply { gravity = Gravity.CENTER; background = rounded(Color.WHITE, 24); setPadding(18.dp, 22.dp, 18.dp, 22.dp) }.also { content.addView(it, LinearLayout.LayoutParams(-1, -2)) }
                 if (update?.mandatory != true || ConnectionStateStore.active) connectButton = button(if (ConnectionStateStore.active) L10n.text(R.string.disconnect_action) else L10n.text(R.string.connect_action)) {
@@ -142,7 +142,7 @@ class MainActivity : Activity() {
         }
     }
     private fun login() {
-        content.addView(label(L10n.text(R.string.your_world_one_tap_away), 34f)); content.addView(label(L10n.text(R.string.sign_in_to_northstar_no_imports_or_configuration_needed)))
+        content.addView(label(L10n.text(R.string.your_world_one_tap_away), 34f)); content.addView(label(L10n.text(R.string.sign_in_to_veilbird_no_imports_or_configuration_needed)))
         card(L10n.text(R.string.your_location_your_connection), L10n.text(R.string.connect_automatically_or_choose_your_own_location))
         val server = if (BuildConfig.API_ORIGIN.isEmpty()) field(L10n.text(R.string.server_address_url), api.origin, uri = true) else null
         content.addView(label(L10n.text(R.string.email), 14f)); val email = field(L10n.text(R.string.enter_email))
@@ -193,7 +193,7 @@ class MainActivity : Activity() {
         getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("nodeId", id).putString("nodeName", name).apply()
     }
     private fun account() {
-        content.addView(label(L10n.text(R.string.my_northstar), 28f))
+        content.addView(label(L10n.text(R.string.my_veilbird), 28f))
         content.addView(label(L10n.text(R.string.your_account_usage_and_devices_in_one_place)))
         work({ api.request("account") }) { data ->
             card(data.getString("name"), data.getString("email") + "\n" + L10n.text(R.string.account_valid_until, L10n.date(data.optString("expiresAt"))))

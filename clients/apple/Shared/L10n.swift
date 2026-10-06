@@ -1,7 +1,7 @@
 import Foundation
 
 enum L10n {
-    static let preferenceKey = "northstar.language"
+    static let preferenceKey = "veilbird.language"
     static var language: String {
         let selected = UserDefaults.standard.string(forKey: preferenceKey) ?? "system"
         if ["en", "zh-Hans", "ru"].contains(selected) { return selected }

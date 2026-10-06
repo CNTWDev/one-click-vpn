@@ -53,8 +53,8 @@ jobs:
       - run: bash clients/apple/scripts/build.sh ios
       - run: bash clients/apple/scripts/build.sh macos
       - run: |
-          ditto -c -k --sequesterRsrc --keepParent clients/apple/artifacts/Northstar-iOS/Build/Products/Debug-iphonesimulator clients/apple/artifacts/NORTHSTAR-ios-simulator.zip
-          ditto -c -k --sequesterRsrc --keepParent clients/apple/artifacts/Northstar-macOS/Build/Products/Debug clients/apple/artifacts/NORTHSTAR-macos-unsigned.zip
+          ditto -c -k --sequesterRsrc --keepParent clients/apple/artifacts/Veilbird-iOS/Build/Products/Debug-iphonesimulator clients/apple/artifacts/Veilbird-ios-simulator.zip
+          ditto -c -k --sequesterRsrc --keepParent clients/apple/artifacts/Veilbird-macOS/Build/Products/Debug clients/apple/artifacts/Veilbird-macos-unsigned.zip
       - uses: actions/upload-artifact@v4
         with:
           name: Veilbird-apple-development-only

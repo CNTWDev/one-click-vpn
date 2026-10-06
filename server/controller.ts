@@ -41,7 +41,7 @@ export async function controllerInfo(): Promise<ControllerInfo> {
     publicOrigin: origin,
     publicHost: host,
     publicIp,
-    build: process.env.NORTHSTAR_BUILD_REV || "unknown",
+    build: process.env.VEILBIRD_BUILD_REV || "unknown",
     runtime: {
       uptimeSeconds: Math.floor(process.uptime()), nodeVersion: process.version,
       rssBytes: process.memoryUsage().rss, heapUsedBytes: process.memoryUsage().heapUsed,

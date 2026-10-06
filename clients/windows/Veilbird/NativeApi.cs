@@ -6,7 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 
-namespace Northstar;
+namespace Veilbird;
 public sealed class AccessFailure(string code) : Exception(code) {
     public string Code {get;}=code;
     public override string Message => Code switch {
@@ -15,14 +15,14 @@ public sealed class AccessFailure(string code) : Exception(code) {
         "AUTH_REQUIRED" => L10n.Text("your_session_has_expired_sign_in_again"),
         "INVALID_CREDENTIALS" => L10n.Text("incorrect_email_or_password"),
         "CLIENT_ACCESS_NOT_ENABLED" => L10n.Text("client_access_is_not_enabled_on_the_server"),
-        "MANAGED_ACCESS_REQUIRED" => L10n.Text("ask_your_administrator_to_enable_northstar_client_access"),
+        "MANAGED_ACCESS_REQUIRED" => L10n.Text("ask_your_administrator_to_enable_veilbird_client_access"),
         "CLIENT_UPDATE_REQUIRED" => L10n.Text("client_update_required"),
         _ => L10n.Text("unable_to_reach_the_service_check_your_network_or")
     };
 }
 public sealed class NativeApi : IDisposable {
     private readonly HttpClient client=new(new HttpClientHandler {AllowAutoRedirect=false}) {Timeout=TimeSpan.FromSeconds(15)};
-    private readonly string folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NORTHSTAR");
+    private readonly string folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Veilbird");
     private readonly ECDsa identity;
     public NativeApi() {
         Directory.CreateDirectory(folder);
@@ -48,7 +48,7 @@ public sealed class NativeApi : IDisposable {
     public async Task<JsonObject> Request(string path,JsonObject? body=null) {
         if(!Uri.TryCreate(Origin,UriKind.Absolute,out var origin)||origin.Scheme!="https"||origin.UserInfo!=""||origin.Query!=""||origin.Fragment!=""||origin.AbsolutePath!="/") throw new AccessFailure("SERVER_REQUIRED");
         using var request=new HttpRequestMessage(body is null?HttpMethod.Get:HttpMethod.Post,new Uri(origin,"/api/v2/native/"+path));
-        request.Headers.TryAddWithoutValidation("X-Northstar-Client",ClientAgent);
+        request.Headers.TryAddWithoutValidation("X-Veilbird-Client",ClientAgent);
         if(path!="login" && Read("token") is { } token) request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",Encoding.UTF8.GetString(token));
         if(body is not null) request.Content=JsonContent.Create(body);
         using var response=await client.SendAsync(request,HttpCompletionOption.ResponseHeadersRead);

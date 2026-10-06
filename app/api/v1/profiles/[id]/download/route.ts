@@ -33,7 +33,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         "client-fingerprint": "chrome", "reality-opts": { "public-key": payload.publicKey, "short-id": payload.shortId } };
       if (format === "uri") return new Response(vlessShareLink(proxy) + "\n", { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store, private", "X-Content-Type-Options": "nosniff" } });
       const content = renderSubscription([proxy]);
-      return new Response(content, { headers: { "Content-Type": "application/yaml; charset=utf-8", "Cache-Control": "no-store, private", "X-Content-Type-Options": "nosniff", "Content-Disposition": `attachment; filename="northstar-${profile.id}.yaml"` } });
+      return new Response(content, { headers: { "Content-Type": "application/yaml; charset=utf-8", "Cache-Control": "no-store, private", "X-Content-Type-Options": "nosniff", "Content-Disposition": `attachment; filename="veilbird-${profile.id}.yaml"` } });
     }
     const config = profile.protocol === "openvpn"
       ? await renderOpenVpnProfile({ endpoint: profile.endpoint, transport: profile.transport, dns: profile.dns, payload: profile.protocol_payload })
@@ -43,7 +43,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       headers: {
         "Content-Type": format === "mihomo" ? "application/yaml; charset=utf-8" : "text/plain; charset=utf-8",
         "X-Content-Type-Options": "nosniff",
-        "Content-Disposition": `attachment; filename="northstar-${profile.id}.${extension}"`,
+        "Content-Disposition": `attachment; filename="veilbird-${profile.id}.${extension}"`,
         "Cache-Control": "no-store, private",
       },
     });

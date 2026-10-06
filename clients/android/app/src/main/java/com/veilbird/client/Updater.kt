@@ -1,4 +1,4 @@
-package com.northstar.client
+package com.veilbird.client
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -25,7 +25,7 @@ class ReleaseStatus(val update: UpdateInfo?, val announcement: String)
  * the system installer (which also enforces the same signing key) asks the user to confirm.
  */
 class Updater(private val context: Context, private val api: NativeApi) {
-    private val prefs = context.getSharedPreferences("northstar", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("veilbird", Context.MODE_PRIVATE)
 
     /** Stable random id: places this install in a staged-rollout bucket, nothing more. */
     val installation: String get() = prefs.getString("installation", null) ?: UUID.randomUUID().toString().also { prefs.edit().putString("installation", it).apply() }
@@ -50,7 +50,7 @@ class Updater(private val context: Context, private val api: NativeApi) {
         val uri = URI(update.url)
         if (uri.scheme != "https" || update.sizeBytes <= 0 || update.sizeBytes > 512L * 1024 * 1024 || !update.sha256.matches(Regex("^[0-9a-f]{64}$"))) throw ApiFailure("UPDATE_FAILED")
         val dir = File(context.cacheDir, "updates").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
-        val file = File(dir, "northstar-${update.build}.apk")
+        val file = File(dir, "veilbird-${update.build}.apk")
         val digest = MessageDigest.getInstance("SHA-256")
         var total = 0L
         val connection = uri.toURL().openConnection() as HttpsURLConnection
@@ -78,7 +78,7 @@ class Updater(private val context: Context, private val api: NativeApi) {
         }
         val id = installer.createSession(params)
         installer.openSession(id).use { session ->
-            file.inputStream().use { input -> session.openWrite("northstar.apk", 0, file.length()).use { output -> input.copyTo(output); session.fsync(output) } }
+            file.inputStream().use { input -> session.openWrite("veilbird.apk", 0, file.length()).use { output -> input.copyTo(output); session.fsync(output) } }
             val callback = PendingIntent.getBroadcast(context, id, Intent(context, UpdateInstallReceiver::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
             session.commit(callback.intentSender)
         }

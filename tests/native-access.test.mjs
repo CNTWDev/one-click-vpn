@@ -5,9 +5,9 @@ import test from "node:test";
 import pg from "pg";
 import { hashPassword } from "../server/password.ts";
 
-const database=process.env.NORTHSTAR_NATIVE_TEST_DATABASE_URL;
+const database=process.env.VEILBIRD_NATIVE_TEST_DATABASE_URL;
 test("native admission: signed proof, concurrency quota, revoke grace, ownership and expiry",{skip:!database,timeout:90000},async()=>{
-  const env={...process.env,NORTHSTAR_DATABASE_URL:database,NORTHSTAR_NATIVE_ACCESS_ENABLED:"1",NORTHSTAR_MASTER_KEY:Buffer.alloc(32,9).toString("base64")};
+  const env={...process.env,VEILBIRD_DATABASE_URL:database,VEILBIRD_NATIVE_ACCESS_ENABLED:"1",VEILBIRD_MASTER_KEY:Buffer.alloc(32,9).toString("base64")};
   execFileSync(process.execPath,["scripts/migrate.mjs"],{env,stdio:"pipe"});
   const pool=new pg.Pool({connectionString:database});
   const stamp=new Date().toISOString(),user=`native_${Date.now()}`,node=`${user}_node`,password="test-password-123";
@@ -33,7 +33,7 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     assert.ok(result.wireguard.address);assert.equal(result.ready,false);assert.ok(result.wireguard.dns.length);
     const internalDevice=(await pool.query("SELECT device_id FROM native_leases WHERE id=$1",[result.leaseId])).rows[0].device_id;
     await assert.rejects(pool.query(`INSERT INTO connection_profiles(id,device_id,node_id,protocol,transport,revision,endpoint_json,issued_at,expires_at,updated_at)
-      VALUES($1,$2,$3,'wireguard','udp',1,'{}',$4,$4,$4)`,[`${user}_bypass`,internalDevice,node,stamp]),/NORTHSTAR/);
+      VALUES($1,$2,$3,'wireguard','udp',1,'{}',$4,$4,$4)`,[`${user}_bypass`,internalDevice,node,stamp]),/Veilbird app/);
     assert.equal(Number((await pool.query("SELECT COUNT(*) FROM native_enrollments WHERE user_id=$1",[user])).rows[0].count),1);
     assert.equal((await call("connect",payload,a.token)).status,403,"proof cannot replay");
     assert.equal((await call(`status/${result.leaseId}`,undefined,loser.token)).status,403);

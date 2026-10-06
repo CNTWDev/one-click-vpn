@@ -112,30 +112,30 @@ else
     [ -f "$APP_DIR/.env" ] || return 0
     awk -F= -v wanted="$1" '$1 == wanted { sub(/^[^=]*=/, ""); print; exit }' "$APP_DIR/.env"
   }
-  master_key=$(existing_value NORTHSTAR_MASTER_KEY)
+  master_key=$(existing_value VEILBIRD_MASTER_KEY)
   [ -n "$master_key" ] || master_key=$(openssl rand -base64 32 | tr -d '\n')
-  db_password=$(existing_value NORTHSTAR_DB_PASSWORD)
+  db_password=$(existing_value VEILBIRD_DB_PASSWORD)
   [ -n "$db_password" ] || db_password=$(openssl rand -hex 24)
-  log_storage_password=$(existing_value NORTHSTAR_LOG_STORAGE_PASSWORD)
+  log_storage_password=$(existing_value VEILBIRD_LOG_STORAGE_PASSWORD)
   [ -n "$log_storage_password" ] || log_storage_password=$(openssl rand -hex 24)
   umask 077
   {
     echo "NODE_ENV=production"
     echo "APP_DOMAIN=$portal_domain"
-    echo "NORTHSTAR_PORTAL_DOMAIN=$portal_domain"
-    echo "NORTHSTAR_ADMIN_DOMAIN=$admin_domain"
-    echo "NORTHSTAR_API_DOMAIN=$api_domain"
-    echo "NORTHSTAR_ADMIN_EMAIL=$admin_email"
-    echo "NORTHSTAR_ADMIN_PASSWORD=$admin_password"
-    echo "NORTHSTAR_MASTER_KEY=$master_key"
-    echo "NORTHSTAR_PUBLIC_ORIGIN=https://$portal_domain"
-    echo "NORTHSTAR_API_ORIGIN=https://$api_domain"
-    echo "NORTHSTAR_AGENT_ORIGIN=https://$api_domain"
-    echo "NORTHSTAR_DB_PASSWORD=$db_password"
-    echo "NORTHSTAR_LOG_STORAGE_PASSWORD=$log_storage_password"
-    echo "NORTHSTAR_ADMIN_NAME=Owner"
-    echo "NORTHSTAR_SESSION_TTL_SECONDS=43200"
-    echo "NORTHSTAR_ALLOW_TOFU_HOST_KEYS=false"
+    echo "VEILBIRD_PORTAL_DOMAIN=$portal_domain"
+    echo "VEILBIRD_ADMIN_DOMAIN=$admin_domain"
+    echo "VEILBIRD_API_DOMAIN=$api_domain"
+    echo "VEILBIRD_ADMIN_EMAIL=$admin_email"
+    echo "VEILBIRD_ADMIN_PASSWORD=$admin_password"
+    echo "VEILBIRD_MASTER_KEY=$master_key"
+    echo "VEILBIRD_PUBLIC_ORIGIN=https://$portal_domain"
+    echo "VEILBIRD_API_ORIGIN=https://$api_domain"
+    echo "VEILBIRD_AGENT_ORIGIN=https://$api_domain"
+    echo "VEILBIRD_DB_PASSWORD=$db_password"
+    echo "VEILBIRD_LOG_STORAGE_PASSWORD=$log_storage_password"
+    echo "VEILBIRD_ADMIN_NAME=Owner"
+    echo "VEILBIRD_SESSION_TTL_SECONDS=43200"
+    echo "VEILBIRD_ALLOW_TOFU_HOST_KEYS=false"
   } > "$APP_DIR/.env"
   chmod 600 "$APP_DIR/.env"
   echo "Created $APP_DIR/.env"

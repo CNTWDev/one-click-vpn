@@ -8,7 +8,7 @@ export type RealityTargetMode = "auto" | "custom";
 /** "auto" (default): each node gets a verified large public site; "custom": one operator-run static site. */
 export async function realityDefaults() {
   const row = (await dbQuery<{ mode: string | null; server_name: string; checked_at: string; updated_at: string }>("SELECT mode, server_name, checked_at, updated_at FROM reality_defaults WHERE id='primary'"))[0];
-  const environment = process.env.NORTHSTAR_REALITY_TARGET?.trim() || "";
+  const environment = process.env.VEILBIRD_REALITY_TARGET?.trim() || "";
   const mode: RealityTargetMode = row ? (row.mode === "auto" ? "auto" : "custom") : environment ? "custom" : "auto";
   const serverName = mode === "custom" ? row?.server_name || environment : "";
   return { mode, serverName, candidates: [...REALITY_CANDIDATES], checkedAt: row?.checked_at || null, updatedAt: row?.updated_at || null };

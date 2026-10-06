@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "NorthstarCore",
+    name: "VeilbirdCore",
     platforms: [.iOS(.v16), .macOS(.v13)],
-    products: [.library(name: "NorthstarCore", targets: ["NorthstarCore"])],
+    products: [.library(name: "VeilbirdCore", targets: ["VeilbirdCore"])],
     targets: [
-        .target(name: "NorthstarCore"),
-        .testTarget(name: "NorthstarCoreTests", dependencies: ["NorthstarCore"])
+        .target(name: "VeilbirdCore"),
+        .testTarget(name: "VeilbirdCoreTests", dependencies: ["VeilbirdCore"])
     ]
 )

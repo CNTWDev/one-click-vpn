@@ -1,3 +1,3 @@
 using System.Windows;
-namespace Northstar;
+namespace Veilbird;
 public partial class App : Application { }

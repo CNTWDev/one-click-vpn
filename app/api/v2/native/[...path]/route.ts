@@ -8,7 +8,7 @@ export const runtime="nodejs";
 export const dynamic="force-dynamic";
 async function handle(request:Request) {
   try {
-    if(process.env.NORTHSTAR_NATIVE_ACCESS_ENABLED!=="1") throw new NativeError("CLIENT_ACCESS_NOT_ENABLED",503);
+    if(process.env.VEILBIRD_NATIVE_ACCESS_ENABLED!=="1") throw new NativeError("CLIENT_ACCESS_NOT_ENABLED",503);
     const path=new URL(request.url).pathname.split("/native/")[1];
     const body=request.method==="POST"?await readJson(request):{};
     let result:unknown;

@@ -55,7 +55,7 @@ export function validateClientRelease(item: unknown): ClientRelease {
   } as ClientRelease;
 }
 
-/** Legacy read-only manifest from NORTHSTAR_CLIENT_RELEASES_JSON. New releases live in the database. */
+/** Legacy read-only manifest from VEILBIRD_CLIENT_RELEASES_JSON. New releases live in the database. */
 export function parseClientReleases(raw: string): ClientRelease[] {
   if (raw.length > 131072) throw new Error("Client release manifest too large");
   const data: unknown = JSON.parse(raw);
@@ -109,7 +109,7 @@ export function releaseFor(releases: ClientRelease[], platform: ClientPlatform, 
 }
 const defaultArch: Record<ClientPlatform, ClientArch> = { android: "universal", ios: "universal", macos: "universal", windows: "x64" };
 
-/** `X-Northstar-Client: android/1.2.3+45`. Clients send it on every request so the server can require upgrades. */
+/** `X-Veilbird-Client: android/1.2.3+45`. Clients send it on every request so the server can require upgrades. */
 export type ClientAgent = { platform: ClientPlatform; version: string; build: number };
 export function parseClientAgent(header: string | null | undefined): ClientAgent | null {
   const match = header?.trim().match(/^(android|ios|macos|windows)\/(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?)\+(\d{1,10})$/);

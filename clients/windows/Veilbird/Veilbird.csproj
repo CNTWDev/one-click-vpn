@@ -5,11 +5,10 @@
     <UseWPF>true</UseWPF>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
-    <RootNamespace>Northstar</RootNamespace>
+    <RootNamespace>Veilbird</RootNamespace>
     <NeutralLanguage>en</NeutralLanguage>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- AssemblyName stays NORTHSTAR: it is the executable name inside existing installs and release zips. -->
-    <AssemblyName>NORTHSTAR</AssemblyName>
+    <AssemblyName>Veilbird</AssemblyName>
     <Product>Veilbird</Product>
     <AssemblyTitle>Veilbird</AssemblyTitle>
     <ApplicationIcon>Assets\Veilbird.ico</ApplicationIcon>

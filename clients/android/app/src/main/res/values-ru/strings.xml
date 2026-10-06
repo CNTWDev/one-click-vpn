@@ -10,7 +10,7 @@
   <string name="allow_the_system_vpn_permission_to_connect">Для подключения разрешите использование VPN.</string>
   <string name="allow_vpn_access_on_your_first_connection">При первом подключении разрешите VPN</string>
   <string name="announcement">Объявление</string>
-  <string name="ask_your_administrator_to_enable_northstar_client_access">Попросите администратора включить доступ через клиент Veilbird.</string>
+  <string name="ask_your_administrator_to_enable_veilbird_client_access">Попросите администратора включить доступ через клиент Veilbird.</string>
   <string name="authorized_devices">Авторизованные устройства</string>
   <string name="authorizing_and_connecting">Авторизация и подключение…</string>
   <string name="automatic">Автоматически</string>
@@ -18,9 +18,9 @@
   <string name="available_location">Доступная локация</string>
   <string name="cancel">Отмена</string>
   <string name="change_location">Изменить локацию  ›</string>
-  <string name="choose_a_location_northstar_takes_care_of_the_rest">Выберите локацию. Остальное сделает Veilbird.</string>
   <string name="choose_a_location_then_connect_from_the_home_screen">Выберите локацию и подключитесь с главного экрана.</string>
   <string name="choose_a_location_then_return_to_connect">Выберите локацию и вернитесь к подключению.</string>
+  <string name="choose_a_location_veilbird_takes_care_of_the_rest">Выберите локацию. Остальное сделает Veilbird.</string>
   <string name="choose_location_then_connect_hint">Выберите локацию и подключитесь с главного экрана.</string>
   <string name="client_access_is_not_enabled_on_the_server">Доступ клиентов не включён на сервере.</string>
   <string name="client_access_is_not_enabled_on_the_server_contact">Доступ клиентов не включён на сервере. Обратитесь к администратору.</string>
@@ -72,7 +72,7 @@
   <string name="locations">Локации</string>
   <string name="membership_expired_hint">Срок доступа истёк. Обратитесь к администратору для продления.</string>
   <string name="my_account">Мой аккаунт</string>
-  <string name="my_northstar">Мой Veilbird</string>
+  <string name="my_veilbird">Мой Veilbird</string>
   <string name="new_devices_are_added_on_their_first_connection_when">Новые устройства добавляются при первом подключении, если есть свободное место.</string>
   <string name="no_authorized_devices_yet_they_appear_after_their_first">Пока нет авторизованных устройств. Они появятся после первого подключения.</string>
   <string name="no_expiry">Бессрочно</string>
@@ -95,7 +95,7 @@
   <string name="server_address">Адрес сервера</string>
   <string name="server_address_url">Адрес сервера https://…</string>
   <string name="sign_in_and_start">Войти и начать</string>
-  <string name="sign_in_to_northstar_no_imports_or_configuration_needed">Войдите в Veilbird. Импорт и настройка не нужны.</string>
+  <string name="sign_in_to_veilbird_no_imports_or_configuration_needed">Войдите в Veilbird. Импорт и настройка не нужны.</string>
   <string name="sign_out">Выйти</string>
   <string name="simulator_build_verify_vpn_connections_on_a_signed_physical">Версия для симулятора · Проверяйте VPN на подписанной сборке для устройства</string>
   <string name="the_simulator_is_for_ui_testing_only_test_the">Симулятор предназначен только для интерфейса. Проверяйте VPN на подписанной сборке для устройства.</string>

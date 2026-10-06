@@ -9,22 +9,25 @@ if [ ! -f "$APP_DIR/.env" ]; then
   exit 1
 fi
 
+# Older installs keep NORTHSTAR_DB_PASSWORD; rename it before checking so no new password is generated.
+sh "$SCRIPT_DIR/migrate-env.sh" "$APP_DIR/.env"
+
 if ! command -v openssl >/dev/null 2>&1; then
   echo "openssl is required to generate the PostgreSQL password." >&2
   exit 1
 fi
 
-database_password=$(awk -F= '$1 == "NORTHSTAR_DB_PASSWORD" { sub(/^[^=]*=/, ""); print; exit }' "$APP_DIR/.env")
+database_password=$(awk -F= '$1 == "VEILBIRD_DB_PASSWORD" { sub(/^[^=]*=/, ""); print; exit }' "$APP_DIR/.env")
 case "$database_password" in
   ""|replace-with-*)
     database_password=$(openssl rand -hex 24)
     env_tmp=$(mktemp "$APP_DIR/.env.tmp.XXXXXX")
     awk -v value="$database_password" '
       BEGIN { found = 0 }
-      /^NORTHSTAR_DATABASE_PATH=/ { next }
-      /^NORTHSTAR_DB_PASSWORD=/ { print "NORTHSTAR_DB_PASSWORD=" value; found = 1; next }
+      /^VEILBIRD_DATABASE_PATH=/ { next }
+      /^VEILBIRD_DB_PASSWORD=/ { print "VEILBIRD_DB_PASSWORD=" value; found = 1; next }
       { print }
-      END { if (!found) print "NORTHSTAR_DB_PASSWORD=" value }
+      END { if (!found) print "VEILBIRD_DB_PASSWORD=" value }
     ' "$APP_DIR/.env" > "$env_tmp"
     chmod 600 "$env_tmp"
     mv "$env_tmp" "$APP_DIR/.env"
@@ -32,16 +35,16 @@ case "$database_password" in
     ;;
 esac
 
-log_storage_password=$(awk -F= '$1 == "NORTHSTAR_LOG_STORAGE_PASSWORD" { sub(/^[^=]*=/, ""); print; exit }' "$APP_DIR/.env")
+log_storage_password=$(awk -F= '$1 == "VEILBIRD_LOG_STORAGE_PASSWORD" { sub(/^[^=]*=/, ""); print; exit }' "$APP_DIR/.env")
 case "$log_storage_password" in
   ""|replace-with-*)
     log_storage_password=$(openssl rand -hex 24)
     env_tmp=$(mktemp "$APP_DIR/.env.tmp.XXXXXX")
     awk -v value="$log_storage_password" '
       BEGIN { found = 0 }
-      /^NORTHSTAR_LOG_STORAGE_PASSWORD=/ { print "NORTHSTAR_LOG_STORAGE_PASSWORD=" value; found = 1; next }
+      /^VEILBIRD_LOG_STORAGE_PASSWORD=/ { print "VEILBIRD_LOG_STORAGE_PASSWORD=" value; found = 1; next }
       { print }
-      END { if (!found) print "NORTHSTAR_LOG_STORAGE_PASSWORD=" value }
+      END { if (!found) print "VEILBIRD_LOG_STORAGE_PASSWORD=" value }
     ' "$APP_DIR/.env" > "$env_tmp"
     chmod 600 "$env_tmp"
     mv "$env_tmp" "$APP_DIR/.env"

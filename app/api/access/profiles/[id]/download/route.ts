@@ -24,7 +24,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     return new Response(config, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
-        "Content-Disposition": `attachment; filename="northstar-${profile.id}.${extension}"`,
+        "Content-Disposition": `attachment; filename="veilbird-${profile.id}.${extension}"`,
         "Cache-Control": "no-store, private",
       },
     });

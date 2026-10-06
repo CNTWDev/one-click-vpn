@@ -5,6 +5,11 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 
 compose() {
+  # .env files written before the Veilbird rename still use NORTHSTAR_* keys.
+  if [ -z "${VEILBIRD_ENV_MIGRATED:-}" ] && [ -f "$APP_DIR/scripts/migrate-env.sh" ]; then
+    sh "$APP_DIR/scripts/migrate-env.sh" "$APP_DIR/.env"
+    VEILBIRD_ENV_MIGRATED=1
+  fi
   if docker compose version >/dev/null 2>&1; then
     docker compose "$@"
   elif command -v docker-compose >/dev/null 2>&1; then

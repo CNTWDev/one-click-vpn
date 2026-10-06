@@ -11,8 +11,8 @@ export type Session = { id: string; user_id: string; identity_jwk: string; ident
 type Entitlement = { status: string; native_only: boolean; native_device_limit: number | null; membership_expires_at: string | null };
 const ttl = 300;
 // Sliding: every signed connect/renewal extends it, so active devices never re-enter passwords.
-export const sessionDays = () => { const n = Number(process.env.NORTHSTAR_NATIVE_SESSION_DAYS || 30); return Number.isInteger(n) && n >= 1 && n <= 90 ? n : 30; };
-export const defaultLimit = () => { const n = Number(process.env.NORTHSTAR_NATIVE_DEVICE_LIMIT || 3); return Number.isInteger(n) && n >= 1 && n <= 100 ? n : 3; };
+export const sessionDays = () => { const n = Number(process.env.VEILBIRD_NATIVE_SESSION_DAYS || 30); return Number.isInteger(n) && n >= 1 && n <= 90 ? n : 30; };
+export const defaultLimit = () => { const n = Number(process.env.VEILBIRD_NATIVE_DEVICE_LIMIT || 3); return Number.isInteger(n) && n >= 1 && n <= 100 ? n : 3; };
 export async function transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await getDb().connect();
   try { await client.query("BEGIN"); const result = await work(client); await client.query("COMMIT"); return result; }

@@ -3,8 +3,8 @@ import { randomBytes } from "node:crypto";
 import { createSession, deleteSession, findSession, findUserById, cleanupSessions, type DbUser } from "./db";
 import { sessionTtlSeconds } from "./config";
 
-export const SESSION_COOKIE = "northstar_session";
-export const PORTAL_SESSION_COOKIE = "northstar_portal_session";
+export const SESSION_COOKIE = "veilbird_session";
+export const PORTAL_SESSION_COOKIE = "veilbird_portal_session";
 
 export type SessionKind = "admin" | "portal";
 

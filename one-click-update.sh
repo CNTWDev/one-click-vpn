@@ -11,11 +11,11 @@ while [ "$#" -gt 0 ]; do
     --no-cache) no_cache="yes"; shift ;;
     --service) service=${2:-}; shift 2 ;;
     -h|--help)
-      echo "Usage: sudo ./one-click-update.sh [--service all|northstar|portal-web|admin-web] [--no-cache]"
+      echo "Usage: sudo ./one-click-update.sh [--service all|veilbird|portal-web|admin-web] [--no-cache]"
       exit 0
       ;;
     *)
-      echo "Usage: sudo ./one-click-update.sh [--service all|northstar|portal-web|admin-web] [--no-cache]" >&2
+      echo "Usage: sudo ./one-click-update.sh [--service all|veilbird|portal-web|admin-web] [--no-cache]" >&2
       exit 2
       ;;
   esac
@@ -37,7 +37,7 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 fi
 
 case "$service" in
-  all|northstar|controller)
+  all|veilbird|northstar|controller)
     echo "Creating a database backup before pulling new code..."
     ./scripts/backup.sh ./backups
     ;;
@@ -45,7 +45,7 @@ case "$service" in
     echo "Frontend-only update selected; skipping database backup."
     ;;
   *)
-    echo "Unknown service: $service. Use all, northstar, portal-web, or admin-web." >&2
+    echo "Unknown service: $service. Use all, veilbird, portal-web, or admin-web." >&2
     exit 2
     ;;
 esac

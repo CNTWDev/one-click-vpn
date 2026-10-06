@@ -1,7 +1,7 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
-ARG NORTHSTAR_BUILD_REV=unknown
-ENV NORTHSTAR_BUILD_REV=$NORTHSTAR_BUILD_REV
+ARG VEILBIRD_BUILD_REV=unknown
+ENV VEILBIRD_BUILD_REV=$VEILBIRD_BUILD_REV
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
@@ -9,8 +9,8 @@ RUN npm run build:controller
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
-ARG NORTHSTAR_BUILD_REV=unknown
-ENV NORTHSTAR_BUILD_REV=$NORTHSTAR_BUILD_REV
+ARG VEILBIRD_BUILD_REV=unknown
+ENV VEILBIRD_BUILD_REV=$VEILBIRD_BUILD_REV
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*

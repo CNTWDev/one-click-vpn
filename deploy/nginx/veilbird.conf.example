@@ -1,10 +1,10 @@
-# Northstar has three independently deployable HTTP surfaces:
+# Veilbird has three independently deployable HTTP surfaces:
 #   controller-api :3000, portal-web :3100, admin-web :3200
 # Replace the hostnames and certificate paths before enabling.
 
-upstream northstar_controller { server 127.0.0.1:3000; keepalive 32; }
-upstream northstar_portal { server 127.0.0.1:3100; keepalive 16; }
-upstream northstar_admin { server 127.0.0.1:3200; keepalive 16; }
+upstream veilbird_controller { server 127.0.0.1:3000; keepalive 32; }
+upstream veilbird_portal { server 127.0.0.1:3100; keepalive 16; }
+upstream veilbird_admin { server 127.0.0.1:3200; keepalive 16; }
 
 server {
     listen 80;
@@ -23,10 +23,10 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 10m;
 
-    # Portal proxies /api to http://northstar:3000 over the Docker network.
+    # Portal proxies /api to http://veilbird:3000 over the Docker network.
     # Subscription URLs contain bearer secrets. Do not log their query string.
-    location = /api/subscription { access_log off; proxy_pass http://northstar_controller; include /etc/nginx/snippets/northstar-proxy.conf; }
-    location / { proxy_pass http://northstar_portal; include /etc/nginx/snippets/northstar-proxy.conf; }
+    location = /api/subscription { access_log off; proxy_pass http://veilbird_controller; include /etc/nginx/snippets/veilbird-proxy.conf; }
+    location / { proxy_pass http://veilbird_portal; include /etc/nginx/snippets/veilbird-proxy.conf; }
 }
 
 server {
@@ -39,23 +39,23 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 10m;
 
-    # Admin proxies /api to http://northstar:3000 over the Docker network.
-    location = /api/subscription { access_log off; proxy_pass http://northstar_controller; include /etc/nginx/snippets/northstar-proxy.conf; }
-    location / { proxy_pass http://northstar_admin; include /etc/nginx/snippets/northstar-proxy.conf; }
+    # Admin proxies /api to http://veilbird:3000 over the Docker network.
+    location = /api/subscription { access_log off; proxy_pass http://veilbird_controller; include /etc/nginx/snippets/veilbird-proxy.conf; }
+    location / { proxy_pass http://veilbird_admin; include /etc/nginx/snippets/veilbird-proxy.conf; }
 }
 
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
     server_name api.example.com;
-    location = /api/subscription { access_log off; proxy_pass http://northstar_controller; include /etc/nginx/snippets/northstar-proxy.conf; }
+    location = /api/subscription { access_log off; proxy_pass http://veilbird_controller; include /etc/nginx/snippets/veilbird-proxy.conf; }
 
     ssl_certificate     /etc/nginx/ssl/api.example.com/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/api.example.com/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
 
     location / {
-        proxy_pass http://northstar_controller;
-        include /etc/nginx/snippets/northstar-proxy.conf;
+        proxy_pass http://veilbird_controller;
+        include /etc/nginx/snippets/veilbird-proxy.conf;
     }
 }

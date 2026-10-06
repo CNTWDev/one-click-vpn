@@ -11,7 +11,7 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-default_email=$(env_value NORTHSTAR_ADMIN_EMAIL)
+default_email=$(env_value VEILBIRD_ADMIN_EMAIL)
 printf "Admin email [%s]: " "$default_email"
 read -r email
 email=${email:-$default_email}
@@ -45,7 +45,7 @@ fi
 
 echo "Resetting the password through the Controller database driver..."
 updated=$(printf '%s' "$password" | compose exec -T \
-  -e "NORTHSTAR_RESET_EMAIL=$email" northstar node -e '
+  -e "VEILBIRD_RESET_EMAIL=$email" veilbird node -e '
 const { randomBytes, scryptSync } = require("node:crypto");
 const { Client } = require("pg");
 
@@ -57,7 +57,7 @@ process.stdin.on("end", async () => {
   const derived = scryptSync(password, salt, 64);
   const passwordHash = `scrypt:${salt.toString("base64url")}:${derived.toString("base64url")}`;
   const timestamp = new Date().toISOString();
-  const client = new Client({ connectionString: process.env.NORTHSTAR_DATABASE_URL });
+  const client = new Client({ connectionString: process.env.VEILBIRD_DATABASE_URL });
   try {
     await client.connect();
     const result = await client.query(
@@ -66,7 +66,7 @@ process.stdin.on("end", async () => {
            approved_at = COALESCE(approved_at, $3), updated_at = $3
        WHERE lower(email) = lower($4) AND role IN ($5, $6)
        RETURNING email`,
-      [passwordHash, "active", timestamp, process.env.NORTHSTAR_RESET_EMAIL, "owner", "admin"],
+      [passwordHash, "active", timestamp, process.env.VEILBIRD_RESET_EMAIL, "owner", "admin"],
     );
     if (result.rows[0]?.email) process.stdout.write(result.rows[0].email);
   } finally {

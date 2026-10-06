@@ -1,11 +1,11 @@
 using System.Globalization;
 using System.IO;
 using System.Resources;
-namespace Northstar;
+namespace Veilbird;
 
 public static class L10n {
-    private static readonly ResourceManager Resources = new("Northstar.Resources.Native", typeof(L10n).Assembly);
-    private static readonly string PreferencePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NORTHSTAR", "language.txt");
+    private static readonly ResourceManager Resources = new("Veilbird.Resources.Native", typeof(L10n).Assembly);
+    private static readonly string PreferencePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Veilbird", "language.txt");
     private static readonly CultureInfo SystemCulture = CultureInfo.CurrentUICulture;
     public static string Preference { get; private set; } = "system";
     public static CultureInfo Culture => CultureInfo.CurrentUICulture;

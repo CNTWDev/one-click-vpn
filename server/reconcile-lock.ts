@@ -19,7 +19,7 @@ export async function withReconcileLock<T>(nodeId: string, protocol: string, wor
 async function lockAndRun<T>(key: string, work: () => Promise<T>): Promise<T> {
   if (!pool) {
     getDb();
-    pool = new Pool({ connectionString: process.env.NORTHSTAR_DATABASE_URL, max: Number(process.env.NORTHSTAR_LOCK_POOL_MAX || 10), connectionTimeoutMillis: 30000, idleTimeoutMillis: 10000 });
+    pool = new Pool({ connectionString: process.env.VEILBIRD_DATABASE_URL, max: Number(process.env.VEILBIRD_LOCK_POOL_MAX || 10), connectionTimeoutMillis: 30000, idleTimeoutMillis: 10000 });
     pool.on("error", () => console.error("Reconcile lock connection failed"));
   }
   const client = await pool.connect().catch(() => { throw new ReconcileLockBusyError("Reconcile lock pool is busy or unavailable; retry on next heartbeat"); });

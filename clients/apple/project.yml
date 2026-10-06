@@ -1,64 +1,66 @@
-name: Northstar
+name: Veilbird
 options:
-  bundleIdPrefix: com.northstar.client.dev
+  bundleIdPrefix: com.veilbird.client.dev
   deploymentTarget:
     iOS: "16.0"
     macOS: "13.0"
 packages:
   WireGuardKit:
     path: .dependencies/wireguard-apple
-  NorthstarCore:
+  VeilbirdCore:
     path: .
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    INFOPLIST_KEY_NorthstarKeychainGroup: $(AppIdentifierPrefix)com.northstar.client.dev.shared
-    INFOPLIST_KEY_NorthstarAPIOrigin: $(NORTHSTAR_API_ORIGIN)
+    INFOPLIST_KEY_VeilbirdKeychainGroup: $(AppIdentifierPrefix)com.veilbird.client.dev.shared
+    INFOPLIST_KEY_VeilbirdAPIOrigin: $(VEILBIRD_API_ORIGIN)
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     GENERATE_INFOPLIST_FILE: YES
     CODE_SIGN_STYLE: Automatic
     # Development identifiers: replace with verified identifiers before distribution.
 targets:
-  Northstar-iOS:
+  Veilbird-iOS:
     type: application
     platform: iOS
     sources: [App, Shared]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.northstar.client.dev.ios
+        PRODUCT_BUNDLE_IDENTIFIER: com.veilbird.client.dev.ios
+        PRODUCT_NAME: Veilbird
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_CFBundleDisplayName: Veilbird
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
     dependencies:
-      - package: NorthstarCore
-      - target: NorthstarTunnel-iOS
+      - package: VeilbirdCore
+      - target: VeilbirdTunnel-iOS
     entitlements:
       path: Signing/iOS.entitlements
       properties:
         com.apple.developer.networking.networkextension: [packet-tunnel-provider]
-        keychain-access-groups: [$(AppIdentifierPrefix)com.northstar.client.dev.shared]
-  Northstar-macOS:
+        keychain-access-groups: [$(AppIdentifierPrefix)com.veilbird.client.dev.shared]
+  Veilbird-macOS:
     type: application
     platform: macOS
     sources: [App, Shared]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.northstar.client.dev.macos
+        PRODUCT_BUNDLE_IDENTIFIER: com.veilbird.client.dev.macos
+        PRODUCT_NAME: Veilbird
         INFOPLIST_KEY_CFBundleDisplayName: Veilbird
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
-      - package: NorthstarCore
-      - target: NorthstarTunnel-macOS
+      - package: VeilbirdCore
+      - target: VeilbirdTunnel-macOS
     entitlements:
       path: Signing/macOS.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.developer.networking.networkextension: [packet-tunnel-provider]
-        keychain-access-groups: [$(AppIdentifierPrefix)com.northstar.client.dev.shared]
-  NorthstarTunnel-iOS:
+        keychain-access-groups: [$(AppIdentifierPrefix)com.veilbird.client.dev.shared]
+  VeilbirdTunnel-iOS:
     type: app-extension
     platform: iOS
     sources: [PacketTunnel, Shared]
@@ -70,7 +72,7 @@ targets:
         basedOnDependencyAnalysis: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.northstar.client.dev.ios.tunnel
+        PRODUCT_BUNDLE_IDENTIFIER: com.veilbird.client.dev.ios.tunnel
         TARGETED_DEVICE_FAMILY: "1,2"
         APPLICATION_EXTENSION_API_ONLY: YES
     info:
@@ -83,8 +85,8 @@ targets:
       path: Signing/iOSTunnel.entitlements
       properties:
         com.apple.developer.networking.networkextension: [packet-tunnel-provider]
-        keychain-access-groups: [$(AppIdentifierPrefix)com.northstar.client.dev.shared]
-  NorthstarTunnel-macOS:
+        keychain-access-groups: [$(AppIdentifierPrefix)com.veilbird.client.dev.shared]
+  VeilbirdTunnel-macOS:
     type: app-extension
     platform: macOS
     sources: [PacketTunnel, Shared]
@@ -96,7 +98,7 @@ targets:
         basedOnDependencyAnalysis: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.northstar.client.dev.macos.tunnel
+        PRODUCT_BUNDLE_IDENTIFIER: com.veilbird.client.dev.macos.tunnel
         APPLICATION_EXTENSION_API_ONLY: YES
     info:
       path: Signing/macOSTunnel.plist
@@ -110,13 +112,13 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.developer.networking.networkextension: [packet-tunnel-provider]
-        keychain-access-groups: [$(AppIdentifierPrefix)com.northstar.client.dev.shared]
+        keychain-access-groups: [$(AppIdentifierPrefix)com.veilbird.client.dev.shared]
 schemes:
-  Northstar-iOS:
+  Veilbird-iOS:
     build:
       targets:
-        Northstar-iOS: all
-  Northstar-macOS:
+        Veilbird-iOS: all
+  Veilbird-macOS:
     build:
       targets:
-        Northstar-macOS: all
+        Veilbird-macOS: all

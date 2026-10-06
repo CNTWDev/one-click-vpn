@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Uploads a client installer and registers it as a release draft (optionally publishing it to beta).
 //
-//   NORTHSTAR_RELEASE_API=https://api.example.com NORTHSTAR_RELEASE_TOKEN=... \
+//   VEILBIRD_RELEASE_API=https://api.example.com VEILBIRD_RELEASE_TOKEN=... \
 //   npm run release:client -- --platform android --version 1.2.0 --build 12 --min-os "Android 8.0" \
 //     --file clients/android/app/build/outputs/apk/release/app-release.apk --publish
 //
-// --file uploads through a presigned URL (needs NORTHSTAR_RELEASE_STORAGE=s3 on the Controller);
+// --file uploads through a presigned URL (needs VEILBIRD_RELEASE_STORAGE=s3 on the Controller);
 // --url registers an installer already hosted elsewhere. The Controller downloads it once to verify.
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -17,9 +17,11 @@ const { values: args } = parseArgs({ options: {
   build: { type: "string" }, "min-os": { type: "string" }, file: { type: "string" }, url: { type: "string" }, notes: { type: "string", default: "" },
   distribution: { type: "string", default: "direct" }, publish: { type: "boolean", default: false },
 } });
-const api = process.env.NORTHSTAR_RELEASE_API?.replace(/\/+$/, ""), token = process.env.NORTHSTAR_RELEASE_TOKEN;
+// Operators may still export the pre-rename NORTHSTAR_* names.
+const env = (name) => process.env[`VEILBIRD_${name}`] ?? process.env[`NORTHSTAR_${name}`];
+const api = env("RELEASE_API")?.replace(/\/+$/, ""), token = env("RELEASE_TOKEN");
 function fail(message) { console.error(message); process.exit(1); }
-if (!api || !token) fail("Set NORTHSTAR_RELEASE_API (Controller origin) and NORTHSTAR_RELEASE_TOKEN.");
+if (!api || !token) fail("Set VEILBIRD_RELEASE_API (Controller origin) and VEILBIRD_RELEASE_TOKEN.");
 if (!args.platform || !args.version || !args.build || !args["min-os"] || (!args.file && !args.url)) fail("Required: --platform --version --build --min-os and --file or --url");
 const arch = args.arch || (args.platform === "windows" ? "x64" : "universal"), build = Number(args.build);
 

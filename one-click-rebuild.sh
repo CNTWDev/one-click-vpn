@@ -24,7 +24,7 @@ usage() {
   cat <<'USAGE'
 Usage: sudo ./one-click-rebuild.sh [--yes] [--skip-backup]
 
-Stop and remove the Northstar Compose containers and service image, then
+Stop and remove the Veilbird Compose containers and service image, then
 rebuild the service from scratch and run the health check.
 
 Options:
@@ -60,7 +60,7 @@ fi
 "$APP_DIR/scripts/check-env.sh"
 
 if [ "$assume_yes" != "yes" ]; then
-  echo "This will remove the Northstar Compose containers and service image."
+  echo "This will remove the Veilbird Compose containers and service image."
   echo "It will NOT remove .env or the northstar-postgres volume."
   printf 'Type REBUILD to continue: '
   read -r confirmation
@@ -77,16 +77,16 @@ else
   echo "WARNING: database backup skipped by request." >&2
 fi
 
-old_images=$(compose images -q northstar 2>/dev/null | sort -u || true)
-echo "Stopping Northstar containers..."
+old_images=$(compose images -q veilbird 2>/dev/null | sort -u || true)
+echo "Stopping Veilbird containers..."
 compose down --remove-orphans
 
 if [ -n "$old_images" ]; then
-  echo "Removing old Northstar service image(s)..."
+  echo "Removing old Veilbird service image(s)..."
   for image in $old_images; do
     docker image rm -f "$image" >/dev/null 2>&1 || echo "Could not remove image $image; continuing." >&2
   done
 fi
 
-echo "Building a fresh image and starting Northstar..."
+echo "Building a fresh image and starting Veilbird..."
 "$APP_DIR/scripts/deploy.sh" --no-cache

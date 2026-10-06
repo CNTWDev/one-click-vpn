@@ -288,19 +288,19 @@ aside nav a > em { min-width: 20px; height: 20px; padding: 0 6px; display: grid;
 .fleet-map-stage svg { width: 100%; height: 100%; display: block; position: relative; z-index: 2; }
 .fleet-map-ocean { fill: transparent; }
 .fleet-map-base { opacity: .72; filter: drop-shadow(0 0 16px rgba(81, 125, 104, .12)); }
-.fleet-map-routes path { fill: none; stroke: url(#northstar-route-online); stroke-width: 1.35; stroke-dasharray: 7 7; vector-effect: non-scaling-stroke; opacity: .66; animation: fleet-route-flow 2.3s linear infinite; }
+.fleet-map-routes path { fill: none; stroke: url(#veilbird-route-online); stroke-width: 1.35; stroke-dasharray: 7 7; vector-effect: non-scaling-stroke; opacity: .66; animation: fleet-route-flow 2.3s linear infinite; }
 .fleet-map-routes path.provisioning { stroke: #78b8ff; opacity: .8; }
 .fleet-map-routes path.attention { stroke: #efc276; opacity: .75; }
 .fleet-map-routes path.offline { stroke: #ff8b72; opacity: .75; }
 .fleet-map-control, .fleet-map-marker { font-family: var(--font); cursor: pointer; outline: none; }
 .fleet-map-control .control-halo { fill: rgba(95, 131, 255, .12); stroke: rgba(130, 158, 255, .65); stroke-width: 1; animation: fleet-pulse 2.7s ease-out infinite; }
 .fleet-map-control .control-ring { fill: rgba(95, 131, 255, .2); stroke: #8da7ff; stroke-width: 1.3; }
-.fleet-map-control .control-core { fill: #b3c1ff; filter: url(#northstar-glow); }
+.fleet-map-control .control-core { fill: #b3c1ff; filter: url(#veilbird-glow); }
 .fleet-map-control.unset { opacity: .64; }
 .fleet-map-control text { fill: #aebeff; font-size: 12px; font-weight: 700; letter-spacing: .04em; paint-order: stroke; stroke: #09110f; stroke-width: 3px; }
 .fleet-map-marker .marker-pulse { fill: rgba(185, 239, 105, .1); stroke: rgba(185, 239, 105, .22); animation: fleet-pulse 2.2s ease-out infinite; transform-origin: center; }
 .fleet-map-marker .marker-ring { fill: rgba(185, 239, 105, .13); stroke: #b9ef69; stroke-width: 1.2; }
-.fleet-map-marker .marker-core { fill: #d9ff91; filter: url(#northstar-glow); }
+.fleet-map-marker .marker-core { fill: #d9ff91; filter: url(#veilbird-glow); }
 .fleet-map-marker.provisioning .marker-pulse, .fleet-map-marker.provisioning .marker-ring { fill: rgba(120, 184, 255, .12); stroke: #78b8ff; }
 .fleet-map-marker.provisioning .marker-core { fill: #a7d3ff; }
 .fleet-map-marker.attention .marker-pulse, .fleet-map-marker.attention .marker-ring { fill: rgba(239, 194, 118, .12); stroke: #efc276; }

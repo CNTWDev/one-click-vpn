@@ -1,4 +1,4 @@
-package com.northstar.client
+package com.veilbird.client
 
 import android.app.Application
 import android.app.LocaleManager
@@ -13,7 +13,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 
-class NorthstarApplication : Application() {
+class VeilbirdApplication : Application() {
     override fun onCreate() { super.onCreate(); L10n.initialize(this) }
 }
 object L10n {

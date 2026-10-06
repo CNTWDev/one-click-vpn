@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
-  const configuredOrigin = process.env.NORTHSTAR_PUBLIC_ORIGIN?.trim();
+  const configuredOrigin = process.env.VEILBIRD_PUBLIC_ORIGIN?.trim();
   const forwardedHost = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host");
   const forwardedProtocol = (requestHeaders.get("x-forwarded-proto") || "https").split(",")[0].trim();
   const origin = configuredOrigin || (forwardedHost ? `${forwardedProtocol}://${forwardedHost}` : "http://localhost:3000");
@@ -26,8 +26,8 @@ export async function generateMetadata(): Promise<Metadata> {
       images: ["/og.png"],
     },
     icons: {
-      icon: "/favicon.svg?v=northstar-1",
-      shortcut: "/favicon.svg?v=northstar-1",
+      icon: "/favicon.svg?v=veilbird-1",
+      shortcut: "/favicon.svg?v=veilbird-1",
     },
   };
 }

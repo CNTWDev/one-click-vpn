@@ -61,17 +61,17 @@ test("node names are readable, flagged and unique", () => {
 test("VLESS Agent validation and telemetry tests", async () => {
   await exec("python3",["tests/test_vless_agent.py"], { env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
 });
-test("generated subscription validates with real Mihomo", { skip: !process.env.NORTHSTAR_TEST_MIHOMO }, async () => {
+test("generated subscription validates with real Mihomo", { skip: !process.env.VEILBIRD_TEST_MIHOMO }, async () => {
   const dir = await mkdtemp(path.join(tmpdir(),"northstar-mihomo-config-"));
   try {
     const file = path.join(dir,"config.json");
     await writeFile(file,renderSubscription(proxies,{ mode: "global" }));
-    await exec(process.env.NORTHSTAR_TEST_MIHOMO,["-t","-d",dir,"-f",file]);
-    // Smart routing needs geodata; point NORTHSTAR_TEST_MIHOMO_GEODATA at a directory with GeoSite.dat/GeoIP.dat.
-    if (process.env.NORTHSTAR_TEST_MIHOMO_GEODATA) {
-      for (const name of ["GeoSite.dat","GeoIP.dat"]) await copyFile(path.join(process.env.NORTHSTAR_TEST_MIHOMO_GEODATA,name),path.join(dir,name));
+    await exec(process.env.VEILBIRD_TEST_MIHOMO,["-t","-d",dir,"-f",file]);
+    // Smart routing needs geodata; point VEILBIRD_TEST_MIHOMO_GEODATA at a directory with GeoSite.dat/GeoIP.dat.
+    if (process.env.VEILBIRD_TEST_MIHOMO_GEODATA) {
+      for (const name of ["GeoSite.dat","GeoIP.dat"]) await copyFile(path.join(process.env.VEILBIRD_TEST_MIHOMO_GEODATA,name),path.join(dir,name));
       await writeFile(file,renderSubscription(proxies));
-      await exec(process.env.NORTHSTAR_TEST_MIHOMO,["-t","-d",dir,"-f",file]);
+      await exec(process.env.VEILBIRD_TEST_MIHOMO,["-t","-d",dir,"-f",file]);
     }
   } finally { await rm(dir,{ recursive: true, force: true }); }
 });

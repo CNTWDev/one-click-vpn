@@ -17,7 +17,7 @@ usage() {
   cat <<'USAGE'
 Usage: sudo ./one-click-uninstall.sh [--check] [--yes] [--no-backup]
 
-Permanently removes this Northstar installation's containers, local images,
+Permanently removes this Veilbird installation's containers, local images,
 PostgreSQL/MinIO/Loki volumes, .env, environment backups, and local DB backups.
 
 The source tree, host Nginx configuration, TLS certificates, and DNS are kept.
@@ -56,17 +56,17 @@ cd "$APP_DIR"
 
 if [ "$check_only" = "yes" ]; then
   compose config --quiet
-  echo "Northstar uninstall preflight passed."
+  echo "Veilbird uninstall preflight passed."
   echo "Project: $APP_DIR"
   echo "Environment: $APP_DIR/.env"
   echo "No data was removed."
   exit 0
 fi
 
-portal_domain=$(env_value NORTHSTAR_PORTAL_DOMAIN)
-admin_domain=$(env_value NORTHSTAR_ADMIN_DOMAIN)
-api_domain=$(env_value NORTHSTAR_API_DOMAIN)
-admin_email=$(env_value NORTHSTAR_ADMIN_EMAIL)
+portal_domain=$(env_value VEILBIRD_PORTAL_DOMAIN)
+admin_domain=$(env_value VEILBIRD_ADMIN_DOMAIN)
+api_domain=$(env_value VEILBIRD_API_DOMAIN)
+admin_email=$(env_value VEILBIRD_ADMIN_EMAIL)
 app_domain=$(env_value APP_DOMAIN)
 [ -n "$portal_domain" ] || portal_domain=$app_domain
 default_base_domain=$app_domain
@@ -77,13 +77,13 @@ esac
 [ -n "$api_domain" ] || api_domain="api.$default_base_domain"
 
 echo ""
-echo "Northstar destructive uninstall"
+echo "Veilbird destructive uninstall"
 echo "Project: $APP_DIR"
 echo ""
 echo "This will permanently remove:"
-echo "  - Northstar Controller, Portal, Admin, PostgreSQL, MinIO, and Loki containers"
+echo "  - Veilbird Controller, Portal, Admin, PostgreSQL, MinIO, and Loki containers"
 echo "  - this Compose project's PostgreSQL, MinIO, and Loki volumes"
-echo "  - locally built Northstar images"
+echo "  - locally built Veilbird images"
 echo "  - $APP_DIR/.env and .env.backup*"
 echo "  - $APP_DIR/backups"
 echo ""
@@ -101,10 +101,10 @@ if [ "$assume_yes" = "no" ]; then
     *) create_backup="yes" ;;
   esac
   echo ""
-  echo "Type DELETE NORTHSTAR to confirm permanent removal."
+  echo "Type DELETE VEILBIRD to confirm permanent removal."
   printf "> "
   read -r confirmation
-  if [ "$confirmation" != "DELETE NORTHSTAR" ]; then
+  if [ "$confirmation" != "DELETE VEILBIRD" ]; then
     echo "Confirmation did not match; nothing was removed."
     exit 1
   fi
@@ -113,7 +113,7 @@ fi
 recovery_dir=""
 if [ "$create_backup" = "yes" ]; then
   timestamp=$(date -u +%Y%m%dT%H%M%SZ)
-  recovery_dir="$(dirname "$APP_DIR")/northstar-uninstall-backup-$timestamp"
+  recovery_dir="$(dirname "$APP_DIR")/veilbird-uninstall-backup-$timestamp"
   mkdir -m 700 "$recovery_dir"
   cp -p "$APP_DIR/.env" "$recovery_dir/.env"
   find "$APP_DIR" -maxdepth 1 -type f -name '.env.backup*' -exec cp -p {} "$recovery_dir/" \;
@@ -152,7 +152,7 @@ elif [ "$assume_yes" = "no" ]; then
   echo "No recovery package will be created."
 fi
 
-echo "Stopping Northstar and deleting project volumes..."
+echo "Stopping Veilbird and deleting project volumes..."
 compose down --volumes --remove-orphans --rmi local
 
 rm -f -- "$APP_DIR/.env"
@@ -167,7 +167,7 @@ case "$base_domain" in
 esac
 
 echo ""
-echo "Northstar runtime data and .env were removed successfully."
+echo "Veilbird runtime data and .env were removed successfully."
 [ -n "$recovery_dir" ] && echo "Recovery package: $recovery_dir"
 echo ""
 echo "Reinstall with:"

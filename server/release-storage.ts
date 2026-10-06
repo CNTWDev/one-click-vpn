@@ -18,20 +18,20 @@ export type ReleaseStorage =
   | { mode: "s3"; endpoint: string; bucket: string; region: string; accessKeyId: string; secretAccessKey: string; publicBaseUrl: string };
 
 export function releaseStorage(env: Record<string, string | undefined> = process.env): ReleaseStorage {
-  const mode = env.NORTHSTAR_RELEASE_STORAGE?.trim() || "local";
-  if (mode === "local" || mode === "external") return { mode: "local", dir: path.resolve(env.NORTHSTAR_RELEASE_LOCAL_DIR?.trim() || path.join(process.cwd(), "data", "client-releases")) };
-  if (mode !== "s3") throw new Error("NORTHSTAR_RELEASE_STORAGE must be local or s3");
+  const mode = env.VEILBIRD_RELEASE_STORAGE?.trim() || "local";
+  if (mode === "local" || mode === "external") return { mode: "local", dir: path.resolve(env.VEILBIRD_RELEASE_LOCAL_DIR?.trim() || path.join(process.cwd(), "data", "client-releases")) };
+  if (mode !== "s3") throw new Error("VEILBIRD_RELEASE_STORAGE must be local or s3");
   const value = (name: string) => {
     const text = env[name]?.trim();
     if (!text) throw new Error(`${name} is required for S3 release storage`);
     return text;
   };
-  const endpoint = new URL(value("NORTHSTAR_RELEASE_S3_ENDPOINT"));
-  const publicBaseUrl = new URL(value("NORTHSTAR_RELEASE_PUBLIC_BASE_URL"));
+  const endpoint = new URL(value("VEILBIRD_RELEASE_S3_ENDPOINT"));
+  const publicBaseUrl = new URL(value("VEILBIRD_RELEASE_PUBLIC_BASE_URL"));
   if (endpoint.protocol !== "https:" || publicBaseUrl.protocol !== "https:") throw new Error("Release storage URLs must use HTTPS");
   return {
-    mode, endpoint: endpoint.origin, bucket: value("NORTHSTAR_RELEASE_S3_BUCKET"), region: env.NORTHSTAR_RELEASE_S3_REGION?.trim() || "auto",
-    accessKeyId: value("NORTHSTAR_RELEASE_S3_ACCESS_KEY_ID"), secretAccessKey: value("NORTHSTAR_RELEASE_S3_SECRET_ACCESS_KEY"),
+    mode, endpoint: endpoint.origin, bucket: value("VEILBIRD_RELEASE_S3_BUCKET"), region: env.VEILBIRD_RELEASE_S3_REGION?.trim() || "auto",
+    accessKeyId: value("VEILBIRD_RELEASE_S3_ACCESS_KEY_ID"), secretAccessKey: value("VEILBIRD_RELEASE_S3_SECRET_ACCESS_KEY"),
     publicBaseUrl: publicBaseUrl.href.replace(/\/+$/, ""),
   };
 }

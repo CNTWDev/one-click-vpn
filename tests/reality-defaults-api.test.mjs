@@ -4,10 +4,10 @@ import { promisify } from "node:util";
 import pg from "pg";
 import test from "node:test";
 
-test("REALITY defaults migration/API: admin-only, invalid changes preserve state, deployment inherits without migrating old nodes", { skip: !process.env.NORTHSTAR_TEST_REALITY_DATABASE_URL }, async () => {
-  const databaseUrl = process.env.NORTHSTAR_TEST_REALITY_DATABASE_URL;
+test("REALITY defaults migration/API: admin-only, invalid changes preserve state, deployment inherits without migrating old nodes", { skip: !process.env.VEILBIRD_TEST_REALITY_DATABASE_URL }, async () => {
+  const databaseUrl = process.env.VEILBIRD_TEST_REALITY_DATABASE_URL;
   const base = "http://127.0.0.1:3198";
-  const env = { ...process.env, NODE_ENV: "production", NORTHSTAR_DATABASE_URL: databaseUrl, NORTHSTAR_MASTER_KEY: Buffer.alloc(32,7).toString("base64"), NORTHSTAR_ADMIN_EMAIL: "owner@example.com", NORTHSTAR_ADMIN_PASSWORD: "test-password-123", NORTHSTAR_PUBLIC_ORIGIN: base, NORTHSTAR_PORTAL_DOMAIN: "app.example.com", NORTHSTAR_REALITY_TARGET: "environment.example.com" };
+  const env = { ...process.env, NODE_ENV: "production", VEILBIRD_DATABASE_URL: databaseUrl, VEILBIRD_MASTER_KEY: Buffer.alloc(32,7).toString("base64"), VEILBIRD_ADMIN_EMAIL: "owner@example.com", VEILBIRD_ADMIN_PASSWORD: "test-password-123", VEILBIRD_PUBLIC_ORIGIN: base, VEILBIRD_PORTAL_DOMAIN: "app.example.com", VEILBIRD_REALITY_TARGET: "environment.example.com" };
   const exec = promisify(execFile);
   await exec(process.execPath, ["scripts/migrate.mjs"], { env });
   await exec(process.execPath, ["scripts/migrate.mjs"], { env });

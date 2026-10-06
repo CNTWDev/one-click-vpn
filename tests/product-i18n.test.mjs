@@ -38,7 +38,7 @@ test("Native resources cover all three platforms with matching parameters", asyn
       if (locale !== "zh") assert.doesNotMatch(values[locale], han, `${key}/${locale}`);
     }
   }
-  for (const dir of ["clients/android/app/src/main/java", "clients/apple/App", "clients/apple/Shared", "clients/apple/PacketTunnel", "clients/windows/Northstar"]) {
+  for (const dir of ["clients/android/app/src/main/java", "clients/apple/App", "clients/apple/Shared", "clients/apple/PacketTunnel", "clients/windows/Veilbird"]) {
     for (const name of await fs.readdir(dir, { recursive: true })) {
       if (!/\.(kt|swift|cs)$/.test(name) || /(^|\/)(obj|bin)\//.test(name)) continue;
       const file = `${dir}/${name}`, source = await fs.readFile(file, "utf8");

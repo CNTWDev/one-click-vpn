@@ -18,13 +18,13 @@ test("standard automation registers VLESS and runs during node bootstrap, not ev
   assert.doesNotMatch(heartbeat, /ensureStandardVpnServices/);
 });
 
-test("automatic deployment is idempotent, preserves custom templates and keys, recovers after target setup, and supports old-node rollout", { skip: !process.env.NORTHSTAR_TEST_AUTOMATION_DATABASE_URL }, async () => {
-  const databaseUrl = process.env.NORTHSTAR_TEST_AUTOMATION_DATABASE_URL;
-  process.env.NORTHSTAR_DATABASE_URL = databaseUrl;
-  process.env.NORTHSTAR_MASTER_KEY = Buffer.alloc(32,7).toString("base64");
-  process.env.NORTHSTAR_ADMIN_EMAIL = "automation@example.com";
-  process.env.NORTHSTAR_ADMIN_PASSWORD = "automation-test-password";
-  delete process.env.NORTHSTAR_REALITY_TARGET;
+test("automatic deployment is idempotent, preserves custom templates and keys, recovers after target setup, and supports old-node rollout", { skip: !process.env.VEILBIRD_TEST_AUTOMATION_DATABASE_URL }, async () => {
+  const databaseUrl = process.env.VEILBIRD_TEST_AUTOMATION_DATABASE_URL;
+  process.env.VEILBIRD_DATABASE_URL = databaseUrl;
+  process.env.VEILBIRD_MASTER_KEY = Buffer.alloc(32,7).toString("base64");
+  process.env.VEILBIRD_ADMIN_EMAIL = "automation@example.com";
+  process.env.VEILBIRD_ADMIN_PASSWORD = "automation-test-password";
+  delete process.env.VEILBIRD_REALITY_TARGET;
   const root = process.cwd();
   const directory = await mkdtemp(path.join(tmpdir(),"northstar-automation-"));
   const pool = new pg.Pool({ connectionString: databaseUrl });

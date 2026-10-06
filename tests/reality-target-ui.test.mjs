@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-test("REALITY setup UI: automatic default, custom target flow, per-node override and mobile layout", { skip: !process.env.NORTHSTAR_TEST_PLAYWRIGHT }, async () => {
-  const { chromium } = await import(process.env.NORTHSTAR_TEST_PLAYWRIGHT);
+test("REALITY setup UI: automatic default, custom target flow, per-node override and mobile layout", { skip: !process.env.VEILBIRD_TEST_PLAYWRIGHT }, async () => {
+  const { chromium } = await import(process.env.VEILBIRD_TEST_PLAYWRIGHT);
   const port = 3391;
   const child = spawn(process.execPath, ["frontend-server.mjs"], { env: { ...process.env, STATIC_DIR: path.resolve("dist/admin-web"), PORT: String(port) }, stdio: "ignore" });
   let browser;
@@ -15,7 +15,7 @@ test("REALITY setup UI: automatic default, custom target flow, per-node override
       if (await fetch(`http://127.0.0.1:${port}/health`).then((r) => r.ok).catch(() => false)) break;
       await new Promise((resolve) => setTimeout(resolve,100));
     }
-    browser = await chromium.launch({ headless: true, ...(process.env.NORTHSTAR_TEST_BROWSER ? { executablePath: process.env.NORTHSTAR_TEST_BROWSER } : {}) });
+    browser = await chromium.launch({ headless: true, ...(process.env.VEILBIRD_TEST_BROWSER ? { executablePath: process.env.VEILBIRD_TEST_BROWSER } : {}) });
     const page = await browser.newPage({ locale: "zh-CN", viewport: { width: 1440, height: 1000 } });
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
