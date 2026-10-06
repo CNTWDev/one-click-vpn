@@ -507,6 +507,29 @@
         }
       }
     },
+    "client_update_required": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This version is no longer supported. Download the latest NORTHSTAR to sign in or connect."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前版本过旧，请下载最新版 NORTHSTAR 后再登录或连接。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Эта версия больше не поддерживается. Скачайте последнюю версию NORTHSTAR, чтобы войти или подключиться."
+          }
+        }
+      }
+    },
     "confirming_connection_status": {
       "extractionState": "manual",
       "localizations": {

@@ -25,6 +25,7 @@
   <data name="choose_location_then_connect_hint" xml:space="preserve"><value>Choose a location, then connect from the home screen.</value></data>
   <data name="client_access_is_not_enabled_on_the_server" xml:space="preserve"><value>Client access is not enabled on the server.</value></data>
   <data name="client_access_is_not_enabled_on_the_server_contact" xml:space="preserve"><value>Client access is not enabled on the server. Contact your administrator.</value></data>
+  <data name="client_update_required" xml:space="preserve"><value>This version is no longer supported. Download the latest NORTHSTAR to sign in or connect.</value></data>
   <data name="confirming_connection_status" xml:space="preserve"><value>Confirming connection…</value></data>
   <data name="connect_action" xml:space="preserve"><value>Connect</value></data>
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>Connect automatically or choose your own location.</value></data>

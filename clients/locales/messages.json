@@ -613,5 +613,10 @@
     "en": "NORTHSTAR — Development",
     "zh": "NORTHSTAR — 开发版",
     "ru": "NORTHSTAR — Версия для разработки"
+  },
+  "client_update_required": {
+    "zh": "当前版本过旧，请下载最新版 NORTHSTAR 后再登录或连接。",
+    "en": "This version is no longer supported. Download the latest NORTHSTAR to sign in or connect.",
+    "ru": "Эта версия больше не поддерживается. Скачайте последнюю версию NORTHSTAR, чтобы войти или подключиться."
   }
 }

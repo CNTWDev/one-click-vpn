@@ -379,6 +379,27 @@ WHERE p.credential_id = c.id AND u.id = c.user_id AND d.id = c.device_id
   AND NOT c.user_disabled AND NOT c.admin_disabled AND c.deleted_at IS NULL
   AND c.expires_at::timestamptz > p.expires_at::timestamptz
   AND EXTRACT(EPOCH FROM (p.expires_at::timestamptz - p.issued_at::timestamptz)) BETWEEN 86399 AND 86401;
+
+-- Native client releases: one immutable artifact per platform/architecture/build; the channel is promoted in place.
+CREATE TABLE IF NOT EXISTS client_releases (
+  id TEXT PRIMARY KEY, platform TEXT NOT NULL CHECK (platform IN ('android','ios','macos','windows')),
+  arch TEXT NOT NULL CHECK (arch IN ('arm64','x64','universal')), channel TEXT NOT NULL CHECK (channel IN ('stable','beta')),
+  version TEXT NOT NULL, build INTEGER NOT NULL CHECK (build > 0),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','withdrawn')),
+  distribution TEXT NOT NULL CHECK (distribution IN ('direct','app-store','testflight')),
+  url TEXT NOT NULL, sha256 TEXT, size_bytes BIGINT, min_os TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '', storage_key TEXT,
+  verified_at TIMESTAMPTZ, published_at TIMESTAMPTZ, created_by TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), UNIQUE(platform, arch, build)
+);
+CREATE INDEX IF NOT EXISTS client_releases_public ON client_releases(platform, status, build DESC);
+CREATE TABLE IF NOT EXISTS client_policies (
+  platform TEXT PRIMARY KEY CHECK (platform IN ('android','ios','macos','windows')),
+  min_build INTEGER NOT NULL DEFAULT 0 CHECK (min_build >= 0), updated_by TEXT, updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE native_sessions ADD COLUMN IF NOT EXISTS client_version TEXT;
+ALTER TABLE native_sessions ADD COLUMN IF NOT EXISTS client_build INTEGER;
+ALTER TABLE native_enrollments ADD COLUMN IF NOT EXISTS client_version TEXT;
+ALTER TABLE native_enrollments ADD COLUMN IF NOT EXISTS client_build INTEGER;
 `;
 
 try {

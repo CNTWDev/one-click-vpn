@@ -58,6 +58,8 @@ class NativeApi(context: Context) {
         val connection = URI("${origin}/api/v2/native/$path").toURL().openConnection() as HttpsURLConnection
         connection.connectTimeout = 10000; connection.readTimeout = 10000; connection.instanceFollowRedirects = false
         connection.setRequestProperty("Accept", "application/json")
+        // Lets the server require an upgrade (CLIENT_UPDATE_REQUIRED) and track version adoption.
+        connection.setRequestProperty("X-Northstar-Client", "android/${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}")
         if (path != "login") secret("token")?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
         try {
             if (body != null) {
@@ -114,5 +116,6 @@ fun friendlyResource(error: Throwable): Int = when ((error as? ApiFailure)?.code
     "CLIENT_ACCESS_NOT_ENABLED" -> R.string.client_access_is_not_enabled_on_the_server_contact
     "SERVER_REQUIRED" -> R.string.enter_an_https_server_address_first
     "RATE_LIMITED" -> R.string.too_many_attempts_try_again_later
+    "CLIENT_UPDATE_REQUIRED" -> R.string.client_update_required
     else -> R.string.unable_to_reach_the_service_check_your_network_and
 }

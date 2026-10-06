@@ -21,14 +21,16 @@ const NodesPage = lazy(() => import("./pages/nodes").then((module) => ({ default
 const ServicesPage = lazy(() => import("./pages/services").then((module) => ({ default: module.ServicesPage })));
 const RegionsPage = lazy(() => import("./pages/regions").then((module) => ({ default: module.RegionsPage })));
 const ControllerPage = lazy(() => import("./pages/controller").then((module) => ({ default: module.ControllerPage })));
+const ReleasesPage = lazy(() => import("./pages/releases").then((module) => ({ default: module.ReleasesPage })));
 const LogsPage = lazy(() => import("./pages/logs").then((module) => ({ default: module.LogsPage })));
 
-type PageId = "overview" | "topology" | "users" | "subscriptions" | "nodes" | "services" | "regions" | "controller" | "logs";
+type PageId = "overview" | "topology" | "users" | "subscriptions" | "nodes" | "services" | "regions" | "controller" | "logs" | "releases";
 type NavItem = { id: PageId; icon: IconName; label: string };
 const navigation: Array<{ group: string; items: NavItem[] }> = [
   { group: "监控", items: [{ id: "overview", icon: "overview", label: "运维总览" }, { id: "topology", icon: "topology", label: "全球拓扑" }, { id: "logs", icon: "logs", label: "运行日志" }] },
   { group: "基础设施", items: [{ id: "nodes", icon: "nodes", label: "节点运维" }, { id: "services", icon: "services", label: "VPN 服务" }, { id: "regions", icon: "regions", label: "区域管理" }, { id: "controller", icon: "controller", label: "Controller" }] },
   { group: "用户", items: [{ id: "users", icon: "users", label: "账号管理" }, { id: "subscriptions", icon: "subscriptions", label: "订阅管理" }] },
+  { group: "客户端", items: [{ id: "releases", icon: "download", label: "客户端发布" }] },
 ];
 const pages = navigation.flatMap((section) => section.items.map((item) => ({ ...item, group: section.group })));
 applyTheme();
@@ -145,6 +147,7 @@ function App() {
           {page === "regions" && <RegionsPage regions={regions} nodes={nodes} onRefresh={refreshCore} />}
           {page === "controller" && <ControllerPage onSettingsChange={setControllerSettings} />}
           {page === "logs" && <LogsPage nodes={nodes} />}
+          {page === "releases" && <ReleasesPage />}
         </Suspense>
       </div>
     </section>

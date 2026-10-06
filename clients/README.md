@@ -34,15 +34,32 @@ Portal、Console 和三类原生客户端支持中文、英文、俄语，默认
 
 ## 用户下载与正式发布
 
-门户已接入 `GET /api/v1/client-releases`。服务端读取运维配置的 `NORTHSTAR_CLIENT_RELEASES_JSON`（默认 `[]`）；只展示验证通过、指定为 `published` 的 stable 版本。按平台和 CPU 架构取最大 build 号。
+发布记录保存在数据库 `client_releases`，在控制台「客户端 → 客户端发布」管理。门户下载、固定下载链接和客户端更新检查都读取这里；旧的 `NORTHSTAR_CLIENT_RELEASES_JSON` 仍作为只读清单合并展示。
 
-正式包先完成全部平台协议集成、安全检查、平台签名和真机验证，再由发布人员配置清单；**清单校验不能代替二进制签名验证**。文件保存在独立 HTTPS 下载站/CDN 或正式分发平台，不放入 Git，不让 Controller 接收匿名安装包上传。当前不提供自动安装更新。
+流程：
+
+1. 构建并签名安装包（开发包不要登记为 stable）。
+2. 上传并登记草稿：`NORTHSTAR_RELEASE_API=https://api.example.com NORTHSTAR_RELEASE_TOKEN=… npm run release:client -- --platform android --version 1.2.0 --build 12 --min-os "Android 8.0" --file app-release.apk --publish`。`--file` 通过预签名 URL 直传对象存储（需要 `NORTHSTAR_RELEASE_STORAGE=s3`）；也可以用 `--url` 登记已经托管在别处的 HTTPS 地址，或在控制台手动登记。
+3. Controller 下载一次安装包，记录**实际**的 SHA-256 和大小，不采信上传方提供的值。构建号对同一平台/架构不可重复。
+4. 发布令牌只能上传、登记草稿和发布到测试版（beta）；晋升正式版、撤回和设置最低版本只能在控制台操作。
+
+| 接口 | 用途 |
+| --- | --- |
+| `/download/{platform}[/{arch}]` | 固定下载链接，302 到最新已发布的正式版（`?channel=beta` 取测试版）；门户和 API 域名都可用 |
+| `GET /api/v1/client-releases/latest?platform=&arch=&build=&channel=` | 客户端更新检查：`latest`、`updateAvailable`、`mandatory`、`minBuild` |
+| `GET /api/v1/client-releases` | 门户下载列表 |
+| `POST /api/v1/admin/client-releases`、`…/uploads`、`…/{id}` | 登记草稿、申请上传 URL、publish / promote / withdraw / delete |
+| `PUT /api/v1/admin/client-policy` | 设置平台最低构建号 |
+
+**版本上报与强制升级**：三端每个请求都带 `X-Northstar-Client: <platform>/<version>+<build>`。设置最低构建号后，低于该构建号（或不带此请求头）的客户端在登录和连接时收到 `426 CLIENT_UPDATE_REQUIRED`（附带 `minBuild` 和 `downloadPath`）。最低构建号必须有已发布的正式版满足，撤回版本时也会检查，避免用户无版本可升。默认不限制。
+
+清单校验不能代替二进制签名验证。iPhone / iPad 只登记 App Store / TestFlight 链接。客户端内的自动下载安装（Android PackageInstaller、macOS Sparkle、Windows App Installer）尚未实现。
 
 ## 服务端试点与上线门槛
 
 1. 备份后运行 `npm run db:migrate`，增加 native 会话、签名挑战、授权设备与租约表。现有账号默认保留兼容模式。
 2. 测试环境设置 `NORTHSTAR_NATIVE_ACCESS_ENABLED=1`、`NORTHSTAR_NATIVE_DEVICE_LIMIT=3`。正式环境默认关闭。
-3. 升级测试节点 Agent 至 2.9.0，确认 `northstar-native-expiry.timer` 正常，心跳报告 `nativeLeaseEnforcement:1`；旧 Agent 不参与原生节点选择。保持服务器时间同步。
+3. 升级测试节点 Agent 至 2.10.0，确认 `northstar-native-expiry.timer` 正常，心跳报告 `nativeLeaseEnforcement:1`；旧 Agent 不参与原生节点选择。保持服务器时间同步。
 4. 后台账号「访问详情 → 客户端授权设备与会员额度」为**未曾导出连接配置的新测试账号**启用 NORTHSTAR 模式，可设置设备上限和有效期。旧账号切换明确拒绝，尚未实现安全迁移流程。
 5. 真机测试首次系统权限、实际出口 IP、IPv4/IPv6/DNS 防泄漏、锁屏后台续租、网络切换、断网恢复、撤销/停用/到期、Agent 停止与重启、跨端并发额度及安装升级卸载。普通终端重装会被视为新身份；当前实现不提供抗 root/管理员复制私钥的硬件证明。
 
