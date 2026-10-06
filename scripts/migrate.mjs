@@ -27,6 +27,28 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'
 ALTER TABLE users ADD COLUMN IF NOT EXISTS approved_at TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS approved_by TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS native_only BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS native_device_limit INTEGER CHECK (native_device_limit BETWEEN 1 AND 100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS membership_expires_at TEXT;
+CREATE TABLE IF NOT EXISTS native_sessions (
+  id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, user_id TEXT NOT NULL REFERENCES users(id),
+  identity_jwk TEXT NOT NULL, identity_thumbprint TEXT NOT NULL, device_name TEXT NOT NULL,
+  platform TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS native_sessions_expiry ON native_sessions(expires_at);
+CREATE TABLE IF NOT EXISTS native_challenges (
+  id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES native_sessions(id) ON DELETE CASCADE,
+  action TEXT NOT NULL, request_hash TEXT NOT NULL, payload TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL, consumed BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS native_challenges_expiry ON native_challenges(expires_at);
+CREATE TABLE IF NOT EXISTS native_enrollments (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), identity_thumbprint TEXT NOT NULL,
+  device_name TEXT NOT NULL, platform TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active','revoking','revoked')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  release_after TIMESTAMPTZ, UNIQUE(user_id,identity_thumbprint)
+);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TEXT;
 UPDATE users SET updated_at = COALESCE(updated_at, created_at);
 UPDATE users SET status = 'active' WHERE role IN ('owner', 'admin') AND status = 'pending';
@@ -200,6 +222,13 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_fetched_at TEXT
 );
 ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS token_secret_id TEXT REFERENCES secret_materials(id);
+CREATE TABLE IF NOT EXISTS native_leases (
+  id TEXT PRIMARY KEY, enrollment_id TEXT NOT NULL REFERENCES native_enrollments(id) ON DELETE CASCADE,
+  node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  public_key TEXT NOT NULL, address TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL,
+  UNIQUE(enrollment_id,node_id), UNIQUE(node_id,public_key)
+);
+ALTER TABLE native_leases ADD COLUMN IF NOT EXISTS required_revision INTEGER;
 CREATE TABLE IF NOT EXISTS ip_leases (
   id TEXT PRIMARY KEY, node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   protocol TEXT NOT NULL, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
@@ -317,7 +346,7 @@ INNER JOIN (
   SELECT DISTINCT device_id, protocol FROM connection_profiles
   UNION
   SELECT id AS device_id, CASE WHEN public_key LIKE 'openvpn-managed%' THEN 'openvpn' ELSE 'wireguard' END AS protocol
-  FROM devices WHERE NOT EXISTS (SELECT 1 FROM connection_profiles p WHERE p.device_id = devices.id)
+  FROM devices WHERE app_version <> 'native-1' AND NOT EXISTS (SELECT 1 FROM connection_profiles p WHERE p.device_id = devices.id)
 ) protocols ON protocols.device_id = d.id
 LEFT JOIN LATERAL (
   SELECT subject, not_after, revoked_at FROM certificate_issuances c
@@ -355,6 +384,16 @@ WHERE p.credential_id = c.id AND u.id = c.user_id AND d.id = c.device_id
 try {
   await pool.query("SELECT 1");
   await pool.query(schema);
+  await pool.query(`CREATE OR REPLACE FUNCTION reject_native_legacy_profile() RETURNS trigger AS $$
+    DECLARE managed BOOLEAN;
+    BEGIN
+      SELECT u.native_only INTO managed FROM users u JOIN devices d ON d.user_id=u.id WHERE d.id=NEW.device_id FOR UPDATE OF u;
+      IF managed THEN RAISE EXCEPTION 'Please connect using the NORTHSTAR app'; END IF;
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+    DROP TRIGGER IF EXISTS native_legacy_profile_guard ON connection_profiles;
+    CREATE TRIGGER native_legacy_profile_guard BEFORE INSERT ON connection_profiles FOR EACH ROW EXECUTE FUNCTION reject_native_legacy_profile();`);
   await pool.query("ALTER TABLE secret_materials ADD COLUMN IF NOT EXISTS source_fingerprint TEXT");
   await pool.query("UPDATE vpn_services SET subnet='10.70.0.0/20' WHERE protocol='wireguard' AND subnet='10.70.0.0/24'");
   const timestamp = new Date().toISOString();

@@ -33,7 +33,7 @@ function dayOf(value: string): string {
   return Number.isNaN(parsed.getTime()) ? now().slice(0, 10) : parsed.toISOString().slice(0, 10);
 }
 
-type Owner = { device_id: string; credential_id: string; user_id: string };
+type Owner = { device_id: string; credential_id: string | null; user_id: string };
 type PreviousCounter = { counter_epoch: string; observed_rx_bytes: string; observed_tx_bytes: string; observed_at: string; last_traffic_at: string | null };
 
 const MAX_SNAPSHOTS = 10000;
@@ -67,6 +67,9 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
        ORDER BY c.identity_key, c.created_at DESC`, [wireguardKeys],
     );
     for (const row of rows) wireguardOwners.set(row.identity_key, row);
+    const native = await dbQuery<Owner & {identity_key:string}>(`SELECT l.public_key AS identity_key,l.device_id,NULL AS credential_id,e.user_id
+      FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id WHERE l.node_id=$1 AND l.public_key=ANY($2::text[])`,[nodeId,wireguardKeys]);
+    for (const row of native) wireguardOwners.set(row.identity_key,row);
   }
   const openvpnOwners = new Map<string, Owner>();
   if (openvpnSubjects.length) {
@@ -113,7 +116,7 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
       // Guard against duplicate snapshots for the same key within one heartbeat.
       previousByKey.set(key, { counter_epoch: epoch, observed_rx_bytes: String(rxBytes), observed_tx_bytes: String(txBytes), observed_at: observedAt, last_traffic_at: lastTrafficAt });
       if (owner && (connected || hasTraffic)) {
-        seenCredentials.add(owner.credential_id);
+        if (owner.credential_id) seenCredentials.add(owner.credential_id);
         seenDevices.add(owner.device_id);
       }
       if (!owner || !hasTraffic) continue;

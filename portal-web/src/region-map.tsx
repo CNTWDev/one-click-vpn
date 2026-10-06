@@ -1,3 +1,4 @@
+import { useI18n } from "../../shared/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { countryMapPoints } from "./country-map-points";
 
@@ -74,6 +75,7 @@ export function RegionMap({ regions, selectedRegionId, onSelect }: {
   selectedRegionId: string;
   onSelect: (regionId: string) => void;
 }) {
+  const { t } = useI18n();
   const [location, setLocation] = useState<LocationState>({ status: "unset" });
   const points = useMemo(() => {
     const next: Record<string, MapPoint> = {};
@@ -114,13 +116,13 @@ export function RegionMap({ regions, selectedRegionId, onSelect }: {
 
   return <section className="region-map-panel">
     <div className="region-map-head">
-      <div><p className="kicker">GLOBAL NETWORK</p><h2>全球可用网络</h2><p>点击地图选择区域，生成配置时会自动使用该区域。</p></div>
-      <div className="region-map-summary"><span><b>{availableRegions.length}</b>可用区域</span><span><b>{protocolCount}</b>可用协议</span>{selected && <span className="selected-region"><b>{selected.code}</b>{selected.name}</span>}</div>
+      <div><p className="kicker">{t("GLOBAL NETWORK")}</p><h2>{t("全球可用网络")}</h2><p>{t("点击地图选择区域，生成配置时会自动使用该区域。")}</p></div>
+      <div className="region-map-summary"><span><b>{availableRegions.length}</b>{t("可用区域")}</span><span><b>{protocolCount}</b>{t("可用协议")}</span>{selected && <span className="selected-region"><b>{selected.code}</b>{selected.name}</span>}</div>
     </div>
     <div className="region-map-stage">
       <div className="region-map-scan" />
-      <div className="region-map-location-control"><button type="button" className={`region-locate-button ${hasLocation ? "located" : ""}`} disabled={location.status === "locating"} onClick={locateUser}><span>◎</span>{location.status === "locating" ? "定位中…" : hasLocation ? "重新定位" : "定位我的位置"}</button>{location.message && <small className={`region-location-status ${location.status}`} role="status">{location.message}{hasLocation ? ` · ${location.latitude!.toFixed(2)}, ${location.longitude!.toFixed(2)}` : ""}</small>}</div>
-      <svg viewBox="0 0 1010 666" role="img" aria-label="Northstar 当前可用 VPN 区域地图">
+      <div className="region-map-location-control"><button type="button" className={`region-locate-button ${hasLocation ? "located" : ""}`} disabled={location.status === "locating"} onClick={locateUser}><span>◎</span>{location.status === "locating" ? t("定位中…") : hasLocation ? t("重新定位") : t("定位我的位置")}</button>{location.message && <small className={`region-location-status ${location.status}`} role="status">{t(location.message)}{hasLocation ? ` · ${location.latitude!.toFixed(2)}, ${location.longitude!.toFixed(2)}` : ""}</small>}</div>
+      <svg viewBox="0 0 1010 666" role="img" aria-label={t("Northstar 当前可用 VPN 区域地图")}>
         <defs>
           <linearGradient id="portal-route" x1="0" x2="1"><stop offset="0" stopColor="#6f90ff" /><stop offset="1" stopColor="#b7df5d" /></linearGradient>
           <filter id="portal-glow" x="-200%" y="-200%" width="400%" height="400%"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
@@ -138,7 +140,7 @@ export function RegionMap({ regions, selectedRegionId, onSelect }: {
           const available = region.status === "available";
           const selectedMarker = region.id === selectedRegionId;
           const labelOnLeft = point.x > 790;
-          const details = region.protocols.map(protocolLabel).join(" / ") || "当前无健康协议";
+          const details = region.protocols.map(protocolLabel).join(" / ") || t("当前无健康协议");
           return <g
             key={region.id}
             className={`region-map-marker ${available ? "available" : "unavailable"} ${selectedMarker ? "selected" : ""}`}
@@ -146,25 +148,25 @@ export function RegionMap({ regions, selectedRegionId, onSelect }: {
             role="button"
             tabIndex={0}
             aria-pressed={selectedMarker}
-            aria-label={`${region.name}，${available ? "可用" : "暂不可用"}，${details}`}
+            aria-label={`${region.name}，${available ? t("可用") : t("暂不可用")}，${details}`}
             onClick={() => available && onSelect(region.id)}
             onKeyDown={(event) => { if (available && (event.key === "Enter" || event.key === " ")) onSelect(region.id); }}
           >
-            <title>{`${region.name} · ${region.country}\n${details}\n${region.healthyNodeCount || 0} 个健康节点`}</title>
+            <title>{t("{0} · {1}\n{2}\n{3} 个健康节点", [region.name, region.country, details, region.healthyNodeCount || 0])}</title>
             <circle className="marker-pulse" r="13" /><circle className="marker-ring" r="8" /><circle className="marker-core" r="3.2" />
             <text className="marker-label" x={labelOnLeft ? -13 : 13} y="4" textAnchor={labelOnLeft ? "end" : "start"}>{region.name}</text>
           </g>;
         })}</g>
         <g className={`region-map-origin ${hasLocation ? "located" : "logical"}`} transform={`translate(${origin.x} ${origin.y})`}>
-          <title>{hasLocation ? `浏览器定位\n${location.latitude}, ${location.longitude}` : "逻辑入口，不代表你的真实地理位置"}</title>
+          <title>{hasLocation ? t("浏览器定位\n{0}, {1}", [location.latitude, location.longitude]) : t("逻辑入口，不代表你的真实地理位置")}</title>
           <circle className="origin-halo" r="14" /><circle className="origin-ring" r="7" /><path className="origin-core" d="M0 -4.8 L4.8 0 L0 4.8 L-4.8 0 Z" />
-          <text x={origin.x > 790 ? -14 : 14} y="4" textAnchor={origin.x > 790 ? "end" : "start"}>{hasLocation ? "YOUR LOCATION" : "LOGICAL ENTRY"}</text>
+          <text x={origin.x > 790 ? -14 : 14} y="4" textAnchor={origin.x > 790 ? "end" : "start"}>{hasLocation ? t("YOUR LOCATION") : t("LOGICAL ENTRY")}</text>
         </g>
       </svg>
-      {!visibleRegions.length && <div className="region-map-empty">管理员部署并启用节点后，可用区域会显示在这里。</div>}
-      <div className="region-map-caption"><span>{hasLocation ? "浏览器位置 → 可用区域" : "逻辑入口 → 可用区域（未定位）"}</span><small>不代表实际公网路由或节点间直连</small></div>
+      {!visibleRegions.length && <div className="region-map-empty">{t("管理员部署并启用节点后，可用区域会显示在这里。")}</div>}
+      <div className="region-map-caption"><span>{hasLocation ? t("浏览器位置 → 可用区域") : t("逻辑入口 → 可用区域（未定位）")}</span><small>{t("不代表实际公网路由或节点间直连")}</small></div>
       <div className="region-map-attribution">Map data · @svg-maps/world · CC BY 4.0</div>
     </div>
-    <div className="region-map-footer"><div><span><i className="available" />可用</span><span><i className="selected" />已选择</span><span><i className="unavailable" />暂不可用</span></div><small>定位坐标仅在当前浏览器中用于绘图，不会上传 Controller。</small></div>
+    <div className="region-map-footer"><div><span><i className="available" />{t("可用")}</span><span><i className="selected" />{t("已选择")}</span><span><i className="unavailable" />{t("暂不可用")}</span></div><small>{t("定位坐标仅在当前浏览器中用于绘图，不会上传 Controller。")}</small></div>
   </section>;
 }

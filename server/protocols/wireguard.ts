@@ -58,6 +58,7 @@ export const wireguardAdapter: ProtocolAdapter = {
       serverPublicKey: input.serverPublicKey || null,
       peers: input.peers.map((peer) => ({
         publicKey: peer.publicKey,
+        ...(peer.expiresAt ? { expiresAt: peer.expiresAt } : {}),
         allowedIps: peer.allowedIps,
         persistentKeepaliveSeconds: peer.persistentKeepaliveSeconds || 25,
       })),

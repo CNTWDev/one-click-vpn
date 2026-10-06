@@ -11,11 +11,14 @@ export async function assertCredentialUsable(id: string) {
     throw new Error("Credential is disabled, expired or revoked");
   }
   if ((await findUserById(credential.user_id))?.status !== "active") throw new Error("Account is not active");
+  if ((await dbQuery<{native_only:boolean}>("SELECT native_only FROM users WHERE id=$1", [credential.user_id]))[0]?.native_only) throw new Error("Please connect using the NORTHSTAR app");
   return credential;
 }
 
 // OpenVPN credentials are valid across the fleet. WireGuard peers are node-specific.
 export async function reconcileUserAccess(userId: string) {
+  const nativeNodes = await dbQuery<{node_id:string}>("SELECT DISTINCT l.node_id FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id WHERE e.user_id=$1", [userId]);
+  for (const row of nativeNodes) await rebuildDesiredState(row.node_id, "wireguard").catch(() => undefined);
   const profiles = await listConnectionProfiles({ userId });
   const services = (await listVpnServices()).filter((service) => service.enabled);
   const affected = services.filter((service) => (service.protocol === "openvpn" && profiles.some((profile) => profile.protocol === "openvpn"))

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NativeAccessPanel } from "./native-access";
 import { api } from "../api";
 import { useConfirm } from "../confirm-dialog";
 import type { AccountAccessOverview, AccountCertificateAccess, AdminUser } from "../types";
@@ -118,6 +119,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
       </tr>)}</tbody></table></div>
     </section>
     {credentialOwner && <Modal title={`${credentialOwner.displayName} 的访问资产`} description={`${credentialOwner.email} · 公开证书可查看和下载，私钥不会返回管理端。`} onClose={() => { setCredentialOwner(null); setAccessOverview(null); }} wide>
+      <details><summary>客户端授权设备与会员额度</summary><NativeAccessPanel userId={credentialOwner.id}/></details>
       <div className="account-access-toolbar">
         <div className="access-toolbar-main">
           <label>流量统计周期<select value={rangeDays} onChange={(event) => { const days = Number(event.target.value); setRangeDays(days); void loadAccess(credentialOwner, days); }}><option value={7}>最近 7 天</option><option value={30}>最近 30 天</option><option value={90}>最近 90 天</option></select></label>

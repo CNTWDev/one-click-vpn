@@ -31,6 +31,7 @@ export type ProfileBuildInput = {
 };
 
 export type PeerState = {
+  expiresAt?: number;
   publicKey: string;
   allowedIps: string[];
   persistentKeepaliveSeconds?: number;

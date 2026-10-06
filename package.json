@@ -18,7 +18,9 @@
     "test": "npm run build && node --experimental-strip-types --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:migrate": "node scripts/migrate.mjs",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "clients:doctor": "node scripts/clients.mjs doctor",
+    "clients:build": "node scripts/clients.mjs build"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",

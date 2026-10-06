@@ -1,0 +1,120 @@
+name: Northstar
+options:
+  bundleIdPrefix: com.northstar.client.dev
+  deploymentTarget:
+    iOS: "16.0"
+    macOS: "13.0"
+packages:
+  WireGuardKit:
+    path: .dependencies/wireguard-apple
+  NorthstarCore:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    INFOPLIST_KEY_NorthstarKeychainGroup: $(AppIdentifierPrefix)com.northstar.client.dev.shared
+    INFOPLIST_KEY_NorthstarAPIOrigin: $(NORTHSTAR_API_ORIGIN)
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: YES
+    CODE_SIGN_STYLE: Automatic
+    # Development identifiers: replace with verified identifiers before distribution.
+targets:
+  Northstar-iOS:
+    type: application
+    platform: iOS
+    sources: [App, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.northstar.client.dev.ios
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_CFBundleDisplayName: NORTHSTAR
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    dependencies:
+      - package: NorthstarCore
+      - target: NorthstarTunnel-iOS
+    entitlements:
+      path: Signing/iOS.entitlements
+      properties:
+        com.apple.developer.networking.networkextension: [packet-tunnel-provider]
+        keychain-access-groups: [$(AppIdentifierPrefix)com.northstar.client.dev.shared]
+  Northstar-macOS:
+    type: application
+    platform: macOS
+    sources: [App, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.northstar.client.dev.macos
+        INFOPLIST_KEY_CFBundleDisplayName: NORTHSTAR
+    dependencies:
+      - package: NorthstarCore
+      - target: NorthstarTunnel-macOS
+    entitlements:
+      path: Signing/macOS.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.developer.networking.networkextension: [packet-tunnel-provider]
+        keychain-access-groups: [$(AppIdentifierPrefix)com.northstar.client.dev.shared]
+  NorthstarTunnel-iOS:
+    type: app-extension
+    platform: iOS
+    sources: [PacketTunnel, Shared]
+    dependencies:
+      - package: WireGuardKit
+    preBuildScripts:
+      - name: WireGuard Go bridge
+        script: bash "$SRCROOT/scripts/build-bridge.sh"
+        basedOnDependencyAnalysis: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.northstar.client.dev.ios.tunnel
+        TARGETED_DEVICE_FAMILY: "1,2"
+        APPLICATION_EXTENSION_API_ONLY: YES
+    info:
+      path: Signing/iOSTunnel.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
+    entitlements:
+      path: Signing/iOSTunnel.entitlements
+      properties:
+        com.apple.developer.networking.networkextension: [packet-tunnel-provider]
+        keychain-access-groups: [$(AppIdentifierPrefix)com.northstar.client.dev.shared]
+  NorthstarTunnel-macOS:
+    type: app-extension
+    platform: macOS
+    sources: [PacketTunnel, Shared]
+    dependencies:
+      - package: WireGuardKit
+    preBuildScripts:
+      - name: WireGuard Go bridge
+        script: bash "$SRCROOT/scripts/build-bridge.sh"
+        basedOnDependencyAnalysis: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.northstar.client.dev.macos.tunnel
+        APPLICATION_EXTENSION_API_ONLY: YES
+    info:
+      path: Signing/macOSTunnel.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
+    entitlements:
+      path: Signing/macOSTunnel.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.developer.networking.networkextension: [packet-tunnel-provider]
+        keychain-access-groups: [$(AppIdentifierPrefix)com.northstar.client.dev.shared]
+schemes:
+  Northstar-iOS:
+    build:
+      targets:
+        Northstar-iOS: all
+  Northstar-macOS:
+    build:
+      targets:
+        Northstar-macOS: all

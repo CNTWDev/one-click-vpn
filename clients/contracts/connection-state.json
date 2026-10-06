@@ -1,0 +1,12 @@
+{
+  "contractVersion": 2,
+  "implementationStatus": "development-opt-in-wireguard-android-apple",
+  "states": ["signed_out", "ready", "authorizing", "device_limit_reached", "device_revoked", "preparing", "connecting", "connected", "disconnecting", "error"],
+  "rules": [
+    "Login does not consume a device slot; first authorized connection does.",
+    "Only tunnel engine confirmation can produce connected; a login response cannot.",
+    "A revoked identity cannot automatically enroll again.",
+    "All native nodes share account-level device entitlements; current native transport is WireGuard only.",
+    "Production access is gated until signing, Windows tunnel integration and physical-device acceptance pass."
+  ]
+}

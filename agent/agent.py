@@ -8,6 +8,8 @@ remote command execution is deliberately not part of this channel.
 """
 
 import base64
+import fcntl
+from contextlib import contextmanager
 import hashlib
 import ipaddress
 import io
@@ -49,6 +51,126 @@ VPN_PORTS = {
 last_cpu_sample = None
 last_network_sample = None
 last_errors = {}
+native_watchdog_ready = False
+
+
+@contextmanager
+def wireguard_lock():
+    STATE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with (STATE_DIR / "wireguard.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
+def expire_native_peers():
+    """Independent of Controller availability, including across host restarts."""
+    with wireguard_lock():
+        if not WIREGUARD_CONFIG.exists():
+            return
+        blocks = re.split(r"(?m)^\[Peer\]\s*$", WIREGUARD_CONFIG.read_text())
+        retained = [blocks[0]]
+        expired = []
+        for block in blocks[1:]:
+            stamp = re.search(r"(?m)^# NorthstarExpiresAt=(\S+)$", block)
+            # Malformed managed deadlines fail closed, legacy peers have no marker.
+            if stamp and (not stamp[1].isdigit() or int(stamp[1]) <= time.time()):
+                key = re.search(r"(?m)^PublicKey\s*=\s*(\S+)\s*$", block)
+                if key and validate_key(key[1]):
+                    expired.append(key[1])
+            else:
+                retained.append(block)
+        if not expired and len(retained) == len(blocks):
+            return
+        # Remove live peers before losing their keys from the persisted config;
+        # command failure preserves the file for the next independent retry.
+        if command_succeeds(["wg", "show", "northstar"]):
+            for key in expired:
+                run_fixed(["wg", "set", "northstar", "peer", key, "remove"])
+        atomic_write(WIREGUARD_CONFIG, "[Peer]".join(retained))
+
+
+def native_kernel_guard(peers):
+    """Kernel time matches enforce deadlines even if Python or its lock stalls.
+
+    Once enabled, unknown peers fail closed. Legacy peers in the Controller's
+    desired configuration remain explicitly allowed without a deadline.
+    """
+    marker = STATE_DIR / "native-kernel-guard.enabled"
+    if not marker.exists() and not any("expiresAt" in peer for peer in peers):
+        return
+    lines = ["*filter", ":NS_NATIVE_IN - [0:0]", ":NS_NATIVE_OUT - [0:0]"]
+    for peer in peers:
+        deadline = peer.get("expiresAt")
+        if deadline is not None and deadline <= time.time():
+            continue
+        match = ""
+        if deadline is not None:
+            # xt_time uses UTC unless --kerneltz is explicitly supplied.
+            match = " -m time --datestop " + time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(deadline))
+        for value in peer.get("allowedIps", []):
+            network = ipaddress.ip_network(value, strict=False)
+            if network.version != 4:
+                continue
+            if network.prefixlen != 32:
+                raise ValueError("native lease enforcement requires unique IPv4 host routes")
+            lines.append(f"-A NS_NATIVE_IN -s {network}{match} -j RETURN")
+            lines.append(f"-A NS_NATIVE_OUT -d {network}{match} -j RETURN")
+    lines.extend(["-A NS_NATIVE_IN -j DROP", "-A NS_NATIVE_OUT -j DROP", "COMMIT", ""])
+    # Only these two user-defined chains are replaced, in a single commit.
+    run_fixed(["iptables-restore", "--noflush", "--wait", "5"], input_text="\n".join(lines))
+    for chain, direction, target in (("INPUT", "-i", "NS_NATIVE_IN"), ("FORWARD", "-i", "NS_NATIVE_IN"), ("OUTPUT", "-o", "NS_NATIVE_OUT"), ("FORWARD", "-o", "NS_NATIVE_OUT")):
+        rule = [direction, "northstar", "-j", target]
+        if not command_succeeds(["iptables", "-w", "5", "-C", chain, *rule]):
+            run_fixed(["iptables", "-w", "5", "-I", chain, "1", *rule])
+    atomic_write(marker, "1\n")
+
+
+def restore_native_kernel_guard():
+    if not WIREGUARD_CONFIG.exists():
+        return
+    peers = []
+    for block in re.split(r"(?m)^\[Peer\]\s*$", WIREGUARD_CONFIG.read_text())[1:]:
+        allowed = re.search(r"(?m)^AllowedIPs\s*=\s*([^\n]+)$", block)
+        stamp = re.search(r"(?m)^# NorthstarExpiresAt=(\S+)$", block)
+        peer = {"allowedIps": [v.strip() for v in allowed[1].split(",")] if allowed else []}
+        if stamp:
+            peer["expiresAt"] = int(stamp[1]) if stamp[1].isdigit() else 0
+        peers.append(peer)
+    native_kernel_guard(peers)
+
+
+def install_native_watchdog():
+    global native_watchdog_ready
+    if Path(__file__).resolve() != Path("/opt/northstar-agent/agent.py"):
+        return
+    # Keep expiry independent of an Agent rollback to a version that does not
+    # recognize --expire-native (which would otherwise start a second Agent).
+    atomic_write(Path("/opt/northstar-agent/native-expiry.py"), Path(__file__).read_text(), 0o700)
+    unit = Path("/etc/systemd/system")
+    service = """[Unit]
+Description=NORTHSTAR device lease expiry
+Before=wg-quick@northstar.service
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/northstar-agent/config.env
+ExecStart=/usr/bin/env python3 /opt/northstar-agent/native-expiry.py --expire-native
+TimeoutStartSec=20
+"""
+    timer = """[Unit]
+Description=NORTHSTAR device lease watchdog
+[Timer]
+OnBootSec=1s
+OnUnitActiveSec=2s
+AccuracySec=1s
+[Install]
+WantedBy=timers.target
+"""
+    atomic_write(unit / "northstar-native-expiry.service", service, 0o644)
+    atomic_write(unit / "northstar-native-expiry.timer", timer, 0o644)
+    run_fixed(["systemctl", "daemon-reload"])
+    run_fixed(["systemctl", "enable", "--now", "northstar-native-expiry.timer"])
+    run_fixed(["systemctl", "start", "northstar-native-expiry.service"])
+    native_watchdog_ready = command_succeeds(["systemctl", "is-active", "northstar-native-expiry.timer"])
 
 
 class AgentRequestError(RuntimeError):
@@ -278,6 +400,11 @@ def ensure_wireguard_key():
 
 
 def wireguard_sync_config(desired):
+    with wireguard_lock():
+        return wireguard_sync_config_locked(desired)
+
+
+def wireguard_sync_config_locked(desired):
     if desired.get("interface") != "northstar":
         raise ValueError("only the northstar interface is allowed")
     if shutil.which("wg") is None or shutil.which("wg-quick") is None:
@@ -317,6 +444,14 @@ def wireguard_sync_config(desired):
     for peer in peers:
         if not isinstance(peer, dict) or not validate_key(peer.get("publicKey")):
             raise ValueError("invalid WireGuard peer public key")
+        deadline = peer.get("expiresAt")
+        if deadline is not None:
+            if not isinstance(deadline, int) or isinstance(deadline, bool) or deadline > time.time() + 310:
+                raise ValueError("invalid native lease expiry")
+            if deadline <= time.time():
+                continue
+            if not native_watchdog_ready:
+                raise RuntimeError("native lease watchdog is unavailable")
         allowed_ips = peer.get("allowedIps", [])
         if not isinstance(allowed_ips, list) or not allowed_ips or len(allowed_ips) > 64 or not all(valid_network(item) for item in allowed_ips):
             raise ValueError("invalid WireGuard peer allowed IPs")
@@ -330,10 +465,14 @@ def wireguard_sync_config(desired):
         ]
         if keepalive:
             peer_lines.append(f"PersistentKeepalive = {keepalive}")
+        if deadline is not None:
+            peer_lines.append(f"# NorthstarExpiresAt={deadline}")
         full_lines.extend(peer_lines + [""])
         sync_lines.extend(peer_lines + [""])
 
     previous_listener = configured_listener(WIREGUARD_CONFIG, 51820, "udp") if WIREGUARD_CONFIG.exists() else None
+    # Never activate a native peer before its kernel-side expiry guard exists.
+    native_kernel_guard(peers)
     atomic_write(WIREGUARD_CONFIG, "\n".join(full_lines))
     try:
         run_fixed(["wg", "show", "northstar"])
@@ -356,6 +495,11 @@ def wireguard_sync_config(desired):
 
 
 def disable_wireguard():
+    with wireguard_lock():
+        return disable_wireguard_locked()
+
+
+def disable_wireguard_locked():
     if WIREGUARD_CONFIG.exists() and shutil.which("wg-quick") is not None:
         run_optional(["wg-quick", "down", str(WIREGUARD_CONFIG)])
     remove_wireguard_mss_clamp()
@@ -787,6 +931,7 @@ def capabilities():
         "protocols": protocols,
         "transports": transports,
         "routing": ["full", "split"],
+        "nativeLeaseEnforcement": 1 if native_watchdog_ready and command_succeeds(["systemctl", "is-active", "northstar-native-expiry.timer"]) and not command_succeeds(["systemctl", "is-failed", "northstar-native-expiry.service"]) else 0,
         "runtime": {
             "wireguardTools": "wireguard" in protocols,
             "openvpn": "openvpn" in protocols,
@@ -1054,7 +1199,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.8.0",
+        "version": "agent 2.9.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
@@ -1085,6 +1230,8 @@ def poll_tasks():
 
 
 def restore_wireguard():
+    expire_native_peers()
+    restore_native_kernel_guard()
     if not WIREGUARD_CONFIG.exists() or shutil.which("wg") is None or shutil.which("wg-quick") is None:
         return
     try:
@@ -1100,6 +1247,10 @@ def restore_openvpn():
 
 def main():
     STATE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    try:
+        install_native_watchdog()
+    except Exception as error:
+        log_failure("native watchdog", error)
     try:
         restore_wireguard()
     except Exception as error:
@@ -1143,4 +1294,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if sys.argv[1:] == ["--expire-native"]:
+        expire_native_peers()
+    else:
+        main()

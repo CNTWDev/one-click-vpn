@@ -50,7 +50,7 @@ async function realityUserRows(nodeId: string) {
     JOIN users u ON u.id=c.user_id JOIN connection_profiles p ON p.credential_id=c.id
     WHERE p.node_id=$1 AND p.protocol='vless' AND p.status='active' AND p.expires_at>$2
     AND c.status='active' AND NOT c.user_disabled AND NOT c.admin_disabled AND c.deleted_at IS NULL
-    AND (c.expires_at IS NULL OR c.expires_at>$2) AND u.status='active' ORDER BY c.identity_key`, [nodeId,new Date().toISOString()]);
+    AND (c.expires_at IS NULL OR c.expires_at>$2) AND u.status='active' AND NOT u.native_only ORDER BY c.identity_key`, [nodeId,new Date().toISOString()]);
 }
 
 async function decryptUsers(rows: Awaited<ReturnType<typeof realityUserRows>>) {

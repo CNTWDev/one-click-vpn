@@ -1,0 +1,62 @@
+name: Native client development builds
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.5'
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - run: gradle -p clients/android :app:assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NORTHSTAR-android-development-only
+          path: clients/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+  apple:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --package-path clients/apple
+      - run: brew install xcodegen
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.4'
+          cache: false
+      - run: bash clients/apple/scripts/build.sh ios
+      - run: bash clients/apple/scripts/build.sh macos
+      - run: |
+          ditto -c -k --sequesterRsrc --keepParent clients/apple/artifacts/Northstar-iOS/Build/Products/Debug-iphonesimulator clients/apple/artifacts/NORTHSTAR-ios-simulator.zip
+          ditto -c -k --sequesterRsrc --keepParent clients/apple/artifacts/Northstar-macOS/Build/Products/Debug clients/apple/artifacts/NORTHSTAR-macos-unsigned.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NORTHSTAR-apple-development-only
+          path: clients/apple/artifacts/*.zip
+          if-no-files-found: error
+  windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        runtime: [win-x64, win-arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - shell: pwsh
+        run: ./clients/windows/build.ps1 -Runtime ${{ matrix.runtime }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NORTHSTAR-${{ matrix.runtime }}-development-only
+          path: clients/windows/artifacts/*.zip
+          if-no-files-found: error

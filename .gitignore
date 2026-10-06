@@ -50,3 +50,21 @@ next-env.d.ts
 .env.*
 !.env.example
 tsconfig.tsbuildinfo
+
+# Native client build output and local signing material
+/clients/**/.build/
+/clients/**/.dependencies/
+/clients/**/.gradle/
+/clients/**/build/
+/clients/**/bin/
+/clients/**/obj/
+/clients/**/artifacts/
+/clients/**/DerivedData/
+/clients/**/local.properties
+/clients/**/*.xcodeproj/
+/clients/**/*.xcworkspace/
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.mobileprovision

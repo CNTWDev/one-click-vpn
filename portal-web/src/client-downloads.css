@@ -1,0 +1,9 @@
+.client-downloads > p { color: #65705e; line-height: 1.6; }
+.client-download-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 14px; margin-top: 16px; }
+.client-download-grid article { min-width: 0; border: 1px solid #d8dfd1; border-radius: 12px; background: #fff; padding: 20px; }
+.client-download-grid h3 { margin: 0 0 12px; }
+.client-download-grid p { color: #65705e; font-size: 13px; line-height: 1.6; }
+.client-download-item + .client-download-item { border-top: 1px solid #d8dfd1; margin-top: 16px; padding-top: 8px; }
+.client-download-item a { text-decoration: none; padding: 10px 14px; }
+.client-download-item details { margin-top: 12px; }
+.client-download-item code { display: block; overflow-wrap: anywhere; font-size: 11px; margin-top: 8px; }

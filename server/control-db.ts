@@ -210,7 +210,7 @@ export async function listRevokedCertificateSerials(authorityId: string): Promis
     LEFT JOIN users u ON u.id = c.user_id
     WHERE ci.authority_id = $1 AND (ci.status = 'revoked' OR
       (ci.purpose = 'client' AND (c.user_disabled OR c.admin_disabled OR c.deleted_at IS NOT NULL
-        OR c.status <> 'active' OR u.status <> 'active' OR c.expires_at <= $2 OR ci.not_after <= $2)))
+        OR c.status <> 'active' OR u.status <> 'active' OR u.native_only OR c.expires_at <= $2 OR ci.not_after <= $2)))
     ORDER BY ci.serial`, [authorityId, now()]);
   return rows.map((row) => row.serial);
 }
@@ -289,6 +289,7 @@ export async function createAccessCredential(input: {
   protocol: Protocol;
   identityKey: string;
 }): Promise<AccessCredential> {
+  if ((await dbQuery<{native_only:boolean}>("SELECT native_only FROM users WHERE id=$1",[input.userId]))[0]?.native_only) throw new Error("Please connect using the NORTHSTAR app");
   const credentialId = `cred_${randomUUID()}`;
   const deviceId = `dev_${randomUUID()}`;
   const timestamp = now();
@@ -737,7 +738,7 @@ export async function finishReconcileTask(input: {
   }
 }
 
-export async function listActivePeers(nodeId: string, protocol: Protocol): Promise<Array<{ publicKey: string; allowedIps: string[]; persistentKeepaliveSeconds: number }>> {
+export async function listActivePeers(nodeId: string, protocol: Protocol): Promise<Array<{ publicKey: string; allowedIps: string[]; persistentKeepaliveSeconds: number; expiresAt?: number }>> {
   await expireDueConnectionProfiles();
   const rows = await dbQuery<{ public_key: string; address: string }>(`SELECT d.public_key, l.address
     FROM devices d JOIN ip_leases l ON l.device_id = d.id
@@ -745,8 +746,12 @@ export async function listActivePeers(nodeId: string, protocol: Protocol): Promi
     JOIN users u ON u.id = d.user_id
     LEFT JOIN access_credentials c ON c.id = p.credential_id
     WHERE l.node_id = $1 AND l.protocol = $2 AND l.status = 'active' AND d.status = 'active' AND p.status = 'active'
-      AND u.status = 'active' AND (c.id IS NULL OR (c.status = 'active' AND NOT c.user_disabled
+      AND u.status = 'active' AND NOT u.native_only AND (c.id IS NULL OR (c.status = 'active' AND NOT c.user_disabled
         AND NOT c.admin_disabled AND c.deleted_at IS NULL AND (c.expires_at IS NULL OR c.expires_at > $3)))
     GROUP BY d.id, l.address, d.public_key`, [nodeId, protocol, now()]);
-  return rows.map((row) => ({ publicKey: row.public_key, allowedIps: [row.address], persistentKeepaliveSeconds: 25 }));
+  const native = protocol === "wireguard" ? await dbQuery<{public_key:string;address:string;expires_at:Date}>(`SELECT l.public_key,l.address,l.expires_at FROM native_leases l
+    JOIN native_enrollments e ON e.id=l.enrollment_id JOIN users u ON u.id=e.user_id WHERE l.node_id=$1 AND l.expires_at>now()
+    AND e.status='active' AND u.status='active' AND u.native_only AND (u.membership_expires_at IS NULL OR u.membership_expires_at>$2)`,[nodeId,now()]) : [];
+  return [...rows.map((row) => ({ publicKey: row.public_key, allowedIps: [row.address], persistentKeepaliveSeconds: 25 })),
+    ...native.map(row=>({publicKey:row.public_key,allowedIps:[row.address],persistentKeepaliveSeconds:25,expiresAt:Math.floor(new Date(row.expires_at).getTime()/1000)}))];
 }
