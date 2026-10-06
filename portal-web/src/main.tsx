@@ -1,15 +1,13 @@
-import { errorText } from "../../shared/i18n-errors";
-import { PortalLanguage } from "./language";
 import { useI18n } from "../../shared/i18n";
+import { PortalLanguage } from "./language";
+import "./language.css";
+import { errorText } from "../../shared/i18n-errors";
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { api } from "./api";
 import { CredentialDashboard } from "./credential-dashboard";
 import "./styles.css";
-import "./profile-actions.css";
 import "./region-map.css";
-import "./ui-refinements.css";
-import "./language.css";
 
 type User = {
   id: string;
@@ -46,7 +44,7 @@ function Auth({ mode, onMode, onUser }: {
         return;
       }
       const result = await api<{ user: User; message?: string }>("/api/v1/auth/web-login", { method: "POST", body: JSON.stringify(form) });
-      if (!result.user?.id) throw new Error("登录接口返回异常，请检查 Portal 的 /api/ 反向代理。");
+      if (!result.user?.id) throw new Error(t("登录接口返回异常，请检查 Portal 的 /api/ 反向代理。"));
       onUser(result.user);
     } catch (caught) {
       const requestError = caught as Error & { body?: { user?: User } };
@@ -60,21 +58,19 @@ function Auth({ mode, onMode, onUser }: {
   return <main className="auth-layout">
     <section className="auth-intro">
       <Brand />
-      <p className="kicker">{t("PRIVATE NETWORK FOR PEOPLE AROUND YOU")}</p>
       <h1>{t("连接到你")}<br /><span>{t("信任的网络。")}</span></h1>
-      <p className="intro-copy">{t("审核通过后，一次导入订阅，随时切换节点；也可以下载指定节点的独立配置。")}</p>
-      <div className="trust"><span>●</span><div><b>{t("人工审核")}</b><small>{t("仅限受邀和熟悉的用户使用")}</small></div></div>
+      <p className="intro-copy">{t("审核通过后，一键创建订阅：Clash Verge、Hiddify、Shadowrocket 导入或扫码即用，VLESS + REALITY 与 WireGuard 节点自动更新。也可为固定节点下载 WireGuard、OpenVPN 配置。")}</p>
+      <ul className="trust"><li><b>{t("一份订阅，全部节点")}</b><small>{t("客户端里随时切换，新节点自动出现")}</small></li><li><b>{t("人工审核")}</b><small>{t("仅限受邀和熟悉的用户使用")}</small></li></ul>
     </section>
     <form className="auth-panel" onSubmit={submit}>
-      <p className="kicker">{mode === "login" ? t("WELCOME BACK") : t("REQUEST ACCESS")}</p>
       <h2>{mode === "login" ? t("登录 Northstar") : t("申请使用 VPN")}</h2>
-      <p className="muted">{mode === "login" ? t("使用已审核的账号继续。") : t("提交后由管理员人工审核。")}</p>
+      <p className="muted">{mode === "login" ? t("使用已审核的账号继续，获取你的订阅链接。") : t("提交后由管理员人工审核。")}</p>
       {mode === "register" && <label>{t("称呼")}<input required value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder={t("例如：小王")} /></label>}
       <label>{t("邮箱")}<input type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="you@example.com" /></label>
       <label>{t("密码")}<input type="password" minLength={12} required value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={t("至少 12 位")} /></label>
-      <button className="primary" disabled={busy}>{busy ? t("处理中…") : mode === "login" ? t("登录") : t("提交申请")}<span aria-hidden="true">→</span></button>
-      {error && <p className="error">{errorText(error, t)}</p>}
-      <button type="button" className="text-button" onClick={() => onMode(mode === "login" ? "register" : "login")}>{mode === "login" ? t("还没有账号？申请使用") : t("已有账号？返回登录")}</button>
+      {error && <p className="inline-error" role="alert">{errorText(error, t)}</p>}
+      <button className="primary large wide" disabled={busy}>{busy ? t("处理中…") : mode === "login" ? t("登录") : t("提交申请")}</button>
+      <button type="button" className="ghost wide" onClick={() => onMode(mode === "login" ? "register" : "login")}>{mode === "login" ? t("还没有账号？申请使用") : t("已有账号？返回登录")}</button>
     </form>
   </main>;
 }
@@ -83,11 +79,10 @@ function Pending({ user, onLogout }: { user: User; onLogout: () => void }) {
   const { t } = useI18n();
   return <main className="center-page"><Brand /><div className="status-card">
     <span className="status-icon">…</span>
-    <p className="kicker">{t("APPLICATION RECEIVED")}</p>
     <h1>{t("等待管理员审核")}</h1>
-    <p>{t("账号 {0} 已提交。审核通过后即可登录并创建连接。", [user.email])}</p>
+    <p>{t("账号")}<b>{user.email}</b>{t("已提交。审核通过后即可登录，一键创建订阅。")}</p>
     {!user.id && <p className="muted">{t("如果这个邮箱之前已经注册过，请直接返回登录。")}</p>}
-    {user.status === "rejected" && <p className="error">{t("申请未通过：")}{user.rejectionReason || t("请联系管理员")}</p>}
+    {user.status === "rejected" && <p className="inline-error">{t("申请未通过：")}{user.rejectionReason || t("请联系管理员")}</p>}
     <button className="secondary" onClick={onLogout}>{t("返回")}</button>
   </div></main>;
 }
@@ -114,7 +109,7 @@ export default function App() {
     setMode("login");
   }
 
-  if (loading) return <main className="center-page"><Brand /><p>{t("正在连接 Northstar…")}</p></main>;
+  if (loading) return <main className="center-page" aria-busy="true"><Brand /><span className="loader" aria-label={t("正在连接 Northstar…")} /></main>;
   if (!user) return <Auth mode={mode} onMode={setMode} onUser={setUser} />;
   if (user.status !== "active") return <Pending user={user} onLogout={() => void logout()} />;
   return <CredentialDashboard user={user} onLogout={() => void logout()} />;

@@ -4,15 +4,20 @@ const lock = `exec 9>${directory}/upgrade.lock\nflock -x 9\n`;
 export function agentRollbackCommand(): string {
   return `set -eu\n${lock}if test -f ${directory}/upgrade.pending; then
   cp -p ${directory}/agent.py.rollback ${directory}/agent.py
-  rm -f ${directory}/upgrade.pending
+  rm -f ${directory}/upgrade.pending ${directory}/upgrade.confirmed
   systemctl restart northstar-agent
   echo 'Unverified Agent upgrade rolled back'
 fi\n`;
 }
+/** Idempotent: the new Agent normally confirms itself after its first authenticated heartbeat. */
 export function agentUpgradeFinalizeCommand(): string {
-  return `set -eu\n${lock}test -f ${directory}/upgrade.pending || { echo 'Agent upgrade already rolled back'; exit 1; }
+  return `set -eu\n${lock}if ! test -f ${directory}/upgrade.pending; then
+  test -f ${directory}/upgrade.confirmed || { echo 'Agent upgrade already rolled back'; exit 1; }
+  echo 'Agent upgrade confirmed by the Agent'; exit 0
+fi
 systemctl is-active --quiet northstar-agent
 cp -p ${directory}/agent.py.rollback ${directory}/agent.py.previous
+sha256sum ${directory}/agent.py | cut -d' ' -f1 > ${directory}/upgrade.confirmed
 rm -f ${directory}/upgrade.pending
 systemctl stop northstar-agent-upgrade-rollback.timer || true\n`;
 }
@@ -27,6 +32,7 @@ if test -f ${directory}/upgrade.pending; then
   rm -f ${directory}/upgrade.pending
   systemctl restart northstar-agent
 fi
+rm -f ${directory}/upgrade.confirmed
 # Never overwrite the last confirmed backup with a source that cannot run.
 if ! systemctl is-active --quiet northstar-agent; then
   test -s ${directory}/agent.py.previous || { echo 'No healthy Agent backup available'; exit 1; }

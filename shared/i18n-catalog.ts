@@ -1,5 +1,7 @@
+import { onboardingCatalog } from "./i18n-onboarding";
 /** Source text is the Chinese fallback. Every entry must supply English and Russian. */
 export const catalog: Record<string, readonly [en: string, ru: string]> = {
+  ...onboardingCatalog,
   "下载 NORTHSTAR 客户端": ["Download NORTHSTAR", "Скачать NORTHSTAR"],
   "正式版本发布后，可在这里下载安装。iPhone 和 iPad 通过 App Store 分发。": ["Official releases will be available here. iPhone and iPad apps are distributed through the App Store.", "Здесь появятся официальные версии. Приложения для iPhone и iPad распространяются через App Store."],
   "暂时无法获取客户端版本，请稍后重试。": ["Could not load client releases. Please try again later.", "Не удалось загрузить версии клиента. Повторите позже."],

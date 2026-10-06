@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { renderMihomoConfig } from "../mihomo-config.mjs";
 
 type WireGuardExport = {
   name: string;
@@ -11,7 +12,7 @@ type WireGuardExport = {
 };
 
 /** Serialize values as JSON flow syntax (valid YAML), never interpolate user data into YAML. */
-export function renderMihomoWireGuard(input: WireGuardExport): string {
+export function renderMihomoWireGuard(input: WireGuardExport, mode: "smart" | "global" = "smart"): string {
   const ip = input.clientAddress.split("/")[0];
   const keyPattern = /^[A-Za-z0-9+/]{43}=$/;
   if (isIP(ip) !== 4) throw new Error("Mihomo export requires an IPv4 WireGuard address");
@@ -29,17 +30,11 @@ export function renderMihomoWireGuard(input: WireGuardExport): string {
     "allowed-ips": input.allowedIps, "persistent-keepalive": 25,
     udp: true, "remote-dns-resolve": true, dns, mtu: 1280,
   };
+  // Same document layout and routing rules as subscriptions, so every Mihomo export behaves alike.
   return [
     "# Northstar · WireGuard for Mihomo (not legacy Clash)",
     "# Sensitive: contains your private key. Do not share or upload to conversion websites.",
     "# Import as a local configuration; enable system proxy or TUN in your client.",
     "# One active client per WireGuard credential. Expiry and access controls still apply.",
-    "mixed-port: 7890", "allow-lan: false", 'bind-address: "127.0.0.1"',
-    "mode: rule", "log-level: warning", "ipv6: false",
-    // DNS follows MATCH through WG. Endpoint DNS is explicitly bootstrapped outside the tunnel.
-    `dns: ${JSON.stringify({ enable: true, ipv6: false, "enhanced-mode": "redir-host", "respect-rules": true, nameserver: dns, "proxy-server-nameserver": ["1.1.1.1", "8.8.8.8"] })}`,
-    "proxies:", `  - ${JSON.stringify(proxy)}`,
-    "proxy-groups:", `  - ${JSON.stringify({ name: "Northstar", type: "select", proxies: [input.name] })}`,
-    "rules:", '  - "MATCH,Northstar"', "",
-  ].join("\n");
+  ].join("\n") + "\n" + renderMihomoConfig([proxy], { mode });
 }

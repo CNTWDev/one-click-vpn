@@ -3,7 +3,10 @@ import fs from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
 import { rolldown } from "rolldown";
-import { catalog } from "../shared/i18n-catalog.ts";
+const catalogBundle = await rolldown({ input: "shared/i18n-catalog.ts" });
+const { output: catalogOutput } = await catalogBundle.generate({ format: "esm" });
+await catalogBundle.close();
+const { catalog } = await import(`data:text/javascript;base64,${Buffer.from(catalogOutput[0].code).toString("base64")}`);
 
 const bundle = await rolldown({ input: "shared/i18n-core.ts" });
 const { output } = await bundle.generate({ format: "esm" });
@@ -35,7 +38,7 @@ test("All Portal translations exist, preserve placeholders and have nonempty EN/
       assert.doesNotMatch(value, /[\u3400-\u9fff]/u, key);
     }
   }
-  const files = ["main.tsx", "credential-dashboard.tsx", "action-dialog.tsx", "subscription-access.tsx", "region-map.tsx", "language.tsx", "client-downloads.tsx"].map((name) => `portal-web/src/${name}`);
+  const files = ["main.tsx", "credential-dashboard.tsx", "action-dialog.tsx", "subscription-access.tsx", "region-map.tsx", "language.tsx", "client-downloads.tsx", "onboarding.tsx", "node-creator.tsx", "ui.tsx"].map((name) => `portal-web/src/${name}`);
   files.push("shared/subscription-panel.tsx");
   for (const file of files) {
     const source = await fs.readFile(file, "utf8");

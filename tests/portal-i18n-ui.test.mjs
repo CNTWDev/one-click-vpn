@@ -17,9 +17,10 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     }
     browser = await chromium.launch({ headless: true, ...(process.env.NORTHSTAR_TEST_BROWSER ? { executablePath: process.env.NORTHSTAR_TEST_BROWSER } : {}) });
     const context = await browser.newContext({ locale: "ru-RU", viewport: { width: 1440, height: 1000 } });
+    context.setDefaultTimeout(10000);
     const page = await context.newPage(), errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
-    let signedIn = false, badLogin = true, created, profileCreated;
+    let signedIn = false, badLogin = true, firstRun = false, created, profileCreated;
     const now = new Date().toISOString();
     const user = { id: "user", displayName: "Test User", email: "test@example.com", status: "active", role: "user" };
     const credential = { id: "sub-credential", name: "Personal", protocol: "wireguard", subscriptionId: "sub", status: "active", state: "online", userDisabled: false, adminDisabled: false, accountStatus: "active", online: true, connectionCount: 1, syncStatus: "applied", totalBytes: 2048, uploadBytes: 1024, downloadBytes: 1024, createdAt: now, expiresAt: "2027-10-06T12:00:00Z", lastActivityAt: now };
@@ -30,7 +31,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
       else if (pathname === "/api/v1/auth/web-login") { if (badLogin) { status = 401; body = { error: "Invalid email or password" }; } else { signedIn = true; body = { user }; } }
       else if (pathname === "/api/v1/auth/register") { status = 202; body = { status: "received" }; }
       else if (pathname === "/api/v1/availability") body = { regions: [{ id: "sg", name: "Singapore", code: "SG", country: "Singapore", protocols: ["wireguard", "vless", "openvpn"], status: "available" }], nodes: [{ id: "node", name: "Node 1", regionId: "sg", regionName: "Singapore", protocols: ["wireguard", "vless", "openvpn"] }] };
-      else if (pathname === "/api/v1/credentials") body = method === "POST" ? { credential: { ...credential, id: "new" } } : { credentials: [credential, { ...credential, id: "single", name: "Office", subscriptionId: null }] };
+      else if (pathname === "/api/v1/credentials") body = method === "POST" ? { credential: { ...credential, id: "new" } } : { credentials: firstRun ? [] : [...(created ? [{ ...credential, id: "new-sub", subscriptionId: "new-subscription", name: created.name }] : []), credential, { ...credential, id: "single", name: "Office", subscriptionId: null }] };
       else if (pathname === "/api/v1/profiles") {
         if (method === "POST") profileCreated = route.request().postDataJSON();
         const profile = { id: "profile", credentialId: "single", protocol: "wireguard", status: "active", regionCode: "SG", regionName: "Singapore", nodeName: "Node 1", issuedAt: now, expiresAt: credential.expiresAt };
@@ -40,7 +41,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
       else if (pathname.endsWith("/download")) { await route.fulfill({ contentType: "text/plain", body: "# Test configuration" }); return; }
       else if (pathname === "/api/v1/usage/summary") body = { totals: { totalBytes: 4096, uploadBytes: 2048, downloadBytes: 2048 }, daily: [] };
       else if (pathname === "/api/v1/subscriptions") {
-        if (method === "POST") { created = route.request().postDataJSON(); body = { token: "test-token", credentialId: "sub-credential" }; }
+        if (method === "POST") { created = route.request().postDataJSON(); body = { token: "test-token", credentialId: "new-sub" }; }
         else if (method === "PATCH") { status = 403; body = { error: "登录密码不正确" }; }
         else body = { subscriptions: [] };
       }
@@ -79,14 +80,14 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await page.getByLabel("Электронная почта").fill("test@example.com");
     await page.getByLabel("Пароль", { exact: true }).fill("test-password-123");
     await page.getByRole("button", { name: "Войти", exact: true }).click();
-    await page.getByRole("heading", { name: "Мои подключения", level: 1 }).waitFor();
-    await page.getByRole("button", { name: "Импорт / копирование ссылки" }).click();
+    await page.getByRole("heading", { name: "Мои подключения", level: 2 }).waitFor();
+    await page.getByRole("button", { name: /Копировать ссылку/ }).click();
     await page.getByLabel("Пароль аккаунта").fill("incorrect");
-    await page.getByRole("button", { name: "Проверить и получить ссылку" }).click();
+    await page.getByRole("button", { name: "Подтвердить и продолжить" }).click();
     await page.getByText("Неверный пароль аккаунта", { exact: true }).waitFor();
     await page.getByRole("button", { name: "Отмена", exact: true }).click();
-    await page.getByRole("button", { name: "＋ Новое подключение" }).click();
-    await page.getByRole("heading", { name: "Один импорт, свободный выбор серверов" }).waitFor();
+    await page.getByRole("button", { name: "Новое подключение", exact: true }).click();
+    await page.getByRole("heading", { name: "Новое подключение" }).waitFor();
     await noChinese();
     await page.setViewportSize({ width: 390, height: 844 });
     await noOverflow();
@@ -97,20 +98,22 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await page.getByLabel("Subscription link", { exact: true }).waitFor();
     assert.equal(created.name, "My custom subscription");
     await noChinese();
-    await page.getByRole("button", { name: "Single server Download a configuration for one server" }).click();
+    await page.getByRole("button", { name: "New connection", exact: true }).click();
+    await page.locator('.mode-switch button').nth(1).click();
+    const downloadResponse = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith("/download"));
     await page.getByRole("button", { name: "Create and download" }).click();
-    await page.getByRole("button", { name: "Download again" }).waitFor();
+    await downloadResponse;
     assert.equal(profileCreated.nodeId, "node");
     await noChinese();
     await picker().selectOption("ru");
     await noOverflow();
-    await page.locator(".device-card").filter({ hasText: "Office" }).click();
-    await page.getByText("Другие действия", { exact: true }).click();
-    await page.getByRole("button", { name: "Переименовать", exact: true }).click();
+    await page.locator(".list-item").filter({ hasText: "Office" }).click();
+    await page.getByRole("button", { name: "Управление подключением", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Переименовать", exact: true }).click();
     await page.getByRole("dialog").getByRole("heading", { name: "Переименовать подключение" }).waitFor();
     await page.getByRole("dialog").getByRole("button", { name: "Отмена", exact: true }).click();
-    await page.getByText("Сертификат и конфигурации", { exact: true }).click();
-    await page.getByText("Карта доступных регионов", { exact: true }).click();
+    await page.getByText("Конфигурации и сертификаты", { exact: true }).click();
+    await page.locator("summary").filter({ hasText: "Карта доступных регионов" }).click();
     await noChinese();
     await noOverflow();
     await page.setViewportSize({ width: 320, height: 844 });
@@ -127,12 +130,12 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     });
     assert.equal(await page.locator("html").getAttribute("lang"), "en-US", "manual preference wins over system changes");
     await picker().selectOption("system");
-    await page.getByRole("heading", { name: "我的连接", level: 1 }).waitFor();
+    await page.getByRole("heading", { name: "我的连接", level: 2 }).waitFor();
     // A second same-origin tab updates the stored preference; the first tab follows.
     const secondPage = await context.newPage();
     await secondPage.goto(`${base}/health`);
     await secondPage.evaluate(() => localStorage.setItem("northstar.portal.language", "ru"));
-    await page.getByRole("heading", { name: "Мои подключения", level: 1 }).waitFor();
+    await page.getByRole("heading", { name: "Мои подключения", level: 2 }).waitFor();
     await secondPage.close();
     await picker().selectOption("en");
     await page.getByText("Download NORTHSTAR", { exact: true }).click();
@@ -155,6 +158,14 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await page.getByRole("link", { name: "Скачать установочный файл", exact: true }).waitFor();
     await noChinese();
     await page.locator(".client-downloads").screenshot({ path: path.join(directory, "downloads-ru-mobile.png") });
+    firstRun = true;
+    await page.reload();
+    await page.getByRole("heading", { name: "Три шага для начала" }).waitFor();
+    await noChinese();
+    await noOverflow();
+    await picker().selectOption("en");
+    await page.getByRole("heading", { name: "Get started in three steps" }).waitFor();
+    await noChinese();
     assert.deepEqual(errors, []);
     console.log(`Portal i18n screenshots: ${directory}`);
     const blocked = await browser.newContext({ locale: "fr-FR" });

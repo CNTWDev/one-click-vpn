@@ -12,7 +12,7 @@ const clients = [
 ];
 const bytes = (value: string) => { const n = Number(value); return n >= 1073741824 ? `${(n/1073741824).toFixed(2)} GB` : `${(n/1048576).toFixed(1)} MB`; };
 
-export function SubscriptionPanel({ api, admin = false, createOnly = false, availableProtocols = ["wireguard", "vless"], onCreated }: { api: Api; admin?: boolean; createOnly?: boolean; availableProtocols?: string[]; onCreated?: (credentialId: string) => void }) {
+export function SubscriptionPanel({ api, admin = false, createOnly = false, availableProtocols = ["wireguard", "vless"], onCreated }: { api: Api; admin?: boolean; createOnly?: boolean; availableProtocols?: string[]; onCreated?: (credentialId: string, token: string) => void }) {
   const { t, locale } = useI18n();
   const date = (value: string | null) => value ? formatDate(value, locale) : t("尚未拉取");
   const endpoint = admin ? "/api/v1/admin/subscriptions" : "/api/v1/subscriptions";
@@ -40,13 +40,14 @@ export function SubscriptionPanel({ api, admin = false, createOnly = false, avai
     return () => { document.removeEventListener("keydown", onKey); previous?.focus(); };
   }, [confirm]);
   const refresh = useCallback(async () => { const result = await api<{ subscriptions: Item[] }>(endpoint); setItems(result.subscriptions); }, [api, endpoint]);
-  useEffect(() => { void refresh().catch((e: Error) => setError(e.message)); const timer = setInterval(() => { void refresh().catch(() => {}); }, 30000); return () => clearInterval(timer); }, [refresh]);
+  // createOnly embeds just the form: no list, so no fetch, no polling and no refresh button.
+  useEffect(() => { if (createOnly) return; void refresh().catch((e: Error) => setError(e.message)); const timer = setInterval(() => { void refresh().catch(() => {}); }, 30000); return () => clearInterval(timer); }, [refresh, createOnly]);
   function showLink(token: string) { setLink(`${window.location.origin}/api/subscription?token=${encodeURIComponent(token)}`); }
   async function create(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError(""); setNotice("");
     try {
       const result = await api<{ token: string; credentialId: string }>(endpoint, { method: "POST", body: JSON.stringify({ name, protocol: effectiveProtocol }) });
-      showLink(result.token); setNotice(message("订阅已创建。首次节点权限同步通常需要几十秒；看到已同步节点后再导入。以后可在“我的连接”验证登录密码后再次获取链接。")); await refresh(); onCreated?.(result.credentialId);
+      showLink(result.token); setNotice(message("订阅已创建。首次节点权限同步通常需要几十秒；看到已同步节点后再导入。以后可在“我的连接”验证登录密码后再次获取链接。")); if (!createOnly) await refresh(); onCreated?.(result.credentialId, result.token);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   async function action(item: Item, action: string) {
@@ -61,9 +62,9 @@ export function SubscriptionPanel({ api, admin = false, createOnly = false, avai
   }
   async function copy() { try { await navigator.clipboard.writeText(link); setNotice(message("订阅链接已复制，请在客户端中添加远程订阅。")); } catch { setError("无法自动复制，请选中下方链接手动复制。"); } }
   const selected = clients.find((c) => c.id === client)!;
-  const importUrl = client === "hiddify" ? `hiddify://import/${link}#Northstar` : `clash://install-config?url=${encodeURIComponent(link)}&name=Northstar`;
+  const importUrl = client === "hiddify" ? `hiddify://import?url=${encodeURIComponent(link)}&name=Northstar` : `clash://install-config?url=${encodeURIComponent(link)}&name=Northstar`;
   return <section className="subscription-panel" aria-label={admin ? t("订阅管理") : t("动态订阅")}>
-    <div className="subscription-heading"><div><p className="subscription-kicker">{t("ONE IMPORT · ALL NODES")}</p><h2>{admin ? t("订阅管理") : t("一次导入，随时换节点")}</h2><p>{admin ? t("按账号管理订阅访问权限。流量与连接凭据统一归集。") : t("自动获取可用节点，在客户端切换；新增节点刷新后即可出现。")}</p></div><button disabled={busy} onClick={() => void refresh().catch((e: Error) => setError(e.message))}>{t("刷新状态")}</button></div>
+    {!createOnly && <div className="subscription-heading"><div><p className="subscription-kicker">{t("ONE IMPORT · ALL NODES")}</p><h2>{admin ? t("订阅管理") : t("一次导入，随时换节点")}</h2><p>{admin ? t("按账号管理订阅访问权限。流量与连接凭据统一归集。") : t("自动获取可用节点，在客户端切换；新增节点刷新后即可出现。")}</p></div><button disabled={busy} onClick={() => void refresh().catch((e: Error) => setError(e.message))}>{t("刷新状态")}</button></div>}
     {error && <p className="subscription-error" role="alert">{errorText(error, t)}</p>}{notice && <p className="subscription-notice" role="status">{translateMessage(notice, t)}</p>}
     {!admin && <div className="subscription-setup"><form onSubmit={create}>
       <label>{t("给订阅取个名字")}<input required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("例如：日常使用")} /></label>

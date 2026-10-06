@@ -38,7 +38,7 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(agent, /DisableOpenVpn/);
   assert.match(agent, /RestartWireGuard/);
   assert.match(agent, /RestartOpenVpn/);
-  assert.match(agent, /\["systemctl", "restart", "northstar-openvpn"\]/);
+  assert.match(agent, /restart_and_verify\("northstar-openvpn"\)/);
   assert.match(agent, /add\[add\.index\("-C"\)\] = operation/);
   assert.doesNotMatch(agent, /add\[1\] = operation/);
   assert.match(agent, /\/etc\/wireguard\/northstar\.conf/);
@@ -71,7 +71,8 @@ test("regional profiles provide protocol-appropriate multi-node behavior", async
   assert.match(openVpnPki, /regionalEndpoints/);
   assert.match(openVpnPki, /endpoint\.transport === "tcp" \? "tcp-client" : "udp"/);
   assert.match(heartbeat, /activeSessionCount/);
-  assert.match(portal, /createZipBlob/);
+  assert.match(portal, /saveFiles/);
+  assert.match(readFileSync(path.join(root, "portal-web/src/files.ts"), "utf8"), /createZipBlob/);
   const { createZipBlob } = await import("../portal-web/src/zip.ts");
   const archive = new Uint8Array(await createZipBlob([
     { name: "SG-node-1.conf", text: "[Interface]\nPrivateKey = one\n" },
@@ -568,7 +569,16 @@ test("subscriptions provision stable multi-node WG/VLESS profiles and enforce ac
     assert.match(config.proxies[0].uuid,/^[a-f0-9-]{36}$/);
     assert.equal(config.proxies[0].servername,"www.example.com");
     assert.ok(config.proxies[0]["reality-opts"]["public-key"]);
-    assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.cloudflare.com" },true)).status,409,"do not silently invalidate issued profiles by changing their SNI");
+    // Changing the target is a smooth switch: keys stay, the old SNI stays accepted, issued profiles move to the new SNI.
+    assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.cloudflare.com" },true)).status,200);
+    let switched = (await pool.query("SELECT server_name,previous_server_names FROM reality_settings WHERE node_id=$1",[nodes[0]])).rows[0];
+    assert.equal(switched.server_name,"www.cloudflare.com");
+    assert.deepEqual(JSON.parse(switched.previous_server_names),["www.example.com"]);
+    assert.equal((await pool.query("SELECT protocol_payload_json FROM connection_profiles WHERE credential_id=$1 AND node_id=$2",[vsub.credentialId,nodes[0]])).rows.map((row) => JSON.parse(row.protocol_payload_json).serverName).join(),"www.cloudflare.com");
+    assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.example.com" },true)).status,200);
+    switched = (await pool.query("SELECT server_name,previous_server_names FROM reality_settings WHERE node_id=$1",[nodes[0]])).rows[0];
+    assert.deepEqual([switched.server_name,JSON.parse(switched.previous_server_names)],["www.example.com",["www.cloudflare.com"]]);
+    await ack();
     assert.doesNotMatch(JSON.stringify(config),/serverBundleSecretId|privateKey|secret_/);
     const agentToken = "subscription-test-agent";
     const telemetryId = (await pool.query("SELECT identity_key FROM access_credentials WHERE id=$1", [vsub.credentialId])).rows[0].identity_key;

@@ -395,6 +395,11 @@ try {
     DROP TRIGGER IF EXISTS native_legacy_profile_guard ON connection_profiles;
     CREATE TRIGGER native_legacy_profile_guard BEFORE INSERT ON connection_profiles FOR EACH ROW EXECUTE FUNCTION reject_native_legacy_profile();`);
   await pool.query("ALTER TABLE secret_materials ADD COLUMN IF NOT EXISTS source_fingerprint TEXT");
+  // Rows written before target modes existed were operator-chosen custom targets.
+  await pool.query("ALTER TABLE reality_defaults ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'custom'");
+  await pool.query("ALTER TABLE reality_settings ADD COLUMN IF NOT EXISTS previous_server_names TEXT NOT NULL DEFAULT '[]'");
+  // First desired revision that contained this profile; subscriptions wait only for that, not for later revisions.
+  await pool.query("ALTER TABLE connection_profiles ADD COLUMN IF NOT EXISTS included_revision INTEGER");
   await pool.query("UPDATE vpn_services SET subnet='10.70.0.0/20' WHERE protocol='wireguard' AND subnet='10.70.0.0/24'");
   const timestamp = new Date().toISOString();
   const regions = [

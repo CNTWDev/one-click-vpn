@@ -29,7 +29,7 @@ test("automatic deployment is idempotent, preserves custom templates and keys, r
   const directory = await mkdtemp(path.join(tmpdir(),"northstar-automation-"));
   const pool = new pg.Pool({ connectionString: databaseUrl });
   let api;
-  const nodeIds = ["new-standard","old-standard","custom","agent-only","rollout-old"].map((name) => `${name}-${Date.now()}`);
+  const nodeIds = ["new-standard","old-standard","custom","agent-only","rollout-old","auto-probe"].map((name) => `${name}-${Date.now()}`);
   try {
     await promisify(execFile)(process.execPath,["scripts/migrate.mjs"]);
     await symlink(path.join(root,"node_modules"),path.join(directory,"node_modules"),"dir");
@@ -48,16 +48,17 @@ test("automatic deployment is idempotent, preserves custom templates and keys, r
         VALUES ($1,$1,'Test','192.0.2.90','root','password','','','',$2,$2,'online',$2,$3)`,[id,timestamp,Buffer.alloc(32,9).toString("base64")]);
       await api.ensureDefaultNodeProtocols(id);
     }
-    const [fresh,old,custom,agentOnly,rollout] = nodeIds;
+    const [fresh,old,custom,agentOnly,rollout,probed] = nodeIds;
     await api.initializeVpnServices(fresh);
     assert.equal((await api.listVpnServices(fresh)).length,3);
     await api.reconcileEnabledVpnServices(fresh);
     assert.equal((await api.findVpnService(fresh,"vless")).status,"attention");
-    assert.match((await api.findVpnService(fresh,"vless")).last_error,/默认/);
+    // Auto target mode waits for the node's own probe; nothing to configure by hand.
+    assert.match((await api.findVpnService(fresh,"vless")).last_error,/REALITY 目标探测/);
     assert.ok(await api.findDesiredConfig(fresh,"wireguard"));
     assert.ok(await api.findDesiredConfig(fresh,"openvpn"));
     assert.equal(await api.findDesiredConfig(fresh,"vless"),undefined);
-    assert.equal((await api.deploymentPolicyOverview()).driftedNodes.find((node)=>node.id===fresh).eligible,false);
+    assert.match((await api.deploymentPolicyOverview()).driftedNodes.find((node)=>node.id===fresh).reason,/VLESS：/);
 
     await pool.query("INSERT INTO reality_defaults VALUES ('primary','auto.example.com',$1,$1)",[timestamp]);
     // Avoid public DNS in this isolated test. Port 443 and target safety are separately tested.
@@ -99,6 +100,16 @@ test("automatic deployment is idempotent, preserves custom templates and keys, r
     assert.equal((await api.listVpnServices(rollout)).length,3);
     assert.ok(await api.findDesiredConfig(rollout,"vless"));
     assert.equal((await pool.query("SELECT server_name FROM reality_settings WHERE node_id=$1",[rollout])).rows[0].server_name,"changed.example.com");
+
+    // Auto mode: the node's probe picks one of the built-in large sites.
+    await pool.query("UPDATE reality_defaults SET mode='auto',server_name=''");
+    await pool.query("UPDATE nodes SET agent_capabilities_json=$1 WHERE id=$2",[JSON.stringify({ realityProbe: { checkedAt: timestamp, results: [
+      { serverName: "www.apple.com", ok: true, latencyMs: 31 }, { serverName: "www.microsoft.com", ok: false, latencyMs: null } ] } }),probed]);
+    await api.initializeVpnServices(probed);
+    await pool.query("UPDATE vpn_services SET listen_port=8443 WHERE node_id=$1 AND protocol='vless'",[probed]);
+    await api.reconcileEnabledVpnServices(probed);
+    assert.equal((await pool.query("SELECT server_name FROM reality_settings WHERE node_id=$1",[probed])).rows[0].server_name,"www.apple.com");
+    assert.equal((await api.findDesiredConfig(probed,"vless")).payload.serverName,"www.apple.com");
   } finally {
     await api?.closeDb();
     await pool.query("DELETE FROM nodes WHERE id=ANY($1)",[nodeIds]);

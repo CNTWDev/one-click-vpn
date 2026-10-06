@@ -6,7 +6,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readSecretMaterial, createSecretMaterial, findSecretMaterialByKind } from "./secret-materials";
 import { hashToken } from "./crypto";
 
-export type RealitySettings = { node_id: string; server_name: string; public_key: string; short_id: string; secret_id: string };
+export type RealitySettings = { node_id: string; server_name: string; public_key: string; short_id: string; secret_id: string; previous_server_names?: string };
 export async function realitySettings(nodeId: string) {
   return (await dbQuery<RealitySettings>("SELECT * FROM reality_settings WHERE node_id = $1", [nodeId]))[0];
 }
@@ -21,14 +21,17 @@ export async function configureReality(nodeId: string, serverName: string, optio
     if (existing) {
       if (options.onlyIfMissing) return;
       if (existing.server_name === name) return;
-      const inUse = await exec("SELECT id FROM connection_profiles WHERE node_id=$1 AND protocol='vless' AND status IN ('issued','active') AND expires_at>$2", [nodeId,new Date().toISOString()]);
-      if (inUse) throw new Error("节点已有有效 VLESS 配置，不能直接更换目标域名。请先撤销相关连接或使用新节点。");
+      // Smooth switch: keys stay, the old names remain accepted, and existing profiles move to the
+      // new name so subscribers pick it up on their next refresh without re-issuing anything.
+      const previous = [existing.server_name, ...parsePreviousNames(existing.previous_server_names)].filter((item) => item !== name).slice(0, 3);
       const raw = await readSecretMaterial(existing.secret_id,nodeId);
       if (!raw) throw new Error("REALITY server secret unavailable");
-      const value = JSON.stringify({ ...JSON.parse(raw), serverName: name });
-      const encrypted = encryptSecret(value);
-      await exec("UPDATE secret_materials SET ciphertext=$1,iv=$2,tag=$3,fingerprint=$4,updated_at=$5 WHERE id=$6", [encrypted.ciphertext,encrypted.iv,encrypted.tag,hashToken(value),new Date().toISOString(),existing.secret_id]);
-      await exec("UPDATE reality_settings SET server_name=$1 WHERE node_id=$2", [name,nodeId]);
+      const value = JSON.stringify({ ...JSON.parse(raw), serverName: name, previousServerNames: previous });
+      const encrypted = encryptSecret(value), timestamp = new Date().toISOString();
+      await exec("UPDATE secret_materials SET ciphertext=$1,iv=$2,tag=$3,fingerprint=$4,updated_at=$5 WHERE id=$6", [encrypted.ciphertext,encrypted.iv,encrypted.tag,hashToken(value),timestamp,existing.secret_id]);
+      await exec("UPDATE reality_settings SET server_name=$1,previous_server_names=$2 WHERE node_id=$3", [name,JSON.stringify(previous),nodeId]);
+      await exec(`UPDATE connection_profiles SET protocol_payload_json=jsonb_set(protocol_payload_json::jsonb,'{serverName}',to_jsonb($1::text))::text,updated_at=$3
+        WHERE node_id=$2 AND protocol='vless'`, [name,nodeId,timestamp]);
       return;
     }
     const key = randomBytes(32);
@@ -40,6 +43,11 @@ export async function configureReality(nodeId: string, serverName: string, optio
       VALUES ($1,'reality_server',$2,$3,$4,$5,$6,$7,$7)`, [id,nodeId,encrypted.ciphertext,encrypted.iv,encrypted.tag,createHash("sha256").update(value).digest("hex"),timestamp]);
     await exec("INSERT INTO reality_settings (node_id,server_name,public_key,short_id,secret_id) VALUES ($1,$2,$3,$4,$5)", [nodeId,name,publicKey,shortId,id]);
   });
+}
+
+function parsePreviousNames(value: string | undefined): string[] {
+  try { const names = JSON.parse(value || "[]"); return Array.isArray(names) ? names.filter((item): item is string => typeof item === "string") : []; }
+  catch { return []; }
 }
 
 async function realityUserRows(nodeId: string) {
@@ -60,6 +68,9 @@ async function decryptUsers(rows: Awaited<ReturnType<typeof realityUserRows>>) {
     return { id, email: row.email };
   }));
 }
+
+/** Telemetry identities currently granted on a node (no secrets are decrypted). */
+export async function realityUserIdentities(nodeId: string) { return new Set((await realityUserRows(nodeId)).map((row) => row.email)); }
 
 export async function realityUsers(nodeId: string) { return decryptUsers(await realityUserRows(nodeId)); }
 
@@ -85,6 +96,9 @@ export async function realityUsersSecret(nodeId: string) {
   return material.id;
 }
 async function cleanRealityBundles(nodeId: string, keepId: string) {
+  // Runs on every heartbeat: an indexed existence probe first, the jsonb scans only when there is something to collect.
+  const cutoff = new Date(Date.now()-86400000).toISOString();
+  if (!(await dbQuery("SELECT 1 FROM secret_materials WHERE kind='vless_users_bundle' AND owner_node_id=$1 AND id<>$2 AND created_at<$3 LIMIT 1", [nodeId, keepId, cutoff])).length) return;
   // Keep queued and in-flight revisions readable; completed bundles have a one-day grace period.
   await dbExec(`DELETE FROM secret_materials s WHERE s.kind='vless_users_bundle' AND s.owner_node_id=$1
     AND s.id<>$2 AND s.created_at<$3

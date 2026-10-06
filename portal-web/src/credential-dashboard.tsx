@@ -1,21 +1,20 @@
-import { formatDate, formatActivity, intlLocales, message, translateMessage, type LocalizedMessage } from "../../shared/i18n-core";
-import { errorText } from "../../shared/i18n-errors";
 import { useI18n } from "../../shared/i18n";
-import { useCallback, useEffect, useState } from "react";
-import { x25519 } from "@noble/curves/ed25519.js";
+import { ClientDownloads } from "./client-downloads";
+import { intlLocales } from "../../shared/i18n-core";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useActionDialog } from "./action-dialog";
 import { api, fetchText, isUnauthorized } from "./api";
-import { clientOptions, clientProtocol, clientFormat, clientName, usableCredential, type ClientChoice } from "./client-options";
+import { usableCredential, type ClientChoice } from "./client-options";
+import { filenamePart, profileFilename, saveFiles, type Profile } from "./files";
+import { dayLabel as formatDay, formatBytes, protocolLabel } from "./format";
+import { NodeCreator, type AvailableNode, type NodePreset, type Region } from "./node-creator";
+import { Onboarding } from "./onboarding";
 import { RegionMap } from "./region-map";
-import { createZipBlob } from "./zip";
+import { SubscriptionAccess, type SubscriptionAccessHandle } from "./subscription-access";
+import { AppIcon, Icon, InlineError, Menu, Modal, ProtocolBadge, QrCode, Skeleton, Time, useToasts } from "./ui";
 import { SubscriptionPanel } from "../../shared/subscription-panel";
-import { SubscriptionAccess } from "./subscription-access";
-import { ClientDownloads } from "./client-downloads";
 
 type User = { email: string; displayName: string };
-type Region = { id: string; name: string; country: string; code: string; protocols: string[]; status: string; protocolNodeCounts?: Record<string, number> };
-type AvailableNode = { id: string; name: string; regionId: string; regionName: string; protocols: string[] };
-type Profile = { nodeId?: string; id: string; credentialId?: string | null; displayName?: string | null; nodeName?: string | null; regionalNodeCount?: number; regionCode?: string | null; regionName?: string | null; protocol: string; status: string; issuedAt: string; expiresAt: string };
 type Credential = {
   subscriptionId?: string | null;
   expiringSoon: boolean; daysRemaining: number | null;
@@ -27,90 +26,46 @@ type Credential = {
   certificate?: { id: string; serial?: string | null; subject?: string | null; pem?: string | null; fingerprint?: string; notBefore?: string | null; notAfter?: string | null } | null;
 };
 type Usage = { totals: { uploadBytes: number; downloadBytes: number; totalBytes: number }; daily: Array<{ day: string; totalBytes: number }>; updatedAt?: string };
-type Download = { client: ClientChoice; name: string; text?: string; files?: Array<{ name: string; text: string }> };
-
-const base64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
-const protocolLabel = (value: string) => value === "wireguard" ? "WireGuard" : value === "openvpn" ? "OpenVPN" : value === "vless" ? "VLESS + REALITY" : value;
-function filenamePart(value: string | null | undefined, fallback: string, maxLength = 18) {
-  return (value || "").normalize("NFKC").trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-").replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, maxLength) || fallback;
-}
-function profileFilename(profile: Profile) {
-  const extension = profile.protocol === "vless" ? "yaml" : profile.protocol === "openvpn" ? "ovpn" : "conf";
-  const protocolCode = profile.protocol === "vless" ? "VL" : profile.protocol === "openvpn" ? "OV" : "WG";
-  const node = (profile.regionalNodeCount || 0) > 1 ? `${profile.regionalNodeCount}nodes` : filenamePart(profile.nodeName, "node", 12);
-  return `${filenamePart(profile.regionCode?.toUpperCase(), "AUTO", 8)}-${filenamePart(profile.displayName, "credential")}-${protocolCode}-${node}.${extension}`;
-}
-function saveBlob(name: string, blob: Blob) {
-  const url = URL.createObjectURL(blob); const link = document.createElement("a");
-  link.href = url; link.download = name; document.body.appendChild(link); link.click(); link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
-}
-function saveText(name: string, text: string) { saveBlob(name, new Blob([text], { type: "text/plain;charset=utf-8" })); }
+type Issue = { message: string; retry?: () => void };
 
 export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const { t, locale } = useI18n();
-  const stateLabel = (value: string) => ({ disabled: t("已停用"), "admin-disabled": t("管理员已停用"), "account-disabled": t("账号已停用"), online: t("在线"), offline: t("离线"), "never-connected": t("尚未连接"), "telemetry-delayed": t("状态未知"), revoked: t("已撤销"), expired: t("已过期") } as Record<string, string>)[value] || value;
-  const statusLabel = (value: string) => ({ active: t("有效"), issued: t("待启用"), revoked: t("已撤销"), expired: t("已过期") } as Record<string, string>)[value] || value;
-  const formatBytes = (bytes = 0) => {
-    if (!bytes) return "0 B";
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-    return `${new Intl.NumberFormat(intlLocales[locale], { minimumFractionDigits: index ? 1 : 0, maximumFractionDigits: index ? 1 : 0 }).format(bytes / 1024 ** index)} ${units[index]}`;
-  };
+  const dayLabel = (value?: string | null) => t(formatDay(value, "长期有效", intlLocales[locale]));
+const stateLabel = (value: string) => ({ disabled: t("已停用"), "admin-disabled": t("管理员已停用"), "account-disabled": t("账号已停用"), online: t("在线"), offline: t("离线"), "never-connected": t("尚未连接"), "telemetry-delayed": t("状态未知"), revoked: t("已撤销"), expired: t("已过期") } as Record<string, string>)[value] || value;
+const statusLabel = (value: string) => ({ active: t("有效"), issued: t("待启用"), revoked: t("已撤销"), expired: t("已过期") } as Record<string, string>)[value] || value;
+const presence = (item: Credential) => item.protocol === "vless" && item.online ? t("最近活跃") : stateLabel(item.state);
+const tone = (state: string) => state === "online" ? "success" : ["offline", "never-connected", "telemetry-delayed"].includes(state) ? "neutral" : "danger";
 
-  const dateLabel = (value?: string | null) => formatDate(value, locale);
-  const activityLabel = (value?: string | null) => formatActivity(value, locale);
   const { ask, dialog } = useActionDialog();
+  const { notify, toasts } = useToasts();
   const [regions, setRegions] = useState<Region[]>([]);
   const [nodes, setNodes] = useState<AvailableNode[]>([]);
-  const [nodeId, setNodeId] = useState("");
-  const [mode, setMode] = useState<"subscription" | "single">("subscription");
-  const [creating, setCreating] = useState(false);
-  const [connectionFilter, setConnectionFilter] = useState("all");
-  const [advancedProtocol, setAdvancedProtocol] = useState("");
   const [credentials, setCredentials] = useState<Credential[]>([]);
-  const [allCredentials, setAllCredentials] = useState<Credential[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [usage, setUsage] = useState<Usage | null>(null);
-  const [selectedId, setSelectedId] = useState("");
-  const [customName, setName] = useState<string | null>(null);
-  const name = customName ?? t("我的 VPN");
-  const [preferredClient, setClient] = useState<ClientChoice>("hiddify");
-  const [downloadChoices, setDownloadChoices] = useState<Record<string, ClientChoice>>({});
-  const [stale, setStale] = useState(false);
-  const [regionId, setRegionId] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [notice, setNotice] = useState<LocalizedMessage>("");
-  const [error, setError] = useState("");
-  const [download, setDownload] = useState<Download | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [stale, setStale] = useState(false), [loadError, setLoadError] = useState(""), [refreshing, setRefreshing] = useState(false);
+  const [selectedId, setSelectedId] = useState(""), [filter, setFilter] = useState("all"), [regionId, setRegionId] = useState("");
+  const [creating, setCreating] = useState<"" | "subscription" | "single">("");
+  const [preset, setPreset] = useState<NodePreset & { key: number }>();
+  const [freshTokens, setFreshTokens] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false), [issue, setIssue] = useState<Issue | null>(null);
+  const [qr, setQr] = useState<{ title: string; text: string; hint: string } | null>(null);
+  const accessRef = useRef<SubscriptionAccessHandle>(null), detailRef = useRef<HTMLElement>(null), creatorRef = useRef<HTMLElement>(null);
 
-  const regionNodes = nodes.filter((item) => !regionId || item.regionId === regionId);
-  const chosenNode = nodeId ? regionNodes.find((item) => item.id === nodeId) : regionNodes[0];
-  const availableClients = clientOptions.filter((option) => ["clash", "hiddify"].includes(option.id)
-    ? chosenNode?.protocols.some((p) => ["wireguard", "vless"].includes(p)) : chosenNode?.protocols.includes(clientProtocol(option.id)));
-  const client = availableClients.find((item) => item.id === preferredClient)?.id || availableClients[0]?.id || preferredClient;
-  const flexibleClient = client === "clash" || client === "hiddify";
-  const protocol = flexibleClient ? (advancedProtocol || (chosenNode?.protocols.includes("wireguard") ? "wireguard" : "vless")) : clientProtocol(client);
-  const canCreate = !!chosenNode && chosenNode.protocols.includes(protocol) && availableClients.some((item) => item.id === client);
-  const visibleCredentials = credentials.filter((item) => connectionFilter === "all" || (connectionFilter === "subscription" ? !!item.subscriptionId : !item.subscriptionId));
-  const selected = visibleCredentials.find((item) => item.id === selectedId) || visibleCredentials[0];
+  const loaded = updatedAt !== null;
+  const visible = credentials.filter((item) => filter === "all" || (filter === "subscription" ? !!item.subscriptionId : !item.subscriptionId));
+  const selected = visible.find((item) => item.id === selectedId) || visible[0];
   const selectedProfiles = profiles.filter((item) => item.credentialId === selected?.id);
   const currentProfiles = selectedProfiles.filter((item) => item.status === "active" || item.status === "issued");
   const historyProfiles = selectedProfiles.filter((item) => item.status !== "active" && item.status !== "issued");
-  const onlineCount = allCredentials.filter((item) => item.online).length;
-  const usableCount = allCredentials.filter((item) => usableCredential(item)).length;
-  const selectedClient = selected?.protocol === "openvpn" ? "openvpn" : downloadChoices[selected?.id] || "hiddify";
+  const usableCount = credentials.filter((item) => usableCredential(item)).length;
+  const onlineCount = credentials.filter((item) => item.online).length;
   const canDownload = !!selected && usableCredential(selected) && currentProfiles.length > 0;
   const recentDays = (usage?.daily || []).slice(-14);
   const recentTotal = recentDays.reduce((sum, day) => sum + day.totalBytes, 0);
   const maxDay = Math.max(...recentDays.map((item) => item.totalBytes), 1);
-
-  function fail(caught: unknown) {
-    if (isUnauthorized(caught)) onLogout();
-    else setError((caught as Error).message);
-  }
+  const protocols = [...new Set(nodes.flatMap((item) => item.protocols))];
 
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
@@ -121,19 +76,15 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
         api<{ profiles: Profile[] }>("/api/v1/profiles"),
         api<Usage>("/api/v1/usage/summary"),
       ]);
-      const nextRegions = availability.regions || [];
-      const nextCredentials = credentialResult.credentials || [];
-      setNodes(availability.nodes || []);
-      setAllCredentials(credentialResult.credentials || []);
-      setRegions(nextRegions); setCredentials(nextCredentials); setProfiles(profileResult.profiles || []); setUsage(usageResult);
-      setUpdatedAt(new Date().toISOString()); setStale(false);
+      const nextRegions = availability.regions || [], nextCredentials = credentialResult.credentials || [];
+      setNodes(availability.nodes || []); setRegions(nextRegions); setCredentials(nextCredentials); setProfiles(profileResult.profiles || []); setUsage(usageResult);
+      setUpdatedAt(new Date().toISOString()); setStale(false); setLoadError("");
       setSelectedId((current) => nextCredentials.some((item) => item.id === current) ? current : nextCredentials[0]?.id || "");
       setRegionId((current) => current && !nextRegions.some((item) => item.id === current) ? "" : current);
     } catch (caught) {
       if (isUnauthorized(caught)) { onLogout(); return; }
-      setStale(true); if (!silent) setError((caught as Error).message);
-    }
-    finally { if (!silent) setRefreshing(false); }
+      setStale(true); if (!silent) setLoadError((caught as Error).message);
+    } finally { if (!silent) setRefreshing(false); }
   }, [onLogout]);
 
   useEffect(() => {
@@ -144,183 +95,196 @@ export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: 
     return () => { window.clearTimeout(initial); window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
   }, [refresh]);
 
-  function selectRegion(nextRegionId: string) {
-    setRegionId(nextRegionId); setNodeId(""); setAdvancedProtocol("");
-
-  }
-
-  async function createCredential(event: React.FormEvent) {
-    event.preventDefault();
-    if (busy || !canCreate) return;
-    if (!name.trim()) { setError("请输入连接名称，不能只包含空格。"); return; }
-    setBusy(true); setError(""); setNotice(""); setDownload(null);
-    let createdCredentialId = "";
-    let profileIssued = false;
-    try {
-      const privateBytes = protocol === "wireguard" ? x25519.utils.randomSecretKey() : null;
-      const clientPrivateKey = privateBytes ? base64(privateBytes) : undefined;
-      const publicKey = privateBytes ? base64(x25519.getPublicKey(privateBytes)) : undefined;
-      const created = await api<{ credential: Credential }>("/api/v1/credentials", { method: "POST", body: JSON.stringify({ name: name.trim(), protocol, publicKey }) });
-      createdCredentialId = created.credential.id;
-      const issued = await api<{ profile: Profile; profiles?: Profile[] }>("/api/v1/profiles", { method: "POST", body: JSON.stringify({ credentialId: created.credential.id, nodeId: chosenNode!.id, protocol, clientPrivateKey }) });
-      profileIssued = true;
-      const issuedProfiles = issued.profiles?.length ? issued.profiles : [issued.profile];
-      const activated = await Promise.all(issuedProfiles.map(async (item) => ({ ...(await api<{ profile: Profile }>(`/api/v1/profiles/${item.id}/activate`, { method: "POST" })).profile, displayName: name })));
-      const files = await Promise.all(activated.map(async (item) => {
-        const text = await fetchText(`/api/v1/profiles/${item.id}/download${clientFormat(client) === "mihomo" ? "?format=mihomo" : ""}`);
-        return { name: clientFormat(client) === "mihomo" ? profileFilename(item).replace(/\.conf$/, `-${item.id}-Clash.yaml`) : profileFilename(item), text };
-      }));
-      const prepared: Download = files.length === 1 ? { ...files[0], client } : { name: `${filenamePart(name, "credential")}-${clientName(client)}.zip`, files, client };
-      setDownload(prepared);
-      if (prepared.text) saveText(prepared.name, prepared.text);
-      else if (prepared.files) saveBlob(prepared.name, createZipBlob(prepared.files));
-      setDownloadChoices((choices) => ({ ...choices, [created.credential.id]: client }));
-      setSelectedId(created.credential.id); setConnectionFilter("all");
-      setNotice(message("「{0}」已创建，{1} 配置下载已开始。若浏览器未保存，可点击「重新下载」。", [name, clientName(client)]));
-      await refresh(true);
-    } catch (caught) {
-      if (createdCredentialId && !profileIssued) await api(`/api/v1/credentials/${createdCredentialId}/revoke`, { method: "POST" }).catch(() => undefined);
-      fail(caught);
-      await refresh(true);
-    }
+  /** Runs a detail action; failures stay inline in the detail card with a retry. */
+  async function perform(task: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true); setIssue(null);
+    try { await task(); }
+    catch (caught) { if (isUnauthorized(caught)) onLogout(); else setIssue({ message: (caught as Error).message, retry: () => void perform(task) }); }
     finally { setBusy(false); }
   }
+  function select(id: string) {
+    setSelectedId(id); setIssue(null);
+    if (window.matchMedia("(max-width: 900px)").matches) window.requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+  function openCreator(mode: "subscription" | "single", next?: NodePreset) {
+    setCreating(mode); if (next) setPreset((current) => ({ ...next, key: (current?.key || 0) + 1 }));
+    window.requestAnimationFrame(() => creatorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+  function created(id: string, token?: string) {
+    if (token) setFreshTokens((current) => ({ ...current, [id]: token }));
+    if (id) { setSelectedId(id); setFilter("all"); }
+    void refresh(true);
+  }
 
-  async function downloadProfiles(format: "native" | "mihomo" = "native") {
-    if (busy || !canDownload || !selected) return;
-    setBusy(true); setError(""); setNotice("");
-    try {
-      const targets = selected.protocol === "wireguard" ? currentProfiles : [currentProfiles[0]];
+  function downloadProfiles(target: Credential, format: "native" | "mihomo") {
+    return perform(async () => {
+      const targets = target.protocol === "wireguard" ? currentProfiles : [currentProfiles[0]];
       const files = await Promise.all(targets.map(async (profile) => {
-        const text = await fetchText(`/api/v1/profiles/${profile.id}/download${format === "mihomo" ? "?format=mihomo" : ""}`);
-        const filename = profileFilename({ ...profile, displayName: selected.name });
-        return { name: format === "mihomo" ? filename.replace(/\.conf$/, `-${profile.id}-Mihomo.yaml`) : filename, text };
+        const filename = profileFilename({ ...profile, displayName: target.name });
+        return { name: format === "mihomo" ? filename.replace(/\.conf$/, `-${profile.id}-Mihomo.yaml`) : filename, text: await fetchText(`/api/v1/profiles/${profile.id}/download${format === "mihomo" ? "?format=mihomo" : ""}`) };
       }));
-      if (files.length === 1) saveText(files[0].name, files[0].text);
-      else saveBlob(`${filenamePart(selected.name, "credential")}-${format === "mihomo" ? "Mihomo" : selected.protocol === "wireguard" ? "WG" : "OV"}.zip`, createZipBlob(files));
-      setNotice(format === "mihomo" ? message("Mihomo 配置下载已开始。多节点压缩包请先解压，再选择一份 YAML 作为本地配置导入。") : message("配置下载已开始。"));
-    } catch (caught) { fail(caught); }
-    finally { setBusy(false); }
+      saveFiles(files, `${filenamePart(target.name, "credential")}-${format === "mihomo" ? "Mihomo" : target.protocol === "wireguard" ? "WG" : "OV"}.zip`);
+      notify(format === "mihomo" ? t("配置开始下载。多节点压缩包请先解压，再选择一份 YAML 导入。") : t("配置开始下载，在客户端选择「从文件导入」。"));
+    });
   }
-
-  async function renameCredential() {
-    if (!selected) return;
-    const next = await ask({ title: t("修改连接名称"), description: t("名称只用于区分凭据，不影响现有配置和连接。"), confirmLabel: t("保存名称"), initialValue: selected.name });
-    if (!next || next === selected.name) return;
-    setBusy(true); setError(""); setNotice("");
-    try { await api(`/api/v1/credentials/${selected.id}`, { method: "PATCH", body: JSON.stringify({ name: next }) }); await refresh(true); setNotice(message("连接名称已更新，不会影响现有配置。")); }
-    catch (caught) { fail(caught); }
-    finally { setBusy(false); }
+  function profileLink(target: Credential, action: "copy" | "qr") {
+    return perform(async () => {
+      const vless = target.protocol === "vless";
+      const text = (await fetchText(`/api/v1/profiles/${currentProfiles[0].id}/download${vless ? "?format=uri" : ""}`)).trim();
+      if (action === "qr") setQr(vless
+        ? { title: t("扫码导入节点"), text, hint: t("Shadowrocket / v2rayNG / Hiddify 扫码即可添加这个节点。链接仅供本人使用。") }
+        : { title: t("扫码导入 WireGuard"), text, hint: t("WireGuard 手机客户端：＋ → 扫描二维码。二维码包含私钥，请勿截图分享。") });
+      else { await navigator.clipboard.writeText(text); notify(t("vless:// 链接已复制，在客户端选择「从剪贴板导入」。")); }
+    });
   }
-
-  async function revokeCredential() {
-    if (!selected || !await ask({ title: t("撤销「{0}」？", [selected.name]), description: t("节点同步后，所有复制出去的配置都会永久失效。此操作不可恢复；如需暂时停止使用，请选择停用。"), confirmLabel: t("确认撤销"), danger: true })) return;
-    setBusy(true); setError(""); setNotice("");
-    try { await api(`/api/v1/credentials/${selected.id}/revoke`, { method: "POST" }); await refresh(true); setDownload(null); setNotice(message("连接已撤销，节点同步后全部配置失效。")); }
-    catch (caught) { fail(caught); }
-    finally { setBusy(false); }
+  async function rename(target: Credential) {
+    const next = await ask({ title: t("修改连接名称"), description: t("名称只用于区分连接，不影响现有配置。"), confirmLabel: t("保存名称"), initialValue: target.name });
+    if (!next || next === target.name) return;
+    await perform(async () => { await api(`/api/v1/credentials/${target.id}`, { method: "PATCH", body: JSON.stringify({ name: next }) }); await refresh(true); notify(t("名称已更新。")); });
   }
-
-  async function changeAccess(action: "enable" | "disable" | "delete") {
-    if (!selected || !await ask({ title: t("{0}「{1}」？", [action === "enable" ? t("启用") : action === "disable" ? t("停用") : t("删除"), selected.name]), description: action === "delete" ? t("节点同步后，所有配置将永久失效，连接从列表移除。历史流量与审计保留，此操作不可恢复。") : action === "disable" ? t("节点同步后，所有配置副本将暂停使用。之后可以重新启用，无需重新下载配置。") : t("节点同步后恢复使用。管理员或账号限制仍需由管理员解除。"), confirmLabel: action === "enable" ? t("确认启用") : action === "disable" ? t("确认停用") : t("确认删除"), danger: action === "delete" })) return;
-    setBusy(true); setError(""); setNotice("");
-    try {
-      const result = await api<{ sync: { status: string } }>(`/api/v1/credentials/${selected.id}`, { method: "PATCH", body: JSON.stringify({ action }) });
-      setDownload(null);
-      setNotice(result.sync.status === "failed" ? message("状态已保存，但节点同步失败，请联系管理员重试。") : message("操作已保存，请查看节点同步状态。管理员限制只能由管理员解除。"));
+  async function changeAccess(target: Credential, action: "enable" | "disable" | "delete") {
+    const copy = {
+      enable: { title: t("启用「{0}」？", [target.name]), description: t("节点同步后恢复使用。管理员或账号限制仍需由管理员解除。"), confirmLabel: t("启用") },
+      disable: { title: t("停用「{0}」？", [target.name]), description: t("节点同步后，所有配置副本暂停使用。之后可以重新启用，无需重新导入。"), confirmLabel: t("停用") },
+      delete: { title: t("删除「{0}」？", [target.name]), description: t("删除后立即永久失效：所有客户端里的订阅和配置都无法再连接，连接从列表移除。历史流量保留。此操作不可恢复。"), confirmLabel: t("永久删除"), danger: true },
+    }[action];
+    if (!await ask(copy)) return;
+    await perform(async () => {
+      const result = await api<{ sync: { status: string } }>(`/api/v1/credentials/${target.id}`, { method: "PATCH", body: JSON.stringify({ action }) });
       await refresh(true);
-    } catch (caught) { fail(caught); }
-    finally { setBusy(false); }
+      if (result.sync.status === "failed") throw new Error(t("已保存，但节点同步失败，请稍后重试或联系管理员。"));
+      notify(action === "delete" ? t("连接已删除，所有配置立即失效。") : action === "disable" ? t("已停用，节点同步后生效。") : t("已启用，节点同步后生效。"));
+    });
   }
-
   async function bulkAccess(action: "disable" | "revoke") {
-    if (!await ask({ title: action === "disable" ? t("停用全部连接？") : t("撤销全部连接？"), description: action === "disable" ? t("节点同步后，自己的全部有效连接将暂停使用。可以逐个重新启用。") : t("节点同步后，自己的全部连接及所有配置副本将永久失效，无法恢复。"), confirmLabel: action === "disable" ? t("全部停用") : t("全部撤销"), danger: true })) return;
-    setBusy(true); setError(""); setNotice("");
-    try {
-      await api("/api/v1/credentials", { method: "PATCH", body: JSON.stringify({ action }) });
-      setDownload(null); setNotice(message("批量操作已保存，请查看节点同步状态。")); await refresh(true);
-    } catch (caught) { fail(caught); }
-    finally { setBusy(false); }
+    if (!await ask(action === "disable"
+      ? { title: t("停用全部连接？"), description: t("节点同步后，你的全部有效连接暂停使用，可以逐个重新启用。"), confirmLabel: t("全部停用") }
+      : { title: t("删除全部连接？"), description: t("你的全部连接和所有配置副本将立即永久失效，无法恢复。"), confirmLabel: t("全部永久删除"), danger: true })) return;
+    await perform(async () => { await api("/api/v1/credentials", { method: "PATCH", body: JSON.stringify({ action }) }); await refresh(true); notify(t("批量操作已保存，节点同步后生效。")); });
   }
-
-  function prepareReplacement() {
-    if (!selected) return;
-    setCreating(true); setMode(selected.subscriptionId ? "subscription" : "single");
-    setName(t("{0}（换发）", [selected.name]));
-    setClient(selectedClient);
+  function prepareReplacement(target: Credential) {
+    if (target.subscriptionId) { openCreator("subscription"); notify(t("创建新订阅并导入后，可删除旧连接。")); return; }
     const previous = selectedProfiles[0];
     const region = regions.find((item) => item.code === previous?.regionCode && item.name === previous?.regionName);
     if (region) setRegionId(region.id);
-    setNodeId(previous?.nodeId || "");
-    setNotice(message("已填好换发信息，请在上方创建新凭据并下载配置，然后重新导入所有使用端。旧配置保持原到期时间；新配置验证成功后可撤销旧凭据。"));
-    document.getElementById("credential-create")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const client: ClientChoice = target.protocol === "openvpn" ? "openvpn" : target.protocol === "wireguard" ? "wireguard" : "hiddify";
+    openCreator("single", { name: t("{0}（换发）", [target.name]), client, nodeId: previous?.nodeId || "" });
+    notify(t("已填好换发信息。新配置导入并验证后，再删除旧连接。"));
   }
 
-  function saveDownload() {
-    if (!download) return;
-    if (download.text) saveText(download.name, download.text);
-    else if (download.files) saveBlob(download.name, createZipBlob(download.files));
-  }
+  const hero = <section className="hero">
+    <div>
+      <h1>{!loaded ? loadError ? t("{0}，你好", [user.displayName]) : <Skeleton height={34} width={320} /> : credentials.length ? <>{user.displayName}{t("，你有")}{usableCount}{t("个可用连接")}<span>{t("近 30 天")}{formatBytes(usage?.totals.totalBytes)}</span></> : t("{0}，欢迎使用 Northstar", [user.displayName])}</h1>
+      {loaded && credentials.length > 0 && <div className="metrics-row" aria-label={t("使用概览")}>
+        <span><small>{t("上传")}</small><b>{formatBytes(usage?.totals.uploadBytes)}</b></span>
+        <span><small>{t("下载")}</small><b>{formatBytes(usage?.totals.downloadBytes)}</b></span>
+        <span><small>{t("最近活跃")}</small><b>{onlineCount}{t("个连接")}</b></span>
+        <span><small>{t("全部连接")}</small><b>{credentials.length}{t("个")}</b></span>
+      </div>}
+    </div>
+    {loaded && credentials.length > 0 && <button type="button" className={creating ? "secondary" : "primary"} onClick={() => creating ? setCreating("") : openCreator("subscription")}>{creating ? t("收起") : <>{Icon.plus()}{t("新建连接")}</>}</button>}
+  </section>;
+
+  const creator = creating && <section className="card creator" ref={creatorRef} aria-labelledby="creator-title">
+    <div className="card-head"><h2 id="creator-title">{t("新建连接")}</h2><button type="button" className="icon-button" aria-label={t("关闭")} onClick={() => setCreating("")}>{Icon.close()}</button></div>
+    <div className="mode-switch" role="group" aria-label={t("连接模式")}>
+      <button type="button" aria-pressed={creating === "subscription"} onClick={() => setCreating("subscription")}><b>{t("订阅")}<em>{t("推荐")}</em></b><small>{t("一次导入全部节点，自动更新")}</small></button>
+      <button type="button" aria-pressed={creating === "single"} onClick={() => setCreating("single")}><b>{t("指定节点")}</b><small>{t("固定一个节点，下载独立配置")}</small></button>
+    </div>
+    {creating === "subscription"
+      ? <SubscriptionPanel api={api} createOnly availableProtocols={protocols} onCreated={(id, token) => { setCreating(""); notify(t("订阅已创建，节点同步约需几十秒，之后在下方导入。")); created(id, token); }} />
+      : <NodeCreator key={preset?.key || 0} nodes={nodes} regions={regions} regionId={regionId} onRegion={setRegionId} preset={preset} notify={notify} onCreated={created} onUnauthorized={onLogout} />}
+  </section>;
+
+  const detail = selected && <article className="detail" ref={detailRef} key={selected.id} aria-labelledby="detail-title">
+    <div className="detail-head">
+      <ProtocolBadge protocol={selected.protocol} subscription={!!selected.subscriptionId} />
+      <div className="detail-title"><h3 id="detail-title">{selected.name}<span className={`pill ${tone(selected.state)}`}>{presence(selected)}</span></h3><p>{selected.subscriptionId ? t("{0} 订阅", [protocolLabel(selected.protocol)]) : `${protocolLabel(selected.protocol)} · ${currentProfiles[0]?.nodeName ? `${currentProfiles[0].regionName || ""} ${currentProfiles[0].nodeName}` : t("尚未生成配置")}`}{t("· 有效期至")}{dayLabel(selected.expiresAt)}</p></div>
+      <Menu label={t("管理连接")} items={[
+        { label: t("改名"), onSelect: () => void rename(selected), disabled: busy },
+        selected.status === "active" && { label: selected.userDisabled ? t("启用") : t("停用"), onSelect: () => void changeAccess(selected, selected.userDisabled ? "enable" : "disable"), disabled: busy || selected.adminDisabled },
+        selected.status === "active" && !selected.adminDisabled && !selected.userDisabled && { label: t("换发连接"), onSelect: () => prepareReplacement(selected) },
+        !!selected.subscriptionId && usableCredential(selected) && { label: t("重置订阅链接"), onSelect: () => accessRef.current?.resetLink() },
+        "-",
+        { label: t("删除（立即永久失效）"), danger: true, onSelect: () => void changeAccess(selected, "delete"), disabled: busy },
+      ]} />
+    </div>
+    {selected.syncStatus !== "applied" && <p className="callout warning">{selected.syncStatus === "failed" ? t("更改尚未同步到节点，请稍后刷新或联系管理员。") : t("更改正在同步到节点，请稍候。")}</p>}
+    {(selected.expiringSoon || selected.status === "expired") && <div className="callout warning"><p>{selected.status === "expired" ? t("连接已到期，请换发后重新导入。") : t("还有 {0} 天到期，请提前换发。", [selected.daysRemaining])}</p>{!selected.adminDisabled && !selected.userDisabled && <button type="button" className="secondary small" disabled={busy} onClick={() => prepareReplacement(selected)}>{t("换发连接")}</button>}</div>}
+    {selected.subscriptionId
+      ? <SubscriptionAccess key={selected.subscriptionId} ref={accessRef} id={selected.subscriptionId} protocol={selected.protocol} initialToken={freshTokens[selected.id]} disabled={!usableCredential(selected)} notify={notify} onChanged={() => void refresh(true)} />
+      : <section className="access" aria-label={t("下载配置")}>
+        <div className="access-head"><h4>{currentProfiles.length > 1 && selected.protocol !== "openvpn" ? t("下载配置包 · {0} 个节点", [currentProfiles.length]) : t("导入到客户端")}</h4></div>
+        <div className="client-buttons">
+          {selected.protocol === "openvpn" && <button type="button" className="client-button" disabled={busy || !canDownload} onClick={() => void downloadProfiles(selected, "native")}><AppIcon id="openvpn" /><span><b>OpenVPN Connect</b><small>{t("下载 .ovpn 文件")}</small></span></button>}
+          {selected.protocol === "wireguard" && <button type="button" className="client-button" disabled={busy || !canDownload} onClick={() => void downloadProfiles(selected, "native")}><AppIcon id="wireguard" /><span><b>WireGuard</b><small>{t("下载 .conf 文件")}</small></span></button>}
+          {selected.protocol !== "openvpn" && <>
+            <button type="button" className="client-button" disabled={busy || !canDownload} onClick={() => void downloadProfiles(selected, "mihomo")}><AppIcon id="hiddify" /><span><b>Hiddify</b><small>{t("下载 YAML 配置")}</small></span></button>
+            <button type="button" className="client-button" disabled={busy || !canDownload} onClick={() => void downloadProfiles(selected, "mihomo")}><AppIcon id="clash" /><span><b>Clash Verge</b><small>{t("Mihomo 内核")}</small></span></button>
+          </>}
+          {selected.protocol === "vless" && <button type="button" className="client-button" disabled={busy || !canDownload} onClick={() => void profileLink(selected, "copy")}><span className="app-icon neutral">{Icon.copy()}</span><span><b>{t("复制链接")}</b><small>{t("vless:// 单节点")}</small></span></button>}
+          {(selected.protocol === "vless" || (selected.protocol === "wireguard" && currentProfiles.length === 1)) && <button type="button" className="client-button" disabled={busy || !canDownload} onClick={() => void profileLink(selected, "qr")}><span className="app-icon neutral">{Icon.qr()}</span><span><b>{t("二维码")}</b><small>{t("手机扫码导入")}</small></span></button>}
+        </div>
+        <p className={`hint ${usableCredential(selected) ? "" : "warning"}`}>{!usableCredential(selected) ? t("当前连接不可用，恢复后才能下载；管理员限制请联系管理员解除。") : t("下载后在客户端选择「从文件导入」。")}{selected.protocol === "wireguard" ? t(" 同一份 WireGuard 连接请勿在多个设备同时开启。") : ""}</p>
+      </section>}
+    {issue && <InlineError message={issue.message} onRetry={issue.retry} busy={busy} />}
+    <div className="tiles">
+      <div><small>{t("近 30 天流量")}</small><strong>{formatBytes(selected.totalBytes)}</strong><span>↑ {formatBytes(selected.uploadBytes)} · ↓ {formatBytes(selected.downloadBytes)}</span></div>
+      <div><small>{selected.protocol === "vless" ? t("使用状态") : t("当前连接")}</small><strong>{selected.protocol === "vless" ? selected.online ? t("最近活跃") : t("暂无活动") : selected.connectionCount}</strong><span>{t("最近活动")}<Time value={selected.lastActivityAt} fallback={t("尚未使用")} /></span></div>
+    </div>
+    <details className="disclosure">
+      <summary>{t("配置与证书详情")}</summary>
+      <dl className="facts"><div><dt>{t("底层协议")}</dt><dd>{protocolLabel(selected.protocol)}</dd></div><div><dt>{t("创建时间")}</dt><dd><Time value={selected.createdAt} /></dd></div><div><dt>{t("到期时间")}</dt><dd><Time value={selected.expiresAt} relative={false} fallback={t("长期有效")} /></dd></div><div><dt>{t("连接身份")}</dt><dd>…{selected.identitySuffix}</dd></div>
+        {selected.certificate && <><div><dt>{t("证书到期")}</dt><dd><Time value={selected.certificate.notAfter} relative={false} /></dd></div><div><dt>{t("序列号")}</dt><dd><code>{selected.certificate.serial || "—"}</code></dd></div><div><dt>{t("SHA-256 指纹")}</dt><dd><code>{selected.certificate.fingerprint || "—"}</code></dd></div></>}
+      </dl>
+      {selected.certificate?.pem && <details className="disclosure compact"><summary>{t("查看公开证书")}</summary><pre>{selected.certificate.pem}</pre></details>}
+      <h5>{t("当前配置 ·")}{currentProfiles.length}{t("份")}</h5>
+      <ul className="plain-list">{currentProfiles.map((profile) => <li key={profile.id}><span>{profile.regionName || t("自动区域")} · {profile.nodeName || "—"}</span><small>{statusLabel(profile.status)}{t("· 到期")}{dayLabel(profile.expiresAt)}</small></li>)}</ul>
+      {historyProfiles.length > 0 && <><h5>{t("历史配置 ·")}{historyProfiles.length}{t("份")}</h5><ul className="plain-list">{historyProfiles.slice(0, 8).map((profile) => <li key={profile.id}><span>{profile.regionName || profile.regionCode}</span><small>{statusLabel(profile.status)} · <Time value={profile.issuedAt} /></small></li>)}</ul></>}
+    </details>
+  </article>;
+
+  const counts = { all: credentials.length, subscription: credentials.filter((item) => item.subscriptionId).length, single: credentials.filter((item) => !item.subscriptionId).length };
+  const connections = !loaded
+    ? loadError
+      ? <section className="card"><InlineError message={t("无法读取连接：{0}", [loadError])} onRetry={() => void refresh()} busy={refreshing} /></section>
+      : <section className="card connections" aria-busy="true" aria-label={t("正在读取")}><div className="split"><div className="list">{[0, 1, 2].map((key) => <div className="list-item" key={key}><Skeleton height={36} width={36} /><span className="list-main"><Skeleton width="60%" /><Skeleton height={12} width="85%" /></span></div>)}</div><div className="detail"><Skeleton height={28} width="45%" /><Skeleton height={14} width="70%" /><div className="client-buttons">{[0, 1, 2, 3].map((key) => <Skeleton key={key} height={64} />)}</div><Skeleton height={80} /></div></div></section>
+    : !credentials.length
+      ? <Onboarding protocols={protocols} notify={notify} onCreated={created} onSingle={() => openCreator("single")} onUnauthorized={onLogout} />
+      : <section className="card connections" aria-labelledby="connections-title">
+        <div className="section-head">
+          <h2 id="connections-title">{t("我的连接")}</h2>
+          <div className="chips" role="group" aria-label={t("筛选连接")}>{([["all", t("全部")], ["subscription", t("订阅")], ["single", t("节点配置")]] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}<span>{counts[value]}</span></button>)}</div>
+          <span className="updated">{stale ? <span className="warning-text">{t("暂时无法更新，显示上次结果")}</span> : <>{t("更新于")}<Time value={updatedAt} /></>}<button type="button" className="icon-button" aria-label={t("刷新")} title={t("刷新")} disabled={refreshing} onClick={() => void refresh()}><span className={refreshing ? "spin" : ""}>{Icon.refresh(17)}</span></button></span>
+          <Menu label={t("全部连接管理")} text={t("批量")} items={[{ label: t("停用全部连接"), onSelect: () => void bulkAccess("disable"), disabled: busy }, "-", { label: t("删除全部（立即永久失效）"), danger: true, onSelect: () => void bulkAccess("revoke"), disabled: busy }]} />
+        </div>
+        {stale && loadError && <InlineError message={loadError} onRetry={() => void refresh()} busy={refreshing} />}
+        <div className="split">
+          <div className="list" role="list">{visible.length ? visible.map((item) => <button type="button" role="listitem" aria-current={selected?.id === item.id} className={`list-item ${selected?.id === item.id ? "selected" : ""}`} key={item.id} onClick={() => select(item.id)}>
+            <ProtocolBadge protocol={item.protocol} subscription={!!item.subscriptionId} />
+            <span className="list-main"><strong>{item.name}</strong><small>{item.subscriptionId ? t("{0} 订阅", [protocolLabel(item.protocol)]) : t("节点配置")} · {presence(item)}{t("· 30 天")}{formatBytes(item.totalBytes)}</small></span>
+            <span className={`presence ${item.online ? "online" : ""}`} aria-label={item.online ? t("在线") : t("离线")} />
+          </button>) : <p className="hint">{t("暂无此类连接。")}</p>}</div>
+          {detail || <div className="detail empty-detail"><p>{t("选择左侧的连接查看详情。")}</p></div>}
+        </div>
+      </section>;
 
   return <main className="dashboard">
-    {dialog}
-    {(error || notice || busy) && <div className={`action-feedback ${error ? "error" : ""}`} role={error ? "alert" : "status"}><span>{(error && errorText(error, t)) || (busy ? t("正在处理，请稍候…") : translateMessage(notice, t))}</span>{!busy && <button type="button" aria-label={t("关闭提示")} onClick={() => { setError(""); setNotice(""); }}>×</button>}</div>}
-    <header><div className="brand"><span className="brand-mark"><i /><i /><i /></span><span>NORTHSTAR <em>VPN</em></span></div><div className="account"><span>{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b><small>{user.email}</small></div><button onClick={onLogout}>{t("退出")}</button></div></header>
-    <section className="welcome"><div><p className="kicker">{t("MY CONNECTIONS")}</p><h1>{t("我的连接")}</h1><p>{t("订阅随时换节点，独立配置固定连接。所有使用情况在这里统一管理。")}</p></div><button className="primary" onClick={() => { setCreating(!creating); setDownload(null); }}>{creating ? t("收起创建") : t("＋ 新建连接")}</button></section>
-    <section className="stats simple-stats" aria-label={t("使用概览")}>
-      <article><small>{t("近 30 天总流量")}</small><strong>{usage ? formatBytes(usage.totals.totalBytes) : "—"}</strong><span>{t("上传")} {usage ? formatBytes(usage.totals.uploadBytes) : "—"} {t("· 下载")} {usage ? formatBytes(usage.totals.downloadBytes) : "—"}</span></article>
-      <article><small>{t("最近活跃")}</small><strong>{updatedAt ? onlineCount : "—"}</strong><span>{stale ? t("更新中断，显示上次结果") : t("包含订阅与文件连接，不代表设备数")}</span></article>
-      <article><small>{t("可用连接")}</small><strong>{updatedAt ? usableCount : "—"}</strong><span>{allCredentials.length} {t("份连接 · 已停用或到期的不计入")}</span></article>
-    </section>
-    <div className="grid simple-create-grid">
-      {creating && <section className="card connection-creator"><div className="card-head"><div><p className="kicker">{t("NEW CONNECTION")}</p><h2 id="credential-create">{t("新建连接")}</h2></div><span className="muted">{t("有效期 1 年")}</span></div>
-        <div className="mode-switch" role="group" aria-label={t("连接模式")}><button type="button" aria-pressed={mode === "subscription"} onClick={() => setMode("subscription")}><b>{t("订阅 · 推荐")}</b><small>{t("一次导入，自动更新可用节点")}</small></button><button type="button" aria-pressed={mode === "single"} onClick={() => setMode("single")}><b>{t("指定节点")}</b><small>{t("固定一个节点，下载独立配置")}</small></button></div>
-        {mode === "subscription" ? <SubscriptionPanel api={api} createOnly availableProtocols={[...new Set(nodes.flatMap((item) => item.protocols))]} onCreated={(id) => { setSelectedId(id); setConnectionFilter("all"); void refresh(true); }} /> : <>
-        <form onSubmit={createCredential}>
-          <div className="form-grid"><label>{t("区域")}<select disabled={busy} value={regionId} onChange={(event) => selectRegion(event.target.value)}><option value="">{t("全部区域")}</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select></label><label>{t("指定节点")}<select disabled={busy} value={nodeId} onChange={(event) => { setNodeId(event.target.value); setAdvancedProtocol(""); }}><option value="">{chosenNode && !nodeId ? t("推荐：{0}", [chosenNode.name]) : t("选择节点")}</option>{regionNodes.map((node) => <option value={node.id} key={node.id}>{node.regionName} · {node.name}</option>)}</select></label></div>
-          <fieldset className="client-picker" disabled={busy}><legend>{t("你使用哪个客户端？")}</legend>{availableClients.map((option) => <label className={client === option.id ? "selected" : ""} key={option.id}><input type="radio" name="client" value={option.id} checked={client === option.id} onChange={() => setClient(option.id)} /><strong>{option.name}</strong><small>{t(option.description)}</small></label>)}</fieldset>
-          <div className="form-grid"><label>{t("连接名称")}<input required disabled={busy} value={name} onChange={(event) => setName(event.target.value)} placeholder={t("例如：我的连接")} /></label></div>
-          {flexibleClient && chosenNode && <details className="connection-disclosure"><summary>{t("高级设置")}</summary><label>{t("连接协议")}<select value={advancedProtocol} disabled={busy} onChange={(e) => setAdvancedProtocol(e.target.value)}><option value="">{t("自动匹配")}</option>{chosenNode.protocols.filter((p) => ["wireguard", "vless"].includes(p)).map((p) => <option key={p} value={p}>{protocolLabel(p)}</option>)}</select></label></details>}
-          <p className="form-footnote">{t("仅生成所选节点的配置，不会自动加入其他节点。节点变化时请重新生成。")}</p>
-          {!canCreate && updatedAt && <p className="error" role="status">{t("当前节点或客户端不可用，请选择可用节点和客户端。")}</p>}
-          <button className="primary create-download" disabled={busy || !canCreate}>{busy ? t("处理中…") : t("创建并下载")}<span aria-hidden="true">↓</span></button>
-          <p className="form-footnote">{client === "clash" ? t("支持 Mihomo 内核的 Clash 客户端，不适用于旧版 Clash。") : t("下载后导入 {0} 客户端。", [clientName(client)])} {t("配置仅供本人使用。")}</p>
-        </form>
-        {download && <div className="download-box" role="status"><b>{t("已准备好，下一步导入")} {clientName(download.client)}</b><p>{download.files ? t("先解压下载的 ZIP，再选择一份配置文件导入。") : t("在客户端中选择「导入配置」或「从文件导入」，打开刚下载的文件。")}{download.client === "clash" ? t(" 启用配置后，打开客户端的系统代理或 TUN。") : t(" 导入后开启连接。")}{protocol === "wireguard" ? t(" 同一份连接请勿在多个客户端同时开启。") : ""}</p><button type="button" className="secondary" onClick={saveDownload}>{t("重新下载")}</button></div>}
-      </>}
-      </section>}
-
-    </div>
-    <section className="device-hub"><div className="device-hub-head"><div><p className="kicker">{t("YOUR CONNECTIONS")}</p><h2>{t("我的连接")}</h2><p>{t("订阅和节点配置统一管理，不区分实际安装设备。")}</p></div><div className="device-hub-head-actions"><button type="button" className="refresh-button" disabled={refreshing} onClick={() => void refresh()}>{refreshing ? t("刷新中…") : t("刷新状态")}</button><small className={stale ? "stale" : ""}>{stale ? t("暂时无法更新，以下为上次结果") : updatedAt ? t("更新于 {0} · 自动刷新", [dateLabel(updatedAt)]) : t("正在读取…")}</small></div></div>
-      <div className="connection-filters" role="group" aria-label={t("筛选连接")}>{[["all", t("全部")], ["subscription", t("订阅")], ["single", t("节点配置")]].map(([value, label]) => <button key={value} aria-pressed={connectionFilter === value} onClick={() => setConnectionFilter(value)}>{label}</button>)}</div>
-      <div className="device-hub-layout"><div className="device-list">{visibleCredentials.length ? visibleCredentials.map((credential) => <button type="button" aria-pressed={selected?.id === credential.id} className={`device-card ${selected?.id === credential.id ? "selected" : ""}`} key={credential.id} onClick={() => setSelectedId(credential.id)}><span className="connection-symbol" aria-hidden="true">↗</span><span className="device-card-main"><strong>{credential.name}</strong><small>{credential.subscriptionId ? t("订阅") : t("节点配置")} · {credential.protocol === "vless" && credential.online ? t("最近活跃") : stateLabel(credential.state)} {t("· 30 天")} {formatBytes(credential.totalBytes)}</small></span><span className={`presence-dot ${credential.online ? "online" : ""}`} /></button>) : <p className="empty">{t("暂无此类连接。点击“新建连接”开始。")}</p>}</div>
-      {selected ? <article className="device-detail" key={selected.id}>
-        <div className="device-detail-head"><div className="device-title-line"><h3>{selected.name}</h3><span className={`status-pill ${selected.state}`}>{selected.protocol === "vless" && selected.online ? t("最近活跃") : stateLabel(selected.state)}</span></div><p>{t("有效期至")} {dateLabel(selected.expiresAt)} {t("· 最近活动")} {activityLabel(selected.lastActivityAt)}</p></div>
-        <p className="connection-mode-label">{selected.subscriptionId ? t("动态订阅 · 已生成 {0} 个节点配置，更新后获取可用节点", [currentProfiles.length]) : currentProfiles.length > 1 || currentProfiles.some((p) => (p.regionalNodeCount || 0) > 1) ? t("原有区域配置 · 保留原使用方式") : t("指定节点 · {0}", [currentProfiles[0]?.nodeName || t("尚未生成配置")])}</p>
-        {selected.syncStatus !== "applied" && <p className="credential-warning" role="status">{selected.syncStatus === "failed" ? t("更改尚未成功同步，请联系管理员。") : t("更改正在生效，请稍候。")}</p>}
-        {(selected.expiringSoon || selected.status === "expired") && <div className="credential-warning"><p>{selected.status === "expired" ? t("连接已到期，请换发后重新导入。") : t("还有 {0} 天到期，请提前换发。", [selected.daysRemaining])}</p>{!selected.adminDisabled && !selected.userDisabled && <button className="text-link" disabled={busy} onClick={prepareReplacement}>{t("换发连接")}</button>}</div>}
-        <div className="device-metrics simple-metrics"><div><small>{t("近 30 天流量")}</small><strong>{formatBytes(selected.totalBytes)}</strong><span>↑ {formatBytes(selected.uploadBytes)} · ↓ {formatBytes(selected.downloadBytes)}</span></div><div><small>{selected.protocol === "vless" ? t("使用状态") : t("当前连接")}</small><strong>{selected.protocol === "vless" ? selected.online ? t("最近活跃") : t("暂无活动") : selected.connectionCount}</strong><span>{selected.state === "telemetry-delayed" ? t("状态暂未更新") : selected.online ? t("正在使用") : t("暂未观测到连接")}</span></div></div>
-        {selected.subscriptionId ? <SubscriptionAccess key={selected.subscriptionId} id={selected.subscriptionId} disabled={!usableCredential(selected)} onChanged={() => void refresh(true)} /> : <>
-        <section className="connection-download"><label>{t("下载到哪个客户端？")}<select disabled={busy} value={selectedClient} onChange={(event) => setDownloadChoices((choices) => ({ ...choices, [selected.id]: event.target.value as ClientChoice }))}>{clientOptions.filter((item) => selected.protocol === "vless" ? ["hiddify", "clash"].includes(item.id) : clientProtocol(item.id) === selected.protocol).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><button className="primary" disabled={busy || !canDownload} onClick={() => void downloadProfiles(clientFormat(selectedClient))}>{t(currentProfiles.length > 1 && selected.protocol !== "openvpn" ? "下载配置包" : "下载配置")}</button></section>
-        <p className="form-footnote">{!usableCredential(selected) ? t("当前连接不可用，恢复后才能下载；管理员限制请联系管理员解除。") : selectedClient === "clash" ? t("适用于 Mihomo 内核。下载后从文件导入，再开启系统代理或 TUN。") : t("下载后导入 {0}。", [clientName(selectedClient)])}{selected.protocol === "wireguard" && t(" 同一份连接请勿在多个客户端同时开启。")}</p>
-        </>}
-        <details className="connection-disclosure"><summary>{t("更多操作")}</summary><div className="connection-manage"><button className="text-link" disabled={busy} onClick={() => void renameCredential()}>{t("改名")}</button>{selected.status === "active" && <button className="text-link" disabled={busy || selected.adminDisabled} onClick={() => void changeAccess(selected.userDisabled ? "enable" : "disable")}>{selected.userDisabled ? t("启用") : t("停用")}</button>}{selected.status === "active" && <button className="danger-link" disabled={busy} onClick={() => void revokeCredential()}>{t("永久撤销")}</button>}<button className="danger-link" disabled={busy} onClick={() => void changeAccess("delete")}>{t("删除")}</button></div><p className="form-footnote">{t("停用可以恢复；撤销或删除会永久作废全部配置副本。")}</p></details>
-        <details className="connection-disclosure"><summary>{t("证书与配置详情")}</summary>
-          <dl className="connection-facts"><div><dt>{t("底层协议")}</dt><dd>{protocolLabel(selected.protocol)}</dd></div><div><dt>{t("创建时间")}</dt><dd>{dateLabel(selected.createdAt)}</dd></div><div><dt>{t("连接身份")}</dt><dd>…{selected.identitySuffix}</dd></div></dl>
-          {selected.certificate && <div className="certificate-summary"><span><small>{t("证书到期时间")}</small><b>{dateLabel(selected.certificate.notAfter)}</b></span><span><small>{t("序列号")}</small><code>{selected.certificate.serial || "—"}</code></span><span><small>{t("SHA-256 指纹")}</small><code>{selected.certificate.fingerprint || "—"}</code></span><details><summary>{t("查看公开证书")}</summary><pre>{selected.certificate.pem}</pre></details></div>}
-          <h4>{t("当前配置 · {0}", [currentProfiles.length])}</h4>{currentProfiles.map((profile) => <p className="form-footnote" key={profile.id}>{profile.regionName || t("自动区域")} · {profile.nodeName || ""} · {statusLabel(profile.status)} {t("· 到期")} {dateLabel(profile.expiresAt)}</p>)}
-          {historyProfiles.length > 0 && <><h4>{t("历史配置 · {0}", [historyProfiles.length])}</h4>{historyProfiles.slice(0, 8).map((profile) => <p className="form-footnote" key={profile.id}>{profile.regionName || profile.regionCode} · {statusLabel(profile.status)} · {dateLabel(profile.issuedAt)}</p>)}</>}
-        </details>
-      </article> : <div className="device-detail empty-detail"><h3>{t("你的连接会显示在这里")}</h3><p>{t("先在上方选择客户端，创建并下载。")}</p></div>}
-      </div>
-      {credentials.length > 0 && <details className="connection-disclosure account-bulk"><summary>{t("全部连接管理")}</summary><p className="form-footnote">{t("以下操作会影响账号下的全部连接。")}</p><div className="connection-manage"><button className="secondary" disabled={busy} onClick={() => void bulkAccess("disable")}>{t("停用全部")}</button><button className="danger-link" disabled={busy} onClick={() => void bulkAccess("revoke")}>{t("永久撤销全部")}</button></div></details>}
-    </section>
-    <details className="network-disclosure"><summary>{t("查看流量趋势 · 近 14 天")}</summary>      <section className="card traffic-card"><div className="card-head"><div><p className="kicker">{t("USAGE")}</p><h2>{t("流量趋势")}</h2></div><span className="muted">{t("近 14 天 · UTC")}</span></div><div className="traffic-total">{usage ? formatBytes(recentTotal) : "—"}<small>{t("期间累计")}</small></div>
-        {recentTotal > 0 ? <div className="bars" role="img" aria-label={t("近 14 天流量，累计 {0}", [formatBytes(recentTotal)])}>{recentDays.map((day) => <div key={day.day} title={`${day.day} · ${formatBytes(day.totalBytes)}`}><i style={{ height: `${day.totalBytes > 0 ? Math.max(2, day.totalBytes / maxDay * 100) : 0}%` }} /><small>{day.day.slice(5)}</small></div>)}</div> : <div className="usage-empty"><span>↗</span><p>{usage ? t("开始连接后，这里会显示流量趋势。") : t("正在读取流量…")}</p></div>}
-        <p className="form-footnote">{t("流量按连接汇总，不区分安装在哪台设备。")}</p>
-      </section></details>
-    <details className="network-disclosure"><summary>{t("查看可用区域地图")}</summary><RegionMap regions={regions} selectedRegionId={regionId} onSelect={selectRegion} /></details>
+    {dialog}{toasts}
+    <header className="topbar"><div className="brand"><span className="brand-mark"><i /><i /><i /></span><span>NORTHSTAR <em>VPN</em></span></div><div className="account"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b><small>{user.email}</small></div><button type="button" className="ghost small" onClick={onLogout}>{t("退出")}</button></div></header>
+    {hero}
     <ClientDownloads />
+    {creator}
+    {connections}
+    {loaded && <>
+      {credentials.length > 0 && <details className="disclosure panel"><summary>{t("流量趋势 · 近 14 天")}<span>{formatBytes(recentTotal)}</span></summary>
+        {recentTotal > 0 ? <div className="bars" role="img" aria-label={t("近 14 天流量，累计 {0}", [formatBytes(recentTotal)])}>{recentDays.map((day) => <div key={day.day} title={`${day.day} · ${formatBytes(day.totalBytes)}`}><i style={{ height: `${day.totalBytes > 0 ? Math.max(2, day.totalBytes / maxDay * 100) : 0}%` }} /><small>{day.day.slice(5)}</small></div>)}</div> : <p className="hint">{t("开始连接后，这里会显示流量趋势。")}</p>}
+        <p className="hint">{t("按连接汇总，日期为 UTC，不区分安装在哪台设备。")}</p>
+      </details>}
+      <details className="disclosure panel"><summary>{t("可用区域地图")}<span>{regions.length}{t("个区域")}</span></summary><RegionMap regions={regions} selectedRegionId={regionId} onSelect={(id) => { setRegionId(id); openCreator("single"); }} /></details>
+    </>}
+    <Modal open={!!qr} title={qr?.title || t("二维码")} onClose={() => setQr(null)}>{qr && <div className="stack center"><QrCode text={qr.text} label={qr.title} /><p className="hint">{qr.hint}</p><div className="dialog-actions"><button type="button" className="primary" onClick={() => { void navigator.clipboard.writeText(qr.text).then(() => notify(t("已复制。"))).catch(() => notify(t("浏览器不允许自动复制。"), "error")); }}>{Icon.copy(16)}{t("复制内容")}</button></div></div>}</Modal>
     <footer>{t("Northstar · 配置仅供本人使用，请勿分享或上传第三方转换网站。")}</footer>
   </main>;
 }

@@ -3,10 +3,13 @@ import { type FormEvent, lazy, Suspense, useCallback, useEffect, useState } from
 import { createRoot } from "react-dom/client";
 import { api, isUnauthorized, setUnauthorizedHandler } from "./api";
 import { ConfirmProvider } from "./confirm-dialog";
+import { Icon, type IconName } from "./icons";
+import { href, useRoute } from "./router";
+import { applyTheme, type ThemeChoice, useTheme } from "./theme";
+import { ToastProvider } from "./toast";
 import type { AdminUser, ControllerInfo, NodeRecord, Region } from "./types";
 import "./styles.css";
 import "./credential-usage.css";
-import "./ui-refinements.css";
 import { SubscriptionPanel } from "../../shared/subscription-panel";
 
 // Each console page is its own chunk, fetched the first time it is opened.
@@ -20,17 +23,14 @@ const ControllerPage = lazy(() => import("./pages/controller").then((module) => 
 const LogsPage = lazy(() => import("./pages/logs").then((module) => ({ default: module.LogsPage })));
 
 type PageId = "overview" | "topology" | "users" | "subscriptions" | "nodes" | "services" | "regions" | "controller" | "logs";
-const navigation: Array<{ id: PageId; icon: string; label: string; description: string }> = [
-  { id: "overview", icon: "⌂", label: "运维总览", description: "状态与待处理" },
-  { id: "topology", icon: "G", label: "全球拓扑", description: "节点分布与管理通道" },
-  { id: "users", icon: "U", label: "账号管理", description: "审核与访问控制" },
-  { id: "subscriptions", icon: "S", label: "订阅管理", description: "访问权限与节点同步" },
-  { id: "nodes", icon: "N", label: "节点运维", description: "部署、修复与诊断" },
-  { id: "services", icon: "V", label: "VPN 服务", description: "协议与部署策略" },
-  { id: "regions", icon: "R", label: "区域管理", description: "节点区域目录" },
-  { id: "controller", icon: "C", label: "Controller", description: "控制面设置" },
-  { id: "logs", icon: "L", label: "运行日志", description: "故障定位" },
+type NavItem = { id: PageId; icon: IconName; label: string };
+const navigation: Array<{ group: string; items: NavItem[] }> = [
+  { group: "监控", items: [{ id: "overview", icon: "overview", label: "运维总览" }, { id: "topology", icon: "topology", label: "全球拓扑" }, { id: "logs", icon: "logs", label: "运行日志" }] },
+  { group: "基础设施", items: [{ id: "nodes", icon: "nodes", label: "节点运维" }, { id: "services", icon: "services", label: "VPN 服务" }, { id: "regions", icon: "regions", label: "区域管理" }, { id: "controller", icon: "controller", label: "Controller" }] },
+  { group: "用户", items: [{ id: "users", icon: "users", label: "账号管理" }, { id: "subscriptions", icon: "subscriptions", label: "订阅管理" }] },
 ];
+const pages = navigation.flatMap((section) => section.items.map((item) => ({ ...item, group: section.group })));
+applyTheme();
 
 function Brand() {
   return <div className="brand"><span className="mark"><i /><i /><i /></span><span>NORTHSTAR <em>CONSOLE</em></span></div>;
@@ -53,7 +53,7 @@ function Login({ onUser }: { onUser: (user: AdminUser) => void }) {
   return <main className="login">
     <Brand />
     <form onSubmit={submit}>
-      <p className="eyebrow">CONTROL PLANE</p><h1>管理控制台</h1><p>账号审核、节点部署与修复、VPN 服务和运行诊断。</p>
+      <h1>管理控制台</h1><p>账号审核、节点部署与修复、VPN 服务和运行诊断。</p>
       <label>管理员邮箱<input type="email" required autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
       <label>密码<input type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
       <button type="submit" disabled={busy}>{busy ? "登录中…" : "登录 Console"} →</button>
@@ -70,7 +70,9 @@ function App() {
   const [nodes, setNodes] = useState<NodeRecord[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
   const [controllerSettings, setControllerSettings] = useState<ControllerInfo["settings"] | null>(null);
-  const [page, setPage] = useState<PageId>("overview");
+  const route = useRoute();
+  const page: PageId = pages.some((item) => item.id === route.page) ? route.page as PageId : "overview";
+  const [theme, setTheme] = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState("");
 
@@ -89,7 +91,7 @@ function App() {
   }, []);
 
   const clearSession = useCallback(() => {
-    setUser(null); setUsers([]); setNodes([]); setRegions([]); setControllerSettings(null); setPage("overview"); setMenuOpen(false); setError("");
+    setUser(null); setUsers([]); setNodes([]); setRegions([]); setControllerSettings(null); setMenuOpen(false); setError("");
   }, []);
   useEffect(() => {
     setUnauthorizedHandler(clearSession);
@@ -108,30 +110,32 @@ function App() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => undefined);
     clearSession();
   }
-  function navigate(next: string) { setPage(next as PageId); setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  // Close the mobile drawer and return to the top whenever the page itself changes (not on filter changes).
+  useEffect(() => { setMenuOpen(false); window.scrollTo({ top: 0 }); }, [page]);
 
   if (loading) return <main className="loading"><Brand /><span>正在连接控制面…</span></main>;
   if (!user) return <Login onUser={setUser} />;
 
-  const current = navigation.find((item) => item.id === page)!;
+  const current = pages.find((item) => item.id === page)!;
+  const pendingUsers = users.filter((account) => account.status === "pending").length;
   return <main className="app-shell">
     <aside className={menuOpen ? "open" : ""}>
-      <div className="aside-head"><Brand /><button className="icon-button mobile-only" onClick={() => setMenuOpen(false)}>×</button></div>
-      <nav aria-label="管理控制台导航">{navigation.map((item) => <button key={item.id} className={page === item.id ? "active" : ""} onClick={() => navigate(item.id)}><span className="nav-icon">{item.icon}</span><span><b>{item.label}</b><small>{item.description}</small></span>{item.id === "users" && users.some((account) => account.status === "pending") && <em>{users.filter((account) => account.status === "pending").length}</em>}</button>)}</nav>
-      <div className="aside-health"><span className="live-mark" /><span><b>Controller API</b><small>{error ? "连接异常" : dataLoading ? "同步数据中" : "已认证 · 运行中"}</small></span></div>
-      <div className="aside-user"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><span><b>{user.displayName}</b><small>{user.email}</small></span><button className="text-button" onClick={() => void logout()}>退出</button></div>
+      <div className="aside-head"><Brand /><button className="icon-button mobile-only" aria-label="关闭菜单" onClick={() => setMenuOpen(false)}><Icon name="close" /></button></div>
+      <nav aria-label="管理控制台导航">{navigation.map((section) => <div className="nav-group" key={section.group}><p>{section.group}</p>{section.items.map((item) => <a key={item.id} href={href(item.id)} className={page === item.id ? "active" : ""} aria-current={page === item.id ? "page" : undefined} onClick={() => setMenuOpen(false)}><Icon name={item.icon} /><span>{item.label}</span>{item.id === "users" && pendingUsers > 0 && <em title={`${pendingUsers} 个账号待审核`}>{pendingUsers}</em>}</a>)}</div>)}</nav>
+      <div className="aside-health"><span className={`live-mark ${error ? "down" : ""}`} /><span><b>Controller API</b><small>{error ? "连接异常" : dataLoading ? "同步数据中" : "已认证 · 运行中"}</small></span></div>
+      <div className="aside-user"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><span><b>{user.displayName}</b><small>{user.email}</small></span><button className="icon-button" title="退出登录" aria-label="退出登录" onClick={() => void logout()}><Icon name="logout" size={16} /></button></div>
     </aside>
     {menuOpen && <button className="menu-scrim" aria-label="关闭菜单" onClick={() => setMenuOpen(false)} />}
     <section className="workspace">
-      <header className="topbar"><button className="icon-button mobile-only" onClick={() => setMenuOpen(true)}>☰</button><div><small>Northstar Console</small><b>{current.label}</b></div><span>{dataLoading ? "正在同步…" : `${nodes.filter((node) => node.status === "online").length}/${nodes.length} 节点在线`}</span></header>
+      <header className="topbar"><button className="icon-button mobile-only" aria-label="打开菜单" onClick={() => setMenuOpen(true)}><Icon name="menu" /></button><div className="crumb"><span>{current.group}</span><b>{current.label}</b></div><span className="topbar-status">{dataLoading ? "正在同步…" : `${nodes.filter((node) => node.status === "online").length}/${nodes.length} 节点在线`}</span><ThemeSwitch value={theme} onChange={setTheme} /></header>
       <div className="content">
-        {error && <div className="inline-notice error" role="alert">{error}<button className="text-button" onClick={() => void refreshCore()}>重试</button></div>}
-        <Suspense fallback={<div className="page-loading" role="status">正在加载页面…</div>}>
-          {page === "overview" && <OverviewPage users={users} nodes={nodes} regions={regions} controllerSettings={controllerSettings} onNavigate={navigate} onRefresh={refreshCore} />}
-          {page === "topology" && <TopologyPage nodes={nodes} regions={regions} controllerSettings={controllerSettings} onNavigate={navigate} onRefresh={refreshCore} />}
+        {error && <div className="inline-notice error" role="alert"><span>{error}</span><button className="text-button" onClick={() => void refreshCore()}>重试</button></div>}
+        <Suspense fallback={<div className="page-loading" role="status"><i /><i /><i /></div>}>
+          {page === "overview" && <OverviewPage users={users} nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
+          {page === "topology" && <TopologyPage nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
           {page === "users" && <UsersPage users={users} onRefresh={refreshCore} />}
           {page === "subscriptions" && <SubscriptionPanel api={api} admin />}
-          {page === "nodes" && <NodesPage nodes={nodes} regions={regions} onRefresh={refreshCore} />}
+          {page === "nodes" && <NodesPage nodes={nodes} regions={regions} loading={dataLoading} onRefresh={refreshCore} />}
           {page === "services" && <ServicesPage nodes={nodes} />}
           {page === "regions" && <RegionsPage regions={regions} nodes={nodes} onRefresh={refreshCore} />}
           {page === "controller" && <ControllerPage onSettingsChange={setControllerSettings} />}
@@ -142,4 +146,9 @@ function App() {
   </main>;
 }
 
-createRoot(document.getElementById("root")!).render(<ConfirmProvider><App /></ConfirmProvider>);
+function ThemeSwitch({ value, onChange }: { value: ThemeChoice; onChange: (value: ThemeChoice) => void }) {
+  const options: Array<[ThemeChoice, IconName, string]> = [["light", "sun", "浅色"], ["dark", "moon", "深色"], ["system", "monitor", "跟随系统"]];
+  return <div className="theme-switch" role="group" aria-label="界面主题">{options.map(([choice, icon, label]) => <button key={choice} type="button" className={value === choice ? "active" : ""} aria-pressed={value === choice} title={label} aria-label={label} onClick={() => onChange(choice)}><Icon name={icon} size={15} /></button>)}</div>;
+}
+
+createRoot(document.getElementById("root")!).render(<ConfirmProvider><ToastProvider><App /></ToastProvider></ConfirmProvider>);

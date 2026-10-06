@@ -24,6 +24,8 @@ import tempfile
 import time
 import ssl
 import platform
+import threading
+import fcntl
 import zipfile
 import urllib.error
 import urllib.request
@@ -43,6 +45,13 @@ OPENVPN_STATUS = OPENVPN_DIR / "status.tsv"
 OPENVPN_REVOKED_DIR = OPENVPN_DIR / "revoked"
 VLESS_CONFIG = STATE_DIR / "vless.json"
 XRAY_PATH = Path("/opt/northstar-agent/bin/xray")
+AGENT_DIR = Path("/opt/northstar-agent")
+VLESS_RESTART_DUE = STATE_DIR / "vless-restart-due"
+# Default REALITY target pool: large TLS 1.3 + HTTP/2 sites. Each node probes them and the
+# Controller picks a fast one per node, so nodes do not share one fingerprintable target.
+# Keep in sync with server/reality-candidates.ts (a test enforces it).
+REALITY_CANDIDATES = ("www.microsoft.com", "www.apple.com", "www.amazon.com", "www.tesla.com", "www.nvidia.com",
+                      "www.amd.com", "www.samsung.com", "www.lovelive-anime.jp", "www.cisco.com", "www.mozilla.org")
 KEY_PATTERN = re.compile(r"^[A-Za-z0-9+/]{43}=$")
 VPN_PORTS = {
     "wireguard": {"transport": "udp", "port": 51820, "comment": "northstar-wireguard"},
@@ -477,8 +486,8 @@ def wireguard_sync_config_locked(desired):
     try:
         run_fixed(["wg", "show", "northstar"])
         run_fixed(["ip", "address", "replace", server_address, "dev", "northstar"])
-        if server_address != "10.70.0.1/24":
-            run_optional(["ip", "address", "del", "10.70.0.1/24", "dev", "northstar"])
+        for stale in stale_interface_addresses("northstar", server_address):
+            run_optional(["ip", "address", "del", stale, "dev", "northstar"])
         run_fixed(["wg", "syncconf", "northstar", "/dev/stdin"], input_text="\n".join(sync_lines))
         # syncconf never runs PostUp/PostDown, so move the managed INPUT rule here.
         replace_input_rule("northstar-wireguard", previous_listener, ("udp", listen_port))
@@ -524,6 +533,11 @@ def safe_revocation_serial(value):
     if not isinstance(value, str) or not re.fullmatch(r"[A-F0-9]{1,128}", value):
         raise ValueError("invalid OpenVPN revoked certificate serial")
     return value
+
+
+def stale_interface_addresses(interface, keep):
+    output = run_optional(["ip", "-4", "-o", "address", "show", "dev", interface]).stdout or ""
+    return [address for address in re.findall(r"\binet (\d+\.\d+\.\d+\.\d+/\d+)", output) if address != keep]
 
 
 def openvpn_sync_config(desired):
@@ -589,15 +603,13 @@ def openvpn_sync_config(desired):
     push_lines = ["push \"redirect-gateway def1 ipv6 bypass-dhcp\""] + [f"push \"dhcp-option DNS {item}\"" for item in dns]
     config_lines = [
         f"port {listen_port}", f"proto {proto}", "dev tun", "topology subnet", "server 10.71.0.0 255.255.255.0",
-        "server-ipv6 fd70:71::/64", "block-ipv6",
-        # block-ipv6 runs in userspace; do not let DCO bypass the rejection path.
-        # Older releases without DCO safely ignore this optional directive.
-        "setenv opt disable-dco",
+        *openvpn_ipv6_lines(),
         f"ca {OPENVPN_DIR / 'ca.crt'}", f"cert {OPENVPN_DIR / 'server.crt'}", f"key {OPENVPN_DIR / 'server.key'}",
         f"crl-verify {OPENVPN_REVOKED_DIR} dir", f"tls-crypt {OPENVPN_DIR / 'tls-crypt.key'}", "dh none", "ecdh-curve prime256v1",
         "auth SHA256", "data-ciphers AES-256-GCM:CHACHA20-POLY1305", "data-ciphers-fallback AES-256-GCM", "keepalive 10 120",
         "persist-key", "persist-tun", "duplicate-cn", "explicit-exit-notify 1", f"status {OPENVPN_STATUS} 30", "status-version 3", "verb 3", *push_lines, "",
     ]
+    previous_config = OPENVPN_CONFIG.read_text() if OPENVPN_CONFIG.exists() else None
     atomic_write(OPENVPN_CONFIG, "\n".join(config_lines))
     openvpn_path = shutil.which("openvpn")
     unit = f"""[Unit]
@@ -620,10 +632,54 @@ WantedBy=multi-user.target
     atomic_write(Path("/etc/systemd/system/northstar-openvpn.service"), unit, 0o644)
     run_fixed(["systemctl", "daemon-reload"])
     run_fixed(["systemctl", "enable", "northstar-openvpn"])
-    run_fixed(["systemctl", "restart", "northstar-openvpn"])
-    run_fixed(["systemctl", "is-active", "--quiet", "northstar-openvpn"])
+    try:
+        restart_and_verify("northstar-openvpn")
+    except Exception as error:
+        # Keep the last working server instead of a crash loop; the task reports the failure.
+        if previous_config is not None:
+            atomic_write(OPENVPN_CONFIG, previous_config)
+            run_optional(["systemctl", "restart", "northstar-openvpn"])
+        raise RuntimeError("OpenVPN rejected the new configuration; previous configuration restored: " + (command_failure_detail(error) if isinstance(error, subprocess.CalledProcessError) else str(error))) from error
     digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
     return {"observedHash": digest, "observedStatus": "applied"}
+
+
+def openvpn_version():
+    try:
+        output = subprocess.run([shutil.which("openvpn") or "openvpn", "--version"], capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return (0, 0)
+    match = re.search(r"OpenVPN (\d+)\.(\d+)", output)
+    return (int(match.group(1)), int(match.group(2))) if match else (0, 0)
+
+
+def kernel_ipv6_enabled():
+    try:
+        return Path("/proc/sys/net/ipv6/conf/all/disable_ipv6").read_text().strip() == "0"
+    except OSError:
+        return False
+
+
+def openvpn_ipv6_lines(version=None, ipv6_enabled=None):
+    """Route client IPv6 into the tunnel and reject it there, so dual-stack clients cannot leak.
+
+    Server-side rejection needs OpenVPN 2.5+ and kernel IPv6 (adding an IPv6 address to tun is
+    fatal otherwise). Everywhere else push the client-side block; 2.5+ clients honour it and older
+    clients ignore unknown pushed options.
+    """
+    version = openvpn_version() if version is None else version
+    ipv6_enabled = kernel_ipv6_enabled() if ipv6_enabled is None else ipv6_enabled
+    if version >= (2, 5) and ipv6_enabled:
+        # block-ipv6 runs in userspace; do not let DCO bypass the rejection path.
+        return ["server-ipv6 fd70:71::/64", "block-ipv6", "setenv opt disable-dco"]
+    return ["push \"block-ipv6\""]
+
+
+def restart_and_verify(unit):
+    run_fixed(["systemctl", "restart", unit])
+    # Restart=always hides an immediate crash behind "activating"; give it a moment to fail.
+    time.sleep(2)
+    run_fixed(["systemctl", "is-active", "--quiet", unit])
 
 
 def disable_openvpn():
@@ -653,8 +709,7 @@ def restart_openvpn(desired):
     if not OPENVPN_CONFIG.exists() or shutil.which("openvpn") is None:
         raise RuntimeError("OpenVPN is not configured")
     try:
-        run_fixed(["systemctl", "restart", "northstar-openvpn"])
-        run_fixed(["systemctl", "is-active", "--quiet", "northstar-openvpn"])
+        restart_and_verify("northstar-openvpn")
     except subprocess.CalledProcessError as error:
         raise RuntimeError("OpenVPN restart failed: " + command_failure_detail(error)) from error
     digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
@@ -697,9 +752,13 @@ def reality_destination(server_name, preferred=None):
     # Pin the validated IP in the server config (avoids a later DNS rebinding into private networks).
     if preferred:
         preferred_address = preferred.rsplit(":", 1)[0].strip("[]")
-        if preferred_address in addresses:
-            addresses.remove(preferred_address)
-            addresses.insert(0, preferred_address)
+        try:
+            pinned_is_public = ipaddress.ip_address(preferred_address).is_global
+        except ValueError:
+            pinned_is_public = False
+        # CDN targets rotate DNS answers; keep a still-working pinned address so Xray is not restarted.
+        if pinned_is_public:
+            addresses = [preferred_address] + [address for address in addresses if address != preferred_address]
     context = ssl.create_default_context()
     context.minimum_version = ssl.TLSVersion.TLSv1_3
     context.set_alpn_protocols(["h2"])
@@ -717,6 +776,32 @@ def reality_destination(server_name, preferred=None):
 
 
 reality_target_cache = {}
+reality_probe = {"checkedAt": None, "results": []}
+
+
+def probe_reality_candidates():
+    results = []
+    for name in REALITY_CANDIDATES:
+        started = time.monotonic()
+        try:
+            reality_destination(name)
+            results.append({"serverName": name, "ok": True, "latencyMs": int((time.monotonic() - started) * 1000)})
+        except Exception:
+            results.append({"serverName": name, "ok": False, "latencyMs": None})
+    reality_probe.update({"checkedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "results": results})
+
+
+def start_reality_probe():
+    thread = threading.Thread(target=lambda: _safe(probe_reality_candidates, "REALITY candidate probe"), daemon=True)
+    thread.start()
+    return thread
+
+
+def _safe(work, label):
+    try:
+        work()
+    except Exception as error:
+        log_failure(label, error)
 
 
 def validated_reality_target(server_name, preferred=None):
@@ -755,6 +840,59 @@ def refresh_reality_target():
 
 
 
+VLESS_RESTART_DELAY = 60
+
+
+def vless_apply_user_delta(config, additions, removals):
+    """Apply user changes live. Returns False when a full restart is needed instead."""
+    try:
+        if additions:
+            delta = STATE_DIR / "vless-users-add.json"
+            inbound = json.loads(json.dumps(config["inbounds"][0]))
+            inbound["settings"]["clients"] = additions
+            atomic_write(delta, json.dumps({"inbounds": [inbound]}))
+            try:
+                result = run_fixed([str(XRAY_PATH), "api", "adu", "--server=127.0.0.1:10085", str(delta)])
+            finally:
+                delta.unlink(missing_ok=True)
+            # The pinned CLI exits zero even when individual operations fail.
+            if not re.search(rf"Added {len(additions)} user\(s\) in total\.", result.stdout):
+                return False
+        if removals:
+            result = run_fixed([str(XRAY_PATH), "api", "rmu", "--server=127.0.0.1:10085", "-tag=vless", *[client["email"] for client in removals]])
+            if not re.search(rf"Removed {len(removals)} user\(s\) in total\.", result.stdout):
+                return False
+    except subprocess.CalledProcessError:
+        return False  # Rebuild from the complete desired list after a partial API failure.
+    return True
+
+
+def schedule_vless_restart(delay=VLESS_RESTART_DELAY):
+    if not VLESS_RESTART_DUE.exists():
+        atomic_write(VLESS_RESTART_DUE, str(time.time() + delay))
+
+
+def run_due_vless_restart(now=None):
+    try:
+        due = float(VLESS_RESTART_DUE.read_text())
+    except (OSError, ValueError):
+        return False
+    if (now or time.time()) < due:
+        return False
+    VLESS_RESTART_DUE.unlink(missing_ok=True)
+    if command_succeeds(["systemctl", "is-active", "--quiet", "northstar-vless"]):
+        run_fixed(["systemctl", "restart", "northstar-vless"])
+    return True
+
+
+def reality_server_names(bundle):
+    # Previous names stay accepted while clients move to the new target on their next refresh.
+    names = [bundle["serverName"]] + [name for name in bundle.get("previousServerNames", []) if isinstance(name, str)]
+    if not all(re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}", name) for name in names) or len(names) > 4:
+        raise ValueError("invalid REALITY server names")
+    return list(dict.fromkeys(names))
+
+
 def vless_config(desired, bundle, target):
     port = desired.get("listenPort", 443)
     users = desired.get("users", [])
@@ -781,7 +919,7 @@ def vless_config(desired, bundle, target):
             {"tag": "vless", "listen": "0.0.0.0", "port": port, "protocol": "vless",
              "settings": {"clients": clients, "decryption": "none"},
              "streamSettings": {"network": "tcp", "security": "reality", "realitySettings": {
-                 "show": False, "target": target, "xver": 0, "serverNames": [bundle["serverName"]],
+                 "show": False, "target": target, "xver": 0, "serverNames": reality_server_names(bundle),
                  "privateKey": bundle["privateKey"], "shortIds": [bundle["shortId"]]}}},
             {"tag": "api", "listen": "127.0.0.1", "port": 10085, "protocol": "dokodemo-door", "settings": {"address": "127.0.0.1"}},
         ],
@@ -799,7 +937,8 @@ def vless_sync_config(desired):
     old = json.loads(VLESS_CONFIG.read_text()) if VLESS_CONFIG.exists() else None
     # Revalidate periodically while keeping a still-valid destination stable.
     previous_reality = old["inbounds"][0]["streamSettings"]["realitySettings"] if old else None
-    target = validated_reality_target(bundle.get("serverName"), previous_reality["target"] if previous_reality else None)
+    same_target = previous_reality and previous_reality["serverNames"][:1] == [bundle.get("serverName")]
+    target = validated_reality_target(bundle.get("serverName"), previous_reality["target"] if same_target else None)
     users = json.loads(request_node_secret(desired.get("usersSecretId")))
     config = vless_config({**desired, "users": users}, bundle, target)
     port = config["inbounds"][0]["port"]
@@ -824,25 +963,18 @@ def vless_sync_config(desired):
         old_base["inbounds"][0]["settings"]["clients"] = []
     new_base["inbounds"][0]["settings"]["clients"] = []
     additions = [client for client in new_clients if client not in old_clients]
-    # Adding access must not disconnect existing sessions. Revocations still restart
-    # because removing an API user does not terminate that user's established sessions.
-    if active and old_base == new_base and all(client in new_clients for client in old_clients) and additions:
-        delta = STATE_DIR / "vless-users-add.json"
-        inbound = json.loads(json.dumps(config["inbounds"][0]))
-        inbound["settings"]["clients"] = additions
-        atomic_write(delta, json.dumps({"inbounds": [inbound]}))
-        try:
-            result = run_fixed([str(XRAY_PATH), "api", "adu", "--server=127.0.0.1:10085", str(delta)])
-            # The pinned CLI exits zero even when individual operations fail.
-            if re.search(rf"Added {len(additions)} user\(s\) in total\.", result.stdout):
-                atomic_write(VLESS_CONFIG, json.dumps(config))
-                return {"observedHash": hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest(), "observedStatus": "applied"}
-        except subprocess.CalledProcessError:
-            pass  # Rebuild from the complete desired list after a partial API failure.
-        finally:
-            delta.unlink(missing_ok=True)
+    removals = [client for client in old_clients if client not in new_clients]
+    # Access changes go through the HandlerService API so other users stay connected.
+    if active and old_base == new_base and (additions or removals) and vless_apply_user_delta(config, additions, removals):
+        atomic_write(VLESS_CONFIG, json.dumps(config))
+        if removals:
+            # Removing an API user rejects new connections at once but keeps established ones.
+            # Coalesce revocations into one delayed restart instead of one restart per change.
+            schedule_vless_restart()
+        return {"observedHash": hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest(), "observedStatus": "applied"}
     # Restarting closes sessions removed by disable/revoke as well as removing their credentials.
     atomic_write(VLESS_CONFIG, json.dumps(config))
+    VLESS_RESTART_DUE.unlink(missing_ok=True)
     unit = f"""[Unit]
 Description=Northstar VLESS REALITY
 After=network-online.target
@@ -938,6 +1070,8 @@ def capabilities():
             "python": os.sys.version.split()[0],
         },
         "connectivity": connectivity_snapshot(),
+        "upgradePending": upgrade_pending(),
+        "realityProbe": reality_probe,
     }
 
 
@@ -1194,8 +1328,30 @@ def openvpn_usage_snapshots():
     return snapshots
 
 
+def upgrade_pending():
+    return (AGENT_DIR / "upgrade.pending").exists()
+
+
+def confirm_staged_upgrade():
+    """Mirror agentUpgradeFinalizeCommand: this source reached the Controller, so keep it."""
+    pending = AGENT_DIR / "upgrade.pending"
+    if not pending.exists():
+        return False
+    with open(AGENT_DIR / "upgrade.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not pending.exists():
+            return False
+        rollback = AGENT_DIR / "agent.py.rollback"
+        if rollback.exists():
+            shutil.copy2(rollback, AGENT_DIR / "agent.py.previous")
+        (AGENT_DIR / "upgrade.confirmed").write_text(hashlib.sha256((AGENT_DIR / "agent.py").read_bytes()).hexdigest() + "\n")
+        pending.unlink()
+        run_optional(["systemctl", "stop", "northstar-agent-upgrade-rollback.timer"])
+    return True
+
+
 def heartbeat():
-    return request_json("/api/v1/agent/heartbeat", {
+    response = request_json("/api/v1/agent/heartbeat", {
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
@@ -1205,6 +1361,11 @@ def heartbeat():
         "metrics": metrics(),
         "usageSnapshots": wireguard_usage_snapshots() + openvpn_usage_snapshots() + vless_usage_snapshots(),
     })
+    try:
+        confirm_staged_upgrade()
+    except Exception as error:
+        log_failure("Agent upgrade confirmation", error)
+    return response
 
 
 def poll_tasks():
@@ -1262,6 +1423,7 @@ def main():
     last_heartbeat_attempt = 0
     last_task_poll = 0
     last_reality_refresh = 0
+    last_reality_probe = 0
     request_backoff_until = 0
     consecutive_request_failures = 0
     while True:
@@ -1275,6 +1437,13 @@ def main():
                 log_failure("heartbeat", error)
                 consecutive_request_failures += 1
                 request_backoff_until = now + request_retry_delay(error, consecutive_request_failures)
+        if now - last_reality_probe >= 6 * 3600:
+            last_reality_probe = now
+            start_reality_probe()
+        try:
+            run_due_vless_restart(now)
+        except Exception as error:
+            log_failure("VLESS deferred restart", command_failure_detail(error))
         if now - last_reality_refresh >= 300:
             last_reality_refresh = now
             try:

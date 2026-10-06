@@ -38,6 +38,17 @@ test("Agent upgrade preserves identity, backs up source and restores on service 
     const invalid = agentUpgradeCommand("not valid python !").replaceAll("/opt/northstar-agent",dir);
     await assert.rejects(exec("sh",["-c",invalid],{env}));
     assert.equal(await readFile(path.join(dir,"agent.py"),"utf8"),old);
+    // The Agent confirms itself after its first heartbeat; the SSH finalize is then a no-op, while a
+    // rolled-back upgrade is still reported as failed.
+    await writeFile(path.join(dir,"agent.py"),old);
+    await exec("sh",["-c",command],{env});
+    await rm(path.join(dir,"upgrade.pending"));
+    await writeFile(path.join(dir,"upgrade.confirmed"),"self\n");
+    const finalized = await exec("sh",["-c",agentUpgradeFinalizeCommand().replaceAll("/opt/northstar-agent",dir)],{env});
+    assert.match(finalized.stdout,/confirmed by the Agent/);
+    await exec("sh",["-c",command],{env});
+    await exec("sh",["-c",agentRollbackCommand().replaceAll("/opt/northstar-agent",dir)],{env});
+    await assert.rejects(exec("sh",["-c",agentUpgradeFinalizeCommand().replaceAll("/opt/northstar-agent",dir)],{env}),/already rolled back/);
     await rm(path.join(dir,"config.env"));
     await assert.rejects(exec("sh",["-c",command],{env}),/not installed/);
   } finally { await rm(dir,{recursive:true,force:true}); }
