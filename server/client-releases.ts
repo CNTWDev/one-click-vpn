@@ -1,11 +1,13 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { rm } from "node:fs/promises";
 import {
   clientArchitectures, clientPlatforms, parseClientReleases, releaseFor, updateDecision, validateClientRelease,
   type ClientArch, type ClientChannel, type ClientPlatform, type ClientRelease,
 } from "../shared/client-releases";
 import { addAudit, dbExec, dbQuery } from "./db";
 import { requestAdmin } from "./request-auth";
-import { inspectArtifact, presignReleaseUpload, releaseObjectKey, releaseStorage } from "./release-storage";
+import { publicOrigin } from "./config";
+import { appendLocalArtifact, inspectArtifact, inspectLocalArtifact, localArtifactPath, localArtifactUrl, maxInstallerBytes, presignReleaseUpload, releaseObjectKey, releaseStorage, uploadChunkBytes } from "./release-storage";
 
 export class ReleaseError extends Error {
   constructor(public code: string, public status = 400) { super(code); }
@@ -37,7 +39,7 @@ const iso = (value: Date | null) => value ? new Date(value).toISOString() : null
 function toRelease(row: ReleaseRow): ClientRelease {
   return validateClientRelease({
     platform: row.platform, arch: row.arch, channel: row.channel, version: row.version, build: row.build, status: row.status,
-    distribution: row.distribution, url: row.url, minOs: row.min_os, publishedAt: iso(row.published_at) || iso(row.created_at),
+    distribution: row.distribution, url: row.url, minOs: row.min_os, publishedAt: iso(row.published_at) || iso(row.created_at), notes: row.notes,
     ...(row.sha256 ? { sha256: row.sha256, sizeBytes: Number(row.size_bytes) } : {}),
   });
 }
@@ -87,17 +89,66 @@ function member<T extends string>(value: unknown, values: readonly T[], code: st
   return value as T;
 }
 
+/** Validates upload metadata and returns the immutable storage key for this build. */
+async function uploadKey(actor: ReleaseActor, body: Record<string, unknown>, audit: string) {
+  const platform = member(body.platform, clientPlatforms, "INVALID_PLATFORM"), arch = member(body.arch, clientArchitectures, "INVALID_ARCH");
+  const build = Number(body.build);
+  if (typeof body.version !== "string" || !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(body.version) || !Number.isSafeInteger(build) || build < 1) throw new ReleaseError("INVALID_VERSION");
+  let key: string;
+  try { key = releaseObjectKey({ platform, arch, version: body.version, build, fileName: String(body.fileName || "") }); }
+  catch { throw new ReleaseError("INVALID_FILE_NAME"); }
+  if ((await dbQuery("SELECT id FROM client_releases WHERE platform=$1 AND arch=$2 AND build=$3", [platform, arch, build])).length) throw new ReleaseError("RELEASE_BUILD_EXISTS", 409);
+  await addAudit({ actorUserId: actorId(actor), action: audit, targetType: "client_release", targetId: key, metadata: { actor: actorLabel(actor) } });
+  return key;
+}
+
+/** Object storage: a 15-minute presigned PUT URL, so installer bytes never pass through the Controller. */
 export async function requestUpload(actor: ReleaseActor, body: Record<string, unknown>) {
   const storage = releaseStorage();
   if (storage.mode !== "s3") throw new ReleaseError("RELEASE_STORAGE_NOT_CONFIGURED", 409);
-  const platform = member(body.platform, clientPlatforms, "INVALID_PLATFORM"), arch = member(body.arch, clientArchitectures, "INVALID_ARCH");
-  if (typeof body.version !== "string" || !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(body.version) || !Number.isSafeInteger(body.build) || Number(body.build) < 1) throw new ReleaseError("INVALID_VERSION");
-  let key: string;
-  try { key = releaseObjectKey({ platform, arch, version: body.version, build: Number(body.build), fileName: String(body.fileName || "") }); }
-  catch { throw new ReleaseError("INVALID_FILE_NAME"); }
-  if ((await dbQuery("SELECT id FROM client_releases WHERE platform=$1 AND arch=$2 AND build=$3", [platform, arch, body.build])).length) throw new ReleaseError("RELEASE_BUILD_EXISTS", 409);
-  await addAudit({ actorUserId: actorId(actor), action: "client_release.upload_url", targetType: "client_release", targetId: key, metadata: { actor: actorLabel(actor) } });
+  const key = await uploadKey(actor, body, "client_release.upload_url");
   return { storageKey: key, ...presignReleaseUpload(storage, key) };
+}
+
+/**
+ * Local storage: the Console sends the installer in ordered chunks (each under the default Nginx body limit),
+ * and it is kept on the Controller's data volume. The last chunk returns the recorded SHA-256 and size.
+ */
+export async function receiveUpload(actor: ReleaseActor, query: URLSearchParams, stream: ReadableStream<Uint8Array> | null) {
+  const storage = releaseStorage();
+  if (storage.mode !== "local") throw new ReleaseError("USE_OBJECT_STORAGE_UPLOAD", 409);
+  if (!stream) throw new ReleaseError("ARTIFACT_EMPTY");
+  const offset = Number(query.get("offset") || 0), final = query.get("final") === "1";
+  // Metadata and the duplicate-build check run once, on the first chunk; later chunks only revalidate the key.
+  const key = offset === 0 ? await uploadKey(actor, Object.fromEntries(query), "client_release.upload") : chunkKey(query);
+  // No release row exists for this build (checked above), so a file under the key is an abandoned upload.
+  if (offset === 0) await rm(localArtifactPath(storage, key), { force: true });
+  try {
+    const result = await appendLocalArtifact(storage, key, { id: String(query.get("upload") || ""), offset, final }, stream);
+    return { storageKey: key, ...result, ...(result.complete ? await inspectLocalArtifact(storage, key) : {}) };
+  } catch (error) {
+    const message = (error as Error).message, code = (error as { code?: string }).code;
+    if (code === "EEXIST") throw new ReleaseError("RELEASE_BUILD_EXISTS", 409);
+    if (message === "Installer is too large") throw new ReleaseError("ARTIFACT_TOO_LARGE", 413);
+    if (message === "Installer is empty") throw new ReleaseError("ARTIFACT_EMPTY");
+    if (message === "Upload offset mismatch" || message === "Invalid upload") throw new ReleaseError("UPLOAD_INTERRUPTED", 409);
+    throw error;
+  }
+}
+function chunkKey(query: URLSearchParams) {
+  try {
+    return releaseObjectKey({ platform: member(query.get("platform"), clientPlatforms, "INVALID_PLATFORM"), arch: member(query.get("arch"), clientArchitectures, "INVALID_ARCH"),
+      version: String(query.get("version") || ""), build: Number(query.get("build")), fileName: String(query.get("fileName") || "") });
+  } catch { throw new ReleaseError("INVALID_FILE_NAME"); }
+}
+
+/** Streams a locally stored installer. Drafts are reachable only by administrators testing them. */
+export async function localArtifact(key: string, request: Request) {
+  const storage = releaseStorage();
+  if (storage.mode !== "local") return null;
+  const row = (await dbQuery<{ status: string }>("SELECT status FROM client_releases WHERE storage_key=$1 ORDER BY (status='published') DESC LIMIT 1", [key]))[0];
+  if (!row || (row.status !== "published" && !(await requestAdmin(request)))) return null;
+  try { return { file: localArtifactPath(storage, key), published: row.status === "published" }; } catch { return null; }
 }
 
 export async function createRelease(actor: ReleaseActor, body: Record<string, unknown>) {
@@ -106,7 +157,12 @@ export async function createRelease(actor: ReleaseActor, body: Record<string, un
   const storageKey = typeof body.storageKey === "string" && body.storageKey ? body.storageKey : null;
   const storage = releaseStorage();
   let url = typeof body.url === "string" ? body.url.trim() : "";
+  const local = !!storageKey && storage.mode === "local";
   if (!url && storageKey && storage.mode === "s3") url = `${storage.publicBaseUrl}/${storageKey.split("/").map(encodeURIComponent).join("/")}`;
+  if (local) {
+    if (body.distribution !== undefined && body.distribution !== "direct") throw new ReleaseError("INVALID_DISTRIBUTION");
+    url = localArtifactUrl(publicOrigin(), storageKey!);
+  }
   const draft: Record<string, unknown> = {
     platform, arch: body.arch ?? (platform === "windows" ? "x64" : "universal"), channel: body.channel ?? "beta", version: body.version,
     build: body.build, status: "draft", distribution, url, minOs: body.minOs, publishedAt: new Date().toISOString(),
@@ -116,7 +172,7 @@ export async function createRelease(actor: ReleaseActor, body: Record<string, un
     try { validateClientRelease({ ...draft, sha256: "0".repeat(64), sizeBytes: 1 }); }
     catch (error) { throw new ReleaseError(`INVALID_RELEASE: ${(error as Error).message}`); }
     let inspected: { sha256: string; sizeBytes: number };
-    try { inspected = await inspectArtifact(url); }
+    try { inspected = local ? await inspectLocalArtifact(storage as Extract<typeof storage, { mode: "local" }>, storageKey!) : await inspectArtifact(url); }
     catch (error) { throw new ReleaseError(`ARTIFACT_UNAVAILABLE: ${(error as Error).message}`, 422); }
     if (typeof body.sha256 === "string" && body.sha256 && body.sha256.toLowerCase() !== inspected.sha256) throw new ReleaseError("ARTIFACT_DIGEST_MISMATCH", 422);
     if (body.sizeBytes !== undefined && Number(body.sizeBytes) !== inspected.sizeBytes) throw new ReleaseError("ARTIFACT_SIZE_MISMATCH", 422);
@@ -168,6 +224,9 @@ export async function transitionRelease(actor: ReleaseActor, id: string, action:
   } else if (action === "delete") {
     requireAdmin(actor);
     changed = await dbExec("DELETE FROM client_releases WHERE id=$1 AND status='draft'", [id]);
+    const storage = releaseStorage();
+    // Drafts uploaded to the Controller's own volume are removed with them; object storage is left untouched.
+    if (changed && storage.mode === "local" && release.storageKey) await rm(localArtifactPath(storage, release.storageKey), { force: true }).catch(() => undefined);
   } else throw new ReleaseError("INVALID_ACTION");
   if (!changed) throw new ReleaseError("INVALID_RELEASE_STATE", 409);
   if (action === "withdraw" || action === "rollout") {
@@ -220,7 +279,7 @@ export async function releaseOverview() {
       return { platform, minBuild: policy?.min_build || 0, announcement: policy?.announcement || "", downloadPath: downloadPath(platform) }; }),
     adoption: adoption.map((row) => ({ platform: row.platform, version: row.client_version, build: row.client_build, devices: row.devices })),
     diagnostics: diagnostics.map((row) => ({ platform: row.platform, build: row.client_build, code: row.code, events: row.events, users: row.users, lastAt: iso(row.last_at) })),
-    storage: storage.mode === "s3" ? { mode: storage.mode, publicBaseUrl: storage.publicBaseUrl } : { mode: storage.mode },
+    storage: storage.mode === "s3" ? { mode: storage.mode, publicBaseUrl: storage.publicBaseUrl } : { mode: storage.mode, maxBytes: maxInstallerBytes, chunkBytes: uploadChunkBytes },
     ciTokenConfigured: (process.env.NORTHSTAR_RELEASE_TOKEN?.trim().length || 0) >= 32,
   };
 }

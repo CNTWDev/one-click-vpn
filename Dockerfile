@@ -21,7 +21,7 @@ COPY --from=build /app/agent ./agent
 COPY --from=build /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 # Code stays root-owned and read-only for the runtime user; only data and the Next cache are writable.
-RUN chmod 755 ./docker-entrypoint.sh && mkdir -p /app/data /app/.next/cache && chown -R node:node /app/data /app/.next/cache
+RUN chmod 755 ./docker-entrypoint.sh && mkdir -p /app/data/client-releases /app/.next/cache && chown -R node:node /app/data /app/.next/cache
 USER node
 EXPOSE 3000
 ENTRYPOINT ["./docker-entrypoint.sh"]

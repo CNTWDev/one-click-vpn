@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Veilbird mark (public/favicon.svg) without its rounded background, sized for the 66dp adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="1.1"
+        android:scaleY="1.1"
+        android:translateX="18.8"
+        android:translateY="18.8">
+        <group
+            android:translateX="1"
+            android:translateY="3">
+            <path
+                android:fillColor="#B7DC68"
+                android:fillAlpha="0.62"
+                android:pathData="M25.5,36.5C24.5,27.5 20.5,19.5 14,13.5C24.5,15.5 33.5,21.5 39,29.5Z" />
+            <path
+                android:fillColor="#B7DC68"
+                android:pathData="M11,42.5C21,40.5 29.5,36 37.5,29C41,26 44.5,23.2 48.5,22.6L55,21.8L50,26.2C45.5,32 38.5,37.2 30.5,39.8C24,41.9 17.5,43.2 11,42.5Z" />
+        </group>
+        <path
+            android:fillColor="#111912"
+            android:fillAlpha="0.62"
+            android:pathData="M6,40C18,46 34,49 58,44V58H6Z" />
+        <path
+            android:strokeColor="#B7DC68"
+            android:strokeAlpha="0.55"
+            android:strokeWidth="2"
+            android:strokeLineCap="round"
+            android:pathData="M6,40C18,46 34,49 58,44" />
+    </group>
+</vector>

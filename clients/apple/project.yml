@@ -28,7 +28,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.northstar.client.dev.ios
         TARGETED_DEVICE_FAMILY: "1,2"
-        INFOPLIST_KEY_CFBundleDisplayName: NORTHSTAR
+        INFOPLIST_KEY_CFBundleDisplayName: Veilbird
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
     dependencies:
       - package: NorthstarCore
@@ -45,7 +46,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.northstar.client.dev.macos
-        INFOPLIST_KEY_CFBundleDisplayName: NORTHSTAR
+        INFOPLIST_KEY_CFBundleDisplayName: Veilbird
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - package: NorthstarCore
       - target: NorthstarTunnel-macOS

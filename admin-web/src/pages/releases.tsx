@@ -16,7 +16,7 @@ type Overview = {
   releases: Release[]; policies: Array<{ platform: Platform; minBuild: number; announcement: string; downloadPath: string }>;
   adoption: Array<{ platform: string; version: string | null; build: number | null; devices: number }>;
   diagnostics: Array<{ platform: string; build: number | null; code: string; events: number; users: number; lastAt: string | null }>;
-  storage: { mode: "external" | "s3"; publicBaseUrl?: string }; ciTokenConfigured: boolean;
+  storage: { mode: "local" | "s3"; publicBaseUrl?: string; maxBytes?: number; chunkBytes?: number }; ciTokenConfigured: boolean;
 };
 const platformNames: Record<Platform, string> = { android: "Android", ios: "iPhone / iPad", macos: "macOS", windows: "Windows" };
 const errors: Record<string, string> = {
@@ -33,7 +33,34 @@ const errors: Record<string, string> = {
   INVALID_MIN_BUILD: "最低构建号必须是不小于 0 的整数。",
   INVALID_ROLLOUT: "灰度比例必须是 1 到 100 之间的整数。",
   INVALID_ANNOUNCEMENT: "公告最多 500 个字符。",
+  INVALID_VERSION: "版本号格式应为 1.2.0，构建号为正整数。",
+  INVALID_FILE_NAME: "不支持的安装包类型，请上传 .apk、.aab、.zip、.dmg、.pkg、.msix、.msixbundle、.exe 或 .msi 文件。",
+  ARTIFACT_TOO_LARGE: "安装包超过 1 GB 上限。",
+  ARTIFACT_EMPTY: "安装包是空文件。",
+  UPLOAD_INTERRUPTED: "上传中断，请重新上传。",
+  RELEASE_STORAGE_NOT_CONFIGURED: "对象存储未配置，无法上传。",
+  USE_OBJECT_STORAGE_UPLOAD: "当前使用对象存储，请刷新页面后重试。",
+  INVALID_DISTRIBUTION: "上传的安装包只能用于直接下载。",
 };
+const extensions = ".apk,.aab,.zip,.dmg,.pkg,.msix,.msixbundle,.exe,.msi";
+const defaultArch: Record<Platform, string> = { android: "universal", ios: "universal", macos: "universal", windows: "x64" };
+const minOsHint: Record<Platform, string> = { android: "Android 8.0", ios: "iOS 16", macos: "macOS 13", windows: "Windows 10" };
+
+async function readError(response: Response) {
+  const body = await response.json().catch(() => ({})) as { error?: string };
+  return new Error(body.error || t("请求失败（HTTP {0}）", [response.status]));
+}
+/** PUT with progress (fetch cannot report upload progress). */
+function putWithProgress(url: string, body: Blob, onProgress: (sent: number) => void, withCredentials: boolean) {
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url); xhr.withCredentials = withCredentials;
+    xhr.upload.onprogress = (event) => onProgress(event.loaded);
+    xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(t("上传失败（HTTP {0}）", [xhr.status])));
+    xhr.onerror = () => reject(new Error(t("上传失败，请检查网络或对象存储的 CORS 设置。")));
+    xhr.send(body);
+  });
+}
 const errorText = (error: unknown) => { const code = (error as Error).message.split(":")[0]; return errors[code] ? t(errors[code]) : (error as Error).message; };
 
 export function ReleasesPage() {
@@ -44,6 +71,10 @@ export function ReleasesPage() {
   const [minBuilds, setMinBuilds] = useState<Record<string, string>>({});
   const [announcements, setAnnouncements] = useState<Record<string, string>>({});
   const [rollouts, setRollouts] = useState<Record<string, string>>({});
+  const [platformFilter, setPlatformFilter] = useState<"all" | Platform>("all");
+  const [formPlatform, setFormPlatform] = useState<Platform>("android");
+  const [source, setSource] = useState<"upload" | "url">("upload");
+  const [progress, setProgress] = useState<number | null>(null);
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -87,23 +118,60 @@ export function ReleasesPage() {
     const percent = Number(rollouts[release.id]);
     await run(() => api(`/api/v1/admin/client-releases/${release.id}`, { method: "POST", body: JSON.stringify({ action: "rollout", percent }) }), t("已更新"));
   }
+  /** Sends the installer to the configured storage and returns its storage key. */
+  async function uploadInstaller(file: File, meta: Record<string, string | number>) {
+    const sizeError = data?.storage.maxBytes && file.size > data.storage.maxBytes;
+    if (sizeError) throw new Error("ARTIFACT_TOO_LARGE");
+    const fields = { ...meta, fileName: file.name };
+    if (data?.storage.mode === "s3") {
+      const target = await api<{ storageKey: string; uploadUrl: string }>("/api/v1/admin/client-releases/uploads", { method: "POST", body: JSON.stringify(fields) });
+      await putWithProgress(target.uploadUrl, file, (sent) => setProgress(sent / file.size), false);
+      return target.storageKey;
+    }
+    // Local storage: ordered chunks, each below the default Nginx request limit.
+    const chunk = data?.storage.chunkBytes || 8 * 1024 * 1024, upload = crypto.randomUUID();
+    let storageKey = "";
+    for (let offset = 0; offset < file.size || offset === 0; offset += chunk) {
+      const final = offset + chunk >= file.size;
+      const query = new URLSearchParams({ ...Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v)])), upload, offset: String(offset), final: final ? "1" : "0" });
+      const response = await fetch(`/api/v1/admin/client-releases/files?${query}`, { method: "PUT", credentials: "include", cache: "no-store", headers: { "Content-Type": "application/octet-stream" }, body: file.slice(offset, offset + chunk) });
+      if (!response.ok) throw await readError(response);
+      storageKey = ((await response.json()) as { storageKey: string }).storageKey;
+      setProgress(Math.min(1, (offset + chunk) / Math.max(file.size, 1)));
+      if (final) break;
+    }
+    return storageKey;
+  }
   async function register(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget), value = (name: string) => String(form.get(name) || "").trim();
-    const body = { platform: value("platform"), arch: value("arch"), channel: value("channel"), version: value("version"), build: Number(value("build")),
-      distribution: value("distribution"), url: value("url"), minOs: value("minOs"), notes: value("notes"), sha256: value("sha256") || undefined };
-    const target = event.currentTarget;
-    await run(async () => { await api("/api/v1/admin/client-releases", { method: "POST", body: JSON.stringify(body) }); target.reset(); }, t("草稿已登记，安装包已校验"));
+    const meta = { platform: value("platform"), arch: value("arch"), version: value("version"), build: Number(value("build")) };
+    const body = { ...meta, channel: value("channel"), minOs: value("minOs"), notes: value("notes") };
+    const file = form.get("installer"), target = event.currentTarget;
+    await run(async () => {
+      try {
+        if (source === "upload") {
+          if (!(file instanceof File) || !file.size) throw new Error(t("请选择安装包文件。"));
+          setProgress(0);
+          const storageKey = await uploadInstaller(file, meta);
+          await api("/api/v1/admin/client-releases", { method: "POST", body: JSON.stringify({ ...body, distribution: "direct", storageKey }) });
+        } else {
+          await api("/api/v1/admin/client-releases", { method: "POST", body: JSON.stringify({ ...body, distribution: value("distribution"), url: value("url"), sha256: value("sha256") || undefined }) });
+        }
+        target.reset(); setFormPlatform("android");
+      } finally { setProgress(null); }
+    }, source === "upload" ? t("安装包已上传并校验，已保存为草稿") : t("草稿已登记，安装包已校验"));
   }
+  const visibleReleases = (data?.releases || []).filter((item) => platformFilter === "all" || item.platform === platformFilter);
   const copy = (path: string) => { void navigator.clipboard?.writeText(new URL(path, window.location.origin).href); toast(t("已复制")); };
 
   return <>
-    <PageHeader title={t("客户端发布")} description={t("登记、发布和撤回 NORTHSTAR 客户端；门户下载、固定下载链接和客户端更新检查都读取这里。")}
+    <PageHeader title={t("客户端发布")} description={t("上传、发布和撤回 Veilbird 客户端，并保留每个平台的历史版本；门户下载、固定下载链接和客户端更新检查都读取这里。")}
       actions={<button className="button ghost" disabled={busy} onClick={() => void refresh()}><Icon name="refresh" size={16} />{busy ? t("加载中…") : t("刷新")}</button>} />
     <InlineNotice notice={notice} />
     {data && <>
       <InlineNotice notice={{ tone: "info", message: [
-        data.storage.mode === "s3" ? t("安装包存储：S3 兼容对象存储（{0}）", [data.storage.publicBaseUrl || ""]) : t("安装包存储：外部（手动上传后登记 HTTPS 地址）"),
+        data.storage.mode === "s3" ? t("安装包存储：S3 兼容对象存储（{0}）", [data.storage.publicBaseUrl || ""]) : t("安装包存储：Controller 数据卷"),
         data.ciTokenConfigured ? t("发布令牌已配置：CI 或本地脚本可以上传、登记草稿并发布到测试版。") : t("发布令牌未配置：只能在这里手动登记版本。"),
       ].join(" ") }} />
       <section className="panel flush"><div className="panel-head padded"><h2>{t("下载链接与最低版本")}</h2></div>
@@ -116,8 +184,34 @@ export function ReleasesPage() {
             <td><div className="row-actions"><input maxLength={500} style={{ minWidth: 180 }} aria-label={t("客户端公告")} placeholder={t("留空则不显示")} value={announcements[policy.platform] ?? ""} onChange={(event) => setAnnouncements({ ...announcements, [policy.platform]: event.target.value })} /><button className="button ghost small" disabled={busy || policy.announcement === (announcements[policy.platform] ?? "")} onClick={() => void saveAnnouncement(policy.platform)}>{t("保存")}</button></div></td></tr>;
         })}</tbody></table></div>
       </section>
-      <section className="panel flush"><div className="panel-head padded"><h2>{t("版本")}</h2></div>
-        {data.releases.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("版本")}</th><th>{t("平台")}</th><th>{t("渠道")}</th><th>{t("状态")}</th><th>{t("灰度")}</th><th>{t("安装包")}</th><th>{t("发布时间")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{data.releases.map((release) => <tr key={release.id}>
+      <section className="panel release-upload"><div className="panel-head"><h2>{t("上传新版本")}</h2></div>
+        <p className="form-note">{data.storage.mode === "s3" ? t("安装包直接上传到对象存储（{0}）。上传后 Controller 会下载一次，记录真实的 SHA-256 和大小，并保存为草稿。", [data.storage.publicBaseUrl || ""]) : t("安装包保存在 Controller 的数据卷里，门户通过固定链接提供下载。上传后自动记录 SHA-256 和大小，并保存为草稿。")}{" "}{t("每个版本都会保留，用户可以在门户查看和下载历史版本；撤回的版本不再显示。")}</p>
+        <div className="tabs" role="tablist" aria-label={t("安装包来源")}>
+          <button type="button" role="tab" aria-selected={source === "upload"} className={source === "upload" ? "active" : ""} onClick={() => setSource("upload")}>{t("上传安装包")}</button>
+          <button type="button" role="tab" aria-selected={source === "url"} className={source === "url" ? "active" : ""} onClick={() => setSource("url")}>{t("填写下载地址")}</button>
+        </div>
+        <form className="form-grid" onSubmit={(event) => void register(event)}>
+          <label>{t("平台")}<select name="platform" value={formPlatform} onChange={(event) => setFormPlatform(event.target.value as Platform)}>{Object.entries(platformNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label>{t("架构")}<select name="arch" key={formPlatform} defaultValue={defaultArch[formPlatform]}><option value="universal">universal</option><option value="arm64">arm64</option><option value="x64">x64</option></select></label>
+          <label>{t("版本号")}<input name="version" required placeholder="1.2.0" pattern="\d+\.\d+\.\d+(-[A-Za-z0-9.-]+)?" /></label>
+          <label>{t("构建号")}<input name="build" type="number" min={1} required /></label>
+          <label>{t("渠道")}<select name="channel" defaultValue="beta"><option value="beta">{t("测试版")}</option><option value="stable">{t("正式版")}</option></select></label>
+          <label>{t("最低系统版本")}<input name="minOs" required key={formPlatform} placeholder={minOsHint[formPlatform]} /></label>
+          {source === "upload"
+            ? <label className="span-2">{t("安装包文件")}<input name="installer" type="file" required accept={extensions} /><small>{t("支持 .apk、.aab、.zip、.dmg、.pkg、.msix、.exe、.msi，最大 1 GB。iPhone / iPad 请改用「填写下载地址」登记 App Store 或 TestFlight 链接。")}</small></label>
+            : <>
+              <label>{t("分发方式")}<select name="distribution" defaultValue="direct"><option value="direct">{t("直接下载")}</option><option value="app-store">App Store</option><option value="testflight">TestFlight</option></select></label>
+              <label>{t("下载地址")}<input name="url" type="url" required placeholder="https://downloads.example.com/…" /></label>
+              <label className="span-2">{t("SHA-256（可选，用于核对）")}<input name="sha256" pattern="[A-Fa-f0-9]{64}" /></label>
+            </>}
+          <label className="span-2">{t("更新说明")}<textarea name="notes" maxLength={4000} rows={3} placeholder={t("用户会在门户的下载区看到这段说明。")} /></label>
+          {progress !== null && <div className="span-2 upload-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}><i style={{ width: `${Math.round(progress * 100)}%` }} /><span>{progress < 1 ? t("正在上传 {0}%", [Math.round(progress * 100)]) : t("正在校验…")}</span></div>}
+          <div className="span-2 form-actions"><button className="button primary" disabled={busy}>{source === "upload" ? t("上传并保存草稿") : t("登记草稿")}</button></div>
+        </form>
+      </section>
+      <section className="panel flush"><div className="panel-head padded"><h2>{t("版本历史")}</h2></div>
+        <div className="table-toolbar"><div className="chips" role="group" aria-label={t("平台")}>{(["all", ...Object.keys(platformNames)] as Array<"all" | Platform>).map((value) => <button key={value} type="button" className={platformFilter === value ? "active" : ""} aria-pressed={platformFilter === value} onClick={() => setPlatformFilter(value)}>{value === "all" ? t("全部") : platformNames[value]}<em>{data.releases.filter((item) => value === "all" || item.platform === value).length}</em></button>)}</div></div>
+        {visibleReleases.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("版本")}</th><th>{t("平台")}</th><th>{t("渠道")}</th><th>{t("状态")}</th><th>{t("灰度")}</th><th>{t("安装包")}</th><th>{t("发布时间")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visibleReleases.map((release) => <tr key={release.id}>
           <td><b>{release.version}</b><small> · {t("构建 {0}", [release.build])}</small>{release.notes && <small><br />{release.notes}</small>}</td>
           <td>{platformNames[release.platform]} · {release.arch}<small><br />{release.minOs}</small></td>
           <td><Pill value={release.channel} label={release.channel === "stable" ? t("正式版") : t("测试版")} tone={release.channel === "stable" ? "success" : "progress"} /></td>
@@ -132,24 +226,8 @@ export function ReleasesPage() {
             {release.status === "published" && <button className="button danger small" disabled={busy} onClick={() => void act(release, "withdraw")}>{t("撤回")}</button>}
             {release.status === "draft" && <button className="button danger small" disabled={busy} onClick={() => void act(release, "delete")}>{t("删除")}</button>}
           </div></td></tr>)}</tbody></table></div>
-          : <Empty>{t("还没有登记任何版本。可以用 npm run release:client 上传，或在下方手动登记。")}</Empty>}
+          : <Empty>{platformFilter === "all" ? t("还没有任何版本。在上方上传安装包，或用 npm run release:client 发布。") : t("这个平台还没有版本。")}</Empty>}
       </section>
-      <section className="panel"><details><summary>{t("手动登记版本")}</summary>
-        <p>{t("先把安装包上传到可公开访问的 HTTPS 地址。Controller 会下载一次，记录真实的 SHA-256 和大小。")}</p>
-        <form className="form-grid" onSubmit={(event) => void register(event)}>
-          <label>{t("平台")}<select name="platform" defaultValue="android">{Object.entries(platformNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label>{t("架构")}<select name="arch" defaultValue="universal"><option value="universal">universal</option><option value="arm64">arm64</option><option value="x64">x64</option></select></label>
-          <label>{t("渠道")}<select name="channel" defaultValue="beta"><option value="beta">{t("测试版")}</option><option value="stable">{t("正式版")}</option></select></label>
-          <label>{t("分发方式")}<select name="distribution" defaultValue="direct"><option value="direct">{t("直接下载")}</option><option value="app-store">App Store</option><option value="testflight">TestFlight</option></select></label>
-          <label>{t("版本号")}<input name="version" required placeholder="1.2.0" /></label>
-          <label>{t("构建号")}<input name="build" type="number" min={1} required /></label>
-          <label>{t("最低系统版本")}<input name="minOs" required placeholder="Android 8.0" /></label>
-          <label>{t("下载地址")}<input name="url" type="url" required placeholder="https://downloads.example.com/…" /></label>
-          <label>{t("SHA-256（可选，用于核对）")}<input name="sha256" pattern="[A-Fa-f0-9]{64}" /></label>
-          <label>{t("更新说明")}<input name="notes" maxLength={4000} /></label>
-          <button className="button primary" disabled={busy}>{t("登记草稿")}</button>
-        </form>
-      </details></section>
       <section className="panel flush"><div className="panel-head padded"><h2>{t("版本分布")}</h2></div>
         {data.adoption.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("平台")}</th><th>{t("版本")}</th><th>{t("授权设备")}</th></tr></thead><tbody>{data.adoption.map((row) => <tr key={`${row.platform}:${row.version}:${row.build}`}><td>{platformNames[row.platform as Platform] || row.platform}</td><td>{row.version ? `${row.version} (${row.build})` : t("未上报")}</td><td>{row.devices}</td></tr>)}</tbody></table></div>
           : <Empty>{t("还没有授权设备上报版本。")}</Empty>}

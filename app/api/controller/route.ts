@@ -24,7 +24,7 @@ export async function PUT(request: Request) {
   if (!user) return jsonError("Authentication required", 401);
   try {
     const body = await readJson(request);
-    const displayName = cleanText(body.displayName, 120) || "Northstar Controller";
+    const displayName = cleanText(body.displayName, 120) || "Veilbird Controller";
     const locationLabel = cleanText(body.locationLabel, 160);
     const latitude = coordinate(body.latitude, -90, 90, "Latitude");
     const longitude = coordinate(body.longitude, -180, 180, "Longitude");

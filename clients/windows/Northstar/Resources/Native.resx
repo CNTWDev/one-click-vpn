@@ -12,7 +12,7 @@
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>Allow the system VPN permission to connect.</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>Allow VPN access on your first connection</value></data>
   <data name="announcement" xml:space="preserve"><value>Announcement</value></data>
-  <data name="ask_your_administrator_to_enable_northstar_client_access" xml:space="preserve"><value>Ask your administrator to enable NORTHSTAR client access.</value></data>
+  <data name="ask_your_administrator_to_enable_northstar_client_access" xml:space="preserve"><value>Ask your administrator to enable Veilbird client access.</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>Authorized devices</value></data>
   <data name="authorizing_and_connecting" xml:space="preserve"><value>Authorizing and connecting…</value></data>
   <data name="automatic" xml:space="preserve"><value>Automatic</value></data>
@@ -20,13 +20,13 @@
   <data name="available_location" xml:space="preserve"><value>Available location</value></data>
   <data name="cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="change_location" xml:space="preserve"><value>Change location  ›</value></data>
-  <data name="choose_a_location_northstar_takes_care_of_the_rest" xml:space="preserve"><value>Choose a location. NORTHSTAR takes care of the rest.</value></data>
+  <data name="choose_a_location_northstar_takes_care_of_the_rest" xml:space="preserve"><value>Choose a location. Veilbird takes care of the rest.</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>Choose a location, then connect from the home screen.</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>Choose a location, then return to Connect.</value></data>
   <data name="choose_location_then_connect_hint" xml:space="preserve"><value>Choose a location, then connect from the home screen.</value></data>
   <data name="client_access_is_not_enabled_on_the_server" xml:space="preserve"><value>Client access is not enabled on the server.</value></data>
   <data name="client_access_is_not_enabled_on_the_server_contact" xml:space="preserve"><value>Client access is not enabled on the server. Contact your administrator.</value></data>
-  <data name="client_update_required" xml:space="preserve"><value>This version is no longer supported. Download the latest NORTHSTAR to sign in or connect.</value></data>
+  <data name="client_update_required" xml:space="preserve"><value>This version is no longer supported. Download the latest Veilbird to sign in or connect.</value></data>
   <data name="confirming_connection_status" xml:space="preserve"><value>Confirming connection…</value></data>
   <data name="connect_action" xml:space="preserve"><value>Connect</value></data>
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>Connect automatically or choose your own location.</value></data>
@@ -45,7 +45,7 @@
   <data name="current_page" xml:space="preserve"><value>, current page</value></data>
   <data name="development_build_the_windows_tunnel_service_is_not_integrated" xml:space="preserve"><value>Development build: the Windows tunnel service is not integrated. You can sign in, view locations and manage devices, but cannot connect to a VPN.</value></data>
   <data name="development_server_address" xml:space="preserve"><value>Development server address</value></data>
-  <data name="development_title" xml:space="preserve"><value>NORTHSTAR — Development</value></data>
+  <data name="development_title" xml:space="preserve"><value>Veilbird — Development</value></data>
   <data name="device" xml:space="preserve"><value>Device</value></data>
   <data name="device_limit_reached_account_hint" xml:space="preserve"><value>Device limit reached. Revoke an old device in Account and try again.</value></data>
   <data name="device_limit_reached_revoke_an_old_device_and_try" xml:space="preserve"><value>Device limit reached. Revoke an old device and try again.</value></data>
@@ -74,7 +74,7 @@
   <data name="locations" xml:space="preserve"><value>Locations</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>Your access has expired. Contact your administrator to renew it.</value></data>
   <data name="my_account" xml:space="preserve"><value>My account</value></data>
-  <data name="my_northstar" xml:space="preserve"><value>My NORTHSTAR</value></data>
+  <data name="my_northstar" xml:space="preserve"><value>My Veilbird</value></data>
   <data name="new_devices_are_added_on_their_first_connection_when" xml:space="preserve"><value>New devices are added on their first connection when a slot is available.</value></data>
   <data name="no_authorized_devices_yet_they_appear_after_their_first" xml:space="preserve"><value>No authorized devices yet. They appear after their first connection.</value></data>
   <data name="no_expiry" xml:space="preserve"><value>No expiry</value></data>
@@ -97,7 +97,7 @@
   <data name="server_address" xml:space="preserve"><value>Server address</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Server address https://…</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>Sign in and start</value></data>
-  <data name="sign_in_to_northstar_no_imports_or_configuration_needed" xml:space="preserve"><value>Sign in to NORTHSTAR. No imports or configuration needed.</value></data>
+  <data name="sign_in_to_northstar_no_imports_or_configuration_needed" xml:space="preserve"><value>Sign in to Veilbird. No imports or configuration needed.</value></data>
   <data name="sign_out" xml:space="preserve"><value>Sign out</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Simulator build · Verify VPN connections on a signed physical-device build</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>The simulator is for UI testing only. Test the VPN on a signed physical-device build.</value></data>
@@ -115,7 +115,7 @@
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>Unable to connect. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>Unable to reach the service. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>Unable to reach the service. Check your network or contact your administrator.</value></data>
-  <data name="update_allow_installs" xml:space="preserve"><value>Allow NORTHSTAR to install updates, then come back and tap Update now again.</value></data>
+  <data name="update_allow_installs" xml:space="preserve"><value>Allow Veilbird to install updates, then come back and tap Update now again.</value></data>
   <data name="update_available" xml:space="preserve"><value>Version {0} is available</value></data>
   <data name="update_available_detail" xml:space="preserve"><value>Update to get the latest features and fixes.</value></data>
   <data name="update_downloading" xml:space="preserve"><value>Downloading and verifying the update…</value></data>

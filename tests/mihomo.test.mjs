@@ -21,7 +21,7 @@ test('Mihomo export reuses WireGuard identity, endpoint and routes', () => {
   assert.equal(p['persistent-keepalive'], 25);
   assert.equal(p['remote-dns-resolve'], true);
   assert.match(text, /allow-lan: false/);
-  assert.match(text, /MATCH,Northstar/);
+  assert.match(text, /MATCH,Veilbird/);
   assert.doesNotMatch(text, /external-controller|tun:/);
   const dns = config(text).dns;
   assert.equal(dns['respect-rules'], true);
@@ -32,7 +32,7 @@ test('YAML data cannot inject extra configuration', () => {
   const text = renderMihomoWireGuard({ ...input, name });
   assert.equal(proxy(text).name, name);
   assert.equal(text.split('\n').filter(line => line.startsWith('rules:')).length, 1);
-  assert.equal(config(text).rules.at(-1), 'MATCH,Northstar');
+  assert.equal(config(text).rules.at(-1), 'MATCH,Veilbird');
 });
 test('preserves split routes, supplies DNS fallback and supports IPv6 endpoints', () => {
   const p = proxy(renderMihomoWireGuard({ ...input, endpoint: { host: '2001:db8::1', port: 51820 }, allowedIps: ['10.0.0.0/8'], dns: [] }));

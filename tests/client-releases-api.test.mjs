@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { createHash } from "node:crypto";
+import crypto, { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { createServer } from "node:https";
 import { tmpdir } from "node:os";
@@ -43,10 +43,10 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
   const admin = { email: `release_${Date.now()}@example.com`, password: "release-admin-password-1" };
   const env = { NORTHSTAR_DATABASE_URL: database, NORTHSTAR_MASTER_KEY: Buffer.alloc(32, 7).toString("base64"), NORTHSTAR_RELEASE_TOKEN: token,
     NORTHSTAR_ADMIN_EMAIL: admin.email, NORTHSTAR_ADMIN_PASSWORD: admin.password, NORTHSTAR_NATIVE_ACCESS_ENABLED: "1", NODE_EXTRA_CA_CERTS: cdn.ca,
-    NORTHSTAR_CLIENT_RELEASES_JSON: "[]" };
+    NORTHSTAR_CLIENT_RELEASES_JSON: "[]", NORTHSTAR_PUBLIC_ORIGIN: "https://app.example.com", NORTHSTAR_RELEASE_LOCAL_DIR: mkdtempSync(path.join(tmpdir(), "veilbird-local-")) };
   execFileSync(process.execPath, ["scripts/migrate.mjs"], { env: { ...process.env, ...env }, stdio: "pipe" });
   const pool = new pg.Pool({ connectionString: database });
-  await pool.query("DELETE FROM client_releases WHERE platform='windows'");
+  await pool.query("DELETE FROM client_releases WHERE platform IN ('windows','android')");
   await pool.query("DELETE FROM client_policies WHERE platform='windows'");
   try {
     await withServer(env, 3395, async (base) => {
@@ -56,7 +56,35 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
       assert.equal((await fetch(`${base}/api/v1/admin/client-releases`, { method: "POST", body: "{}" })).status, 403, "anonymous uploads are refused");
       assert.equal((await ci("/api/v1/admin/client-releases", { ...draft, sha256: "0".repeat(64) })).status, 422, "reported digest must match the served file");
       assert.equal((await ci("/api/v1/admin/client-releases", { ...draft, url: `${cdn.origin}/missing.msix` })).status, 422);
-      assert.equal((await ci("/api/v1/admin/client-releases/uploads", { platform: "windows", arch: "x64", version: "2.0.0", build: 200, fileName: "a.msix" })).status, 409, "no storage configured");
+      assert.equal((await ci("/api/v1/admin/client-releases/uploads", { platform: "windows", arch: "x64", version: "2.0.0", build: 200, fileName: "a.msix" })).status, 409, "no object storage configured");
+
+      // Local storage: the Console uploads ordered chunks; the Controller stores and serves published builds.
+      const apk = Buffer.from("veilbird-apk-v1".repeat(1000)), upload = crypto.randomUUID();
+      const meta = { platform: "android", arch: "universal", version: "1.0.0", build: 10, fileName: "Veilbird-1.0.0.apk" };
+      const chunk = (offset, final, bytes, extra = {}) => fetch(`${base}/api/v1/admin/client-releases/files?${new URLSearchParams({ ...meta, upload, offset: String(offset), final: final ? "1" : "0", ...extra })}`,
+        { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: bytes });
+      assert.equal((await fetch(`${base}/api/v1/admin/client-releases/files?${new URLSearchParams({ ...meta, upload, offset: "0", final: "1" })}`, { method: "PUT", body: apk })).status, 403, "anonymous uploads are refused");
+      assert.equal((await chunk(0, true, apk, { fileName: "run.sh" })).status, 400);
+      assert.equal((await chunk(0, false, apk.subarray(0, 6000))).status, 200);
+      assert.equal((await chunk(9000, true, apk.subarray(9000))).status, 409, "chunks must be contiguous");
+      const stored = await (await chunk(6000, true, apk.subarray(6000))).json();
+      assert.deepEqual([stored.complete, stored.sizeBytes, stored.sha256], [true, apk.length, createHash("sha256").update(apk).digest("hex")]);
+      const local = await (await ci("/api/v1/admin/client-releases", { ...meta, channel: "beta", minOs: "Android 8.0", storageKey: stored.storageKey, notes: "首个版本", publish: true })).json();
+      assert.equal(local.url, `https://app.example.com/api/v1/client-releases/files/clients/android/universal/1.0.0%2B10/Veilbird-1.0.0.apk`);
+      assert.deepEqual([local.status, local.sha256, local.sizeBytes], ["published", stored.sha256, apk.length]);
+      const served = await fetch(`${base}${new URL(local.url).pathname}`);
+      assert.equal(served.status, 200);
+      assert.deepEqual(Buffer.from(await served.arrayBuffer()), apk);
+      const second = crypto.randomUUID(), meta2 = { ...meta, version: "1.1.0", build: 11, fileName: "Veilbird-1.1.0.apk" };
+      const stored2 = await (await fetch(`${base}/api/v1/admin/client-releases/files?${new URLSearchParams({ ...meta2, upload: second, offset: "0", final: "1" })}`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: apk })).json();
+      const draft2 = await (await ci("/api/v1/admin/client-releases", { ...meta2, channel: "beta", minOs: "Android 8.0", storageKey: stored2.storageKey })).json();
+      assert.equal((await fetch(`${base}${new URL(draft2.url).pathname}`)).status, 404, "drafts are not public");
+      assert.equal((await ci(`/api/v1/admin/client-releases/${draft2.id}`, { action: "publish" })).status, 200);
+      const listing = await (await fetch(`${base}/api/v1/client-releases?channel=beta&history=1`)).json();
+      assert.deepEqual([listing.releases.find((r) => r.platform === "android").build, listing.history.filter((r) => r.platform === "android").map((r) => r.build)], [11, [10]]);
+      assert.equal(listing.history[0].notes, "首个版本");
+      assert.equal((await fetch(`${base}/api/v1/client-releases?channel=beta`)).headers.get("content-type").includes("json"), true);
+      assert.equal((await (await fetch(`${base}/api/v1/client-releases?channel=beta`)).json()).history, undefined, "history is opt-in");
 
       const created = await (await ci("/api/v1/admin/client-releases", { ...draft, publish: true, privateSigningKey: "NEVER_STORE" })).json();
       assert.equal(created.status, "published");
@@ -141,7 +169,7 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
       assert.deepEqual(await response.json(), { code: "CLIENT_RELEASES_UNAVAILABLE" }, "invalid legacy manifest fails closed without leaking");
     });
   } finally {
-    await pool.query("DELETE FROM client_releases WHERE platform='windows'");
+    await pool.query("DELETE FROM client_releases WHERE platform IN ('windows','android')");
     await pool.query("DELETE FROM client_policies WHERE platform='windows'");
     await pool.end();
     cdn.server.close();

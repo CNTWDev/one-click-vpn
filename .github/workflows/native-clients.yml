@@ -36,7 +36,7 @@ jobs:
       - run: gradle -p clients/android :app:assembleDevDebug :app:assembleProdDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: NORTHSTAR-android-development-only
+          name: Veilbird-android-development-only
           path: clients/android/app/build/outputs/apk/dev/debug/*.apk
           if-no-files-found: error
   apple:
@@ -57,7 +57,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent clients/apple/artifacts/Northstar-macOS/Build/Products/Debug clients/apple/artifacts/NORTHSTAR-macos-unsigned.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: NORTHSTAR-apple-development-only
+          name: Veilbird-apple-development-only
           path: clients/apple/artifacts/*.zip
           if-no-files-found: error
   windows:
@@ -75,6 +75,6 @@ jobs:
         run: ./clients/windows/build.ps1 -Runtime ${{ matrix.runtime }}
       - uses: actions/upload-artifact@v4
         with:
-          name: NORTHSTAR-${{ matrix.runtime }}-development-only
+          name: Veilbird-${{ matrix.runtime }}-development-only
           path: clients/windows/artifacts/*.zip
           if-no-files-found: error

@@ -12,7 +12,7 @@
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>允许系统 VPN 权限后才能连接。</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>首次连接需要允许系统 VPN 权限</value></data>
   <data name="announcement" xml:space="preserve"><value>公告</value></data>
-  <data name="ask_your_administrator_to_enable_northstar_client_access" xml:space="preserve"><value>请联系管理员开通 NORTHSTAR 客户端访问。</value></data>
+  <data name="ask_your_administrator_to_enable_northstar_client_access" xml:space="preserve"><value>请联系管理员开通 Veilbird 客户端访问。</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>授权设备</value></data>
   <data name="authorizing_and_connecting" xml:space="preserve"><value>正在授权并连接…</value></data>
   <data name="automatic" xml:space="preserve"><value>自动选择</value></data>
@@ -20,13 +20,13 @@
   <data name="available_location" xml:space="preserve"><value>可用位置</value></data>
   <data name="cancel" xml:space="preserve"><value>取消</value></data>
   <data name="change_location" xml:space="preserve"><value>更换连接位置  ›</value></data>
-  <data name="choose_a_location_northstar_takes_care_of_the_rest" xml:space="preserve"><value>选好位置，剩下的交给 NORTHSTAR。</value></data>
+  <data name="choose_a_location_northstar_takes_care_of_the_rest" xml:space="preserve"><value>选好位置，剩下的交给 Veilbird。</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>选好位置后，返回首页一键连接。</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>选择位置后，返回连接首页。</value></data>
   <data name="choose_location_then_connect_hint" xml:space="preserve"><value>选择位置后，返回首页一键连接。</value></data>
   <data name="client_access_is_not_enabled_on_the_server" xml:space="preserve"><value>服务端尚未启用客户端访问。</value></data>
   <data name="client_access_is_not_enabled_on_the_server_contact" xml:space="preserve"><value>服务端尚未启用客户端访问，请联系管理员。</value></data>
-  <data name="client_update_required" xml:space="preserve"><value>当前版本过旧，请下载最新版 NORTHSTAR 后再登录或连接。</value></data>
+  <data name="client_update_required" xml:space="preserve"><value>当前版本过旧，请下载最新版 Veilbird 后再登录或连接。</value></data>
   <data name="confirming_connection_status" xml:space="preserve"><value>正在确认连接…</value></data>
   <data name="connect_action" xml:space="preserve"><value>一键连接</value></data>
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>自动选择可用位置，也能自由指定节点。</value></data>
@@ -45,7 +45,7 @@
   <data name="current_page" xml:space="preserve"><value>，当前页面</value></data>
   <data name="development_build_the_windows_tunnel_service_is_not_integrated" xml:space="preserve"><value>开发版：Windows 隧道服务尚未集成。本版本可登录、查看节点和管理授权设备，但不能建立 VPN。</value></data>
   <data name="development_server_address" xml:space="preserve"><value>开发服务地址</value></data>
-  <data name="development_title" xml:space="preserve"><value>NORTHSTAR — 开发版</value></data>
+  <data name="development_title" xml:space="preserve"><value>Veilbird — 开发版</value></data>
   <data name="device" xml:space="preserve"><value>设备</value></data>
   <data name="device_limit_reached_account_hint" xml:space="preserve"><value>授权设备已满，请在「账号」解除旧设备的授权后重试。</value></data>
   <data name="device_limit_reached_revoke_an_old_device_and_try" xml:space="preserve"><value>授权设备已满，请解除旧设备的授权后重试。</value></data>
@@ -74,7 +74,7 @@
   <data name="locations" xml:space="preserve"><value>节点</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>账号已到期，请联系管理员续期。</value></data>
   <data name="my_account" xml:space="preserve"><value>我的账号</value></data>
-  <data name="my_northstar" xml:space="preserve"><value>我的 NORTHSTAR</value></data>
+  <data name="my_northstar" xml:space="preserve"><value>我的 Veilbird</value></data>
   <data name="new_devices_are_added_on_their_first_connection_when" xml:space="preserve"><value>未满额度时，新设备首次连接会自动加入。</value></data>
   <data name="no_authorized_devices_yet_they_appear_after_their_first" xml:space="preserve"><value>还没有授权设备，首次连接后会出现在这里。</value></data>
   <data name="no_expiry" xml:space="preserve"><value>不限期</value></data>
@@ -97,7 +97,7 @@
   <data name="server_address" xml:space="preserve"><value>服务地址</value></data>
   <data name="server_address_url" xml:space="preserve"><value>服务地址 https://…</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>登录并开始</value></data>
-  <data name="sign_in_to_northstar_no_imports_or_configuration_needed" xml:space="preserve"><value>登录 NORTHSTAR，无需导入或配置。</value></data>
+  <data name="sign_in_to_northstar_no_imports_or_configuration_needed" xml:space="preserve"><value>登录 Veilbird，无需导入或配置。</value></data>
   <data name="sign_out" xml:space="preserve"><value>退出登录</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>模拟器开发版 · 连接功能需在已签名的真机版本验证</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>模拟器仅用于界面测试，请使用已签名的真机版本测试 VPN。</value></data>
@@ -115,7 +115,7 @@
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>暂时无法连接，请检查网络后重试。</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>暂时无法连接服务，请检查网络后重试。</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>暂时无法连接服务，请检查网络或联系管理员。</value></data>
-  <data name="update_allow_installs" xml:space="preserve"><value>请允许 NORTHSTAR 安装更新，然后返回再点一次“立即更新”。</value></data>
+  <data name="update_allow_installs" xml:space="preserve"><value>请允许 Veilbird 安装更新，然后返回再点一次“立即更新”。</value></data>
   <data name="update_available" xml:space="preserve"><value>新版本 {0} 已发布</value></data>
   <data name="update_available_detail" xml:space="preserve"><value>更新后可获得最新的功能和修复。</value></data>
   <data name="update_downloading" xml:space="preserve"><value>正在下载并校验更新…</value></data>

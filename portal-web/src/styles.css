@@ -1,4 +1,4 @@
-/* Northstar Portal: one set of design tokens; light by default, dark via prefers-color-scheme. */
+/* Veilbird Portal: one set of design tokens; light by default, dark via prefers-color-scheme. */
 :root {
   color-scheme: light;
   --bg: #f4f6f1;
@@ -67,12 +67,9 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospac
 .hint.warning, .warning-text { color: var(--warning); }
 
 /* Brand */
-.brand { display: flex; align-items: center; gap: 10px; color: var(--text); letter-spacing: .1em; font-size: 13px; font-weight: 800; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--text); letter-spacing: .12em; font-size: 15px; font-weight: 800; }
 .brand em { color: var(--accent); font-style: normal; }
-.brand-mark { display: grid; grid-template-columns: repeat(3, 5px); gap: 2px; transform: rotate(-25deg); }
-.brand-mark i { width: 5px; height: 18px; background: var(--accent); transform: skewY(28deg); border-radius: 1px; }
-.brand-mark i:nth-child(2) { opacity: .65; }
-.brand-mark i:nth-child(3) { opacity: .35; }
+.brand-mark { display: inline-flex; color: var(--accent); }
 
 /* Buttons: one system, no underlined link-buttons */
 .primary, .secondary, .danger, .ghost { min-height: 42px; padding: 0 16px; border-radius: var(--radius-sm); border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; font-weight: 650; text-decoration: none; white-space: nowrap; transition: background .15s, border-color .15s, color .15s; }
@@ -171,7 +168,7 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospac
 .auth-intro { padding: 8vh 8vw; background: #0f1712; color: #eef3e8; display: flex; flex-direction: column; justify-content: center; }
 .auth-intro .brand { color: #eef3e8; }
 .auth-intro .brand em { color: #a8d46a; }
-.auth-intro .brand-mark i { background: #a8d46a; }
+.auth-intro .brand-mark { color: #a8d46a; }
 .auth-intro h1 { font-size: clamp(36px, 4.6vw, 60px); line-height: 1.15; letter-spacing: -.01em; margin: 8vh 0 22px; }
 .auth-intro h1 span { color: #a8d46a; }
 .intro-copy { max-width: 470px; margin: 0; color: #b3bfae; line-height: 1.8; font-size: 15px; }
@@ -193,6 +190,7 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospac
 .dashboard { min-height: 100vh; padding: 20px clamp(16px, 4vw, 56px) 40px; background: radial-gradient(1200px 400px at 85% -10%, var(--accent-soft), transparent 70%), var(--bg); }
 .dashboard > * { max-width: 1180px; margin-left: auto; margin-right: auto; }
 .topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.topbar-tools { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .account { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .avatar { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 800; }
 .account div { min-width: 0; }
@@ -385,4 +383,11 @@ footer { color: var(--text-2); text-align: center; font-size: 12px; padding-top:
 @media (prefers-reduced-motion: reduce) {
   .skeleton, .spin, .loader, .toast { animation: none; }
   .client-button { transition: none; }
+}
+/* Traffic panel is always open now: bars must shrink on narrow screens instead of widening the page. */
+.usage-panel .bars > div { min-width: 0; }
+@media (max-width: 600px) {
+  .usage-panel .bars { gap: 3px; }
+  .usage-panel .bars small { font-size: 10px; }
+  .usage-panel .bars > div:nth-child(even) small { visibility: hidden; }
 }

@@ -14,6 +14,8 @@ export type ClientRelease = {
   sizeBytes?: number;
   minOs: string;
   publishedAt: string;
+  /** Release notes shown to users (plain text). */
+  notes?: string;
 };
 
 export const clientArchitectures = ["arm64", "x64", "universal"] as const;
@@ -49,6 +51,7 @@ export function validateClientRelease(item: unknown): ClientRelease {
     platform: v.platform, arch: v.arch, channel: v.channel, version: v.version, build: v.build,
     status: v.status, distribution: v.distribution, url: url.href, minOs: v.minOs, publishedAt: v.publishedAt,
     ...(v.distribution === "direct" ? { sha256: (v.sha256 as string).toLowerCase(), sizeBytes: v.sizeBytes } : {}),
+    ...(typeof v.notes === "string" && v.notes.trim() ? { notes: v.notes.trim().slice(0, 4000) } : {}),
   } as ClientRelease;
 }
 
@@ -76,6 +79,26 @@ export function latestClientReleases(releases: ClientRelease[], channel: ClientC
     if (!latest.has(key) || latest.get(key)!.build < item.build) latest.set(key, item);
   }
   return [...latest.values()].sort((a, b) => a.platform.localeCompare(b.platform) || a.arch.localeCompare(b.arch));
+}
+
+/**
+ * Older published builds per platform (newest first), excluding the current ones from latestClientReleases.
+ * Withdrawn builds never appear; stable users see stable history only.
+ */
+export function clientReleaseHistory(releases: ClientRelease[], channel: ClientChannel = "stable", perPlatform = 10, now = Date.now()): ClientRelease[] {
+  const current = new Set(latestClientReleases(releases, channel, now).map((item) => `${item.platform}:${item.arch}:${item.build}`));
+  const seen = new Set<string>(), counts = new Map<string, number>();
+  return releases
+    .filter((item) => (item.channel === channel || channel === "beta") && item.status === "published" && Date.parse(item.publishedAt) <= now)
+    .sort((a, b) => a.platform.localeCompare(b.platform) || b.build - a.build || a.arch.localeCompare(b.arch))
+    .filter((item) => {
+      const key = `${item.platform}:${item.arch}:${item.build}`;
+      if (current.has(key) || seen.has(key)) return false;
+      seen.add(key);
+      const count = counts.get(item.platform) || 0;
+      counts.set(item.platform, count + 1);
+      return count < perPlatform;
+    });
 }
 
 /** Release for one installation: the exact architecture wins, otherwise a universal package. */

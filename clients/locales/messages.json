@@ -80,9 +80,9 @@
     "ru": "Подключайтесь легко."
   },
   "choose_a_location_northstar_takes_care_of_the_rest": {
-    "zh": "选好位置，剩下的交给 NORTHSTAR。",
-    "en": "Choose a location. NORTHSTAR takes care of the rest.",
-    "ru": "Выберите локацию. Остальное сделает NORTHSTAR."
+    "zh": "选好位置，剩下的交给 Veilbird。",
+    "en": "Choose a location. Veilbird takes care of the rest.",
+    "ru": "Выберите локацию. Остальное сделает Veilbird."
   },
   "change_location": {
     "zh": "更换连接位置  ›",
@@ -100,9 +100,9 @@
     "ru": "Весь мир.\nВ одно касание."
   },
   "sign_in_to_northstar_no_imports_or_configuration_needed": {
-    "zh": "登录 NORTHSTAR，无需导入或配置。",
-    "en": "Sign in to NORTHSTAR. No imports or configuration needed.",
-    "ru": "Войдите в NORTHSTAR. Импорт и настройка не нужны."
+    "zh": "登录 Veilbird，无需导入或配置。",
+    "en": "Sign in to Veilbird. No imports or configuration needed.",
+    "ru": "Войдите в Veilbird. Импорт и настройка не нужны."
   },
   "your_location_your_connection": {
     "zh": "随心选择，自在连接",
@@ -185,9 +185,9 @@
     "ru": "Отключитесь перед выбором другой локации."
   },
   "my_northstar": {
-    "zh": "我的 NORTHSTAR",
-    "en": "My NORTHSTAR",
-    "ru": "Мой NORTHSTAR"
+    "zh": "我的 Veilbird",
+    "en": "My Veilbird",
+    "ru": "Мой Veilbird"
   },
   "your_account_usage_and_devices_in_one_place": {
     "zh": "账号、用量和设备，都在这里。",
@@ -290,9 +290,9 @@
     "ru": "Аккаунт не активен. Обратитесь к администратору."
   },
   "ask_your_administrator_to_enable_northstar_client_access": {
-    "zh": "请联系管理员开通 NORTHSTAR 客户端访问。",
-    "en": "Ask your administrator to enable NORTHSTAR client access.",
-    "ru": "Попросите администратора включить доступ через клиент NORTHSTAR."
+    "zh": "请联系管理员开通 Veilbird 客户端访问。",
+    "en": "Ask your administrator to enable Veilbird client access.",
+    "ru": "Попросите администратора включить доступ через клиент Veilbird."
   },
   "this_location_is_unavailable_choose_another_or_use_automatic": {
     "zh": "该节点暂时不可用，请选择其他节点或自动选择。",
@@ -610,14 +610,14 @@
     "ru": "Подождите…"
   },
   "development_title": {
-    "en": "NORTHSTAR — Development",
-    "zh": "NORTHSTAR — 开发版",
-    "ru": "NORTHSTAR — Версия для разработки"
+    "en": "Veilbird — Development",
+    "zh": "Veilbird — 开发版",
+    "ru": "Veilbird — Версия для разработки"
   },
   "client_update_required": {
-    "zh": "当前版本过旧，请下载最新版 NORTHSTAR 后再登录或连接。",
-    "en": "This version is no longer supported. Download the latest NORTHSTAR to sign in or connect.",
-    "ru": "Эта версия больше не поддерживается. Скачайте последнюю версию NORTHSTAR, чтобы войти или подключиться."
+    "zh": "当前版本过旧，请下载最新版 Veilbird 后再登录或连接。",
+    "en": "This version is no longer supported. Download the latest Veilbird to sign in or connect.",
+    "ru": "Эта версия больше не поддерживается. Скачайте последнюю версию Veilbird, чтобы войти или подключиться."
   },
   "update_available": {
     "zh": "新版本 {0} 已发布",
@@ -645,9 +645,9 @@
     "ru": "Загрузка и проверка обновления…"
   },
   "update_allow_installs": {
-    "zh": "请允许 NORTHSTAR 安装更新，然后返回再点一次“立即更新”。",
-    "en": "Allow NORTHSTAR to install updates, then come back and tap Update now again.",
-    "ru": "Разрешите NORTHSTAR устанавливать обновления, затем вернитесь и снова нажмите «Обновить»."
+    "zh": "请允许 Veilbird 安装更新，然后返回再点一次“立即更新”。",
+    "en": "Allow Veilbird to install updates, then come back and tap Update now again.",
+    "ru": "Разрешите Veilbird устанавливать обновления, затем вернитесь и снова нажмите «Обновить»."
   },
   "update_failed": {
     "zh": "更新下载或校验失败，请稍后再试。",

@@ -99,7 +99,7 @@ export function FleetMap({ nodes, regions, controller, compact = false }: { node
     {!compact && <div className="fleet-map-head"><div><h2>{t("全球节点态势")}</h2><p>{t("按区域聚合 Edge Node，点击节点标记查看节点详情。")}</p></div><div className="fleet-map-stats"><span><b>{clusters.length}</b>{t("覆盖区域")}</span><span><b>{online}/{nodes.length}</b>{t("节点在线")}</span><span><b>{hasControllerGps ? controlLabel : t("未设置")}</b>Controller GPS</span><a className="text-button" href={href("regions")}>{t("管理区域 →")}</a></div></div>}
     <div className="fleet-map-stage">
       <div className="fleet-map-scan" />
-      <svg viewBox="0 0 1010 666" role="img" aria-label={t("Northstar 全球 VPN 节点分布图")}>
+      <svg viewBox="0 0 1010 666" role="img" aria-label={t("Veilbird 全球 VPN 节点分布图")}>
         <defs>
           <linearGradient id="northstar-route-online" x1="0" x2="1"><stop offset="0" stopColor="#5f83ff" /><stop offset="1" stopColor="#b9ef69" /></linearGradient>
           <filter id="northstar-glow" x="-200%" y="-200%" width="400%" height="400%"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>

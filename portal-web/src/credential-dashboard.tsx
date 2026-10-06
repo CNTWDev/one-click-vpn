@@ -1,4 +1,6 @@
 import { useI18n } from "../../shared/i18n";
+import { Brand } from "./brand";
+import { PortalLanguagePicker } from "./language";
 import { ClientDownloads } from "./client-downloads";
 import { intlLocales } from "../../shared/i18n-core";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -175,7 +177,7 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
 
   const hero = <section className="hero">
     <div>
-      <h1>{!loaded ? loadError ? t("{0}，你好", [user.displayName]) : <Skeleton height={34} width={320} /> : credentials.length ? <>{user.displayName}{t("，你有")}{usableCount}{t("个可用连接")}<span>{t("近 30 天")}{formatBytes(usage?.totals.totalBytes)}</span></> : t("{0}，欢迎使用 Northstar", [user.displayName])}</h1>
+      <h1>{!loaded ? loadError ? t("{0}，你好", [user.displayName]) : <Skeleton height={34} width={320} /> : credentials.length ? <>{user.displayName}{t("，你有")}{usableCount}{t("个可用连接")}<span>{t("近 30 天")}{formatBytes(usage?.totals.totalBytes)}</span></> : t("{0}，欢迎使用 Veilbird", [user.displayName])}</h1>
       {loaded && credentials.length > 0 && <div className="metrics-row" aria-label={t("使用概览")}>
         <span><small>{t("上传")}</small><b>{formatBytes(usage?.totals.uploadBytes)}</b></span>
         <span><small>{t("下载")}</small><b>{formatBytes(usage?.totals.downloadBytes)}</b></span>
@@ -272,19 +274,18 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
 
   return <main className="dashboard">
     {dialog}{toasts}
-    <header className="topbar"><div className="brand"><span className="brand-mark"><i /><i /><i /></span><span>NORTHSTAR <em>VPN</em></span></div><div className="account"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b><small>{user.email}</small></div><button type="button" className="ghost small" onClick={onLogout}>{t("退出")}</button></div></header>
+    <header className="topbar"><Brand /><div className="topbar-tools"><PortalLanguagePicker /><div className="account"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b><small>{user.email}</small></div><button type="button" className="ghost small" onClick={onLogout}>{t("退出")}</button></div></div></header>
     {hero}
-    <ClientDownloads />
     {creator}
     {connections}
-    {loaded && <>
-      {credentials.length > 0 && <details className="disclosure panel"><summary>{t("流量趋势 · 近 14 天")}<span>{formatBytes(recentTotal)}</span></summary>
-        {recentTotal > 0 ? <div className="bars" role="img" aria-label={t("近 14 天流量，累计 {0}", [formatBytes(recentTotal)])}>{recentDays.map((day) => <div key={day.day} title={`${day.day} · ${formatBytes(day.totalBytes)}`}><i style={{ height: `${day.totalBytes > 0 ? Math.max(2, day.totalBytes / maxDay * 100) : 0}%` }} /><small>{day.day.slice(5)}</small></div>)}</div> : <p className="hint">{t("开始连接后，这里会显示流量趋势。")}</p>}
-        <p className="hint">{t("按连接汇总，日期为 UTC，不区分安装在哪台设备。")}</p>
-      </details>}
-      <details className="disclosure panel"><summary>{t("可用区域地图")}<span>{regions.length}{t("个区域")}</span></summary><RegionMap regions={regions} selectedRegionId={regionId} onSelect={(id) => { setRegionId(id); openCreator("single"); }} /></details>
-    </>}
+    {loaded && credentials.length > 0 && <section className="card usage-panel" aria-labelledby="usage-title">
+      <div className="section-head"><h2 id="usage-title">{t("流量趋势 · 近 14 天")}</h2><span className="updated">{t("累计")} {formatBytes(recentTotal)}</span></div>
+      {recentTotal > 0 ? <div className="bars" role="img" aria-label={t("近 14 天流量，累计 {0}", [formatBytes(recentTotal)])}>{recentDays.map((day) => <div key={day.day} title={`${day.day} · ${formatBytes(day.totalBytes)}`}><i style={{ height: `${day.totalBytes > 0 ? Math.max(2, day.totalBytes / maxDay * 100) : 0}%` }} /><small>{day.day.slice(5)}</small></div>)}</div> : <p className="hint">{t("开始连接后，这里会显示流量趋势。")}</p>}
+      <p className="hint">{t("按连接汇总，日期为 UTC，不区分安装在哪台设备。")}</p>
+    </section>}
+    <ClientDownloads />
+    {loaded && <details className="disclosure panel"><summary>{t("可用区域地图")}<span>{regions.length}{t("个区域")}</span></summary><RegionMap regions={regions} selectedRegionId={regionId} onSelect={(id) => { setRegionId(id); openCreator("single"); }} /></details>}
     <Modal open={!!qr} title={qr?.title || t("二维码")} onClose={() => setQr(null)}>{qr && <div className="stack center"><QrCode text={qr.text} label={qr.title} /><p className="hint">{qr.hint}</p><div className="dialog-actions"><button type="button" className="primary" onClick={() => { void navigator.clipboard.writeText(qr.text).then(() => notify(t("已复制。"))).catch(() => notify(t("浏览器不允许自动复制。"), "error")); }}>{Icon.copy(16)}{t("复制内容")}</button></div></div>}</Modal>
-    <footer>{t("Northstar · 配置仅供本人使用，请勿分享或上传第三方转换网站。")}</footer>
+    <footer>{t("Veilbird · 配置仅供本人使用，请勿分享或上传第三方转换网站。")}</footer>
   </main>;
 }

@@ -122,7 +122,7 @@ export function RegionMap({ regions, selectedRegionId, onSelect }: {
     <div className="region-map-stage">
       <div className="region-map-scan" />
       <div className="region-map-location-control"><button type="button" className={`region-locate-button ${hasLocation ? "located" : ""}`} disabled={location.status === "locating"} onClick={locateUser}><span>◎</span>{location.status === "locating" ? t("定位中…") : hasLocation ? t("重新定位") : t("定位我的位置")}</button>{location.message && <small className={`region-location-status ${location.status}`} role="status">{t(location.message)}{hasLocation ? ` · ${location.latitude!.toFixed(2)}, ${location.longitude!.toFixed(2)}` : ""}</small>}</div>
-      <svg viewBox="0 0 1010 666" role="img" aria-label={t("Northstar 当前可用 VPN 区域地图")}>
+      <svg viewBox="0 0 1010 666" role="img" aria-label={t("Veilbird 当前可用 VPN 区域地图")}>
         <defs>
           <linearGradient id="portal-route" x1="0" x2="1"><stop offset="0" stopColor="#6f90ff" /><stop offset="1" stopColor="#b7df5d" /></linearGradient>
           <filter id="portal-glow" x="-200%" y="-200%" width="400%" height="400%"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>

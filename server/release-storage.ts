@@ -1,19 +1,26 @@
 import { createHash, createHmac } from "node:crypto";
+import { createReadStream, createWriteStream } from "node:fs";
+import { link, mkdir, rm, stat } from "node:fs/promises";
+import path from "node:path";
+import { pipeline } from "node:stream/promises";
+import { Readable, Transform } from "node:stream";
+import type { ReadableStream as WebReadableStream } from "node:stream/web";
 
 /**
  * Installer storage. The Controller never receives installer bytes: it signs a short-lived upload URL
  * for S3-compatible storage (Cloudflare R2, AWS S3, MinIO, ...) and later downloads the public object
- * once to record its real SHA-256 and size. With no storage configured, operators upload elsewhere and
- * register the public HTTPS URL; verification is the same.
+ * once to record its real SHA-256 and size. Without object storage ("local", the default; "external" is the
+ * older name for it) the Console uploads installers to the Controller's data volume and the Controller serves
+ * published builds itself. Registering an installer already hosted at a public HTTPS URL works in every mode.
  */
 export type ReleaseStorage =
-  | { mode: "external" }
+  | { mode: "local"; dir: string }
   | { mode: "s3"; endpoint: string; bucket: string; region: string; accessKeyId: string; secretAccessKey: string; publicBaseUrl: string };
 
 export function releaseStorage(env: Record<string, string | undefined> = process.env): ReleaseStorage {
-  const mode = env.NORTHSTAR_RELEASE_STORAGE?.trim() || "external";
-  if (mode === "external") return { mode };
-  if (mode !== "s3") throw new Error("NORTHSTAR_RELEASE_STORAGE must be external or s3");
+  const mode = env.NORTHSTAR_RELEASE_STORAGE?.trim() || "local";
+  if (mode === "local" || mode === "external") return { mode: "local", dir: path.resolve(env.NORTHSTAR_RELEASE_LOCAL_DIR?.trim() || path.join(process.cwd(), "data", "client-releases")) };
+  if (mode !== "s3") throw new Error("NORTHSTAR_RELEASE_STORAGE must be local or s3");
   const value = (name: string) => {
     const text = env[name]?.trim();
     if (!text) throw new Error(`${name} is required for S3 release storage`);
@@ -87,4 +94,57 @@ export async function inspectArtifact(url: string, fetcher: typeof fetch = fetch
   }
   if (!size) throw new Error("Installer is empty");
   return { sha256: hash.digest("hex"), sizeBytes: size };
+}
+
+/** Absolute path of a stored installer; keys come from releaseObjectKey, so they never contain "..". */
+export function localArtifactPath(storage: Extract<ReleaseStorage, { mode: "local" }>, key: string): string {
+  const file = path.resolve(storage.dir, key);
+  if (!key.startsWith("clients/") || key.split("/").some((part) => !part || part === "." || part === "..") || !file.startsWith(storage.dir + path.sep)) throw new Error("Invalid storage key");
+  return file;
+}
+
+/** Upload chunks stay below the 10 MB request limit of the default Nginx configuration. */
+export const uploadChunkBytes = 8 * 1024 * 1024;
+
+/**
+ * Appends one chunk of a resumable upload (chunks must arrive in order). With `final`, the object appears
+ * under its key only once complete, and an existing build is never overwritten.
+ */
+export async function appendLocalArtifact(storage: Extract<ReleaseStorage, { mode: "local" }>, key: string, upload: { id: string; offset: number; final: boolean },
+  body: ReadableStream<Uint8Array>): Promise<{ received: number; complete: boolean }> {
+  if (!/^[a-f0-9-]{36}$/.test(upload.id) || !Number.isSafeInteger(upload.offset) || upload.offset < 0) throw new Error("Invalid upload");
+  const file = localArtifactPath(storage, key), partial = `${file}.${upload.id}.part`;
+  await mkdir(path.dirname(file), { recursive: true });
+  const existing = await stat(partial).then((info) => info.size).catch(() => 0);
+  if (existing !== upload.offset) throw Object.assign(new Error("Upload offset mismatch"), { received: existing });
+  let size = existing;
+  const meter = new Transform({ transform(chunk: Buffer, _encoding, done) {
+    size += chunk.byteLength;
+    if (size > maxInstallerBytes || size - existing > uploadChunkBytes) { done(new Error("Installer is too large")); return; }
+    done(null, chunk);
+  } });
+  try {
+    await pipeline(Readable.fromWeb(body as WebReadableStream<Uint8Array>), meter, createWriteStream(partial, { flags: upload.offset ? "r+" : "wx", start: upload.offset }));
+  } catch (error) { await rm(partial, { force: true }); throw error; }
+  if (!upload.final) return { received: size, complete: false };
+  try {
+    if (!size) throw new Error("Installer is empty");
+    // link() fails when the key already exists, so a build can never be replaced.
+    await link(partial, file);
+  } finally { await rm(partial, { force: true }); }
+  return { received: size, complete: true };
+}
+
+/** Same result as inspectArtifact, read from the data volume. */
+export async function inspectLocalArtifact(storage: Extract<ReleaseStorage, { mode: "local" }>, key: string): Promise<{ sha256: string; sizeBytes: number }> {
+  const file = localArtifactPath(storage, key), info = await stat(file);
+  if (!info.isFile() || !info.size) throw new Error("Installer is missing or empty");
+  const hash = createHash("sha256");
+  await pipeline(createReadStream(file), new Transform({ transform(chunk, _encoding, done) { hash.update(chunk); done(); } }));
+  return { sha256: hash.digest("hex"), sizeBytes: info.size };
+}
+
+/** Public URL of a locally stored installer, served by the Controller through the Portal's /api proxy. */
+export function localArtifactUrl(origin: string, key: string): string {
+  return `${origin.replace(/\/+$/, "")}/api/v1/client-releases/files/${key.split("/").map(encode).join("/")}`;
 }

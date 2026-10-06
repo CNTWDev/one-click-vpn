@@ -1,6 +1,6 @@
-# Northstar VPN Control Plane
+# Veilbird Control Plane
 
-Northstar is a lightweight VPN control plane for a small fleet of Linux Edge Nodes.
+Veilbird is a lightweight VPN control plane for a small fleet of Linux Edge Nodes.
 It includes a customer Portal, an Admin console, a Controller/API, and an outbound
 Node Agent. The current data plane supports WireGuard and OpenVPN.
 
@@ -356,7 +356,7 @@ sample may be lost on a restart.
 Subscription links serve Clash/Mihomo YAML by default and a base64 `vless://` list
 (`format=v2ray`) for Shadowrocket, v2rayN/v2rayNG and similar clients; the format is also
 picked from the client's User-Agent. Routing defaults to `mode=smart` (private networks and
-mainland China direct via GEOSITE/GEOIP rules, everything else through Northstar);
+mainland China direct via GEOSITE/GEOIP rules, everything else through Veilbird);
 `mode=global` sends everything except private networks through the tunnel. Node names
 read `🇯🇵 Tokyo · node-name` and stay stable when nodes are added. Fixed-node VLESS
 profiles also export a single share link (`/api/v1/profiles/{id}/download?format=uri`).
@@ -431,7 +431,7 @@ existing nodes receive the routing changes without rotating credentials.
 ### Client releases and Agent 2.10
 
 Deploy the Controller (migrations add `client_releases`, `client_policies` and client
-version columns), then **升级 Agent** on nodes that use NORTHSTAR native access; 2.10.0 is
+version columns), then **升级 Agent** on nodes that use Veilbird native access; 2.10.0 is
 the native-lease Agent formerly labelled 2.9.0 on the client branch.
 
 - Console → 客户端 → 客户端发布 registers, publishes, promotes and withdraws native clients.

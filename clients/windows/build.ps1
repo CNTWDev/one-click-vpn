@@ -12,7 +12,7 @@ if ($Version -and $Build -gt 0) {
   $properties = @("-p:Version=$Version", "-p:AssemblyVersion=$Version.$Build", "-p:FileVersion=$Version.$Build")
 }
 dotnet publish (Join-Path $PSScriptRoot 'Northstar/Northstar.csproj') -c Release -r $Runtime --self-contained true -o $output @properties
-if ($LASTEXITCODE -ne 0) { throw 'NORTHSTAR build failed' }
+if ($LASTEXITCODE -ne 0) { throw 'Veilbird build failed' }
 $name = if ($properties.Count) { "NORTHSTAR-$Version-$Build-$Runtime.zip" } else { "NORTHSTAR-dev-$Runtime.zip" }
 Compress-Archive -Path "$output/*" -DestinationPath (Join-Path $PSScriptRoot "artifacts/$name") -Force
 Write-Host "Built $name (not code-signed)."

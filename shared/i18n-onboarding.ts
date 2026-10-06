@@ -39,7 +39,7 @@ export const onboardingCatalog: Record<string, readonly [string, string]> = {
   "，你有": [", you have ", ", у вас "],
   "个可用连接": [" available connections", " доступных подключений"],
   "近 30 天": ["Last 30 days", "За 30 дней"],
-  "{0}，欢迎使用 Northstar": ["Welcome to Northstar, {0}", "Добро пожаловать в Northstar, {0}"],
+  "{0}，欢迎使用 Veilbird": ["Welcome to Veilbird, {0}", "Добро пожаловать в Veilbird, {0}"],
   "下载": ["Download", "Загрузка"],
   "个连接": [" connections", " подключений"],
   "全部连接": ["All connections", "Все подключения"],

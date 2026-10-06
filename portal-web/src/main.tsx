@@ -1,5 +1,6 @@
 import { useI18n } from "../../shared/i18n";
-import { PortalLanguage } from "./language";
+import { Brand } from "./brand";
+import { PortalLanguage, PortalLanguagePicker } from "./language";
 import "./language.css";
 import { errorText } from "../../shared/i18n-errors";
 import { useEffect, useState } from "react";
@@ -18,10 +19,7 @@ type User = {
   rejectionReason?: string | null;
 };
 
-function Brand() {
-  return <div className="brand"><span className="brand-mark"><i /><i /><i /></span><span>NORTHSTAR <em>VPN</em></span></div>;
-}
-
+export 
 function Auth({ mode, onMode, onUser }: {
   mode: "login" | "register";
   onMode: (mode: "login" | "register") => void;
@@ -63,7 +61,7 @@ function Auth({ mode, onMode, onUser }: {
       <ul className="trust"><li><b>{t("一份订阅，全部节点")}</b><small>{t("客户端里随时切换，新节点自动出现")}</small></li><li><b>{t("人工审核")}</b><small>{t("仅限受邀和熟悉的用户使用")}</small></li></ul>
     </section>
     <form className="auth-panel" onSubmit={submit}>
-      <h2>{mode === "login" ? t("登录 Northstar") : t("申请使用 VPN")}</h2>
+      <h2>{mode === "login" ? t("登录 Veilbird") : t("申请使用 VPN")}</h2>
       <p className="muted">{mode === "login" ? t("使用已审核的账号继续，获取你的订阅链接。") : t("提交后由管理员人工审核。")}</p>
       {mode === "register" && <label>{t("称呼")}<input required value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder={t("例如：小王")} /></label>}
       <label>{t("邮箱")}<input type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="you@example.com" /></label>
@@ -109,10 +107,9 @@ export default function App() {
     setMode("login");
   }
 
-  if (loading) return <main className="center-page" aria-busy="true"><Brand /><span className="loader" aria-label={t("正在连接 Northstar…")} /></main>;
-  if (!user) return <Auth mode={mode} onMode={setMode} onUser={setUser} />;
-  if (user.status !== "active") return <Pending user={user} onLogout={() => void logout()} />;
-  return <CredentialDashboard user={user} onLogout={() => void logout()} />;
+  if (user?.status === "active" && !loading) return <CredentialDashboard user={user} onLogout={() => void logout()} />;
+  return <><PortalLanguagePicker floating />{loading ? <main className="center-page" aria-busy="true"><Brand /><span className="loader" aria-label={t("正在连接 Veilbird…")} /></main>
+    : !user ? <Auth mode={mode} onMode={setMode} onUser={setUser} /> : <Pending user={user} onLogout={() => void logout()} />}</>;
 }
 
 createRoot(document.getElementById("root")!).render(<PortalLanguage><App /></PortalLanguage>);
