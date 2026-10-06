@@ -10,7 +10,7 @@ const apiUpstream = process.env.API_UPSTREAM?.trim().replace(/\/+$/, "") || "";
 const types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json; charset=utf-8", ".png": "image/png", ".webp": "image/webp", ".ico": "image/x-icon" };
 const hopByHopHeaders = new Set(["connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade"]);
 
-function proxyApi(request, response) {
+function proxyApi(request, response, pathname) {
   if (!apiUpstream) {
     response.writeHead(502, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
     response.end(JSON.stringify({ error: "API upstream is not configured" }));
@@ -19,7 +19,7 @@ function proxyApi(request, response) {
 
   // Never resolve the raw request URL against the upstream: "//host/api" would be treated as protocol-relative.
   const incoming = new URL(request.url || "/api", "http://localhost");
-  const target = new URL(`${apiUpstream}${incoming.pathname}${incoming.search}`);
+  const target = new URL(`${apiUpstream}${pathname || incoming.pathname}${incoming.search}`);
   const headers = {};
   for (const [name, value] of Object.entries(request.headers)) {
     if (!hopByHopHeaders.has(name.toLowerCase()) && value !== undefined) headers[name] = value;
@@ -59,6 +59,8 @@ createServer((request, response) => {
   const pathname = new URL(request.url || "/", "http://localhost").pathname;
   if (pathname === "/health") { response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ status: "ok" })); return; }
   if (pathname === "/api" || pathname.startsWith("/api/")) { proxyApi(request, response); return; }
+  // Permanent client download links (/download/android) redirect to the newest published build.
+  if (/^\/download\/[a-z]+(?:\/[a-z0-9]+)?$/.test(pathname)) { proxyApi(request, response, `/api/v1/client-releases${pathname}`); return; }
   const relative = normalize(pathname).replace(/^([/\\])+/, "");
   let file = join(root, relative);
   if (!file.startsWith(normalize(root))) { response.writeHead(403); response.end("Forbidden"); return; }

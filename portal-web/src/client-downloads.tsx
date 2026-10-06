@@ -25,7 +25,7 @@ export function ClientDownloads() {
         const available = releases.filter((item) => item.platform === platform);
         return <article key={platform}><h3>{platformNames[platform]}</h3>{available.length ? available.map((item) => <div className="client-download-item" key={item.arch}>
           <p>{item.version} · {item.arch} · {item.minOs}</p>
-          <a className="secondary" href={item.url} target="_blank" rel="noopener noreferrer">{item.distribution === "direct" ? t("下载安装包") : t("前往 App Store")}</a>
+          <a className="secondary" href={item.distribution === "direct" ? `/download/${item.platform}/${item.arch}` : item.url} target="_blank" rel="noopener noreferrer">{item.distribution === "direct" ? t("下载安装包") : t("前往 App Store")}</a>
           {item.sha256 && <details><summary>{t("校验信息")}</summary><small>SHA-256</small><code>{item.sha256}</code></details>}
         </div>) : <p>{t("尚未发布，敬请期待")}</p>}</article>;
       })}</div>}

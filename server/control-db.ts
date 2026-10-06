@@ -655,9 +655,10 @@ export async function revokeConnectionProfilesForCredential(credentialId: string
   await dbExec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE credential_id = $2 AND status IN ('issued', 'active')", [now(), credentialId]);
 }
 
-export async function upsertDesiredConfig(input: { nodeId: string; protocol: Protocol; payload: Record<string, unknown> }): Promise<DesiredConfig> {
+export async function upsertDesiredConfig(input: { nodeId: string; protocol: Protocol; payload: Record<string, unknown>; hashPayload?: Record<string, unknown> }): Promise<DesiredConfig> {
   const payloadJson = JSON.stringify(input.payload);
-  const hash = createHash("sha256").update(payloadJson).digest("hex");
+  // hashPayload lets volatile fields (renewed lease deadlines) bypass revisioning.
+  const hash = createHash("sha256").update(input.hashPayload ? JSON.stringify(input.hashPayload) : payloadJson).digest("hex");
   const current = (await dbQuery<{ revision: number; id: string; config_hash: string }>("SELECT revision, id, config_hash FROM desired_configs WHERE node_id = $1 AND protocol = $2", [input.nodeId, input.protocol]))[0];
   if (current?.config_hash === hash) return (await findDesiredConfig(input.nodeId, input.protocol))!;
   const revision = Number(current?.revision || 0) + 1;
@@ -751,9 +752,14 @@ export async function listActivePeers(nodeId: string, protocol: Protocol): Promi
       AND u.status = 'active' AND NOT u.native_only AND (c.id IS NULL OR (c.status = 'active' AND NOT c.user_disabled
         AND NOT c.admin_disabled AND c.deleted_at IS NULL AND (c.expires_at IS NULL OR c.expires_at > $3)))
     GROUP BY d.id, l.address, d.public_key`, [nodeId, protocol, now()]);
-  const native = protocol === "wireguard" ? await dbQuery<{public_key:string;address:string;expires_at:Date}>(`SELECT l.public_key,l.address,l.expires_at FROM native_leases l
+  const native = protocol === "wireguard" ? await listNativeLeasePeers(nodeId) : [];
+  return [...rows.map((row) => ({ publicKey: row.public_key, allowedIps: [row.address], persistentKeepaliveSeconds: 25 })), ...native];
+}
+
+/** Current native peers with their deadlines; Agents that renew in place pull these every task poll. */
+export async function listNativeLeasePeers(nodeId: string): Promise<Array<{ publicKey: string; allowedIps: string[]; persistentKeepaliveSeconds: number; expiresAt: number }>> {
+  const native = await dbQuery<{public_key:string;address:string;expires_at:Date}>(`SELECT l.public_key,l.address,l.expires_at FROM native_leases l
     JOIN native_enrollments e ON e.id=l.enrollment_id JOIN users u ON u.id=e.user_id WHERE l.node_id=$1 AND l.expires_at>now()
-    AND e.status='active' AND u.status='active' AND u.native_only AND (u.membership_expires_at IS NULL OR u.membership_expires_at>$2)`,[nodeId,now()]) : [];
-  return [...rows.map((row) => ({ publicKey: row.public_key, allowedIps: [row.address], persistentKeepaliveSeconds: 25 })),
-    ...native.map(row=>({publicKey:row.public_key,allowedIps:[row.address],persistentKeepaliveSeconds:25,expiresAt:Math.floor(new Date(row.expires_at).getTime()/1000)}))];
+    AND e.status='active' AND u.status='active' AND u.native_only AND (u.membership_expires_at IS NULL OR u.membership_expires_at>$2)`,[nodeId,now()]);
+  return native.map(row=>({publicKey:row.public_key,allowedIps:[row.address],persistentKeepaliveSeconds:25,expiresAt:Math.floor(new Date(row.expires_at).getTime()/1000)}));
 }

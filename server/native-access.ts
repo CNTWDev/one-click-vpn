@@ -10,6 +10,8 @@ import { ipv4Address, ipv4Pool } from "./ipv4-pool";
 export type Session = { id: string; user_id: string; identity_jwk: string; identity_thumbprint: string; device_name: string; platform: string };
 type Entitlement = { status: string; native_only: boolean; native_device_limit: number | null; membership_expires_at: string | null };
 const ttl = 300;
+// Sliding: every signed connect/renewal extends it, so active devices never re-enter passwords.
+export const sessionDays = () => { const n = Number(process.env.NORTHSTAR_NATIVE_SESSION_DAYS || 30); return Number.isInteger(n) && n >= 1 && n <= 90 ? n : 30; };
 export const defaultLimit = () => { const n = Number(process.env.NORTHSTAR_NATIVE_DEVICE_LIMIT || 3); return Number.isInteger(n) && n >= 1 && n <= 100 ? n : 3; };
 export async function transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await getDb().connect();
@@ -26,14 +28,14 @@ export async function nativeLogin(request: Request, body: Record<string, unknown
   const key = identity(body.identityKey);
   if (!["android", "ios", "macos", "windows"].includes(String(body.platform))) throw new NativeError("INVALID_PLATFORM");
   const token = randomBytes(32).toString("base64url"), id = randomUUID();
-  // Short enough to bound stolen login sessions; device proof is still required to connect.
+  // A stolen token alone cannot connect: every connect/renewal also needs the device key's signature.
   await dbExec("DELETE FROM native_sessions WHERE expires_at < now()");
   await dbExec("DELETE FROM native_challenges WHERE expires_at < now()");
   await dbExec(`INSERT INTO native_sessions (id,token_hash,user_id,identity_jwk,identity_thumbprint,device_name,platform,expires_at)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,now()+interval '12 hours')`,
-  [id,digest(token),user.id,JSON.stringify(key.jwk),key.thumbprint,String(body.deviceName || body.platform).slice(0,80),body.platform]);
+    VALUES ($1,$2,$3,$4,$5,$6,$7,now()+make_interval(days=>$8))`,
+  [id,digest(token),user.id,JSON.stringify(key.jwk),key.thumbprint,String(body.deviceName || body.platform).slice(0,80),body.platform,sessionDays()]);
   await addAudit({ actorUserId: user.id, action: "native.login", targetType: "native_session", targetId: id });
-  return { accessToken: token, expiresAt: new Date(Date.now()+12*3600000).toISOString() };
+  return { accessToken: token, expiresAt: new Date(Date.now()+sessionDays()*86400000).toISOString() };
 }
 export async function nativeSession(request: Request): Promise<Session> {
   const token = request.headers.get("authorization")?.match(/^Bearer ([A-Za-z0-9_-]{43})$/)?.[1];
@@ -87,7 +89,7 @@ export async function nativeConnect(session:Session,body:Record<string,unknown>)
     checkEntitlement(user);
     // Only a valid device proof and entitlement may extend a login session.
     // Passive account polling cannot keep a stolen bearer token alive forever.
-    if (!(await client.query("UPDATE native_sessions SET expires_at=now()+interval '12 hours' WHERE id=$1 AND expires_at>now() RETURNING id",[session.id])).rowCount) throw new NativeError("AUTH_REQUIRED",401);
+    if (!(await client.query("UPDATE native_sessions SET expires_at=now()+make_interval(days=>$2) WHERE id=$1 AND expires_at>now() RETURNING id",[session.id,sessionDays()])).rowCount) throw new NativeError("AUTH_REQUIRED",401);
     await client.query("UPDATE native_enrollments SET status='revoked' WHERE user_id=$1 AND status='revoking' AND release_after<=now()",[session.user_id]);
     let enrollment=(await client.query("SELECT id,status FROM native_enrollments WHERE user_id=$1 AND identity_thumbprint=$2",[session.user_id,session.identity_thumbprint])).rows[0];
     if(enrollment && enrollment.status!=="active") throw new NativeError("DEVICE_REVOKED",403);

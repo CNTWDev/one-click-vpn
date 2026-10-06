@@ -19,12 +19,19 @@ struct NorthstarApp: App {
     @Published var nodes:[[String:Any]]=[]
     @Published var account:[String:Any]=[:]
     @Published var manager:NETunnelProviderManager?
+    /// (version, mandatory, download URL) when the release catalog has a newer build.
+    @Published var update:(version:String,mandatory:Bool,url:URL)?
+    @Published var announcement=""
     @Published var origin=UserDefaults.standard.string(forKey:"origin") ?? (Bundle.main.object(forInfoDictionaryKey:"NorthstarAPIOrigin") as? String ?? "")
     var connected:Bool { manager?.connection.status == .connected || manager?.connection.status == .connecting || manager?.connection.status == .reasserting }
     func api() throws -> NativeAPI {try NativeAPI(origin:origin)}
     func work(_ body:@escaping () async throws -> Void) {
         guard !busy else {return};busy=true;message=""
-        Task {do {try await body()} catch {message=error.localizedDescription;if case AccessFailure.code("AUTH_REQUIRED")=error {signedIn=false}};busy=false}
+        Task {do {try await body()} catch {
+            message=error.localizedDescription
+            if case AccessFailure.code("AUTH_REQUIRED")=error {signedIn=false}
+            if case AccessFailure.code("CLIENT_UPDATE_REQUIRED")=error {await checkForUpdate()}
+        };busy=false}
     }
     func load() async throws {
         let api=try api();account=try await api.request("account");nodes=(try await api.request("nodes"))["nodes"] as? [[String:Any]] ?? []
@@ -37,6 +44,20 @@ struct NorthstarApp: App {
             #endif
             if signedIn {try await load()}
         } catch {message=error.localizedDescription}
+        await checkForUpdate()
+    }
+    func checkForUpdate() async {
+        let defaults=UserDefaults.standard
+        let installation=defaults.string(forKey:"installation") ?? UUID().uuidString
+        defaults.set(installation,forKey:"installation")
+        guard let client=try? api(),let data=try? await client.latestRelease(installation:installation) else {return}
+        announcement=String((data["announcement"] as? String ?? "").prefix(500))
+        guard data["updateAvailable"] as? Bool == true,
+              let latest=data["latest"] as? [String:Any],let version=latest["version"] as? String else {update=nil;return}
+        // App Store builds open the store; direct builds use the permanent download link.
+        let target=latest["distribution"] as? String == "direct" ? URL(string:client.origin+(data["downloadPath"] as? String ?? "")) : URL(string:latest["url"] as? String ?? "")
+        guard let target,target.scheme=="https" else {update=nil;return}
+        update=(version,data["mandatory"] as? Bool == true,target)
     }
     func connect() async throws {
         #if targetEnvironment(simulator)
@@ -89,6 +110,14 @@ struct ClientView:View {
                         Text("简体中文").tag("zh-Hans")
                         Text("Русский").tag("ru")
                     }.pickerStyle(.menu).accessibilityIdentifier("language-picker")
+                    if !model.announcement.isEmpty {Text(model.announcement).font(.callout).frame(maxWidth:.infinity,alignment:.leading).northstarCard()}
+                    if let update=model.update {
+                        VStack(alignment:.leading,spacing:10) {
+                            Text(L10n.text("update_available",update.version)).font(.headline)
+                            Text(L10n.text(update.mandatory ? "update_required_detail":"update_available_detail")).font(.callout).foregroundStyle(NorthstarStyle.muted)
+                            Link(L10n.text("update_open_download"),destination:update.url).buttonStyle(NorthstarButton(primary:update.mandatory))
+                        }.frame(maxWidth:.infinity,alignment:.leading).northstarCard()
+                    }
                     if !model.signedIn {loginView}
                     else if tab==0 {connectionView}
                     else if tab==1 {nodesView}
@@ -140,7 +169,7 @@ struct ClientView:View {
     }
     private func login() {
         guard !email.trimmingCharacters(in:.whitespaces).isEmpty,!password.isEmpty else {return}
-        model.work {try await model.api().login(email:email.trimmingCharacters(in:.whitespaces),password:password);UserDefaults.standard.set(model.origin,forKey:"origin");password="";model.signedIn=true;try await model.load()}
+        model.work {try await model.api().login(email:email.trimmingCharacters(in:.whitespaces),password:password);UserDefaults.standard.set(model.origin,forKey:"origin");password="";model.signedIn=true;try await model.load();await model.checkForUpdate()}
     }
     private var connectionView:some View {
         VStack(alignment:.leading,spacing:20) {

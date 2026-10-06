@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cleanText, jsonError, readJson } from "../../../../../../server/http";
 import { agentTokenFromRequest, authenticateAgent } from "../../../../../../server/agent";
-import { pullReconcileTasks } from "../../../../../../server/control-db";
+import { listNativeLeasePeers, pullReconcileTasks } from "../../../../../../server/control-db";
 
 export const runtime = "nodejs";
 
@@ -13,7 +13,8 @@ export async function POST(request: Request) {
     if (!(await authenticateAgent(nodeId, token))) return jsonError("Invalid agent credentials", 401);
     const limit = Math.min(Math.max(Number(body.limit || 10), 1), 20);
     const tasks = await pullReconcileTasks(nodeId, limit);
-    return NextResponse.json({ tasks: tasks.map((task) => ({
+    const nativePeers = body.nativePeers === true ? { nativePeers: await listNativeLeasePeers(nodeId) } : {};
+    return NextResponse.json({ ...nativePeers, tasks: tasks.map((task) => ({
       id: task.id,
       protocol: task.protocol,
       taskType: task.task_type,

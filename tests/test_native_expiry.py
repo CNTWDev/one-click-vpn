@@ -66,4 +66,40 @@ class NativeExpiry(unittest.TestCase):
                 with self.assertRaises(subprocess.CalledProcessError):agent.expire_native_peers()
                 self.assertEqual(config.read_text(),original)
 
+    def test_renewal_extends_native_markers_and_restores_dropped_lease(self):
+        a,b,legacy,c="A"*43+"=","B"*43+"=","L"*43+"=","C"*43+"="
+        soon,later=int(time.time())+30,int(time.time())+300
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);config=root/"northstar.conf"
+            config.write_text(f"[Interface]\nListenPort = 51820\n\n[Peer]\nPublicKey = {a}\nAllowedIPs = 10.70.0.2/32\nPersistentKeepalive = 25\n# NorthstarExpiresAt={soon}\n\n[Peer]\nPublicKey = {legacy}\nAllowedIPs = 10.70.0.9/32\n")
+            peers=[{"publicKey":a,"allowedIps":["10.70.0.2/32"],"expiresAt":later},{"publicKey":b,"allowedIps":["10.70.0.3/32"],"expiresAt":later},
+                {"publicKey":legacy,"allowedIps":["10.70.0.9/32"],"expiresAt":later},{"publicKey":c,"allowedIps":["10.70.0.4/32"],"expiresAt":later+3600},
+                {"publicKey":"bad","allowedIps":["10.70.0.5/32"],"expiresAt":later}]
+            with patch.object(agent,"STATE_DIR",root),patch.object(agent,"WIREGUARD_CONFIG",config),patch.object(agent,"native_watchdog_ready",True),\
+                patch.object(agent,"command_succeeds",return_value=True),patch.object(agent,"run_fixed") as runner:
+                agent.refresh_native_peers(peers)
+                text=config.read_text()
+                self.assertIn(f"# NorthstarExpiresAt={later}",text)
+                self.assertNotIn(str(soon),text)
+                self.assertEqual(text.count("NorthstarExpiresAt"),2,"legacy peers stay legacy and far-future deadlines are refused")
+                self.assertIn(f"PublicKey = {b}\nAllowedIPs = 10.70.0.3/32",text)
+                self.assertNotIn(c,text)
+                calls=[call.args[0] for call in runner.call_args_list]
+                self.assertEqual(calls[0][0],"iptables-restore","kernel deadline moves before the restored peer goes live")
+                self.assertIn(["wg","set","northstar","peer",b,"allowed-ips","10.70.0.3/32","persistent-keepalive","25"],calls)
+                rules=runner.call_args_list[0].kwargs["input_text"]
+                self.assertIn("-s 10.70.0.3/32 -m time --datestop",rules)
+                runner.reset_mock()
+                agent.refresh_native_peers(peers)
+                runner.assert_not_called()
+                self.assertEqual(config.read_text(),text,"an unchanged poll rewrites nothing")
+
+    def test_renewal_is_inert_without_watchdog(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config=Path(directory)/"northstar.conf";config.write_text("[Interface]\n")
+            with patch.object(agent,"WIREGUARD_CONFIG",config),patch.object(agent,"native_watchdog_ready",False),patch.object(agent,"run_fixed") as runner:
+                agent.refresh_native_peers([{"publicKey":"A"*43+"=","allowedIps":["10.70.0.2/32"],"expiresAt":int(time.time())+60}])
+                runner.assert_not_called()
+                self.assertEqual(config.read_text(),"[Interface]\n")
+
 if __name__=="__main__":unittest.main()

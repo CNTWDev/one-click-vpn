@@ -58,6 +58,8 @@ class NativeApi(context: Context) {
         val connection = URI("${origin}/api/v2/native/$path").toURL().openConnection() as HttpsURLConnection
         connection.connectTimeout = 10000; connection.readTimeout = 10000; connection.instanceFollowRedirects = false
         connection.setRequestProperty("Accept", "application/json")
+        // Lets the server require an upgrade (CLIENT_UPDATE_REQUIRED) and track version adoption.
+        connection.setRequestProperty("X-Northstar-Client", "android/${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}")
         if (path != "login") secret("token")?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
         try {
             if (body != null) {
@@ -77,6 +79,18 @@ class NativeApi(context: Context) {
             if (code !in 200..299) throw ApiFailure(data.optString("code", "SERVICE_UNAVAILABLE"))
             return data
         } finally { connection.disconnect() }
+    }
+    /**
+     * Queues a connection failure code (no keys, addresses or traffic) and sends the
+     * queue when the service is reachable; the network is often what just failed.
+     */
+    @Synchronized fun report(code: String, nodeId: String = "") {
+        val queue = try { org.json.JSONArray(prefs.getString("diagnostics", "[]")) } catch (_: Exception) { org.json.JSONArray() }
+        if (code.isNotEmpty()) queue.put(JSONObject().put("code", code).put("at", java.time.Instant.now().toString()).apply { if (nodeId.isNotEmpty()) put("nodeId", nodeId) })
+        while (queue.length() > 20) queue.remove(0)
+        prefs.edit().putString("diagnostics", queue.toString()).apply()
+        if (queue.length() == 0 || secret("token") == null) return
+        try { request("diagnostics", JSONObject().put("events", queue)); prefs.edit().remove("diagnostics").apply() } catch (_: Exception) { }
     }
     fun login(email: String, password: String) {
         val pub = store.getCertificate(alias).publicKey as ECPublicKey
@@ -114,5 +128,7 @@ fun friendlyResource(error: Throwable): Int = when ((error as? ApiFailure)?.code
     "CLIENT_ACCESS_NOT_ENABLED" -> R.string.client_access_is_not_enabled_on_the_server_contact
     "SERVER_REQUIRED" -> R.string.enter_an_https_server_address_first
     "RATE_LIMITED" -> R.string.too_many_attempts_try_again_later
+    "CLIENT_UPDATE_REQUIRED" -> R.string.client_update_required
+    "UPDATE_FAILED" -> R.string.update_failed
     else -> R.string.unable_to_reach_the_service_check_your_network_and
 }

@@ -22,7 +22,8 @@
     "i18n:generate": "node scripts/native-locales.mjs",
     "i18n:check": "node scripts/native-locales.mjs --check && node --test tests/portal-i18n.test.mjs tests/product-i18n.test.mjs",
     "clients:doctor": "node scripts/clients.mjs doctor",
-    "clients:build": "node scripts/clients.mjs build"
+    "clients:build": "node scripts/clients.mjs build",
+    "release:client": "node scripts/release-client.mjs"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",

@@ -9,6 +9,7 @@
   <string name="allow_the_system_to_add_a_vpn_on_first">При первом подключении разрешите добавление VPN. Управляйте устройствами в аккаунте.</string>
   <string name="allow_the_system_vpn_permission_to_connect">Для подключения разрешите использование VPN.</string>
   <string name="allow_vpn_access_on_your_first_connection">При первом подключении разрешите VPN</string>
+  <string name="announcement">Объявление</string>
   <string name="ask_your_administrator_to_enable_northstar_client_access">Попросите администратора включить доступ через клиент NORTHSTAR.</string>
   <string name="authorized_devices">Авторизованные устройства</string>
   <string name="authorizing_and_connecting">Авторизация и подключение…</string>
@@ -23,6 +24,7 @@
   <string name="choose_location_then_connect_hint">Выберите локацию и подключитесь с главного экрана.</string>
   <string name="client_access_is_not_enabled_on_the_server">Доступ клиентов не включён на сервере.</string>
   <string name="client_access_is_not_enabled_on_the_server_contact">Доступ клиентов не включён на сервере. Обратитесь к администратору.</string>
+  <string name="client_update_required">Эта версия больше не поддерживается. Скачайте последнюю версию NORTHSTAR, чтобы войти или подключиться.</string>
   <string name="confirming_connection_status">Проверка подключения…</string>
   <string name="connect_action">Подключиться</string>
   <string name="connect_automatically_or_choose_your_own_location">Подключайтесь автоматически или выбирайте локацию.</string>
@@ -111,6 +113,14 @@
   <string name="unable_to_connect_check_your_network_and_try_again">Не удалось подключиться. Проверьте сеть и повторите.</string>
   <string name="unable_to_reach_the_service_check_your_network_and">Сервис недоступен. Проверьте сеть и повторите.</string>
   <string name="unable_to_reach_the_service_check_your_network_or">Сервис недоступен. Проверьте сеть или обратитесь к администратору.</string>
+  <string name="update_allow_installs">Разрешите NORTHSTAR устанавливать обновления, затем вернитесь и снова нажмите «Обновить».</string>
+  <string name="update_available">Доступна версия %1$s</string>
+  <string name="update_available_detail">Обновите приложение, чтобы получить новые функции и исправления.</string>
+  <string name="update_downloading">Загрузка и проверка обновления…</string>
+  <string name="update_failed">Не удалось загрузить или проверить обновление. Повторите попытку позже.</string>
+  <string name="update_now">Обновить</string>
+  <string name="update_open_download">Скачать</string>
+  <string name="update_required_detail">Эта версия больше не поддерживается. Обновите приложение, чтобы продолжить подключаться.</string>
   <string name="valid_until">\nДействует до · </string>
   <string name="vpn_connection">VPN-подключение</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>

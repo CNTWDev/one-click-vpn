@@ -428,6 +428,25 @@ existing nodes receive the routing changes without rotating credentials.
   bundles are removed after a one-day grace period once no desired or retryable
   task references them.
 
+### Client releases and Agent 2.10
+
+Deploy the Controller (migrations add `client_releases`, `client_policies` and client
+version columns), then **升级 Agent** on nodes that use NORTHSTAR native access; 2.10.0 is
+the native-lease Agent formerly labelled 2.9.0 on the client branch.
+
+- Console → 客户端 → 客户端发布 registers, publishes, promotes and withdraws native clients.
+  Permanent links `/download/{platform}` always redirect to the newest stable build.
+- `npm run release:client` uploads an installer (S3-compatible storage such as R2) and
+  registers a draft with `NORTHSTAR_RELEASE_TOKEN`; see `clients/README.md` and `.env.example`.
+- Native clients send `X-Northstar-Client`; a per-platform minimum build returns
+  `426 CLIENT_UPDATE_REQUIRED` at sign-in and connect. No minimum is set by default.
+- Tag `client-v<version>` (matching `clients/version.json`) to have GitHub Actions build a
+  signed Android APK and publish it to beta; promote it, stage a rollout percentage, set a
+  client announcement and read connection-failure reports in the same Console page.
+- Agent 2.10 applies lease renewals from its task poll, so a renewing client no longer
+  triggers a node-wide WireGuard reconcile. Native sessions slide for
+  `NORTHSTAR_NATIVE_SESSION_DAYS` (default 30) instead of 12 hours.
+
 ### Agent 2.9 update
 
 Deploy the Controller (migrations run automatically), then **升级 Agent** on each node.

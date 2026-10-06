@@ -9,6 +9,7 @@
   <string name="allow_the_system_to_add_a_vpn_on_first">Allow the system to add a VPN on first connection. Manage authorized devices in Account.</string>
   <string name="allow_the_system_vpn_permission_to_connect">Allow the system VPN permission to connect.</string>
   <string name="allow_vpn_access_on_your_first_connection">Allow VPN access on your first connection</string>
+  <string name="announcement">Announcement</string>
   <string name="ask_your_administrator_to_enable_northstar_client_access">Ask your administrator to enable NORTHSTAR client access.</string>
   <string name="authorized_devices">Authorized devices</string>
   <string name="authorizing_and_connecting">Authorizing and connecting…</string>
@@ -23,6 +24,7 @@
   <string name="choose_location_then_connect_hint">Choose a location, then connect from the home screen.</string>
   <string name="client_access_is_not_enabled_on_the_server">Client access is not enabled on the server.</string>
   <string name="client_access_is_not_enabled_on_the_server_contact">Client access is not enabled on the server. Contact your administrator.</string>
+  <string name="client_update_required">This version is no longer supported. Download the latest NORTHSTAR to sign in or connect.</string>
   <string name="confirming_connection_status">Confirming connection…</string>
   <string name="connect_action">Connect</string>
   <string name="connect_automatically_or_choose_your_own_location">Connect automatically or choose your own location.</string>
@@ -111,6 +113,14 @@
   <string name="unable_to_connect_check_your_network_and_try_again">Unable to connect. Check your network and try again.</string>
   <string name="unable_to_reach_the_service_check_your_network_and">Unable to reach the service. Check your network and try again.</string>
   <string name="unable_to_reach_the_service_check_your_network_or">Unable to reach the service. Check your network or contact your administrator.</string>
+  <string name="update_allow_installs">Allow NORTHSTAR to install updates, then come back and tap Update now again.</string>
+  <string name="update_available">Version %1$s is available</string>
+  <string name="update_available_detail">Update to get the latest features and fixes.</string>
+  <string name="update_downloading">Downloading and verifying the update…</string>
+  <string name="update_failed">The update could not be downloaded or verified. Try again later.</string>
+  <string name="update_now">Update now</string>
+  <string name="update_open_download">Download</string>
+  <string name="update_required_detail">This version is no longer supported. Update to keep connecting.</string>
   <string name="valid_until">\nValid until · </string>
   <string name="vpn_connection">VPN connection</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>

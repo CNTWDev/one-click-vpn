@@ -2302,5 +2302,321 @@
   "无法读取该账号的访问资产。": [
     "Could not load this account's access assets.",
     "Не удалось загрузить ресурсы доступа аккаунта."
+  ],
+  "需要管理员权限。": [
+    "Administrator access is required.",
+    "Требуются права администратора."
+  ],
+  "该平台和架构已存在相同构建号，请递增构建号。": [
+    "This platform and architecture already have this build number. Increase the build number.",
+    "Для этой платформы и архитектуры такой номер сборки уже есть. Увеличьте номер сборки."
+  ],
+  "无法下载安装包，请确认 HTTPS 地址可公开访问。": [
+    "Could not download the installer. Make sure the HTTPS address is publicly reachable.",
+    "Не удалось скачать установщик. Убедитесь, что HTTPS-адрес доступен публично."
+  ],
+  "下载到的文件与填写的 SHA-256 不一致。": [
+    "The downloaded file does not match the SHA-256 you entered.",
+    "Скачанный файл не совпадает с указанным SHA-256."
+  ],
+  "下载到的文件大小与填写的不一致。": [
+    "The downloaded file size does not match the size you entered.",
+    "Размер скачанного файла не совпадает с указанным."
+  ],
+  "版本信息不完整或不合法，请检查版本号、构建号、下载地址和最低系统版本。": [
+    "The release details are incomplete or invalid. Check the version, build number, download address and minimum OS version.",
+    "Данные выпуска неполны или неверны. Проверьте версию, номер сборки, адрес загрузки и минимальную версию ОС."
+  ],
+  "当前状态不能执行该操作，请刷新后重试。": [
+    "This action is not available in the current state. Refresh and try again.",
+    "Это действие недоступно в текущем состоянии. Обновите страницу и повторите."
+  ],
+  "预发布版本（带 - 后缀）或 TestFlight 不能晋升为正式版。": [
+    "Prerelease versions (with a - suffix) and TestFlight builds cannot be promoted to stable.",
+    "Предварительные версии (с суффиксом -) и сборки TestFlight нельзя перевести в стабильные."
+  ],
+  "没有已发布的正式版达到该构建号，用户将无法升级。请先发布正式版。": [
+    "No published stable release has this build number or higher, so users could not upgrade. Publish a stable release first.",
+    "Нет опубликованного стабильного выпуска с таким или большим номером сборки, пользователи не смогут обновиться. Сначала опубликуйте стабильный выпуск."
+  ],
+  "撤回后将没有满足最低版本要求的正式版，请先调低最低版本。": [
+    "Withdrawing this would leave no stable release that meets the minimum build. Lower the minimum build first.",
+    "После отзыва не останется стабильного выпуска, удовлетворяющего минимальной сборке. Сначала понизьте минимальную сборку."
+  ],
+  "最低构建号必须是不小于 0 的整数。": [
+    "The minimum build must be a whole number of 0 or more.",
+    "Минимальная сборка должна быть целым числом не меньше 0."
+  ],
+  "晋升为正式版": [
+    "Promote to stable",
+    "Перевести в стабильные"
+  ],
+  "{0} 将成为正式版，固定下载链接和客户端更新检查会立即指向它。": [
+    "{0} becomes the stable release. The permanent download link and client update checks will point to it immediately.",
+    "{0} станет стабильным выпуском. Постоянная ссылка на загрузку и проверка обновлений сразу начнут указывать на него."
+  ],
+  "晋升正式版": [
+    "Promote to stable",
+    "Сделать стабильной"
+  ],
+  "撤回版本": [
+    "Withdraw release",
+    "Отозвать выпуск"
+  ],
+  "撤回 {0}？固定下载链接会回到上一个已发布版本。": [
+    "Withdraw {0}? The permanent download link will fall back to the previous published release.",
+    "Отозвать {0}? Постоянная ссылка вернётся к предыдущему опубликованному выпуску."
+  ],
+  "撤回": [
+    "Withdraw",
+    "Отозвать"
+  ],
+  "删除草稿": [
+    "Delete draft",
+    "Удалить черновик"
+  ],
+  "删除 {0} 的草稿记录？对象存储里的文件不会被删除。": [
+    "Delete the draft for {0}? The file in object storage is not deleted.",
+    "Удалить черновик {0}? Файл в объектном хранилище не удаляется."
+  ],
+  "已更新": [
+    "Updated",
+    "Обновлено"
+  ],
+  "设置最低版本": [
+    "Set minimum version",
+    "Задать минимальную версию"
+  ],
+  "构建号低于 {0} 的 {1} 客户端将无法登录和连接，并提示下载新版。": [
+    "{1} clients with a build below {0} will not be able to sign in or connect and will be asked to download the new version.",
+    "Клиенты {1} со сборкой ниже {0} не смогут войти и подключиться и получат предложение скачать новую версию."
+  ],
+  "保存": [
+    "Save",
+    "Сохранить"
+  ],
+  "已保存": [
+    "Saved",
+    "Сохранено"
+  ],
+  "草稿已登记，安装包已校验": [
+    "Draft registered and installer verified",
+    "Черновик зарегистрирован, установщик проверен"
+  ],
+  "已复制": [
+    "Copied",
+    "Скопировано"
+  ],
+  "客户端发布": [
+    "Client releases",
+    "Выпуски клиентов"
+  ],
+  "登记、发布和撤回 NORTHSTAR 客户端；门户下载、固定下载链接和客户端更新检查都读取这里。": [
+    "Register, publish and withdraw NORTHSTAR clients. Portal downloads, permanent download links and client update checks all read from here.",
+    "Регистрация, публикация и отзыв клиентов NORTHSTAR. Загрузки на портале, постоянные ссылки и проверка обновлений используют эти данные."
+  ],
+  "安装包存储：S3 兼容对象存储（{0}）": [
+    "Installer storage: S3-compatible object storage ({0}).",
+    "Хранилище установщиков: S3-совместимое объектное хранилище ({0})."
+  ],
+  "安装包存储：外部（手动上传后登记 HTTPS 地址）": [
+    "Installer storage: external (upload manually, then register the HTTPS address).",
+    "Хранилище установщиков: внешнее (загрузите вручную, затем зарегистрируйте HTTPS-адрес)."
+  ],
+  "发布令牌已配置：CI 或本地脚本可以上传、登记草稿并发布到测试版。": [
+    "Release token configured: CI or the local script can upload, register drafts and publish to beta.",
+    "Токен выпуска настроен: CI или локальный скрипт могут загружать, регистрировать черновики и публиковать в бета-канал."
+  ],
+  "发布令牌未配置：只能在这里手动登记版本。": [
+    "Release token not configured: releases can only be registered here manually.",
+    "Токен выпуска не настроен: выпуски можно регистрировать только здесь вручную."
+  ],
+  "下载链接与最低版本": [
+    "Download links and minimum versions",
+    "Ссылки на загрузку и минимальные версии"
+  ],
+  "平台": [
+    "Platform",
+    "Платформа"
+  ],
+  "固定下载链接": [
+    "Permanent download link",
+    "Постоянная ссылка"
+  ],
+  "当前正式版": [
+    "Current stable",
+    "Текущая стабильная"
+  ],
+  "最低构建号": [
+    "Minimum build",
+    "Минимальная сборка"
+  ],
+  "复制": [
+    "Copy",
+    "Копировать"
+  ],
+  "尚未发布": [
+    "Not released",
+    "Не выпущено"
+  ],
+  "渠道": [
+    "Channel",
+    "Канал"
+  ],
+  "安装包": [
+    "Installer",
+    "Установщик"
+  ],
+  "发布时间": [
+    "Published",
+    "Опубликовано"
+  ],
+  "构建 {0}": [
+    "build {0}",
+    "сборка {0}"
+  ],
+  "正式版": [
+    "Stable",
+    "Стабильная"
+  ],
+  "测试版": [
+    "Beta",
+    "Бета"
+  ],
+  "已发布": [
+    "Published",
+    "Опубликовано"
+  ],
+  "草稿": [
+    "Draft",
+    "Черновик"
+  ],
+  "已撤回": [
+    "Withdrawn",
+    "Отозвано"
+  ],
+  "发布正式版": [
+    "Publish stable",
+    "Опубликовать стабильную"
+  ],
+  "发布测试版": [
+    "Publish beta",
+    "Опубликовать бету"
+  ],
+  "还没有登记任何版本。可以用 npm run release:client 上传，或在下方手动登记。": [
+    "No releases yet. Upload with npm run release:client, or register one manually below.",
+    "Выпусков пока нет. Загрузите через npm run release:client или зарегистрируйте вручную ниже."
+  ],
+  "手动登记版本": [
+    "Register a release manually",
+    "Зарегистрировать выпуск вручную"
+  ],
+  "先把安装包上传到可公开访问的 HTTPS 地址。Controller 会下载一次，记录真实的 SHA-256 和大小。": [
+    "Upload the installer to a public HTTPS address first. The Controller downloads it once to record its real SHA-256 and size.",
+    "Сначала загрузите установщик по публичному HTTPS-адресу. Controller скачает его один раз и запишет фактический SHA-256 и размер."
+  ],
+  "架构": [
+    "Architecture",
+    "Архитектура"
+  ],
+  "分发方式": [
+    "Distribution",
+    "Способ распространения"
+  ],
+  "直接下载": [
+    "Direct download",
+    "Прямая загрузка"
+  ],
+  "版本号": [
+    "Version",
+    "Версия"
+  ],
+  "构建号": [
+    "Build number",
+    "Номер сборки"
+  ],
+  "最低系统版本": [
+    "Minimum OS version",
+    "Минимальная версия ОС"
+  ],
+  "下载地址": [
+    "Download address",
+    "Адрес загрузки"
+  ],
+  "SHA-256（可选，用于核对）": [
+    "SHA-256 (optional, for verification)",
+    "SHA-256 (необязательно, для проверки)"
+  ],
+  "更新说明": [
+    "Release notes",
+    "Описание изменений"
+  ],
+  "登记草稿": [
+    "Register draft",
+    "Зарегистрировать черновик"
+  ],
+  "版本分布": [
+    "Version adoption",
+    "Распределение версий"
+  ],
+  "授权设备": [
+    "Authorized devices",
+    "Авторизованные устройства"
+  ],
+  "未上报": [
+    "Not reported",
+    "Не сообщается"
+  ],
+  "还没有授权设备上报版本。": [
+    "No authorized device has reported a version yet.",
+    "Ни одно авторизованное устройство пока не сообщило версию."
+  ],
+  "客户端": [
+    "Clients",
+    "Клиенты"
+  ],
+  "灰度比例必须是 1 到 100 之间的整数。": [
+    "Rollout must be a whole number from 1 to 100.",
+    "Доля раскатки должна быть целым числом от 1 до 100."
+  ],
+  "公告最多 500 个字符。": [
+    "Announcements are limited to 500 characters.",
+    "Объявление — не более 500 символов."
+  ],
+  "客户端公告": [
+    "Client announcement",
+    "Объявление в клиенте"
+  ],
+  "留空则不显示": [
+    "Leave empty to hide",
+    "Оставьте пустым, чтобы скрыть"
+  ],
+  "灰度比例 (%)": [
+    "Rollout (%)",
+    "Раскатка (%)"
+  ],
+  "连接失败上报（近 7 天）": [
+    "Connection failures reported (last 7 days)",
+    "Сбои подключения (за 7 дней)"
+  ],
+  "错误代码": [
+    "Error code",
+    "Код ошибки"
+  ],
+  "次数": [
+    "Events",
+    "События"
+  ],
+  "用户数": [
+    "Users",
+    "Пользователи"
+  ],
+  "最近一次": [
+    "Latest",
+    "Последний"
+  ],
+  "近 7 天没有客户端上报连接失败。": [
+    "No client reported a connection failure in the last 7 days.",
+    "За последние 7 дней клиенты не сообщали о сбоях подключения."
   ]
 }

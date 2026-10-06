@@ -1,7 +1,18 @@
-param([ValidateSet('win-x64', 'win-arm64')][string]$Runtime = 'win-x64')
+param(
+  [ValidateSet('win-x64', 'win-arm64')][string]$Runtime = 'win-x64',
+  # Release builds pass both; the fourth assembly field is the build number update checks compare.
+  [string]$Version = '',
+  [int]$Build = 0
+)
 $ErrorActionPreference = 'Stop'
 $output = Join-Path $PSScriptRoot "artifacts/$Runtime"
-dotnet publish (Join-Path $PSScriptRoot 'Northstar/Northstar.csproj') -c Release -r $Runtime --self-contained true -o $output
+$properties = @()
+if ($Version -and $Build -gt 0) {
+  if ($Build -gt 65535) { throw 'Windows build numbers must fit the assembly revision field (<= 65535)' }
+  $properties = @("-p:Version=$Version", "-p:AssemblyVersion=$Version.$Build", "-p:FileVersion=$Version.$Build")
+}
+dotnet publish (Join-Path $PSScriptRoot 'Northstar/Northstar.csproj') -c Release -r $Runtime --self-contained true -o $output @properties
 if ($LASTEXITCODE -ne 0) { throw 'NORTHSTAR build failed' }
-Compress-Archive -Path "$output/*" -DestinationPath (Join-Path $PSScriptRoot "artifacts/NORTHSTAR-dev-$Runtime.zip") -Force
-Write-Host 'Development ZIP only. Not signed, not a VPN-ready release.'
+$name = if ($properties.Count) { "NORTHSTAR-$Version-$Build-$Runtime.zip" } else { "NORTHSTAR-dev-$Runtime.zip" }
+Compress-Archive -Path "$output/*" -DestinationPath (Join-Path $PSScriptRoot "artifacts/$name") -Force
+Write-Host "Built $name (not code-signed)."

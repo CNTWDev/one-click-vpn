@@ -15,7 +15,7 @@
 
 | 路由 | 用途 |
 | --- | --- |
-| POST `/api/v2/native/login` | email/password/identityKey/platform/deviceName；返回 12 小时会话，不占额度 |
+| POST `/api/v2/native/login` | email/password/identityKey/platform/deviceName；返回滑动会话（默认 30 天，`NORTHSTAR_NATIVE_SESSION_DAYS`），不占额度 |
 | POST `/api/v2/native/challenge` | action + request；返回 id/payload/expiresAt，60 秒有效 |
 | POST `/api/v2/native/connect` | challengeId/signature/request；request 包含 publicKey 和可选 nodeId；登记、签发或续租 |
 | GET `/api/v2/native/account` | 自己的账号、设备、额度、有效期、近 30 天流量 |
@@ -31,7 +31,7 @@
 
 锁定账号权益记录 → 校验会员状态 → 检查已有 enrollment / 撤销 tombstone → 检查名额 → 原子登记和占位 → 提交后下发权限。用数据库唯一约束约束 `(account_id, identity_thumbprint)`，使用请求幂等键；两台设备抢最后名额只能成功一台。
 
-设备状态：`active → revoking → revoked`。离线或断开不释放名额。撤销禁止续租并下发移除；等待旧租约最晚截止加 20 秒才释放名额，不根据早期 ACK 提前释放。旧任务保留原始截止时间，不得延长。Agent 2.9.0 在激活 native peer 之前，以 iptables-restore 单次提交更新独立的允许列表，原生地址带 UTC datestop，legacy 地址不带期限，未知地址默认拒绝。内核负责截止时间阻断，独立 systemd timer 清理过期 peer 和持久化配置；重启恢复前先清理并恢复内核规则。节点时钟必须可靠，Linux 真机故障场景仍须验收，不能声称保存即全网即时下线。
+设备状态：`active → revoking → revoked`。离线或断开不释放名额。撤销禁止续租并下发移除；等待旧租约最晚截止加 20 秒才释放名额，不根据早期 ACK 提前释放。旧任务保留原始截止时间，不得延长。Agent 2.10.0 在激活 native peer 之前，以 iptables-restore 单次提交更新独立的允许列表，原生地址带 UTC datestop，legacy 地址不带期限，未知地址默认拒绝。内核负责截止时间阻断，独立 systemd timer 清理过期 peer 和持久化配置；重启恢复前先清理并恢复内核规则。节点时钟必须可靠，Linux 真机故障场景仍须验收，不能声称保存即全网即时下线。
 
 控制器不可用时不新增设备、不续期；已批准租约只能用到本地截止时间。Agent 需要本地到期执行器及重启后的恢复检查。严格模式不可 fallback 到永久静态配置。实际同步延迟与租约长度须经真机测试后制定 SLA。
 

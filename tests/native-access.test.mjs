@@ -48,7 +48,21 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     const next=await proof(loser,"connect",{...input,publicKey:randomBytes(32).toString("base64")});assert.equal((await call("connect",next,loser.token)).data.code,"DEVICE_LIMIT_REACHED");
     await pool.query("UPDATE native_enrollments SET release_after=now()-interval '1 second' WHERE id=$1",[result.enrollmentId]);
     assert.equal((await call("account",undefined,winner.token)).data.used,0);
-    const enrolled=await call("connect",await proof(loser,"connect",{...input,publicKey:randomBytes(32).toString("base64")}),loser.token);assert.equal(enrolled.status,200,JSON.stringify(enrolled));
+    const renewKey=randomBytes(32).toString("base64"),enrolled=await call("connect",await proof(loser,"connect",{...input,publicKey:renewKey}),loser.token);assert.equal(enrolled.status,200,JSON.stringify(enrolled));
+    // Agents advertising in-place renewal get deadlines by poll: renewing a live lease is not a node revision.
+    await pool.query("UPDATE nodes SET agent_capabilities_json=$2 WHERE id=$1",[node,JSON.stringify({nativeLeaseEnforcement:1,nativeLeaseRenewal:1,connectivity:{protocols:{wireguard:{runtimeActive:true,listening:true}}}})]);
+    const renew=async()=>{const r=await call("connect",await proof(loser,"connect",{...input,publicKey:renewKey}),loser.token);assert.equal(r.status,200,JSON.stringify(r.data));return r.data;};
+    const first=await renew();
+    await pool.query("UPDATE observed_configs SET applied_revision=$2 WHERE node_id=$1",[node,first.revision]);
+    await new Promise(r=>setTimeout(r,1100));
+    const second=await renew();
+    assert.equal(second.revision,first.revision,"renewal must not enqueue a reconcile");
+    assert.ok(Date.parse(second.expiresAt)>Date.parse(first.expiresAt));
+    assert.equal(second.ready,true);
+    assert.equal((await call(`status/${second.leaseId}`,undefined,loser.token)).data.ready,true);
+    const report=await call("diagnostics",{events:[{code:"HANDSHAKE_TIMEOUT",at:new Date().toISOString(),nodeId:node},{code:"bad code",at:new Date().toISOString()},{code:"OLD",at:"2000-01-01T00:00:00Z"}]},loser.token);
+    assert.deepEqual([report.status,report.data.accepted],[200,1],"only well-formed recent codes are stored");
+    assert.equal((await call("diagnostics",{events:[]})).status,401);
     await pool.query("UPDATE users SET membership_expires_at=$2 WHERE id=$1",[user,new Date(Date.now()-1000).toISOString()]);
     assert.equal((await call("connect",await proof(loser,"connect",input),loser.token)).data.code,"MEMBERSHIP_EXPIRED");
     // Migration must not turn native internal devices into exportable credentials.

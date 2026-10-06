@@ -63,7 +63,8 @@ class ConnectionService : Service(), Tunnel {
                 backend.setState(this, Tunnel.State.UP, Config.parse(config.byteInputStream()))
                 startedAt = SystemClock.elapsedRealtime(); ConnectionStateStore.messageId = R.string.confirming_connection_status
                 worker.scheduleWithFixedDelay({ tick() }, 2, 5, TimeUnit.SECONDS)
-            } catch (e: Exception) { stopConnection(friendlyResource(e)) }
+                api.report("")
+            } catch (e: Exception) { api.report((e as? ApiFailure)?.code ?: "CONNECT_FAILED", nodeId); stopConnection(friendlyResource(e)) }
         }
         return START_NOT_STICKY
     }
@@ -86,23 +87,24 @@ class ConnectionService : Service(), Tunnel {
     private fun tick() {
         if (stopping) return
         try {
-            if (SystemClock.elapsedRealtime() >= deadline) { stopConnection(R.string.connection_authorization_expired_connect_again); return }
-            if (SystemClock.elapsedRealtime() >= renewAt) {
-                try { acquire() } catch (e: ApiFailure) {
-                    if (e.code in listOf("AUTH_REQUIRED", "DEVICE_REVOKED", "MEMBERSHIP_EXPIRED", "ACCOUNT_UNAVAILABLE", "MANAGED_ACCESS_REQUIRED")) { stopConnection(friendlyResource(e)); return }
+            // After Doze the lease may already have lapsed: one renewal attempt before closing the tunnel.
+            if (SystemClock.elapsedRealtime() >= renewAt || SystemClock.elapsedRealtime() >= deadline) {
+                try { acquire(); startedAt = maxOf(startedAt, SystemClock.elapsedRealtime()) } catch (e: ApiFailure) {
+                    if (e.code in listOf("AUTH_REQUIRED", "DEVICE_REVOKED", "MEMBERSHIP_EXPIRED", "ACCOUNT_UNAVAILABLE", "MANAGED_ACCESS_REQUIRED", "CLIENT_UPDATE_REQUIRED")) { api.report(e.code, nodeId); stopConnection(friendlyResource(e)); return }
                     renewAt = SystemClock.elapsedRealtime() + 15000
                 } catch (_: Exception) { renewAt = SystemClock.elapsedRealtime() + 15000 }
+                if (SystemClock.elapsedRealtime() >= deadline) { api.report("LEASE_RENEWAL_FAILED", nodeId); stopConnection(R.string.connection_authorization_expired_connect_again); return }
             }
             val stats = backend.getStatistics(this)
             val handshake = stats.peers().maxOfOrNull { stats.peer(it)?.latestHandshakeEpochMillis() ?: 0 } ?: 0
             if (handshake > 0 && System.currentTimeMillis() - handshake < 180000) ConnectionStateStore.messageId = R.string.connected_status
             else {
                 ConnectionStateStore.messageId = R.string.confirming_connection_status
-                if (SystemClock.elapsedRealtime() - startedAt > 45000) { stopConnection(R.string.this_location_is_not_responding_try_another); return }
+                if (SystemClock.elapsedRealtime() - startedAt > 45000) { api.report("HANDSHAKE_TIMEOUT", nodeId); stopConnection(R.string.this_location_is_not_responding_try_another); return }
             }
             ConnectionStateStore.bytes = "↑ ${stats.totalTx() / 1024} KB   ↓ ${stats.totalRx() / 1024} KB"
             getSystemService(NotificationManager::class.java).notify(1, notification(ConnectionStateStore.message))
-        } catch (_: Exception) { stopConnection(R.string.connection_interrupted_try_again) }
+        } catch (_: Exception) { api.report("TUNNEL_ERROR", nodeId); stopConnection(R.string.connection_interrupted_try_again) }
     }
     private fun notification(text: String): Notification {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)

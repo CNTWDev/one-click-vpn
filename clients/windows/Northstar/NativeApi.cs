@@ -16,6 +16,7 @@ public sealed class AccessFailure(string code) : Exception(code) {
         "INVALID_CREDENTIALS" => L10n.Text("incorrect_email_or_password"),
         "CLIENT_ACCESS_NOT_ENABLED" => L10n.Text("client_access_is_not_enabled_on_the_server"),
         "MANAGED_ACCESS_REQUIRED" => L10n.Text("ask_your_administrator_to_enable_northstar_client_access"),
+        "CLIENT_UPDATE_REQUIRED" => L10n.Text("client_update_required"),
         _ => L10n.Text("unable_to_reach_the_service_check_your_network_or")
     };
 }
@@ -47,6 +48,7 @@ public sealed class NativeApi : IDisposable {
     public async Task<JsonObject> Request(string path,JsonObject? body=null) {
         if(!Uri.TryCreate(Origin,UriKind.Absolute,out var origin)||origin.Scheme!="https"||origin.UserInfo!=""||origin.Query!=""||origin.Fragment!=""||origin.AbsolutePath!="/") throw new AccessFailure("SERVER_REQUIRED");
         using var request=new HttpRequestMessage(body is null?HttpMethod.Get:HttpMethod.Post,new Uri(origin,"/api/v2/native/"+path));
+        request.Headers.TryAddWithoutValidation("X-Northstar-Client",ClientAgent);
         if(path!="login" && Read("token") is { } token) request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",Encoding.UTF8.GetString(token));
         if(body is not null) request.Content=JsonContent.Create(body);
         using var response=await client.SendAsync(request,HttpCompletionOption.ResponseHeadersRead);
@@ -55,6 +57,23 @@ public sealed class NativeApi : IDisposable {
         if(!response.IsSuccessStatusCode) throw new AccessFailure(json["code"]?.GetValue<string>()??"SERVICE_UNAVAILABLE");
         return json;
     }
+    /// Public release catalog: the operator's announcement, and a newer build for this install if one is published.
+    public async Task<(string Announcement,(string Version,bool Mandatory,Uri Download)? Update)?> LatestRelease() {
+        if(!Uri.TryCreate(Origin,UriKind.Absolute,out var origin)||origin.Scheme!="https") return null;
+        var installation=Read("installation") is { } saved?Encoding.UTF8.GetString(saved):Guid.NewGuid().ToString();Save("installation",Encoding.UTF8.GetBytes(installation));
+        var build=ClientAgent[(ClientAgent.IndexOf('+')+1)..];
+        using var response=await client.GetAsync(new Uri(origin,$"/api/v1/client-releases/latest?platform=windows&arch={(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture==System.Runtime.InteropServices.Architecture.Arm64?"arm64":"x64")}&build={build}&installation={installation}"));
+        if(!response.IsSuccessStatusCode) return null;
+        await response.Content.LoadIntoBufferAsync(65536);
+        var json=JsonNode.Parse(await response.Content.ReadAsStringAsync()) as JsonObject;
+        if(json is null) return null;
+        var announcement=json["announcement"]?.GetValue<string>() is { } text?text[..Math.Min(text.Length,500)]:"";
+        if(json["updateAvailable"]?.GetValue<bool>()!=true||json["latest"]?["version"]?.GetValue<string>() is not { } version) return (announcement,null);
+        // The permanent link always resolves to the current stable installer.
+        return (announcement,(version,json["mandatory"]?.GetValue<bool>()==true,new Uri(origin,json["downloadPath"]?.GetValue<string>()??"/download/windows")));
+    }
+    /// windows/0.1.0+1 (the fourth assembly version field is the build number; CI sets it per release).
+    private static readonly string ClientAgent=typeof(NativeApi).Assembly.GetName().Version is { } v?$"windows/{v.Major}.{v.Minor}.{Math.Max(0,v.Build)}+{Math.Max(1,v.Revision)}":"windows/0.0.0+1";
     private static string B64(byte[] bytes)=>Convert.ToBase64String(bytes).TrimEnd('=').Replace('+','-').Replace('/','_');
     public async Task Login(string email,string password) {
         var key=identity.ExportParameters(false);

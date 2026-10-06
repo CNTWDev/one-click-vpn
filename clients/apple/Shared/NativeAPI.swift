@@ -17,7 +17,7 @@ enum AccessFailure: LocalizedError {
                 "SIMULATOR_UNSUPPORTED":L10n.text("the_simulator_is_for_ui_testing_only_test_the"),
                 "SERVER_REQUIRED":L10n.text("enter_a_valid_https_server_address"),
                 "ACCOUNT_UNAVAILABLE":L10n.text("your_account_is_not_active"), "ACCESS_EXPIRED":L10n.text("connection_authorization_expired_connect_again"),
-                "RATE_LIMITED":L10n.text("too_many_attempts_try_again_later"), "INVALID_RESPONSE":L10n.text("invalid_server_response_try_again_later")] [code] ?? L10n.text("unable_to_connect_check_your_network_and_try_again")
+                "RATE_LIMITED":L10n.text("too_many_attempts_try_again_later"), "CLIENT_UPDATE_REQUIRED":L10n.text("client_update_required"), "INVALID_RESPONSE":L10n.text("invalid_server_response_try_again_later")] [code] ?? L10n.text("unable_to_connect_check_your_network_and_try_again")
     }
 }
 
@@ -59,6 +59,7 @@ final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func request(_ path:String,_ body:[String:Any]?=nil) async throws -> [String:Any] {
         var request=URLRequest(url:URL(string:"\(origin)/api/v2/native/\(path)")!);request.timeoutInterval=15
         request.setValue("application/json",forHTTPHeaderField:"Accept")
+        request.setValue(Self.clientAgent,forHTTPHeaderField:"X-Northstar-Client")
         if path != "login",let token=try SecureStorage.read("token").flatMap({String(data:$0,encoding:.utf8)}) {request.setValue("Bearer \(token)",forHTTPHeaderField:"Authorization")}
         if let body {request.httpMethod="POST";request.setValue("application/json",forHTTPHeaderField:"Content-Type");request.httpBody=try JSONSerialization.data(withJSONObject:body)}
         let session=URLSession(configuration:.ephemeral,delegate:self,delegateQueue:nil)
@@ -67,6 +68,28 @@ final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         guard data.count<=262144,let json=try JSONSerialization.jsonObject(with:data) as? [String:Any],let response=response as? HTTPURLResponse else {throw AccessFailure.code("INVALID_RESPONSE")}
         guard (200..<300).contains(response.statusCode) else {throw AccessFailure.code(json["code"] as? String ?? "SERVICE_UNAVAILABLE")}
         return json
+    }
+    /// Public release catalog: whether a newer build (or a required one) exists for this install.
+    func latestRelease(installation:String) async throws -> [String:Any] {
+        let info=Bundle.main.infoDictionary ?? [:],build=Int(info["CFBundleVersion"] as? String ?? "") ?? 0
+        var components=URLComponents(string:"\(origin)/api/v1/client-releases/latest")!
+        components.queryItems=[URLQueryItem(name:"platform",value:Self.clientAgent.components(separatedBy:"/")[0]),URLQueryItem(name:"build",value:String(build)),URLQueryItem(name:"installation",value:installation)]
+        var request=URLRequest(url:components.url!);request.timeoutInterval=15;request.setValue("application/json",forHTTPHeaderField:"Accept")
+        let session=URLSession(configuration:.ephemeral,delegate:self,delegateQueue:nil)
+        defer { session.invalidateAndCancel() }
+        let (data,response)=try await session.data(for:request)
+        guard (response as? HTTPURLResponse)?.statusCode==200,data.count<=65536,let json=try JSONSerialization.jsonObject(with:data) as? [String:Any] else {throw AccessFailure.code("SERVICE_UNAVAILABLE")}
+        return json
+    }
+    /// `ios/1.2.3+45`: lets the server require an upgrade (CLIENT_UPDATE_REQUIRED) and track version adoption.
+    static var clientAgent:String {
+        #if os(iOS)
+        let platform="ios"
+        #else
+        let platform="macos"
+        #endif
+        let info=Bundle.main.infoDictionary ?? [:]
+        return "\(platform)/\(info["CFBundleShortVersionString"] as? String ?? "0.0.0")+\(info["CFBundleVersion"] as? String ?? "0")"
     }
     static func identity() throws -> P256.Signing.PrivateKey {
         if let data=try SecureStorage.read("identity") {return try P256.Signing.PrivateKey(rawRepresentation:data)}
