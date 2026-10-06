@@ -2,7 +2,7 @@
 
 ## 当前工程状态（2026-10-06）
 
-产品名统一为 **NORTHSTAR**。原生工程位于 `clients/android`、`clients/apple`、`clients/windows`；Apple 覆盖 iOS/iPadOS 和 macOS。工程构建方式与发布步骤见 [客户端工作区](../../clients/README.md)。
+产品名统一为 **Veilbird**（原 Northstar）。为保证已安装客户端可原地升级、部署不中断，技术标识保持不变：Android `applicationId`/包名 `com.northstar.client`、Apple Bundle ID `com.northstar.client.*` 与 `NorthstarCore` 等 target、Windows `NORTHSTAR.exe` 与 `Northstar` 命名空间、`NORTHSTAR_*` 环境变量、`X-Northstar-Client` 请求头及本地存储键。原生工程位于 `clients/android`、`clients/apple`、`clients/windows`；Apple 覆盖 iOS/iPadOS 和 macOS。工程构建方式与发布步骤见 [客户端工作区](../../clients/README.md)。
 
 已经实现：Android / Apple 登录、自动/指定节点、设备管理与 WireGuard 引擎；服务端签名挑战、账号锁下的设备额度、短期租约；Agent 独立到期 watchdog；后台账号设备设置；正式版本清单读取 API 和门户下载入口。Windows 已接入账号与设备 API，隧道仍未实现。
 
@@ -24,7 +24,7 @@ Protocol-specific native engines
 ## 2. macOS 和 iPhone
 
 ```text
-Northstar App
+Veilbird App
   ├── Login / Device / Profile UI
   ├── API Client
   ├── Keychain / App Group storage
@@ -41,7 +41,7 @@ Northstar App
 ## 3. Android
 
 ```text
-Northstar Android App
+Veilbird Android App
   ├── Native Android UI
   ├── API Client
   ├── Android Keystore

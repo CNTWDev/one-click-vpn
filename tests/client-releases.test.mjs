@@ -68,7 +68,8 @@ test("S3 presigning matches the AWS SigV4 reference vector; object keys are immu
   assert.match(url, /X-Amz-Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404$/);
   assert.equal(releaseObjectKey({ platform: "android", arch: "universal", version: "1.2.0", build: 12, fileName: "../NORTHSTAR 1.2.apk" }), "clients/android/universal/1.2.0+12/NORTHSTAR-1.2.apk");
   assert.throws(() => releaseObjectKey({ platform: "android", arch: "universal", version: "1.2.0", build: 12, fileName: "run.sh" }));
-  assert.deepEqual(releaseStorage({}), { mode: "external" });
+  assert.equal(releaseStorage({}).mode, "local");
+  assert.equal(releaseStorage({ NORTHSTAR_RELEASE_STORAGE: "external", NORTHSTAR_RELEASE_LOCAL_DIR: "/srv/r" }).dir, "/srv/r", "external is the old name for local");
   assert.throws(() => releaseStorage({ NORTHSTAR_RELEASE_STORAGE: "s3" }), /ENDPOINT/);
   assert.throws(() => releaseStorage({ NORTHSTAR_RELEASE_STORAGE: "s3", NORTHSTAR_RELEASE_S3_ENDPOINT: "http://minio:9000", NORTHSTAR_RELEASE_S3_BUCKET: "b", NORTHSTAR_RELEASE_S3_ACCESS_KEY_ID: "a", NORTHSTAR_RELEASE_S3_SECRET_ACCESS_KEY: "s", NORTHSTAR_RELEASE_PUBLIC_BASE_URL: "https://d.example.com" }), /HTTPS/);
 });
@@ -82,4 +83,33 @@ test("artifact inspection records what the URL serves and refuses redirects or e
   assert.equal(options.redirect, "error");
   await assert.rejects(inspectArtifact("https://x", async () => new Response("", { status: 200 })), /empty/);
   await assert.rejects(inspectArtifact("https://x", async () => new Response("no", { status: 404 })), /HTTP 404/);
+});
+
+test("local storage: ordered chunks, immutable keys and verified digests", async () => {
+  const { appendLocalArtifact, inspectLocalArtifact, localArtifactPath, localArtifactUrl, releaseStorage } = await import("../server/release-storage.ts");
+  const { mkdtempSync, readFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { createHash, randomUUID } = await import("node:crypto");
+  const storage = releaseStorage({ NORTHSTAR_RELEASE_LOCAL_DIR: mkdtempSync(`${tmpdir()}/veilbird-releases-`) });
+  const key = "clients/android/universal/1.2.0+12/Veilbird-1.2.0.apk", upload = randomUUID();
+  const web = (text) => new Response(text).body;
+  assert.deepEqual(await appendLocalArtifact(storage, key, { id: upload, offset: 0, final: false }, web("hello ")), { received: 6, complete: false });
+  await assert.rejects(appendLocalArtifact(storage, key, { id: upload, offset: 3, final: true }, web("x")), /offset/, "chunks must be contiguous");
+  assert.deepEqual(await appendLocalArtifact(storage, key, { id: upload, offset: 6, final: true }, web("world")), { received: 11, complete: true });
+  assert.equal(readFileSync(localArtifactPath(storage, key), "utf8"), "hello world");
+  assert.deepEqual(await inspectLocalArtifact(storage, key), { sha256: createHash("sha256").update("hello world").digest("hex"), sizeBytes: 11 });
+  await assert.rejects(appendLocalArtifact(storage, key, { id: randomUUID(), offset: 0, final: true }, web("other")), { code: "EEXIST" }, "a build is never overwritten");
+  assert.equal(readFileSync(localArtifactPath(storage, key), "utf8"), "hello world");
+  assert.throws(() => localArtifactPath(storage, "clients/../../etc/passwd"));
+  assert.equal(localArtifactUrl("https://app.example.com/", key), "https://app.example.com/api/v1/client-releases/files/clients/android/universal/1.2.0%2B12/Veilbird-1.2.0.apk");
+});
+
+test("history lists older published builds per platform, never withdrawn or beta for stable users", async () => {
+  const { clientReleaseHistory } = await import("../shared/client-releases.ts");
+  const base = { platform: "android", arch: "universal", channel: "stable", status: "published", distribution: "direct", url: "https://d.example.com/a.apk", sha256: "a".repeat(64), sizeBytes: 1, minOs: "Android 8", publishedAt: "2026-01-01T00:00:00Z" };
+  const releases = [10, 11, 12].map((build) => ({ ...base, version: `1.0.${build}`, build }))
+    .concat([{ ...base, version: "1.0.9", build: 9, status: "withdrawn" }, { ...base, version: "1.1.0-beta.1", build: 13, channel: "beta" }]);
+  assert.deepEqual(clientReleaseHistory(releases).map((item) => item.build), [11, 10]);
+  assert.deepEqual(clientReleaseHistory(releases, "beta").map((item) => item.build), [12, 11, 10]);
+  assert.deepEqual(clientReleaseHistory(releases, "stable", 1).map((item) => item.build), [11]);
 });

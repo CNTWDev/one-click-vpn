@@ -32,7 +32,7 @@ export function renderMihomoWireGuard(input: WireGuardExport, mode: "smart" | "g
   };
   // Same document layout and routing rules as subscriptions, so every Mihomo export behaves alike.
   return [
-    "# Northstar · WireGuard for Mihomo (not legacy Clash)",
+    "# Veilbird · WireGuard for Mihomo (not legacy Clash)",
     "# Sensitive: contains your private key. Do not share or upload to conversion websites.",
     "# Import as a local configuration; enable system proxy or TUN in your client.",
     "# One active client per WireGuard credential. Expiry and access controls still apply.",

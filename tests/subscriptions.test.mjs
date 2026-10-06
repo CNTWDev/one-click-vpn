@@ -14,7 +14,7 @@ const proxies = [
 ];
 test("subscription format contains selection groups and cannot inject rules", () => {
   const config = parseConfig(renderSubscription(proxies));
-  assert.equal(config.rules.at(-1),"MATCH,Northstar");
+  assert.equal(config.rules.at(-1),"MATCH,Veilbird");
   assert.ok(config.rules.includes("GEOIP,CN,DIRECT"));
   assert.ok(config.rules.includes("IP-CIDR,192.168.0.0/16,DIRECT,no-resolve"));
   assert.equal(config.rules.filter((rule) => rule.startsWith("MATCH")).length,1);
@@ -27,7 +27,7 @@ test("subscription format contains selection groups and cannot inject rules", ()
 test("global mode proxies everything except private networks", () => {
   const config = parseConfig(renderSubscription(proxies, { mode: "global" }));
   assert.equal(config.rules.some((rule) => rule.includes("GEO")),false);
-  assert.equal(config.rules.at(-1),"MATCH,Northstar");
+  assert.equal(config.rules.at(-1),"MATCH,Veilbird");
   assert.equal(config["geox-url"],undefined);
 });
 test("v2ray format lists standard vless:// share links", () => {

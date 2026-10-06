@@ -5,16 +5,16 @@
 ```text
 Cloud VM
   ├── Host Nginx / HTTPS
-  ├── Northstar Controller/API :3000
-  ├── Northstar Portal Web :3100
-  ├── Northstar Admin Web :3200
+  ├── Veilbird Controller/API :3000
+  ├── Veilbird Portal Web :3100
+  ├── Veilbird Admin Web :3200
   ├── PostgreSQL（Docker Compose db 服务）
   └── Backup worker
 
 Cloud VMs in regions
   ├── WireGuard
   ├── Optional OpenVPN/IKEv2
-  └── Northstar Agent
+  └── Veilbird Agent
 ```
 
 Controller 可以部署在阿里云 ECS、腾讯云 CVM、GCP Compute Engine 或普通 VPS。Edge Node 可以跨云厂商部署，业务层只记录 provider、region、endpoint 和 capabilities。
@@ -24,7 +24,7 @@ Controller 可以部署在阿里云 ECS、腾讯云 CVM、GCP Compute Engine 或
 Controller/API：
 
 - TCP 443：由宿主机 Nginx 提供 Portal、Admin、API 和 Agent Gateway；
-- TCP 3000：Northstar 容器，仅绑定到 Controller 主机的 `127.0.0.1`；
+- TCP 3000：Veilbird 容器，仅绑定到 Controller 主机的 `127.0.0.1`；
 - TCP 3100：Portal Web，仅绑定到 Controller 主机的 `127.0.0.1`；
 - TCP 3200：Admin Web，仅绑定到 Controller 主机的 `127.0.0.1`；
 - TCP 22：仅 bootstrap/recovery，尽量限制源地址。Agent 正常运行后只需要向 API/Agent 域名出站 TCP 443，不需要给节点开放 Controller 入站端口。
@@ -35,7 +35,7 @@ Agent 安装、Desired State 和 VPN Adapter 不区分登录凭据类型。
 
 添加节点时，Controller 先完成 SSH 认证和权限检查，从握手中取得并固定
 host key，然后读取或原子创建 `/var/lib/northstar/node-id`。节点 ID 是机器在
-Northstar 中的持久身份；host key 只表示 SSH 端点身份。数据库在同一事务中
+Veilbird 中的持久身份；host key 只表示 SSH 端点身份。数据库在同一事务中
 检查节点 ID、host key 和 IP/端口，任何冲突都不会进入部署队列。后续部署会
 在执行安装命令前重新验证这两种身份，防止 IP 回收、重复配置或镜像克隆导致
 操作落到错误服务器。

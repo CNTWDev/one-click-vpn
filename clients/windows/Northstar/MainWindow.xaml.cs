@@ -28,11 +28,11 @@ public partial class MainWindow : Window {
     private async void Work(Func<Task> action) {
         if(busy)return;busy=true;ContentPanel.IsEnabled=false;NavigationPanel.IsEnabled=false;BusyBanner.Visibility=Visibility.Visible;
         try {await action();}
-        catch(Exception error) {if(error is AccessFailure {Code:"CLIENT_UPDATE_REQUIRED"})CheckForUpdate();MessageBox.Show(error is AccessFailure?error.Message:L10n.Text("unable_to_reach_the_service_check_your_network_and"),"NORTHSTAR");}
+        catch(Exception error) {if(error is AccessFailure {Code:"CLIENT_UPDATE_REQUIRED"})CheckForUpdate();MessageBox.Show(error is AccessFailure?error.Message:L10n.Text("unable_to_reach_the_service_check_your_network_and"),"Veilbird");}
         finally {busy=false;ContentPanel.IsEnabled=true;NavigationPanel.IsEnabled=true;BusyBanner.Visibility=Visibility.Collapsed;}
     }
     private void Render() {
-        ContentPanel.Children.Clear();NavigationPanel.Children.Clear();Text("✦  NORTHSTAR",22);
+        ContentPanel.Children.Clear();NavigationPanel.Children.Clear();Text("Veilbird",22);
         Title=L10n.Text("development_title");BusyLabel.Text=L10n.Text("working");Language=System.Windows.Markup.XmlLanguage.GetLanguage(L10n.Culture.IetfLanguageTag);
         Text(L10n.Text("language"),14);
         var languages=new[]{"system","en","zh","ru"};
@@ -73,7 +73,7 @@ public partial class MainWindow : Window {
                 if(device!["status"]!.GetValue<string>()=="revoked")continue;
                 Text(device["name"]!.GetValue<string>()+(device["isCurrent"]!.GetValue<bool>()?L10n.Text("this_device"):""));
                 if(device["status"]!.GetValue<string>()=="revoking")Text(L10n.Text("revoking_access_the_slot_is_released_in_about_5"));
-                else Button(L10n.Text("revoke_access"),()=>{if(MessageBox.Show(L10n.Text("this_device_will_lose_access_revoke_authorization"),"NORTHSTAR",MessageBoxButton.YesNo)==MessageBoxResult.Yes)Work(async()=>{await api.Action("revoke",new JsonObject {["enrollmentId"]=device["id"]!.GetValue<string>()});page="connect";Render();});});
+                else Button(L10n.Text("revoke_access"),()=>{if(MessageBox.Show(L10n.Text("this_device_will_lose_access_revoke_authorization"),"Veilbird",MessageBoxButton.YesNo)==MessageBoxResult.Yes)Work(async()=>{await api.Action("revoke",new JsonObject {["enrollmentId"]=device["id"]!.GetValue<string>()});page="connect";Render();});});
             }
             Button(L10n.Text("refresh_devices"),()=>Render());Button(L10n.Text("sign_out"),()=>Work(async()=>{await api.Logout();Render();}));
         });
@@ -85,7 +85,7 @@ public partial class MainWindow : Window {
         Text(L10n.Text("email"));var email=new TextBox {MinHeight=36};ContentPanel.Children.Add(email);
         Text(L10n.Text("password"));var password=new PasswordBox {MinHeight=36};ContentPanel.Children.Add(password);
         AutomationProperties.SetName(origin,L10n.Text("server_address"));AutomationProperties.SetName(email,L10n.Text("email"));AutomationProperties.SetName(password,L10n.Text("password"));
-        var login=Button(L10n.Text("sign_in_and_start"),()=>{if(string.IsNullOrWhiteSpace(email.Text)||password.Password.Length==0){MessageBox.Show(L10n.Text("enter_your_email_and_password"),"NORTHSTAR");return;}Work(async()=>{api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password.Password);password.Clear();page="connect";Render();CheckForUpdate();});});login.Background=Brush("#007A64");login.Foreground=Brush("#FFFFFF");login.IsDefault=true;
+        var login=Button(L10n.Text("sign_in_and_start"),()=>{if(string.IsNullOrWhiteSpace(email.Text)||password.Password.Length==0){MessageBox.Show(L10n.Text("enter_your_email_and_password"),"Veilbird");return;}Work(async()=>{api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password.Password);password.Clear();page="connect";Render();CheckForUpdate();});});login.Background=Brush("#007A64");login.Foreground=Brush("#FFFFFF");login.IsDefault=true;
     }
     private static string Bytes(JsonNode? value) {double.TryParse(value?.ToString(),out var bytes);string[] units={"B","KB","MB","GB","TB"};var i=0;while(bytes>=1024&&i<units.Length-1){bytes/=1024;i++;}return $"{bytes:0.#} {units[i]}";}
 }

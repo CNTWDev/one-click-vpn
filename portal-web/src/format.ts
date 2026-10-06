@@ -38,11 +38,11 @@ export function subscriptionLink(token: string, options: { format?: Subscription
 }
 const base64Url = (value: string) => btoa(String.fromCharCode(...new TextEncoder().encode(value))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 export const importUrls = {
-  clash: (link: string) => `clash://install-config?url=${encodeURIComponent(link)}&name=Northstar`,
+  clash: (link: string) => `clash://install-config?url=${encodeURIComponent(link)}&name=Veilbird`,
   // Hiddify reads the raw (still percent-encoded) path of hiddify://import/<url>, so an encoded URL there fails
   // to import; its query form decodes `url` properly and keeps the token's own query string intact.
-  hiddify: (link: string) => `hiddify://import?url=${encodeURIComponent(link)}&name=Northstar`,
-  shadowrocket: (link: string) => `shadowrocket://add/sub://${base64Url(link)}?remark=Northstar`,
+  hiddify: (link: string) => `hiddify://import?url=${encodeURIComponent(link)}&name=Veilbird`,
+  shadowrocket: (link: string) => `shadowrocket://add/sub://${base64Url(link)}?remark=Veilbird`,
 };
 
 export type Platform = "ios" | "android" | "mac" | "windows" | "linux";

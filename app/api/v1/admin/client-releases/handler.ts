@@ -3,12 +3,12 @@ import { readJson } from "../../../../../server/http";
 import { ReleaseError, releaseActor, type ReleaseActor } from "../../../../../server/client-releases";
 
 /** Shared wrapper: release token or administrator, JSON body, stable error codes for the console and CI. */
-export async function releaseRoute(request: Request, work: (actor: ReleaseActor, body: Record<string, unknown>) => Promise<unknown>) {
+export async function releaseRoute(request: Request, work: (actor: ReleaseActor, body: Record<string, unknown>) => Promise<unknown>, options: { rawBody?: boolean } = {}) {
   const headers = { "Cache-Control": "no-store" };
   try {
     const actor = await releaseActor(request);
     if (!actor) return NextResponse.json({ code: "ADMIN_REQUIRED", error: "ADMIN_REQUIRED" }, { status: 403, headers });
-    const body = request.method === "GET" || request.method === "DELETE" ? {} : await readJson(request);
+    const body = options.rawBody || request.method === "GET" || request.method === "DELETE" ? {} : await readJson(request);
     return NextResponse.json(await work(actor, body), { headers });
   } catch (error) {
     if (error instanceof ReleaseError) return NextResponse.json({ code: error.code.split(":")[0], error: error.code }, { status: error.status, headers });

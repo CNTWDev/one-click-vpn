@@ -41,7 +41,7 @@ Controller 保存“应该是什么”，Agent 上报“现在是什么”。所
 
 ## P8. 不自研密码学和 VPN 协议
 
-使用成熟的 WireGuard、OpenVPN3、IKEv2/IPsec、TLS/PKI 实现。Northstar 负责编排和策略，不负责发明新的加密协议或自定义“伪装协议”。
+使用成熟的 WireGuard、OpenVPN3、IKEv2/IPsec、TLS/PKI 实现。Veilbird 负责编排和策略，不负责发明新的加密协议或自定义“伪装协议”。
 
 ## P9. 云厂商是部署属性，不是业务模型
 

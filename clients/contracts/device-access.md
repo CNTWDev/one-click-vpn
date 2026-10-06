@@ -1,4 +1,4 @@
-# NORTHSTAR 设备接入协议 v2（开发试点，默认关闭）
+# Veilbird 设备接入协议 v2（开发试点，默认关闭）
 
 本目录记录当前实现及后续目标。设置 `NORTHSTAR_NATIVE_ACCESS_ENABLED=1` 才启用原生 API；现有 `/api/v1/auth/login`、`/api/v1/devices` 不能代替设备签名准入。仅 Android / Apple 的 WireGuard 数据面已接入，仍待真机及故障验收。
 

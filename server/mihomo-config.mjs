@@ -23,12 +23,12 @@ export function renderMihomoConfig(proxies, options = {}) {
       "proxy-server-nameserver": ["https://doh.pub/dns-query", "223.5.5.5"] },
     proxies,
     "proxy-groups": [
-      { name: "Northstar", type: "select", proxies: ["自动选择", ...names] },
+      { name: "Veilbird", type: "select", proxies: ["自动选择", ...names] },
       { name: "自动选择", type: "url-test", proxies: names, url: "https://www.gstatic.com/generate_204", interval: 300, tolerance: 80 },
     ],
     rules: smart
-      ? [...privateNetworks.map((cidr) => `IP-CIDR,${cidr},DIRECT,no-resolve`), "GEOSITE,private,DIRECT", "GEOSITE,cn,DIRECT", "GEOIP,CN,DIRECT", "MATCH,Northstar"]
-      : [...privateNetworks.map((cidr) => `IP-CIDR,${cidr},DIRECT,no-resolve`), "MATCH,Northstar"],
+      ? [...privateNetworks.map((cidr) => `IP-CIDR,${cidr},DIRECT,no-resolve`), "GEOSITE,private,DIRECT", "GEOSITE,cn,DIRECT", "GEOIP,CN,DIRECT", "MATCH,Veilbird"]
+      : [...privateNetworks.map((cidr) => `IP-CIDR,${cidr},DIRECT,no-resolve`), "MATCH,Veilbird"],
   };
   return Object.entries(config).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join("\n") + "\n";
 }

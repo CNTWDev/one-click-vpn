@@ -289,7 +289,7 @@ export async function createAccessCredential(input: {
   protocol: Protocol;
   identityKey: string;
 }): Promise<AccessCredential> {
-  if ((await dbQuery<{native_only:boolean}>("SELECT native_only FROM users WHERE id=$1",[input.userId]))[0]?.native_only) throw new Error("Please connect using the NORTHSTAR app");
+  if ((await dbQuery<{native_only:boolean}>("SELECT native_only FROM users WHERE id=$1",[input.userId]))[0]?.native_only) throw new Error("Please connect using the Veilbird app");
   const credentialId = `cred_${randomUUID()}`;
   const deviceId = `dev_${randomUUID()}`;
   const timestamp = now();

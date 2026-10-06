@@ -32,7 +32,7 @@ for (const app of ["admin-web", "portal-web"]) {
       server.once("error", (error) => { clearTimeout(timeout); reject(error); });
       server.once("exit", (code) => { clearTimeout(timeout); reject(new Error(`Frontend exited: ${code}`)); });
       server.stdout.on("data", (chunk) => {
-        if (String(chunk).includes("Northstar frontend listening")) { clearTimeout(timeout); done(); }
+        if (String(chunk).includes("Veilbird frontend listening")) { clearTimeout(timeout); done(); }
       });
     });
     const base = `http://127.0.0.1:${port}`;

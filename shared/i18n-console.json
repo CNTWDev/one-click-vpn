@@ -107,9 +107,9 @@
     "Manage regions →",
     "Управление регионами →"
   ],
-  "Northstar 全球 VPN 节点分布图": [
-    "Northstar global VPN node map",
-    "Карта узлов VPN Northstar"
+  "Veilbird 全球 VPN 节点分布图": [
+    "Veilbird global VPN node map",
+    "Карта узлов VPN Veilbird"
   ],
   "{0}，{1} 个节点，{2} 个在线": [
     "{0}, {1} nodes, {2} online",
@@ -631,13 +631,13 @@
     "Saved. Revocation requires synchronization; offline nodes may take about 5 minutes. Slots remain occupied until then.",
     "Сохранено. Отзыв требует синхронизации; недоступным узлам может потребоваться около 5 минут. До этого места остаются занятыми."
   ],
-  "NORTHSTAR 授权设备": [
-    "NORTHSTAR authorized devices",
-    "Авторизованные устройства NORTHSTAR"
+  "Veilbird 授权设备": [
+    "Veilbird authorized devices",
+    "Авторизованные устройства Veilbird"
   ],
-  "设备额度与会员有效期仅对 NORTHSTAR 模式生效。兼容模式无法限制第三方配置复制后的设备数量。": [
-    "Device limits and membership expiry apply only in NORTHSTAR mode. Compatibility mode cannot limit devices using copied third-party configurations.",
-    "Лимит устройств и срок подписки действуют только в режиме NORTHSTAR. Режим совместимости не ограничивает устройства с копиями сторонних конфигураций."
+  "设备额度与会员有效期仅对 Veilbird 模式生效。兼容模式无法限制第三方配置复制后的设备数量。": [
+    "Device limits and membership expiry apply only in Veilbird mode. Compatibility mode cannot limit devices using copied third-party configurations.",
+    "Лимит устройств и срок подписки действуют только в режиме Veilbird. Режим совместимости не ограничивает устройства с копиями сторонних конфигураций."
   ],
   "访问方式": [
     "Access mode",
@@ -647,9 +647,9 @@
     "Compatibility · allow third-party clients",
     "Совместимость · сторонние клиенты"
   ],
-  "仅 NORTHSTAR · 严格授权设备": [
-    "NORTHSTAR only · authorized devices",
-    "Только NORTHSTAR · авторизованные устройства"
+  "仅 Veilbird · 严格授权设备": [
+    "Veilbird only · authorized devices",
+    "Только Veilbird · авторизованные устройства"
   ],
   "设备上限": [
     "Device limit",
@@ -1107,9 +1107,9 @@
     "No manual fingerprint generation or entry",
     "Не нужно создавать или вводить отпечаток вручную"
   ],
-  "添加时，Controller 会通过 SSH 自动读取并固定主机公钥，同时在服务器上读取或生成持久的 Northstar 节点 ID。发现重复节点、复用的 SSH host key 或重复 IP/端口时会停止部署。": [
-    "When adding a server, Controller retrieves and pins its SSH public key, then reads or creates a persistent Northstar node ID. Deployment stops if it detects duplicate nodes, reused SSH host keys or duplicate IP/port pairs.",
-    "При добавлении Controller получает и закрепляет открытый ключ SSH, затем читает или создаёт постоянный ID узла Northstar. Развёртывание останавливается при обнаружении дубликатов узлов, ключей SSH или пар IP/порт."
+  "添加时，Controller 会通过 SSH 自动读取并固定主机公钥，同时在服务器上读取或生成持久的 Veilbird 节点 ID。发现重复节点、复用的 SSH host key 或重复 IP/端口时会停止部署。": [
+    "When adding a server, Controller retrieves and pins its SSH public key, then reads or creates a persistent Veilbird node ID. Deployment stops if it detects duplicate nodes, reused SSH host keys or duplicate IP/port pairs.",
+    "При добавлении Controller получает и закрепляет открытый ключ SSH, затем читает или создаёт постоянный ID узла Veilbird. Развёртывание останавливается при обнаружении дубликатов узлов, ключей SSH или пар IP/порт."
   ],
   "首次连接采用 TOFU；后续部署和修复必须匹配已固定的主机指纹与节点 ID。": [
     "The first connection uses TOFU. Later deployments and repairs must match the pinned host fingerprint and node ID.",
@@ -2411,9 +2411,9 @@
     "Client releases",
     "Выпуски клиентов"
   ],
-  "登记、发布和撤回 NORTHSTAR 客户端；门户下载、固定下载链接和客户端更新检查都读取这里。": [
-    "Register, publish and withdraw NORTHSTAR clients. Portal downloads, permanent download links and client update checks all read from here.",
-    "Регистрация, публикация и отзыв клиентов NORTHSTAR. Загрузки на портале, постоянные ссылки и проверка обновлений используют эти данные."
+  "登记、发布和撤回 Veilbird 客户端；门户下载、固定下载链接和客户端更新检查都读取这里。": [
+    "Register, publish and withdraw Veilbird clients. Portal downloads, permanent download links and client update checks all read from here.",
+    "Регистрация, публикация и отзыв клиентов Veilbird. Загрузки на портале, постоянные ссылки и проверка обновлений используют эти данные."
   ],
   "安装包存储：S3 兼容对象存储（{0}）": [
     "Installer storage: S3-compatible object storage ({0}).",

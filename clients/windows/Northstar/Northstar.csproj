@@ -8,9 +8,14 @@
     <RootNamespace>Northstar</RootNamespace>
     <NeutralLanguage>en</NeutralLanguage>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- AssemblyName stays NORTHSTAR: it is the executable name inside existing installs and release zips. -->
     <AssemblyName>NORTHSTAR</AssemblyName>
+    <Product>Veilbird</Product>
+    <AssemblyTitle>Veilbird</AssemblyTitle>
+    <ApplicationIcon>Assets\Veilbird.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
+  <ItemGroup><Resource Include="Assets\Veilbird.ico" /></ItemGroup>
   <ItemGroup><PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" /></ItemGroup>
 </Project>

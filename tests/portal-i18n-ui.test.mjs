@@ -48,10 +48,11 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
       await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     });
     const picker = () => page.locator(".portal-language-picker select");
-    const noChinese = async () => assert.doesNotMatch(await page.locator("main").innerText(), /[\u3400-\u9fff]/u);
+    // The language picker (now inside the dashboard header) lists each language in its own script.
+    const noChinese = async () => assert.doesNotMatch(await page.locator("main").evaluate((main) => { const copy = main.cloneNode(true); copy.querySelectorAll(".portal-language-bar").forEach((node) => node.remove()); document.body.append(copy); const text = copy.innerText; copy.remove(); return text; }), /[\u3400-\u9fff]/u);
     const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.goto(base);
-    await page.getByRole("heading", { name: "Вход в Northstar" }).waitFor();
+    await page.getByRole("heading", { name: "Вход в Veilbird" }).waitFor();
     assert.equal(await picker().inputValue(), "system");
     assert.equal(await page.locator("html").getAttribute("lang"), "ru-RU");
     await noChinese();
@@ -62,7 +63,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await picker().selectOption("en");
     await page.getByText("Invalid email or password", { exact: true }).waitFor();
     await page.reload();
-    await page.getByRole("heading", { name: "Sign in to Northstar" }).waitFor();
+    await page.getByRole("heading", { name: "Sign in to Veilbird" }).waitFor();
     assert.equal(await picker().inputValue(), "en");
     await page.getByRole("button", { name: "New here? Request access" }).click();
     await page.getByLabel("Name", { exact: true }).fill("Test User");
@@ -138,24 +139,28 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await page.getByRole("heading", { name: "Мои подключения", level: 2 }).waitFor();
     await secondPage.close();
     await picker().selectOption("en");
-    await page.getByText("Download NORTHSTAR", { exact: true }).click();
+    // Downloads are always open (no disclosure to click) and sit before the region map.
+    await page.getByRole("heading", { name: "Download Veilbird", level: 2 }).waitFor();
     assert.equal(await page.getByText("Not released yet", { exact: true }).count(), 4);
+    assert.equal(await page.locator(".client-downloads details.disclosure:not(.release-history)").count(), 0);
     let catalogUnavailable = true;
-    await page.route("**/api/v1/client-releases", (route) => route.fulfill({
+    await page.route("**/api/v1/client-releases?**", (route) => route.fulfill({
       status: catalogUnavailable ? 503 : 200, contentType: "application/json",
-      body: JSON.stringify(catalogUnavailable ? { code: "CLIENT_RELEASES_UNAVAILABLE" } : { releases: [{ platform: "windows", arch: "x64", version: "1.0.0", distribution: "direct", url: "https://downloads.example.com/northstar.exe", sha256: "a".repeat(64), minOs: "Windows 10" }] }),
+      body: JSON.stringify(catalogUnavailable ? { code: "CLIENT_RELEASES_UNAVAILABLE" } : { releases: [{ platform: "windows", arch: "x64", version: "1.0.0", distribution: "direct", url: "https://downloads.example.com/veilbird.exe", sha256: "a".repeat(64), minOs: "Windows 10" }],
+        history: [{ platform: "windows", arch: "x64", version: "0.9.0", build: 9, distribution: "direct", url: "https://downloads.example.com/veilbird-0.9.exe", sha256: "b".repeat(64), minOs: "Windows 10", publishedAt: "2026-09-01T00:00:00Z" }] }),
     }));
     await page.reload();
-    await page.getByText("Download NORTHSTAR", { exact: true }).click();
     await page.getByText("Could not load client releases. Please try again later.", { exact: true }).waitFor();
     catalogUnavailable = false;
     await page.getByRole("button", { name: "Retry", exact: true }).click();
-    await page.getByRole("link", { name: "Download installer", exact: true }).waitFor();
-    assert.equal(await page.getByRole("link", { name: "Download installer", exact: true }).getAttribute("href"), "/download/windows/x64", "permanent link, so a cached page never serves a stale installer");
+    await page.getByRole("link", { name: "Download installer", exact: true }).first().waitFor();
+    assert.equal(await page.getByRole("link", { name: "Download installer", exact: true }).first().getAttribute("href"), "/download/windows/x64", "permanent link, so a cached page never serves a stale installer");
+    await page.locator(".release-history summary").filter({ hasText: "Earlier versions" }).click();
+    assert.equal(await page.locator(".release-history a").getAttribute("href"), "https://downloads.example.com/veilbird-0.9.exe", "earlier versions link to their own immutable file");
     await page.setViewportSize({ width: 390, height: 844 });
     await noOverflow();
     await picker().selectOption("ru");
-    await page.getByRole("link", { name: "Скачать установочный файл", exact: true }).waitFor();
+    await page.getByRole("link", { name: "Скачать установочный файл", exact: true }).first().waitFor();
     await noChinese();
     await page.locator(".client-downloads").screenshot({ path: path.join(directory, "downloads-ru-mobile.png") });
     firstRun = true;
@@ -173,8 +178,8 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await blockedPage.addInitScript(() => { Object.defineProperty(window, "localStorage", { get() { throw new Error("Storage blocked"); } }); });
     await blockedPage.route("**/api/**", (route) => route.fulfill({ status: 401, contentType: "application/json", body: "{}" }));
     await blockedPage.goto(base);
-    await blockedPage.getByRole("heading", { name: "Sign in to Northstar" }).waitFor();
+    await blockedPage.getByRole("heading", { name: "Sign in to Veilbird" }).waitFor();
     await blockedPage.getByLabel("Language", { exact: true }).selectOption("ru");
-    await blockedPage.getByRole("heading", { name: "Вход в Northstar" }).waitFor();
+    await blockedPage.getByRole("heading", { name: "Вход в Veilbird" }).waitFor();
   } finally { await browser?.close(); child.kill("SIGTERM"); }
 });

@@ -10,7 +10,7 @@
   <string name="allow_the_system_vpn_permission_to_connect">允许系统 VPN 权限后才能连接。</string>
   <string name="allow_vpn_access_on_your_first_connection">首次连接需要允许系统 VPN 权限</string>
   <string name="announcement">公告</string>
-  <string name="ask_your_administrator_to_enable_northstar_client_access">请联系管理员开通 NORTHSTAR 客户端访问。</string>
+  <string name="ask_your_administrator_to_enable_northstar_client_access">请联系管理员开通 Veilbird 客户端访问。</string>
   <string name="authorized_devices">授权设备</string>
   <string name="authorizing_and_connecting">正在授权并连接…</string>
   <string name="automatic">自动选择</string>
@@ -18,13 +18,13 @@
   <string name="available_location">可用位置</string>
   <string name="cancel">取消</string>
   <string name="change_location">更换连接位置  ›</string>
-  <string name="choose_a_location_northstar_takes_care_of_the_rest">选好位置，剩下的交给 NORTHSTAR。</string>
+  <string name="choose_a_location_northstar_takes_care_of_the_rest">选好位置，剩下的交给 Veilbird。</string>
   <string name="choose_a_location_then_connect_from_the_home_screen">选好位置后，返回首页一键连接。</string>
   <string name="choose_a_location_then_return_to_connect">选择位置后，返回连接首页。</string>
   <string name="choose_location_then_connect_hint">选择位置后，返回首页一键连接。</string>
   <string name="client_access_is_not_enabled_on_the_server">服务端尚未启用客户端访问。</string>
   <string name="client_access_is_not_enabled_on_the_server_contact">服务端尚未启用客户端访问，请联系管理员。</string>
-  <string name="client_update_required">当前版本过旧，请下载最新版 NORTHSTAR 后再登录或连接。</string>
+  <string name="client_update_required">当前版本过旧，请下载最新版 Veilbird 后再登录或连接。</string>
   <string name="confirming_connection_status">正在确认连接…</string>
   <string name="connect_action">一键连接</string>
   <string name="connect_automatically_or_choose_your_own_location">自动选择可用位置，也能自由指定节点。</string>
@@ -43,7 +43,7 @@
   <string name="current_page">，当前页面</string>
   <string name="development_build_the_windows_tunnel_service_is_not_integrated">开发版：Windows 隧道服务尚未集成。本版本可登录、查看节点和管理授权设备，但不能建立 VPN。</string>
   <string name="development_server_address">开发服务地址</string>
-  <string name="development_title">NORTHSTAR — 开发版</string>
+  <string name="development_title">Veilbird — 开发版</string>
   <string name="device">设备</string>
   <string name="device_limit_reached_account_hint">授权设备已满，请在「账号」解除旧设备的授权后重试。</string>
   <string name="device_limit_reached_revoke_an_old_device_and_try">授权设备已满，请解除旧设备的授权后重试。</string>
@@ -72,7 +72,7 @@
   <string name="locations">节点</string>
   <string name="membership_expired_hint">账号已到期，请联系管理员续期。</string>
   <string name="my_account">我的账号</string>
-  <string name="my_northstar">我的 NORTHSTAR</string>
+  <string name="my_northstar">我的 Veilbird</string>
   <string name="new_devices_are_added_on_their_first_connection_when">未满额度时，新设备首次连接会自动加入。</string>
   <string name="no_authorized_devices_yet_they_appear_after_their_first">还没有授权设备，首次连接后会出现在这里。</string>
   <string name="no_expiry">不限期</string>
@@ -95,7 +95,7 @@
   <string name="server_address">服务地址</string>
   <string name="server_address_url">服务地址 https://…</string>
   <string name="sign_in_and_start">登录并开始</string>
-  <string name="sign_in_to_northstar_no_imports_or_configuration_needed">登录 NORTHSTAR，无需导入或配置。</string>
+  <string name="sign_in_to_northstar_no_imports_or_configuration_needed">登录 Veilbird，无需导入或配置。</string>
   <string name="sign_out">退出登录</string>
   <string name="simulator_build_verify_vpn_connections_on_a_signed_physical">模拟器开发版 · 连接功能需在已签名的真机版本验证</string>
   <string name="the_simulator_is_for_ui_testing_only_test_the">模拟器仅用于界面测试，请使用已签名的真机版本测试 VPN。</string>
@@ -113,7 +113,7 @@
   <string name="unable_to_connect_check_your_network_and_try_again">暂时无法连接，请检查网络后重试。</string>
   <string name="unable_to_reach_the_service_check_your_network_and">暂时无法连接服务，请检查网络后重试。</string>
   <string name="unable_to_reach_the_service_check_your_network_or">暂时无法连接服务，请检查网络或联系管理员。</string>
-  <string name="update_allow_installs">请允许 NORTHSTAR 安装更新，然后返回再点一次“立即更新”。</string>
+  <string name="update_allow_installs">请允许 Veilbird 安装更新，然后返回再点一次“立即更新”。</string>
   <string name="update_available">新版本 %1$s 已发布</string>
   <string name="update_available_detail">更新后可获得最新的功能和修复。</string>
   <string name="update_downloading">正在下载并校验更新…</string>

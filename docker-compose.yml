@@ -56,6 +56,9 @@ services:
     # Keep the controller reachable only from this ECS host.
     ports:
       - "127.0.0.1:3000:3000"
+    volumes:
+      # Client installers uploaded from Console (NORTHSTAR_RELEASE_STORAGE=local, the default).
+      - northstar-client-releases:/app/data/client-releases
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       start_period: 10s
@@ -154,6 +157,7 @@ services:
       - northstar-loki:/loki
 
 volumes:
+  northstar-client-releases:
   northstar-postgres:
   northstar-minio:
   northstar-loki:

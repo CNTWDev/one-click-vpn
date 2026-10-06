@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const result = await downloadSubscription(token, { format: subscriptionFormat(params.get("format"), request.headers.get("user-agent")), mode: routingMode(params.get("mode")) });
     const yaml = result.format === "clash";
     return new Response(result.content, { headers: { ...headers, "Content-Type": yaml ? "application/yaml; charset=utf-8" : "text/plain; charset=utf-8",
-      "Content-Disposition": `attachment; filename="Northstar.${yaml ? "yaml" : "txt"}"`, "profile-update-interval": "1",
+      "Content-Disposition": `attachment; filename="Veilbird.${yaml ? "yaml" : "txt"}"`, "profile-update-interval": "1",
       ...(result.expiresAt ? { "subscription-userinfo": `expire=${Math.floor(new Date(result.expiresAt).getTime()/1000)}` } : {}) } });
   } catch {
     // Never return an empty successful config (clients would replace working nodes), SQL errors, tokens or keys.

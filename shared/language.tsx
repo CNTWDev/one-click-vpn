@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { I18nProvider } from "./i18n";
 import { intlLocales, type LanguagePreference } from "./i18n-core";
 import { createLanguageStore } from "./language-store";
@@ -21,7 +21,13 @@ export function LanguagePicker({ store, className }: { store: LanguageStore; cla
     </select>
   </label></div>;
 }
-export function ProductLanguage({ children, storageKey, className }: { children: ReactNode; storageKey: string; className: string }) {
+const LanguageStoreContext = createContext<LanguageStore | null>(null);
+/** Provides the language and lets each page place its own picker (e.g. inside the header) with ProductLanguagePicker. */
+export function ProductLanguage({ children, storageKey }: { children: ReactNode; storageKey: string }) {
   const [store] = useState(() => createLanguageStore(storageKey));
-  return <LanguageScope store={store}><LanguagePicker store={store} className={className} />{children}</LanguageScope>;
+  return <LanguageStoreContext.Provider value={store}><LanguageScope store={store}>{children}</LanguageScope></LanguageStoreContext.Provider>;
+}
+export function ProductLanguagePicker({ className }: { className: string }) {
+  const store = useContext(LanguageStoreContext);
+  return store ? <LanguagePicker store={store} className={className} /> : null;
 }

@@ -11,7 +11,7 @@ export async function assertCredentialUsable(id: string) {
     throw new Error("Credential is disabled, expired or revoked");
   }
   if ((await findUserById(credential.user_id))?.status !== "active") throw new Error("Account is not active");
-  if ((await dbQuery<{native_only:boolean}>("SELECT native_only FROM users WHERE id=$1", [credential.user_id]))[0]?.native_only) throw new Error("Please connect using the NORTHSTAR app");
+  if ((await dbQuery<{native_only:boolean}>("SELECT native_only FROM users WHERE id=$1", [credential.user_id]))[0]?.native_only) throw new Error("Please connect using the Veilbird app");
   return credential;
 }
 

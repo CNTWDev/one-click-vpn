@@ -1,6 +1,9 @@
-.portal-language-bar { display: flex; justify-content: flex-end; max-width: 1440px; margin: 0 auto; padding: 14px 32px 0; }
-.portal-language-picker { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; margin: 0; }
-.portal-language-picker select { width: auto; min-width: 140px; min-height: 44px; margin: 0; padding: 8px 30px 8px 12px; border: 1px solid #ccd6c3; border-radius: 10px; background: #fff; color: #293523; cursor: pointer; }
+/* The picker lives in the dashboard header, or floats top-right on sign-in and status pages. */
+.portal-language-bar { display: flex; align-items: center; }
+.portal-language-floating { position: absolute; top: 16px; right: clamp(16px, 3vw, 32px); z-index: 5; }
+.portal-language-picker { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; margin: 0; color: var(--text-2); }
+.portal-language-picker select { width: auto; min-width: 0; min-height: 36px; margin: 0; padding: 6px 28px 6px 10px; border: 1px solid var(--border-strong); border-radius: 999px; background-color: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; }
+.topbar .language-caption { display: none; }
 .portal-language-picker select:focus-visible { outline: 2px solid #46734a; outline-offset: 3px; }
 html:not(:lang(zh)) .auth-intro h1 { font-size: clamp(36px, 5vw, 68px); letter-spacing: -.025em; }
 html:not(:lang(zh)) .kicker { letter-spacing: .08em; }
@@ -9,10 +12,16 @@ html :is(.auth-layout, .center-page, .dashboard) :is(h1, h2, h3) { letter-spacin
 .device-hub-head-actions, .subscription-actions, .connection-manage, .dialog-actions { flex-wrap: wrap; }
 .subscription-heading h2, .welcome h1, .device-detail-head h3 { overflow-wrap: anywhere; }
 @media (max-width: 640px) {
-  .portal-language-bar { padding: 12px 16px 0; }
+  .portal-language-floating { top: 30px; right: 16px; }
   .language-caption { display: none; }
   .mode-switch { grid-template-columns: 1fr; }
   .subscription-heading { flex-wrap: wrap; gap: 12px; }
   .dashboard .account { flex-wrap: wrap; }
   .dialog-actions > button { flex: 1 1 auto; }
 }
+@media (max-width: 600px) {
+  .topbar-tools { gap: 8px; }
+  .topbar .portal-language-picker select { max-width: 116px; }
+}
+/* Very narrow phones: keep the mark, drop the wordmark so the header fits on one line. */
+@media (max-width: 420px) { .topbar .brand > span:last-child { display: none; } }

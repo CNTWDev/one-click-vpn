@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Direct-download builds update themselves; the system still asks the user to confirm. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <application android:name=".NorthstarApplication" android:label="${appLabel}" android:localeConfig="@xml/locales_config" android:supportsRtl="true" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    <application android:name=".NorthstarApplication" android:label="${appLabel}" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:localeConfig="@xml/locales_config" android:supportsRtl="true" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>

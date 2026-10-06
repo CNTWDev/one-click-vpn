@@ -101,7 +101,7 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(canvas); fitsSystemWindows = true }
         root.addView(ScrollView(this).apply { isFillViewport = true; addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
-        content.addView(label("✦  NORTHSTAR", 22f))
+        content.addView(label("Veilbird", 22f))
         button(L10n.text(R.string.language)) {
             val values = listOf("system", "en", "zh", "ru")
             AlertDialog.Builder(this).setTitle(L10n.text(R.string.language))
@@ -248,7 +248,7 @@ class MainActivity : Activity() {
         status?.text = L10n.text(R.string.update_downloading)
         work({ updater.downloadAndInstall(available) }) {}
     }
-    private fun alert(message: String) { AlertDialog.Builder(this).setTitle("NORTHSTAR").setMessage(message).setPositiveButton(L10n.text(R.string.got_it), null).show() }
+    private fun alert(message: String) { AlertDialog.Builder(this).setTitle("Veilbird").setMessage(message).setPositiveButton(L10n.text(R.string.got_it), null).show() }
     private fun startConnection() { startForegroundService(Intent(this, ConnectionService::class.java).putExtra("nodeId", selectedId)) }
     @Deprecated("Activity result compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

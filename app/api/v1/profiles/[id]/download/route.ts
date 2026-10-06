@@ -28,7 +28,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       const payload = profile.protocol_payload;
       const uuid = await readSecretMaterial(String(payload.clientUuidSecretId || ""));
       if (!uuid) return jsonError("连接密钥不可用，请联系管理员", 409);
-      const proxy = { name: "Northstar", type: "vless", server: profile.endpoint.host, port: profile.endpoint.port,
+      const proxy = { name: "Veilbird", type: "vless", server: profile.endpoint.host, port: profile.endpoint.port,
         uuid, network: "tcp", tls: true, udp: true, flow: "xtls-rprx-vision", servername: payload.serverName,
         "client-fingerprint": "chrome", "reality-opts": { "public-key": payload.publicKey, "short-id": payload.shortId } };
       if (format === "uri") return new Response(vlessShareLink(proxy) + "\n", { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store, private", "X-Content-Type-Options": "nosniff" } });
