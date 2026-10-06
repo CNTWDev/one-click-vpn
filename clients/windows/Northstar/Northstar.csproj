@@ -5,6 +5,8 @@
     <UseWPF>true</UseWPF>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
+    <RootNamespace>Northstar</RootNamespace>
+    <NeutralLanguage>en</NeutralLanguage>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>NORTHSTAR</AssemblyName>
     <Version>0.1.0</Version>

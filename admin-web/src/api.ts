@@ -1,3 +1,4 @@
+import { localError, t } from "./i18n";
 export type ApiError = Error & { status?: number };
 
 let unauthorizedHandler: (() => void) | null = null;
@@ -26,10 +27,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     try { body = JSON.parse(text) as Record<string, unknown>; } catch { body = {}; }
   }
   if (!response.ok) {
-    throw Object.assign(new Error(typeof body.error === "string" && body.error ? body.error : `请求失败（HTTP ${response.status}）`), { status: response.status }) as ApiError;
+    throw Object.assign(new Error(typeof body.error === "string" && body.error ? localError(body.error) : t("请求失败（HTTP {0}）", [response.status])), { status: response.status }) as ApiError;
   }
   if (!contentType.includes("application/json")) {
-    throw Object.assign(new Error(`API 返回了非 JSON 响应（HTTP ${response.status}），请检查 Console 的 /api/ 反向代理。`), { status: response.status }) as ApiError;
+    throw Object.assign(new Error(t("API 返回了非 JSON 响应（HTTP {0}），请检查 Console 的 /api/ 反向代理。", [response.status])), { status: response.status }) as ApiError;
   }
   return body as T;
 }

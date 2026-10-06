@@ -150,6 +150,13 @@ aside nav a > em { min-width: 20px; height: 20px; padding: 0 6px; display: grid;
 .crumb span::after { content: "/"; margin-left: 8px; color: var(--border-strong); }
 .crumb b { font-weight: 600; }
 .topbar-status { color: var(--text-2); font-size: 13px; white-space: nowrap; }
+.console-language-picker { display: flex; align-items: center; gap: 8px; }
+.console-language-picker .language-caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.console-language-picker select { width: auto; max-width: 180px; min-height: 40px; padding: 8px 30px 8px 12px; }
+.topbar .crumb { min-width: 0; }
+.topbar .crumb b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.login > .console-language-bar { justify-self: end; margin-right: 24px; }
+@media (max-width: 600px) { .console-language-picker select { max-width: 124px; } .topbar .crumb > span { display: none; } }
 .theme-switch { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
 .theme-switch button { width: 30px; height: 28px; display: grid; place-items: center; padding: 0; color: var(--text-3); background: transparent; border: 0; border-radius: 6px; }
 .theme-switch button:hover { color: var(--text); }

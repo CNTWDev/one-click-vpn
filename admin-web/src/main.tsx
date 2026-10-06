@@ -1,3 +1,4 @@
+import { ConsoleLanguage, ConsoleLanguagePicker, t, useConsoleLanguage } from "./i18n";
 /* eslint-disable react-hooks/set-state-in-effect */
 import { type FormEvent, lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -33,10 +34,12 @@ const pages = navigation.flatMap((section) => section.items.map((item) => ({ ...
 applyTheme();
 
 function Brand() {
+  useConsoleLanguage();
   return <div className="brand"><span className="mark"><i /><i /><i /></span><span>NORTHSTAR <em>CONSOLE</em></span></div>;
 }
 
 function Login({ onUser }: { onUser: (user: AdminUser) => void }) {
+  useConsoleLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -45,24 +48,26 @@ function Login({ onUser }: { onUser: (user: AdminUser) => void }) {
     event.preventDefault(); setBusy(true); setError("");
     try {
       const result = await api<{ user: AdminUser }>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
-      if (!result.user?.id) throw new Error("登录接口返回异常，请检查 Console 的 /api/ 反向代理。");
+      if (!result.user?.id) throw new Error(t("登录接口返回异常，请检查 Console 的 /api/ 反向代理。"));
       onUser(result.user);
     } catch (reason) { setError((reason as Error).message); }
     finally { setBusy(false); }
   }
   return <main className="login">
+    <ConsoleLanguagePicker />
     <Brand />
     <form onSubmit={submit}>
-      <h1>管理控制台</h1><p>账号审核、节点部署与修复、VPN 服务和运行诊断。</p>
-      <label>管理员邮箱<input type="email" required autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-      <label>密码<input type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-      <button type="submit" disabled={busy}>{busy ? "登录中…" : "登录 Console"} →</button>
+      <h1>{t("管理控制台")}</h1><p>{t("账号审核、节点部署与修复、VPN 服务和运行诊断。")}</p>
+      <label>{t("管理员邮箱")}<input type="email" required autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+      <label>{t("密码")}<input type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+      <button type="submit" disabled={busy}>{busy ? t("登录中…") : t("登录 Console")} →</button>
       {error && <div className="login-error" role="alert">{error}</div>}
     </form>
   </main>;
 }
 
 function App() {
+  useConsoleLanguage();
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
@@ -113,23 +118,23 @@ function App() {
   // Close the mobile drawer and return to the top whenever the page itself changes (not on filter changes).
   useEffect(() => { setMenuOpen(false); window.scrollTo({ top: 0 }); }, [page]);
 
-  if (loading) return <main className="loading"><Brand /><span>正在连接控制面…</span></main>;
+  if (loading) return <main className="loading"><Brand /><span>{t("正在连接控制面…")}</span></main>;
   if (!user) return <Login onUser={setUser} />;
 
   const current = pages.find((item) => item.id === page)!;
   const pendingUsers = users.filter((account) => account.status === "pending").length;
   return <main className="app-shell">
     <aside className={menuOpen ? "open" : ""}>
-      <div className="aside-head"><Brand /><button className="icon-button mobile-only" aria-label="关闭菜单" onClick={() => setMenuOpen(false)}><Icon name="close" /></button></div>
-      <nav aria-label="管理控制台导航">{navigation.map((section) => <div className="nav-group" key={section.group}><p>{section.group}</p>{section.items.map((item) => <a key={item.id} href={href(item.id)} className={page === item.id ? "active" : ""} aria-current={page === item.id ? "page" : undefined} onClick={() => setMenuOpen(false)}><Icon name={item.icon} /><span>{item.label}</span>{item.id === "users" && pendingUsers > 0 && <em title={`${pendingUsers} 个账号待审核`}>{pendingUsers}</em>}</a>)}</div>)}</nav>
-      <div className="aside-health"><span className={`live-mark ${error ? "down" : ""}`} /><span><b>Controller API</b><small>{error ? "连接异常" : dataLoading ? "同步数据中" : "已认证 · 运行中"}</small></span></div>
-      <div className="aside-user"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><span><b>{user.displayName}</b><small>{user.email}</small></span><button className="icon-button" title="退出登录" aria-label="退出登录" onClick={() => void logout()}><Icon name="logout" size={16} /></button></div>
+      <div className="aside-head"><Brand /><button className="icon-button mobile-only" aria-label={t("关闭菜单")} onClick={() => setMenuOpen(false)}><Icon name="close" /></button></div>
+      <nav aria-label={t("管理控制台导航")}>{navigation.map((section) => <div className="nav-group" key={section.group}><p>{t(section.group)}</p>{section.items.map((item) => <a key={item.id} href={href(item.id)} className={page === item.id ? "active" : ""} aria-current={page === item.id ? "page" : undefined} onClick={() => setMenuOpen(false)}><Icon name={item.icon} /><span>{t(item.label)}</span>{item.id === "users" && pendingUsers > 0 && <em title={t("{0} 个账号待审核", [pendingUsers])}>{pendingUsers}</em>}</a>)}</div>)}</nav>
+      <div className="aside-health"><span className={`live-mark ${error ? "down" : ""}`} /><span><b>Controller API</b><small>{error ? t("连接异常") : dataLoading ? t("同步数据中") : t("已认证 · 运行中")}</small></span></div>
+      <div className="aside-user"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><span><b>{user.displayName}</b><small>{user.email}</small></span><button className="icon-button" title={t("退出登录")} aria-label={t("退出登录")} onClick={() => void logout()}><Icon name="logout" size={16} /></button></div>
     </aside>
-    {menuOpen && <button className="menu-scrim" aria-label="关闭菜单" onClick={() => setMenuOpen(false)} />}
+    {menuOpen && <button className="menu-scrim" aria-label={t("关闭菜单")} onClick={() => setMenuOpen(false)} />}
     <section className="workspace">
-      <header className="topbar"><button className="icon-button mobile-only" aria-label="打开菜单" onClick={() => setMenuOpen(true)}><Icon name="menu" /></button><div className="crumb"><span>{current.group}</span><b>{current.label}</b></div><span className="topbar-status">{dataLoading ? "正在同步…" : `${nodes.filter((node) => node.status === "online").length}/${nodes.length} 节点在线`}</span><ThemeSwitch value={theme} onChange={setTheme} /></header>
+      <header className="topbar"><button className="icon-button mobile-only" aria-label={t("打开菜单")} onClick={() => setMenuOpen(true)}><Icon name="menu" /></button><div className="crumb"><span>{t(current.group)}</span><b>{t(current.label)}</b></div><span className="topbar-status">{dataLoading ? t("正在同步…") : t("{0}/{1} 节点在线", [nodes.filter((node) => node.status === "online").length, nodes.length])}</span><ConsoleLanguagePicker /><ThemeSwitch value={theme} onChange={setTheme} /></header>
       <div className="content">
-        {error && <div className="inline-notice error" role="alert"><span>{error}</span><button className="text-button" onClick={() => void refreshCore()}>重试</button></div>}
+        {error && <div className="inline-notice error" role="alert"><span>{error}</span><button className="text-button" onClick={() => void refreshCore()}>{t("重试")}</button></div>}
         <Suspense fallback={<div className="page-loading" role="status"><i /><i /><i /></div>}>
           {page === "overview" && <OverviewPage users={users} nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
           {page === "topology" && <TopologyPage nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
@@ -147,8 +152,9 @@ function App() {
 }
 
 function ThemeSwitch({ value, onChange }: { value: ThemeChoice; onChange: (value: ThemeChoice) => void }) {
-  const options: Array<[ThemeChoice, IconName, string]> = [["light", "sun", "浅色"], ["dark", "moon", "深色"], ["system", "monitor", "跟随系统"]];
-  return <div className="theme-switch" role="group" aria-label="界面主题">{options.map(([choice, icon, label]) => <button key={choice} type="button" className={value === choice ? "active" : ""} aria-pressed={value === choice} title={label} aria-label={label} onClick={() => onChange(choice)}><Icon name={icon} size={15} /></button>)}</div>;
+  useConsoleLanguage();
+  const options: Array<[ThemeChoice, IconName, string]> = [["light", "sun", t("浅色")], ["dark", "moon", t("深色")], ["system", "monitor", t("跟随系统")]];
+  return <div className="theme-switch" role="group" aria-label={t("界面主题")}>{options.map(([choice, icon, label]) => <button key={choice} type="button" className={value === choice ? "active" : ""} aria-pressed={value === choice} title={label} aria-label={label} onClick={() => onChange(choice)}><Icon name={icon} size={15} /></button>)}</div>;
 }
 
-createRoot(document.getElementById("root")!).render(<ConfirmProvider><ToastProvider><App /></ToastProvider></ConfirmProvider>);
+createRoot(document.getElementById("root")!).render(<ConsoleLanguage><ConfirmProvider><ToastProvider><App /></ToastProvider></ConfirmProvider></ConsoleLanguage>);

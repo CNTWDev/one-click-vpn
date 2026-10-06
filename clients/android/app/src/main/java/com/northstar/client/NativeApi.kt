@@ -101,17 +101,18 @@ class NativeApi(context: Context) {
         return request(action, JSONObject().put("challengeId", challenge.getString("id")).put("signature", b64(raw)).put("request", input))
     }
 }
-fun friendly(error: Throwable): String = when ((error as? ApiFailure)?.code) {
-    "DEVICE_LIMIT_REACHED" -> "授权设备已满，请到「账号」解除一台旧设备的授权后重试。"
-    "DEVICE_REVOKED" -> "这台设备的授权已解除，请联系管理员。"
-    "INVALID_CREDENTIALS" -> "邮箱或密码不正确。"
-    "AUTH_REQUIRED" -> "登录已过期，请重新登录。"
-    "MEMBERSHIP_EXPIRED" -> "账号使用期限已到，请联系管理员续期。"
-    "ACCOUNT_UNAVAILABLE" -> "账号尚未启用或已停用，请联系管理员。"
-    "MANAGED_ACCESS_REQUIRED" -> "请联系管理员开通 NORTHSTAR 客户端访问。"
-    "NODE_UNAVAILABLE", "NODE_FULL" -> "该节点暂时不可用，请选择其他节点或自动选择。"
-    "CLIENT_ACCESS_NOT_ENABLED" -> "服务端尚未启用客户端访问，请联系管理员。"
-    "SERVER_REQUIRED" -> "请先填写 HTTPS 服务地址。"
-    "RATE_LIMITED" -> "操作太频繁，请稍后重试。"
-    else -> "暂时无法连接服务，请检查网络后重试。"
+fun friendly(error: Throwable): String = L10n.text(friendlyResource(error))
+fun friendlyResource(error: Throwable): Int = when ((error as? ApiFailure)?.code) {
+    "DEVICE_LIMIT_REACHED" -> R.string.device_limit_reached_revoke_an_old_device_in_account
+    "DEVICE_REVOKED" -> R.string.access_for_this_device_has_been_revoked_contact_your
+    "INVALID_CREDENTIALS" -> R.string.incorrect_email_or_password
+    "AUTH_REQUIRED" -> R.string.your_session_has_expired_sign_in_again
+    "MEMBERSHIP_EXPIRED" -> R.string.your_access_has_expired_contact_your_administrator_to_renew
+    "ACCOUNT_UNAVAILABLE" -> R.string.your_account_is_not_active_contact_your_administrator
+    "MANAGED_ACCESS_REQUIRED" -> R.string.ask_your_administrator_to_enable_northstar_client_access
+    "NODE_UNAVAILABLE", "NODE_FULL" -> R.string.this_location_is_unavailable_choose_another_or_use_automatic
+    "CLIENT_ACCESS_NOT_ENABLED" -> R.string.client_access_is_not_enabled_on_the_server_contact
+    "SERVER_REQUIRED" -> R.string.enter_an_https_server_address_first
+    "RATE_LIMITED" -> R.string.too_many_attempts_try_again_later
+    else -> R.string.unable_to_reach_the_service_check_your_network_and
 }

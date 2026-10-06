@@ -1,8 +1,8 @@
-<Window x:Class="Northstar.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="NORTHSTAR — 开发版" Width="620" Height="800" MinWidth="400" MinHeight="540" Background="#F8F6EE" FontFamily="Segoe UI" UseLayoutRounding="True" WindowStartupLocation="CenterScreen">
+<Window x:Class="Northstar.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="NORTHSTAR" Width="620" Height="800" MinWidth="400" MinHeight="540" Background="#F8F6EE" FontFamily="Segoe UI" UseLayoutRounding="True" WindowStartupLocation="CenterScreen">
   <Grid>
     <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="ContentPanel" Margin="32" MaxWidth="600" /></ScrollViewer>
     <Border Grid.Row="1" Background="White" Padding="16,12"><UniformGrid x:Name="NavigationPanel" Rows="1" MaxWidth="600"/></Border>
-    <Border x:Name="BusyBanner" Grid.RowSpan="2" Visibility="Collapsed" VerticalAlignment="Top" Background="#E2F7F0" Padding="16"><TextBlock Text="正在处理，请稍候…" HorizontalAlignment="Center" Foreground="#007A64"/></Border>
+    <Border x:Name="BusyBanner" Grid.RowSpan="2" Visibility="Collapsed" VerticalAlignment="Top" Background="#E2F7F0" Padding="16"><TextBlock x:Name="BusyLabel" HorizontalAlignment="Center" Foreground="#007A64"/></Border>
   </Grid>
 </Window>

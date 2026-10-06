@@ -10,13 +10,13 @@ namespace Northstar;
 public sealed class AccessFailure(string code) : Exception(code) {
     public string Code {get;}=code;
     public override string Message => Code switch {
-        "DEVICE_LIMIT_REACHED" => "授权设备已满，请解除旧设备的授权后重试。",
-        "DEVICE_REVOKED" => "这台设备的授权已解除，请联系管理员。",
-        "AUTH_REQUIRED" => "登录已过期，请重新登录。",
-        "INVALID_CREDENTIALS" => "邮箱或密码不正确。",
-        "CLIENT_ACCESS_NOT_ENABLED" => "服务端尚未启用客户端访问。",
-        "MANAGED_ACCESS_REQUIRED" => "请联系管理员开通 NORTHSTAR 客户端访问。",
-        _ => "暂时无法连接服务，请检查网络或联系管理员。"
+        "DEVICE_LIMIT_REACHED" => L10n.Text("device_limit_reached_revoke_an_old_device_and_try"),
+        "DEVICE_REVOKED" => L10n.Text("access_for_this_device_has_been_revoked_contact_your"),
+        "AUTH_REQUIRED" => L10n.Text("your_session_has_expired_sign_in_again"),
+        "INVALID_CREDENTIALS" => L10n.Text("incorrect_email_or_password"),
+        "CLIENT_ACCESS_NOT_ENABLED" => L10n.Text("client_access_is_not_enabled_on_the_server"),
+        "MANAGED_ACCESS_REQUIRED" => L10n.Text("ask_your_administrator_to_enable_northstar_client_access"),
+        _ => L10n.Text("unable_to_reach_the_service_check_your_network_or")
     };
 }
 public sealed class NativeApi : IDisposable {

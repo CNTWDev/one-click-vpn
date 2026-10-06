@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import NorthstarCore
 import NetworkExtension
 
@@ -13,7 +14,7 @@ struct NorthstarApp: App {
     @Published var signedIn=false
     @Published var busy=false
     @Published var message=""
-    @Published var status="未连接"
+    @Published var status="not_connected"
     @Published var selected=UserDefaults.standard.string(forKey:"selectedNode") ?? "" {didSet {UserDefaults.standard.set(selected,forKey:"selectedNode")}}
     @Published var nodes:[[String:Any]]=[]
     @Published var account:[String:Any]=[:]
@@ -55,10 +56,10 @@ struct NorthstarApp: App {
     }
     func refreshStatus() {
         switch manager?.connection.status {
-        case .connected:status="隧道已启用"
-        case .connecting,.reasserting:status="正在连接…"
-        case .disconnecting:status="正在断开…"
-        default:status="未连接"
+        case .connected:status="tunnel_enabled"
+        case .connecting,.reasserting:status="connecting"
+        case .disconnecting:status="disconnecting"
+        default:status="not_connected"
         }
         if manager?.connection.status == .connected,let session=manager?.connection as? NETunnelProviderSession {
             try? session.sendProviderMessage(Data("status".utf8)) {data in
@@ -69,6 +70,7 @@ struct NorthstarApp: App {
     }
 }
 struct ClientView:View {
+    @AppStorage(L10n.preferenceKey) private var language = "system"
     @StateObject private var model=ClientModel()
     @State private var email=""
     @State private var password=""
@@ -80,32 +82,38 @@ struct ClientView:View {
         VStack(spacing:0) {
             ScrollView {
                 VStack(alignment:.leading,spacing:24) {
-                    HStack {Label("NORTHSTAR",systemImage:"sparkle").font(.headline).tracking(2);Spacer();Text("随心连接").font(.caption).foregroundStyle(NorthstarStyle.muted)}
+                    HStack {Label("NORTHSTAR",systemImage:"sparkle").font(.headline).tracking(2);Spacer();Text(L10n.text("connect_freely")).font(.caption).foregroundStyle(NorthstarStyle.muted)}
+                    Picker(L10n.text("language"), selection: $language) {
+                        Text(L10n.text("language_system")).tag("system")
+                        Text("English").tag("en")
+                        Text("简体中文").tag("zh-Hans")
+                        Text("Русский").tag("ru")
+                    }.pickerStyle(.menu).accessibilityIdentifier("language-picker")
                     if !model.signedIn {loginView}
                     else if tab==0 {connectionView}
                     else if tab==1 {nodesView}
                     else {accountView}
-                    if model.busy {ProgressView("正在处理，请稍候…").tint(NorthstarStyle.accent)}
+                    if model.busy {ProgressView(L10n.text("working_please_wait")).tint(NorthstarStyle.accent)}
                     if !model.message.isEmpty {Label(model.message,systemImage:"exclamationmark.circle").foregroundStyle(.red).font(.callout).textSelection(.enabled).northstarCard()}
                     #if targetEnvironment(simulator)
-                    Text("模拟器开发版 · 连接功能需在已签名的真机版本验证").font(.caption).foregroundStyle(NorthstarStyle.muted)
+                    Text(L10n.text("simulator_build_verify_vpn_connections_on_a_signed_physical")).font(.caption).foregroundStyle(NorthstarStyle.muted)
                     #endif
                 }.padding(24).frame(maxWidth:640).frame(maxWidth:.infinity)
             }
             if model.signedIn {
                 HStack(spacing:8) {
-                    navigationItem("连接","power",0)
-                    navigationItem("节点","globe.asia.australia",1)
-                    navigationItem("我的","person.crop.circle",2)
+                    navigationItem(L10n.text("connect_tab"),"power",0)
+                    navigationItem(L10n.text("locations"),"globe.asia.australia",1)
+                    navigationItem(L10n.text("account"),"person.crop.circle",2)
                 }.padding(12).frame(maxWidth:640).frame(maxWidth:.infinity).background(.white)
             }
         }.background(NorthstarStyle.canvas).foregroundStyle(NorthstarStyle.ink).tint(NorthstarStyle.accent)
-        .preferredColorScheme(.light).frame(minWidth:300,minHeight:480).disabled(model.busy)
+        .environment(\.locale, L10n.locale).preferredColorScheme(.light).frame(minWidth:300,minHeight:480).disabled(model.busy)
         .task {await model.restore()}.onReceive(timer) {_ in model.refreshStatus()}
-        .alert("解除这台设备的授权？",isPresented:Binding(get:{revoke != nil},set:{if !$0 {revoke=nil}})) {
-            Button("取消",role:.cancel) {revoke=nil}
-            Button("解除授权",role:.destructive) {if let device=revoke {model.work {_ = try await model.api().action("revoke",["enrollmentId":device["id"] as? String ?? ""]);if device["isCurrent"] as? Bool == true {model.manager?.connection.stopVPNTunnel()};try await model.load()}};revoke=nil}
-        } message:{Text("该设备将无法继续连接。节点同步后释放额度，离线节点最多等待约 5 分钟。")}
+        .alert(L10n.text("revoke_this_device_s_access"),isPresented:Binding(get:{revoke != nil},set:{if !$0 {revoke=nil}})) {
+            Button(L10n.text("cancel"),role:.cancel) {revoke=nil}
+            Button(L10n.text("revoke_access"),role:.destructive) {if let device=revoke {model.work {_ = try await model.api().action("revoke",["enrollmentId":device["id"] as? String ?? ""]);if device["isCurrent"] as? Bool == true {model.manager?.connection.stopVPNTunnel()};try await model.load()}};revoke=nil}
+        } message:{Text(L10n.text("this_device_will_lose_access_the_slot_is_released"))}
     }
 
     private func heading(_ title:String,_ subtitle:String)->some View {
@@ -118,16 +126,16 @@ struct ClientView:View {
     }
     private var loginView:some View {
         VStack(alignment:.leading,spacing:24) {
-            heading("世界很大，\n一点即达。","登录 NORTHSTAR，无需导入或配置。")
-            Label("自动选择位置，也能自由指定",systemImage:"globe.asia.australia.fill").font(.headline).foregroundStyle(.white).padding(24).frame(maxWidth:.infinity,alignment:.leading)
+            heading(L10n.text("your_world_one_tap_away"),L10n.text("sign_in_to_northstar_no_imports_or_configuration_needed"))
+            Label(L10n.text("connect_automatically_or_pick_a_location"),systemImage:"globe.asia.australia.fill").font(.headline).foregroundStyle(.white).padding(24).frame(maxWidth:.infinity,alignment:.leading)
                 .background(LinearGradient(colors:[NorthstarStyle.ink,NorthstarStyle.accent],startPoint:.topLeading,endPoint:.bottomTrailing),in:RoundedRectangle(cornerRadius:26))
             VStack(alignment:.leading,spacing:12) {
-                if (Bundle.main.object(forInfoDictionaryKey:"NorthstarAPIOrigin") as? String ?? "").isEmpty {Text("开发服务地址").font(.caption.bold());TextField("https://…",text:$model.origin).literalInput().northstarField()}
-                Text("邮箱").font(.caption.bold());TextField("输入邮箱",text:$email).literalInput().northstarField()
-                Text("密码").font(.caption.bold());SecureField("输入密码",text:$password).northstarField().onSubmit {login()}
-                Button("登录并开始") {login()}.buttonStyle(NorthstarButton(primary:true)).disabled(email.trimmingCharacters(in:.whitespaces).isEmpty || password.isEmpty)
+                if (Bundle.main.object(forInfoDictionaryKey:"NorthstarAPIOrigin") as? String ?? "").isEmpty {Text(L10n.text("development_server_address")).font(.caption.bold());TextField("https://…",text:$model.origin).literalInput().northstarField()}
+                Text(L10n.text("email")).font(.caption.bold());TextField(L10n.text("enter_email"),text:$email).literalInput().northstarField()
+                Text(L10n.text("password")).font(.caption.bold());SecureField(L10n.text("enter_password"),text:$password).northstarField().onSubmit {login()}
+                Button(L10n.text("sign_in_and_start")) {login()}.buttonStyle(NorthstarButton(primary:true)).disabled(email.trimmingCharacters(in:.whitespaces).isEmpty || password.isEmpty)
             }
-            Text("首次连接时，请允许系统添加 VPN。授权设备可在「我的」中管理。").font(.footnote).foregroundStyle(NorthstarStyle.muted)
+            Text(L10n.text("allow_the_system_to_add_a_vpn_on_first")).font(.footnote).foregroundStyle(NorthstarStyle.muted)
         }
     }
     private func login() {
@@ -136,17 +144,17 @@ struct ClientView:View {
     }
     private var connectionView:some View {
         VStack(alignment:.leading,spacing:20) {
-            heading("连接，自在一点。","选好位置，剩下的交给 NORTHSTAR。")
+            heading(L10n.text("connect_with_ease"),L10n.text("choose_a_location_northstar_takes_care_of_the_rest"))
             VStack(spacing:22) {
-                Text(model.status).font(.headline).padding(.horizontal,16).padding(.vertical,8).background(NorthstarStyle.mint,in:Capsule())
+                Text(L10n.text(model.status)).font(.headline).padding(.horizontal,16).padding(.vertical,8).background(NorthstarStyle.mint,in:Capsule())
                 Image(systemName:"power").font(.system(size:54,weight:.light)).foregroundStyle(NorthstarStyle.accent)
                     .frame(width:140,height:140).background(NorthstarStyle.mint,in:Circle()).overlay(Circle().stroke(NorthstarStyle.accent.opacity(0.13),lineWidth:10)).accessibilityHidden(true)
-                Button(model.connected ? "断开连接":"一键连接") {model.work {try await model.connect()}}.buttonStyle(NorthstarButton(primary:true))
-                Text("首次连接需要允许系统 VPN 权限").font(.footnote).foregroundStyle(NorthstarStyle.muted)
+                Button(model.connected ? L10n.text("disconnect_action"):L10n.text("connect_action")) {model.work {try await model.connect()}}.buttonStyle(NorthstarButton(primary:true))
+                Text(L10n.text("allow_vpn_access_on_your_first_connection")).font(.footnote).foregroundStyle(NorthstarStyle.muted)
             }.frame(maxWidth:.infinity).northstarCard()
             Button {tab=1} label:{HStack(spacing:16) {
                 Image(systemName:"globe.asia.australia").font(.title2).foregroundStyle(NorthstarStyle.accent)
-                VStack(alignment:.leading,spacing:5) {Text("连接位置").font(.caption).foregroundStyle(NorthstarStyle.muted);Text(model.nodes.first {($0["id"] as? String)==model.selected}?["name"] as? String ?? (model.selected.isEmpty ? "自动选择 · 推荐":"节点不可用，请重新选择")).font(.headline)}
+                VStack(alignment:.leading,spacing:5) {Text(L10n.text("location")).font(.caption).foregroundStyle(NorthstarStyle.muted);Text(model.nodes.first {($0["id"] as? String)==model.selected}?["name"] as? String ?? (model.selected.isEmpty ? L10n.text("automatic_recommended"):L10n.text("location_unavailable_select_another"))).font(.headline)}
                 Spacer();Image(systemName:"chevron.right").foregroundStyle(NorthstarStyle.muted)
             }.northstarCard()}.buttonStyle(.plain)
         }
@@ -154,13 +162,13 @@ struct ClientView:View {
     private var filteredNodes:[[String:Any]] {model.nodes.filter {search.isEmpty || "\($0["name"] ?? "") \($0["region"] ?? "")".localizedCaseInsensitiveContains(search)}}
     private var nodesView:some View {
         VStack(alignment:.leading,spacing:16) {
-            heading("你想从哪里连接？","选择位置后，返回首页一键连接。")
-            HStack {Image(systemName:"magnifyingglass");TextField("搜索节点或地区",text:$search).textFieldStyle(.plain)}.northstarCard()
-            if model.connected {Label("请先断开连接，再更换位置。",systemImage:"info.circle").font(.callout).foregroundStyle(NorthstarStyle.muted)}
-            nodeRow("自动选择","为你选择可用节点",id:"")
-            ForEach(filteredNodes.indices,id:\.self) {i in let node=filteredNodes[i];nodeRow(node["name"] as? String ?? "节点",node["region"] as? String ?? "可用位置",id:node["id"] as? String ?? "")}
-            if filteredNodes.isEmpty {Text(model.nodes.isEmpty ? "暂无可用节点，请刷新或联系管理员。":"没有匹配的位置，试试其他关键词。").foregroundStyle(NorthstarStyle.muted).northstarCard()}
-            Button {model.work {try await model.load()}} label:{Label("刷新节点",systemImage:"arrow.clockwise")}.buttonStyle(NorthstarButton())
+            heading(L10n.text("where_would_you_like_to_connect"),L10n.text("choose_location_then_connect_hint"))
+            HStack {Image(systemName:"magnifyingglass");TextField(L10n.text("search_locations_or_regions"),text:$search).textFieldStyle(.plain)}.northstarCard()
+            if model.connected {Label(L10n.text("disconnect_before_changing_location"),systemImage:"info.circle").font(.callout).foregroundStyle(NorthstarStyle.muted)}
+            nodeRow(L10n.text("automatic"),L10n.text("select_an_available_location_for_you"),id:"")
+            ForEach(filteredNodes.indices,id:\.self) {i in let node=filteredNodes[i];nodeRow(node["name"] as? String ?? L10n.text("locations"),node["region"] as? String ?? L10n.text("available_location"),id:node["id"] as? String ?? "")}
+            if filteredNodes.isEmpty {Text(model.nodes.isEmpty ? L10n.text("no_locations_available_refresh_or_contact_your_administrator"):L10n.text("no_matching_locations_try_another_search")).foregroundStyle(NorthstarStyle.muted).northstarCard()}
+            Button {model.work {try await model.load()}} label:{Label(L10n.text("refresh_locations"),systemImage:"arrow.clockwise")}.buttonStyle(NorthstarButton())
         }
     }
     private func nodeRow(_ name:String,_ detail:String,id:String)->some View {
@@ -172,30 +180,30 @@ struct ClientView:View {
     }
     private var accountView:some View {
         VStack(alignment:.leading,spacing:18) {
-            heading("我的 NORTHSTAR","账号、用量和设备，都在这里。")
+            heading(L10n.text("my_northstar"),L10n.text("your_account_usage_and_devices_in_one_place"))
             VStack(alignment:.leading,spacing:12) {
-                Label(model.account["name"] as? String ?? "我的账号",systemImage:"person.crop.circle.fill").font(.title2.bold())
+                Label(model.account["name"] as? String ?? L10n.text("my_account"),systemImage:"person.crop.circle.fill").font(.title2.bold())
                 Text(model.account["email"] as? String ?? "").foregroundStyle(NorthstarStyle.muted)
-                Divider();Text("有效期 · \((model.account["expiresAt"] as? String).map {String($0.prefix(10))} ?? "不限期")").font(.callout)
+                Divider();Text(L10n.text("account_valid_until", L10n.date(model.account["expiresAt"] as? String))).font(.callout)
                 let traffic=model.account["traffic"] as? [String:Any] ?? [:]
-                Text("近 30 天流量").font(.caption).foregroundStyle(NorthstarStyle.muted)
+                Text(L10n.text("traffic_30_days")).font(.caption).foregroundStyle(NorthstarStyle.muted)
                 Text("↑ \(bytes(traffic["uploadBytes"]))    ↓ \(bytes(traffic["downloadBytes"]))").font(.headline).monospacedDigit()
             }.northstarCard()
-            HStack {Text("授权设备").font(.title3.bold());Spacer();Text("\(model.account["used"] as? Int ?? 0) / \(model.account["limit"] as? Int ?? 0)").font(.headline).foregroundStyle(NorthstarStyle.accent)}
-            Text("未满额度时，新设备首次连接会自动加入。").font(.footnote).foregroundStyle(NorthstarStyle.muted)
+            HStack {Text(L10n.text("authorized_devices")).font(.title3.bold());Spacer();Text("\(L10n.number(model.account["used"] as? Int ?? 0)) / \(L10n.number(model.account["limit"] as? Int ?? 0))").font(.headline).foregroundStyle(NorthstarStyle.accent)}
+            Text(L10n.text("new_devices_are_added_on_their_first_connection_when")).font(.footnote).foregroundStyle(NorthstarStyle.muted)
             let devices=(model.account["devices"] as? [[String:Any]] ?? []).filter {$0["status"] as? String != "revoked"}
-            if devices.isEmpty {Text("还没有授权设备，首次连接后会出现在这里。").foregroundStyle(NorthstarStyle.muted).northstarCard()}
+            if devices.isEmpty {Text(L10n.text("no_authorized_devices_yet_they_appear_after_their_first")).foregroundStyle(NorthstarStyle.muted).northstarCard()}
             ForEach(devices.indices,id:\.self) {i in let device=devices[i]
                 VStack(alignment:.leading,spacing:14) {
-                    Label((device["name"] as? String ?? "设备")+(device["isCurrent"] as? Bool == true ? " · 本机":""),systemImage:"desktopcomputer").font(.headline)
+                    Label((device["name"] as? String ?? L10n.text("device"))+(device["isCurrent"] as? Bool == true ? L10n.text("this_device"):""),systemImage:"desktopcomputer").font(.headline)
                     Text(device["platform"] as? String ?? "").font(.caption).foregroundStyle(NorthstarStyle.muted)
-                    if device["status"] as? String == "revoking" {Text("解除中 · 等待旧连接到期后释放额度").font(.callout).foregroundStyle(NorthstarStyle.muted)}
-                    else {Button("解除授权",role:.destructive) {revoke=device}.buttonStyle(.bordered).controlSize(.large)}
+                    if device["status"] as? String == "revoking" {Text(L10n.text("revoking_slot_released_when_the_old_connection_expires")).font(.callout).foregroundStyle(NorthstarStyle.muted)}
+                    else {Button(L10n.text("revoke_access"),role:.destructive) {revoke=device}.buttonStyle(.bordered).controlSize(.large)}
                 }.northstarCard()
             }
-            Button("刷新设备状态") {model.work {try await model.load()}}.buttonStyle(NorthstarButton())
-            Button("退出登录",role:.destructive) {model.work {_ = try? await model.api().request("logout",[:]);try SecureStorage.write("token",nil);model.signedIn=false}}.buttonStyle(.bordered).controlSize(.large).disabled(model.connected)
-            if model.connected {Text("退出登录前请先断开 VPN。").font(.caption).foregroundStyle(NorthstarStyle.muted)}
+            Button(L10n.text("refresh_devices")) {model.work {try await model.load()}}.buttonStyle(NorthstarButton())
+            Button(L10n.text("sign_out"),role:.destructive) {model.work {_ = try? await model.api().request("logout",[:]);try SecureStorage.write("token",nil);model.signedIn=false}}.buttonStyle(.bordered).controlSize(.large).disabled(model.connected)
+            if model.connected {Text(L10n.text("disconnect_before_signing_out_hint")).font(.caption).foregroundStyle(NorthstarStyle.muted)}
         }
     }
     private func bytes(_ value:Any?)->String {ByteCountFormatter.string(fromByteCount:Int64(String(describing:value ?? "0")) ?? 0,countStyle:.binary)}

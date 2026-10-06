@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 // One dictionary for every status value the Console shows: Chinese label + semantic tone.
 // Tones: success (green), progress (blue), warning (amber), danger (red); neutral is for unknown / intentionally off.
 export type Tone = "success" | "progress" | "warning" | "danger" | "neutral";
@@ -19,8 +20,9 @@ const dictionary: Record<string, [label: string, tone: Tone]> = {
 };
 
 export function statusLabel(value?: string | null): string {
-  if (!value) return "未知";
-  return dictionary[value]?.[0] ?? dictionary[value.toLowerCase()]?.[0] ?? value;
+  if (!value) return t("未知");
+  const label = dictionary[value]?.[0] ?? dictionary[value.toLowerCase()]?.[0];
+  return label ? t(label) : value;
 }
 
 export function statusTone(value?: string | null): Tone {

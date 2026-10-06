@@ -6,7 +6,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var lifecycle:Task<Void,Never>?
     private var deadline:TimeInterval=0
     private let stateLock=NSLock()
-    private var statusText="正在确认连接…"
+    private var statusText="connection_confirming"
     private var state:String {
         get {stateLock.lock();defer {stateLock.unlock()};return statusText}
         set {stateLock.lock();defer {stateLock.unlock()};statusText=newValue}
@@ -38,8 +38,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 let latest=raw.components(separatedBy:"\n").compactMap {line -> Double? in
                     guard line.hasPrefix("last_handshake_time_sec=") else {return nil};return Double(line.dropFirst("last_handshake_time_sec=".count))
                 }.max() ?? 0
-                if latest>0 && Date().timeIntervalSince1970-latest<180 {state="已连接"}
-                else {state="正在确认连接…";if ProcessInfo.processInfo.systemUptime-startedAt>45 {cancelTunnelWithError(AccessFailure.code("NODE_UNAVAILABLE"));return}}
+                if latest>0 && Date().timeIntervalSince1970-latest<180 {state="connection_connected"}
+                else {state="connection_confirming";if ProcessInfo.processInfo.systemUptime-startedAt>45 {cancelTunnelWithError(AccessFailure.code("NODE_UNAVAILABLE"));return}}
             }
         }
     }

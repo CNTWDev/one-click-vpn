@@ -34,7 +34,9 @@ test("native builds do not publish artifacts or fake a connected tunnel", async 
   const android = await readFile("clients/android/app/src/main/java/com/northstar/client/MainActivity.kt", "utf8");
   assert.match(android, /GoBackend.VpnService.prepare/);
   const windows = await readFile("clients/windows/Northstar/MainWindow.xaml.cs", "utf8");
-  assert.match(windows, /连接尚不可用/);
+  assert.match(windows, /Button\(L10n.Text\("connection_unavailable"\),\(\)=>\{\},false\)/);
+  const messages = JSON.parse(await readFile("clients/locales/messages.json", "utf8"));
+  assert.match(messages.connection_unavailable.en, /unavailable/i);
   const workflow = await readFile(".github/workflows/native-clients.yml", "utf8");
   assert.match(workflow, /workflow_dispatch/);
   assert.doesNotMatch(workflow, /contents: write|gh release|signingPassword/);

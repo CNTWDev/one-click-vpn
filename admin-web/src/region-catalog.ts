@@ -1,3 +1,4 @@
+import type { Locale } from "../../shared/i18n-core";
 export type CountryOption = { code: string; country: string; label: string };
 export type RegionPreset = { id: string; group: string; name: string; label: string; code: string };
 
@@ -84,3 +85,12 @@ export const regionPresets: RegionPreset[] = presets.map(([group, name, label, c
 }));
 
 export const presetGroups = [...new Set(regionPresets.map((item) => item.group))];
+
+// Localized labels are presentation-only. Persist the existing ISO code and canonical name.
+export function localizedCountryLabel(code: string, locale: Locale): string {
+  try { return `${new Intl.DisplayNames([locale], { type: "region" }).of(code)} (${code})`; }
+  catch { return `${countryName(code)} (${code})`; }
+}
+export function localizedPresetLabel(preset: RegionPreset, locale: Locale): string {
+  return locale === "zh" ? preset.label : `${preset.name} · ${localizedCountryLabel(preset.code, locale)}`;
+}

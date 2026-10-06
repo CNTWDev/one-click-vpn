@@ -16,7 +16,7 @@ test("REALITY setup UI: automatic default, custom target flow, per-node override
       await new Promise((resolve) => setTimeout(resolve,100));
     }
     browser = await chromium.launch({ headless: true, ...(process.env.NORTHSTAR_TEST_BROWSER ? { executablePath: process.env.NORTHSTAR_TEST_BROWSER } : {}) });
-    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    const page = await browser.newPage({ locale: "zh-CN", viewport: { width: 1440, height: 1000 } });
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     const candidates = ["www.microsoft.com", "www.apple.com"];

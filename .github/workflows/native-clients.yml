@@ -4,7 +4,18 @@ on:
 permissions:
   contents: read
 jobs:
+  localization:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run i18n:check
   android:
+    needs: localization
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +35,7 @@ jobs:
           path: clients/android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
   apple:
+    needs: localization
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +56,7 @@ jobs:
           path: clients/apple/artifacts/*.zip
           if-no-files-found: error
   windows:
+    needs: localization
     runs-on: windows-latest
     strategy:
       matrix:

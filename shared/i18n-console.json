@@ -1,0 +1,2306 @@
+{
+  "API 返回了非 JSON 响应（HTTP {0}），请检查 Console 的 /api/ 反向代理。": [
+    "Non-JSON API response (HTTP {0}). Check the Console /api/ reverse proxy.",
+    "API вернул не JSON (HTTP {0}). Проверьте обратный прокси Console /api/."
+  ],
+  "危险操作": [
+    "Dangerous action",
+    "Опасное действие"
+  ],
+  "操作确认": [
+    "Confirm action",
+    "Подтверждение действия"
+  ],
+  "请输入": [
+    "Enter",
+    "Введите"
+  ],
+  "以确认": [
+    "to confirm",
+    "для подтверждения"
+  ],
+  "新加坡": [
+    "Singapore",
+    "Сингапур"
+  ],
+  "东南亚枢纽": [
+    "Southeast Asia hub",
+    "Центр Юго-Восточной Азии"
+  ],
+  "东京": [
+    "Tokyo",
+    "Токио"
+  ],
+  "东北亚枢纽": [
+    "Northeast Asia hub",
+    "Центр Северо-Восточной Азии"
+  ],
+  "法兰克福": [
+    "Frankfurt",
+    "Франкфурт"
+  ],
+  "欧洲中部": [
+    "Central Europe",
+    "Центральная Европа"
+  ],
+  "洛杉矶": [
+    "Los Angeles",
+    "Лос-Анджелес"
+  ],
+  "北美西部": [
+    "Western North America",
+    "Запад Северной Америки"
+  ],
+  "悉尼": [
+    "Sydney",
+    "Сидней"
+  ],
+  "大洋洲": [
+    "Oceania",
+    "Океания"
+  ],
+  "圣保罗": [
+    "São Paulo",
+    "Сан-Паулу"
+  ],
+  "南美洲": [
+    "South America",
+    "Южная Америка"
+  ],
+  "约翰内斯堡": [
+    "Johannesburg",
+    "Йоханнесбург"
+  ],
+  "非洲南部": [
+    "Southern Africa",
+    "Южная Африка"
+  ],
+  "迪拜": [
+    "Dubai",
+    "Дубай"
+  ],
+  "中东": [
+    "Middle East",
+    "Ближний Восток"
+  ],
+  "全球节点态势": [
+    "Global node status",
+    "Состояние узлов в мире"
+  ],
+  "按区域聚合 Edge Node，点击节点标记查看节点详情。": [
+    "Edge nodes grouped by region. Select a marker to view details.",
+    "Узлы сгруппированы по регионам. Выберите маркер для просмотра."
+  ],
+  "覆盖区域": [
+    "Regions covered",
+    "Охват регионов"
+  ],
+  "节点在线": [
+    "Nodes online",
+    "Узлы в сети"
+  ],
+  "未设置": [
+    "Not set",
+    "Не задано"
+  ],
+  "管理区域 →": [
+    "Manage regions →",
+    "Управление регионами →"
+  ],
+  "Northstar 全球 VPN 节点分布图": [
+    "Northstar global VPN node map",
+    "Карта узлов VPN Northstar"
+  ],
+  "{0}，{1} 个节点，{2} 个在线": [
+    "{0}, {1} nodes, {2} online",
+    "{0}, узлов: {1}, в сети: {2}"
+  ],
+  "Controller GPS 尚未设置": [
+    "Controller location not set",
+    "Местоположение Controller не задано"
+  ],
+  "Controller · 未设置位置": [
+    "Controller · Location not set",
+    "Controller · Местоположение не задано"
+  ],
+  "创建区域并部署节点后，全球分布会显示在这里。": [
+    "Create regions and deploy nodes to see the global distribution here.",
+    "Создайте регионы и разверните узлы, чтобы увидеть их на карте."
+  ],
+  "地图底图加载失败。若刷新无效，请检查前端是否已更新部署。": [
+    "Map failed to load. If refreshing does not help, check the deployed frontend version.",
+    "Не удалось загрузить карту. Если обновление не помогает, проверьте версию интерфейса."
+  ],
+  "重新加载": [
+    "Reload",
+    "Перезагрузить"
+  ],
+  "动态连线：Controller GPS → Agent 区域": [
+    "Connections: Controller location → Agent regions",
+    "Связи: местоположение Controller → регионы Agent"
+  ],
+  "动态连线：Agent 管理通道（Controller GPS 未设置）": [
+    "Connections: Agent management channels (Controller location not set)",
+    "Связи: каналы управления Agent (местоположение Controller не задано)"
+  ],
+  "不代表用户 VPN 流量路径": [
+    "Not a representation of user VPN traffic routes",
+    "Не отображает маршруты пользовательского VPN-трафика"
+  ],
+  "部署中": [
+    "Deploying",
+    "Развёртывание"
+  ],
+  "需关注": [
+    "Needs attention",
+    "Требует внимания"
+  ],
+  "基础覆盖空白": [
+    "Coverage gaps",
+    "Пробелы покрытия"
+  ],
+  "基础全球覆盖已齐备": [
+    "Basic global coverage is complete",
+    "Базовое глобальное покрытие обеспечено"
+  ],
+  "可结合用户位置与延迟继续扩容。": [
+    "Expand further based on user locations and latency.",
+    "Расширяйте сеть с учётом местоположения пользователей и задержки."
+  ],
+  "监控": [
+    "Monitoring",
+    "Мониторинг"
+  ],
+  "运维总览": [
+    "Operations overview",
+    "Обзор эксплуатации"
+  ],
+  "全球拓扑": [
+    "Global topology",
+    "Глобальная топология"
+  ],
+  "运行日志": [
+    "Runtime logs",
+    "Журналы работы"
+  ],
+  "基础设施": [
+    "Infrastructure",
+    "Инфраструктура"
+  ],
+  "节点运维": [
+    "Node operations",
+    "Управление узлами"
+  ],
+  "VPN 服务": [
+    "VPN services",
+    "Сервисы VPN"
+  ],
+  "区域管理": [
+    "Regions",
+    "Регионы"
+  ],
+  "用户": [
+    "Users",
+    "Пользователи"
+  ],
+  "账号管理": [
+    "Accounts",
+    "Аккаунты"
+  ],
+  "登录接口返回异常，请检查 Console 的 /api/ 反向代理。": [
+    "Unexpected login response. Check the Console /api/ reverse proxy.",
+    "Некорректный ответ входа. Проверьте обратный прокси Console /api/."
+  ],
+  "管理控制台": [
+    "Management console",
+    "Консоль управления"
+  ],
+  "账号审核、节点部署与修复、VPN 服务和运行诊断。": [
+    "Account approvals, node deployment and recovery, VPN services and diagnostics.",
+    "Одобрение аккаунтов, развёртывание и восстановление узлов, сервисы VPN и диагностика."
+  ],
+  "管理员邮箱": [
+    "Administrator email",
+    "Почта администратора"
+  ],
+  "登录中…": [
+    "Signing in…",
+    "Вход…"
+  ],
+  "登录 Console": [
+    "Sign in to Console",
+    "Войти в Console"
+  ],
+  "正在连接控制面…": [
+    "Connecting to control plane…",
+    "Подключение к системе управления…"
+  ],
+  "关闭菜单": [
+    "Close menu",
+    "Закрыть меню"
+  ],
+  "管理控制台导航": [
+    "Console navigation",
+    "Навигация консоли"
+  ],
+  "{0} 个账号待审核": [
+    "Accounts awaiting approval: {0}",
+    "Аккаунтов на рассмотрении: {0}"
+  ],
+  "连接异常": [
+    "Connection error",
+    "Ошибка подключения"
+  ],
+  "同步数据中": [
+    "Syncing data",
+    "Синхронизация данных"
+  ],
+  "已认证 · 运行中": [
+    "Authenticated · Running",
+    "Авторизовано · Работает"
+  ],
+  "退出登录": [
+    "Sign out",
+    "Выйти"
+  ],
+  "打开菜单": [
+    "Open menu",
+    "Открыть меню"
+  ],
+  "正在同步…": [
+    "Syncing…",
+    "Синхронизация…"
+  ],
+  "{0}/{1} 节点在线": [
+    "{0}/{1} nodes online",
+    "Узлов в сети: {0}/{1}"
+  ],
+  "浅色": [
+    "Light",
+    "Светлая"
+  ],
+  "深色": [
+    "Dark",
+    "Тёмная"
+  ],
+  "界面主题": [
+    "Theme",
+    "Тема"
+  ],
+  "正常": [
+    "Healthy",
+    "Норма"
+  ],
+  "等待中": [
+    "Waiting",
+    "Ожидание"
+  ],
+  "排队中": [
+    "Queued",
+    "В очереди"
+  ],
+  "执行中": [
+    "Running",
+    "Выполняется"
+  ],
+  "检测中": [
+    "Checking",
+    "Проверка"
+  ],
+  "计划中": [
+    "Planned",
+    "Запланировано"
+  ],
+  "已接收": [
+    "Received",
+    "Получено"
+  ],
+  "同步中": [
+    "Syncing",
+    "Синхронизация"
+  ],
+  "同步有异常": [
+    "Sync issues",
+    "Ошибки синхронизации"
+  ],
+  "成功": [
+    "Succeeded",
+    "Успешно"
+  ],
+  "已完成": [
+    "Completed",
+    "Завершено"
+  ],
+  "部分失败": [
+    "Partially failed",
+    "Частичный сбой"
+  ],
+  "已同步": [
+    "Synced",
+    "Синхронизировано"
+  ],
+  "失败": [
+    "Failed",
+    "Сбой"
+  ],
+  "错误": [
+    "Error",
+    "Ошибка"
+  ],
+  "已中断": [
+    "Interrupted",
+    "Прервано"
+  ],
+  "不可用": [
+    "Unavailable",
+    "Недоступно"
+  ],
+  "暂不可更新": [
+    "Update blocked",
+    "Обновление заблокировано"
+  ],
+  "可同步": [
+    "Ready to sync",
+    "Готово к синхронизации"
+  ],
+  "不支持": [
+    "Unsupported",
+    "Не поддерживается"
+  ],
+  "等待目标": [
+    "Waiting for target",
+    "Ожидание цели"
+  ],
+  "已启用": [
+    "Enabled",
+    "Включено"
+  ],
+  "已签发": [
+    "Issued",
+    "Выдано"
+  ],
+  "已释放": [
+    "Released",
+    "Освобождено"
+  ],
+  "已拒绝": [
+    "Rejected",
+    "Отклонено"
+  ],
+  "状态延迟": [
+    "Delayed status",
+    "Состояние задерживается"
+  ],
+  "用户已停用": [
+    "Disabled by user",
+    "Отключено пользователем"
+  ],
+  "未配置": [
+    "Not configured",
+    "Не настроено"
+  ],
+  "未知": [
+    "Unknown",
+    "Неизвестно"
+  ],
+  "已托管": [
+    "Managed",
+    "Управляется"
+  ],
+  "全部放行": [
+    "Allow all",
+    "Разрешить всё"
+  ],
+  "未验证": [
+    "Unverified",
+    "Не проверено"
+  ],
+  "监听中": [
+    "Listening",
+    "Прослушивание"
+  ],
+  "已取消": [
+    "Cancelled",
+    "Отменено"
+  ],
+  "信息": [
+    "Information",
+    "Информация"
+  ],
+  "警告": [
+    "Warning",
+    "Предупреждение"
+  ],
+  "Controller 设置已保存，全球拓扑已同步更新。": [
+    "Controller settings saved; global topology updated.",
+    "Настройки Controller сохранены; топология обновлена."
+  ],
+  "查看控制面运行状态，并维护对外展示的名称与位置。": [
+    "View control-plane status and manage its public name and location.",
+    "Просматривайте состояние системы управления, задавайте имя и местоположение."
+  ],
+  "构建版本": [
+    "Build version",
+    "Версия сборки"
+  ],
+  "运行时": [
+    "Runtime",
+    "Среда выполнения"
+  ],
+  "运行时间": [
+    "Uptime",
+    "Время работы"
+  ],
+  "小时": [
+    "hours",
+    "ч."
+  ],
+  "内存": [
+    "Memory",
+    "Память"
+  ],
+  "1 分钟负载": [
+    "1-minute load",
+    "Нагрузка за 1 минуту"
+  ],
+  "公网 IP": [
+    "Public IP",
+    "Внешний IP"
+  ],
+  "未检测": [
+    "Not detected",
+    "Не обнаружено"
+  ],
+  "显示与位置": [
+    "Display and location",
+    "Отображение и местоположение"
+  ],
+  "Controller 名称": [
+    "Controller name",
+    "Имя Controller"
+  ],
+  "位置名称": [
+    "Location name",
+    "Название местоположения"
+  ],
+  "纬度": [
+    "Latitude",
+    "Широта"
+  ],
+  "经度": [
+    "Longitude",
+    "Долгота"
+  ],
+  "经纬度必须同时填写或同时留空。当前来源：": [
+    "Set or clear both coordinates together. Current source:",
+    "Задайте или очистите обе координаты. Текущий источник:"
+  ],
+  "环境变量": [
+    "Environment variables",
+    "Переменные окружения"
+  ],
+  "手动设置": [
+    "Manual configuration",
+    "Ручная настройка"
+  ],
+  "保存中…": [
+    "Saving…",
+    "Сохранение…"
+  ],
+  "保存设置": [
+    "Save settings",
+    "Сохранить настройки"
+  ],
+  "运行详情": [
+    "Runtime details",
+    "Сведения о работе"
+  ],
+  "公网域名": [
+    "Public domain",
+    "Публичный домен"
+  ],
+  "堆内存": [
+    "Heap memory",
+    "Память кучи"
+  ],
+  "常驻内存（RSS）": [
+    "Resident memory (RSS)",
+    "Резидентная память (RSS)"
+  ],
+  "最近观测": [
+    "Last observed",
+    "Последнее наблюдение"
+  ],
+  "正在读取 Controller 状态": [
+    "Loading Controller status",
+    "Загрузка состояния Controller"
+  ],
+  "清除{0}日志": [
+    "Clear {0} logs",
+    "Очистить журналы {0}"
+  ],
+  "这是不可逆操作，将删除{0}日志。": [
+    "This permanently deletes {0} logs.",
+    "Журналы {0} будут удалены безвозвратно."
+  ],
+  "日志删除请求已接受，物理删除由日志服务异步执行。": [
+    "Deletion request accepted. The log service removes physical data asynchronously.",
+    "Запрос удаления принят. Служба журналов удалит данные асинхронно."
+  ],
+  "查询 Controller、Agent、部署和配置同步日志，用于定位节点故障。": [
+    "Search Controller, Agent, deployment and synchronization logs to diagnose node failures.",
+    "Поиск по журналам Controller, Agent, развёртывания и синхронизации для диагностики узлов."
+  ],
+  "加载中…": [
+    "Loading…",
+    "Загрузка…"
+  ],
+  "清除": [
+    "Clear",
+    "Очистить"
+  ],
+  "节点": [
+    "Nodes",
+    "Узлы"
+  ],
+  "日志": [
+    "Logs",
+    "Журналы"
+  ],
+  "运行日志存储尚未启用或当前不可用；这不会阻塞节点恢复操作。": [
+    "Log storage is disabled or unavailable. Node recovery is not blocked.",
+    "Хранилище журналов отключено или недоступно. Восстановление узлов не блокируется."
+  ],
+  "搜索消息、节点或 action ID": [
+    "Search messages, nodes or action IDs",
+    "Поиск сообщений, узлов или ID действий"
+  ],
+  "全部节点 / Controller": [
+    "All nodes / Controller",
+    "Все узлы / Controller"
+  ],
+  "时间范围": [
+    "Time range",
+    "Период"
+  ],
+  "最近 1 小时": [
+    "Last hour",
+    "За последний час"
+  ],
+  "最近 6 小时": [
+    "Last 6 hours",
+    "За 6 часов"
+  ],
+  "最近 24 小时": [
+    "Last 24 hours",
+    "За 24 часа"
+  ],
+  "最近 7 天": [
+    "Last 7 days",
+    "За 7 дней"
+  ],
+  "最近 30 天": [
+    "Last 30 days",
+    "За 30 дней"
+  ],
+  "正在查询日志": [
+    "Querying logs",
+    "Запрос журналов"
+  ],
+  "清除筛选": [
+    "Clear filters",
+    "Сбросить фильтры"
+  ],
+  "当前筛选范围内没有日志。": [
+    "No logs match these filters.",
+    "Нет журналов по выбранным фильтрам."
+  ],
+  "该账号曾导出配置，不能直接切换严格设备控制。请使用新账号试点；旧账号需先完成凭据迁移及所有节点失效确认。": [
+    "This account has exported configurations and cannot switch directly to strict device control. Pilot with a new account; existing accounts need credential migration and invalidation on every node first.",
+    "Аккаунт экспортировал конфигурации и не может сразу перейти на строгий контроль устройств. Используйте новый аккаунт для тестирования; старым требуется миграция и аннулирование учётных данных на всех узлах."
+  ],
+  "请先解除多余设备的授权，等待生效后再修改。": [
+    "Revoke excess devices and wait for it to take effect before changing the limit.",
+    "Отзовите лишние устройства и дождитесь применения перед изменением лимита."
+  ],
+  "设备上限应为 1–100。": [
+    "Device limit must be between 1 and 100.",
+    "Лимит устройств должен быть от 1 до 100."
+  ],
+  "已保存。解除授权需节点同步，离线节点最多等待约 5 分钟；生效前继续占用额度。": [
+    "Saved. Revocation requires synchronization; offline nodes may take about 5 minutes. Slots remain occupied until then.",
+    "Сохранено. Отзыв требует синхронизации; недоступным узлам может потребоваться около 5 минут. До этого места остаются занятыми."
+  ],
+  "NORTHSTAR 授权设备": [
+    "NORTHSTAR authorized devices",
+    "Авторизованные устройства NORTHSTAR"
+  ],
+  "设备额度与会员有效期仅对 NORTHSTAR 模式生效。兼容模式无法限制第三方配置复制后的设备数量。": [
+    "Device limits and membership expiry apply only in NORTHSTAR mode. Compatibility mode cannot limit devices using copied third-party configurations.",
+    "Лимит устройств и срок подписки действуют только в режиме NORTHSTAR. Режим совместимости не ограничивает устройства с копиями сторонних конфигураций."
+  ],
+  "访问方式": [
+    "Access mode",
+    "Режим доступа"
+  ],
+  "兼容模式 · 保留第三方客户端": [
+    "Compatibility · allow third-party clients",
+    "Совместимость · сторонние клиенты"
+  ],
+  "仅 NORTHSTAR · 严格授权设备": [
+    "NORTHSTAR only · authorized devices",
+    "Только NORTHSTAR · авторизованные устройства"
+  ],
+  "设备上限": [
+    "Device limit",
+    "Лимит устройств"
+  ],
+  "系统默认（{0}）": [
+    "System default ({0})",
+    "По умолчанию ({0})"
+  ],
+  "会员有效期（UTC）": [
+    "Membership expires (UTC)",
+    "Срок подписки (UTC)"
+  ],
+  "已授权": [
+    "Authorized",
+    "Авторизовано"
+  ],
+  "台 · 留空额度跟随系统默认，留空有效期表示不限期。": [
+    "devices · Leave the limit blank to use the system default; leave the expiry blank for no expiry.",
+    "устройств · Пустой лимит означает значение по умолчанию, пустой срок — без ограничения срока."
+  ],
+  "· 最近使用": [
+    "· Last used",
+    "· Последнее использование"
+  ],
+  "解除中，预计": [
+    "Revoking; quota will be released in",
+    "Отзыв; место освободится через"
+  ],
+  "后释放额度": [
+    "before quota is released",
+    "до освобождения места"
+  ],
+  "解除设备授权": [
+    "Revoke device access",
+    "Отозвать доступ устройства"
+  ],
+  "解除 {0} 的授权？这台设备将无法继续连接。": [
+    "Revoke access for {0}? This device will no longer be able to connect.",
+    "Отозвать доступ для {0}? Устройство больше не сможет подключаться."
+  ],
+  "解除授权": [
+    "Revoke access",
+    "Отозвать доступ"
+  ],
+  "安装 / 修复 Agent": [
+    "Install / repair Agent",
+    "Установить / восстановить Agent"
+  ],
+  "升级 Agent": [
+    "Upgrade Agent",
+    "Обновить Agent"
+  ],
+  "检查 Agent": [
+    "Check Agent",
+    "Проверить Agent"
+  ],
+  "重启 Agent": [
+    "Restart Agent",
+    "Перезапустить Agent"
+  ],
+  "等待开始": [
+    "Waiting to start",
+    "Ожидание запуска"
+  ],
+  "无法读取 Agent 目标版本：{0}": [
+    "Could not read the target Agent version: {0}",
+    "Не удалось получить целевую версию Agent: {0}"
+  ],
+  "需升级": [
+    "Update available",
+    "Доступно обновление"
+  ],
+  "节点配置已保存。": [
+    "Server configuration saved.",
+    "Настройки сервера сохранены."
+  ],
+  "节点已创建，安全部署任务已加入队列。": [
+    "Server created. Secure deployment is queued.",
+    "Сервер создан. Безопасное развёртывание поставлено в очередь."
+  ],
+  "SSH 私钥文件不能超过 60 KB。": [
+    "The SSH private key file must be no larger than 60 KB.",
+    "Файл закрытого ключа SSH не должен превышать 60 КБ."
+  ],
+  "无法读取 SSH 私钥文件。": [
+    "Could not read the SSH private key file.",
+    "Не удалось прочитать закрытый ключ SSH."
+  ],
+  "SSH 连接与{0}验证通过，主机指纹已自动读取。": [
+    "SSH connection and {0} verified. Host fingerprint retrieved automatically.",
+    "Подключение SSH и {0} проверены. Отпечаток хоста получен автоматически."
+  ],
+  "将 {0} 从 {1} 升级至 {2}。通过 SSH 更新程序并重启 Agent，保留身份和 VPN 配置。": [
+    "Upgrade {0} from {1} to {2}. Updates and restarts Agent via SSH, preserving its identity and VPN configuration.",
+    "Обновить {0} с {1} до {2}. Agent обновится и перезапустится через SSH с сохранением идентификатора и настроек VPN."
+  ],
+  "确定重启 {0} 的 Agent 吗？短时间内会中断状态上报。": [
+    "Restart Agent on {0}? Status reporting will briefly pause.",
+    "Перезапустить Agent на {0}? Передача статуса ненадолго прервётся."
+  ],
+  "确定重新安装/修复 {0} 吗？这会重新部署 Agent，并为标准模板节点自动补齐缺少的协议（含 VLESS）。保留已有密钥和单节点配置；自定义模板不会被覆盖。": [
+    "Reinstall / repair {0}? This redeploys Agent and adds missing protocols (including VLESS) for standard templates. Existing keys and server configurations are preserved; custom templates are not overwritten.",
+    "Переустановить / восстановить {0}? Agent будет развёрнут заново, а недостающие протоколы (включая VLESS) добавлены для стандартных шаблонов. Ключи и настройки сохранятся; пользовательские шаблоны не изменятся."
+  ],
+  "将从 Controller 移除节点 {0}（{1}）。此操作不可撤销，且不会自动销毁云服务器。": [
+    "Remove server {0} ({1}) from Controller? This cannot be undone and does not destroy the cloud server.",
+    "Удалить сервер {0} ({1}) из Controller? Действие необратимо и не удаляет облачный сервер."
+  ],
+  "重新安装 / 修复": [
+    "Reinstall / repair",
+    "Переустановить / восстановить"
+  ],
+  "删除节点": [
+    "Delete server",
+    "Удалить сервер"
+  ],
+  "节点 {0} 已删除。": [
+    "Server {0} deleted.",
+    "Сервер {0} удалён."
+  ],
+  "操作已加入队列，可在节点详情中跟踪进度。": [
+    "Action queued. Track progress in server details.",
+    "Действие поставлено в очередь. Ход выполнения доступен в сведениях о сервере."
+  ],
+  "升级 Agent 至 {0}": [
+    "Upgrade Agent to {0}",
+    "Обновить Agent до {0}"
+  ],
+  "重新安装/修复": [
+    "Reinstall / repair",
+    "Переустановить / восстановить"
+  ],
+  "批量{0}": [
+    "Bulk: {0}",
+    "Массовое действие: {0}"
+  ],
+  "确定对选中的 {0} 个节点执行“{1}”吗？": [
+    "Run “{1}” on {0} selected servers?",
+    "Выполнить «{1}» на выбранных серверах ({0})?"
+  ],
+  "确认执行": [
+    "Confirm",
+    "Подтвердить"
+  ],
+  "已加入队列 {0} 个，未提交 {1} 个；逐台结果见列表上方。": [
+    "Queued: {0}; not submitted: {1}. Per-server results are above the list.",
+    "В очереди: {0}; не отправлено: {1}. Результаты по серверам приведены над списком."
+  ],
+  "删除 {0} 个节点": [
+    "Delete {0} servers",
+    "Удалить серверы ({0})"
+  ],
+  "将从 Controller 移除：{0}。此操作不可撤销，且不会自动销毁云服务器。": [
+    "Remove from Controller: {0}. This cannot be undone and does not destroy the cloud servers.",
+    "Удалить из Controller: {0}. Действие необратимо и не удаляет облачные серверы."
+  ],
+  "{0} 个节点删除失败：{1}": [
+    "Failed to delete {0} servers: {1}",
+    "Не удалось удалить серверы ({0}): {1}"
+  ],
+  "已删除 {0} 个节点。": [
+    "Deleted {0} servers.",
+    "Удалено серверов: {0}."
+  ],
+  "{0} 的更多操作": [
+    "More actions for {0}",
+    "Другие действия для {0}"
+  ],
+  "编辑配置": [
+    "Edit configuration",
+    "Изменить настройки"
+  ],
+  "已是目标版本": [
+    "Already on target version",
+    "Целевая версия уже установлена"
+  ],
+  "只读，不重启服务": [
+    "Read-only; does not restart services",
+    "Только чтение, без перезапуска служб"
+  ],
+  "部署、修复和诊断 Agent。Controller 当前提供 Agent": [
+    "Deploy, repair and diagnose Agent. Controller provides Agent",
+    "Развёртывание, восстановление и диагностика Agent. Версия Agent в Controller:"
+  ],
+  "，升级保留身份和 VPN 配置。": [
+    "; upgrades preserve identity and VPN configuration.",
+    "; при обновлении сохраняются идентификатор и настройки VPN."
+  ],
+  "添加节点": [
+    "Add server",
+    "Добавить сервер"
+  ],
+  "添加节点前，请先在“区域管理”中创建至少一个区域。": [
+    "Create at least one region in Regions before adding a server.",
+    "Перед добавлением сервера создайте хотя бы один регион в разделе «Регионы»."
+  ],
+  "逐台提交结果": [
+    "Submission results",
+    "Результаты отправки"
+  ],
+  "已排队，不代表执行完成；请在详情中查看进度。": [
+    "Queued does not mean completed. Open details to track progress.",
+    "Постановка в очередь не означает завершения. Откройте сведения для отслеживания."
+  ],
+  "查看进度": [
+    "View progress",
+    "Ход выполнения"
+  ],
+  "搜索名称、IP 或区域": [
+    "Search name, IP or region",
+    "Поиск по имени, IP или региону"
+  ],
+  "名称": [
+    "Name",
+    "Название"
+  ],
+  "状态（异常优先）": [
+    "Status (issues first)",
+    "Статус (сначала проблемы)"
+  ],
+  "CPU 负载": [
+    "CPU load",
+    "Загрузка CPU"
+  ],
+  "个节点": [
+    "servers",
+    "серверов"
+  ],
+  "检查": [
+    "Check",
+    "Проверить"
+  ],
+  "重启": [
+    "Restart",
+    "Перезапустить"
+  ],
+  "选择全部节点": [
+    "Select all servers",
+    "Выбрать все серверы"
+  ],
+  "状态": [
+    "Status",
+    "Статус"
+  ],
+  "负载": [
+    "Load",
+    "Нагрузка"
+  ],
+  "策略": [
+    "Policy",
+    "Политика"
+  ],
+  "操作": [
+    "Actions",
+    "Действия"
+  ],
+  "选择 {0}": [
+    "Select {0}",
+    "Выбрать {0}"
+  ],
+  "点击升级 Agent": [
+    "Click to upgrade Agent",
+    "Нажмите для обновления Agent"
+  ],
+  "可升级": [
+    "Update available",
+    "Доступно обновление"
+  ],
+  "磁盘": [
+    "Disk",
+    "Диск"
+  ],
+  "暂无指标": [
+    "No metrics yet",
+    "Пока нет метрик"
+  ],
+  "自定义": [
+    "Custom",
+    "Пользовательский"
+  ],
+  "仅 Agent": [
+    "Agent only",
+    "Только Agent"
+  ],
+  "标准": [
+    "Standard",
+    "Стандартный"
+  ],
+  "策略 v": [
+    "Policy v",
+    "Политика v"
+  ],
+  "部署进度": [
+    "Deployment progress",
+    "Ход развёртывания"
+  ],
+  "详情": [
+    "Details",
+    "Сведения"
+  ],
+  "正在加载节点": [
+    "Loading servers",
+    "Загрузка серверов"
+  ],
+  "没有符合条件的节点。": [
+    "No matching servers.",
+    "Подходящих серверов нет."
+  ],
+  "添加第一台节点": [
+    "Add your first server",
+    "Добавить первый сервер"
+  ],
+  "先创建区域": [
+    "Create a region first",
+    "Сначала создайте регион"
+  ],
+  "尚未部署节点。": [
+    "No servers deployed yet.",
+    "Серверы ещё не развёрнуты."
+  ],
+  "编辑 {0}": [
+    "Edit {0}",
+    "Изменить {0}"
+  ],
+  "留空凭据表示保持当前 SSH 凭据。": [
+    "Leave credentials blank to keep the current SSH credentials.",
+    "Оставьте реквизиты пустыми, чтобы сохранить текущие реквизиты SSH."
+  ],
+  "节点会先验证 SSH 主机，再加入安全部署队列。": [
+    "The SSH host is verified before the server enters the secure deployment queue.",
+    "Хост SSH проверяется до постановки сервера в очередь безопасного развёртывания."
+  ],
+  "测试中…": [
+    "Testing…",
+    "Проверка…"
+  ],
+  "测试 SSH 连接": [
+    "Test SSH connection",
+    "Проверить SSH"
+  ],
+  "保存配置": [
+    "Save configuration",
+    "Сохранить настройки"
+  ],
+  "添加并部署": [
+    "Add and deploy",
+    "Добавить и развернуть"
+  ],
+  "节点名称": [
+    "Server name",
+    "Название сервера"
+  ],
+  "公网 IPv4": [
+    "Public IPv4",
+    "Публичный IPv4"
+  ],
+  "选择区域": [
+    "Select region",
+    "Выберите регион"
+  ],
+  "SSH 用户": [
+    "SSH user",
+    "Пользователь SSH"
+  ],
+  "SSH 端口": [
+    "SSH port",
+    "Порт SSH"
+  ],
+  "凭据类型": [
+    "Credential type",
+    "Тип реквизитов"
+  ],
+  "SSH 密码": [
+    "SSH password",
+    "Пароль SSH"
+  ],
+  "SSH 私钥": [
+    "SSH private key",
+    "Закрытый ключ SSH"
+  ],
+  "远程权限": [
+    "Remote privileges",
+    "Права на сервере"
+  ],
+  "直接使用 root": [
+    "Use root directly",
+    "Вход от root"
+  ],
+  "非 root + 免密 sudo": [
+    "Non-root + passwordless sudo",
+    "Не root + sudo без пароля"
+  ],
+  "适合 ubuntu、ec2-user、debian 等云主机账号。": [
+    "For cloud accounts such as ubuntu, ec2-user and debian.",
+    "Для облачных аккаунтов ubuntu, ec2-user, debian и подобных."
+  ],
+  "SSH 登录账号必须具有 uid 0。": [
+    "The SSH account must have UID 0.",
+    "Аккаунт SSH должен иметь UID 0."
+  ],
+  "部署模板": [
+    "Deployment template",
+    "Шаблон развёртывания"
+  ],
+  "标准：全部可用协议（推荐）": [
+    "Standard: all available protocols (recommended)",
+    "Стандартный: все доступные протоколы (рекомендуется)"
+  ],
+  "仅 WireGuard": [
+    "WireGuard only",
+    "Только WireGuard"
+  ],
+  "仅 OpenVPN": [
+    "OpenVPN only",
+    "Только OpenVPN"
+  ],
+  "标准模板自动部署 WireGuard、OpenVPN、VLESS。REALITY 目标只需在平台配置一次；未配置时其他协议仍可正常部署。": [
+    "The standard template deploys WireGuard, OpenVPN and VLESS automatically. Configure a REALITY target once for the platform; other protocols can still deploy without it.",
+    "Стандартный шаблон автоматически развёртывает WireGuard, OpenVPN и VLESS. Цель REALITY настраивается один раз для платформы; без неё остальные протоколы по-прежнему доступны."
+  ],
+  "新凭据（可留空）": [
+    "New credentials (optional)",
+    "Новые реквизиты (необязательно)"
+  ],
+  "SSH 凭据": [
+    "SSH credentials",
+    "Реквизиты SSH"
+  ],
+  "选择 .pem / .key 文件": [
+    "Choose a .pem / .key file",
+    "Выбрать файл .pem / .key"
+  ],
+  "粘贴 OpenSSH、RSA、EC 或 PKCS#8 私钥": [
+    "Paste an OpenSSH, RSA, EC or PKCS#8 private key",
+    "Вставьте закрытый ключ OpenSSH, RSA, EC или PKCS#8"
+  ],
+  "输入 SSH 密码": [
+    "Enter SSH password",
+    "Введите пароль SSH"
+  ],
+  "私钥会在 Controller 使用主密钥加密；暂不支持带口令的私钥。": [
+    "Controller encrypts the private key with its master key. Passphrase-protected keys are not supported yet.",
+    "Controller шифрует закрытый ключ своим главным ключом. Ключи с парольной фразой пока не поддерживаются."
+  ],
+  "密码会加密保存，仅用于节点安装和应急修复。": [
+    "The password is encrypted and used only for installation and emergency recovery.",
+    "Пароль хранится в зашифрованном виде и используется только для установки и аварийного восстановления."
+  ],
+  "服务器身份自动识别": [
+    "Automatic server identification",
+    "Автоматическая идентификация сервера"
+  ],
+  "无需手工生成或填写指纹": [
+    "No manual fingerprint generation or entry",
+    "Не нужно создавать или вводить отпечаток вручную"
+  ],
+  "添加时，Controller 会通过 SSH 自动读取并固定主机公钥，同时在服务器上读取或生成持久的 Northstar 节点 ID。发现重复节点、复用的 SSH host key 或重复 IP/端口时会停止部署。": [
+    "When adding a server, Controller retrieves and pins its SSH public key, then reads or creates a persistent Northstar node ID. Deployment stops if it detects duplicate nodes, reused SSH host keys or duplicate IP/port pairs.",
+    "При добавлении Controller получает и закрепляет открытый ключ SSH, затем читает или создаёт постоянный ID узла Northstar. Развёртывание останавливается при обнаружении дубликатов узлов, ключей SSH или пар IP/порт."
+  ],
+  "首次连接采用 TOFU；后续部署和修复必须匹配已固定的主机指纹与节点 ID。": [
+    "The first connection uses TOFU. Later deployments and repairs must match the pinned host fingerprint and node ID.",
+    "Первое подключение использует TOFU. Последующие развёртывания и восстановления должны совпадать с закреплённым отпечатком и ID узла."
+  ],
+  "本次连接读取到的 SSH 指纹": [
+    "SSH fingerprint from this connection",
+    "Отпечаток SSH этого подключения"
+  ],
+  "保存节点时会重新连接、登记节点 ID，并执行去重检查。": [
+    "Saving reconnects to the server, registers its node ID and checks for duplicates.",
+    "При сохранении выполняется повторное подключение, регистрация ID узла и проверка дубликатов."
+  ],
+  "{0} · 节点详情": [
+    "{0} · Server details",
+    "{0} · Сведения о сервере"
+  ],
+  "每 5 秒自动刷新": [
+    "Refreshes every 5 seconds",
+    "Обновление каждые 5 секунд"
+  ],
+  "升级 Agent 至": [
+    "Upgrade Agent to",
+    "Обновить Agent до"
+  ],
+  "正在读取诊断信息": [
+    "Loading diagnostics",
+    "Загрузка диагностики"
+  ],
+  "当前 / 最近任务": [
+    "Current / latest task",
+    "Текущая / последняя задача"
+  ],
+  "该节点还没有部署或运维任务记录。": [
+    "No deployment or maintenance tasks for this server yet.",
+    "Для этого сервера ещё нет задач развёртывания или обслуживания."
+  ],
+  "节点身份": [
+    "Server identity",
+    "Идентификатор сервера"
+  ],
+  " · 等待首次身份绑定": [
+    " · Waiting for initial identity binding",
+    " · Ожидание первичной привязки"
+  ],
+  "Agent 通道": [
+    "Agent channel",
+    "Канал Agent"
+  ],
+  "最近心跳": [
+    "Last heartbeat",
+    "Последний сигнал"
+  ],
+  "防火墙": [
+    "Firewall",
+    "Межсетевой экран"
+  ],
+  "资源": [
+    "Resources",
+    "Ресурсы"
+  ],
+  "内存 {0}% · 网络 ↓ {1}/s": [
+    "Memory {0}% · Network ↓ {1}/s",
+    "Память {0}% · Сеть ↓ {1}/с"
+  ],
+  "等待心跳上报": [
+    "Waiting for heartbeat",
+    "Ожидание сигнала"
+  ],
+  "部署与操作日志": [
+    "Deployment and action logs",
+    "Журнал развёртывания и действий"
+  ],
+  "Controller 记录的 Bootstrap、Agent 和修复任务事件，最新事件在最上方。": [
+    "Bootstrap, Agent and repair events recorded by Controller, newest first.",
+    "События Bootstrap, Agent и восстановления, записанные Controller. Сначала новые."
+  ],
+  "条事件": [
+    "events",
+    "событий"
+  ],
+  "还没有部署或操作日志。": [
+    "No deployment or action logs yet.",
+    "Журнал развёртывания и действий пока пуст."
+  ],
+  "VPN 协议运行状态": [
+    "VPN protocol status",
+    "Состояние протоколов VPN"
+  ],
+  "正在监听": [
+    "Listening",
+    "Прослушивается"
+  ],
+  "未监听": [
+    "Not listening",
+    "Не прослушивается"
+  ],
+  "· 运行时": [
+    "· Runtime",
+    "· Среда выполнения"
+  ],
+  "运行中": [
+    "Running",
+    "Работает"
+  ],
+  "未运行": [
+    "Not running",
+    "Не работает"
+  ],
+  "主机防火墙：": [
+    "Host firewall:",
+    "Межсетевой экран хоста:"
+  ],
+  "· 云防火墙：": [
+    "· Cloud firewall:",
+    "· Облачный межсетевой экран:"
+  ],
+  "没有 Agent 协议状态。": [
+    "No protocol status from Agent.",
+    "Нет сведений о протоколах от Agent."
+  ],
+  "配置同步任务": [
+    "Configuration sync tasks",
+    "Задачи синхронизации настроек"
+  ],
+  "· 尝试": [
+    "· Attempts",
+    "· Попытки"
+  ],
+  "次 ·": [
+    "times ·",
+    "раз ·"
+  ],
+  "没有待处理的配置同步任务。": [
+    "No pending configuration sync tasks.",
+    "Нет ожидающих задач синхронизации."
+  ],
+  "任务历史与原始输出": [
+    "Task history and raw output",
+    "История задач и исходный вывод"
+  ],
+  "原始输出": [
+    "Raw output",
+    "Исходный вывод"
+  ],
+  "该任务没有保存额外输出。": [
+    "No additional output saved for this task.",
+    "Для этой задачи нет сохранённого дополнительного вывода."
+  ],
+  "没有历史任务。": [
+    "No previous tasks.",
+    "Нет предыдущих задач."
+  ],
+  "从账号准入到边缘节点，集中查看当前需要处理的事项。": [
+    "Review what needs attention, from account approvals to edge servers.",
+    "Всё, что требует внимания: от одобрения аккаунтов до периферийных серверов."
+  ],
+  "待审核账号": [
+    "Pending accounts",
+    "Аккаунты на проверке"
+  ],
+  "去审核 →": [
+    "Review →",
+    "Проверить →"
+  ],
+  "在线节点": [
+    "Online servers",
+    "Серверы в сети"
+  ],
+  "查看节点 →": [
+    "View servers →",
+    "Серверы →"
+  ],
+  "需关注节点": [
+    "Servers needing attention",
+    "Серверы, требующие внимания"
+  ],
+  "查看需关注节点 →": [
+    "Review server issues →",
+    "Проблемы серверов →"
+  ],
+  "已启用账号": [
+    "Enabled accounts",
+    "Активные аккаунты"
+  ],
+  "查看账号 →": [
+    "View accounts →",
+    "Аккаунты →"
+  ],
+  "需要处理": [
+    "Needs attention",
+    "Требует внимания"
+  ],
+  "当前没有待处理事项。": [
+    "Nothing needs attention right now.",
+    "Сейчас нет задач, требующих внимания."
+  ],
+  "等待账号审核": [
+    "Awaiting account approval",
+    "Ожидают одобрения аккаунта"
+  ],
+  "审核 →": [
+    "Review →",
+    "Проверить →"
+  ],
+  "诊断 →": [
+    "Diagnose →",
+    "Диагностика →"
+  ],
+  "节点状态": [
+    "Server status",
+    "Состояние серверов"
+  ],
+  "全部节点 →": [
+    "All servers →",
+    "Все серверы →"
+  ],
+  "全球节点分布": [
+    "Global server coverage",
+    "Серверы по всему миру"
+  ],
+  "个区域 ·": [
+    "regions ·",
+    "регионов ·"
+  ],
+  "完整拓扑 →": [
+    "Full topology →",
+    "Вся топология →"
+  ],
+  "已切换为自动选择：各节点将自动探测并使用各自最合适的目标。": [
+    "Automatic selection enabled. Each server will probe and choose its own best target.",
+    "Автовыбор включён. Каждый сервер проверит цели и выберет наиболее подходящую."
+  ],
+  "自定义目标已检测并保存。新建或等待目标的 VLESS 服务将自动使用。": [
+    "Custom target verified and saved. New VLESS services and services awaiting a target will use it automatically.",
+    "Пользовательская цель проверена и сохранена. Новые службы VLESS и службы, ожидающие цель, будут использовать её автоматически."
+  ],
+  "REALITY 目标": [
+    "REALITY target",
+    "Цель REALITY"
+  ],
+  "VLESS + REALITY 伪装成访问某个真实 HTTPS 站点。平台统一设置一次，标准模板自动为新节点部署 VLESS。": [
+    "VLESS + REALITY resembles traffic to a real HTTPS site. Configure it once; the standard template deploys VLESS automatically on new servers.",
+    "Трафик VLESS + REALITY похож на обращение к настоящему HTTPS-сайту. Настройте цель один раз; стандартный шаблон автоматически развернёт VLESS на новых серверах."
+  ],
+  "REALITY 目标模式": [
+    "REALITY target mode",
+    "Режим цели REALITY"
+  ],
+  "自动选择": [
+    "Automatic selection",
+    "Автовыбор"
+  ],
+  "每个节点从内置的大型公共站点池（TLS 1.3 + HTTP/2）中自动探测，各自选用最合适的目标。零配置，无需准备域名或证书。": [
+    "Each server probes the built-in pool of major public sites (TLS 1.3 + HTTP/2) and chooses its own best target. No domain or certificate setup required.",
+    "Каждый сервер проверяет встроенный список крупных публичных сайтов (TLS 1.3 + HTTP/2) и выбирает подходящую цель. Настройка домена и сертификата не требуется."
+  ],
+  "自定义目标（高级）": [
+    "Custom target (advanced)",
+    "Своя цель (дополнительно)"
+  ],
+  "使用你自己部署的独立静态站点作为所有节点的统一目标，需要自行准备域名、证书并保持站点可用。": [
+    "Use your own standalone static site as a shared target. You are responsible for its domain, certificate and availability.",
+    "Используйте свой отдельный статический сайт как общую цель. Домен, сертификат и доступность сайта нужно поддерживать самостоятельно."
+  ],
+  "内置候选站点（": [
+    "Built-in candidates (",
+    "Встроенные кандидаты ("
+  ],
+  "候选站点由 Controller 内置维护，节点部署时自动探测。": [
+    "Candidates are maintained by Controller and probed during server deployment.",
+    "Список кандидатов поддерживается Controller и проверяется при развёртывании сервера."
+  ],
+  "独立站点域名": [
+    "Standalone site domain",
+    "Домен отдельного сайта"
+  ],
+  "例如 www.example.com": [
+    "For example, www.example.com",
+    "Например, www.example.com"
+  ],
+  "使用独立静态站点，不要填写 APP、Console 或 API 域名。目标未就绪时仅 VLESS 等待配置，不影响 WireGuard / OpenVPN。": [
+    "Use a standalone static site, not an APP, Console or API domain. Only VLESS waits if the target is not ready; WireGuard and OpenVPN are unaffected.",
+    "Используйте отдельный статический сайт, а не домен APP, Console или API. Если цель не готова, ожидает только VLESS; WireGuard и OpenVPN не затрагиваются."
+  ],
+  "还没有目标站点？查看一键初始化步骤": [
+    "No target site yet? View setup steps",
+    "Нет целевого сайта? Инструкция по настройке"
+  ],
+  "将上面的域名解析到管理服务器，并放行 TCP 80 / 443。不要解析到所有 VPN 节点。": [
+    "Point the domain above to the management server and allow TCP 80 / 443. Do not point it to every VPN server.",
+    "Направьте домен на сервер управления и откройте TCP 80 / 443. Не направляйте его на все VPN-серверы."
+  ],
+  "在管理服务器项目目录运行下方命令。脚本启动独立静态服务、配置 Nginx、申请证书并设置自动续期。": [
+    "Run the command below in the project directory on the management server. It starts a static service, configures Nginx, obtains a certificate and enables automatic renewal.",
+    "Выполните команду ниже в каталоге проекта на сервере управления. Она запустит статический сайт, настроит Nginx, получит сертификат и включит его автоматическое продление."
+  ],
+  "回到这里点击“检测并保存”，以后部署节点无需重复填写。": [
+    "Return here and select Verify and save. Future server deployments need no additional target setup.",
+    "Вернитесь сюда и нажмите «Проверить и сохранить». При дальнейшем развёртывании повторная настройка цели не потребуется."
+  ],
+  "证书续期联系邮箱": [
+    "Certificate renewal contact email",
+    "Почта для продления сертификата"
+  ],
+  "运维邮箱，仅用于生成命令": [
+    "Operations email, used only to generate the command",
+    "Почта администратора, только для формирования команды"
+  ],
+  "命令已复制，请在管理服务器执行；此按钮不会直接部署服务器。": [
+    "Command copied. Run it on the management server; this button does not deploy anything directly.",
+    "Команда скопирована. Выполните её на сервере управления; эта кнопка сама ничего не развёртывает."
+  ],
+  "无法访问剪贴板，请手动复制命令。": [
+    "Clipboard unavailable. Copy the command manually.",
+    "Буфер обмена недоступен. Скопируйте команду вручную."
+  ],
+  "复制初始化命令": [
+    "Copy setup command",
+    "Скопировать команду настройки"
+  ],
+  "需要主机已有 Nginx、Certbot、Docker Compose 和 systemd。宝塔等面板需指定实际 Nginx 配置目录，详见部署文档。域名和证书只需准备一份。": [
+    "Requires Nginx, Certbot, Docker Compose and systemd on the host. For panels such as BT, specify the actual Nginx configuration directory; see the deployment guide. Only one domain and certificate are needed.",
+    "На хосте требуются Nginx, Certbot, Docker Compose и systemd. Для панелей вроде BT укажите фактический каталог конфигурации Nginx; см. руководство. Достаточно одного домена и сертификата."
+  ],
+  "上次控制端检测：{0}。这不是实时健康状态，各节点部署时仍会独立检测。": [
+    "Last Controller check: {0}. This is not live health data; each server checks independently during deployment.",
+    "Последняя проверка Controller: {0}. Это не текущий статус; каждый сервер проверяет цель самостоятельно при развёртывании."
+  ],
+  "保存前会检查公网解析、证书、TLS 1.3 和 HTTP/2。": [
+    "Public DNS, certificate, TLS 1.3 and HTTP/2 are verified before saving.",
+    "Перед сохранением проверяются публичный DNS, сертификат, TLS 1.3 и HTTP/2."
+  ],
+  "保存后，新建或等待目标的 VLESS 服务立即使用新设置；已在运行的节点保持原目标。需要为某台节点更换时，在“服务状态”点 VLESS 徽标进入高级设置，更换为平滑切换：旧目标在过渡期内仍然有效，客户端下次刷新订阅时自动使用新目标。": [
+    "New VLESS services and those awaiting a target use the new setting immediately. Running servers keep their current target. To change one server, open its VLESS badge in Services and use advanced settings. The old target remains valid during the transition; clients receive the new target on their next subscription refresh.",
+    "Новые службы VLESS и службы, ожидающие цель, сразу используют новую настройку. Работающие серверы сохраняют прежнюю цель. Чтобы изменить один сервер, откройте значок VLESS в разделе служб и дополнительные настройки. Старая цель действует в переходный период; клиенты получают новую при обновлении подписки."
+  ],
+  " 最近修改：{0}。": [
+    " Last modified: {0}.",
+    " Последнее изменение: {0}."
+  ],
+  "正在检测…": [
+    "Verifying…",
+    "Проверка…"
+  ],
+  "已在使用自动选择": [
+    "Automatic selection is active",
+    "Автовыбор включён"
+  ],
+  "切换为自动选择": [
+    "Use automatic selection",
+    "Включить автовыбор"
+  ],
+  "检测并保存": [
+    "Verify and save",
+    "Проверить и сохранить"
+  ],
+  "区域已更新。": [
+    "Region updated.",
+    "Регион обновлён."
+  ],
+  "区域已创建。": [
+    "Region created.",
+    "Регион создан."
+  ],
+  "删除区域": [
+    "Delete region",
+    "Удалить регион"
+  ],
+  "确定删除区域 {0} · {1} 吗？仍有关联节点时系统会拒绝删除。": [
+    "Delete region {0} · {1}? Regions with linked servers cannot be deleted.",
+    "Удалить регион {0} · {1}? Регионы с привязанными серверами удалить нельзя."
+  ],
+  "区域已删除。": [
+    "Region deleted.",
+    "Регион удалён."
+  ],
+  "维护节点所在区域；区域用于展示、分组和部署选择。": [
+    "Manage server locations for display, grouping and deployment.",
+    "Управляйте расположением серверов для отображения, группировки и развёртывания."
+  ],
+  "区域列表": [
+    "Regions",
+    "Регионы"
+  ],
+  "编辑": [
+    "Edit",
+    "Изменить"
+  ],
+  "尚未创建区域，请在右侧选择服务器位置创建。": [
+    "No regions yet. Select a server location on the right to create one.",
+    "Регионов пока нет. Выберите расположение сервера справа для создания."
+  ],
+  "编辑区域": [
+    "Edit region",
+    "Изменить регион"
+  ],
+  "创建区域": [
+    "Create region",
+    "Создать регион"
+  ],
+  "服务器位置": [
+    "Server location",
+    "Расположение сервера"
+  ],
+  "请选择服务器所在地": [
+    "Choose the server location",
+    "Выберите расположение сервера"
+  ],
+  "常用机房 · {0}": [
+    "Popular locations · {0}",
+    "Популярные расположения · {0}"
+  ],
+  "全球国家 / 地区": [
+    "Countries / territories",
+    "Страны / территории"
+  ],
+  "自定义位置（城市未列出）": [
+    "Custom location (city not listed)",
+    "Другое расположение (города нет в списке)"
+  ],
+  "选择城市、州或国家后自动填写；同一国家可以添加多个区域，未列出的位置可自定义。": [
+    "Choose a city, state or country to fill the form. Multiple regions per country and custom locations are supported.",
+    "Выберите город, штат или страну для заполнения формы. Можно добавить несколько регионов одной страны или своё расположение."
+  ],
+  "城市 / 区域显示名称": [
+    "City / region display name",
+    "Название города / региона"
+  ],
+  "例如 Tokyo、US West": [
+    "For example, Tokyo or US West",
+    "Например, Tokyo или US West"
+  ],
+  "国家 / 地区": [
+    "Country / territory",
+    "Страна / территория"
+  ],
+  "请选择国家 / 地区": [
+    "Choose a country / territory",
+    "Выберите страну / территорию"
+  ],
+  "自动填写": [
+    "Filled automatically",
+    "Заполняется автоматически"
+  ],
+  "国家 / 地区代码（ISO）": [
+    "Country / territory code (ISO)",
+    "Код страны / территории (ISO)"
+  ],
+  "保存区域": [
+    "Save region",
+    "Сохранить регион"
+  ],
+  "重启服务": [
+    "Restart service",
+    "Перезапустить службу"
+  ],
+  "重新部署": [
+    "Redeploy",
+    "Развернуть заново"
+  ],
+  "进行中": [
+    "In progress",
+    "Выполняется"
+  ],
+  "确定对 {0} 的 {1} 执行“{2}”吗？{3}": [
+    "Run “{2}” for {1} on {0}? {3}",
+    "Выполнить «{2}» для {1} на {0}? {3}"
+  ],
+  "{0}操作已提交，可在节点详情的配置同步任务中查看进度。": [
+    "{0} submitted. Track it in configuration sync tasks in server details.",
+    "Действие {0} отправлено. Отслеживайте его в задачах синхронизации в сведениях о сервере."
+  ],
+  "所选节点没有已启用的协议。": [
+    "Selected servers have no enabled protocols.",
+    "На выбранных серверах нет включённых протоколов."
+  ],
+  "将对 {0} 个节点上的 {1} 个已启用协议执行“{2}”。{3}": [
+    "Run “{2}” on {1} enabled protocols across {0} servers. {3}",
+    "Выполнить «{2}» для включённых протоколов ({1}) на серверах ({0}). {3}"
+  ],
+  "{0} 项提交失败：{1}": [
+    "{0} submissions failed: {1}",
+    "Не удалось отправить задач: {0}. {1}"
+  ],
+  "已提交 {0} 项{1}，可在节点详情中查看进度。": [
+    "Submitted {0} tasks for {1}. Track progress in server details.",
+    "Отправлено задач для {1}: {0}. Ход выполнения доступен в сведениях о сервере."
+  ],
+  "单节点灰度": [
+    "Single-server canary",
+    "Пробный запуск на одном сервере"
+  ],
+  "批量同步策略": [
+    "Sync policy in bulk",
+    "Массовая синхронизация политики"
+  ],
+  "启动{0}": [
+    "Start {0}",
+    "Запустить: {0}"
+  ],
+  "确定启动 Standard 策略{0}吗？只会处理状态可用且发生漂移的节点，不会升级 Agent。": [
+    "Start Standard policy {0}? Only available servers with configuration drift are processed. Agent is not upgraded.",
+    "Запустить {0} для политики Standard? Обрабатываются только доступные серверы с расхождениями настроек. Agent не обновляется."
+  ],
+  "开始{0}": [
+    "Start {0}",
+    "Запустить: {0}"
+  ],
+  "策略发布已创建：目标 {0}，已排队 {1}，失败 {2}。": [
+    "Policy rollout created: target {0}, queued {1}, failed {2}.",
+    "Запуск политики создан: целевых {0}, в очереди {1}, ошибок {2}."
+  ],
+  "修改单节点协议配置": [
+    "Edit server protocol settings",
+    "Изменить настройки протокола сервера"
+  ],
+  "仅覆盖 {0} 上 {1} 的{2}，节点的部署策略保持不变。保存后会重新部署该协议；修改端口后客户端需刷新订阅或重新获取配置。{3}": [
+    "Override only {2} for {1} on {0}. The server deployment policy stays unchanged. Saving redeploys this protocol; after a port change, clients must refresh their subscription or download a new configuration. {3}",
+    "Изменить только {2} для {1} на {0}. Политика развёртывания сервера не изменится. Сохранение повторно развернёт протокол; после смены порта клиентам нужно обновить подписку или скачать новую конфигурацию. {3}"
+  ],
+  "保存并部署": [
+    "Save and deploy",
+    "Сохранить и развернуть"
+  ],
+  "单节点协议配置已提交，请查看服务同步状态。": [
+    "Server protocol settings submitted. Check service sync status.",
+    "Настройки протокола отправлены. Проверьте статус синхронизации службы."
+  ],
+  "端口 / 目标覆盖": [
+    "Port / target override",
+    "Изменение порта / цели"
+  ],
+  "停用协议": [
+    "Disable protocol",
+    "Отключить протокол"
+  ],
+  "启用协议": [
+    "Enable protocol",
+    "Включить протокол"
+  ],
+  "服务状态": [
+    "Services",
+    "Службы"
+  ],
+  "策略发布": [
+    "Policy rollouts",
+    "Развёртывания политики"
+  ],
+  "REALITY 设置": [
+    "REALITY settings",
+    "Настройки REALITY"
+  ],
+  "管理各节点的协议服务与标准部署策略。Agent 程序升级请到“节点运维”。": [
+    "Manage server protocols and standard deployment policies. To upgrade Agent, open Server operations.",
+    "Управляйте протоколами серверов и стандартными политиками развёртывания. Для обновления Agent откройте «Обслуживание серверов»."
+  ],
+  "搜索节点名称或 IP": [
+    "Search server name or IP",
+    "Поиск по имени или IP сервера"
+  ],
+  "批量重启": [
+    "Restart selected",
+    "Перезапустить выбранные"
+  ],
+  "批量重新部署": [
+    "Redeploy selected",
+    "Развернуть выбранные заново"
+  ],
+  "协议（点击徽标操作）": [
+    "Protocols (select a badge for actions)",
+    "Протоколы (действия по нажатию значка)"
+  ],
+  "更新时间": [
+    "Updated",
+    "Обновлено"
+  ],
+  "节点详情": [
+    "Server details",
+    "Сведения о сервере"
+  ],
+  "重启全部协议": [
+    "Restart all protocols",
+    "Перезапустить все протоколы"
+  ],
+  "重新部署全部协议": [
+    "Redeploy all protocols",
+    "Развернуть все протоколы заново"
+  ],
+  "正在加载服务": [
+    "Loading services",
+    "Загрузка служб"
+  ],
+  "前往节点运维": [
+    "Open server operations",
+    "Открыть обслуживание серверов"
+  ],
+  "还没有 VPN 服务。部署节点后，服务会在此出现。": [
+    "No VPN services yet. They will appear after server deployment.",
+    "Служб VPN пока нет. Они появятся после развёртывания серверов."
+  ],
+  "标准模板自动部署 WireGuard、OpenVPN 和 VLESS，无需逐个协议启用；老标准节点可用“批量同步策略”补齐。自定义及仅 Agent 节点不会被自动覆盖。默认需放行 UDP 51820、UDP 1194、TCP 443。": [
+    "The standard template deploys WireGuard, OpenVPN and VLESS automatically; no need to enable them individually. Use Sync policy in bulk for older standard servers. Custom and Agent-only servers are not overwritten. Default ports: UDP 51820, UDP 1194, TCP 443.",
+    "Стандартный шаблон автоматически развёртывает WireGuard, OpenVPN и VLESS. Для старых стандартных серверов используйте массовую синхронизацию политики. Пользовательские серверы и серверы только с Agent не изменяются. Порты по умолчанию: UDP 51820, UDP 1194, TCP 443."
+  ],
+  "Standard 策略 v": [
+    "Standard policy v",
+    "Политика Standard v"
+  ],
+  "标准部署策略": [
+    "Standard deployment policy",
+    "Стандартная политика развёртывания"
+  ],
+  "当前没有启用的标准协议": [
+    "No standard protocols enabled",
+    "Стандартные протоколы не включены"
+  ],
+  "标准节点": [
+    "Standard servers",
+    "Стандартные серверы"
+  ],
+  "策略漂移": [
+    "Policy drift",
+    "Расхождения политики"
+  ],
+  "灰度 1 台": [
+    "Canary: 1 server",
+    "Пробный запуск: 1 сервер"
+  ],
+  "待同步节点": [
+    "Servers awaiting sync",
+    "Серверы, ожидающие синхронизации"
+  ],
+  "缺少：": [
+    "Missing: ",
+    "Отсутствуют: "
+  ],
+  "策略版本": [
+    "Policy version",
+    "Версия политики"
+  ],
+  "当前标准节点已无策略差异。": [
+    "All standard servers match the policy.",
+    "Все стандартные серверы соответствуют политике."
+  ],
+  "策略发布记录": [
+    "Policy rollout history",
+    "История развёртывания политики"
+  ],
+  "时间": [
+    "Time",
+    "Время"
+  ],
+  "模式": [
+    "Mode",
+    "Режим"
+  ],
+  "版本": [
+    "Version",
+    "Версия"
+  ],
+  "结果": [
+    "Result",
+    "Результат"
+  ],
+  "灰度": [
+    "Canary",
+    "Пробный запуск"
+  ],
+  "成功 /": [
+    "succeeded /",
+    "успешно /"
+  ],
+  "处理中 /": [
+    "in progress /",
+    "выполняется /"
+  ],
+  "异常": [
+    "Issue",
+    "Проблема"
+  ],
+  "{0} · 单节点高级设置": [
+    "{0} · Advanced server settings",
+    "{0} · Дополнительные настройки сервера"
+  ],
+  "{0} · 仅覆盖此节点上该协议的设置，通常无需修改。": [
+    "{0} · Overrides this protocol on this server only. Usually no changes are needed.",
+    "{0} · Изменяет только этот протокол на этом сервере. Обычно изменения не нужны."
+  ],
+  "提交中…": [
+    "Submitting…",
+    "Отправка…"
+  ],
+  "监听端口": [
+    "Listening port",
+    "Порт прослушивания"
+  ],
+  "仅在端口冲突等特殊情况下修改；不会占用或关闭其他服务的端口。请同步调整安全组规则。": [
+    "Change only for special cases such as port conflicts. Other services are not stopped or displaced. Update your firewall rules too.",
+    "Меняйте только в особых случаях, например при конфликте портов. Другие службы не останавливаются. Также обновите правила межсетевого экрана."
+  ],
+  "覆盖目标域名": [
+    "Override target domain",
+    "Изменить целевой домен"
+  ],
+  "留空保留当前目标": [
+    "Leave blank to keep the current target",
+    "Оставьте пустым для сохранения текущей цели"
+  ],
+  "更换目标为平滑切换：旧 SNI 在过渡期内仍然有效，客户端下次刷新订阅时自动使用新目标。": [
+    "Target changes are gradual: the old SNI remains valid during transition, and clients receive the new target on their next subscription refresh.",
+    "Смена цели выполняется плавно: старый SNI действует в переходный период, а клиенты получают новую цель при следующем обновлении подписки."
+  ],
+  "只影响这一个节点上的": [
+    "Affects only this server's",
+    "Затрагивает только на этом сервере:"
+  ],
+  "，不会把节点切换为自定义部署策略。": [
+    "; does not change the server to a custom deployment policy.",
+    "; сервер не переводится на пользовательскую политику развёртывания."
+  ],
+  "分钟": [
+    "minutes",
+    "минут"
+  ],
+  "天": [
+    "days",
+    "дней"
+  ],
+  "前": [
+    "ago",
+    "назад"
+  ],
+  "后": [
+    "from now",
+    "спустя"
+  ],
+  "放弃未保存的修改？": [
+    "Discard unsaved changes?",
+    "Отменить несохранённые изменения?"
+  ],
+  "表单中已填写的内容尚未保存，关闭后将丢失。": [
+    "Your form changes have not been saved and will be lost when you close it.",
+    "Изменения формы не сохранены и будут потеряны при закрытии."
+  ],
+  "放弃修改": [
+    "Discard changes",
+    "Отменить изменения"
+  ],
+  "清除搜索": [
+    "Clear search",
+    "Очистить поиск"
+  ],
+  "筛选": [
+    "Filter",
+    "Фильтр"
+  ],
+  "排序": [
+    "Sort",
+    "Сортировка"
+  ],
+  "批量操作": [
+    "Bulk actions",
+    "Массовые действия"
+  ],
+  "取消选择": [
+    "Clear selection",
+    "Снять выделение"
+  ],
+  "Controller 与各区域 Agent 的管理通道、节点状态和覆盖空白；点击节点标记打开节点详情。": [
+    "Management channels, server health and coverage gaps across regions. Select a server marker to open its details.",
+    "Каналы управления, состояние серверов и пробелы покрытия по регионам. Нажмите на маркер сервера для просмотра сведений."
+  ],
+  "Controller 控制面": [
+    "Controller control plane",
+    "Плоскость управления Controller"
+  ],
+  "统一下发部署、修复、配置同步和诊断任务。": [
+    "Dispatch deployment, repair, configuration sync and diagnostic tasks centrally.",
+    "Централизованная отправка задач развёртывания, восстановления, синхронизации и диагностики."
+  ],
+  "Agent 管理通道": [
+    "Agent management channel",
+    "Канал управления Agent"
+  ],
+  "连线表示 Controller 与节点 Agent 的控制关系，不暴露用户流量。": [
+    "Lines show the control relationship between Controller and Agents, not user traffic.",
+    "Линии показывают связь управления между Controller и Agent, а не трафик пользователей."
+  ],
+  "Edge Node 独立承载": [
+    "Independent edge servers",
+    "Независимые периферийные серверы"
+  ],
+  "当前不是节点间 Mesh；VPN 用户连接由所选区域节点独立处理。": [
+    "This is not a server-to-server mesh. VPN connections are handled independently by the selected regional server.",
+    "Это не mesh-сеть между серверами. VPN-подключения независимо обрабатываются выбранным региональным сервером."
+  ],
+  "拒绝账号申请": [
+    "Decline account request",
+    "Отклонить заявку"
+  ],
+  "拒绝 {0} 的原因（可留空）": [
+    "Reason for declining {0} (optional)",
+    "Причина отклонения {0} (необязательно)"
+  ],
+  "拒绝申请": [
+    "Decline request",
+    "Отклонить заявку"
+  ],
+  "拒绝原因": [
+    "Reason for declining",
+    "Причина отклонения"
+  ],
+  "可留空": [
+    "Optional",
+    "Необязательно"
+  ],
+  "停用账号": [
+    "Disable account",
+    "Отключить аккаунт"
+  ],
+  "确定停用 {0} 吗？登录会话将退出，全部凭据暂停连接；恢复账号不会解除单独停用或撤销的凭据。": [
+    "Disable {0}? Login sessions will end and all credentials will be paused. Re-enabling the account will not re-enable individually disabled or revoked credentials.",
+    "Отключить {0}? Сеансы входа завершатся, все реквизиты будут приостановлены. Восстановление аккаунта не включит отдельно отключённые или отозванные реквизиты."
+  ],
+  "{0} 已启用。": [
+    "{0} enabled.",
+    "{0}: включено."
+  ],
+  "已拒绝 {0} 的申请。": [
+    "Request from {0} declined.",
+    "Заявка от {0} отклонена."
+  ],
+  "{0} 已停用。": [
+    "{0} disabled.",
+    "{0}: отключено."
+  ],
+  "拒绝 {0} 个账号申请": [
+    "Decline {0} account requests",
+    "Отклонить заявки ({0})"
+  ],
+  "将拒绝：{0}。原因会对所有选中账号生效（可留空）。": [
+    "Decline: {0}. The reason applies to all selected accounts (optional).",
+    "Отклонить: {0}. Причина применяется ко всем выбранным аккаунтам (необязательно)."
+  ],
+  "批量拒绝": [
+    "Decline selected",
+    "Отклонить выбранные"
+  ],
+  "通过 {0} 个账号申请": [
+    "Approve {0} account requests",
+    "Одобрить заявки ({0})"
+  ],
+  "将启用：{0}。": [
+    "Enable: {0}.",
+    "Включить: {0}."
+  ],
+  "批量通过": [
+    "Approve selected",
+    "Одобрить выбранные"
+  ],
+  "{0} 个账号处理失败：{1}": [
+    "Failed to process {0} accounts: {1}",
+    "Не удалось обработать аккаунты ({0}): {1}"
+  ],
+  "已{0} {1} 个账号申请。": [
+    "Account requests: {1}; action: {0}.",
+    "Заявок: {1}; действие: {0}."
+  ],
+  "撤销": [
+    "Revoke",
+    "Отозвать"
+  ],
+  "全部凭据": [
+    "all credentials",
+    "все реквизиты"
+  ],
+  "凭据": [
+    "credential",
+    "реквизиты"
+  ],
+  "确定{0}{1}？{2} OpenVPN 同步会使同节点连接短暂重连。": [
+    "Confirm {0} {1}? {2} OpenVPN sync briefly reconnects sessions on the same server.",
+    "Подтвердить: {0} {1}? {2} Синхронизация OpenVPN ненадолго переподключает сеансы на том же сервере."
+  ],
+  "操作已保存，请查看各凭据的节点同步状态。": [
+    "Action saved. Check server sync status for each credential.",
+    "Действие сохранено. Проверьте синхронизацию серверов для каждого реквизита."
+  ],
+  "证书 {0} 已复制。": [
+    "Certificate {0} copied.",
+    "Сертификат {0} скопирован."
+  ],
+  "浏览器无法访问剪贴板，请展开证书后手动复制。": [
+    "Clipboard unavailable. Expand the certificate and copy it manually.",
+    "Буфер обмена недоступен. Раскройте сертификат и скопируйте его вручную."
+  ],
+  "待审核": [
+    "Pending approval",
+    "Ожидает одобрения"
+  ],
+  "访问详情": [
+    "Access details",
+    "Сведения о доступе"
+  ],
+  "通过": [
+    "Approve",
+    "Одобрить"
+  ],
+  "恢复": [
+    "Restore",
+    "Восстановить"
+  ],
+  "新凭据默认有效 365 天，旧证书保留原期限。停用或撤销可提前终止使用；换发后需用户重新导入配置。": [
+    "New credentials are valid for 365 days by default. Existing certificates retain their original expiry. Disable or revoke to end access early; users must import new configurations after reissuance.",
+    "Новые реквизиты по умолчанию действуют 365 дней. Старые сертификаты сохраняют свой срок. Отключите или отзовите доступ для досрочного прекращения; после перевыпуска пользователям нужно импортировать новые конфигурации."
+  ],
+  "个账号等待审核。": [
+    "accounts awaiting approval.",
+    "аккаунтов ожидают одобрения."
+  ],
+  "可勾选后批量通过或拒绝。": [
+    "Select accounts to approve or decline together.",
+    "Выберите аккаунты для одновременного одобрения или отклонения."
+  ],
+  "查看待审核": [
+    "View pending requests",
+    "Заявки на проверке"
+  ],
+  "搜索名称或邮箱": [
+    "Search name or email",
+    "Поиск по имени или почте"
+  ],
+  "注册时间（最新）": [
+    "Registration (newest first)",
+    "Регистрация (сначала новые)"
+  ],
+  "个待审核账号": [
+    "pending accounts",
+    "аккаунтов на проверке"
+  ],
+  "选择全部待审核账号": [
+    "Select all pending accounts",
+    "Выбрать все аккаунты на проверке"
+  ],
+  "仅待审核账号可批量处理": [
+    "Only pending accounts support bulk actions",
+    "Массовые действия доступны только для аккаунтов на проверке"
+  ],
+  "访问资产": [
+    "Access assets",
+    "Ресурсы доступа"
+  ],
+  "注册时间": [
+    "Registered",
+    "Дата регистрации"
+  ],
+  "所有者": [
+    "Owner",
+    "Владелец"
+  ],
+  "份凭据": [
+    "credentials",
+    "реквизитов"
+  ],
+  "份有效配置 ·": [
+    "active configurations ·",
+    "действующих конфигураций ·"
+  ],
+  "张有效证书": [
+    "active certificates",
+    "действующих сертификатов"
+  ],
+  "最后活动": [
+    "Last activity",
+    "Последняя активность"
+  ],
+  "没有符合条件的账号。": [
+    "No matching accounts.",
+    "Подходящих аккаунтов нет."
+  ],
+  "还没有账号。": [
+    "No accounts yet.",
+    "Аккаунтов пока нет."
+  ],
+  "{0} 的访问资产": [
+    "Access assets for {0}",
+    "Ресурсы доступа: {0}"
+  ],
+  "{0} · 公开证书可查看和下载，私钥不会返回管理端。": [
+    "{0} · Public certificates can be viewed and downloaded. Private keys are never returned to the console.",
+    "{0} · Открытые сертификаты доступны для просмотра и скачивания. Закрытые ключи не передаются в консоль."
+  ],
+  "客户端授权设备与会员额度": [
+    "Authorized devices and membership limits",
+    "Авторизованные устройства и лимиты подписки"
+  ],
+  "流量统计周期": [
+    "Traffic reporting period",
+    "Период статистики трафика"
+  ],
+  "最近 90 天": [
+    "Last 90 days",
+    "Последние 90 дней"
+  ],
+  "刷新数据": [
+    "Refresh data",
+    "Обновить данные"
+  ],
+  "账号批量操作": [
+    "Account-wide actions",
+    "Действия для всего аккаунта"
+  ],
+  "撤销全部凭据": [
+    "Revoke all credentials",
+    "Отозвать все реквизиты"
+  ],
+  "正在读取账号访问资产": [
+    "Loading account access assets",
+    "Загрузка ресурсов доступа аккаунта"
+  ],
+  "连接凭据": [
+    "Connection credentials",
+    "Реквизиты подключения"
+  ],
+  "有效 / 全部": [
+    "Active / total",
+    "Действующие / всего"
+  ],
+  "连接配置": [
+    "Configurations",
+    "Конфигурации"
+  ],
+  "有效 / 历史": [
+    "Active / historical",
+    "Действующие / за всё время"
+  ],
+  "OpenVPN 证书": [
+    "OpenVPN certificates",
+    "Сертификаты OpenVPN"
+  ],
+  "天总流量": [
+    "days of total traffic",
+    "дней общего трафика"
+  ],
+  "正在刷新统计…": [
+    "Refreshing statistics…",
+    "Обновление статистики…"
+  ],
+  "连接类型": [
+    "Connection type",
+    "Тип подключения"
+  ],
+  "· 创建于": [
+    "· Created",
+    "· Создано"
+  ],
+  "同步": [
+    "Sync",
+    "Синхронизация"
+  ],
+  "中": [
+    "in progress",
+    "выполняется"
+  ],
+  "完成": [
+    "Complete",
+    "Завершено"
+  ],
+  "待确认": [
+    "Awaiting confirmation",
+    "Ожидает подтверждения"
+  ],
+  "天流量": [
+    "days of traffic",
+    "дней трафика"
+  ],
+  "条": [
+    "items",
+    "записей"
+  ],
+  "连接有效期至": [
+    "Connection valid until",
+    "Подключение действует до"
+  ],
+  "剩余 {0} 天，请通知用户换发": [
+    "{0} days remaining. Ask the user to renew.",
+    "Осталось дней: {0}. Попросите пользователя обновить реквизиты."
+  ],
+  "停用或撤销可提前终止访问": [
+    "Disable or revoke to end access early",
+    "Отключите или отзовите для досрочного прекращения доступа"
+  ],
+  "用于区分凭据，不代表设备": [
+    "Identifies credentials, not devices",
+    "Различает реквизиты, а не устройства"
+  ],
+  "停用可恢复；撤销将永久作废所有配置副本。": [
+    "Disabling is reversible. Revoking permanently invalidates all configuration copies.",
+    "Отключение обратимо. Отзыв навсегда делает все копии конфигурации недействительными."
+  ],
+  "{0}的操作": [
+    "Actions for {0}",
+    "Действия для {0}"
+  ],
+  "启用凭据": [
+    "Enable credential",
+    "Включить реквизиты"
+  ],
+  "停用凭据": [
+    "Disable credential",
+    "Отключить реквизиты"
+  ],
+  "删除凭据": [
+    "Delete credential",
+    "Удалить реквизиты"
+  ],
+  "撤销凭据": [
+    "Revoke credential",
+    "Отозвать реквизиты"
+  ],
+  "OpenVPN 公开证书": [
+    "OpenVPN public certificates",
+    "Открытые сертификаты OpenVPN"
+  ],
+  "张": [
+    "certificates",
+    "сертификатов"
+  ],
+  "凭据窗口流量": [
+    "Credential-window traffic",
+    "Трафик за срок действия реквизитов"
+  ],
+  "签发机构": [
+    "Issuer",
+    "Издатель"
+  ],
+  "生效时间": [
+    "Valid from",
+    "Действует с"
+  ],
+  "吊销时间": [
+    "Revoked",
+    "Отозван"
+  ],
+  "上传 / 下载": [
+    "Upload / download",
+    "Отправлено / получено"
+  ],
+  "复制证书": [
+    "Copy certificate",
+    "Скопировать сертификат"
+  ],
+  "下载 .crt": [
+    "Download .crt",
+    "Скачать .crt"
+  ],
+  "平台按连接凭据聚合全部配置副本的会话和流量，不区分实际安装设备。": [
+    "Sessions and traffic from all configuration copies are aggregated per credential, without distinguishing physical devices.",
+    "Сеансы и трафик всех копий конфигурации суммируются по реквизитам без различения физических устройств."
+  ],
+  "尚未签发证书。生成 OpenVPN 配置后，公开证书会显示在这里。": [
+    "No certificates issued yet. Public certificates appear here after generating an OpenVPN configuration.",
+    "Сертификаты ещё не выпущены. Открытые сертификаты появятся здесь после создания конфигурации OpenVPN."
+  ],
+  "· 配置可用至": [
+    "· Configuration valid until",
+    "· Конфигурация действует до"
+  ],
+  "· 身份 …": [
+    "· Identity …",
+    "· Идентификатор …"
+  ],
+  "配置有效期窗口": [
+    "Configuration validity window",
+    "Срок действия конфигурации"
+  ],
+  "该凭据还没有生成连接配置。": [
+    "No configurations generated for this credential yet.",
+    "Для этих реквизитов конфигурации ещё не созданы."
+  ],
+  "该账号还没有创建连接凭据。": [
+    "This account has no connection credentials yet.",
+    "У этого аккаунта ещё нет реквизитов подключения."
+  ],
+  "该账号暂无此类连接，可切换到全部连接查看。": [
+    "No connections of this type. Switch to All connections.",
+    "Нет подключений этого типа. Переключитесь на все подключения."
+  ],
+  "无法读取该账号的访问资产。": [
+    "Could not load this account's access assets.",
+    "Не удалось загрузить ресурсы доступа аккаунта."
+  ]
+}

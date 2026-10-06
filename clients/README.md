@@ -19,9 +19,13 @@
 
 连接页保留一个主要连接操作；节点支持搜索、选中反馈与无匹配提示，选择后回到连接页；账号将身份、用量和授权设备分组，解除授权需要确认。Windows 未集成隧道服务时继续明确禁用连接，视觉升级不代表 VPN 能力已完成。
 
-本轮验证：Android APK、iOS 模拟器与 macOS 构建通过，iOS 登录页已检查模拟器实图。Windows 仅完成 XAML XML 结构检查，仍需在 Windows 上编译并验收键盘操作、缩放与实际布局。Android 真机视觉与三端登录后全流程仍需测试环境验收。
+验证记录：Android APK、iOS 模拟器与 macOS 构建通过，iOS 登录页已检查中/英/俄模拟器实图。Windows 已使用 .NET 10 SDK 交叉编译通过，仍需在 Windows 真机验收键盘操作、缩放与实际布局。Android 真机视觉与三端登录后全流程仍需测试环境验收。
 
-## 开发构建
+## 语言与文案
+
+Portal、Console 和三类原生客户端支持中文、英文、俄语，默认跟随系统，登录前即可手动切换。不使用在线翻译服务。原生文案统一维护于 `locales/messages.json`，通过 `npm run i18n:generate` 生成平台标准资源；`npm run i18n:check` 检查缺失翻译、占位符与生成结果。资源 ID 保持稳定，显示语言与设备身份/协议状态分离。完整规则见[产品国际化约定](../docs/architecture/04-clients.md#产品国际化约定)。
+
+## 开发构建命令
 
 - Android：JDK 17+、Android SDK 35、Gradle 8.14.5；`cd clients/android && ./gradlew :app:assembleDebug`。完整 wrapper 已加入并固定发行包 SHA-256。`NORTHSTAR_API_ORIGIN` 在构建时内置服务地址；未设置的开发包需要填写 HTTPS 地址。APK 位于 `app/build/outputs/apk/debug/app-debug.apk`，仅用于测试。
 - Apple：完整 Xcode、XcodeGen、Go 1.24.4；执行 `bash clients/apple/scripts/build.sh ios` 或 `macos`。iOS 使用模拟器 ad-hoc 签名；macOS 包含 arm64/x64，未签名。WireGuardKit 固定上游提交，构建脚本应用 tools-version 与 SDK 头文件兼容补丁；Go bridge 在独立临时目录构建以支持项目路径含空格。这些开发产物不能用于真机 VPN 验收或正式分发。

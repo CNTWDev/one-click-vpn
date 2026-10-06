@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "npm run build:controller && npm run build:portal && npm run build:admin-web",
+    "build": "npm run i18n:check && npm run build:controller && npm run build:portal && npm run build:admin-web",
     "build:controller": "next build --webpack",
     "build:portal": "vite build --config portal-web/vite.config.ts && node scripts/check-frontend-assets.mjs portal-web",
     "build:admin-web": "vite build --config admin-web/vite.config.ts && node scripts/check-frontend-assets.mjs admin-web",
@@ -19,6 +19,8 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:migrate": "node scripts/migrate.mjs",
     "db:generate": "drizzle-kit generate",
+    "i18n:generate": "node scripts/native-locales.mjs",
+    "i18n:check": "node scripts/native-locales.mjs --check && node --test tests/portal-i18n.test.mjs tests/product-i18n.test.mjs",
     "clients:doctor": "node scripts/clients.mjs doctor",
     "clients:build": "node scripts/clients.mjs build"
   },

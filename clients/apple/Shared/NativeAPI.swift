@@ -6,18 +6,18 @@ enum AccessFailure: LocalizedError {
     case code(String)
     var errorDescription: String? {
         guard case .code(let code) = self else { return nil }
-        return ["DEVICE_LIMIT_REACHED":"授权设备已满，请在「账号」解除旧设备的授权后重试。",
-                "DEVICE_REVOKED":"这台设备的授权已解除，请联系管理员。",
-                "AUTH_REQUIRED":"登录已过期，请重新登录。", "INVALID_CREDENTIALS":"邮箱或密码不正确。",
-                "NODE_UNAVAILABLE":"节点暂时不可用，请换一个节点重试。", "MEMBERSHIP_EXPIRED":"账号已到期，请联系管理员续期。",
-                "MANAGED_ACCESS_REQUIRED":"请联系管理员开通 NORTHSTAR 客户端访问。",
-                "CLIENT_ACCESS_NOT_ENABLED":"服务端尚未启用客户端访问。",
-                "KEYCHAIN_UNAVAILABLE":"无法访问安全存储，请解锁设备后重试。",
-                "KEYCHAIN_SIGNATURE_REQUIRED":"当前开发包缺少签名授权，需配置开发者团队并签名后使用。",
-                "SIMULATOR_UNSUPPORTED":"模拟器仅用于界面测试，请使用已签名的真机版本测试 VPN。",
-                "SERVER_REQUIRED":"请填写有效的 HTTPS 服务地址。",
-                "ACCOUNT_UNAVAILABLE":"账号尚未启用或已停用。", "ACCESS_EXPIRED":"连接授权已过期，请重新连接。",
-                "RATE_LIMITED":"操作太频繁，请稍后重试。", "INVALID_RESPONSE":"服务器响应无效，请稍后重试。"] [code] ?? "暂时无法连接，请检查网络后重试。"
+        return ["DEVICE_LIMIT_REACHED":L10n.text("device_limit_reached_account_hint"),
+                "DEVICE_REVOKED":L10n.text("access_for_this_device_has_been_revoked_contact_your"),
+                "AUTH_REQUIRED":L10n.text("your_session_has_expired_sign_in_again"), "INVALID_CREDENTIALS":L10n.text("incorrect_email_or_password"),
+                "NODE_UNAVAILABLE":L10n.text("this_location_is_unavailable_try_another"), "MEMBERSHIP_EXPIRED":L10n.text("membership_expired_hint"),
+                "MANAGED_ACCESS_REQUIRED":L10n.text("ask_your_administrator_to_enable_northstar_client_access"),
+                "CLIENT_ACCESS_NOT_ENABLED":L10n.text("client_access_is_not_enabled_on_the_server"),
+                "KEYCHAIN_UNAVAILABLE":L10n.text("secure_storage_is_unavailable_unlock_your_device_and_try"),
+                "KEYCHAIN_SIGNATURE_REQUIRED":L10n.text("this_development_build_lacks_signing_entitlements_configure_your_developer"),
+                "SIMULATOR_UNSUPPORTED":L10n.text("the_simulator_is_for_ui_testing_only_test_the"),
+                "SERVER_REQUIRED":L10n.text("enter_a_valid_https_server_address"),
+                "ACCOUNT_UNAVAILABLE":L10n.text("your_account_is_not_active"), "ACCESS_EXPIRED":L10n.text("connection_authorization_expired_connect_again"),
+                "RATE_LIMITED":L10n.text("too_many_attempts_try_again_later"), "INVALID_RESPONSE":L10n.text("invalid_server_response_try_again_later")] [code] ?? L10n.text("unable_to_connect_check_your_network_and_try_again")
     }
 }
 

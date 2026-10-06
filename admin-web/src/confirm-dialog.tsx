@@ -1,3 +1,4 @@
+import { t, useConsoleLanguage } from "./i18n";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 export type ConfirmInput = { label: string; placeholder?: string; required?: boolean };
@@ -13,6 +14,7 @@ const ConfirmContext = createContext<ConfirmFn | null>(null);
 
 /** Native <dialog> provides focus trapping, Escape handling and background inertness. */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+  useConsoleLanguage();
   const [request, setRequest] = useState<ConfirmOptions | null>(null);
   const [typed, setTyped] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -69,11 +71,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         if (request.input.required && !value.trim()) return;
         finish(value);
       }}>
-        <p className="eyebrow">{request.danger ? "危险操作" : "操作确认"}</p>
+        <p className="eyebrow">{request.danger ? t("危险操作") : t("操作确认")}</p>
         <h2 id="confirm-dialog-title">{request.title}</h2>
         <p id="confirm-dialog-message">{request.message}</p>
         {request.confirmText !== undefined && <label>
-          <span>请输入 <code>{request.confirmText}</code> 以确认</span>
+          <span>{t("请输入")}<code>{request.confirmText}</code>{t("以确认")}</span>
           <input name="confirm-text" value={typed} onChange={(event) => setTyped(event.target.value)} placeholder={request.confirmText} autoComplete="off" spellCheck={false} autoFocus />
         </label>}
         {request.input && <label>
@@ -88,8 +90,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           />
         </label>}
         <div className="form-actions">
-          <button type="button" className="button ghost" autoFocus={!request.input && request.confirmText === undefined} onClick={() => finish(null)}>取消</button>
-          <button type="submit" className={`button ${request.danger ? "danger solid" : "primary"}`} disabled={request.confirmText !== undefined && typed.trim() !== request.confirmText}>{request.confirmLabel || "确认"}</button>
+          <button type="button" className="button ghost" autoFocus={!request.input && request.confirmText === undefined} onClick={() => finish(null)}>{t("取消")}</button>
+          <button type="submit" className={`button ${request.danger ? "danger solid" : "primary"}`} disabled={request.confirmText !== undefined && typed.trim() !== request.confirmText}>{request.confirmLabel || t("确认")}</button>
         </div>
       </form>
     </dialog>}
@@ -97,6 +99,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 }
 
 export function useConfirm(): ConfirmFn {
+  useConsoleLanguage();
   const confirm = useContext(ConfirmContext);
   if (!confirm) throw new Error("useConfirm must be used inside <ConfirmProvider>");
   return confirm;
