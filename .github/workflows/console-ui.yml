@@ -1,11 +1,11 @@
-name: Console UI checks
+name: Console and Portal UI checks
 on:
   workflow_dispatch:
   push:
     branches: [master]
-    paths: ['admin-web/**', 'shared/**', 'tests/console-*.mjs', 'tests/fixtures/**', 'frontend-server.mjs', '.github/workflows/console-ui.yml']
+    paths: ['admin-web/**', 'portal-web/**', 'shared/**', 'tests/console-*.mjs', 'tests/portal-*.mjs', 'tests/fixtures/**', 'frontend-server.mjs', '.github/workflows/console-ui.yml']
   pull_request:
-    paths: ['admin-web/**', 'shared/**', 'tests/console-*.mjs', 'tests/fixtures/**', 'frontend-server.mjs', '.github/workflows/console-ui.yml']
+    paths: ['admin-web/**', 'portal-web/**', 'shared/**', 'tests/console-*.mjs', 'tests/portal-*.mjs', 'tests/fixtures/**', 'frontend-server.mjs', '.github/workflows/console-ui.yml']
 permissions:
   contents: read
 jobs:
@@ -20,10 +20,11 @@ jobs:
       - run: npm ci
       - run: npm run i18n:check
       - run: npm run build:admin-web
+      - run: npm run build:portal
       # Browser tests run only when VEILBIRD_TEST_PLAYWRIGHT points at playwright-core; it is not a project dependency.
       - run: npm install --no-save playwright-core@1.56 && npx playwright-core install --with-deps chromium
-      - name: Layout and locale checks (every page, zh/en/ru, 1440/1100/820/390 px)
-        run: node --test tests/console-layout.test.mjs tests/console-i18n-ui.test.mjs
+      - name: Layout and locale checks (Console and Portal, zh/en/ru, desktop to phone widths)
+        run: node --test tests/console-layout.test.mjs tests/console-i18n-ui.test.mjs tests/portal-layout.test.mjs tests/portal-i18n-ui.test.mjs
         env:
           VEILBIRD_TEST_PLAYWRIGHT: ${{ github.workspace }}/node_modules/playwright-core/index.mjs
           VEILBIRD_LAYOUT_SHOTS: ${{ runner.temp }}/console-layout

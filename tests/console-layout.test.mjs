@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { consoleApi } from "./fixtures/console-api.mjs";
-import { auditLayout } from "./fixtures/layout-audit.mjs";
+import { auditLayout, installWideFont } from "./fixtures/layout-audit.mjs";
 
 // Every Console page and the main dialogs, in every locale, at desktop / narrow desktop / tablet / phone widths,
 // with a realistic fleet. Fails on sideways page scroll, text spilling out of its box, or content painting over
@@ -47,6 +47,7 @@ test("Console layout: no overflow, spill or overlap on any page, locale or width
     for (const [locale, browserLocale] of locales) {
       const context = await browser.newContext({ locale: browserLocale, viewport: { width: widths[0], height: 900 }, reducedMotion: "reduce" });
       context.setDefaultTimeout(10000);
+      await installWideFont(context);
       const api = consoleApi();
       await context.route("**/api/**", async (route) => {
         const [status, body] = api(new URL(route.request().url()).pathname, route.request().method());

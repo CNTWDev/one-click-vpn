@@ -120,6 +120,11 @@ export function auditLayout() {
     const rects = [...range.getClientRects()].filter((r) => r.width > 0);
     if (rects.length) runs.push({ el, text: n.textContent, first: rects[0], last: rects[rects.length - 1] });
   }
+  // Sentences joined without a space inside one string ("…one year.Includes…").
+  for (const run of runs) {
+    const match = run.text.match(/[a-zа-яё]{2}[.!?][A-ZА-ЯЁ][a-zа-яё]/u);
+    if (match) issues.push({ kind: "glued", detail: `"${match[0]}" has no space after the full stop (${describe(run.el)})` });
+  }
   const word = /[\p{L}\p{N}]/u;
   for (let i = 1; i < runs.length; i++) {
     const a = runs[i - 1], b = runs[i];
@@ -134,3 +139,11 @@ export function auditLayout() {
   }
   return issues;
 }
+
+// Inter is not bundled, so many visitors (Windows, Android, CI) get a wider fallback font. Tests pin "Inter" to
+// DejaVu Sans, a wide metric present on Linux CI and dev boxes alike, so a layout that fits here fits everywhere.
+export const wideFontStyle = `@font-face { font-family: Inter; font-weight: 100 550; src: local("DejaVu Sans"); }
+@font-face { font-family: Inter; font-weight: 551 900; src: local("DejaVu Sans Bold"); }`;
+export const installWideFont = (context) => context.addInitScript((css) => {
+  document.addEventListener("DOMContentLoaded", () => { const style = document.createElement("style"); style.textContent = css; document.head.append(style); });
+}, wideFontStyle);
