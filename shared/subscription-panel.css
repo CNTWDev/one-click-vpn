@@ -32,6 +32,8 @@
 .subscription-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px}
 .subscription-list article{padding:20px;border:1px solid var(--sp-border);border-radius:var(--sp-radius-sm);min-width:0}
 .subscription-list h3{overflow-wrap:anywhere}
+.subscription-row>div{min-width:0}
+.subscription-row>div small{overflow-wrap:anywhere}
 .subscription-row b{white-space:nowrap;text-align:right}
 .subscription-link{padding:20px;border:1px solid var(--sp-accent);border-radius:var(--sp-radius-sm);margin:20px 0}
 .subscription-link input{margin:12px 0}

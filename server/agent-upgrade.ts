@@ -19,7 +19,7 @@ systemctl is-active --quiet northstar-agent
 cp -p ${directory}/agent.py.rollback ${directory}/agent.py.previous
 sha256sum ${directory}/agent.py | cut -d' ' -f1 > ${directory}/upgrade.confirmed
 rm -f ${directory}/upgrade.pending
-systemctl stop northstar-agent-upgrade-rollback.timer || true\n`;
+systemctl stop northstar-agent-upgrade-rollback.timer 2>/dev/null || true\n`;
 }
 /** Stage a source-only upgrade, confirmed only after an authenticated target-version heartbeat. */
 export function agentUpgradeCommand(source: string): string {
@@ -49,8 +49,9 @@ cp -p ${directory}/agent.py ${directory}/agent.py.rollback
 printf '%s' '${rollback}' | base64 -d > ${directory}/upgrade-rollback.sh
 chmod 700 ${directory}/upgrade-rollback.sh
 touch ${directory}/upgrade.pending
-systemctl stop northstar-agent-upgrade-rollback.timer northstar-agent-upgrade-rollback.service || true
-systemctl reset-failed northstar-agent-upgrade-rollback.service || true
+# The watchdog units usually do not exist yet; these are cleanup no-ops, so keep "not loaded" out of the action log.
+systemctl stop northstar-agent-upgrade-rollback.timer northstar-agent-upgrade-rollback.service 2>/dev/null || true
+systemctl reset-failed northstar-agent-upgrade-rollback.service 2>/dev/null || true
 if ! systemd-run --unit=northstar-agent-upgrade-rollback --on-active=90s --timer-property=AccuracySec=1s /bin/sh ${directory}/upgrade-rollback.sh; then
   rm -f ${directory}/upgrade.pending
   echo 'Could not arm Agent rollback watchdog'; exit 1

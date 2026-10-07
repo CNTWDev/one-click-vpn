@@ -451,10 +451,6 @@
     "Uptime",
     "Время работы"
   ],
-  "小时": [
-    "hours",
-    "ч."
-  ],
   "内存": [
     "Memory",
     "Память"
@@ -670,10 +666,6 @@
   "台 · 留空额度跟随系统默认，留空有效期表示不限期。": [
     "devices · Leave the limit blank to use the system default; leave the expiry blank for no expiry.",
     "устройств · Пустой лимит означает значение по умолчанию, пустой срок — без ограничения срока."
-  ],
-  "· 最近使用": [
-    "· Last used",
-    "· Последнее использование"
   ],
   "解除中，预计": [
     "Revoking; quota will be released in",
@@ -915,9 +907,9 @@
     "Click to upgrade Agent",
     "Нажмите для обновления Agent"
   ],
-  "可升级": [
-    "Update available",
-    "Доступно обновление"
+  "升级到 {0}": [
+    "Update to {0}",
+    "Обновить до {0}"
   ],
   "磁盘": [
     "Disk",
@@ -1131,10 +1123,6 @@
     "Refreshes every 5 seconds",
     "Обновление каждые 5 секунд"
   ],
-  "升级 Agent 至": [
-    "Upgrade Agent to",
-    "Обновить Agent до"
-  ],
   "正在读取诊断信息": [
     "Loading diagnostics",
     "Загрузка диагностики"
@@ -1187,10 +1175,6 @@
     "Bootstrap, Agent and repair events recorded by Controller, newest first.",
     "События Bootstrap, Agent и восстановления, записанные Controller. Сначала новые."
   ],
-  "条事件": [
-    "events",
-    "событий"
-  ],
   "还没有部署或操作日志。": [
     "No deployment or action logs yet.",
     "Журнал развёртывания и действий пока пуст."
@@ -1207,10 +1191,6 @@
     "Not listening",
     "Не прослушивается"
   ],
-  "· 运行时": [
-    "· Runtime",
-    "· Среда выполнения"
-  ],
   "运行中": [
     "Running",
     "Работает"
@@ -1219,14 +1199,6 @@
     "Not running",
     "Не работает"
   ],
-  "主机防火墙：": [
-    "Host firewall:",
-    "Межсетевой экран хоста:"
-  ],
-  "· 云防火墙：": [
-    "· Cloud firewall:",
-    "· Облачный межсетевой экран:"
-  ],
   "没有 Agent 协议状态。": [
     "No protocol status from Agent.",
     "Нет сведений о протоколах от Agent."
@@ -1234,14 +1206,6 @@
   "配置同步任务": [
     "Configuration sync tasks",
     "Задачи синхронизации настроек"
-  ],
-  "· 尝试": [
-    "· Attempts",
-    "· Попытки"
-  ],
-  "次 ·": [
-    "times ·",
-    "раз ·"
   ],
   "没有待处理的配置同步任务。": [
     "No pending configuration sync tasks.",
@@ -1823,14 +1787,6 @@
     "Target changes are gradual: the old SNI remains valid during transition, and clients receive the new target on their next subscription refresh.",
     "Смена цели выполняется плавно: старый SNI действует в переходный период, а клиенты получают новую цель при следующем обновлении подписки."
   ],
-  "只影响这一个节点上的": [
-    "Affects only this server's",
-    "Затрагивает только на этом сервере:"
-  ],
-  "，不会把节点切换为自定义部署策略。": [
-    "; does not change the server to a custom deployment policy.",
-    "; сервер не переводится на пользовательскую политику развёртывания."
-  ],
   "分钟": [
     "minutes",
     "минут"
@@ -2027,10 +1983,6 @@
     "New credentials are valid for 365 days by default. Existing certificates retain their original expiry. Disable or revoke to end access early; users must import new configurations after reissuance.",
     "Новые реквизиты по умолчанию действуют 365 дней. Старые сертификаты сохраняют свой срок. Отключите или отзовите доступ для досрочного прекращения; после перевыпуска пользователям нужно импортировать новые конфигурации."
   ],
-  "个账号等待审核。": [
-    "accounts awaiting approval.",
-    "аккаунтов ожидают одобрения."
-  ],
   "可勾选后批量通过或拒绝。": [
     "Select accounts to approve or decline together.",
     "Выберите аккаунты для одновременного одобрения или отклонения."
@@ -2070,18 +2022,6 @@
   "所有者": [
     "Owner",
     "Владелец"
-  ],
-  "份凭据": [
-    "credentials",
-    "реквизитов"
-  ],
-  "份有效配置 ·": [
-    "active configurations ·",
-    "действующих конфигураций ·"
-  ],
-  "张有效证书": [
-    "active certificates",
-    "действующих сертификатов"
   ],
   "最后活动": [
     "Last activity",
@@ -2163,30 +2103,6 @@
     "Connection type",
     "Тип подключения"
   ],
-  "· 创建于": [
-    "· Created",
-    "· Создано"
-  ],
-  "同步": [
-    "Sync",
-    "Синхронизация"
-  ],
-  "中": [
-    "in progress",
-    "выполняется"
-  ],
-  "完成": [
-    "Complete",
-    "Завершено"
-  ],
-  "待确认": [
-    "Awaiting confirmation",
-    "Ожидает подтверждения"
-  ],
-  "天流量": [
-    "days of traffic",
-    "дней трафика"
-  ],
   "条": [
     "items",
     "записей"
@@ -2235,10 +2151,6 @@
     "OpenVPN public certificates",
     "Открытые сертификаты OpenVPN"
   ],
-  "张": [
-    "certificates",
-    "сертификатов"
-  ],
   "凭据窗口流量": [
     "Credential-window traffic",
     "Трафик за срок действия реквизитов"
@@ -2274,14 +2186,6 @@
   "尚未签发证书。生成 OpenVPN 配置后，公开证书会显示在这里。": [
     "No certificates issued yet. Public certificates appear here after generating an OpenVPN configuration.",
     "Сертификаты ещё не выпущены. Открытые сертификаты появятся здесь после создания конфигурации OpenVPN."
-  ],
-  "· 配置可用至": [
-    "· Configuration valid until",
-    "· Конфигурация действует до"
-  ],
-  "· 身份 …": [
-    "· Identity …",
-    "· Идентификатор …"
   ],
   "配置有效期窗口": [
     "Configuration validity window",
@@ -2618,5 +2522,97 @@
   "近 7 天没有客户端上报连接失败。": [
     "No client reported a connection failure in the last 7 days.",
     "За последние 7 дней клиенты не сообщали о сбоях подключения."
+  ],
+  "运行时：{0}": [
+    "Runtime: {0}",
+    "Среда выполнения: {0}"
+  ],
+  "主机防火墙：{0}": [
+    "Host firewall: {0}",
+    "Межсетевой экран хоста: {0}"
+  ],
+  "云防火墙：{0}": [
+    "Cloud firewall: {0}",
+    "Облачный межсетевой экран: {0}"
+  ],
+  "尝试 {0} 次": [
+    "{0} attempts",
+    "Попыток: {0}"
+  ],
+  "{0} / {1} 份凭据": [
+    "{0} / {1} credentials",
+    "Реквизиты: {0} / {1}"
+  ],
+  "{0} 份有效配置 · {1} 张有效证书": [
+    "{0} active configurations · {1} active certificates",
+    "Конфигурации: {0} · сертификаты: {1}"
+  ],
+  "序列号 {0}": [
+    "Serial {0}",
+    "Серийный номер {0}"
+  ],
+  "有效期至 {0}": [
+    "Valid until {0}",
+    "Действует до {0}"
+  ],
+  "配置可用至 {0}": [
+    "Configuration valid until {0}",
+    "Конфигурация действует до {0}"
+  ],
+  "身份": [
+    "Identity",
+    "Идентификатор"
+  ],
+  "最近使用 {0}": [
+    "Last used {0}",
+    "Последнее использование: {0}"
+  ],
+  "只影响这一个节点上的 {0}，不会把节点切换为自定义部署策略。": [
+    "Affects only {0} on this server; does not change the server to a custom deployment policy.",
+    "Затрагивает только {0} на этом сервере; сервер не переводится на пользовательскую политику развёртывания."
+  ],
+  "{0} 小时": [
+    "{0} hours",
+    "{0} ч."
+  ],
+  "{0} 条事件": [
+    "{0} events",
+    "Событий: {0}"
+  ],
+  "{0} 个账号等待审核。": [
+    "{0} accounts awaiting approval.",
+    "Аккаунтов ожидают одобрения: {0}."
+  ],
+  "创建于": [
+    "Created",
+    "Создано"
+  ],
+  "同步完成": [
+    "Synced",
+    "Синхронизировано"
+  ],
+  "同步失败": [
+    "Sync failed",
+    "Ошибка синхронизации"
+  ],
+  "同步待确认": [
+    "Sync awaiting confirmation",
+    "Синхронизация ожидает подтверждения"
+  ],
+  "{0} 天流量": [
+    "{0}-day traffic",
+    "Трафик за {0} дн."
+  ],
+  "{0} 张": [
+    "{0} certificates",
+    "Сертификатов: {0}"
+  ],
+  "{0} 份": [
+    "{0} files",
+    "Файлов: {0}"
+  ],
+  "{0} 个节点": [
+    "{0} servers",
+    "Серверов: {0}"
   ]
 }
