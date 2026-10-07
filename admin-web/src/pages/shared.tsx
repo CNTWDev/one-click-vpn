@@ -167,7 +167,7 @@ export function TableToolbar({ search, onSearch, placeholder, chips, chip, onChi
 export function BatchBar({ count, unit, onClear, children }: { count: number; unit: string; onClear: () => void; children: ReactNode }) {
   useConsoleLanguage();
   if (!count) return null;
-  return <div className="batch-bar" role="region" aria-label={t("批量操作")}><div className="batch-count"><b>{t("已选择")}{count} {unit}</b><button className="text-button" onClick={onClear}>{t("取消选择")}</button></div><span>{children}</span></div>;
+  return <div className="batch-bar" role="region" aria-label={t("批量操作")}><div className="batch-count"><b>{t("已选择")} {count} {unit}</b><button className="text-button" onClick={onClear}>{t("取消选择")}</button></div><span>{children}</span></div>;
 }
 
 export const includesText = (query: string, ...values: Array<string | null | undefined>) => {

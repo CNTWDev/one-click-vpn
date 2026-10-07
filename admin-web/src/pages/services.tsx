@@ -156,7 +156,7 @@ export function ServicesPage({ nodes }: { nodes: NodeRecord[] }) {
         <button className="button ghost small" disabled={Boolean(busy)} onClick={() => void batchServices("restart")}>{t("批量重启")}</button>
         <button className="button primary small" disabled={Boolean(busy)} onClick={() => void batchServices("redeploy")}>{t("批量重新部署")}</button>
       </BatchBar>
-      <div className="table-wrap"><table className="data-table service-table"><thead><tr><th className="check"><input type="checkbox" aria-label={t("选择全部节点")} checked={allSelected} onChange={(event) => setSelected(event.target.checked ? new Set(visible.map((row) => row.nodeId)) : new Set())} /></th><th>{t("节点")}</th><th>{t("协议（点击徽标操作）")}</th><th>{t("更新时间")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visible.map((row) => <tr key={row.nodeId} className={selected.has(row.nodeId) ? "selected" : ""}>
+      <div className="table-wrap"><table className="data-table cards service-table"><thead><tr><th className="check"><input type="checkbox" aria-label={t("选择全部节点")} checked={allSelected} onChange={(event) => setSelected(event.target.checked ? new Set(visible.map((row) => row.nodeId)) : new Set())} /></th><th>{t("节点")}</th><th>{t("协议（点击徽标操作）")}</th><th>{t("更新时间")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visible.map((row) => <tr key={row.nodeId} className={selected.has(row.nodeId) ? "selected" : ""}>
         <td className="check"><input type="checkbox" aria-label={t("选择 {0}", [row.name])} checked={selected.has(row.nodeId)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(row.nodeId); else next.delete(row.nodeId); return next; })} /></td>
         <td className="cell-main"><a className="node-detail-trigger" href={href("nodes", { focus: row.nodeId })}><StateDot tone={row.tone} /><span><b>{row.name}</b><small>{row.ip}{row.place ? ` · ${row.place}` : ""}</small></span></a></td>
         <td className="cell-status"><div className="badge-row">{row.services.map(badge)}</div>{row.services.filter((item) => item.enabled && item.last_error).slice(0, 1).map((item) => <small key={item.protocol} className="error-text">{protocolName(item.protocol)}：{item.last_error}</small>)}</td>
@@ -183,7 +183,7 @@ export function ServicesPage({ nodes }: { nodes: NodeRecord[] }) {
       <form id="service-form" className="stack-form" onSubmit={saveService}>
         <label>{t("监听端口")}<input type="number" min={1} max={65535} required value={servicePort} onChange={(e) => setServicePort(Number(e.target.value))} /><small>{t("仅在端口冲突等特殊情况下修改；不会占用或关闭其他服务的端口。请同步调整安全组规则。")}</small></label>
         {editingService.protocol === "vless" && <label>{t("覆盖目标域名")}<input maxLength={253} value={serverName} onChange={(e) => setServerName(e.target.value)} placeholder={t("留空保留当前目标")} /><small>{t("更换目标为平滑切换：旧 SNI 在过渡期内仍然有效，客户端下次刷新订阅时自动使用新目标。")}</small></label>}
-        <p className="form-note">{t("只影响这一个节点上的")}{protocolName(editingService.protocol)}{t("，不会把节点切换为自定义部署策略。")}</p>
+        <p className="form-note">{t("只影响这一个节点上的 {0}，不会把节点切换为自定义部署策略。", [protocolName(editingService.protocol)])}</p>
       </form>
     </Modal>}
   </>;

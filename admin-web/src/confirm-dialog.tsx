@@ -75,7 +75,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         <h2 id="confirm-dialog-title">{request.title}</h2>
         <p id="confirm-dialog-message">{request.message}</p>
         {request.confirmText !== undefined && <label>
-          <span>{t("请输入")}<code>{request.confirmText}</code>{t("以确认")}</span>
+          <span>{t("请输入")} <code>{request.confirmText}</code> {t("以确认")}</span>
           <input name="confirm-text" value={typed} onChange={(event) => setTyped(event.target.value)} placeholder={request.confirmText} autoComplete="off" spellCheck={false} autoFocus />
         </label>}
         {request.input && <label>
