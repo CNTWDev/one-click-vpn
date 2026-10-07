@@ -57,10 +57,13 @@ export function auditLayout() {
     const box = el.getBoundingClientRect();
     for (const n of el.childNodes) {
       if (n.nodeType !== 3 || !n.textContent.trim()) continue;
-      const range = document.createRange(); range.selectNodeContents(n);
-      for (const r of range.getClientRects()) {
-        if (r.right > box.right + 2 || r.left < box.left - 2) { issues.push({ kind: "spill", detail: `${describe(el)} text is ${Math.round(r.width)}px wide in a ${Math.round(box.width)}px box` }); break; }
-      }
+      // Measure words, not the whole run: wrapped pre-wrap text lets trailing spaces hang past the edge invisibly.
+      const range = document.createRange();
+      const spilled = [...n.textContent.matchAll(/\S+/g)].some((word) => {
+        range.setStart(n, word.index); range.setEnd(n, word.index + word[0].length);
+        return [...range.getClientRects()].some((r) => r.right > box.right + 2 || r.left < box.left - 2);
+      });
+      if (spilled) issues.push({ kind: "spill", detail: `${describe(el)} text runs past its ${Math.round(box.width)}px box` });
     }
   }
 
