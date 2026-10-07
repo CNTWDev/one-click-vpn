@@ -139,3 +139,11 @@ export function auditLayout() {
   }
   return issues;
 }
+
+// Inter is not bundled, so many visitors (Windows, Android, CI) get a wider fallback font. Tests pin "Inter" to
+// DejaVu Sans, a wide metric present on Linux CI and dev boxes alike, so a layout that fits here fits everywhere.
+export const wideFontStyle = `@font-face { font-family: Inter; font-weight: 100 550; src: local("DejaVu Sans"); }
+@font-face { font-family: Inter; font-weight: 551 900; src: local("DejaVu Sans Bold"); }`;
+export const installWideFont = (context) => context.addInitScript((css) => {
+  document.addEventListener("DOMContentLoaded", () => { const style = document.createElement("style"); style.textContent = css; document.head.append(style); });
+}, wideFontStyle);

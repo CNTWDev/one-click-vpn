@@ -4,7 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { portalApi } from "./fixtures/portal-api.mjs";
-import { auditLayout } from "./fixtures/layout-audit.mjs";
+import { auditLayout, installWideFont } from "./fixtures/layout-audit.mjs";
 
 // The Portal's sign-in, request-access, onboarding and dashboard states, in every locale, at desktop / tablet / phone
 // widths. Same audit as the Console: sideways scroll, text spill, overlap, clipped controls, glued words.
@@ -36,6 +36,7 @@ test("Portal layout: no overflow, spill or overlap in any state, locale or width
     for (const locale of locales) for (const view of views) {
       const context = await browser.newContext({ locale, viewport: { width: widths[0], height: 900 }, reducedMotion: "reduce" });
       context.setDefaultTimeout(10000);
+      await installWideFont(context);
       const api = portalApi(view.api);
       await context.route("**/api/**", async (route) => {
         const [status, body] = api(new URL(route.request().url()).pathname, route.request().method());
