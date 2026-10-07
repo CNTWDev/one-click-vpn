@@ -211,7 +211,7 @@ footer { color: var(--text-2); text-align: center; font-size: 12px; padding-top:
 .mode-switch button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .mode-switch b, .mode-switch small { display: block; }
 .mode-switch b { font-size: 15px; }
-.mode-switch em { margin-left: 6px; padding: 1px 7px; border-radius: 6px; background: var(--accent); color: var(--accent-contrast); font-size: 12px; font-style: normal; font-weight: 700; }
+.mode-switch em { display: inline-block; white-space: nowrap; margin-left: 6px; padding: 1px 7px; border-radius: 6px; background: var(--accent); color: var(--accent-contrast); font-size: 12px; font-style: normal; font-weight: 700; }
 .mode-switch small { margin-top: 4px; color: var(--text-2); font-size: 13px; }
 .creator .subscription-panel { margin: 0; padding: 0; border: 0; background: transparent; }
 .node-creator { display: grid; gap: 22px; }

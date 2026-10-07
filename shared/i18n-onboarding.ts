@@ -153,7 +153,7 @@ export const onboardingCatalog: Record<string, readonly [string, string]> = {
   "将生成 {0} · {1} 的 {2} 配置，有效期 1 年。": ["Creates a {2} configuration for {0} · {1}, valid for one year.", "Создаёт конфигурацию {2} для {0} · {1}, действующую один год."],
   "请先选择可用的客户端和节点。": ["Select an available client and node first.", "Сначала выберите доступный клиент и узел."],
   " 需要 Mihomo 内核的 Clash 客户端。": [" Requires a Mihomo-based Clash client.", " Требуется клиент Clash на базе Mihomo."],
-  "仅包含所选节点，节点变化时请重新生成。": ["Includes only the selected node. Regenerate when the node changes.", "Включает только выбранный узел. При изменении узла создайте конфигурацию заново."],
+  "仅包含所选节点，节点变化时请重新生成。": [" Includes only the selected node. Regenerate when the node changes.", " Включает только выбранный узел. При изменении узла создайте конфигурацию заново."],
   "已开始下载，下一步导入": ["Download started. Import next.", "Загрузка началась. Далее импортируйте."],
   "在客户端选择「导入配置 / 从文件导入」，打开刚下载的文件。": ["In your client, select Import configuration / From file, then open the downloaded file.", "В клиенте выберите импорт конфигурации из файла и откройте скачанный файл."],
   " 启用配置后，打开系统代理或 TUN。": [" After enabling the configuration, turn on system proxy or TUN.", " После включения конфигурации включите системный прокси или TUN."],

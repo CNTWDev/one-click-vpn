@@ -120,6 +120,11 @@ export function auditLayout() {
     const rects = [...range.getClientRects()].filter((r) => r.width > 0);
     if (rects.length) runs.push({ el, text: n.textContent, first: rects[0], last: rects[rects.length - 1] });
   }
+  // Sentences joined without a space inside one string ("…one year.Includes…").
+  for (const run of runs) {
+    const match = run.text.match(/[a-zа-яё]{2}[.!?][A-ZА-ЯЁ][a-zа-яё]/u);
+    if (match) issues.push({ kind: "glued", detail: `"${match[0]}" has no space after the full stop (${describe(run.el)})` });
+  }
   const word = /[\p{L}\p{N}]/u;
   for (let i = 1; i < runs.length; i++) {
     const a = runs[i - 1], b = runs[i];
