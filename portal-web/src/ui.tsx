@@ -4,7 +4,7 @@ import { intlLocales } from "../../shared/i18n-core";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import QRCode from "qrcode";
 import { apps, type AppId } from "./client-options";
-import { dateLabel, protocolBadge, relativeLabel } from "./format";
+import { dateLabel, protocolBadge, protocolLabel, relativeLabel } from "./format";
 
 /* Small, dependency-free building blocks shared by the Portal views. */
 
@@ -27,7 +27,8 @@ export function AppIcon({ id }: { id: AppId }) {
 
 export function ProtocolBadge({ protocol, subscription = false }: { protocol: string; subscription?: boolean }) {
   const { t } = useI18n();
-  return <span className={`proto-badge ${subscription ? "sub" : protocol}`} aria-label={subscription ? t("订阅") : protocol}>{t(protocolBadge(protocol, subscription))}</span>;
+  // Same size and text for every connection; subscriptions only change the tint.
+  return <span className={`proto-badge ${subscription ? "sub" : protocol}`} aria-label={subscription ? t("{0} 订阅", [protocolLabel(protocol)]) : protocolLabel(protocol)}>{protocolBadge(protocol)}</span>;
 }
 
 /** Relative time with the absolute zh-CN time on hover. */
@@ -95,7 +96,7 @@ export function QrCode({ text, label }: { text: string; label: string }) {
 
 export type MenuItem = { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean } | "-" | false | null | undefined;
 /** One "⋯" button that collects all secondary management actions. */
-export function Menu({ items, label = "更多操作", text }: { items: MenuItem[]; label?: string; text?: string }) {
+export function Menu({ items, label = "更多操作", text, plain = false }: { items: MenuItem[]; label?: string; text?: string; plain?: boolean }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -117,7 +118,7 @@ export function Menu({ items, label = "更多操作", text }: { items: MenuItem[
     return () => { document.removeEventListener("pointerdown", onPointer); document.removeEventListener("keydown", onKey); };
   }, [open]);
   return <div className="menu" ref={root}>
-    <button type="button" className={text ? "ghost small menu-trigger" : "icon-button bordered menu-trigger"} aria-haspopup="menu" aria-expanded={open} aria-label={t(label)} title={t(label)} onClick={() => setOpen(!open)}>{text ? <>{text}{Icon.dots(16)}</> : Icon.dots(20)}</button>
+    <button type="button" className={text ? "ghost small menu-trigger" : `icon-button menu-trigger ${plain ? "" : "bordered"}`} aria-haspopup="menu" aria-expanded={open} aria-label={t(label)} title={t(label)} onClick={() => setOpen(!open)}>{text ? <>{text}{Icon.dots(16)}</> : Icon.dots(20)}</button>
     {open && <div className="menu-list" role="menu" aria-label={label}>{items.filter(Boolean).map((item, index) => item && item !== "-"
       ? <button key={item.label} type="button" role="menuitem" className={item.danger ? "danger-item" : ""} disabled={item.disabled} onClick={() => { setOpen(false); item.onSelect(); }}>{item.label}</button>
       : <hr key={`separator-${index}`} />)}</div>}

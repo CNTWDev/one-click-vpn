@@ -32,7 +32,7 @@ export function ClientDownloads() {
   const action = (item: ClientRelease) => item.distribution === "direct" ? t("下载安装包") : item.distribution === "testflight" ? "TestFlight" : "App Store";
 
   return <section className="card client-downloads" aria-labelledby="downloads-title">
-    <div className="section-head"><h2 id="downloads-title">{t("下载 Veilbird 客户端")}</h2><p className="hint">{t("登录后自动获取线路，无需导入配置。iPhone 和 iPad 通过 App Store 分发。")}</p></div>
+    <div className="section-head"><h2 id="downloads-title">{t("下载 Veilbird 客户端")}</h2><p className="hint">{t("登录即可使用，无需导入配置。")}</p></div>
     {status === "loading" ? <div className="client-download-grid" aria-busy="true">{platforms.map((key) => <article key={key}><Skeleton width="50%" /><Skeleton height={40} /></article>)}</div>
       : status === "error" ? <InlineError message={t("暂时无法获取客户端版本，请稍后重试。")} onRetry={() => { setStatus("loading"); setRetry((value) => value + 1); }} />
         : <div className="client-download-grid">{platforms.map((platform) => {

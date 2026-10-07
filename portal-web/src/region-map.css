@@ -1,4 +1,4 @@
-.region-map-panel { max-width: 1240px; margin: 18px auto 0; border-radius: var(--radius-sm, 14px); overflow: hidden; color: #eef4e6; background: linear-gradient(145deg, #111b17, #09110e); border: 1px solid rgba(98, 128, 89, .35); border-radius: 14px; box-shadow: 0 26px 70px rgba(24, 42, 22, .12); }
+.region-map-panel { max-width: 1240px; margin: 18px auto 0; overflow: hidden; color: #eef4e6; background: linear-gradient(145deg, #111b17, #09110e); border: 1px solid rgba(98, 128, 89, .35); border-radius: var(--radius); box-shadow: 0 26px 70px rgba(24, 42, 22, .12); }
 .region-map-head { min-height: 94px; padding: 20px 24px 16px; display: flex; align-items: start; justify-content: space-between; gap: 24px; }
 .region-map-head h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
 .region-map-head > div:first-child > p:last-child { margin: 7px 0 0; color: #7f8d81; font-size: 11px; }
@@ -8,7 +8,7 @@
 .region-map-summary .selected-region { padding-left: 18px; border-left: 1px solid rgba(158, 184, 150, .18); color: #aeb9ab; }
 .region-map-summary .selected-region b { color: #b7df5d; }
 .region-map-location-control { min-width: 178px; position: absolute; z-index: 7; top: 16px; right: 16px; display: grid; justify-items: end; gap: 7px; }
-.region-locate-button { min-height: 39px; padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; color: #16200c; background: #b7df5d; border: 1px solid #d6f78c; border-radius: 9px; box-shadow: 0 8px 28px rgba(183, 223, 93, .2); font-size: 11px; font-weight: 850; }
+.region-locate-button { min-height: 39px; padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; color: #16200c; background: #b7df5d; border: 1px solid #d6f78c; border-radius: var(--radius-sm); box-shadow: 0 8px 28px rgba(183, 223, 93, .2); font-size: 11px; font-weight: 850; }
 .region-locate-button > span { font-size: 17px; line-height: 1; }
 .region-locate-button:hover { color: #0c1207; background: #c9ed78; border-color: #e7ffad; transform: translateY(-1px); }
 .region-locate-button.located { color: #17203b; background: #aebeff; border-color: #d3dcff; box-shadow: 0 8px 28px rgba(111, 144, 255, .22); }
