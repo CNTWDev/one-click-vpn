@@ -27,6 +27,14 @@ jobs:
         env:
           VEILBIRD_TEST_PLAYWRIGHT: ${{ github.workspace }}/node_modules/playwright-core/index.mjs
           VEILBIRD_LAYOUT_SHOTS: ${{ runner.temp }}/console-layout
+      # Surface the problems as annotations so they are readable without downloading logs or screenshots.
+      - if: failure()
+        run: |
+          f="$RUNNER_TEMP/console-layout/failures.txt"
+          test -f "$f" || exit 0
+          summary=$(sed -E 's/^(zh|en|ru) [0-9]+px ([a-z-]+): \[([a-z]+)\].*/\3 \2/' "$f" | sort | uniq -c | sort -rn | head -30 | awk '{printf "%s%%0A", $0}')
+          echo "::error title=Layout problems by kind and view::${summary}"
+          head -8 "$f" | while IFS= read -r line; do echo "::error title=Layout problem::${line}"; done
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

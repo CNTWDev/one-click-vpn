@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -70,6 +70,7 @@ test("Console layout: no overflow, spill or overlap on any page, locale or width
       await context.close();
     }
   } finally { await browser?.close(); child.kill("SIGTERM"); }
+  if (shots && failures.length) await writeFile(path.join(shots, "failures.txt"), failures.join("\n") + "\n");
   assert.deepEqual(errors, []);
   assert.equal(failures.length, 0, `${failures.length} layout problems:\n${failures.join("\n")}`);
 });
