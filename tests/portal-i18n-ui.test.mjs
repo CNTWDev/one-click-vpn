@@ -47,24 +47,27 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
       }
       await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     });
-    const picker = () => page.locator(".portal-language-picker select");
+    // The globe menu lists "System" first, then each language in its own script.
+    const languageOrder = ["system", "en", "zh", "ru"];
+    const chooseLanguage = async (value) => { await page.locator(".portal-language-trigger").click(); await page.locator(".portal-language-list [role=menuitemradio]").nth(languageOrder.indexOf(value)).click(); };
+    const languagePreference = async () => { await page.locator(".portal-language-trigger").click(); const checked = await page.locator(".portal-language-list [role=menuitemradio]").evaluateAll((items) => items.findIndex((item) => item.getAttribute("aria-checked") === "true")); await page.keyboard.press("Escape"); return languageOrder[checked]; };
     // The language picker (now inside the dashboard header) lists each language in its own script.
-    const noChinese = async () => assert.doesNotMatch(await page.locator("main").evaluate((main) => { const copy = main.cloneNode(true); copy.querySelectorAll(".portal-language-bar").forEach((node) => node.remove()); document.body.append(copy); const text = copy.innerText; copy.remove(); return text; }), /[\u3400-\u9fff]/u);
+    const noChinese = async () => assert.doesNotMatch(await page.locator("main").evaluate((main) => { const copy = main.cloneNode(true); copy.querySelectorAll(".portal-language-menu").forEach((node) => node.remove()); document.body.append(copy); const text = copy.innerText; copy.remove(); return text; }), /[\u3400-\u9fff]/u);
     const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.goto(base);
     await page.getByRole("heading", { name: "Вход в Veilbird" }).waitFor();
-    assert.equal(await picker().inputValue(), "system");
+    assert.equal(await languagePreference(), "system");
     assert.equal(await page.locator("html").getAttribute("lang"), "ru-RU");
     await noChinese();
     await page.getByLabel("Электронная почта").fill("test@example.com");
     await page.getByLabel("Пароль", { exact: true }).fill("test-password-123");
     await page.getByRole("button", { name: "Войти", exact: true }).click();
     await page.getByText("Неверная почта или пароль", { exact: true }).waitFor();
-    await picker().selectOption("en");
+    await chooseLanguage("en");
     await page.getByText("Invalid email or password", { exact: true }).waitFor();
     await page.reload();
     await page.getByRole("heading", { name: "Sign in to Veilbird" }).waitFor();
-    assert.equal(await picker().inputValue(), "en");
+    assert.equal(await languagePreference(), "en");
     await page.getByRole("button", { name: "New here? Request access" }).click();
     await page.getByLabel("Name", { exact: true }).fill("Test User");
     await page.getByLabel("Email", { exact: true }).fill("test@example.com");
@@ -72,9 +75,9 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await page.getByRole("button", { name: "Submit request" }).click();
     await page.getByRole("heading", { name: "Awaiting approval" }).waitFor();
     await noChinese();
-    await picker().selectOption("zh");
+    await chooseLanguage("zh");
     await page.getByRole("heading", { name: "等待管理员审核" }).waitFor();
-    await picker().selectOption("system");
+    await chooseLanguage("system");
     await page.getByRole("heading", { name: "Ожидание одобрения" }).waitFor();
     await page.getByRole("button", { name: "Назад", exact: true }).click();
     badLogin = false;
@@ -93,7 +96,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await page.setViewportSize({ width: 390, height: 844 });
     await noOverflow();
     await page.getByLabel("Название подписки").fill("My custom subscription");
-    await picker().selectOption("en");
+    await chooseLanguage("en");
     assert.equal(await page.getByLabel("Subscription name").inputValue(), "My custom subscription");
     await page.getByRole("button", { name: "Create subscription", exact: true }).click();
     await page.getByLabel("Subscription link", { exact: true }).waitFor();
@@ -106,7 +109,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await downloadResponse;
     assert.equal(profileCreated.nodeId, "node");
     await noChinese();
-    await picker().selectOption("ru");
+    await chooseLanguage("ru");
     await noOverflow();
     await page.locator(".list-item").filter({ hasText: "Office" }).click();
     await page.getByRole("button", { name: "Управление подключением", exact: true }).click();
@@ -123,14 +126,14 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     const directory = await mkdtemp(path.join(tmpdir(), "northstar-i18n-ui-"));
     await page.screenshot({ path: path.join(directory, "ru-mobile.png"), fullPage: true });
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await picker().selectOption("en");
+    await chooseLanguage("en");
     await page.screenshot({ path: path.join(directory, "en-desktop.png"), fullPage: true });
     await page.evaluate(() => {
       Object.defineProperty(navigator, "languages", { configurable: true, value: ["zh-CN"] });
       window.dispatchEvent(new Event("languagechange"));
     });
     assert.equal(await page.locator("html").getAttribute("lang"), "en-US", "manual preference wins over system changes");
-    await picker().selectOption("system");
+    await chooseLanguage("system");
     await page.getByRole("heading", { name: "我的连接", level: 2 }).waitFor();
     // A second same-origin tab updates the stored preference; the first tab follows.
     const secondPage = await context.newPage();
@@ -138,7 +141,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await secondPage.evaluate(() => localStorage.setItem("veilbird.portal.language", "ru"));
     await page.getByRole("heading", { name: "Мои подключения", level: 2 }).waitFor();
     await secondPage.close();
-    await picker().selectOption("en");
+    await chooseLanguage("en");
     // Downloads are always open (no disclosure to click) and sit before the region map.
     await page.getByRole("heading", { name: "Download Veilbird", level: 2 }).waitFor();
     assert.equal(await page.getByText("Not released yet", { exact: true }).count(), 4);
@@ -159,7 +162,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     assert.equal(await page.locator(".release-history a").getAttribute("href"), "https://downloads.example.com/veilbird-0.9.exe", "earlier versions link to their own immutable file");
     await page.setViewportSize({ width: 390, height: 844 });
     await noOverflow();
-    await picker().selectOption("ru");
+    await chooseLanguage("ru");
     await page.getByRole("link", { name: "Скачать установочный файл", exact: true }).first().waitFor();
     await noChinese();
     await page.locator(".client-downloads").screenshot({ path: path.join(directory, "downloads-ru-mobile.png") });
@@ -168,7 +171,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await page.getByRole("heading", { name: "Три шага для начала" }).waitFor();
     await noChinese();
     await noOverflow();
-    await picker().selectOption("en");
+    await chooseLanguage("en");
     await page.getByRole("heading", { name: "Get started in three steps" }).waitFor();
     await noChinese();
     assert.deepEqual(errors, []);
@@ -179,7 +182,8 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await blockedPage.route("**/api/**", (route) => route.fulfill({ status: 401, contentType: "application/json", body: "{}" }));
     await blockedPage.goto(base);
     await blockedPage.getByRole("heading", { name: "Sign in to Veilbird" }).waitFor();
-    await blockedPage.getByLabel("Language", { exact: true }).selectOption("ru");
+    await blockedPage.getByRole("button", { name: "Language", exact: true }).click();
+    await blockedPage.getByRole("menuitemradio", { name: "Русский" }).click();
     await blockedPage.getByRole("heading", { name: "Вход в Veilbird" }).waitFor();
   } finally { await browser?.close(); child.kill("SIGTERM"); }
 });

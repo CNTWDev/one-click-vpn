@@ -1,6 +1,6 @@
 .client-downloads .section-head { display: grid; gap: 4px; }
 .client-download-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
-.client-download-grid article { display: flex; flex-direction: column; gap: 10px; min-width: 0; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); padding: 18px; }
+.client-download-grid article { display: flex; flex-direction: column; gap: 10px; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); padding: 18px; }
 .client-download-grid article.current-device { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--accent-soft); }
 .client-download-grid article > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .client-download-grid h3 { margin: 0; font-size: 16px; }

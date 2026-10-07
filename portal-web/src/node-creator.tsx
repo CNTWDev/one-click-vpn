@@ -83,7 +83,7 @@ export function NodeCreator({ nodes, regions, regionId, onRegion, preset, notify
     </fieldset>
     <fieldset className="step" disabled={busy}>
       <legend><span className="step-no">2</span>{t("选择节点")}</legend>
-      {regionsWithNodes.length > 1 && <div className="chips" role="group" aria-label={t("按区域筛选")}><button type="button" aria-pressed={!regionId} onClick={() => onRegion("")}>{t("全部区域")}</button>{regionsWithNodes.map((region) => <button key={region.id} type="button" aria-pressed={regionId === region.id} onClick={() => onRegion(region.id)}>{region.name}</button>)}</div>}
+      {regionsWithNodes.length > 1 && <div className="segmented" role="group" aria-label={t("按区域筛选")}><button type="button" aria-pressed={!regionId} onClick={() => onRegion("")}>{t("全部区域")}</button>{regionsWithNodes.map((region) => <button key={region.id} type="button" aria-pressed={regionId === region.id} onClick={() => onRegion(region.id)}>{region.name}</button>)}</div>}
       <div className="choice-grid nodes">{visibleNodes.map((node) => {
         const ok = supports(node, client, preference);
         return <label key={node.id} className={`choice ${chosen?.id === node.id ? "selected" : ""} ${ok ? "" : "unavailable"}`}>

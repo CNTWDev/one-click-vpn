@@ -70,7 +70,7 @@ export function SubscriptionAccess({ id, protocol, disabled, initialToken = "", 
       </div>
     </div>
     <div className="client-buttons">{buttons.map((item) => <button key={item.action} type="button" className="client-button" disabled={disabled || busy} onClick={() => start(item.action)}>{item.icon}<span><b>{item.title}</b><small>{item.note}</small></span></button>)}</div>
-    <p className="hint">{mode === "smart" ? t("智能分流：国内网站直连，其余经代理。") : t("全局代理：全部流量经代理。")}{t("切换后需重新导入。")}{token ? "" : t("首次使用需验证登录密码。")}</p>
+    <p className="hint">{mode === "smart" ? t("国内网站直连，其余经代理。切换后需重新导入。") : t("全部流量经代理。切换后需重新导入。")}</p>
     {disabled && <p className="hint warning">{t("连接当前不可用，恢复后才能导入。")}</p>}
     {token && !disabled && <div className="link-row"><input readOnly aria-label={t("订阅链接")} value={link()} onFocus={(event) => event.target.select()} /><button type="button" className="ghost small" onClick={() => setToken("")}>{t("隐藏")}</button></div>}
 

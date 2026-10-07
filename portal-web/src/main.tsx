@@ -57,7 +57,7 @@ function Auth({ mode, onMode, onUser }: {
     <section className="auth-intro">
       <Brand />
       <h1>{t("连接到你")}<br /><span>{t("信任的网络。")}</span></h1>
-      <p className="intro-copy">{t("审核通过后，一键创建订阅：Clash Verge、Hiddify、Shadowrocket 导入或扫码即用，VLESS + REALITY 与 WireGuard 节点自动更新。也可为固定节点下载 WireGuard、OpenVPN 配置。")}</p>
+      <p className="intro-copy">{t("审核通过后一键创建订阅，导入客户端或扫码即用。")}</p>
       <ul className="trust"><li><b>{t("一份订阅，全部节点")}</b><small>{t("客户端里随时切换，新节点自动出现")}</small></li><li><b>{t("人工审核")}</b><small>{t("仅限受邀和熟悉的用户使用")}</small></li></ul>
     </section>
     <form className="auth-panel" onSubmit={submit}>
@@ -78,7 +78,7 @@ function Pending({ user, onLogout }: { user: User; onLogout: () => void }) {
   return <main className="center-page"><Brand /><div className="status-card">
     <span className="status-icon">…</span>
     <h1>{t("等待管理员审核")}</h1>
-    <p>{t("账号")}<b>{user.email}</b>{t("已提交。审核通过后即可登录，一键创建订阅。")}</p>
+    <p>{t("账号")} <b>{user.email}</b> {t("已提交。审核通过后即可登录，一键创建订阅。")}</p>
     {!user.id && <p className="muted">{t("如果这个邮箱之前已经注册过，请直接返回登录。")}</p>}
     {user.status === "rejected" && <p className="inline-error">{t("申请未通过：")}{user.rejectionReason || t("请联系管理员")}</p>}
     <button className="secondary" onClick={onLogout}>{t("返回")}</button>

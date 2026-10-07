@@ -1,27 +1,30 @@
 /* The picker lives in the dashboard header, or floats top-right on sign-in and status pages. */
-.portal-language-bar { display: flex; align-items: center; }
 .portal-language-floating { position: absolute; top: 16px; right: clamp(16px, 3vw, 32px); z-index: 5; }
-.portal-language-picker { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; margin: 0; color: var(--text-2); }
-.portal-language-picker select { width: auto; min-width: 0; min-height: 36px; margin: 0; padding: 6px 28px 6px 10px; border: 1px solid var(--border-strong); border-radius: 999px; background-color: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; }
-.topbar .language-caption { display: none; }
-.portal-language-picker select:focus-visible { outline: 2px solid #46734a; outline-offset: 3px; }
+.portal-language-menu { position: relative; flex: none; }
+.portal-language-trigger { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-2); font-size: 13px; font-weight: 600; }
+.portal-language-trigger:hover, .portal-language-trigger[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
+.portal-language-list { position: absolute; z-index: 30; top: calc(100% + 6px); right: 0; min-width: 180px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-pop); }
+.portal-language-list button { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 38px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); font-size: 14px; text-align: left; }
+.portal-language-list button:hover, .portal-language-list button:focus-visible { background: var(--surface-2); outline: 0; }
+.portal-language-list button[aria-checked="true"] { color: var(--accent); font-weight: 650; }
+.portal-language-list button[aria-checked="true"]::after { content: ""; width: 10px; height: 5px; margin: -3px 2px 0 0; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); }
+.portal-language-list hr { margin: 6px 4px; border: 0; border-top: 1px solid var(--border); }
 html:not(:lang(zh)) .auth-intro h1 { font-size: clamp(36px, 5vw, 68px); letter-spacing: -.025em; }
 html:not(:lang(zh)) .kicker { letter-spacing: .08em; }
 html :is(.auth-layout, .center-page, .dashboard) :is(h1, h2, h3) { letter-spacing: -.02em; line-height: 1.2; }
-.mode-switch button, .client-picker label, .simple-stats article, .subscription-heading > div { min-width: 0; overflow-wrap: anywhere; }
+.mode-switch button, .client-picker label, .subscription-heading > div { min-width: 0; overflow-wrap: anywhere; }
 .device-hub-head-actions, .subscription-actions, .connection-manage, .dialog-actions { flex-wrap: wrap; }
 .subscription-heading h2, .welcome h1, .device-detail-head h3 { overflow-wrap: anywhere; }
 @media (max-width: 640px) {
   .portal-language-floating { top: 30px; right: 16px; }
-  .language-caption { display: none; }
   .mode-switch { grid-template-columns: 1fr; }
   .subscription-heading { flex-wrap: wrap; gap: 12px; }
   .dashboard .account { flex-wrap: wrap; }
   .dialog-actions > button { flex: 1 1 auto; }
 }
 @media (max-width: 600px) {
-  .topbar-tools { gap: 8px; }
-  .topbar .portal-language-picker select { max-width: 116px; }
+  .topbar-tools { gap: 4px; }
+  .topbar .portal-language-trigger > span { display: none; }
 }
 /* Very narrow phones: keep the mark, drop the wordmark so the header fits on one line. */
 @media (max-width: 420px) { .topbar .brand > span:last-child { display: none; } }

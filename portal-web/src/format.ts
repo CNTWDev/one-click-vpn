@@ -1,6 +1,6 @@
 /** Pure formatting helpers; callers can supply the selected Portal locale. */
 export const protocolLabel = (value: string) => value === "wireguard" ? "WireGuard" : value === "openvpn" ? "OpenVPN" : value === "vless" ? "VLESS + REALITY" : value;
-export const protocolBadge = (value: string, subscription = false) => subscription ? "订阅" : value === "wireguard" ? "WG" : value === "openvpn" ? "OVPN" : value === "vless" ? "VLESS" : value.toUpperCase();
+export const protocolBadge = (value: string) => value === "wireguard" ? "WG" : value === "openvpn" ? "OVPN" : value === "vless" ? "VLESS" : value.toUpperCase();
 
 export function formatBytes(bytes = 0) {
   if (!bytes) return "0 B";

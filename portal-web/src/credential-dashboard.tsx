@@ -61,7 +61,6 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
   const selectedProfiles = profiles.filter((item) => item.credentialId === selected?.id);
   const currentProfiles = selectedProfiles.filter((item) => item.status === "active" || item.status === "issued");
   const historyProfiles = selectedProfiles.filter((item) => item.status !== "active" && item.status !== "issued");
-  const usableCount = credentials.filter((item) => usableCredential(item)).length;
   const onlineCount = credentials.filter((item) => item.online).length;
   const canDownload = !!selected && usableCredential(selected) && currentProfiles.length > 0;
   const recentDays = (usage?.daily || []).slice(-14);
@@ -177,13 +176,8 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
 
   const hero = <section className="hero">
     <div>
-      <h1>{!loaded ? loadError ? t("{0}，你好", [user.displayName]) : <Skeleton height={34} width={320} /> : credentials.length ? <>{user.displayName}{t("，你有")}{usableCount}{t("个可用连接")}<span>{t("近 30 天")}{formatBytes(usage?.totals.totalBytes)}</span></> : t("{0}，欢迎使用 Veilbird", [user.displayName])}</h1>
-      {loaded && credentials.length > 0 && <div className="metrics-row" aria-label={t("使用概览")}>
-        <span><small>{t("上传")}</small><b>{formatBytes(usage?.totals.uploadBytes)}</b></span>
-        <span><small>{t("下载")}</small><b>{formatBytes(usage?.totals.downloadBytes)}</b></span>
-        <span><small>{t("最近活跃")}</small><b>{onlineCount}{t("个连接")}</b></span>
-        <span><small>{t("全部连接")}</small><b>{credentials.length}{t("个")}</b></span>
-      </div>}
+      <h1>{!loaded ? loadError ? t("{0}，你好", [user.displayName]) : <Skeleton height={34} width={240} /> : credentials.length ? t("{0}，你好", [user.displayName]) : t("{0}，欢迎使用 Veilbird", [user.displayName])}</h1>
+      {loaded && credentials.length > 0 && <p className="hero-stats">{t("{0} 个连接 · {1} 个在线 · 近 30 天 {2}", [credentials.length, onlineCount, formatBytes(usage?.totals.totalBytes)])}</p>}
     </div>
     {loaded && credentials.length > 0 && <button type="button" className={creating ? "secondary" : "primary"} onClick={() => creating ? setCreating("") : openCreator("subscription")}>{creating ? t("收起") : <>{Icon.plus()}{t("新建连接")}</>}</button>}
   </section>;
@@ -201,8 +195,7 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
 
   const detail = selected && <article className="detail" ref={detailRef} key={selected.id} aria-labelledby="detail-title">
     <div className="detail-head">
-      <ProtocolBadge protocol={selected.protocol} subscription={!!selected.subscriptionId} />
-      <div className="detail-title"><h3 id="detail-title">{selected.name}<span className={`pill ${tone(selected.state)}`}>{presence(selected)}</span></h3><p>{selected.subscriptionId ? t("{0} 订阅", [protocolLabel(selected.protocol)]) : `${protocolLabel(selected.protocol)} · ${currentProfiles[0]?.nodeName ? `${currentProfiles[0].regionName || ""} ${currentProfiles[0].nodeName}` : t("尚未生成配置")}`}{t("· 有效期至")}{dayLabel(selected.expiresAt)}</p></div>
+      <div className="detail-title"><h3 id="detail-title">{selected.name}<span className={`status ${tone(selected.state)}`}>{presence(selected)}</span></h3><p>{t("{0} · 有效期至 {1}", [selected.subscriptionId ? t("{0} 订阅", [protocolLabel(selected.protocol)]) : `${protocolLabel(selected.protocol)} · ${currentProfiles[0]?.nodeName ? `${currentProfiles[0].regionName || ""} ${currentProfiles[0].nodeName}`.trim() : t("尚未生成配置")}`, dayLabel(selected.expiresAt)])}</p></div>
       <Menu label={t("管理连接")} items={[
         { label: t("改名"), onSelect: () => void rename(selected), disabled: busy },
         selected.status === "active" && { label: selected.userDisabled ? t("启用") : t("停用"), onSelect: () => void changeAccess(selected, selected.userDisabled ? "enable" : "disable"), disabled: busy || selected.adminDisabled },
@@ -228,12 +221,12 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
           {selected.protocol === "vless" && <button type="button" className="client-button" disabled={busy || !canDownload} onClick={() => void profileLink(selected, "copy")}><span className="app-icon neutral">{Icon.copy()}</span><span><b>{t("复制链接")}</b><small>{t("vless:// 单节点")}</small></span></button>}
           {(selected.protocol === "vless" || (selected.protocol === "wireguard" && currentProfiles.length === 1)) && <button type="button" className="client-button" disabled={busy || !canDownload} onClick={() => void profileLink(selected, "qr")}><span className="app-icon neutral">{Icon.qr()}</span><span><b>{t("二维码")}</b><small>{t("手机扫码导入")}</small></span></button>}
         </div>
-        <p className={`hint ${usableCredential(selected) ? "" : "warning"}`}>{!usableCredential(selected) ? t("当前连接不可用，恢复后才能下载；管理员限制请联系管理员解除。") : t("下载后在客户端选择「从文件导入」。")}{selected.protocol === "wireguard" ? t(" 同一份 WireGuard 连接请勿在多个设备同时开启。") : ""}</p>
+        <p className={`hint ${usableCredential(selected) ? "" : "warning"}`}>{!usableCredential(selected) ? t("当前连接不可用，恢复后才能下载；管理员限制请联系管理员解除。") : selected.protocol === "wireguard" ? t("同一份 WireGuard 连接请勿在多个设备同时开启。") : t("下载后在客户端选择「从文件导入」。")}</p>
       </section>}
     {issue && <InlineError message={issue.message} onRetry={issue.retry} busy={busy} />}
     <div className="tiles">
       <div><small>{t("近 30 天流量")}</small><strong>{formatBytes(selected.totalBytes)}</strong><span>↑ {formatBytes(selected.uploadBytes)} · ↓ {formatBytes(selected.downloadBytes)}</span></div>
-      <div><small>{selected.protocol === "vless" ? t("使用状态") : t("当前连接")}</small><strong>{selected.protocol === "vless" ? selected.online ? t("最近活跃") : t("暂无活动") : selected.connectionCount}</strong><span>{t("最近活动")}<Time value={selected.lastActivityAt} fallback={t("尚未使用")} /></span></div>
+      <div><small>{selected.protocol === "vless" ? t("使用状态") : t("当前连接")}</small><strong>{selected.protocol === "vless" ? selected.online ? t("最近活跃") : t("暂无活动") : selected.connectionCount}</strong><span>{t("最近活动")} <Time value={selected.lastActivityAt} fallback={t("尚未使用")} /></span></div>
     </div>
     <details className="disclosure">
       <summary>{t("配置与证书详情")}</summary>
@@ -242,11 +235,12 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
       </dl>
       {selected.certificate?.pem && <details className="disclosure compact"><summary>{t("查看公开证书")}</summary><pre>{selected.certificate.pem}</pre></details>}
       <h5>{t("当前配置 ·")}{currentProfiles.length}{t("份")}</h5>
-      <ul className="plain-list">{currentProfiles.map((profile) => <li key={profile.id}><span>{profile.regionName || t("自动区域")} · {profile.nodeName || "—"}</span><small>{statusLabel(profile.status)}{t("· 到期")}{dayLabel(profile.expiresAt)}</small></li>)}</ul>
+      <ul className="plain-list">{currentProfiles.map((profile) => <li key={profile.id}><span>{profile.regionName || t("自动区域")} · {profile.nodeName || "—"}</span><small>{statusLabel(profile.status)} {t("· 到期")} {dayLabel(profile.expiresAt)}</small></li>)}</ul>
       {historyProfiles.length > 0 && <><h5>{t("历史配置 ·")}{historyProfiles.length}{t("份")}</h5><ul className="plain-list">{historyProfiles.slice(0, 8).map((profile) => <li key={profile.id}><span>{profile.regionName || profile.regionCode}</span><small>{statusLabel(profile.status)} · <Time value={profile.issuedAt} /></small></li>)}</ul></>}
     </details>
   </article>;
 
+  const regionOf = (id: string) => profiles.find((item) => item.credentialId === id && (item.status === "active" || item.status === "issued"))?.regionName;
   const counts = { all: credentials.length, subscription: credentials.filter((item) => item.subscriptionId).length, single: credentials.filter((item) => !item.subscriptionId).length };
   const connections = !loaded
     ? loadError
@@ -257,16 +251,16 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
       : <section className="card connections" aria-labelledby="connections-title">
         <div className="section-head">
           <h2 id="connections-title">{t("我的连接")}</h2>
-          <div className="chips" role="group" aria-label={t("筛选连接")}>{([["all", t("全部")], ["subscription", t("订阅")], ["single", t("节点配置")]] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}<span>{counts[value]}</span></button>)}</div>
-          <span className="updated">{stale ? <span className="warning-text">{t("暂时无法更新，显示上次结果")}</span> : <>{t("更新于")}<Time value={updatedAt} /></>}<button type="button" className="icon-button" aria-label={t("刷新")} title={t("刷新")} disabled={refreshing} onClick={() => void refresh()}><span className={refreshing ? "spin" : ""}>{Icon.refresh(17)}</span></button></span>
-          <Menu label={t("全部连接管理")} text={t("批量")} items={[{ label: t("停用全部连接"), onSelect: () => void bulkAccess("disable"), disabled: busy }, "-", { label: t("删除全部（立即永久失效）"), danger: true, onSelect: () => void bulkAccess("revoke"), disabled: busy }]} />
+          <div className="segmented" role="group" aria-label={t("筛选连接")}>{([["all", t("全部")], ["subscription", t("订阅")], ["single", t("节点配置")]] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}<span>{counts[value]}</span></button>)}</div>
+          <span className="updated">{stale && <span className="warning-text">{t("暂时无法更新，显示上次结果")}</span>}<button type="button" className="icon-button" aria-label={t("刷新")} title={t("刷新")} disabled={refreshing} onClick={() => void refresh()}><span className={refreshing ? "spin" : ""}>{Icon.refresh(17)}</span></button></span>
+          <Menu label={t("全部连接管理")} plain items={[{ label: t("停用全部连接"), onSelect: () => void bulkAccess("disable"), disabled: busy }, "-", { label: t("删除全部（立即永久失效）"), danger: true, onSelect: () => void bulkAccess("revoke"), disabled: busy }]} />
         </div>
         {stale && loadError && <InlineError message={loadError} onRetry={() => void refresh()} busy={refreshing} />}
         <div className="split">
           <div className="list" role="list">{visible.length ? visible.map((item) => <button type="button" role="listitem" aria-current={selected?.id === item.id} className={`list-item ${selected?.id === item.id ? "selected" : ""}`} key={item.id} onClick={() => select(item.id)}>
             <ProtocolBadge protocol={item.protocol} subscription={!!item.subscriptionId} />
-            <span className="list-main"><strong>{item.name}</strong><small>{item.subscriptionId ? t("{0} 订阅", [protocolLabel(item.protocol)]) : t("节点配置")} · {presence(item)}{t("· 30 天")}{formatBytes(item.totalBytes)}</small></span>
-            <span className={`presence ${item.online ? "online" : ""}`} aria-label={item.online ? t("在线") : t("离线")} />
+            <span className="list-main"><strong>{item.name}</strong><small>{item.subscriptionId ? t("订阅 · {0}", [formatBytes(item.totalBytes)]) : `${regionOf(item.id) || protocolLabel(item.protocol)} · ${formatBytes(item.totalBytes)}`}</small></span>
+            <span className={`presence ${item.online ? "online" : ""}`} role="img" aria-label={presence(item)} title={presence(item)} />
           </button>) : <p className="hint">{t("暂无此类连接。")}</p>}</div>
           {detail || <div className="detail empty-detail"><p>{t("选择左侧的连接查看详情。")}</p></div>}
         </div>
@@ -274,14 +268,13 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
 
   return <main className="dashboard">
     {dialog}{toasts}
-    <header className="topbar"><Brand /><div className="topbar-tools"><PortalLanguagePicker /><div className="account"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b><small>{user.email}</small></div><button type="button" className="ghost small" onClick={onLogout}>{t("退出")}</button></div></div></header>
+    <header className="topbar"><Brand /><div className="topbar-tools"><PortalLanguagePicker /><div className="account" title={user.email}><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b></div><button type="button" className="ghost small" onClick={onLogout}>{t("退出")}</button></div></div></header>
     {hero}
     {creator}
     {connections}
     {loaded && credentials.length > 0 && <section className="card usage-panel" aria-labelledby="usage-title">
-      <div className="section-head"><h2 id="usage-title">{t("流量趋势 · 近 14 天")}</h2><span className="updated">{t("累计")} {formatBytes(recentTotal)}</span></div>
-      {recentTotal > 0 ? <div className="bars" role="img" aria-label={t("近 14 天流量，累计 {0}", [formatBytes(recentTotal)])}>{recentDays.map((day) => <div key={day.day} title={`${day.day} · ${formatBytes(day.totalBytes)}`}><i style={{ height: `${day.totalBytes > 0 ? Math.max(2, day.totalBytes / maxDay * 100) : 0}%` }} /><small>{day.day.slice(5)}</small></div>)}</div> : <p className="hint">{t("开始连接后，这里会显示流量趋势。")}</p>}
-      <p className="hint">{t("按连接汇总，日期为 UTC，不区分安装在哪台设备。")}</p>
+      <div className="section-head"><h2 id="usage-title">{t("流量趋势 · 近 14 天")}</h2><span className="updated">{t("累计")} {formatBytes(recentTotal)} · ↑ {formatBytes(usage?.totals.uploadBytes)} ↓ {formatBytes(usage?.totals.downloadBytes)}</span></div>
+      {recentTotal > 0 ? <div className="bars" role="img" title={t("按连接汇总，日期为 UTC，不区分安装在哪台设备。")} aria-label={t("近 14 天流量，累计 {0}", [formatBytes(recentTotal)])}>{recentDays.map((day) => <div key={day.day} title={`${day.day} · ${formatBytes(day.totalBytes)}`}><i style={{ height: `${day.totalBytes > 0 ? Math.max(2, day.totalBytes / maxDay * 100) : 0}%` }} /><small>{day.day.slice(5)}</small></div>)}</div> : <p className="hint">{t("开始连接后，这里会显示流量趋势。")}</p>}
     </section>}
     <ClientDownloads />
     {loaded && <details className="disclosure panel"><summary>{t("可用区域地图")}<span>{regions.length}{t("个区域")}</span></summary><RegionMap regions={regions} selectedRegionId={regionId} onSelect={(id) => { setRegionId(id); openCreator("single"); }} /></details>}
