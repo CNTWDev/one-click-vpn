@@ -1,0 +1,28 @@
+name: Dev bundle to draft release
+# Temporary: copies a native-clients run's artifacts into a draft release so they can be downloaded.
+on:
+  push:
+    branches: ['ci/dev-bundle']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: '37764070322'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ github.token }}
+          path: out
+      - run: |
+          cd out && ls -R
+          mkdir ../assets
+          for d in */; do (cd "$d" && zip -qr "../../assets/${d%/}.zip" .); done
+          find . -name '*.apk' -exec cp {} ../assets/ \;
+          ls -la ../assets
+          gh release create "dev-build-$RUN_ID" --repo "$GITHUB_REPOSITORY" --draft --target "$GITHUB_SHA" \
+            --title "Dev build $RUN_ID (not for distribution)" --notes "Artifacts of run $RUN_ID" ../assets/*
