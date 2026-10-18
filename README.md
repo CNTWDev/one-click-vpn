@@ -434,6 +434,14 @@ existing nodes receive the routing changes without rotating credentials.
   bundles are removed after a one-day grace period once no desired or retryable
   task references them.
 
+### Monthly node traffic and Agent 2.11
+
+Agent 2.11 reports byte counters of the node's default-route (public) interface. The
+Controller accumulates them per UTC calendar month and shows **outbound** (what most clouds
+bill) and inbound per node in Console → 节点运维. Tunnel interfaces are excluded so VPN
+traffic is not counted twice. Counting starts with the first heartbeat after **升级 Agent**;
+reboots and counter resets are handled automatically.
+
 ### Client releases and Agent 2.10
 
 Deploy the Controller (migrations add `client_releases`, `client_policies` and client

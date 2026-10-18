@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { currentMonthTrafficByNode } from "../../../../server/node-traffic";
 import { addAudit, countRunningNodeActions, NodeBusyError, deleteNode, findNode, findRegion, listNodeActionEvents, listNodeActions, NodeIdentityConflictError, publicNode, updateNodeConfig } from "../../../../server/db";
 import { currentUser } from "../../../../server/auth";
 import { cleanText, isValidIp, isValidPort, jsonError, readJson } from "../../../../server/http";
@@ -16,7 +17,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   const node = await findNode(id);
   if (!node) return jsonError("Node not found", 404);
-  return NextResponse.json({ node: publicNode(node), actions: await listNodeActions(id), actionEvents: await listNodeActionEvents(id), reconcile: await getNodeReconcileStatus(id), connectivity: await getNodeConnectivity(id) });
+  const monthlyTraffic = (await currentMonthTrafficByNode()).get(id) || null;
+  return NextResponse.json({ node: { ...publicNode(node), monthlyTraffic }, actions: await listNodeActions(id), actionEvents: await listNodeActionEvents(id), reconcile: await getNodeReconcileStatus(id), connectivity: await getNodeConnectivity(id) });
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
