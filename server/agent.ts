@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { findNode, updateNode } from "./db";
 import { hashToken } from "./crypto";
 import { updateNodeControlMetadata } from "./control-db";
+import { recordNodeNetworkCounters } from "./node-traffic";
 
 function metricNumber(value: unknown, max = Number.MAX_SAFE_INTEGER): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : 0;
@@ -66,6 +67,7 @@ export async function recordAgentHeartbeat(input: {
     version: input.version || "unknown",
     ...(normalizedMetrics ? { metrics_json: normalizedMetrics } : {}),
   });
+  if (input.metrics !== undefined) await recordNodeNetworkCounters(input.nodeId, input.metrics);
   await updateNodeControlMetadata(input.nodeId, {
     publicEndpoint: input.publicEndpoint,
     ...(input.serverPublicKey ? { serverPublicKey: input.serverPublicKey } : {}),

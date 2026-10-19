@@ -391,6 +391,7 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .data-table th:last-child, .data-table td:last-child { padding-right: 18px; }
 .data-table td b, .data-table td small { display: block; }
 .data-table td b { font-weight: 600; }
+.data-table td.nowrap { white-space: nowrap; }
 .data-table td small { margin-top: 2px; color: var(--text-2); font-size: 13px; line-height: 1.45; }
 .data-table td .pill + small { margin-top: 4px; }
 .data-table time { color: var(--text-2); font-size: 13px; }
@@ -471,7 +472,7 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .job-progress span { position: relative; z-index: 1; height: 100%; display: grid; place-items: center; color: var(--text); font-size: 12px; font-weight: 700; }
 .job-error, .operation-history-list pre { margin: 10px 0 0; padding: 11px; color: var(--text-2); background: var(--surface-3); border: 1px solid var(--border); border-radius: 6px; font: 12px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .job-error, .operation-history-list pre.history-error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
-.diagnostic-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.diagnostic-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .diagnostic-cards article { padding: 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
 .diagnostic-cards small, .diagnostic-cards b, .diagnostic-cards article > span { display: block; }
 .diagnostic-cards small { color: var(--text-2); font-size: 13px; }

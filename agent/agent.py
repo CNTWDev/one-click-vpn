@@ -59,6 +59,7 @@ VPN_PORTS = {
 }
 last_cpu_sample = None
 last_network_sample = None
+wan_interface_cache = (0.0, None)
 last_errors = {}
 native_watchdog_ready = False
 
@@ -1286,9 +1287,41 @@ def read_network():
             rx_rate = round(max(0, received - previous_received) / elapsed)
             tx_rate = round(max(0, sent - previous_sent) / elapsed)
         last_network_sample = (now, received, sent)
-        return {"rxBytes": received, "txBytes": sent, "rxBytesPerSecond": rx_rate, "txBytesPerSecond": tx_rate}
+        result = {"rxBytes": received, "txBytes": sent, "rxBytesPerSecond": rx_rate, "txBytesPerSecond": tx_rate}
+        result.update(read_wan_counters())
+        return result
     except (OSError, ValueError, IndexError):
         return {"rxBytes": 0, "txBytes": 0, "rxBytesPerSecond": 0, "txBytesPerSecond": 0}
+
+
+def wan_interface():
+    global wan_interface_cache
+    checked_at, interface = wan_interface_cache
+    if time.time() - checked_at < 300:
+        return interface
+    try:
+        interface = default_interface()
+    except Exception:
+        interface = None
+    wan_interface_cache = (time.time(), interface)
+    return interface
+
+
+def read_wan_counters():
+    # Cloud providers bill the public interface; tunnel interfaces would count VPN traffic twice.
+    interface = wan_interface()
+    if not interface:
+        return {}
+    try:
+        statistics = Path("/sys/class/net") / interface / "statistics"
+        return {
+            "wanInterface": interface[:32],
+            "wanRxBytes": int((statistics / "rx_bytes").read_text().strip()),
+            "wanTxBytes": int((statistics / "tx_bytes").read_text().strip()),
+            "counterEpoch": counter_epoch(),
+        }
+    except (OSError, ValueError):
+        return {}
 
 
 def metrics():
@@ -1413,7 +1446,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.10.0",
+        "version": "agent 2.11.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),

@@ -2614,5 +2614,29 @@
   "{0} 个节点": [
     "{0} servers",
     "Серверов: {0}"
+  ],
+  "本月流量": [
+    "This month",
+    "За месяц"
+  ],
+  "本月出站流量": [
+    "Outbound this month",
+    "Исходящий за месяц"
+  ],
+  "升级 Agent 后统计": [
+    "Upgrade Agent to track",
+    "Обновите Agent"
+  ],
+  "公网网卡流量，按 UTC 自然月累计，自 {0} 起": [
+    "Public interface traffic per UTC calendar month, tracked since {0}",
+    "Трафик внешнего интерфейса за календарный месяц (UTC), учёт с {0}"
+  ],
+  "出 {0}": [
+    "Out {0}",
+    "Исх. {0}"
+  ],
+  "入 {0}": [
+    "In {0}",
+    "Вх. {0}"
   ]
 }

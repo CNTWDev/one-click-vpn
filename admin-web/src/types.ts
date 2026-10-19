@@ -114,7 +114,11 @@ export type NodeRecord = {
   deployment_policy?: string;
   policy_version?: number;
   metrics?: NodeMetrics | null;
+  monthlyTraffic?: NodeMonthlyTraffic | null;
 };
+
+/** Public-interface bytes for the current UTC calendar month; tx (outbound) is what most clouds bill. */
+export type NodeMonthlyTraffic = { month: string; rxBytes: number; txBytes: number; trackedSince: string };
 
 export type Region = { id: string; name: string; country: string; code: string };
 

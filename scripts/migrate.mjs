@@ -407,6 +407,15 @@ CREATE TABLE IF NOT EXISTS native_diagnostics (
   code TEXT NOT NULL, node_id TEXT, occurred_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS native_diagnostics_recent ON native_diagnostics(created_at DESC);
+CREATE TABLE IF NOT EXISTS node_network_counters (
+  node_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, interface TEXT NOT NULL, counter_epoch TEXT NOT NULL,
+  rx_bytes BIGINT NOT NULL, tx_bytes BIGINT NOT NULL, observed_at TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE IF NOT EXISTS node_traffic_monthly (
+  node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, month TEXT NOT NULL,
+  rx_bytes BIGINT NOT NULL DEFAULT 0, tx_bytes BIGINT NOT NULL DEFAULT 0,
+  tracked_since TIMESTAMPTZ NOT NULL, updated_at TIMESTAMPTZ NOT NULL, PRIMARY KEY (node_id, month)
+);
 `;
 
 try {
