@@ -232,24 +232,42 @@ if command -v curl >/dev/null 2>&1; then
 fi
 
 # Runtime logs are optional for recovery, so a log store problem is a warning, not a failed deploy.
-echo "Checking the log service (Loki), up to 60 seconds..."
 loki_ready=""
-i=0
-while [ "$i" -lt 20 ]; do
+loki_crashed=""
+check_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+check_deadline=$(( $(date +%s) + 60 ))
+while :; do
+  elapsed=$(( 60 - (check_deadline - $(date +%s)) ))
+  if [ -t 1 ]; then
+    printf '\rChecking the log service (Loki)... %ss / 60s ' "$elapsed"
+  elif [ -z "${check_announced:-}" ]; then
+    echo "Checking the log service (Loki), up to 60 seconds..."
+    check_announced="yes"
+  fi
   if compose exec -T veilbird node -e "fetch('http://loki:3100/ready',{signal:AbortSignal.timeout(2000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" </dev/null >/dev/null 2>&1; then
     loki_ready="yes"
     break
   fi
-  i=$((i + 1))
+  # A startup error will not fix itself by waiting: report it right away.
+  if compose logs --no-color --since "$check_started" loki 2>/dev/null | grep -q "error running loki"; then
+    loki_crashed="yes"
+    break
+  fi
+  [ "$(date +%s)" -lt "$check_deadline" ] || break
   sleep 1
 done
+if [ -t 1 ]; then echo ""; fi
 if [ -n "$loki_ready" ]; then
   echo "Log service (Loki) is ready."
 else
   echo "Warning: the log service (Loki) is not ready; Console Runtime logs stay empty until it is." >&2
   compose ps --all loki minio minio-init >&2 || true
   echo "Recent Loki output:" >&2
-  compose logs --no-color --tail=40 loki >&2 || true
+  if [ -n "$loki_crashed" ]; then
+    compose logs --no-color --since "$check_started" loki 2>/dev/null | grep "error running loki" | tail -n 1 >&2 || true
+  else
+    compose logs --no-color --tail=40 loki >&2 || true
+  fi
 fi
 
 compose ps
