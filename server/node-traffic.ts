@@ -5,7 +5,9 @@ export type WanCounters = { interface: string; counterEpoch: string; rxBytes: nu
 
 export type NodeMonthlyTraffic = { month: string; rxBytes: number; txBytes: number; trackedSince: string };
 
-type PreviousSample = { interface: string; counter_epoch: string; rx_bytes: string | number; tx_bytes: string | number };
+export type NodeNetworkRate = { rxBytesPerSecond: number; txBytesPerSecond: number };
+
+type PreviousSample = { interface: string; counter_epoch: string; rx_bytes: string | number; tx_bytes: string | number; observed_at?: Date | string };
 
 function counter(value: unknown): number | null {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -37,14 +39,25 @@ export function counterDelta(previous: PreviousSample | undefined, current: WanC
   return { rx: step(Number(previous.rx_bytes), current.rxBytes), tx: step(Number(previous.tx_bytes), current.txBytes) };
 }
 
-export async function recordNodeNetworkCounters(nodeId: string, metrics: unknown, observedAt = new Date()): Promise<void> {
+/** Average public-interface rate between two heartbeats; only the latest value is kept, never a history. */
+export function counterRate(previous: PreviousSample | undefined, current: WanCounters, observedAt: Date): NodeNetworkRate | null {
+  if (!previous?.observed_at || previous.interface !== current.interface || previous.counter_epoch !== current.counterEpoch) return null;
+  const seconds = (observedAt.getTime() - new Date(previous.observed_at).getTime()) / 1000;
+  const rx = current.rxBytes - Number(previous.rx_bytes);
+  const tx = current.txBytes - Number(previous.tx_bytes);
+  // Missed heartbeats would flatten a burst into a misleading average, so a gap longer than 3 minutes shows no rate.
+  if (!(seconds >= 5 && seconds <= 180) || rx < 0 || tx < 0) return null;
+  return { rxBytesPerSecond: Math.round(rx / seconds), txBytesPerSecond: Math.round(tx / seconds) };
+}
+
+export async function recordNodeNetworkCounters(nodeId: string, metrics: unknown, observedAt = new Date()): Promise<NodeNetworkRate | null> {
   const current = wanCountersFromMetrics(metrics);
-  if (!current) return;
+  if (!current) return null;
   const month = billingMonth(observedAt);
   const timestamp = observedAt.toISOString();
-  await withTransaction(async (exec, query) => {
+  return withTransaction(async (exec, query) => {
     const previous = (await query<PreviousSample>(
-      "SELECT interface, counter_epoch, rx_bytes, tx_bytes FROM node_network_counters WHERE node_id = $1 FOR UPDATE", [nodeId],
+      "SELECT interface, counter_epoch, rx_bytes, tx_bytes, observed_at FROM node_network_counters WHERE node_id = $1 FOR UPDATE", [nodeId],
     ))[0];
     const delta = counterDelta(previous, current);
     await exec(`INSERT INTO node_network_counters (node_id, interface, counter_epoch, rx_bytes, tx_bytes, observed_at)
@@ -55,6 +68,7 @@ export async function recordNodeNetworkCounters(nodeId: string, metrics: unknown
       VALUES ($1, $2, $3, $4, $5, $5) ON CONFLICT (node_id, month) DO UPDATE SET
       rx_bytes = node_traffic_monthly.rx_bytes + EXCLUDED.rx_bytes, tx_bytes = node_traffic_monthly.tx_bytes + EXCLUDED.tx_bytes,
       updated_at = EXCLUDED.updated_at`, [nodeId, month, delta.rx, delta.tx, timestamp]);
+    return counterRate(previous, current, observedAt);
   });
 }
 

@@ -113,6 +113,15 @@ function App() {
       .finally(() => setLoading(false));
   }, []);
   useEffect(() => { if (user) void refreshCore(); }, [user, refreshCore]);
+  // Heartbeats arrive every 30 s; refresh node rows quietly so speeds stay current without a full reload.
+  useEffect(() => {
+    if (!user || page !== "nodes") return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void api<{ nodes: NodeRecord[] }>("/api/nodes").then((result) => setNodes(result.nodes || [])).catch(() => undefined);
+    }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [user, page]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => undefined);

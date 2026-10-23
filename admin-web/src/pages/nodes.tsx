@@ -8,7 +8,7 @@ import { setQuery, useQueryParam, useRoute } from "../router";
 import { protocolName, statusLabel, statusTone } from "../status";
 import { useToast } from "../toast";
 import type { NodeDiagnostics, NodeRecord, Region } from "../types";
-import { BatchBar, Empty, formatBytes, formatTime, includesText, InlineNotice, Menu, Meter, Modal, type Notice, PageHeader, Pill, StateDot, TableToolbar, Time } from "./shared";
+import { BatchBar, Empty, formatBytes, formatRate, formatTime, includesText, InlineNotice, Menu, Meter, Modal, type Notice, PageHeader, Pill, StateDot, TableToolbar, Time } from "./shared";
 
 function actionLabel(value: string): string {
   return ({ bootstrap: t("安装 / 修复 Agent"), "upgrade-agent": t("升级 Agent"), "status-agent": t("检查 Agent"), "restart-agent": t("重启 Agent") } as Record<string, string>)[value] || value.replaceAll("-", " ");
@@ -31,6 +31,13 @@ type NodeForm = {
   credentialType: "password" | "private_key"; sshPrivilegeMode: "root" | "sudo"; deploymentTemplate: string;
 };
 type NodeAction = "status-agent" | "restart-agent" | "upgrade-agent" | "bootstrap" | "delete";
+
+/** Public-interface rate from the latest heartbeat; hidden once the heartbeat goes stale. */
+function liveRate(node: NodeRecord): { rx: number; tx: number } | null {
+  const network = node.metrics?.network;
+  if (node.status !== "online" || network?.wanRxBytesPerSecond === undefined || network.wanTxBytesPerSecond === undefined) return null;
+  return { rx: network.wanRxBytesPerSecond, tx: network.wanTxBytesPerSecond };
+}
 
 const blankNodeForm: NodeForm = { name: "", ip: "", regionId: "", sshUser: "root", sshPort: "22", secret: "", credentialType: "password", sshPrivilegeMode: "root", deploymentTemplate: "standard" };
 const statusRank = { danger: 0, warning: 1, progress: 2, neutral: 3, success: 4 };
@@ -78,6 +85,7 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
     .filter((node) => (matchers[filter] || matchers.all)(node) && includesText(search, node.name, node.ip, node.place, regionName.get(node.region_id)))
     .sort((left, right) => sort === "status" ? statusRank[statusTone(left.status)] - statusRank[statusTone(right.status)] || left.name.localeCompare(right.name)
       : sort === "cpu" ? (right.metrics?.cpuPercent ?? -1) - (left.metrics?.cpuPercent ?? -1)
+        : sort === "rate" ? (liveRate(right)?.tx ?? -1) - (liveRate(left)?.tx ?? -1)
         : sort === "traffic" ? (right.monthlyTraffic?.txBytes ?? -1) - (left.monthlyTraffic?.txBytes ?? -1)
         : sort === "region" ? (regionName.get(left.region_id) || "").localeCompare(regionName.get(right.region_id) || "") || left.name.localeCompare(right.name)
           : left.name.localeCompare(right.name, consoleLanguage.locale()));
@@ -260,6 +268,12 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
     ]} />;
   }
 
+  function networkRateCell(node: NodeRecord) {
+    const rate = liveRate(node);
+    if (!rate) return <span className="muted" title={node.status === "online" ? needsUpgrade(node) ? t("升级 Agent 后显示") : t("等待心跳上报") : undefined}>—</span>;
+    return <><b>{t("出 {0}", [formatRate(rate.tx)])}</b><small>{t("入 {0}", [formatRate(rate.rx)])}</small></>;
+  }
+
   function monthlyTrafficCell(node: NodeRecord) {
     const traffic = node.monthlyTraffic;
     if (!traffic) return <span className="muted" title={needsUpgrade(node) ? t("升级 Agent 后统计") : t("等待心跳上报")}>—</span>;
@@ -274,7 +288,7 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
     <InlineNotice notice={notice} />
     {shownResults.length > 0 && <section className="panel result-panel"><div className="panel-head"><h2>{t("逐台提交结果")}</h2><button className="text-button" onClick={() => setBatchResults([])}>{t("关闭")}</button></div><div className="compact-list">{shownResults.map((result) => { const node = nodes.find((item) => item.id === result.nodeId)!; return <div key={result.nodeId}><StateDot value={result.reason ? "attention" : "queued"} /><span><b>{node.name}</b><small>{result.reason || t("已排队，不代表执行完成；请在详情中查看进度。")}</small></span><button className="button ghost small" onClick={() => openDetail(node)}>{t("查看进度")}</button></div>; })}</div></section>}
     <section className="panel flush table-panel">
-      <TableToolbar search={search} onSearch={setSearch} placeholder={t("搜索名称、IP 或区域")} chips={chips} chip={filter} onChip={setFilter} sort={sort} onSort={setSort} sortOptions={[["name", t("名称")], ["status", t("状态（异常优先）")], ["cpu", t("CPU 负载")], ["traffic", t("本月出站流量")], ["region", t("区域")]]} />
+      <TableToolbar search={search} onSearch={setSearch} placeholder={t("搜索名称、IP 或区域")} chips={chips} chip={filter} onChip={setFilter} sort={sort} onSort={setSort} sortOptions={[["name", t("名称")], ["status", t("状态（异常优先）")], ["cpu", t("CPU 负载")], ["rate", t("实时出站网速")], ["traffic", t("本月出站流量")], ["region", t("区域")]]} />
       <BatchBar count={selectedIds.length} unit={t("个节点")} onClear={() => setSelected(new Set())}>
         <button className="button primary small" disabled={Boolean(busy) || !targetVersion} onClick={() => void batch("upgrade-agent")}>{t("升级 Agent")}</button>
         <button className="button ghost small" disabled={Boolean(busy)} onClick={() => void batch("status-agent")}>{t("检查")}</button>
@@ -282,12 +296,13 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
         <button className="button ghost small" disabled={Boolean(busy)} onClick={() => void batch("bootstrap")}>{t("重新安装 / 修复")}</button>
         <button className="button danger small" disabled={Boolean(busy)} onClick={() => void batchDelete()}>{t("删除")}</button>
       </BatchBar>
-      <div className="table-wrap"><table className="data-table cards node-table"><thead><tr><th className="check"><input type="checkbox" aria-label={t("选择全部节点")} checked={allSelected} onChange={(event) => setSelected(event.target.checked ? new Set(visible.map((node) => node.id)) : new Set())} /></th><th>{t("节点")}</th><th>{t("状态")}</th><th>Agent</th><th>{t("负载")}</th><th>{t("本月流量")}</th><th>{t("策略")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visible.map((node) => <tr key={node.id} className={selected.has(node.id) ? "selected" : ""}>
+      <div className="table-wrap"><table className="data-table cards node-table"><thead><tr><th className="check"><input type="checkbox" aria-label={t("选择全部节点")} checked={allSelected} onChange={(event) => setSelected(event.target.checked ? new Set(visible.map((node) => node.id)) : new Set())} /></th><th>{t("节点")}</th><th>{t("状态")}</th><th>Agent</th><th>{t("负载")}</th><th>{t("网速")}</th><th>{t("本月流量")}</th><th>{t("策略")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visible.map((node) => <tr key={node.id} className={selected.has(node.id) ? "selected" : ""}>
         <td className="check"><input type="checkbox" aria-label={t("选择 {0}", [node.name])} checked={selected.has(node.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(node.id); else next.delete(node.id); return next; })} /></td>
         <td className="cell-main"><button className="node-detail-trigger" onClick={() => openDetail(node)}><StateDot value={node.status} /><span><b>{node.name}</b><small>{node.ip} · {node.place}</small></span></button></td>
         <td className="cell-status"><Pill value={node.status} /><small>{node.latency} · {node.last_seen}</small></td>
         <td className="m-hide"><b className="mono">{node.version || "—"}</b>{needsUpgrade(node) ? <button className="upgrade-chip" disabled={Boolean(busy)} onClick={() => void operate(node, "upgrade-agent")} title={t("点击升级 Agent")}>{t("升级到 {0}", [targetVersion])}</button> : <small>{node.ssh_user || "root"}@{node.ssh_port || 22}</small>}</td>
         <td className="m-hide">{node.metrics ? <div className="meters"><Meter label="CPU" value={node.metrics.cpuPercent} /><Meter label={t("内存")} value={node.metrics.memory.percent} /><Meter label={t("磁盘")} value={node.metrics.disk.percent} /></div> : <span className="muted">{t("暂无指标")}</span>}</td>
+        <td className="m-hide nowrap" title={liveRate(node) ? t("公网网卡近 30 秒平均速率") : undefined}>{networkRateCell(node)}</td>
         <td className="m-hide nowrap" title={node.monthlyTraffic ? t("公网网卡流量，按 UTC 自然月累计，自 {0} 起", [formatTime(node.monthlyTraffic.trackedSince)]) : undefined}>{monthlyTrafficCell(node)}</td>
         <td className="m-hide nowrap"><b>{node.deployment_policy === "custom" ? t("自定义") : node.deployment_policy === "agent-only" ? t("仅 Agent") : node.deployment_policy === "standard" || !node.deployment_policy ? t("标准") : node.deployment_policy}</b><small>{t("策略 v")}{node.policy_version || 0}</small></td>
         <td className="align-right cell-actions"><div className="row-actions"><button className="button ghost small" onClick={() => openDetail(node)}>{node.status === "provisioning" ? t("部署进度") : t("详情")}</button>{rowMenu(node)}</div></td>
@@ -320,7 +335,7 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
           <div className="job-progress"><i style={{ width: `${Math.min(Math.max(diagnostics.actions[0].progress || 0, 0), 100)}%` }} /><span>{diagnostics.actions[0].progress || 0}%</span></div>
           {diagnostics.actions[0].error && <pre className="job-error">{diagnostics.actions[0].error}</pre>}
         </section> : <InlineNotice notice={{ tone: "info", message: t("该节点还没有部署或运维任务记录。") }} />}
-        <div className="diagnostic-cards"><article><small>{t("节点身份")}</small><b><Pill value={diagnostics.connectivity?.status || diagnosticNode.status} /></b><span title={diagnosticNode.node_identity || undefined}>{diagnosticNode.ip}{diagnosticNode.node_identity ? ` · ID …${diagnosticNode.node_identity.slice(-8)}` : t(" · 等待首次身份绑定")}</span></article><article><small>{t("Agent 通道")}</small><b><Pill value={diagnostics.connectivity?.agentChannel || "unknown"} /></b><span>{t("最近心跳")} <Time value={diagnostics.connectivity?.lastAuthenticatedHeartbeat} /></span></article><article><small>{t("防火墙")}</small><b>{diagnostics.connectivity?.firewall.manager || "unknown"}</b><span>{diagnostics.connectivity?.firewall.inputPolicy || "—"}</span></article><article><small>{t("资源")}</small><b>{diagnosticNode.metrics ? `CPU ${diagnosticNode.metrics.cpuPercent.toFixed(0)}%` : t("暂无指标")}</b><span>{diagnosticNode.metrics ? t("内存 {0}% · 网络 ↓ {1}/s", [diagnosticNode.metrics.memory.percent.toFixed(0), formatBytes(diagnosticNode.metrics.network.rxBytesPerSecond)]) : t("等待心跳上报")}</span></article><article title={diagnosticNode.monthlyTraffic ? t("公网网卡流量，按 UTC 自然月累计，自 {0} 起", [formatTime(diagnosticNode.monthlyTraffic.trackedSince)]) : undefined}><small>{t("本月流量")}</small><b>{diagnosticNode.monthlyTraffic ? t("出 {0}", [formatBytes(diagnosticNode.monthlyTraffic.txBytes)]) : "—"}</b><span>{diagnosticNode.monthlyTraffic ? t("入 {0}", [formatBytes(diagnosticNode.monthlyTraffic.rxBytes)]) : needsUpgrade(diagnosticNode) ? t("升级 Agent 后统计") : t("等待心跳上报")}</span></article></div>
+        <div className="diagnostic-cards"><article><small>{t("节点身份")}</small><b><Pill value={diagnostics.connectivity?.status || diagnosticNode.status} /></b><span title={diagnosticNode.node_identity || undefined}>{diagnosticNode.ip}{diagnosticNode.node_identity ? ` · ID …${diagnosticNode.node_identity.slice(-8)}` : t(" · 等待首次身份绑定")}</span></article><article><small>{t("Agent 通道")}</small><b><Pill value={diagnostics.connectivity?.agentChannel || "unknown"} /></b><span>{t("最近心跳")} <Time value={diagnostics.connectivity?.lastAuthenticatedHeartbeat} /></span></article><article><small>{t("防火墙")}</small><b>{diagnostics.connectivity?.firewall.manager || "unknown"}</b><span>{diagnostics.connectivity?.firewall.inputPolicy || "—"}</span></article><article><small>{t("资源")}</small><b>{diagnosticNode.metrics ? `CPU ${diagnosticNode.metrics.cpuPercent.toFixed(0)}%` : t("暂无指标")}</b><span>{diagnosticNode.metrics ? t("内存 {0}% · 磁盘 {1}%", [diagnosticNode.metrics.memory.percent.toFixed(0), diagnosticNode.metrics.disk.percent.toFixed(0)]) : t("等待心跳上报")}</span></article><article title={liveRate(diagnosticNode) ? t("公网网卡近 30 秒平均速率") : undefined}><small>{t("网速")}</small><b>{liveRate(diagnosticNode) ? t("出 {0}", [formatRate(liveRate(diagnosticNode)!.tx)]) : "—"}</b><span>{liveRate(diagnosticNode) ? t("入 {0}", [formatRate(liveRate(diagnosticNode)!.rx)]) : diagnosticNode.status !== "online" ? "—" : needsUpgrade(diagnosticNode) ? t("升级 Agent 后显示") : t("等待心跳上报")}</span></article><article title={diagnosticNode.monthlyTraffic ? t("公网网卡流量，按 UTC 自然月累计，自 {0} 起", [formatTime(diagnosticNode.monthlyTraffic.trackedSince)]) : undefined}><small>{t("本月流量")}</small><b>{diagnosticNode.monthlyTraffic ? t("出 {0}", [formatBytes(diagnosticNode.monthlyTraffic.txBytes)]) : "—"}</b><span>{diagnosticNode.monthlyTraffic ? t("入 {0}", [formatBytes(diagnosticNode.monthlyTraffic.rxBytes)]) : needsUpgrade(diagnosticNode) ? t("升级 Agent 后统计") : t("等待心跳上报")}</span></article></div>
         {diagnostics.connectivity?.note && <div className="inline-notice info">{diagnostics.connectivity.note}</div>}
         <section className="deployment-log"><div className="diagnostic-section-head"><div><h3>{t("部署与操作日志")}</h3><p>{t("Controller 记录的 Bootstrap、Agent 和修复任务事件，最新事件在最上方。")}</p></div><span>{t("{0} 条事件", [diagnostics.actionEvents.length])}</span></div>{diagnostics.actionEvents.length ? <div className="event-list">{diagnostics.actionEvents.slice(0, 100).map((event) => <div key={event.id}><time>{formatTime(event.created_at)}</time><Pill value={event.level} /><span><b>{phaseLabel(event.phase)}</b>{event.message}</span></div>)}</div> : <Empty>{t("还没有部署或操作日志。")}</Empty>}</section>
         <section><h3>{t("VPN 协议运行状态")}</h3>{diagnostics.connectivity?.protocols.length ? <div className="protocol-grid">{diagnostics.connectivity.protocols.map((protocol) => <article key={protocol.protocol}><div><b>{protocolName(protocol.protocol)}</b><Pill value={protocol.state} /></div><small>{protocol.transport}:{protocol.port} · {protocol.listening ? t("正在监听") : t("未监听")} · {t("运行时：{0}", [protocol.runtimeActive ? t("运行中") : t("未运行")])}</small><small>{t("主机防火墙：{0}", [statusLabel(protocol.hostFirewall)])} · {t("云防火墙：{0}", [statusLabel(protocol.cloudFirewall)])}</small>{protocol.lastError && <p>{protocol.lastError}</p>}</article>)}</div> : <Empty>{t("没有 Agent 协议状态。")}</Empty>}</section>

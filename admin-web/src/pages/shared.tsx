@@ -44,6 +44,15 @@ export function formatBytes(value?: number): string {
   return `${consoleLanguage.number(value / 1024 ** power, { maximumFractionDigits: power > 1 ? 1 : 0 })} ${units[power]}`;
 }
 
+/** Link speed in bits per second, the unit cloud bandwidth is sold in. */
+export function formatRate(bytesPerSecond?: number): string {
+  const bits = (bytesPerSecond || 0) * 8;
+  if (bits < 1000) return `${consoleLanguage.number(bits, { maximumFractionDigits: 0 })} bps`;
+  const units = ["Kbps", "Mbps", "Gbps"];
+  const power = Math.min(Math.floor(Math.log10(bits) / 3), units.length);
+  return `${consoleLanguage.number(bits / 1000 ** power, { maximumFractionDigits: power > 1 ? 1 : 0 })} ${units[power - 1]}`;
+}
+
 export function PageHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {
   useConsoleLanguage();
   return <div className="page-head">

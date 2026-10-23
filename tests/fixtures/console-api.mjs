@@ -19,13 +19,13 @@ const regions = [
   { id: "r4", name: "Malaysia", country: "Malaysia", code: "MY" },
   { id: "r5", name: "São Paulo Metropolitan Area", country: "Brazil", code: "BR" },
 ];
-const metrics = (cpu, mem, disk) => ({ collectedAt: now, cpuPercent: cpu, load1: cpu / 25, memory: { usedBytes: mem * 0.08 * GB, totalBytes: 8 * GB, percent: mem }, disk: { usedBytes: disk * 0.4 * GB, totalBytes: 40 * GB, percent: disk }, network: { rxBytes: 9e9, txBytes: 7e9, rxBytesPerSecond: 120000, txBytesPerSecond: 98000 } });
+const metrics = (cpu, mem, disk, wanTx = 1.6e6, wanRx = 1.4e6) => ({ collectedAt: now, cpuPercent: cpu, load1: cpu / 25, memory: { usedBytes: mem * 0.08 * GB, totalBytes: 8 * GB, percent: mem }, disk: { usedBytes: disk * 0.4 * GB, totalBytes: 40 * GB, percent: disk }, network: { rxBytes: 9e9, txBytes: 7e9, rxBytesPerSecond: 120000, txBytesPerSecond: 98000, wanRxBytesPerSecond: wanRx, wanTxBytesPerSecond: wanTx } });
 const monthly = (rxGb, txGb) => ({ month: now.slice(0, 7), rxBytes: rxGb * GB, txBytes: txGb * GB, trackedSince: now.slice(0, 8) + "01T00:00:04Z" });
 const node = (id, name, region, ip, user, port, extra = {}) => ({ id, name, place: regions.find((r) => r.id === region).name, region_id: region, ip, ssh_user: user, ssh_port: port, ssh_privilege_mode: "auto", credential_type: "private_key", status: "online", latency: "38 ms", users: 3, traffic: "12.4 GB", version: "agent 2.10.0", last_seen: "now", host_fingerprint: "SHA256:" + "x".repeat(43), host_fingerprint_source: "ssh_tofu", node_identity: "node-" + id, identity_verified_at: now, deployment_policy: "standard", policy_version: 2, metrics: metrics(2, 17, 3), monthlyTraffic: monthly(412.6, 438.9), ...extra });
 const nodes = [
   node("n1", "13.245.35.167@Cape Town", "r1", "13.245.35.167", "root", 10022, { metrics: metrics(2, 17, 3) }),
-  node("n2", "190.92.202.34@Singapore", "r2", "190.92.202.34", "root", 22, { metrics: metrics(3, 16, 18), monthlyTraffic: monthly(1843.2, 1907.5) }),
-  node("n3", "3.139.105.5(US)", "r3", "3.139.105.5", "ubuntu", 22, { metrics: metrics(2, 48, 3), monthlyTraffic: monthly(0.004, 0.006) }),
+  node("n2", "190.92.202.34@Singapore", "r2", "190.92.202.34", "root", 22, { metrics: metrics(3, 16, 18, 117.6e6, 112.9e6), monthlyTraffic: monthly(1843.2, 1907.5) }),
+  node("n3", "3.139.105.5(US)", "r3", "3.139.105.5", "ubuntu", 22, { metrics: metrics(2, 48, 3, 90, 40), monthlyTraffic: monthly(0.004, 0.006) }),
   node("n4", "Johor-bytedance", "r4", "101.47.28.201", "root", 22, { metrics: metrics(100, 94, 71) }),
   node("n5", "sao-paulo-edge-gateway-primary-with-a-very-long-hostname", "r5", "2001:db8:85a3::8a2e:370:7334", "administrator", 65022, { status: "offline", last_seen: "2 days ago", metrics: null, monthlyTraffic: null, deployment_policy: "custom", policy_version: 1, version: "agent 2.9.4" }),
 ];
