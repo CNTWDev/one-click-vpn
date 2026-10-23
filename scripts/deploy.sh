@@ -116,7 +116,10 @@ wait_for_healthy() {
 
 wait_for_healthy db
 echo "PostgreSQL is healthy. Preparing internal operational-log storage..."
-compose up -d minio minio-init
+compose up -d minio
+# Re-run the one-shot bucket setup on every deploy: an exit code from an earlier run says nothing
+# about whether the bucket still exists, and Loki crash-loops without it.
+compose up -d --force-recreate minio-init
 
 minio_init_id=$(compose ps --all --quiet minio-init)
 if [ -z "$minio_init_id" ]; then
@@ -229,19 +232,24 @@ if command -v curl >/dev/null 2>&1; then
 fi
 
 # Runtime logs are optional for recovery, so a log store problem is a warning, not a failed deploy.
+echo "Checking the log service (Loki), up to 60 seconds..."
 loki_ready=""
 i=0
-while [ "$i" -lt 45 ]; do
-  if compose exec -T veilbird node -e "fetch('http://loki:3100/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
+while [ "$i" -lt 20 ]; do
+  if compose exec -T veilbird node -e "fetch('http://loki:3100/ready',{signal:AbortSignal.timeout(2000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" </dev/null >/dev/null 2>&1; then
     loki_ready="yes"
     break
   fi
   i=$((i + 1))
-  sleep 2
+  sleep 1
 done
-if [ -z "$loki_ready" ]; then
-  echo "Warning: the log service (Loki) is not ready; Console Runtime logs stay empty until it is. Recent Loki output:" >&2
-  compose logs --tail=40 loki >&2 || true
+if [ -n "$loki_ready" ]; then
+  echo "Log service (Loki) is ready."
+else
+  echo "Warning: the log service (Loki) is not ready; Console Runtime logs stay empty until it is." >&2
+  compose ps --all loki minio minio-init >&2 || true
+  echo "Recent Loki output:" >&2
+  compose logs --no-color --tail=40 loki >&2 || true
 fi
 
 compose ps
