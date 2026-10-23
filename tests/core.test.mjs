@@ -417,6 +417,12 @@ test("node heartbeats accumulate public-interface traffic per UTC month", integr
     assert.equal(node.monthlyTraffic.month, month);
     assert.equal(node.monthlyTraffic.rxBytes, 1_500);
     assert.equal(node.monthlyTraffic.txBytes, 30_900);
+    assert.equal(node.metrics.network.wanTxBytesPerSecond, undefined); // Back-to-back beats are too close for a meaningful rate.
+    await pool.query("UPDATE node_network_counters SET observed_at = now() - interval '30 seconds' WHERE node_id = $1", [nodeId]);
+    assert.equal((await beat(wan(30_100, 3_000_200, "boot-2"))).status, 200);
+    const rated = (await (await fetch(`${base}/api/nodes`, { headers: { Cookie: login.headers.get("set-cookie").split(";")[0] } })).json()).nodes.find((item) => item.id === nodeId);
+    assert.ok(Math.abs(rated.metrics.network.wanRxBytesPerSecond - 1_000) <= 40);
+    assert.ok(Math.abs(rated.metrics.network.wanTxBytesPerSecond - 100_000) <= 4_000);
   } finally {
     await pool.query("DELETE FROM nodes WHERE id = $1", [nodeId]);
     await pool.end();

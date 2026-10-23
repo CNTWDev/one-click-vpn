@@ -57,7 +57,7 @@ export type NodeMetrics = {
   load1: number;
   memory: { usedBytes: number; totalBytes: number; percent: number };
   disk: { usedBytes: number; totalBytes: number; percent: number };
-  network: { rxBytes: number; txBytes: number; rxBytesPerSecond: number; txBytesPerSecond: number };
+  network: { rxBytes: number; txBytes: number; rxBytesPerSecond: number; txBytesPerSecond: number; wanRxBytesPerSecond?: number; wanTxBytesPerSecond?: number };
 };
 
 export type DbRegion = {
