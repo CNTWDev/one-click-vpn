@@ -213,4 +213,9 @@ export type ControllerInfo = {
   runtime: { uptimeSeconds: number; nodeVersion: string; rssBytes: number; heapUsedBytes: number; load1: number; observedAt: string };
 };
 
-export type OperationalLogLine = { timestamp: string; labels: Record<string, string>; message: string; actionId?: string };
+export type OperationalLogLine = {
+  timestamp: string; labels: Record<string, string>; message: string;
+  traceId?: string; actionId?: string; action?: string;
+  actor?: { id: string; email?: string; role?: string }; target?: { type?: string; id?: string };
+  ip?: string; request?: string; details?: Record<string, unknown>;
+};

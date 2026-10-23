@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { writeOperationalLog } from "./operational-logs";
 
 export function jsonError(message: string, status = 400): NextResponse {
+  // Rejected requests are logged with their trace so "请求 ID" from a Console error finds the cause.
+  // Unauthenticated (401) and not-found (404) answers are routine and would only add noise.
+  if (status !== 401 && status !== 404) void writeOperationalLog({ component: "api", level: status >= 500 ? "error" : "warning", message, actorFromRequest: true });
   return NextResponse.json({ error: message }, { status });
 }
 
