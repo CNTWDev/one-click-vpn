@@ -239,6 +239,19 @@ Controller host:
 sudo ./scripts/reset-admin-password.sh
 ```
 
+Users who forget their Portal password have two ways back, both through a
+one-time link that stops working once used (nothing is stored in the database):
+
+- **Console → Users → ⋯ → Password reset link** creates a link valid for 24
+  hours. Send it to the user; they choose the new password themselves.
+- **Forgot password?** on the Portal sign-in page emails a link valid for 1
+  hour. Turn it on in **Console → Controller → Email**: pick Alibaba Cloud
+  DirectMail (or any SMTP service), enter the sender address and its SMTP
+  password, save and send a test email. Without it the page asks the user to
+  contact the administrator.
+
+Setting a new password signs the account out of the Portal and native clients.
+
 ## Edge Node bootstrap
 
 In Admin, create a node with its public address and SSH credential, then choose

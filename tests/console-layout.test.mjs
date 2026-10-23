@@ -20,6 +20,8 @@ const views = [
   { name: "topology", hash: "topology" },
   { name: "users", hash: "users" },
   { name: "users-access", hash: "users", open: (page, l) => page.getByRole("button", { name: tr(l, "访问详情"), exact: true }).first().click() },
+  // The users table scrolls sideways on narrow screens, and any scroll closes an open menu: scroll first, then open it.
+  { name: "users-reset", hash: "users", open: async (page, l) => { const more = page.getByRole("button", { name: tr(l, "{0} 的更多操作").replace("{0}", "liming@example.cn") }); await more.scrollIntoViewIfNeeded(); await page.waitForTimeout(150); await more.click(); await page.getByRole("menuitem", { name: tr(l, "重置密码链接") }).click(); } },
   { name: "subscriptions", hash: "subscriptions" },
   { name: "nodes", hash: "nodes" },
   { name: "nodes-detail", hash: "nodes?focus=n4" },

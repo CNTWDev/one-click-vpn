@@ -42,3 +42,11 @@ export function allowSubscriptionFetch(request: Request, tokenHash: string): boo
   return hit(`subscription-ip:${clientAddress(request)}`, 300, Date.now())
     && hit(`subscription-token:${tokenHash}`, 60, Date.now());
 }
+
+/** Reset emails: 10 per client address and 3 per account every 15 minutes. */
+export function allowPasswordResetRequest(request: Request, email: string): boolean {
+  const now = Date.now();
+  const byAddress = hit(`reset-ip:${clientAddress(request)}`, 10, now);
+  const byAccount = hit(`reset-email:${email}`, 3, now);
+  return byAddress && byAccount;
+}

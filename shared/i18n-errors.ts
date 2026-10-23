@@ -15,6 +15,9 @@ const errorSources: Record<string, string> = {
   "Credential not found": "连接不存在",
   "Profile not found": "配置不存在",
   "Credential name is required": "请输入连接名称，不能只包含空格。",
+  "This reset link is invalid or has expired": "重置链接无效或已过期，请重新获取。",
+  "Email delivery is not configured": "未开启邮件找回，请联系管理员。",
+  "Too many requests": "请求过于频繁，请稍后重试",
   "Profile has expired; create a replacement credential": "连接已到期，请换发后重新导入。",
 };
 export function errorText(message: string, t: Translator): string {
