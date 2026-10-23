@@ -116,7 +116,10 @@ wait_for_healthy() {
 
 wait_for_healthy db
 echo "PostgreSQL is healthy. Preparing internal operational-log storage..."
-compose up -d minio minio-init
+compose up -d minio
+# Re-run the one-shot bucket setup on every deploy: an exit code from an earlier run says nothing
+# about whether the bucket still exists, and Loki crash-loops without it.
+compose up -d --force-recreate minio-init
 
 minio_init_id=$(compose ps --all --quiet minio-init)
 if [ -z "$minio_init_id" ]; then
