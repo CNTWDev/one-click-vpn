@@ -268,16 +268,21 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
     ]} />;
   }
 
-  function networkRateCell(node: NodeRecord) {
+  // One column keeps the table within 1440 px in every locale; the drawer shows the full in/out split.
+  function trafficCell(node: NodeRecord) {
     const rate = liveRate(node);
-    if (!rate) return <span className="muted" title={node.status === "online" ? needsUpgrade(node) ? t("升级 Agent 后显示") : t("等待心跳上报") : undefined}>—</span>;
-    return <><b>{t("出 {0}", [formatRate(rate.tx)])}</b><small>{t("入 {0}", [formatRate(rate.rx)])}</small></>;
+    const traffic = node.monthlyTraffic;
+    if (!rate && !traffic) return <span className="muted" title={needsUpgrade(node) ? t("升级 Agent 后显示") : t("等待心跳上报")}>—</span>;
+    return <><b>{rate ? `↑ ${formatRate(rate.tx)}` : "—"}</b><small>{traffic ? t("本月 {0}", [formatBytes(traffic.txBytes)]) : "—"}</small></>;
   }
 
-  function monthlyTrafficCell(node: NodeRecord) {
+  function trafficTitle(node: NodeRecord) {
+    const rate = liveRate(node);
     const traffic = node.monthlyTraffic;
-    if (!traffic) return <span className="muted" title={needsUpgrade(node) ? t("升级 Agent 后统计") : t("等待心跳上报")}>—</span>;
-    return <><b>{t("出 {0}", [formatBytes(traffic.txBytes)])}</b><small>{t("入 {0}", [formatBytes(traffic.rxBytes)])}</small></>;
+    return [
+      rate && t("近 30 秒：出 {0} · 入 {1}", [formatRate(rate.tx), formatRate(rate.rx)]),
+      traffic && t("本月：出 {0} · 入 {1}（UTC 自然月，自 {2} 起）", [formatBytes(traffic.txBytes), formatBytes(traffic.rxBytes), formatTime(traffic.trackedSince)]),
+    ].filter(Boolean).join("\n") || undefined;
   }
 
   const allSelected = visible.length > 0 && visible.every((node) => selected.has(node.id));
@@ -296,14 +301,13 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
         <button className="button ghost small" disabled={Boolean(busy)} onClick={() => void batch("bootstrap")}>{t("重新安装 / 修复")}</button>
         <button className="button danger small" disabled={Boolean(busy)} onClick={() => void batchDelete()}>{t("删除")}</button>
       </BatchBar>
-      <div className="table-wrap"><table className="data-table cards node-table"><thead><tr><th className="check"><input type="checkbox" aria-label={t("选择全部节点")} checked={allSelected} onChange={(event) => setSelected(event.target.checked ? new Set(visible.map((node) => node.id)) : new Set())} /></th><th>{t("节点")}</th><th>{t("状态")}</th><th>Agent</th><th>{t("负载")}</th><th>{t("网速")}</th><th>{t("本月流量")}</th><th>{t("策略")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visible.map((node) => <tr key={node.id} className={selected.has(node.id) ? "selected" : ""}>
+      <div className="table-wrap"><table className="data-table cards node-table"><thead><tr><th className="check"><input type="checkbox" aria-label={t("选择全部节点")} checked={allSelected} onChange={(event) => setSelected(event.target.checked ? new Set(visible.map((node) => node.id)) : new Set())} /></th><th>{t("节点")}</th><th>{t("状态")}</th><th>Agent</th><th>{t("负载")}</th><th>{t("流量")}</th><th>{t("策略")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visible.map((node) => <tr key={node.id} className={selected.has(node.id) ? "selected" : ""}>
         <td className="check"><input type="checkbox" aria-label={t("选择 {0}", [node.name])} checked={selected.has(node.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(node.id); else next.delete(node.id); return next; })} /></td>
         <td className="cell-main"><button className="node-detail-trigger" onClick={() => openDetail(node)}><StateDot value={node.status} /><span><b>{node.name}</b><small>{node.ip} · {node.place}</small></span></button></td>
         <td className="cell-status"><Pill value={node.status} /><small>{node.latency} · {node.last_seen}</small></td>
         <td className="m-hide"><b className="mono">{node.version || "—"}</b>{needsUpgrade(node) ? <button className="upgrade-chip" disabled={Boolean(busy)} onClick={() => void operate(node, "upgrade-agent")} title={t("点击升级 Agent")}>{t("升级到 {0}", [targetVersion])}</button> : <small>{node.ssh_user || "root"}@{node.ssh_port || 22}</small>}</td>
         <td className="m-hide">{node.metrics ? <div className="meters"><Meter label="CPU" value={node.metrics.cpuPercent} /><Meter label={t("内存")} value={node.metrics.memory.percent} /><Meter label={t("磁盘")} value={node.metrics.disk.percent} /></div> : <span className="muted">{t("暂无指标")}</span>}</td>
-        <td className="m-hide nowrap" title={liveRate(node) ? t("公网网卡近 30 秒平均速率") : undefined}>{networkRateCell(node)}</td>
-        <td className="m-hide nowrap" title={node.monthlyTraffic ? t("公网网卡流量，按 UTC 自然月累计，自 {0} 起", [formatTime(node.monthlyTraffic.trackedSince)]) : undefined}>{monthlyTrafficCell(node)}</td>
+        <td className="m-hide nowrap" title={trafficTitle(node)}>{trafficCell(node)}</td>
         <td className="m-hide nowrap"><b>{node.deployment_policy === "custom" ? t("自定义") : node.deployment_policy === "agent-only" ? t("仅 Agent") : node.deployment_policy === "standard" || !node.deployment_policy ? t("标准") : node.deployment_policy}</b><small>{t("策略 v")}{node.policy_version || 0}</small></td>
         <td className="align-right cell-actions"><div className="row-actions"><button className="button ghost small" onClick={() => openDetail(node)}>{node.status === "provisioning" ? t("部署进度") : t("详情")}</button>{rowMenu(node)}</div></td>
       </tr>)}</tbody></table></div>
