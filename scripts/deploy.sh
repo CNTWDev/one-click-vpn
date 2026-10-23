@@ -252,6 +252,9 @@ else
   compose logs --no-color --tail=40 loki >&2 || true
 fi
 
+# Cleanup runs only after a healthy deploy, so a failed one still has its previous images.
+sh "$SCRIPT_DIR/prune-docker.sh" || echo "Warning: Docker cleanup failed; deployment is unaffected." >&2
+
 compose ps
 echo "Northstar deployment is healthy (service: $service)."
 echo "Controller: http://127.0.0.1:3000"

@@ -169,6 +169,13 @@ together with `sudo ./one-click-update.sh --service all`.
 database backup and do not restart the Controller. Use the full update when a
 change touches dependencies, migrations, Compose configuration, or shared code.
 
+Updates clean up after themselves so the disk does not fill over time: only the
+newest 10 database dumps in `./backups` are kept (`VEILBIRD_BACKUP_KEEP` in `.env`,
+`0` keeps all), each container keeps at most 30 MB of Docker output, and after a
+healthy deploy the untagged images left by the previous build and build cache older
+than 7 days are removed (`VEILBIRD_DOCKER_PRUNE=no` skips this). Copy important
+dumps off the server; they are not a substitute for off-site backups.
+
 When upgrading a legacy single-domain installation, deployment opens a one-time
 domain migration prompt and rewrites only the seven Portal/Admin/API origin keys.
 It backs up `.env` first; passwords and application secrets are preserved.
