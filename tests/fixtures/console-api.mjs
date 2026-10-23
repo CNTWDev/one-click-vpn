@@ -85,6 +85,8 @@ export function consoleApi({ signedIn = true } = {}) {
     if (pathname === "/api/auth/logout") { session = false; return [200, {}]; }
     if (pathname === "/api/v1/admin/users") return [200, { users }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/credentials$/.test(pathname)) return [200, access];
+    if (pathname === "/api/v1/admin/mail-settings") return [200, { settings: { provider: "aliyun", host: "smtpdm-ap-southeast-1.aliyun.com", port: 465, username: "no-reply@notifications.very-long-company-domain.example", fromName: "Veilbird", passwordSet: true, updatedAt: now } }];
+    if (/^\/api\/v1\/admin\/users\/[^/]+\/password-reset$/.test(pathname)) return [200, { url: `https://app.very-long-subdomain.example.com/#reset=usr_6f1c2d3e-4b5a-6978-8a9b-0c1d2e3f4a5b.1792000000.${"x".repeat(43)}`, expiresAt: "2026-10-24T10:00:00Z" }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/native-access$/.test(pathname)) return [200, { enabled: true, devices: [], credentials: [] }];
     if (pathname === "/api/nodes") return [200, { nodes }];
     if (pathname === "/api/nodes/agent-release") return [200, { version: "2.10.0", revision: "test" }];

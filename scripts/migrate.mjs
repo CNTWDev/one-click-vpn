@@ -99,6 +99,11 @@ CREATE TABLE IF NOT EXISTS controller_settings (
   location_label TEXT NOT NULL DEFAULT '', latitude DOUBLE PRECISION, longitude DOUBLE PRECISION,
   location_source TEXT NOT NULL DEFAULT 'unset', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mail_settings (
+  id TEXT PRIMARY KEY CHECK (id = 'primary'), provider TEXT NOT NULL, host TEXT NOT NULL, port INTEGER NOT NULL,
+  username TEXT NOT NULL, from_name TEXT NOT NULL DEFAULT '', password_ciphertext TEXT NOT NULL,
+  password_iv TEXT NOT NULL, password_tag TEXT NOT NULL, updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS node_actions (
   id TEXT PRIMARY KEY, node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   action TEXT NOT NULL, status TEXT NOT NULL, output TEXT NOT NULL DEFAULT '',

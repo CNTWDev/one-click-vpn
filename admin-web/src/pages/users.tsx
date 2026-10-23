@@ -22,6 +22,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
   const [rangeDays, setRangeDays] = useState(30);
   const [credentialsBusy, setCredentialsBusy] = useState(false);
   const [connectionFilter, setConnectionFilter] = useState("all");
+  const [resetLink, setResetLink] = useState<{ user: AdminUser; url: string } | null>(null);
   const visibleConnections = (accessOverview?.credentials || []).filter((item) => connectionFilter === "all" || (connectionFilter === "subscription" ? !!item.subscriptionId : !item.subscriptionId));
   const time = (value?: string | null) => value ? new Date(value).getTime() || 0 : 0;
   const visible = users.filter((user) => (filter === "all" || user.status === filter) && includesText(search, user.displayName, user.email))
@@ -83,6 +84,22 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
     if (failures.length) setNotice({ tone: "error", message: t("{0} 个账号处理失败：{1}", [failures.length, failures.join("；")]) });
     if (targets.length > failures.length) toast(t("已{0} {1} 个账号申请。", [status === "active" ? t("通过") : t("拒绝"), targets.length - failures.length]));
     setSelected(new Set()); setBusy(""); await onRefresh();
+  }
+
+  // The administrator only hands over a one-time link; the user picks the new password themselves.
+  async function createResetLink(user: AdminUser) {
+    setBusy(user.id); setNotice(null);
+    try {
+      const result = await api<{ url: string }>(`/api/v1/admin/users/${user.id}/password-reset`, { method: "POST" });
+      setResetLink({ user, url: result.url });
+    } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
+    finally { setBusy(""); }
+  }
+
+  async function copyResetLink() {
+    if (!resetLink) return;
+    try { await navigator.clipboard.writeText(resetLink.url); toast(t("重置链接已复制。")); }
+    catch { setNotice({ tone: "error", message: t("浏览器无法访问剪贴板，请手动复制链接。") }); }
   }
 
   function accessRange(days: number) {
@@ -153,7 +170,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
       primary = <button className="button ghost small" disabled={busy === user.id} onClick={() => void update(user, "active")}>{t("恢复")}</button>;
       items.push({ label: t("访问详情"), onSelect: () => void openCredentials(user) });
     } else if (user.role !== "owner" && user.status === "active") {
-      items.push({ label: t("停用账号"), danger: true, disabled: busy === user.id, onSelect: () => void update(user, "suspended") });
+      items.push({ label: t("重置密码链接"), disabled: busy === user.id, onSelect: () => void createResetLink(user) }, "divider", { label: t("停用账号"), danger: true, disabled: busy === user.id, onSelect: () => void update(user, "suspended") });
     }
     return <div className="row-actions">{primary}{items.length > 0 ? <Menu label={t("{0} 的更多操作", [user.email])} items={items} /> : <span className="menu-spacer" />}</div>;
   }
@@ -179,6 +196,9 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
       </tr>)}</tbody></table></div>
       {!visible.length && <Empty action={search || filter !== "all" ? <button className="button ghost" onClick={() => { setSearch(""); setFilter("all"); }}>{t("清除筛选")}</button> : undefined}>{users.length ? t("没有符合条件的账号。") : t("还没有账号。")}</Empty>}
     </section>
+    {resetLink && <Modal title={t("重置密码链接")} description={t("发给 {0}，对方打开后自己设置新密码。24 小时内有效，只能使用一次。", [resetLink.user.email])} onClose={() => setResetLink(null)} footer={<div className="form-actions"><button className="button primary" onClick={() => void copyResetLink()}>{t("复制链接")}</button></div>}>
+      <input readOnly value={resetLink.url} aria-label={t("重置密码链接")} onFocus={(event) => event.currentTarget.select()} />
+    </Modal>}
     {credentialOwner && <Modal title={t("{0} 的访问资产", [credentialOwner.displayName])} description={t("{0} · 公开证书可查看和下载，私钥不会返回管理端。", [credentialOwner.email])} onClose={() => { setCredentialOwner(null); setAccessOverview(null); }} wide>
       <details><summary>{t("客户端授权设备与会员额度")}</summary><NativeAccessPanel userId={credentialOwner.id}/></details>
       <InlineNotice notice={notice} />

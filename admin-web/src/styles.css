@@ -439,6 +439,9 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .stack-form input[readonly] { color: var(--text-2); background: var(--surface-2); cursor: default; }
 .stack-form { display: grid; gap: 16px; }
 .split-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mail-server-fields { grid-template-columns: minmax(0, 1fr) 7rem; }
+.mail-actions > .danger-text { margin-right: auto; }
+@media (max-width: 640px) { .mail-actions > .button { flex: 1 1 auto; } }
 .span-2 { grid-column: span 2; }
 .form-note { margin: 0; padding: 10px 12px; color: var(--text-2); background: var(--surface-2); border-radius: 8px; font-size: 13px; }
 .fingerprint-field { min-width: 0; }
