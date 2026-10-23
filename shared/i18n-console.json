@@ -543,10 +543,6 @@
     "Deletion request accepted. The log service removes physical data asynchronously.",
     "Запрос удаления принят. Служба журналов удалит данные асинхронно."
   ],
-  "查询 Controller、Agent、部署和配置同步日志，用于定位节点故障。": [
-    "Search Controller, Agent, deployment and synchronization logs to diagnose node failures.",
-    "Поиск по журналам Controller, Agent, развёртывания и синхронизации для диагностики узлов."
-  ],
   "加载中…": [
     "Loading…",
     "Загрузка…"
@@ -562,14 +558,6 @@
   "日志": [
     "Logs",
     "Журналы"
-  ],
-  "运行日志存储尚未启用或当前不可用；这不会阻塞节点恢复操作。": [
-    "Log storage is disabled or unavailable. Node recovery is not blocked.",
-    "Хранилище журналов отключено или недоступно. Восстановление узлов не блокируется."
-  ],
-  "搜索消息、节点或 action ID": [
-    "Search messages, nodes or action IDs",
-    "Поиск сообщений, узлов или ID действий"
   ],
   "全部节点 / Controller": [
     "All nodes / Controller",
@@ -2638,5 +2626,69 @@
   "入 {0}": [
     "In {0}",
     "Вх. {0}"
+  ],
+  "记录用户关键操作和系统事件。点请求或任务 ID，可查看同一次操作的全部日志。": [
+    "Key user actions and system events. Select a request or task ID to see every line from that operation.",
+    "Ключевые действия пользователей и системные события. Нажмите ID запроса или задачи, чтобы увидеть все записи этой операции."
+  ],
+  "日志服务（Loki）当前不可用。在服务器上运行 sudo ./one-click-update.sh 可自动修复；节点恢复操作不受影响。": [
+    "The log service (Loki) is unavailable. Run sudo ./one-click-update.sh on the server to repair it; node recovery is not affected.",
+    "Служба журналов (Loki) недоступна. Запустите на сервере sudo ./one-click-update.sh для восстановления; восстановление узлов это не блокирует."
+  ],
+  "搜索消息、用户、IP 或请求 ID": [
+    "Search text, user, IP or ID",
+    "Текст, пользователь, IP, ID"
+  ],
+  "来源": [
+    "Source",
+    "Источник"
+  ],
+  "全部来源": [
+    "All sources",
+    "Все источники"
+  ],
+  "用户操作": [
+    "User actions",
+    "Действия пользователей"
+  ],
+  "系统事件": [
+    "System events",
+    "Системные события"
+  ],
+  "部署": [
+    "Deployment",
+    "Развёртывание"
+  ],
+  "配置同步": [
+    "Config sync",
+    "Синхронизация конфигурации"
+  ],
+  "关键操作": [
+    "Key action",
+    "Ключевое действие"
+  ],
+  "未登录用户": [
+    "Signed-out user",
+    "Неавторизованный пользователь"
+  ],
+  "查看同一请求的全部日志": [
+    "Show every line from this request",
+    "Показать все записи этого запроса"
+  ],
+  "查看同一任务的全部日志": [
+    "Show every line from this task",
+    "Показать все записи этой задачи"
+  ],
+  "请求": [
+    "Request",
+    "Запрос"
+  ],
+  "任务": [
+    "Task",
+    "Задача"
+  ],
+  "{0}（请求 ID {1}）": [
+    "{0} (request ID {1})",
+    "{0} (ID запроса {1})"
   ]
 }

@@ -67,9 +67,12 @@ const subscriptions = [
 ];
 
 const logs = [
-  { timestamp: ago(1), labels: { node: "n1", level: "info", service: "agent" }, message: "heartbeat ok · reconcile revision 14 applied (wireguard, vless, openvpn)" },
-  { timestamp: ago(3), labels: { node: "n4", level: "error", service: "xray" }, message: "failed to bind 0.0.0.0:443: address already in use; a very long log line continues here with stack details /usr/local/bin/xray run -config /etc/northstar/xray/config.json", actionId: "act_1" },
-  { timestamp: ago(8), labels: { node: "n2", level: "warning", service: "agent" }, message: "disk usage above 80% on /var/lib/docker" },
+  { timestamp: ago(1), labels: { node: "n4", level: "info", component: "audit", source: "user" }, message: "node.upgrade-agent.queued", action: "node.upgrade-agent.queued", traceId: "5708c90d6f874045", actor: { id: "u2", email: "aleksandra.konstantinopolskaya@very-long-company-domain.example", role: "admin" }, target: { type: "node", id: "n4" }, ip: "2001:db8:85a3::8a2e:370:7334", request: "POST /api/nodes/n4/actions" },
+  { timestamp: ago(2), labels: { node: "n4", level: "info", component: "bootstrap", source: "system" }, message: "Uploading Agent 2.11.0 and verifying checksum", traceId: "5708c90d6f874045", actionId: "3f1c2a9e-7b44-4d0e-9a51-0c8e2f6d1b7a", details: { phase: "upload", action: "upgrade-agent" } },
+  { timestamp: ago(3), labels: { node: "n4", level: "error", component: "reconcile", source: "system" }, message: "failed to bind 0.0.0.0:443: address already in use; a very long log line continues here with stack details /usr/local/bin/xray run -config /etc/northstar/xray/config.json", traceId: "a7dece2875fe4cfd", details: { taskId: "task_1", status: "failed" } },
+  { timestamp: ago(5), labels: { node: "controller", level: "warning", component: "audit", source: "user" }, message: "auth.login.failed", action: "auth.login.failed", traceId: "e19824c3836d45af", ip: "198.51.100.7", request: "POST /api/auth/login", details: { metadata: { email: "unknown@example.com" } } },
+  { timestamp: ago(8), labels: { node: "controller", level: "warning", component: "api", source: "user" }, message: "Region code must contain 2 to 8 letters", traceId: "6f06b16223ac4e00", actor: { id: "owner", email: "owner@example.com", role: "owner" }, ip: "127.0.0.1", request: "POST /api/regions" },
+  { timestamp: ago(9), labels: { node: "n2", level: "warning", component: "agent", source: "system" }, message: "disk usage above 80% on /var/lib/docker" },
 ];
 
 const release = (id, platform, channel, version, build, extra = {}) => ({ id, platform, arch: "universal", channel, version, build, status: "published", distribution: "direct", url: `https://downloads.example.com/veilbird/${platform}/${version}/Veilbird-${version}-${platform}-universal-release.bin`, sha256: "a".repeat(64), sizeBytes: 48234567, minOs: platform === "android" ? "Android 8.0" : platform === "windows" ? "Windows 10 1809" : "13.0", notes: "Fixes reconnect after network change.", publishedAt: "2026-10-06T00:00:00Z", createdAt: "2026-10-06T00:00:00Z", createdBy: "release-token", rolloutPercent: channel === "beta" ? 20 : 100, ...extra });

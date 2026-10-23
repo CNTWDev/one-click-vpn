@@ -516,6 +516,29 @@ export async function addAudit(input: {
     randomUUID(), input.actorUserId || null, input.action, input.targetType || null,
     input.targetId || null, JSON.stringify(input.metadata || {}), now(),
   ]);
+  void mirrorAuditToLog(input);
+}
+
+/** Key user and system actions also go to the operational log, with the actor and request trace. */
+async function mirrorAuditToLog(input: Parameters<typeof addAudit>[0]): Promise<void> {
+  try {
+    const actor = input.actorUserId ? await findUserById(input.actorUserId) : undefined;
+    const metadataNode = typeof input.metadata?.nodeId === "string" ? input.metadata.nodeId : undefined;
+    await writeOperationalLog({
+      component: "audit",
+      level: /\.(failed|blocked|heartbeat_failed)$|\.skipped$|node-pending$/.test(input.action) ? "warning" : "info",
+      message: input.action,
+      action: input.action,
+      nodeId: input.targetType === "node" ? input.targetId : metadataNode,
+      actor: actor ? { id: actor.id, email: actor.email, role: actor.role } : input.actorUserId ? { id: input.actorUserId } : null,
+      target: { type: input.targetType, id: input.targetId },
+      // A failed sign-in has no actor yet but is still someone's action.
+      source: /(^|\.)auth\./.test(input.action) ? "user" : undefined,
+      fields: input.metadata && Object.keys(input.metadata).length ? { metadata: input.metadata } : undefined,
+    });
+  } catch {
+    // The audit row is already committed; the log mirror is best-effort.
+  }
 }
 
 export class NodeBusyError extends Error {

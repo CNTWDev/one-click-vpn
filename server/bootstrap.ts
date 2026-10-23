@@ -7,6 +7,7 @@ import { addAudit, addNodeAction, appendNodeActionEvent, bindNodeIdentity, count
 import { ensureDefaultNodeProtocols, rebuildDesiredState } from "./control-plane";
 import { ensureStandardVpnServices, reconcileEnabledVpnServices } from "./vpn-services";
 import { writeOperationalLog } from "./operational-logs";
+import { captureTrace, runWithTrace, type TraceContext } from "./trace";
 import { discoverRemoteNode, executeRemoteCommand } from "./remote-ssh";
 import { dbExec } from "./db";
 import { listVpnServices, updateVpnServiceState } from "./control-db";
@@ -29,14 +30,15 @@ function processRemoteActionQueue(): void {
   }
 }
 
-function enqueueRemoteAction(actionId: string, action: () => Promise<void>): void {
+function enqueueRemoteAction(actionId: string, trace: TraceContext, action: () => Promise<void>): void {
   const renew = () => dbExec("UPDATE node_actions SET lease_updated_at = $2 WHERE id = $1 AND status IN ('queued', 'running')", [actionId, new Date().toISOString()]);
   const timer = setInterval(() => { void renew().catch(() => undefined); }, 30_000);
   timer.unref();
-  remoteActionQueue.push(async () => {
+  // The work runs after the request returned; it keeps the request's trace so its logs stay linked.
+  remoteActionQueue.push(() => runWithTrace(trace, async () => {
     try { if (await renew()) await action(); }
     finally { clearInterval(timer); }
-  });
+  }));
   processRemoteActionQueue();
 }
 
@@ -109,13 +111,13 @@ class ActionOutputRecorder {
 
 export async function queueNodeBootstrap(nodeId: string, actorUserId?: string): Promise<string> {
   const actionId = await addNodeAction(nodeId, "bootstrap");
-  enqueueRemoteAction(actionId, () => bootstrapNode(nodeId, actorUserId, actionId));
+  enqueueRemoteAction(actionId, await captureTrace(), () => bootstrapNode(nodeId, actorUserId, actionId));
   return actionId;
 }
 
 export async function queueNodeAction(nodeId: string, action: "restart-agent" | "status-agent" | "upgrade-agent", actorUserId?: string): Promise<string> {
   const actionId = await addNodeAction(nodeId, action);
-  enqueueRemoteAction(actionId, async () => {
+  enqueueRemoteAction(actionId, await captureTrace(), async () => {
     try {
       await runNodeAction(nodeId, action, actorUserId, actionId);
     } catch (error) {

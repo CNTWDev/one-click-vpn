@@ -39,6 +39,19 @@ export async function currentPortalUser(): Promise<DbUser | null> {
   return currentUserForCookie(PORTAL_SESSION_COOKIE, "portal");
 }
 
+/** Whoever is signed in on this request (Console first, then Portal), for log attribution only. */
+export async function requestActor(): Promise<{ id: string; email: string; role: string } | null> {
+  for (const [cookie, kind] of [[SESSION_COOKIE, "admin"], [PORTAL_SESSION_COOKIE, "portal"]] as const) {
+    try {
+      const user = await currentUserForCookie(cookie, kind);
+      if (user) return { id: user.id, email: user.email, role: user.role };
+    } catch {
+      // No request scope or no database: the line is still logged, just without an actor.
+    }
+  }
+  return null;
+}
+
 export async function requireUser(): Promise<DbUser> {
   const user = await currentUser();
   if (!user) throw new Response("Unauthorized", { status: 401 });

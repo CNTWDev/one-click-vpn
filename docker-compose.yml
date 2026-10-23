@@ -152,6 +152,8 @@ services:
     command: -config.file=/etc/loki/loki.yml -config.expand-env=true
     environment:
       VEILBIRD_LOG_STORAGE_PASSWORD: ${VEILBIRD_LOG_STORAGE_PASSWORD:?VEILBIRD_LOG_STORAGE_PASSWORD is required}
+      # Set by scripts/deploy.sh from loki.yml so an edited config recreates the container.
+      VEILBIRD_LOKI_CONFIG_SHA: ${VEILBIRD_LOKI_CONFIG_SHA:-}
     volumes:
       - ./deploy/loki/loki.yml:/etc/loki/loki.yml:ro
       - northstar-loki:/loki

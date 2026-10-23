@@ -73,6 +73,8 @@ esac
 "$SCRIPT_DIR/check-env.sh"
 
 export VEILBIRD_BUILD_REV=$(git rev-parse --short HEAD)
+# A changed Loki config is a bind mount Compose cannot see; its checksum makes "up -d loki" recreate it.
+export VEILBIRD_LOKI_CONFIG_SHA=$(cksum < deploy/loki/loki.yml | cut -d ' ' -f 1)
 echo "Deploying build $VEILBIRD_BUILD_REV (service: $service)"
 
 echo "Starting PostgreSQL and waiting for it to become healthy..."
@@ -224,6 +226,22 @@ if command -v curl >/dev/null 2>&1; then
       check_endpoint admin-web 3200 /api/health
       ;;
   esac
+fi
+
+# Runtime logs are optional for recovery, so a log store problem is a warning, not a failed deploy.
+loki_ready=""
+i=0
+while [ "$i" -lt 45 ]; do
+  if compose exec -T veilbird node -e "fetch('http://loki:3100/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
+    loki_ready="yes"
+    break
+  fi
+  i=$((i + 1))
+  sleep 2
+done
+if [ -z "$loki_ready" ]; then
+  echo "Warning: the log service (Loki) is not ready; Console Runtime logs stay empty until it is. Recent Loki output:" >&2
+  compose logs --tail=40 loki >&2 || true
 fi
 
 compose ps
