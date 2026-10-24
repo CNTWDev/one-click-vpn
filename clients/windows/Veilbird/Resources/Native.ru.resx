@@ -155,6 +155,7 @@
   <data name="update_required_detail" xml:space="preserve"><value>Эта версия больше не поддерживается. Обновите приложение, чтобы продолжить подключаться.</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 Действует до · </value></data>
+  <data name="valid_until_label" xml:space="preserve"><value>Действует до</value></data>
   <data name="version_label" xml:space="preserve"><value>Версия {0}</value></data>
   <data name="vpn_connection" xml:space="preserve"><value>VPN-подключение</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>

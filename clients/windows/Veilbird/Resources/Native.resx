@@ -155,6 +155,7 @@
   <data name="update_required_detail" xml:space="preserve"><value>This version is no longer supported. Update to keep connecting.</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 Valid until · </value></data>
+  <data name="valid_until_label" xml:space="preserve"><value>Valid until</value></data>
   <data name="version_label" xml:space="preserve"><value>Version {0}</value></data>
   <data name="vpn_connection" xml:space="preserve"><value>VPN connection</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>

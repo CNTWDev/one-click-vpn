@@ -16,6 +16,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.os.Bundle
 import android.os.Handler
@@ -66,6 +67,8 @@ class MainActivity : Activity() {
     private var pulseAnimator: Animator? = null
     private var poweredOn: Boolean? = null
     private var lastView = ""
+    // The last account summary, so the home page shows usage at once and refreshes it quietly.
+    private var accountData: JSONObject? = null
     private var stats: TextView? = null
     private var nodeTitle: TextView? = null
     private var nodeDetail: TextView? = null
@@ -183,18 +186,37 @@ class MainActivity : Activity() {
                 dialog.dismiss(); if (languages[which].first != current) { L10n.select(languages[which].first); if (android.os.Build.VERSION.SDK_INT < 33) recreate() }
             }.setNegativeButton(L10n.text(R.string.cancel), null).show()
     }
-    /** The language as one full-width row at the top: flag and name; a tap lists all languages. */
-    private fun languageBar() {
-        val (_, flag, name) = currentLanguage()
-        val bar = LinearLayout(this).apply {
+    /** A settings row: name on the left, current value on the right. */
+    private fun settingRow(title: String, value: String, onClick: () -> Unit) {
+        val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = 52.dp
             background = surface(Color.WHITE, 14); setPadding(14.dp, 8.dp, 14.dp, 8.dp)
-            isClickable = true; setOnClickListener { if (!busy) chooseLanguage() }; contentDescription = L10n.text(R.string.language) + ": " + name
+            isClickable = true; setOnClickListener { if (!busy) onClick() }; contentDescription = "$title: $value"
         }
-        bar.addView(TextView(this).apply { text = flag; textSize = 20f }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 12.dp })
-        bar.addView(label(name, 15f).apply { setTextColor(ink); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); setPadding(0, 0, 0, 0); maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
-        bar.addView(label(L10n.text(R.string.language) + "  ›", 14f).apply { setPadding(12.dp, 0, 0, 0); maxLines = 1 })
-        content.addView(bar, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 10.dp })
+        row.addView(label(title, 15f).apply { setTextColor(ink); setPadding(0, 0, 0, 0); maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
+        row.addView(label("$value  ›", 14f).apply { setPadding(12.dp, 0, 0, 0); maxLines = 1 })
+        content.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp; bottomMargin = 6.dp })
+    }
+    private fun bytes(value: Long) = android.text.format.Formatter.formatShortFileSize(this, value)
+    /** Below the connect button: what this account has used and how long it runs. */
+    private fun usage() {
+        val traffic = label("—", 15f); val until = label("—", 15f)
+        val strip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; background = rounded(Color.WHITE, 14); setPadding(16.dp, 10.dp, 16.dp, 10.dp) }
+        for ((title, value) in listOf(L10n.text(R.string.traffic_30_days) to traffic, L10n.text(R.string.valid_until_label) to until)) strip.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(label(title, 12f).apply { setPadding(0, 0, 0, 2.dp); maxLines = 1 })
+            addView(value.apply { setTextColor(ink); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); setPadding(0, 0, 0, 0); maxLines = 1 })
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        content.addView(strip, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 10.dp })
+        fun show(data: JSONObject) {
+            val used = data.optJSONObject("traffic")?.let { (it.optString("uploadBytes", "0").toLongOrNull() ?: 0) + (it.optString("downloadBytes", "0").toLongOrNull() ?: 0) }
+            traffic.text = used?.let { bytes(it) } ?: "—"; until.text = L10n.date(data.optString("expiresAt"))
+        }
+        accountData?.let { show(it) }
+        Thread {
+            val data = try { api.request("account") } catch (_: Exception) { null } ?: return@Thread
+            runOnUiThread { accountData = data; if (!isDestroyed && traffic.isAttachedToWindow) show(data) }
+        }.start()
     }
     /** A soft ring breathes out of the power button while connecting. Off when the system disables animations. */
     private fun pulse(on: Boolean) {
@@ -221,6 +243,11 @@ class MainActivity : Activity() {
         lastView = view
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         header.addView(label("TrackNothing", 18f).apply { setPadding(0, 0, 0, 0) }, LinearLayout.LayoutParams(0, -2, 1f))
+        // Before sign-in the only language entry is this small globe; afterwards it is a row on the account page.
+        if (!signedIn) header.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_language); imageTintList = ColorStateList.valueOf(muted); setPadding(10.dp, 10.dp, 10.dp, 10.dp)
+            background = surface(canvas, 20); contentDescription = L10n.text(R.string.language); setOnClickListener { if (!busy) chooseLanguage() }
+        }, LinearLayout.LayoutParams(44.dp, 44.dp))
         content.addView(header, LinearLayout.LayoutParams(-1, 44.dp))
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { isIndeterminate = true; indeterminateTintList = ColorStateList.valueOf(teal); visibility = if (busy) View.VISIBLE else View.INVISIBLE }
         content.addView(progress, LinearLayout.LayoutParams(-1, 4.dp).apply { bottomMargin = 4.dp })
@@ -229,7 +256,7 @@ class MainActivity : Activity() {
             card(L10n.text(R.string.update_available, available.version), L10n.text(if (available.mandatory) R.string.update_required_detail else R.string.update_available_detail))
             button(L10n.text(R.string.update_now)) { installUpdate(available) }
         }
-        if (!signedIn) { languageBar(); login(); return }
+        if (!signedIn) { accountData = null; login(); return }
         val nav = LinearLayout(this).apply { setPadding(8.dp, 6.dp, 8.dp, 6.dp); setBackgroundColor(Color.WHITE) }
         for ((tab, title) in listOf("connect" to L10n.text(R.string.connect_tab), "nodes" to L10n.text(R.string.locations), "account" to L10n.text(R.string.account))) nav.addView(styleButton(Button(this)).apply {
             text = title; isSelected = tab == page; background = surface(if (isSelected) mint else Color.WHITE, 12)
@@ -264,6 +291,7 @@ class MainActivity : Activity() {
             if (ConnectionStateStore.active) startService(Intent(this, ConnectionService::class.java).setAction("disconnect"))
             else { val consent = VpnService.prepare(this); if (consent != null) startActivityForResult(consent, 10) else startConnection() }
         }.apply { minHeight = 52.dp; minimumHeight = 52.dp }
+        usage()
         showCurrentNode()
     }
     private fun login() {
@@ -376,8 +404,8 @@ class MainActivity : Activity() {
     }
     private fun account() {
         content.addView(label(L10n.text(R.string.my_veilbird), 20f).apply { setPadding(0, 0, 0, 8.dp) })
-        languageBar()
         work({ api.request("account") }) { data ->
+            accountData = data
             card(data.getString("name"), data.getString("email") + "\n" + L10n.text(R.string.account_valid_until, L10n.date(data.optString("expiresAt"))))
             data.optJSONObject("traffic")?.let { traffic -> card(L10n.text(R.string.traffic_30_days), "↑ ${android.text.format.Formatter.formatFileSize(this, traffic.optString("uploadBytes", "0").toLongOrNull() ?: 0)}   ↓ ${android.text.format.Formatter.formatFileSize(this, traffic.optString("downloadBytes", "0").toLongOrNull() ?: 0)}") }
             content.addView(label(L10n.text(R.string.account_device_quota, L10n.number(data.getInt("used")), L10n.number(data.getInt("limit"))), 18f).apply { setPadding(0, 8.dp, 0, 4.dp) })
@@ -401,6 +429,7 @@ class MainActivity : Activity() {
             }
             if (deviceCount == 0) content.addView(label(L10n.text(R.string.no_authorized_devices_yet_they_appear_after_their_first)))
             button(L10n.text(R.string.refresh_devices)) { render() }
+            settingRow(L10n.text(R.string.language), currentLanguage().let { "${it.second} ${it.third}" }) { chooseLanguage() }
             button(L10n.text(R.string.sign_out)) {
                 if (ConnectionStateStore.active) { alert(L10n.text(R.string.disconnect_the_vpn_before_signing_out)); return@button }
                 work({ try { api.request("logout", JSONObject()) } finally { api.saveSecret("token", null) } }) { render() }

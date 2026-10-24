@@ -152,6 +152,7 @@
   <string name="update_open_download">前往下载</string>
   <string name="update_required_detail">当前版本已停止支持，更新后才能继续连接。</string>
   <string name="valid_until">\n有效期 · </string>
+  <string name="valid_until_label">有效期至</string>
   <string name="version_label">版本 %1$s</string>
   <string name="vpn_connection">VPN 连接</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>

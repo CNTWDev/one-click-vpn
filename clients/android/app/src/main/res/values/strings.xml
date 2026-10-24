@@ -152,6 +152,7 @@
   <string name="update_open_download">Download</string>
   <string name="update_required_detail">This version is no longer supported. Update to keep connecting.</string>
   <string name="valid_until">\nValid until · </string>
+  <string name="valid_until_label">Valid until</string>
   <string name="version_label">Version %1$s</string>
   <string name="vpn_connection">VPN connection</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>

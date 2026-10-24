@@ -44,6 +44,8 @@ public partial class MainWindow : Window {
     private bool? poweredOn;
     private bool pulsing;
     private string lastView="";
+    // The last account summary, so the connect page shows usage at once and refreshes it quietly.
+    private JsonNode? accountData;
     private Button? mainButton;
     private (TextBlock Title,TextBlock Detail,Ellipse Dot)? currentNode;
     private static readonly Brush Ink=Brush("#182731"),Muted=Brush("#5B6970"),Teal=Brush("#007A64"),Mint=Brush("#E2F7F0"),White=Brush("#FFFFFF"),Canvas=Brush("#F8F6EE");
@@ -189,7 +191,13 @@ public partial class MainWindow : Window {
             Add(Action(L10n.Text("update_open_download"),()=>System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(available.Download.AbsoluteUri) {UseShellExecute=true}),primary:available.Mandatory));
         }
         NavigationPanel.Visibility=api.SignedIn?Visibility.Visible:Visibility.Collapsed;
-        if(!api.SignedIn) {Add(LanguageBar(),4,6);Login();return;}
+        if(!api.SignedIn) {
+            // Before sign-in the only language entry is this small globe; afterwards it is a row on the account page.
+            accountData=null;Link("\uE774",()=>ChooseLanguage(HeaderAction));
+            HeaderAction.FontFamily=new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets");HeaderAction.FontSize=16;HeaderAction.Foreground=Muted;
+            AutomationProperties.SetName(HeaderAction,L10n.Text("language")+": "+LanguageName(L10n.Preference));
+            Login();return;
+        }
         foreach(var (id,name) in new[]{("connect",L10n.Text("connect_tab")),("nodes",L10n.Text("locations")),("account",L10n.Text("account"))}) {
             var selected=page==id||(page=="logs"&&id=="account");
             var tab=new Button {Content=name,MinHeight=40,Margin=new Thickness(4,0,4,0),Background=selected?Mint:White,Foreground=selected?Teal:Muted};
@@ -218,6 +226,7 @@ public partial class MainWindow : Window {
         Add(Row("","",Teal,"›",Muted,false,()=>{page="nodes";Render();},out var title,out var detail,out var dot),0,8);
         currentNode=(title,detail,dot);
         if(update?.Mandatory!=true||connection.Active) {mainButton=Add(Action("",Toggle,primary:true));mainButton.MinHeight=46;}
+        Usage();
     }
     private void Nodes() {
         Link(L10n.Text(measuring?"measuring_latency":"retest_latency"),()=>{});
@@ -283,9 +292,8 @@ public partial class MainWindow : Window {
     }
     private void Account() {
         Add(Label(L10n.Text("my_veilbird"),17,true),0,6);
-        Add(LanguageBar(),0,8);
         Work(async()=>{
-            var account=await api.Request("account");
+            var account=await api.Request("account");accountData=account;
             var card=new StackPanel();
             card.Children.Add(Label(account["name"]!.GetValue<string>(),15,true));
             card.Children.Add(Label(account["email"]!.GetValue<string>()+"\n"+L10n.Text("account_valid_until",L10n.Date(account["expiresAt"]?.GetValue<string>())),13));
@@ -305,6 +313,7 @@ public partial class MainWindow : Window {
                 },out _,out _,out _);
                 Add(row,0,6);
             }
+            Add(LanguageRow(),4,6);
             Add(Action(L10n.Text("sign_out"),()=>{
                 if(connection.Active) {Alert(L10n.Text("disconnect_the_vpn_before_signing_out"));return;}
                 Work(async()=>{await api.Logout();Render();});
@@ -367,20 +376,37 @@ public partial class MainWindow : Window {
         return new Border {CornerRadius=new CornerRadius(3),BorderBrush=Brush("#DDE2DC"),BorderThickness=new Thickness(0.5),Child=face,VerticalAlignment=VerticalAlignment.Center,
             Clip=new RectangleGeometry(new Rect(0,0,23,16),3,3)};
     }
-    /// The language as one full-width row at the top: flag, name, and a menu of all languages on click.
-    private Button LanguageBar() {
+    /// Signed in, language is a settings row on the account page: name on the left, flag and current value on the right.
+    private Button LanguageRow() {
         var grid=new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});grid.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(1,GridUnitType.Star)});grid.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});
-        var flag=Flag(L10n.Preference);flag.Margin=new Thickness(0,0,12,0);grid.Children.Add(flag);
-        var name=new TextBlock {Text=LanguageName(L10n.Preference),FontSize=14,FontWeight=FontWeights.SemiBold,Foreground=Ink,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(name,1);grid.Children.Add(name);
-        var hint=new TextBlock {Text=L10n.Text("language")+"  ›",FontSize=13,Foreground=Muted,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(hint,2);grid.Children.Add(hint);
-        var bar=new Button {Content=grid,HorizontalContentAlignment=HorizontalAlignment.Stretch,Background=White,MinHeight=48,Padding=new Thickness(14,8,14,8)};
-        AutomationProperties.SetName(bar,L10n.Text("language")+": "+LanguageName(L10n.Preference));
-        bar.Click+=(_,_)=>ChooseLanguage(bar);
-        return bar;
+        grid.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(1,GridUnitType.Star)});grid.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});grid.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});
+        grid.Children.Add(new TextBlock {Text=L10n.Text("language"),FontSize=14,Foreground=Ink,VerticalAlignment=VerticalAlignment.Center});
+        var flag=Flag(L10n.Preference);flag.Margin=new Thickness(0,0,8,0);Grid.SetColumn(flag,1);grid.Children.Add(flag);
+        var value=new TextBlock {Text=LanguageName(L10n.Preference)+"  ›",FontSize=13,Foreground=Muted,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(value,2);grid.Children.Add(value);
+        var row=new Button {Content=grid,HorizontalContentAlignment=HorizontalAlignment.Stretch,Background=White,MinHeight=46,Padding=new Thickness(14,8,14,8)};
+        AutomationProperties.SetName(row,L10n.Text("language")+": "+LanguageName(L10n.Preference));
+        row.Click+=(_,_)=>ChooseLanguage(row);
+        return row;
     }
+    /// Below the connect button: what this account has used and how long it runs.
+    private async void Usage() {
+        var traffic=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold,Foreground=Ink};
+        var until=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold,Foreground=Ink};
+        var strip=new UniformGrid {Rows=1};
+        foreach(var (title,value) in new[]{(L10n.Text("traffic_30_days"),traffic),(L10n.Text("valid_until_label"),until)}) {
+            var cell=new StackPanel();cell.Children.Add(new TextBlock {Text=title,FontSize=11,Foreground=Muted,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new Thickness(0,0,8,2)});cell.Children.Add(value);strip.Children.Add(cell);
+        }
+        Add(new Border {Background=White,CornerRadius=new CornerRadius(12),Padding=new Thickness(14,8,14,8),Child=strip},10,0);
+        void Show(JsonNode data) {
+            var used=data["traffic"] is { } t?(long.TryParse(t["uploadBytes"]?.ToString(),out var up)?up:0)+(long.TryParse(t["downloadBytes"]?.ToString(),out var down)?down:0):(long?)null;
+            traffic.Text=used is { } bytes?Bytes(JsonValue.Create(bytes)):"—";until.Text=L10n.Date(data["expiresAt"]?.GetValue<string>());
+        }
+        if(accountData is not null) Show(accountData);
+        try {var data=await api.Request("account");accountData=data;Show(data);} catch {/* Usage is a nicety; the next visit retries. */}
+    }
+
     private void ChooseLanguage(FrameworkElement anchor) {
-        var menu=new ContextMenu {PlacementTarget=anchor,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MinWidth=anchor.ActualWidth};
+        var menu=new ContextMenu {PlacementTarget=anchor,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MinWidth=Math.Max(200,anchor.ActualWidth)};
         foreach(var (code,_) in Languages) {
             var item=new MenuItem {Header=LanguageName(code),Icon=Flag(code),IsCheckable=true,IsChecked=L10n.Preference==code,Padding=new Thickness(4,8,4,8)};
             item.Click+=(_,_)=>{if(L10n.Preference==code) return;L10n.Select(code);Render();UpdateTray();};menu.Items.Add(item);

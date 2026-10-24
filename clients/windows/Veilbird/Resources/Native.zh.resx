@@ -155,6 +155,7 @@
   <data name="update_required_detail" xml:space="preserve"><value>当前版本已停止支持，更新后才能继续连接。</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 有效期 · </value></data>
+  <data name="valid_until_label" xml:space="preserve"><value>有效期至</value></data>
   <data name="version_label" xml:space="preserve"><value>版本 {0}</value></data>
   <data name="vpn_connection" xml:space="preserve"><value>VPN 连接</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
