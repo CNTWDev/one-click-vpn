@@ -6,7 +6,9 @@
 package core
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,13 +54,36 @@ func Start(home string, configuration string) error {
 	}
 	C.SetHomeDir(home)
 	C.SetConfig(filepath.Join(home, "config.yaml"))
-	cfg, err := config.Parse([]byte(configuration))
+	cfg, err := config.Parse(normalize([]byte(configuration)))
 	if err != nil {
 		return err
 	}
 	executor.ApplyConfig(cfg, true)
 	running = true
 	return nil
+}
+
+// normalize re-encodes a JSON configuration the way YAML can read it. The apps build JSON
+// (valid YAML), but Android's org.json and Apple's JSONSerialization write "/" as "\/", an
+// escape YAML rejects ("found unknown escape character"); Go's encoder never writes it.
+func normalize(configuration []byte) []byte {
+	trimmed := bytes.TrimSpace(configuration)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return configuration
+	}
+	decoder := json.NewDecoder(bytes.NewReader(trimmed))
+	decoder.UseNumber()
+	var value any
+	if decoder.Decode(&value) != nil {
+		return configuration
+	}
+	var out bytes.Buffer
+	encoder := json.NewEncoder(&out)
+	encoder.SetEscapeHTML(false)
+	if encoder.Encode(value) != nil {
+		return configuration
+	}
+	return out.Bytes()
 }
 
 // Stop closes the tun and every open connection, then drops all proxies.
