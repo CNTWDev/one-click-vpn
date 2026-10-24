@@ -75,7 +75,6 @@ async function consume(session:Session,action:string,body:Record<string,unknown>
 }
 function checkEntitlement(user:Entitlement) {
   if(user.status!=="active") throw new NativeError("ACCOUNT_UNAVAILABLE",403);
-  if(!user.native_only) throw new NativeError("MANAGED_ACCESS_REQUIRED",403);
   if(user.membership_expires_at && Date.parse(user.membership_expires_at)<=Date.now()) throw new NativeError("MEMBERSHIP_EXPIRED",403);
 }
 export async function nativeConnect(session:Session,body:Record<string,unknown>) {
@@ -139,7 +138,7 @@ export async function nativeConnect(session:Session,body:Record<string,unknown>)
 }
 export async function nativeStatus(session:Session,leaseId:string) {
   const row=(await dbQuery(`SELECT l.node_id,l.expires_at,l.required_revision,e.status,u.status AS account_status,u.native_only,u.membership_expires_at FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id JOIN users u ON u.id=e.user_id WHERE l.id=$1 AND e.user_id=$2 AND e.identity_thumbprint=$3`,[leaseId,session.user_id,session.identity_thumbprint]))[0];
-  if(!row || row.status!=="active" || row.account_status!=="active" || !row.native_only || new Date(row.expires_at).getTime()<=Date.now() || (row.membership_expires_at&&Date.parse(row.membership_expires_at)<=Date.now())) throw new NativeError("ACCESS_EXPIRED",403);
+  if(!row || row.status!=="active" || row.account_status!=="active" || new Date(row.expires_at).getTime()<=Date.now() || (row.membership_expires_at&&Date.parse(row.membership_expires_at)<=Date.now())) throw new NativeError("ACCESS_EXPIRED",403);
   const observed=(await dbQuery(`SELECT d.revision,o.applied_revision,o.status FROM desired_configs d LEFT JOIN observed_configs o ON o.node_id=d.node_id AND o.protocol=d.protocol WHERE d.node_id=$1 AND d.protocol='wireguard'`,[row.node_id]))[0];
   return {ready:row.required_revision!=null && !!observed && observed.applied_revision>=row.required_revision && ["applied","succeeded"].includes(observed.status),expiresAt:row.expires_at};
 }
