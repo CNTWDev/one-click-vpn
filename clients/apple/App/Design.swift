@@ -29,8 +29,7 @@ enum VeilbirdStyle {
 /// The pixel language shared by every TrackNothing client: the ∅ mark on a 16×16 grid, rings of square dots
 /// and the Doto dot-matrix face for figures. Same cells as scripts/brand-icons.py and the other clients.
 enum Pixel {
-    static let mark:[(Int,Int)]=("14,1 5,2 6,2 7,2 8,2 9,2 10,2 13,2 3,3 4,3 11,3 12,3 2,4 11,4 13,4 2,5 10,5 13,5 1,6 9,6 14,6 1,7 8,7 14,7 "
-        +"1,8 7,8 14,8 1,9 6,9 14,9 2,10 5,10 13,10 2,11 4,11 13,11 3,12 4,12 11,12 12,12 2,13 5,13 6,13 7,13 8,13 9,13 10,13 1,14")
+    static let mark:[(Int,Int)]="14,1 5,2 6,2 7,2 8,2 9,2 10,2 13,2 3,3 4,3 11,3 12,3 2,4 11,4 13,4 2,5 10,5 13,5 1,6 9,6 14,6 1,7 8,7 14,7 1,8 7,8 14,8 1,9 6,9 14,9 2,10 5,10 13,10 2,11 4,11 13,11 3,12 4,12 11,12 12,12 2,13 5,13 6,13 7,13 8,13 9,13 10,13 1,14"
         .split(separator:" ").map {cell in let xy=cell.split(separator:",").map {Int($0)!};return (xy[0],xy[1])}
     /// Cells one cell wide on a circle of `radius` in an n×n grid, each with its clockwise position from the top (0…1).
     static func ring(_ n:Int,radius:Double)->[(x:Int,y:Int,turn:Double)] {
@@ -154,7 +153,8 @@ struct DataStream:View {
         let seconds=Int(date.timeIntervalSince1970), hex=Array("0123456789ABCDEF")
         return String((0..<16).map {i->String in
             let beat=seconds/(3+i%7)
-            var h=UInt64(truncatingIfNeeded:beat)&*0x9E3779B97F4A7C15 ^ UInt64(i)&*0xBF58476D1CE4E5B9
+            let mixed:UInt64=UInt64(truncatingIfNeeded:beat) &* 0x9E3779B97F4A7C15
+            var h:UInt64=mixed ^ (UInt64(i) &* 0xBF58476D1CE4E5B9)
             h^=h>>31
             return String(hex[Int(h%16)])+(i%4==3 && i<15 ? " ":"")
         }.joined())
