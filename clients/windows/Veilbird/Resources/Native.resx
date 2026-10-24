@@ -12,7 +12,7 @@
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>Allow the system VPN permission to connect.</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>Allow VPN access on your first connection</value></data>
   <data name="announcement" xml:space="preserve"><value>Announcement</value></data>
-  <data name="ask_your_administrator_to_enable_veilbird_client_access" xml:space="preserve"><value>Ask your administrator to enable Veilbird client access.</value></data>
+  <data name="ask_your_administrator_to_enable_veilbird_client_access" xml:space="preserve"><value>Ask your administrator to enable TrackNothing client access.</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>Authorized devices</value></data>
   <data name="authorizing_and_connecting" xml:space="preserve"><value>Authorizing and connecting…</value></data>
   <data name="auto_detail" xml:space="preserve"><value>Picked by latency, stability and load</value></data>
@@ -24,12 +24,12 @@
   <data name="change_location" xml:space="preserve"><value>Change location  ›</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>Choose a location, then connect from the home screen.</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>Choose a location, then return to Connect.</value></data>
-  <data name="choose_a_location_veilbird_takes_care_of_the_rest" xml:space="preserve"><value>Choose a location. Veilbird takes care of the rest.</value></data>
+  <data name="choose_a_location_veilbird_takes_care_of_the_rest" xml:space="preserve"><value>Choose a location. TrackNothing takes care of the rest.</value></data>
   <data name="choose_location_then_connect_hint" xml:space="preserve"><value>Choose a location, then connect from the home screen.</value></data>
   <data name="clear_action" xml:space="preserve"><value>Clear</value></data>
   <data name="client_access_is_not_enabled_on_the_server" xml:space="preserve"><value>Client access is not enabled on the server.</value></data>
   <data name="client_access_is_not_enabled_on_the_server_contact" xml:space="preserve"><value>Client access is not enabled on the server. Contact your administrator.</value></data>
-  <data name="client_update_required" xml:space="preserve"><value>This version is no longer supported. Download the latest Veilbird to sign in or connect.</value></data>
+  <data name="client_update_required" xml:space="preserve"><value>This version is no longer supported. Download the latest TrackNothing to sign in or connect.</value></data>
   <data name="confirming_connection_status" xml:space="preserve"><value>Confirming connection…</value></data>
   <data name="connect_action" xml:space="preserve"><value>Connect</value></data>
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>Connect automatically or choose your own location.</value></data>
@@ -51,7 +51,7 @@
   <data name="current_page" xml:space="preserve"><value>, current page</value></data>
   <data name="development_build_the_windows_tunnel_service_is_not_integrated" xml:space="preserve"><value>Development build: the Windows tunnel service is not integrated. You can sign in, view locations and manage devices, but cannot connect to a VPN.</value></data>
   <data name="development_server_address" xml:space="preserve"><value>Development server address</value></data>
-  <data name="development_title" xml:space="preserve"><value>Veilbird — Development</value></data>
+  <data name="development_title" xml:space="preserve"><value>TrackNothing — Development</value></data>
   <data name="device" xml:space="preserve"><value>Device</value></data>
   <data name="device_limit_reached_account_hint" xml:space="preserve"><value>Device limit reached. Revoke an old device in Account and try again.</value></data>
   <data name="device_limit_reached_revoke_an_old_device_and_try" xml:space="preserve"><value>Device limit reached. Revoke an old device and try again.</value></data>
@@ -86,7 +86,7 @@
   <data name="measuring_latency" xml:space="preserve"><value>Testing…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>Your access has expired. Contact your administrator to renew it.</value></data>
   <data name="my_account" xml:space="preserve"><value>My account</value></data>
-  <data name="my_veilbird" xml:space="preserve"><value>My Veilbird</value></data>
+  <data name="my_veilbird" xml:space="preserve"><value>My TrackNothing</value></data>
   <data name="new_devices_are_added_on_their_first_connection_when" xml:space="preserve"><value>New devices are added on their first connection when a slot is available.</value></data>
   <data name="no_authorized_devices_yet_they_appear_after_their_first" xml:space="preserve"><value>No authorized devices yet. They appear after their first connection.</value></data>
   <data name="no_expiry" xml:space="preserve"><value>No expiry</value></data>
@@ -111,9 +111,9 @@
   <data name="revoking_access_the_slot_is_usually_released_within_about" xml:space="preserve"><value>Revoking access. The slot is usually released within about 5 minutes.</value></data>
   <data name="revoking_slot_released_when_the_old_connection_expires" xml:space="preserve"><value>Revoking · Slot released when the old connection expires</value></data>
   <data name="routing_global" xml:space="preserve"><value>Global</value></data>
-  <data name="routing_global_detail" xml:space="preserve"><value>All traffic goes through Veilbird</value></data>
+  <data name="routing_global_detail" xml:space="preserve"><value>All traffic goes through TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>Smart</value></data>
-  <data name="routing_smart_detail" xml:space="preserve"><value>Sites in mainland China go direct, the rest through Veilbird</value></data>
+  <data name="routing_smart_detail" xml:space="preserve"><value>Sites in mainland China go direct, the rest through TrackNothing</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>Search locations or regions</value></data>
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>Secure storage is unavailable. Unlock your device and try again.</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>Fastest location, switches if one fails</value></data>
@@ -121,7 +121,7 @@
   <data name="server_address_url" xml:space="preserve"><value>Server address https://…</value></data>
   <data name="share_action" xml:space="preserve"><value>Share</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>Sign in and start</value></data>
-  <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Sign in to Veilbird. No imports or configuration needed.</value></data>
+  <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Sign in to TrackNothing. No imports or configuration needed.</value></data>
   <data name="sign_out" xml:space="preserve"><value>Sign out</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Simulator build · Verify VPN connections on a signed physical-device build</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>Tap to change location</value></data>
@@ -140,7 +140,7 @@
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>Unable to connect. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>Unable to reach the service. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>Unable to reach the service. Check your network or contact your administrator.</value></data>
-  <data name="update_allow_installs" xml:space="preserve"><value>Allow Veilbird to install updates, then come back and tap Update now again.</value></data>
+  <data name="update_allow_installs" xml:space="preserve"><value>Allow TrackNothing to install updates, then come back and tap Update now again.</value></data>
   <data name="update_available" xml:space="preserve"><value>Version {0} is available</value></data>
   <data name="update_available_detail" xml:space="preserve"><value>Update to get the latest features and fixes.</value></data>
   <data name="update_downloading" xml:space="preserve"><value>Downloading and verifying the update…</value></data>

@@ -103,7 +103,7 @@ export function getDb(): Pool {
   const connectionString = process.env.VEILBIRD_DATABASE_URL?.trim();
   if (!connectionString) throw new Error("VEILBIRD_DATABASE_URL is required");
   pool = new Pool({ connectionString, max: Number(process.env.VEILBIRD_DB_POOL_MAX || 10), idleTimeoutMillis: 30_000 });
-  pool.on("error", (error) => console.error("Veilbird PostgreSQL pool error", error));
+  pool.on("error", (error) => console.error("TrackNothing PostgreSQL pool error", error));
   return pool;
 }
 
@@ -268,7 +268,7 @@ export async function getControllerSettings(): Promise<ControllerSettings> {
   const timestamp = now();
   await dbExec(`INSERT INTO controller_settings
     (id, display_name, location_label, latitude, longitude, location_source, created_at, updated_at)
-    VALUES ('primary', 'Veilbird Controller', $1, $2, $3, $4, $5, $5)
+    VALUES ('primary', 'TrackNothing Controller', $1, $2, $3, $4, $5, $5)
     ON CONFLICT (id) DO NOTHING`, [locationLabel, latitude, longitude, source, timestamp]);
   return (await dbQuery<ControllerSettings>("SELECT * FROM controller_settings WHERE id = 'primary'"))[0]!;
 }

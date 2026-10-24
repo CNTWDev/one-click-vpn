@@ -9,8 +9,8 @@
     <NeutralLanguage>en</NeutralLanguage>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Veilbird</AssemblyName>
-    <Product>Veilbird</Product>
-    <AssemblyTitle>Veilbird</AssemblyTitle>
+    <Product>TrackNothing</Product>
+    <AssemblyTitle>TrackNothing</AssemblyTitle>
     <ApplicationIcon>Assets\Veilbird.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>

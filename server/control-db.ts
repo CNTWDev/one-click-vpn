@@ -255,7 +255,7 @@ export async function createDevice(input: {
   return (await findDevice(id))!;
 }
 
-/** Devices for subscriptions and exported configs; Veilbird app devices (native-1) are managed as enrollments instead. */
+/** Devices for subscriptions and exported configs; TrackNothing app devices (native-1) are managed as enrollments instead. */
 export async function listDevices(userId?: string): Promise<Device[]> {
   return userId
     ? dbQuery<Device>("SELECT * FROM devices WHERE user_id = $1 AND app_version <> 'native-1' ORDER BY created_at DESC", [userId])
@@ -290,7 +290,7 @@ export async function createAccessCredential(input: {
   protocol: Protocol;
   identityKey: string;
 }): Promise<AccessCredential> {
-  if ((await dbQuery<{native_only:boolean}>("SELECT native_only FROM users WHERE id=$1",[input.userId]))[0]?.native_only) throw new Error("Please connect using the Veilbird app");
+  if ((await dbQuery<{native_only:boolean}>("SELECT native_only FROM users WHERE id=$1",[input.userId]))[0]?.native_only) throw new Error("Please connect using the TrackNothing app");
   const credentialId = `cred_${randomUUID()}`;
   const deviceId = `dev_${randomUUID()}`;
   const timestamp = now();

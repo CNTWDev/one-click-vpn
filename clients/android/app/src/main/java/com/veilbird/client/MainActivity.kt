@@ -169,7 +169,7 @@ class MainActivity : Activity() {
         setContentView(root)
         val signedIn = api.secret("token") != null
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        header.addView(label("Veilbird", 18f).apply { setPadding(0, 0, 0, 0) }, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(label("TrackNothing", 18f).apply { setPadding(0, 0, 0, 0) }, LinearLayout.LayoutParams(0, -2, 1f))
         // Signed in, the language setting lives on the account page; before that it is the only way to change it.
         if (!signedIn) header.addView(label(L10n.text(R.string.language), 14f).apply {
             setTextColor(teal); setPadding(12.dp, 10.dp, 12.dp, 10.dp); background = surface(canvas, 12); setOnClickListener { chooseLanguage() }
@@ -378,7 +378,7 @@ class MainActivity : Activity() {
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         for ((title, action) in listOf<Pair<Int, () -> Unit>>(
             R.string.copy_action to {
-                getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Veilbird", log))
+                getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("TrackNothing", log))
                 Toast.makeText(this, L10n.text(R.string.copied), Toast.LENGTH_SHORT).show()
             },
             R.string.share_action to { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, log), null)) },
@@ -418,7 +418,7 @@ class MainActivity : Activity() {
         status?.text = L10n.text(R.string.update_downloading)
         work({ updater.downloadAndInstall(available) }) {}
     }
-    private fun alert(message: String) { AlertDialog.Builder(this).setTitle("Veilbird").setMessage(message).setPositiveButton(L10n.text(R.string.got_it), null).show() }
+    private fun alert(message: String) { AlertDialog.Builder(this).setTitle("TrackNothing").setMessage(message).setPositiveButton(L10n.text(R.string.got_it), null).show() }
     private fun startConnection() { startForegroundService(Intent(this, ConnectionService::class.java).putExtra("nodeId", selectedId)) }
     @Deprecated("Activity result compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

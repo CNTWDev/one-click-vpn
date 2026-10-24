@@ -10,7 +10,7 @@ test("Hiddify deep link round-trips the subscription URL the way Hiddify parses 
   assert.equal(uri.protocol, "hiddify:");
   assert.equal(uri.host, "import");
   assert.equal(uri.searchParams.get("url"), link);
-  assert.equal(uri.searchParams.get("name"), "Veilbird");
+  assert.equal(uri.searchParams.get("name"), "TrackNothing");
 });
 
 test("Clash deep link round-trips the subscription URL", () => {

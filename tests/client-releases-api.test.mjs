@@ -60,7 +60,7 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
 
       // Local storage: the Console uploads ordered chunks; the Controller stores and serves published builds.
       const apk = Buffer.from("veilbird-apk-v1".repeat(1000)), upload = crypto.randomUUID();
-      const meta = { platform: "android", arch: "universal", version: "1.0.0", build: 10, fileName: "Veilbird-1.0.0.apk" };
+      const meta = { platform: "android", arch: "universal", version: "1.0.0", build: 10, fileName: "TrackNothing-1.0.0.apk" };
       const chunk = (offset, final, bytes, extra = {}) => fetch(`${base}/api/v1/admin/client-releases/files?${new URLSearchParams({ ...meta, upload, offset: String(offset), final: final ? "1" : "0", ...extra })}`,
         { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: bytes });
       assert.equal((await fetch(`${base}/api/v1/admin/client-releases/files?${new URLSearchParams({ ...meta, upload, offset: "0", final: "1" })}`, { method: "PUT", body: apk })).status, 403, "anonymous uploads are refused");
@@ -75,7 +75,7 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
       const served = await fetch(`${base}${new URL(local.url).pathname}`);
       assert.equal(served.status, 200);
       assert.deepEqual(Buffer.from(await served.arrayBuffer()), apk);
-      const second = crypto.randomUUID(), meta2 = { ...meta, version: "1.1.0", build: 11, fileName: "Veilbird-1.1.0.apk" };
+      const second = crypto.randomUUID(), meta2 = { ...meta, version: "1.1.0", build: 11, fileName: "TrackNothing-1.1.0.apk" };
       const stored2 = await (await fetch(`${base}/api/v1/admin/client-releases/files?${new URLSearchParams({ ...meta2, upload: second, offset: "0", final: "1" })}`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: apk })).json();
       const draft2 = await (await ci("/api/v1/admin/client-releases", { ...meta2, channel: "beta", minOs: "Android 8.0", storageKey: stored2.storageKey })).json();
       assert.equal((await fetch(`${base}${new URL(draft2.url).pathname}`)).status, 404, "drafts are not public");

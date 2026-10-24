@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   const admin = await requestAdmin(request);
   if (!admin) return jsonError("Administrator authentication required", 403);
   try {
-    await sendMail({ to: admin.email, subject: "Veilbird test email", text: "Mail delivery works. Users can now reset a forgotten password from the Portal sign-in page." });
+    await sendMail({ to: admin.email, subject: "TrackNothing test email", text: "Mail delivery works. Users can now reset a forgotten password from the Portal sign-in page." });
     return NextResponse.json({ to: admin.email });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to send email", 502);

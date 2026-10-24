@@ -60,7 +60,7 @@ async function realityUserRows(nodeId: string) {
     WHERE p.node_id=$1 AND p.protocol='vless' AND p.status='active' AND p.expires_at>$2
     AND c.status='active' AND NOT c.user_disabled AND NOT c.admin_disabled AND c.deleted_at IS NULL
     AND (c.expires_at IS NULL OR c.expires_at>$2) AND u.status='active' AND NOT u.native_only ORDER BY c.identity_key`, [nodeId,new Date().toISOString()]);
-  // Veilbird app devices fall back to this node's VLESS port when UDP is blocked.
+  // TrackNothing app devices fall back to this node's VLESS port when UDP is blocked.
   return [...rows, ...await nativeUserRows()];
 }
 

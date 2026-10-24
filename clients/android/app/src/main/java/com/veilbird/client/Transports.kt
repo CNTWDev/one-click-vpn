@@ -18,7 +18,7 @@ import java.security.MessageDigest
  */
 object Transports {
     val ladder = listOf("wireguard", "hysteria2", "reality", "xhttp")
-    const val GROUP = "Veilbird"
+    const val GROUP = "TrackNothing"
     const val TEST_URL = "https://www.gstatic.com/generate_204"
     private const val MEMORY_DAYS = 7L
     private val privateNetworks = listOf("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16")

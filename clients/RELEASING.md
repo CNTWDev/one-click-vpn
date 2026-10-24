@@ -29,8 +29,8 @@ Android 版内嵌 mihomo 内核（`clients/android/core`）。CI 先用 Go 和 A
 
 1. 改 `clients/version.json` 的版本号，提交后推送标签 `client-v<版本号>`；或在 GitHub → Actions →「Client release」→ Run workflow。
 2. 运行结束后，在该次运行页面底部 **Artifacts** 下载（GitHub 会再套一层 zip，先解压）：
-   - `Veilbird-android-…` → `Veilbird-<版本>-<构建号>.apk`
-   - `Veilbird-windows-x64-…` → `Veilbird-<版本>-<构建号>-win-x64-setup.exe`（arm64 同理，给 ARM 笔记本用）
+   - `TrackNothing-android-…` → `TrackNothing-<版本>-<构建号>.apk`
+   - `TrackNothing-windows-x64-…` → `TrackNothing-<版本>-<构建号>-win-x64-setup.exe`（arm64 同理，给 ARM 笔记本用）
 3. 控制台 → 客户端 → 客户端发布 →「上传安装包」，选择解压出来的 `.apk` 或 `-setup.exe`。平台、架构、版本号、构建号会按文件名自动填好，点「上传并保存草稿」。
 4. 版本历史里点「发布」（测试版），自己装一遍确认没问题，再点「晋升正式版」。门户下载区和固定链接 `/download/android`、`/download/windows` 立即指向它，已安装的客户端下次启动会提示更新。
 5. 需要强制所有人升级时，在「下载链接与最低版本」设置最低构建号。

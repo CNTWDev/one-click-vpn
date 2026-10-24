@@ -1,4 +1,4 @@
-/* Veilbird Console — design tokens first; every rule below reads tokens so light and dark stay in sync.
+/* TrackNothing Console — design tokens first; every rule below reads tokens so light and dark stay in sync.
    Shared components (shared/subscription-panel.*) read the same names: --accent --accent-strong --surface --surface-2
    --border --text --text-2 --success --warning --danger. */
 :root {
@@ -99,7 +99,8 @@ code { font-family: var(--mono); font-size: .92em; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); letter-spacing: .1em; font-size: 12px; font-weight: 800; white-space: nowrap; }
 .brand em { color: var(--accent); font-style: normal; }
 .mark { display: inline-flex; color: var(--accent); }
-.brand small { color: var(--muted, currentColor); font-size: 10px; font-weight: 700; letter-spacing: .14em; opacity: .75; }
+.brand-text { display: flex; flex-direction: column; gap: 2px; line-height: 1.1; }
+.brand small { color: var(--muted, currentColor); font-size: 9px; font-weight: 700; letter-spacing: .2em; opacity: .75; }
 
 /* Login / loading */
 .loading, .login { min-height: 100vh; display: grid; place-items: center; align-content: center; background: radial-gradient(circle at 64% -10%, var(--accent-soft), transparent 40%), var(--bg); }

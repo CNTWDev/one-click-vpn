@@ -64,9 +64,9 @@ export async function sendMail(input: { to: string; subject: string; text: strin
 }
 
 const resetMail = {
-  zh: { subject: "重置 Veilbird 密码", body: (url: string) => `点击下面的链接设置新密码，1 小时内有效，只能使用一次：\n\n${url}\n\n如果不是你本人操作，忽略这封邮件即可，密码不会改变。` },
-  en: { subject: "Reset your Veilbird password", body: (url: string) => `Open this link to set a new password. It works once and expires in 1 hour:\n\n${url}\n\nIf you didn't ask for this, ignore this email. Your password stays the same.` },
-  ru: { subject: "Сброс пароля Veilbird", body: (url: string) => `Откройте ссылку, чтобы задать новый пароль. Она одноразовая и действует 1 час:\n\n${url}\n\nЕсли вы не запрашивали сброс, просто проигнорируйте это письмо. Пароль не изменится.` },
+  zh: { subject: "重置 TrackNothing 密码", body: (url: string) => `点击下面的链接设置新密码，1 小时内有效，只能使用一次：\n\n${url}\n\n如果不是你本人操作，忽略这封邮件即可，密码不会改变。` },
+  en: { subject: "Reset your TrackNothing password", body: (url: string) => `Open this link to set a new password. It works once and expires in 1 hour:\n\n${url}\n\nIf you didn't ask for this, ignore this email. Your password stays the same.` },
+  ru: { subject: "Сброс пароля TrackNothing", body: (url: string) => `Откройте ссылку, чтобы задать новый пароль. Она одноразовая и действует 1 час:\n\n${url}\n\nЕсли вы не запрашивали сброс, просто проигнорируйте это письмо. Пароль не изменится.` },
 };
 
 export function passwordResetMail(language: unknown, url: string): { subject: string; text: string } {
