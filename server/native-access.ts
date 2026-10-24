@@ -7,9 +7,14 @@ import { canonical, digest, identity, NativeError, verifyNativeProof } from "./n
 import { rebuildDesiredState, selectVpnServices } from "./control-plane";
 import { ipv4Address, ipv4Pool } from "./ipv4-pool";
 import { ensureNativeSecret, nativeProxies } from "./stealth";
+import { accessSql, accountAccess } from "./entitlements";
 
 export type Session = { id: string; user_id: string; identity_jwk: string; identity_thumbprint: string; device_name: string; platform: string };
-type Entitlement = { status: string; native_only: boolean; native_device_limit: number | null; membership_expires_at: string | null };
+type Entitlement = { status: string; native_only: boolean; device_limit: number; allowed: boolean; exhausted: boolean; access_until: Date | null };
+/** The account row as connect needs it: the one access rule and the device limit (own override, then plan, then default). */
+const entitlementSql = (lock = "") => `SELECT status,native_only,COALESCE(native_device_limit,access_device_limit,${defaultLimit()}) AS device_limit,${accessSql("users")} AS allowed,access_until,
+  EXISTS (SELECT 1 FROM access_grants g WHERE g.user_id=users.id AND g.status='active' AND g.quota_bytes IS NOT NULL AND g.used_bytes>=g.quota_bytes AND g.starts_at<=now() AND (g.ends_at IS NULL OR g.ends_at>now())) AS exhausted
+  FROM users WHERE id=$1${lock}`;
 const ttl = 300;
 // Sliding: every signed connect/renewal extends it, so active devices never re-enter passwords.
 export const sessionDays = () => { const n = Number(process.env.VEILBIRD_NATIVE_SESSION_DAYS || 30); return Number.isInteger(n) && n >= 1 && n <= 90 ? n : 30; };
@@ -49,14 +54,17 @@ export async function nativeSession(request: Request): Promise<Session> {
 }
 export async function nativeAccount(session: Session) {
   await dbExec("UPDATE native_enrollments SET status='revoked' WHERE user_id=$1 AND status='revoking' AND release_after<=now()",[session.user_id]);
-  const user = (await dbQuery<Entitlement & {email:string;display_name:string}>("SELECT email,display_name,status,native_only,native_device_limit,membership_expires_at FROM users WHERE id=$1",[session.user_id]))[0];
+  const user = (await dbQuery<{email:string;display_name:string;native_only:boolean;native_device_limit:number|null;access_device_limit:number|null}>("SELECT email,display_name,native_only,native_device_limit,access_device_limit FROM users WHERE id=$1",[session.user_id]))[0];
+  const access = await accountAccess(session.user_id);
   const devices = await dbQuery(`SELECT id,device_name AS name,platform,status,created_at AS "createdAt",last_seen_at AS "lastSeenAt",release_after AS "releaseAfter",
     identity_thumbprint=$2 AS "isCurrent" FROM native_enrollments WHERE user_id=$1 ORDER BY created_at`,[session.user_id,session.identity_thumbprint]);
   const since=new Date(Date.now()-29*86400000).toISOString().slice(0,10);
   const traffic=(await dbQuery<Record<string,unknown>>("SELECT COALESCE(SUM(upload_bytes),0)::text AS \"uploadBytes\",COALESCE(SUM(download_bytes),0)::text AS \"downloadBytes\" FROM traffic_daily WHERE user_id=$1 AND day >= $2",[session.user_id,since]))[0];
   // Per-day totals for the small usage chart in the apps; days without traffic are absent.
   traffic.days=await dbQuery("SELECT day::text AS day,(SUM(upload_bytes)+SUM(download_bytes))::text AS bytes FROM traffic_daily WHERE user_id=$1 AND day >= $2 GROUP BY day ORDER BY day",[session.user_id,since]);
-  return { name:user.display_name,email:user.email,managed:user.native_only,limit:user.native_device_limit??defaultLimit(),limitSource:user.native_device_limit===null?"default":"override",used:devices.filter(d=>d.status!=="revoked").length,expiresAt:user.membership_expires_at,devices,traffic };
+  // expiresAt stays for apps that predate `access`: the end of the current period, null when it has none.
+  return { name:user.display_name,email:user.email,managed:user.native_only,limit:user.native_device_limit??user.access_device_limit??defaultLimit(),limitSource:user.native_device_limit!==null?"override":user.access_device_limit!==null?"plan":"default",used:devices.filter(d=>d.status!=="revoked").length,
+    expiresAt:access.state==="active"?access.until:access.endedAt,access,devices,traffic };
 }
 async function candidates() {
   return (await selectVpnServices({protocol:"wireguard"})).filter(({node})=>node.capabilities.nativeLeaseEnforcement === 1);
@@ -99,7 +107,7 @@ async function consume(session:Session,action:string,body:Record<string,unknown>
 }
 function checkEntitlement(user:Entitlement) {
   if(user.status!=="active") throw new NativeError("ACCOUNT_UNAVAILABLE",403);
-  if(user.membership_expires_at && Date.parse(user.membership_expires_at)<=Date.now()) throw new NativeError("MEMBERSHIP_EXPIRED",403);
+  if(!user.allowed) throw new NativeError(user.exhausted?"QUOTA_EXHAUSTED":"MEMBERSHIP_EXPIRED",403);
 }
 export async function nativeConnect(session:Session,body:Record<string,unknown>) {
   const input=await consume(session,"connect",body);
@@ -108,7 +116,7 @@ export async function nativeConnect(session:Session,body:Record<string,unknown>)
   if(!chosen || !chosen.node.server_public_key) throw new NativeError("NODE_UNAVAILABLE",409);
   const {node,service}=chosen;
   const result=await transaction(async client=>{
-    const user=(await client.query<Entitlement>("SELECT status,native_only,native_device_limit,membership_expires_at FROM users WHERE id=$1 FOR UPDATE",[session.user_id])).rows[0];
+    const user=(await client.query<Entitlement>(entitlementSql(" FOR UPDATE"),[session.user_id])).rows[0];
     checkEntitlement(user);
     // Only a valid device proof and entitlement may extend a login session.
     // Passive account polling cannot keep a stolen bearer token alive forever.
@@ -117,7 +125,7 @@ export async function nativeConnect(session:Session,body:Record<string,unknown>)
     let enrollment=(await client.query("SELECT id,status FROM native_enrollments WHERE user_id=$1 AND identity_thumbprint=$2",[session.user_id,session.identity_thumbprint])).rows[0];
     if(enrollment && enrollment.status!=="active") throw new NativeError("DEVICE_REVOKED",403);
     if(!enrollment) {
-      const used=Number((await client.query("SELECT COUNT(*) AS count FROM native_enrollments WHERE user_id=$1 AND status<>'revoked'",[session.user_id])).rows[0].count),limit=user.native_device_limit??defaultLimit();
+      const used=Number((await client.query("SELECT COUNT(*) AS count FROM native_enrollments WHERE user_id=$1 AND status<>'revoked'",[session.user_id])).rows[0].count),limit=user.device_limit;
       if(used>=limit) throw new NativeError("DEVICE_LIMIT_REACHED",409,{limit,used});
       enrollment={id:`enr_${randomUUID()}`,status:"active"};
       await client.query("INSERT INTO native_enrollments (id,user_id,identity_thumbprint,device_name,platform) VALUES ($1,$2,$3,$4,$5)",[enrollment.id,session.user_id,session.identity_thumbprint,session.device_name,session.platform]);
@@ -142,7 +150,7 @@ export async function nativeConnect(session:Session,body:Record<string,unknown>)
       if(!address) throw new NativeError("NODE_FULL",409);
       lease={id:randomUUID(),device_id:deviceId,address};
     }
-    const expiry=Math.min(Date.now()+ttl*1000,user.membership_expires_at?Date.parse(user.membership_expires_at):Infinity);
+    const expiry=Math.min(Date.now()+ttl*1000,user.access_until?user.access_until.getTime():Infinity);
     const expiresAt=new Date(expiry).toISOString();
     await client.query(`INSERT INTO native_leases (id,enrollment_id,node_id,device_id,public_key,address,expires_at) VALUES ($1,$2,$3,$4,$5,$6,$7)
       ON CONFLICT(enrollment_id,node_id) DO UPDATE SET public_key=excluded.public_key,expires_at=excluded.expires_at,required_revision=NULL`,[lease.id,enrollment.id,node.id,lease.device_id,input.publicKey,lease.address,expiresAt]);
@@ -169,8 +177,8 @@ async function fallbackProxies(node:{id:string;ip:string;public_endpoint:string|
   catch { return []; }
 }
 export async function nativeStatus(session:Session,leaseId:string) {
-  const row=(await dbQuery(`SELECT l.node_id,l.expires_at,l.required_revision,e.status,u.status AS account_status,u.native_only,u.membership_expires_at FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id JOIN users u ON u.id=e.user_id WHERE l.id=$1 AND e.user_id=$2 AND e.identity_thumbprint=$3`,[leaseId,session.user_id,session.identity_thumbprint]))[0];
-  if(!row || row.status!=="active" || row.account_status!=="active" || new Date(row.expires_at).getTime()<=Date.now() || (row.membership_expires_at&&Date.parse(row.membership_expires_at)<=Date.now())) throw new NativeError("ACCESS_EXPIRED",403);
+  const row=(await dbQuery(`SELECT l.node_id,l.expires_at,l.required_revision,e.status,${accessSql()} AS allowed FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id JOIN users u ON u.id=e.user_id WHERE l.id=$1 AND e.user_id=$2 AND e.identity_thumbprint=$3`,[leaseId,session.user_id,session.identity_thumbprint]))[0];
+  if(!row || row.status!=="active" || !row.allowed || new Date(row.expires_at).getTime()<=Date.now()) throw new NativeError("ACCESS_EXPIRED",403);
   const observed=(await dbQuery(`SELECT d.revision,o.applied_revision,o.status FROM desired_configs d LEFT JOIN observed_configs o ON o.node_id=d.node_id AND o.protocol=d.protocol WHERE d.node_id=$1 AND d.protocol='wireguard'`,[row.node_id]))[0];
   return {ready:row.required_revision!=null && !!observed && observed.applied_revision>=row.required_revision && ["applied","succeeded"].includes(observed.status),expiresAt:row.expires_at};
 }

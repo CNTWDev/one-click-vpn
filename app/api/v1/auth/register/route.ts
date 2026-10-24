@@ -3,6 +3,7 @@ import { createPendingUser, findUserByEmail, addAudit } from "../../../../../ser
 import { hashPasswordAsync } from "../../../../../server/password";
 import { cleanText, jsonError, readJson } from "../../../../../server/http";
 import { allowRegistration } from "../../../../../server/rate-limit";
+import { grantWelcome } from "../../../../../server/entitlements";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
       await addAudit({ actorUserId: existing.id, action: "auth.register.duplicate", targetType: "user", targetId: existing.id });
     } else {
       const user = await createPendingUser({ email, displayName, passwordHash });
+      await grantWelcome(user.id);
       await addAudit({ actorUserId: user.id, action: "auth.registered", targetType: "user", targetId: user.id });
     }
     return NextResponse.json({ status: "received", email, message: "Registration received. An administrator must approve the account before VPN access is available." }, { status: 202 });

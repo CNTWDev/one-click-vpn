@@ -22,15 +22,15 @@ export async function updateNativeAccess(userId: string, actor: string, body: Re
     const limit=body.limit;
     if (limit !== null && (!Number.isInteger(limit) || Number(limit)<1 || Number(limit)>100)) throw new NativeError("INVALID_DEVICE_LIMIT");
     if (typeof body.managed !== "boolean") throw new NativeError("INVALID_REQUEST");
-    if (body.expiresAt !== null && (typeof body.expiresAt!=="string" || !Number.isFinite(Date.parse(body.expiresAt)))) throw new NativeError("INVALID_EXPIRY");
     await transaction(async c => {
       const user=(await c.query("SELECT native_only FROM users WHERE id=$1 FOR UPDATE",[userId])).rows[0];
       // Do not promise strict isolation while previously exported credentials can still exist on offline nodes.
       if (body.managed && !user.native_only && (await c.query("SELECT p.id FROM connection_profiles p JOIN devices d ON d.id=p.device_id WHERE d.user_id=$1 LIMIT 1",[userId])).rowCount) throw new NativeError("LEGACY_ACCESS_MIGRATION_REQUIRED",409);
       const used=Number((await c.query("SELECT COUNT(*) AS count FROM native_enrollments WHERE user_id=$1 AND status<>'revoked'",[userId])).rows[0].count);
-      if (used > (limit === null ? defaultLimit() : Number(limit))) throw new NativeError("REVOKE_DEVICES_FIRST",409,{used});
+      const planLimit=(await c.query("SELECT access_device_limit FROM users WHERE id=$1",[userId])).rows[0]?.access_device_limit;
+      if (used > (limit === null ? planLimit ?? defaultLimit() : Number(limit))) throw new NativeError("REVOKE_DEVICES_FIRST",409,{used});
       if (!body.managed && used) throw new NativeError("REVOKE_DEVICES_FIRST",409,{used});
-      await c.query("UPDATE users SET native_only=$2,native_device_limit=$3,membership_expires_at=$4 WHERE id=$1",[userId,body.managed,limit,body.expiresAt ? new Date(String(body.expiresAt)).toISOString():null]);
+      await c.query("UPDATE users SET native_only=$2,native_device_limit=$3 WHERE id=$1",[userId,body.managed,limit]);
     });
   } else throw new NativeError("INVALID_REQUEST");
   await reconcileUserAccess(userId);

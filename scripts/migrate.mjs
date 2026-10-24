@@ -422,6 +422,30 @@ CREATE TABLE IF NOT EXISTS node_network_counters (
   node_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, interface TEXT NOT NULL, counter_epoch TEXT NOT NULL,
   rx_bytes BIGINT NOT NULL, tx_bytes BIGINT NOT NULL, observed_at TIMESTAMPTZ NOT NULL
 );
+-- Account entitlements: what an account may use (time window, total traffic, devices) comes only from its grants.
+-- users.access_* caches the result of server/entitlements.ts so every enforcement point checks one row.
+CREATE TABLE IF NOT EXISTS access_plans (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, duration_days INTEGER CHECK (duration_days BETWEEN 1 AND 3650),
+  quota_bytes BIGINT CHECK (quota_bytes > 0), device_limit INTEGER CHECK (device_limit BETWEEN 1 AND 100),
+  is_welcome BOOLEAN NOT NULL DEFAULT FALSE, enabled BOOLEAN NOT NULL DEFAULT TRUE, sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS access_plans_one_welcome ON access_plans (is_welcome) WHERE is_welcome;
+CREATE TABLE IF NOT EXISTS access_grants (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source TEXT NOT NULL CHECK (source IN ('admin','gift','welcome','order','migration')),
+  plan_id TEXT REFERENCES access_plans(id) ON DELETE SET NULL, plan_name TEXT NOT NULL DEFAULT '',
+  starts_at TIMESTAMPTZ NOT NULL, ends_at TIMESTAMPTZ, quota_bytes BIGINT CHECK (quota_bytes > 0),
+  used_bytes BIGINT NOT NULL DEFAULT 0, device_limit INTEGER CHECK (device_limit BETWEEN 1 AND 100),
+  reference TEXT UNIQUE, status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','revoked')),
+  note TEXT NOT NULL DEFAULT '', created_by TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), revoked_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS access_grants_user ON access_grants(user_id, status);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS access_ok BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS access_until TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS access_device_limit INTEGER;
+-- Last reminder mailed for the current period (soon / low / ended + its end or quota), so each goes out once.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS access_notice TEXT NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS node_traffic_monthly (
   node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, month TEXT NOT NULL,
   rx_bytes BIGINT NOT NULL DEFAULT 0, tx_bytes BIGINT NOT NULL DEFAULT 0,
@@ -431,6 +455,8 @@ CREATE TABLE IF NOT EXISTS node_traffic_monthly (
 
 try {
   await pool.query("SELECT 1");
+  // Grants arrive with this release; accounts that exist before it keep working: permanent and unlimited.
+  const firstEntitlements = !(await pool.query("SELECT to_regclass('access_grants') AS t")).rows[0].t;
   await pool.query(schema);
   await pool.query(`CREATE OR REPLACE FUNCTION reject_native_legacy_profile() RETURNS trigger AS $$
     DECLARE managed BOOLEAN;
@@ -490,11 +516,24 @@ try {
   const email = process.env.VEILBIRD_ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.VEILBIRD_ADMIN_PASSWORD;
   if (email && password) {
-    await pool.query(
+    const owner = await pool.query(
       `INSERT INTO users (id, email, display_name, password_hash, role, status, approved_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 'owner', 'active', $5, $5, $5) ON CONFLICT (email) DO NOTHING`,
+       VALUES ($1, $2, $3, $4, 'owner', 'active', $5, $5, $5) ON CONFLICT (email) DO NOTHING RETURNING id`,
       [randomUUID(), email, process.env.VEILBIRD_ADMIN_NAME?.trim() || "Owner", hashPassword(password), timestamp],
     );
+    // A new owner is permanent and unlimited (on a fresh install the block below covers it).
+    if (owner.rowCount && !firstEntitlements) await pool.query(`INSERT INTO access_grants (id, user_id, source, plan_name, starts_at, note)
+      VALUES ($1, $2, 'migration', '', now(), 'Owner')`, [`grant_${randomUUID()}`, owner.rows[0].id]);
+  }
+  if (firstEntitlements) {
+    await pool.query(`INSERT INTO access_grants (id, user_id, source, plan_name, starts_at, note)
+      SELECT 'grant_' || md5(random()::text || id), id, 'migration', '', now(), 'Existing account' FROM users`);
+    await pool.query("UPDATE users SET access_ok = TRUE, access_until = NULL, access_device_limit = NULL");
+    // Starter plans, created once; operators rename, change or switch them off in Console → 套餐.
+    await pool.query(`INSERT INTO access_plans (id, name, duration_days, quota_bytes, is_welcome, sort_order) VALUES
+      ('welcome', '新用户赠送', NULL, 10737418240, TRUE, 0), ('day', '1 天体验', 1, NULL, FALSE, 1),
+      ('week', '周卡', 7, NULL, FALSE, 2), ('month', '月卡', 30, NULL, FALSE, 3), ('year', '年卡', 365, NULL, FALSE, 4)
+      ON CONFLICT (id) DO NOTHING`);
   }
   console.log("TrackNothing PostgreSQL database ready");
 } finally {

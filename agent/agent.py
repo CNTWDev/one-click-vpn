@@ -48,6 +48,9 @@ XRAY_PATH = Path("/opt/northstar-agent/bin/xray")
 MIHOMO_PATH = Path("/opt/northstar-agent/bin/mihomo")
 STEALTH_DIR = STATE_DIR / "stealth"
 STEALTH_CONFIG = STEALTH_DIR / "config.yaml"
+# mihomo's own API, loopback only: the Agent reads per-device traffic from it.
+STEALTH_API = "127.0.0.1:10086"
+STEALTH_API_SECRET = STEALTH_DIR / "api.secret"
 AGENT_DIR = Path("/opt/northstar-agent")
 VLESS_RESTART_DUE = STATE_DIR / "vless-restart-due"
 # Default REALITY target pool: large TLS 1.3 + HTTP/2 sites. Each node probes them and the
@@ -1109,7 +1112,7 @@ UUID_PATTERN = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
 PRIVATE_NETWORKS = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "169.254.0.0/16", "100.64.0.0/10", "0.0.0.0/8", "224.0.0.0/4"]
 
 
-def stealth_config(desired, server, reality, users, target):
+def stealth_config(desired, server, reality, users, target, api_secret=None):
     """mihomo as a server: Hysteria2 (Salamander) on UDP and VLESS REALITY XHTTP on TCP, same port."""
     port = desired.get("listenPort")
     if not isinstance(port, int) or isinstance(port, bool) or port < 1 or port > 65535:
@@ -1125,8 +1128,11 @@ def stealth_config(desired, server, reality, users, target):
         raise ValueError("invalid stealth certificate")
     if not re.fullmatch(r"[A-Za-z0-9_-]{43}", reality.get("privateKey", "")) or not re.fullmatch(r"[0-9a-f]{16}", reality.get("shortId", "")):
         raise ValueError("invalid REALITY server keys")
+    if api_secret is not None and not re.fullmatch(r"[A-Za-z0-9_-]{32,64}", api_secret):
+        raise ValueError("invalid stealth API secret")
+    api = {"external-controller": STEALTH_API, "secret": api_secret} if api_secret else {}
     return {
-        "log-level": "warning", "ipv6": True, "mode": "rule", "find-process-mode": "off",
+        "log-level": "warning", "ipv6": True, "mode": "rule", "find-process-mode": "off", **api,
         "listeners": [
             {"name": "hysteria2", "type": "hysteria2", "listen": "0.0.0.0", "port": port,
              "users": {user["email"]: user["id"] for user in users},
@@ -1141,6 +1147,57 @@ def stealth_config(desired, server, reality, users, target):
         # Same egress policy as the VLESS node: never into the node's own private networks.
         "rules": [f"IP-CIDR,{network},REJECT,no-resolve" for network in PRIVATE_NETWORKS] + ["IP-CIDR6,fc00::/7,REJECT,no-resolve", "IP-CIDR6,fe80::/10,REJECT,no-resolve", "MATCH,DIRECT"],
     }
+
+
+def stealth_api_secret():
+    STEALTH_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if STEALTH_API_SECRET.exists():
+        value = STEALTH_API_SECRET.read_text().strip()
+        if re.fullmatch(r"[A-Za-z0-9_-]{32,64}", value):
+            return value
+    value = base64.urlsafe_b64encode(os.urandom(24)).decode().rstrip("=")
+    atomic_write(STEALTH_API_SECRET, value, 0o600)
+    return value
+
+
+# Per-device stealth traffic since this Agent process started (its counter epoch): mihomo lists
+# open connections only, so the Agent adds up how much each one grew between polls. A connection
+# that closes between two polls loses at most its last two seconds.
+STEALTH_EPOCH = base64.urlsafe_b64encode(os.urandom(9)).decode()
+stealth_connections = {}
+stealth_totals = {}
+LOCAL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def poll_stealth_usage():
+    global stealth_connections
+    if not STEALTH_CONFIG.exists() or not STEALTH_API_SECRET.exists():
+        return
+    request = urllib.request.Request(f"http://{STEALTH_API}/connections", headers={"Authorization": f"Bearer {STEALTH_API_SECRET.read_text().strip()}"})
+    try:
+        with LOCAL_OPENER.open(request, timeout=2) as response:
+            connections = json.loads(response.read(32 * 1024 * 1024)).get("connections") or []
+    except (OSError, ValueError, AttributeError):
+        return
+    seen = {}
+    for connection in connections if isinstance(connections, list) else []:
+        if not isinstance(connection, dict):
+            continue
+        user = str((connection.get("metadata") or {}).get("inboundUser") or "")
+        key, upload, download = connection.get("id"), connection.get("upload"), connection.get("download")
+        if not UUID_PATTERN.fullmatch(user) or not isinstance(key, str) or not isinstance(upload, int) or not isinstance(download, int):
+            continue
+        _, previous_upload, previous_download = stealth_connections.get(key, (user, 0, 0))
+        totals = stealth_totals.setdefault(user, [0, 0])
+        totals[0] += max(0, upload - previous_upload)
+        totals[1] += max(0, download - previous_download)
+        seen[key] = (user, upload, download)
+    stealth_connections = seen
+
+
+def stealth_usage_snapshots():
+    return [{"protocol": "stealth", "identityKey": user, "rxBytes": upload, "txBytes": download, "counterEpoch": STEALTH_EPOCH}
+            for user, (upload, download) in stealth_totals.items()]
 
 
 def stealth_listen_port():
@@ -1185,7 +1242,7 @@ def stealth_sync_config(desired):
     users = json.loads(request_node_secret(desired.get("usersSecretId")))
     ensure_mihomo()
     target = validated_reality_target(reality.get("serverName"), stealth_target())
-    config = stealth_config(desired, server, reality, users, target)
+    config = stealth_config(desired, server, reality, users, target, stealth_api_secret())
     port = config["listeners"][0]["port"]
     old_port = stealth_listen_port()
     if old_port != port and (socket_listening("tcp", port) or socket_listening("udp", port)):
@@ -1627,11 +1684,11 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.13.0",
+        "version": "agent 2.14.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
-        "usageSnapshots": wireguard_usage_snapshots() + openvpn_usage_snapshots() + vless_usage_snapshots(),
+        "usageSnapshots": wireguard_usage_snapshots() + openvpn_usage_snapshots() + vless_usage_snapshots() + stealth_usage_snapshots(),
     })
     try:
         confirm_staged_upgrade()
@@ -1665,7 +1722,7 @@ def adopt_controller_origin(target):
     CONTROLLER = target
     try:
         request_json("/api/v1/agent/heartbeat", {"nodeId": NODE_ID, "token": TOKEN, "hostname": socket.gethostname(),
-                                                 "version": "agent 2.13.0", "capabilities": capabilities()})
+                                                 "version": "agent 2.14.0", "capabilities": capabilities()})
         lines = CONFIG_ENV.read_text().splitlines()
         lines = [f"NORTHSTAR_CONTROLLER_URL={target}" if line.startswith("NORTHSTAR_CONTROLLER_URL=") else line for line in lines]
         if f"NORTHSTAR_CONTROLLER_URL={target}" not in lines:
@@ -1747,6 +1804,7 @@ def main():
     last_task_poll = 0
     last_reality_refresh = 0
     last_reality_probe = 0
+    last_stealth_poll = 0
     request_backoff_until = 0
     consecutive_request_failures = 0
     while True:
@@ -1760,6 +1818,12 @@ def main():
                 log_failure("heartbeat", error)
                 consecutive_request_failures += 1
                 request_backoff_until = now + request_retry_delay(error, consecutive_request_failures)
+        if now - last_stealth_poll >= 2:
+            last_stealth_poll = now
+            try:
+                poll_stealth_usage()
+            except Exception as error:
+                log_failure("stealth traffic", error)
         if now - last_reality_probe >= 6 * 3600:
             last_reality_probe = now
             start_reality_probe()

@@ -129,11 +129,14 @@ async function ensureReady(): Promise<void> {
         WHERE nodes.region_id IS NULL AND nodes.place = regions.name || ' · ' || regions.country`);
       const seed = adminSeed();
       if (seed) {
-        await database.query(
+        const owner = await database.query(
           `INSERT INTO users (id, email, display_name, password_hash, role, status, approved_at, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, 'owner', 'active', $5, $5, $5) ON CONFLICT (email) DO NOTHING`,
+           VALUES ($1, $2, $3, $4, 'owner', 'active', $5, $5, $5) ON CONFLICT (email) DO NOTHING RETURNING id`,
           [randomUUID(), seed.email, seed.displayName, hashPassword(seed.password), timestamp],
         );
+        // The owner never depends on the welcome gift: permanent and unlimited, like accounts from before grants.
+        if (owner.rowCount) await database.query(`INSERT INTO access_grants (id, user_id, source, plan_name, starts_at, note)
+          VALUES ($1, $2, 'migration', '', now(), 'Owner')`, [`grant_${randomUUID()}`, owner.rows[0].id]);
       }
     })().catch((error) => {
       readyPromise = null;
