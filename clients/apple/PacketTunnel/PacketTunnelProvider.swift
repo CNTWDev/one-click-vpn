@@ -43,15 +43,19 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 api=try NativeAPI(origin:origin);nodeId=configuration["nodeId"] as? String ?? "";smart=(configuration["routing"] as? String ?? "smart") != "global"
                 try await Task.sleep(nanoseconds:200_000_000) // let the path monitor report the current network
                 network=Transports.networkKey(monitor.currentPath)
-                Journal.add("connect: start, network \(network), routing \(smart ? "smart":"global")")
+                api?.attempt=String(UUID().uuidString.replacingOccurrences(of:"-",with:"").prefix(16)).lowercased()
+                // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
+                Journal.add("connect: start \(api?.attempt ?? ""), network \(network), routing \(smart ? "smart":"global")")
                 if nodeId.isEmpty {await chooseFastest()}
                 try await setTunnelNetworkSettings(networkSettings())
                 try await connectWithFallback()
                 completionHandler(nil)
             } catch {
-                var code="CONNECT_FAILED"
+                var code="CONNECT_FAILED",detail=""
                 if case AccessFailure.code(let known)=error {code=known}
-                Journal.add("connect: failed \(code)");await report(code)
+                // Unexpected errors keep their (scrubbed) text, e.g. why the core refused its configuration.
+                else {detail=Journal.scrub(error.localizedDescription)}
+                Journal.add("connect: failed \(code)"+(detail.isEmpty ? "":" (\(detail))"));await report(code,detail)
                 CoreStop();completionHandler(error);return
             }
             while !Task.isCancelled {
@@ -141,10 +145,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         if !now.isEmpty && now != carrying {if !carrying.isEmpty {Journal.add("transport: \(carrying) -> \(now)")};carrying=now}
     }
     private func status() async -> Bool {(try? await api?.request("status/\(leaseId)")["ready"] as? Bool) ?? false}
-    /// Failure codes only (no keys, addresses or traffic), so operators can see which builds and nodes fail.
-    private func report(_ code:String) async {
+    /// Failure codes and scrubbed error texts (no keys, addresses or traffic), so operators can see which builds and nodes fail and why.
+    private func report(_ code:String,_ detail:String="") async {
         var event:[String:Any]=["code":code,"at":ISO8601DateFormatter().string(from:Date())]
         if !nodeId.isEmpty {event["nodeId"]=nodeId}
+        if !detail.isEmpty {event["detail"]=detail}
+        if let attempt=api?.attempt {event["attempt"]=attempt}
         _ = try? await api?.request("diagnostics",["events":[event]])
     }
     private func fail(_ code:String,_ shown:String?=nil) async {

@@ -7,9 +7,9 @@ import java.time.temporal.ChronoUnit
 
 /**
  * Diagnostic log of the connection process, opened from a hidden entry (7 taps on the version).
- * Only what the app itself writes: steps, node names, transport names, timings and error codes.
- * Never keys, tokens, addresses or visited sites. Two files of 256 KB rotate; lines older than
- * 7 days are dropped, so the log never grows past 512 KB.
+ * Only what the app itself writes: steps, node names, transport names, timings, error codes and
+ * error texts scrubbed of addresses (scrub). Never keys, tokens, addresses or visited sites.
+ * Two files of 256 KB rotate; lines older than 7 days are dropped, so the log never grows past 512 KB.
  */
 object Journal {
     private const val LIMIT = 256 * 1024L
@@ -23,6 +23,18 @@ object Journal {
         val cutoff = System.currentTimeMillis() - DAYS * 86400000
         for (file in listOf(previous, current)) if (file.exists() && file.lastModified() < cutoff) file.delete()
     }
+
+    /**
+     * An error text without anything that names a place: URLs, IP addresses, host names and long
+     * tokens become "…" (same rule as the server's scrubDetail). At most 200 characters.
+     */
+    fun scrub(text: String?): String = (text ?: "")
+        .replace(Regex("(?i)[a-z][a-z0-9+.-]*://\\S+"), "…")
+        .replace(Regex("\\b\\d{1,3}(\\.\\d{1,3}){3}(:\\d+)?\\b"), "…")
+        .replace(Regex("(?i)\\[?\\b(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}]?(:\\d+)?"), "…")
+        .replace(Regex("(?i)\\b(?:[a-z0-9-]+\\.)+[a-z]{2,}(:\\d+)?\\b"), "…")
+        .replace(Regex("[A-Za-z0-9+/=_-]{24,}"), "…")
+        .replace(Regex("\\s+"), " ").trim().take(200)
 
     @Synchronized fun add(message: String) {
         if (!::current.isInitialized) return

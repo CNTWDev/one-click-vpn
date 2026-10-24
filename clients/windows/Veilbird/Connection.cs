@@ -36,15 +36,19 @@ public sealed class Connection(NativeApi api,Core core) {
         try {
             keys=await Task.Run(core.NewKeypair);
             network=await Task.Run(Transports.NetworkKey);lastNetworkCheck=DateTime.UtcNow;
-            Journal.Add($"connect: start, network {network}, routing {(smart?"smart":"global")}");
+            api.Attempt=Guid.NewGuid().ToString("N")[..16];
+            // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
+            Journal.Add($"connect: start {api.Attempt}, network {network}, routing {(smart?"smart":"global")}");
             if(NodeId.Length==0) await ChooseFastest();
             await ConnectWithFallback(smart);
         } catch(Exception) when (!Active) {
             await Task.Run(core.Stop);return; // disconnected while connecting
         } catch(Exception error) {
             var code=error is AccessFailure failure?failure.Code:"CONNECT_FAILED";
-            Journal.Add($"connect: failed {code}");
-            await api.Report(code,NodeId);
+            // Unexpected errors keep their (scrubbed) text, e.g. why the core refused its configuration.
+            var detail=error is AccessFailure?"":$"{error.GetType().Name}: {Journal.Scrub(error.Message)}";
+            Journal.Add($"connect: failed {code}"+(detail.Length>0?$" ({detail})":""));
+            await api.Report(code,NodeId,detail);
             await Task.Run(core.Stop);Active=false;Set("not_connected");
             throw error as AccessFailure ?? new AccessFailure("CONNECT_FAILED");
         }
@@ -162,7 +166,10 @@ public sealed class Connection(NativeApi api,Core core) {
             } else await UpdateCarrying();
             var (up,down)=await Task.Run(core.Rate);
             TxRate=up;RxRate=down;Changed?.Invoke();
-        } catch(Exception error) {Journal.Add($"tunnel: error {error.GetType().Name}");await Fail("TUNNEL_ERROR","connection_interrupted_try_again");}
+        } catch(Exception error) {
+            var detail=$"{error.GetType().Name}: {Journal.Scrub(error.Message)}";
+            Journal.Add($"tunnel: error {detail}");await api.Report("TUNNEL_ERROR",NodeId,detail);await Disconnect("connection_interrupted_try_again");
+        }
     }
     private async Task Fail(string code,string status) {await api.Report(code,NodeId);await Disconnect(status);}
     /// Closes the tunnel and releases the device slot (best effort, at most 5 s).
