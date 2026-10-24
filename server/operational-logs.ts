@@ -8,7 +8,7 @@ import { currentTrace } from "./trace";
 export type OperationalLogInput = {
   nodeId?: string | null;
   actionId?: string | null;
-  component: "controller" | "bootstrap" | "agent" | "reconcile" | "audit" | "api";
+  component: "controller" | "bootstrap" | "agent" | "reconcile" | "audit" | "api" | "client";
   level?: "info" | "warning" | "error";
   message: string;
   /** Who did it. Present only for actions a signed-in person started. */

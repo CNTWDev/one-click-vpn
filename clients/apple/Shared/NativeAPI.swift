@@ -52,6 +52,8 @@ enum SecureStorage {
 
 final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     let origin:String
+    /// Set by the packet tunnel for one connection attempt: the server's runtime log lines for it carry the same id.
+    var attempt:String?
     init(origin:String) throws {
         guard let url=URL(string:origin),url.scheme=="https",url.host != nil,url.user==nil,url.password==nil,url.query==nil,url.fragment==nil,["","/"].contains(url.path) else {throw AccessFailure.code("SERVER_REQUIRED")}
         self.origin=origin.hasSuffix("/") ? String(origin.dropLast()) : origin
@@ -61,6 +63,7 @@ final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         var request=URLRequest(url:URL(string:"\(origin)/api/v2/native/\(path)")!);request.timeoutInterval=15
         request.setValue("application/json",forHTTPHeaderField:"Accept")
         request.setValue(Self.clientAgent,forHTTPHeaderField:"X-Veilbird-Client")
+        if let attempt {request.setValue(attempt,forHTTPHeaderField:"X-Request-Id")}
         if path != "login",let token=try SecureStorage.read("token").flatMap({String(data:$0,encoding:.utf8)}) {request.setValue("Bearer \(token)",forHTTPHeaderField:"Authorization")}
         if let body {request.httpMethod="POST";request.setValue("application/json",forHTTPHeaderField:"Content-Type");request.httpBody=try JSONSerialization.data(withJSONObject:body)}
         let session=URLSession(configuration:.ephemeral,delegate:self,delegateQueue:nil)

@@ -98,7 +98,7 @@ export function LogsPage({ nodes }: { nodes: NodeRecord[] }) {
   </>;
 }
 
-const componentLabels: Record<string, string> = { controller: "Controller", bootstrap: "部署", agent: "Agent", reconcile: "配置同步", audit: "关键操作", api: "API" };
+const componentLabels: Record<string, string> = { controller: "Controller", bootstrap: "部署", agent: "Agent", reconcile: "配置同步", audit: "关键操作", api: "API", client: "客户端" };
 
 function detailText(details?: Record<string, unknown>): string {
   if (!details) return "";

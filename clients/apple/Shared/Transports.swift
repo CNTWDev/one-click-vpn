@@ -100,14 +100,24 @@ enum Shared {
 }
 
 /// Diagnostic log of the connection process, opened from a hidden entry (7 taps on the version). Only what the
-/// apps write: steps, node names, transport names, timings and error codes; never keys, tokens, addresses or
-/// visited sites. Two files of 256 KB rotate and lines older than 7 days are dropped (at most 512 KB).
+/// apps write: steps, node names, transport names, timings, error codes and error texts scrubbed of addresses
+/// (scrub); never keys, tokens, addresses or visited sites. Two files of 256 KB rotate and lines older than 7 days are dropped (at most 512 KB).
 enum Journal {
     private static let limit=256*1024
     private static let retention:TimeInterval=7*86400
     private static let lock=NSLock()
     private static var current:URL {Shared.folder.appendingPathComponent("logs/veilbird.log")}
     private static var previous:URL {Shared.folder.appendingPathComponent("logs/veilbird.1.log")}
+    /// An error text without anything that names a place: URLs, IP addresses, host names and long tokens
+    /// become "…" (same rule as the server's scrubDetail). At most 200 characters.
+    static func scrub(_ text:String) -> String {
+        var value=text
+        for pattern in ["(?i)[a-z][a-z0-9+.-]*://\\S+","\\b\\d{1,3}(\\.\\d{1,3}){3}(:\\d+)?\\b","(?i)\\[?\\b(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}\\]?(:\\d+)?",
+                        "(?i)\\b(?:[a-z0-9-]+\\.)+[a-z]{2,}(:\\d+)?\\b","[A-Za-z0-9+/=_-]{24,}","\\s+"] {
+            value=value.replacingOccurrences(of:pattern,with:pattern=="\\s+" ? " ":"…",options:.regularExpression)
+        }
+        return String(value.trimmingCharacters(in:.whitespaces).prefix(200))
+    }
     static func add(_ message:String) {
         lock.lock();defer {lock.unlock()}
         let manager=FileManager.default

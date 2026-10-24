@@ -53,6 +53,8 @@ class NativeApi(context: Context) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, store.getKey("veilbird-storage", null)) }
         prefs.edit().putString(name, b64(cipher.iv) + "." + b64(cipher.doFinal(value.toByteArray()))).apply()
     }
+    /** Set by the VPN service for the length of one connection attempt. */
+    @Volatile var attempt: String? = null
     fun request(path: String, body: JSONObject? = null): JSONObject {
         if (origin.isEmpty()) throw ApiFailure("SERVER_REQUIRED")
         val connection = URI("${origin}/api/v2/native/$path").toURL().openConnection() as HttpsURLConnection
@@ -61,6 +63,8 @@ class NativeApi(context: Context) {
         // Lets the server require an upgrade (CLIENT_UPDATE_REQUIRED) and track version adoption.
         connection.setRequestProperty("X-Veilbird-Client", "android/${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}")
         if (path != "login") secret("token")?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
+        // One id per connection attempt: the server's runtime log lines for it carry the same id.
+        attempt?.let { connection.setRequestProperty("X-Request-Id", it) }
         try {
             if (body != null) {
                 connection.requestMethod = "POST"; connection.doOutput = true
@@ -81,12 +85,16 @@ class NativeApi(context: Context) {
         } finally { connection.disconnect() }
     }
     /**
-     * Queues a connection failure code (no keys, addresses or traffic) and sends the
-     * queue when the service is reachable; the network is often what just failed.
+     * Queues a connection failure code and a scrubbed error text (no keys, addresses or traffic)
+     * and sends the queue when the service is reachable; the network is often what just failed.
      */
-    @Synchronized fun report(code: String, nodeId: String = "") {
+    @Synchronized fun report(code: String, nodeId: String = "", detail: String = "") {
         val queue = try { org.json.JSONArray(prefs.getString("diagnostics", "[]")) } catch (_: Exception) { org.json.JSONArray() }
-        if (code.isNotEmpty()) queue.put(JSONObject().put("code", code).put("at", java.time.Instant.now().toString()).apply { if (nodeId.isNotEmpty()) put("nodeId", nodeId) })
+        if (code.isNotEmpty()) queue.put(JSONObject().put("code", code).put("at", java.time.Instant.now().toString()).apply {
+            if (nodeId.isNotEmpty()) put("nodeId", nodeId)
+            if (detail.isNotEmpty()) put("detail", detail)
+            attempt?.let { put("attempt", it) }
+        })
         while (queue.length() > 20) queue.remove(0)
         prefs.edit().putString("diagnostics", queue.toString()).apply()
         if (queue.length() == 0 || secret("token") == null) return
