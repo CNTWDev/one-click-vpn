@@ -17,6 +17,11 @@ export function formatTime(value?: string | null): string {
   return date ? new Intl.DateTimeFormat(currentLocale(), { dateStyle: "medium", timeStyle: "medium" }).format(date) : value;
 }
 
+export function formatDate(value?: string | null): string {
+  const date = parse(value);
+  return date ? new Intl.DateTimeFormat(currentLocale(), { dateStyle: "medium" }).format(date) : "—";
+}
+
 /** Intl handles word order and plural forms, including Russian. */
 export function relativeTime(value?: string | null, now = Date.now()): string {
   const date = parse(value);

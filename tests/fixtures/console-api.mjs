@@ -5,12 +5,27 @@ const ago = (minutes) => new Date(Date.now() - minutes * 60000).toISOString();
 const GB = 1073741824;
 
 const user = { id: "owner", displayName: "Owner", email: "owner@example.com", role: "admin", status: "active", createdAt: "2026-10-01T00:00:00Z" };
+const days = (n) => new Date(Date.now() + n * 86400000).toISOString();
 const users = [
-  { ...user, accessSummary: { deviceCount: 3, activeDeviceCount: 2, credentialCount: 4, activeCredentialCount: 3, profileCount: 5, activeProfileCount: 4, certificateCount: 1, activeCertificateCount: 1, uploadBytes: 3.2 * GB, downloadBytes: 41.7 * GB, totalBytes: 44.9 * GB, lastActivityAt: ago(3) } },
+  { ...user, access: { state: "active", until: null, endedAt: null, quotaBytes: null, usedBytes: 0, remainingBytes: null, deviceLimit: null, upcoming: 0 }, accessSummary: { deviceCount: 3, activeDeviceCount: 2, credentialCount: 4, activeCredentialCount: 3, profileCount: 5, activeProfileCount: 4, certificateCount: 1, activeCertificateCount: 1, uploadBytes: 3.2 * GB, downloadBytes: 41.7 * GB, totalBytes: 44.9 * GB, lastActivityAt: ago(3) } },
   { id: "u2", displayName: "Aleksandra Konstantinopolskaya", email: "aleksandra.konstantinopolskaya@very-long-company-domain.example", role: "user", status: "pending", createdAt: "2026-10-05T00:00:00Z" },
-  { id: "u3", displayName: "李明", email: "liming@example.cn", role: "user", status: "active", createdAt: "2026-10-02T00:00:00Z", accessSummary: { deviceCount: 1, activeDeviceCount: 1, credentialCount: 1, activeCredentialCount: 1, profileCount: 1, activeProfileCount: 1, certificateCount: 0, activeCertificateCount: 0, uploadBytes: 120e6, downloadBytes: 2.1 * GB, totalBytes: 2.2 * GB, lastActivityAt: ago(60) } },
+  { id: "u3", displayName: "李明", email: "liming@example.cn", role: "user", status: "active", createdAt: "2026-10-02T00:00:00Z", access: { state: "active", until: days(5), endedAt: null, quotaBytes: 100 * GB, usedBytes: 93.4 * GB, remainingBytes: 6.6 * GB, deviceLimit: 3, upcoming: 1 }, accessSummary: { deviceCount: 1, activeDeviceCount: 1, credentialCount: 1, activeCredentialCount: 1, profileCount: 1, activeProfileCount: 1, certificateCount: 0, activeCertificateCount: 0, uploadBytes: 120e6, downloadBytes: 2.1 * GB, totalBytes: 2.2 * GB, lastActivityAt: ago(60) } },
   { id: "u4", displayName: "Disabled User", email: "disabled@example.com", role: "user", status: "disabled", createdAt: "2026-09-02T00:00:00Z" },
 ];
+
+const plans = [
+  { id: "plan_welcome", name: "新用户赠送", durationDays: null, quotaBytes: 10 * GB, deviceLimit: null, isWelcome: true, enabled: true, sortOrder: 0 },
+  { id: "plan_day", name: "1 天体验", durationDays: 1, quotaBytes: null, deviceLimit: null, isWelcome: false, enabled: true, sortOrder: 1 },
+  { id: "plan_month", name: "Monthly unlimited for families and small teams", durationDays: 30, quotaBytes: 300 * GB, deviceLimit: 5, isWelcome: false, enabled: true, sortOrder: 2 },
+  { id: "plan_year", name: "年卡", durationDays: 365, quotaBytes: null, deviceLimit: 10, isWelcome: false, enabled: false, sortOrder: 3 },
+];
+const grant = (id, source, state, extra) => ({ id, source, planId: null, planName: "", state, startsAt: "2026-09-25T00:00:00Z", endsAt: null, quotaBytes: null, usedBytes: 0, deviceLimit: null, reference: null, note: "", createdAt: "2026-09-25T00:00:00Z", revokedAt: null, ...extra });
+const accountAccess = { access: { state: "active", until: days(5), endedAt: null, quotaBytes: 100 * GB, usedBytes: 93.4 * GB, remainingBytes: 6.6 * GB, deviceLimit: 5, upcoming: 1 }, grants: [
+  grant("g4", "order", "upcoming", { planId: "plan_month", planName: "Monthly unlimited for families and small teams", startsAt: days(5), endsAt: days(35), quotaBytes: 300 * GB, deviceLimit: 5, reference: "order_9f8e7d6c5b4a", note: "Renewal paid by bank transfer, reference 2026-10-24-000173" }),
+  grant("g3", "admin", "active", { planId: "plan_month", planName: "月卡", startsAt: days(-25), endsAt: days(5), quotaBytes: 100 * GB, usedBytes: 93.4 * GB, deviceLimit: 5 }),
+  grant("g2", "welcome", "exhausted", { planId: "plan_welcome", planName: "新用户赠送", quotaBytes: 10 * GB, usedBytes: 10 * GB }),
+  grant("g1", "migration", "revoked", { revokedAt: days(-26) }),
+] };
 
 const regions = [
   { id: "r1", name: "Cape Town", country: "South Africa", code: "ZA" },
@@ -92,6 +107,8 @@ export function consoleApi({ signedIn = true } = {}) {
     if (/^\/api\/v1\/admin\/users\/[^/]+\/credentials$/.test(pathname)) return [200, access];
     if (pathname === "/api/v1/admin/mail-settings") return [200, { settings: { provider: "aliyun", host: "smtpdm-ap-southeast-1.aliyun.com", port: 465, username: "no-reply@notifications.very-long-company-domain.example", fromName: "TrackNothing", passwordSet: true, updatedAt: now } }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/password-reset$/.test(pathname)) return [200, { url: `https://app.very-long-subdomain.example.com/#reset=usr_6f1c2d3e-4b5a-6978-8a9b-0c1d2e3f4a5b.1792000000.${"x".repeat(43)}`, expiresAt: "2026-10-24T10:00:00Z" }];
+    if (/^\/api\/v1\/admin\/users\/[^/]+\/access$/.test(pathname)) return [200, accountAccess];
+    if (pathname === "/api/v1/admin/plans") return [200, { plans }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/native-access$/.test(pathname)) return [200, { enabled: true, devices: [], credentials: [] }];
     if (pathname === "/api/nodes") return [200, { nodes }];
     if (pathname === "/api/nodes/agent-release") return [200, { version: "2.10.0", revision: "test" }];
