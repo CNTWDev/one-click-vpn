@@ -1047,9 +1047,9 @@
     "OpenVPN only",
     "Только OpenVPN"
   ],
-  "标准模板自动部署 WireGuard、OpenVPN、VLESS。REALITY 目标只需在平台配置一次；未配置时其他协议仍可正常部署。": [
-    "The standard template deploys WireGuard, OpenVPN and VLESS automatically. Configure a REALITY target once for the platform; other protocols can still deploy without it.",
-    "Стандартный шаблон автоматически развёртывает WireGuard, OpenVPN и VLESS. Цель REALITY настраивается один раз для платформы; без неё остальные протоколы по-прежнему доступны."
+  "标准模板自动部署 WireGuard、OpenVPN、VLESS 和抗封锁通道。REALITY 目标只需在平台配置一次；未配置时其他协议仍可正常部署。": [
+    "The standard template deploys WireGuard, OpenVPN, VLESS and the stealth transports automatically. Configure a REALITY target once for the platform; other protocols can still deploy without it.",
+    "Стандартный шаблон автоматически развёртывает WireGuard, OpenVPN, VLESS и скрытые транспорты. Цель REALITY настраивается один раз для платформы; без неё остальные протоколы по-прежнему доступны."
   ],
   "新凭据（可留空）": [
     "New credentials (optional)",
@@ -1659,9 +1659,9 @@
     "No VPN services yet. They will appear after server deployment.",
     "Служб VPN пока нет. Они появятся после развёртывания серверов."
   ],
-  "标准模板自动部署 WireGuard、OpenVPN 和 VLESS，无需逐个协议启用；老标准节点可用“批量同步策略”补齐。自定义及仅 Agent 节点不会被自动覆盖。默认需放行 UDP 51820、UDP 1194、TCP 443。": [
-    "The standard template deploys WireGuard, OpenVPN and VLESS automatically; no need to enable them individually. Use Sync policy in bulk for older standard servers. Custom and Agent-only servers are not overwritten. Default ports: UDP 51820, UDP 1194, TCP 443.",
-    "Стандартный шаблон автоматически развёртывает WireGuard, OpenVPN и VLESS. Для старых стандартных серверов используйте массовую синхронизацию политики. Пользовательские серверы и серверы только с Agent не изменяются. Порты по умолчанию: UDP 51820, UDP 1194, TCP 443."
+  "标准模板自动部署 WireGuard、OpenVPN、VLESS 和抗封锁通道（Hysteria2 / XHTTP，仅供 App），无需逐个协议启用；老标准节点可用“批量同步策略”补齐。自定义及仅 Agent 节点不会被自动覆盖。默认需放行 UDP 51820、UDP 1194、TCP 443，以及 UDP 和 TCP 8443。": [
+    "The standard template deploys WireGuard, OpenVPN, VLESS and the stealth transports (Hysteria2 / XHTTP, app only) automatically; no need to enable them individually. Use Sync policy in bulk for older standard servers. Custom and Agent-only servers are not overwritten. Default ports: UDP 51820, UDP 1194, TCP 443, and UDP and TCP 8443.",
+    "Стандартный шаблон автоматически развёртывает WireGuard, OpenVPN, VLESS и скрытые транспорты (Hysteria2 / XHTTP, только для приложения). Для старых стандартных серверов используйте массовую синхронизацию политики. Пользовательские серверы и серверы только с Agent не изменяются. Порты по умолчанию: UDP 51820, UDP 1194, TCP 443, а также UDP и TCP 8443."
   ],
   "Standard 策略 v": [
     "Standard policy v",

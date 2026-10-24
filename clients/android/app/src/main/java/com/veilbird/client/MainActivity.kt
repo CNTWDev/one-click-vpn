@@ -24,7 +24,10 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import com.wireguard.android.backend.GoBackend
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.net.VpnService
+import android.widget.Toast
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
@@ -191,6 +194,7 @@ class MainActivity : Activity() {
         when (page) {
             "connect" -> home()
             "nodes" -> nodes()
+            "logs" -> logs()
             else -> account()
         }
         handler.removeCallbacks(refresh); if (visible) handler.post(refresh)
@@ -207,7 +211,7 @@ class MainActivity : Activity() {
         content.addView(current, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 6.dp })
         if (update?.mandatory != true || ConnectionStateStore.active) connectButton = button(if (ConnectionStateStore.active) L10n.text(R.string.disconnect_action) else L10n.text(R.string.connect_action)) {
             if (ConnectionStateStore.active) startService(Intent(this, ConnectionService::class.java).setAction("disconnect"))
-            else { val consent = GoBackend.VpnService.prepare(this); if (consent != null) startActivityForResult(consent, 10) else startConnection() }
+            else { val consent = VpnService.prepare(this); if (consent != null) startActivityForResult(consent, 10) else startConnection() }
         }.apply { minHeight = 52.dp; minimumHeight = 52.dp }
         showCurrentNode()
     }
@@ -225,16 +229,14 @@ class MainActivity : Activity() {
     }
     private var measuring = false
     private fun nodes() {
-        val active = ConnectionStateStore.active
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         header.addView(label(L10n.text(R.string.locations), 20f).apply { setPadding(0, 0, 0, 0) }, LinearLayout.LayoutParams(0, -2, 1f))
         val retest = label(L10n.text(if (measuring) R.string.measuring_latency else R.string.retest_latency), 14f).apply {
-            setTextColor(if (active) muted else teal); setPadding(12.dp, 10.dp, 12.dp, 10.dp); background = surface(canvas, 12)
+            setTextColor(teal); setPadding(12.dp, 10.dp, 12.dp, 10.dp); background = surface(canvas, 12)
         }
-        if (!active) header.addView(retest)
+        header.addView(retest)
         content.addView(header, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 4.dp })
-        // While connected, probes would run through the tunnel, so the list keeps the last results and the server's order.
-        if (active) content.addView(label(L10n.text(R.string.test_after_disconnecting), 13f))
+        routingChoice()
         val auto = row(L10n.text(R.string.automatic_recommended), L10n.text(R.string.auto_detail), teal, if (selectedId.isEmpty()) "✓" else "", teal, selectedId.isEmpty()) { select("", L10n.text(R.string.automatic_recommended)) }
         content.addView(auto, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 8.dp })
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -254,7 +256,7 @@ class MainActivity : Activity() {
             content.addView(list)
             show(list, ranked, query)
             fun measure() {
-                if (measuring || ConnectionStateStore.active) return
+                if (measuring) return
                 measuring = true; retest.text = L10n.text(R.string.measuring_latency); progress?.visibility = View.VISIBLE
                 Thread {
                     val result = try { Latency.rank(nodes) } catch (_: Exception) { null }
@@ -269,8 +271,29 @@ class MainActivity : Activity() {
             }
             retest.setOnClickListener { measure() }
             // Fresh results are kept for the session; opening the page again does not probe every node again.
-            if (!active && ranked.any { it.second == null }) measure()
+            // The app is outside its own VPN, so probes measure the direct path even while connected.
+            if (ranked.any { it.second == null }) measure()
         }
+    }
+    /** Smart (mainland China direct) or global routing; applies from the next connection. */
+    private fun routingChoice() {
+        val prefs = getSharedPreferences("preferences", MODE_PRIVATE)
+        val mode = prefs.getString("routing", "smart")!!
+        val choice = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; background = rounded(Color.WHITE, 12); setPadding(4.dp, 4.dp, 4.dp, 4.dp) }
+        for ((value, title) in listOf("smart" to R.string.routing_smart, "global" to R.string.routing_global)) choice.addView(TextView(this).apply {
+            text = L10n.text(title); textSize = 14f; gravity = Gravity.CENTER; maxLines = 1
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            val selected = value == mode
+            setTextColor(if (selected) teal else muted); background = surface(if (selected) mint else Color.WHITE, 10)
+            contentDescription = L10n.text(title) + if (selected) L10n.text(R.string.current_page) else ""
+            setOnClickListener {
+                if (busy || selected) return@setOnClickListener
+                if (ConnectionStateStore.active) { alert(L10n.text(R.string.disconnect_before_changing_routing)); return@setOnClickListener }
+                prefs.edit().putString("routing", value).apply(); render()
+            }
+        }, LinearLayout.LayoutParams(0, 36.dp, 1f))
+        content.addView(choice, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4.dp })
+        content.addView(label(L10n.text(if (mode == "smart") R.string.routing_smart_detail else R.string.routing_global_detail), 13f).apply { setPadding(4.dp, 4.dp, 4.dp, 4.dp) })
     }
     private fun show(list: LinearLayout, ranked: List<Pair<JSONObject, Quality?>>, query: String) {
         list.removeAllViews()
@@ -331,7 +354,46 @@ class MainActivity : Activity() {
                 if (ConnectionStateStore.active) { alert(L10n.text(R.string.disconnect_the_vpn_before_signing_out)); return@button }
                 work({ try { api.request("logout", JSONObject()) } finally { api.saveSecret("token", null) } }) { render() }
             }
+            // The diagnostic log has no visible entry: seven taps on the version open it.
+            var taps = 0; var firstTap = 0L
+            content.addView(label(L10n.text(R.string.version_label, BuildConfig.VERSION_NAME), 12f).apply {
+                gravity = Gravity.CENTER; setPadding(0, 12.dp, 0, 12.dp)
+                setOnClickListener {
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - firstTap > 4000) { taps = 0; firstTap = now }
+                    if (++taps >= 7) { taps = 0; page = "logs"; render() }
+                }
+            }, LinearLayout.LayoutParams(-1, -2))
         }
+    }
+    private fun logs() {
+        val log = Journal.read()
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        header.addView(label(L10n.text(R.string.logs_title), 20f).apply { setPadding(0, 0, 0, 0) }, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(label(L10n.text(R.string.back_action), 14f).apply {
+            setTextColor(teal); setPadding(12.dp, 10.dp, 12.dp, 10.dp); background = surface(canvas, 12); setOnClickListener { page = "account"; render() }
+        })
+        content.addView(header, LinearLayout.LayoutParams(-1, -2))
+        content.addView(label(L10n.text(R.string.logs_detail), 13f))
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        for ((title, action) in listOf<Pair<Int, () -> Unit>>(
+            R.string.copy_action to {
+                getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Veilbird", log))
+                Toast.makeText(this, L10n.text(R.string.copied), Toast.LENGTH_SHORT).show()
+            },
+            R.string.share_action to { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, log), null)) },
+            R.string.clear_action to { Journal.clear(); render() },
+        )) actions.addView(styleButton(Button(this), danger = title == R.string.clear_action).apply {
+            this.text = L10n.text(title); maxLines = 1; setPadding(4.dp, 0, 4.dp, 0); isEnabled = log.isNotEmpty() || title == R.string.clear_action
+            setOnClickListener { action() }
+        }, LinearLayout.LayoutParams(0, 44.dp, 1f).apply { marginEnd = 6.dp })
+        content.addView(actions, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 8.dp })
+        // Newest first: the last attempt is what someone opening the log is looking for.
+        content.addView(TextView(this).apply {
+            this.text = if (log.isEmpty()) L10n.text(R.string.logs_empty) else log.lines().reversed().joinToString("\n")
+            textSize = 11f; typeface = Typeface.MONOSPACE; setTextColor(ink); setTextIsSelectable(true)
+            background = rounded(Color.WHITE, 12); setPadding(12.dp, 10.dp, 12.dp, 10.dp)
+        }, LinearLayout.LayoutParams(-1, -2))
     }
     private fun <T> work(task: () -> T, success: (T) -> Unit) {
         if (busy) return

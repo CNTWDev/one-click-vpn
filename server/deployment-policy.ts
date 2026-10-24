@@ -12,7 +12,7 @@ import { rebuildDesiredState } from "./control-plane";
 import { listProtocolAdapters } from "./protocols/registry";
 import { defaultRealityTarget } from "./service-prerequisites";
 
-export const STANDARD_POLICY_VERSION = 2;
+export const STANDARD_POLICY_VERSION = 3;
 export type DeploymentPolicy = "standard" | "custom" | "agent-only";
 
 function now(): string {
@@ -42,7 +42,8 @@ async function standardPolicyDrift() {
     const unsupported = protocols.filter((protocol) => !capabilities.some((capability) => capability.node_id === node.id && capability.protocol === protocol && capability.status === "enabled"));
     // A missing REALITY target only holds back VLESS; the other protocols still roll out.
     const targetWait = missingProtocols.includes("vless") && !configured.has(node.id) ? (await defaultRealityTarget(node.id)).reason : undefined;
-    const actionable = missingProtocols.filter((protocol) => protocol !== "vless" || !targetWait);
+    // The stealth service reuses the VLESS REALITY keys and target, so it waits for the same target.
+    const actionable = missingProtocols.filter((protocol) => (protocol !== "vless" && protocol !== "stealth") || !targetWait);
     const reason = !fresh ? "需要节点在线并上报最新 Agent 心跳"
       : unsupported.length ? `请先通过节点运维升级 Agent，缺少能力：${unsupported.join(", ")}`
       : targetWait ? (actionable.length ? `可同步其他协议；VLESS：${targetWait}` : `VLESS：${targetWait}`) : "可自动同步";

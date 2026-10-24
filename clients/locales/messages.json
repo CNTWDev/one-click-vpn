@@ -724,9 +724,74 @@
     "en": "{0}  ·  ↓ {1}  ↑ {2} Mbps",
     "ru": "{0}  ·  ↓ {1}  ↑ {2} Мбит/с"
   },
-  "test_after_disconnecting": {
-    "zh": "断开连接后可重新测速和更换节点",
-    "en": "Disconnect to test or change locations",
-    "ru": "Отключитесь, чтобы проверить или сменить локацию"
+  "routing_smart": {
+    "zh": "智能分流",
+    "en": "Smart",
+    "ru": "Умная"
+  },
+  "routing_global": {
+    "zh": "全局",
+    "en": "Global",
+    "ru": "Глобальная"
+  },
+  "routing_smart_detail": {
+    "zh": "国内网站直连，其余经过 Veilbird",
+    "en": "Sites in mainland China go direct, the rest through Veilbird",
+    "ru": "Сайты материкового Китая напрямую, остальное через Veilbird"
+  },
+  "routing_global_detail": {
+    "zh": "全部流量经过 Veilbird",
+    "en": "All traffic goes through Veilbird",
+    "ru": "Весь трафик через Veilbird"
+  },
+  "disconnect_before_changing_routing": {
+    "zh": "请先断开连接再切换分流方式。",
+    "en": "Disconnect before changing the routing mode.",
+    "ru": "Отключитесь, чтобы сменить режим маршрутизации."
+  },
+  "version_label": {
+    "zh": "版本 {0}",
+    "en": "Version {0}",
+    "ru": "Версия {0}"
+  },
+  "logs_title": {
+    "zh": "诊断日志",
+    "en": "Diagnostic log",
+    "ru": "Журнал диагностики"
+  },
+  "logs_detail": {
+    "zh": "只记录连接过程，不含地址、密钥和访问记录。保留 7 天，最多 512 KB。",
+    "en": "Connection steps only: no addresses, keys or browsing. Kept for 7 days, up to 512 KB.",
+    "ru": "Только шаги подключения: без адресов, ключей и посещённых сайтов. Хранится 7 дней, до 512 КБ."
+  },
+  "logs_empty": {
+    "zh": "暂无记录。",
+    "en": "No entries yet.",
+    "ru": "Записей пока нет."
+  },
+  "copy_action": {
+    "zh": "复制",
+    "en": "Copy",
+    "ru": "Копировать"
+  },
+  "share_action": {
+    "zh": "分享",
+    "en": "Share",
+    "ru": "Поделиться"
+  },
+  "clear_action": {
+    "zh": "清空",
+    "en": "Clear",
+    "ru": "Очистить"
+  },
+  "copied": {
+    "zh": "已复制",
+    "en": "Copied",
+    "ru": "Скопировано"
+  },
+  "back_action": {
+    "zh": "返回",
+    "en": "Back",
+    "ru": "Назад"
   }
 }

@@ -8,7 +8,8 @@ import { listProtocolAdapters } from "../../../../server/protocols/registry";
 
 export const runtime = "nodejs";
 
-const protocols = new Set<Protocol>(listProtocolAdapters().filter((adapter) => adapter.capability.status === "enabled").map((adapter) => adapter.id));
+// The stealth transports are reachable only through the Veilbird app, never as a downloadable profile.
+const protocols = new Set<Protocol>(listProtocolAdapters().filter((adapter) => adapter.capability.status === "enabled" && adapter.id !== "stealth").map((adapter) => adapter.id));
 
 async function profilesWithRegions(profiles: ConnectionProfile[], userId: string) {
   const [nodes, regions, devices, credentials] = await Promise.all([listNodes(), listRegions(), listDevices(userId), listAccessCredentials(userId)]);
