@@ -25,7 +25,7 @@ Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次�
 
 ## 每次发版
 
-1. 改 `clients/version.json` 的版本号，提交后推送标签 `client-v<版本号>`；或在 GitHub → Actions →「Client release」→ Run workflow（Windows 勾选 `windows`）。
+1. 改 `clients/version.json` 的版本号，提交后推送标签 `client-v<版本号>`；或在 GitHub → Actions →「Client release」→ Run workflow。
 2. 运行结束后，在该次运行页面底部 **Artifacts** 下载（GitHub 会再套一层 zip，先解压）：
    - `Veilbird-android-…` → `Veilbird-<版本>-<构建号>.apk`
    - `Veilbird-windows-x64-…` → `Veilbird-<版本>-<构建号>-win-x64-setup.exe`（arm64 同理，给 ARM 笔记本用）
