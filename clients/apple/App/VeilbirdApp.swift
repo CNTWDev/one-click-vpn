@@ -162,6 +162,29 @@ enum TunnelControl {
     }
 }
 
+/// The two figures under the location: traffic left (or used in the last 30 days) and the end of the access
+/// period, tinted when either is running out or has run out. Traffic quotas count all nodes together.
+struct UsageFigures {
+    let trafficTitle:String, traffic:String, trafficTint:Color, until:String, untilTint:Color
+    init(_ account:[String:Any]) {
+        let access=account["access"] as? [String:Any] ?? [:]
+        let state=access["state"] as? String ?? "active"
+        let format={(value:Int64) in ByteCountFormatter.string(fromByteCount:value,countStyle:.binary)}
+        if let quota=(access["quotaBytes"] as? NSNumber)?.int64Value {
+            let remaining=(access["remainingBytes"] as? NSNumber)?.int64Value ?? 0
+            trafficTitle=L10n.text("traffic_left");traffic=format(remaining)
+            trafficTint=state=="exhausted" ? VeilbirdStyle.danger:(state=="active" && remaining<=quota/10 ? VeilbirdStyle.fair:VeilbirdStyle.text)
+        } else {
+            let used=(account["traffic"] as? [String:Any]).map {(Int64(String(describing:$0["uploadBytes"] ?? "0")) ?? 0)+(Int64(String(describing:$0["downloadBytes"] ?? "0")) ?? 0)}
+            trafficTitle=L10n.text("last_30_days");traffic=used.map(format) ?? "—";trafficTint=VeilbirdStyle.text
+        }
+        until=account.isEmpty ? "—":L10n.date(account["expiresAt"] as? String)
+        let parser=ISO8601DateFormatter();parser.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
+        let end=(access["until"] as? String).flatMap {parser.date(from:$0) ?? ISO8601DateFormatter().date(from:$0)}
+        untilTint=state=="expired" ? VeilbirdStyle.danger:(state=="active" && end.map {$0.timeIntervalSinceNow<=7*86_400} == true ? VeilbirdStyle.fair:VeilbirdStyle.text)
+    }
+}
+
 struct ClientView:View {
     @AppStorage(L10n.preferenceKey) private var language = "system"
     @EnvironmentObject private var model:ClientModel
@@ -481,21 +504,19 @@ struct ClientView:View {
             Image(systemName:"chevron.right").font(.system(size:mac ? 11:13,weight:.semibold)).foregroundStyle(VeilbirdStyle.faint)
         }.padding(.horizontal,16).frame(height:mac ? 58:66)
     }
-    private func trafficTotal(_ traffic:[String:Any]?)->Int64? {
-        traffic.map {(Int64(String(describing:$0["uploadBytes"] ?? "0")) ?? 0)+(Int64(String(describing:$0["downloadBytes"] ?? "0")) ?? 0)}
-    }
     private func bytes(_ value:Int64)->String {ByteCountFormatter.string(fromByteCount:value,countStyle:.binary)}
-    /// What this account has used and how long it runs: two quiet figures under the location.
+    /// What this account has left (or used) and how long it runs: two quiet figures under the location.
     private var usageStrip:some View {
-        HStack(alignment:.top,spacing:16) {
-            usageCell(L10n.text("last_30_days"),trafficTotal(model.account["traffic"] as? [String:Any]).map(bytes) ?? "—")
-            usageCell(L10n.text("valid_until_label"),model.account.isEmpty ? "—":L10n.date(model.account["expiresAt"] as? String))
+        let figures=UsageFigures(model.account)
+        return HStack(alignment:.top,spacing:16) {
+            usageCell(figures.trafficTitle,figures.traffic,figures.trafficTint)
+            usageCell(L10n.text("valid_until_label"),figures.until,figures.untilTint)
         }.padding(.horizontal,4)
     }
-    private func usageCell(_ title:String,_ value:String)->some View {
+    private func usageCell(_ title:String,_ value:String,_ tint:Color)->some View {
         VStack(alignment:.leading,spacing:4) {
             Text(title).font(.system(size:mac ? 11:12)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
-            Text(value).font(.system(size:mac ? 14:16,weight:.medium)).lineLimit(1).monospacedDigit()
+            Text(value).font(.system(size:mac ? 14:16,weight:.medium)).foregroundStyle(tint).lineLimit(1).monospacedDigit()
         }.frame(maxWidth:.infinity,alignment:.leading)
     }
 
@@ -807,9 +828,10 @@ struct MenuBarView:View {
                         Image(systemName:"chevron.right").font(.system(size:10,weight:.semibold)).foregroundStyle(VeilbirdStyle.secondary)
                     }.padding(.horizontal,12).frame(height:52)
                 }.buttonStyle(RowButton()).background(Color(red:26/255,green:34/255,blue:28/255),in:RoundedRectangle(cornerRadius:10)).clipShape(RoundedRectangle(cornerRadius:10))
+                let figures=UsageFigures(model.account)
                 HStack(alignment:.top,spacing:12) {
-                    cell(L10n.text("last_30_days"),traffic)
-                    cell(L10n.text("valid_until_label"),model.account.isEmpty ? "—":L10n.date(model.account["expiresAt"] as? String))
+                    cell(figures.trafficTitle,figures.traffic,figures.trafficTint)
+                    cell(L10n.text("valid_until_label"),figures.until,figures.untilTint)
                 }.padding(.horizontal,6).padding(.vertical,12)
             } else {
                 Text(L10n.text("sign_in_tagline")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).padding(.vertical,16).padding(.horizontal,4)
@@ -823,15 +845,11 @@ struct MenuBarView:View {
         .background(Color(red:18/255,green:25/255,blue:21/255)).foregroundStyle(VeilbirdStyle.text).preferredColorScheme(.dark)
         .environment(\.locale, L10n.locale).task {try? await model.loadAccount()}
     }
-    private var traffic:String {
-        let value=(model.account["traffic"] as? [String:Any]).map {(Int64(String(describing:$0["uploadBytes"] ?? "0")) ?? 0)+(Int64(String(describing:$0["downloadBytes"] ?? "0")) ?? 0)}
-        return value.map {ByteCountFormatter.string(fromByteCount:$0,countStyle:.binary)} ?? "—"
-    }
     private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
-    private func cell(_ title:String,_ value:String)->some View {
+    private func cell(_ title:String,_ value:String,_ tint:Color)->some View {
         VStack(alignment:.leading,spacing:2) {
             Text(title).font(.system(size:11)).foregroundStyle(VeilbirdStyle.secondary)
-            Text(value).font(.system(size:13,weight:.medium)).monospacedDigit().lineLimit(1)
+            Text(value).font(.system(size:13,weight:.medium)).foregroundStyle(tint).monospacedDigit().lineLimit(1)
         }.frame(maxWidth:.infinity,alignment:.leading)
     }
     private func menuItem(_ title:String,shortcut:String,action:@escaping ()->Void)->some View {

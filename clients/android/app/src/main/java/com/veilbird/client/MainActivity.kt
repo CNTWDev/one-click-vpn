@@ -294,17 +294,25 @@ class MainActivity : Activity() {
             Directory.remember(nodes); runOnUiThread { showState() }
         }.start()
     }
-    /** What this account has used and how long it runs: two quiet figures under the location. */
+    /** What this account has left (or used) and how long it runs: two quiet figures under the location. */
     private fun usageStrip() {
+        val trafficTitle = text(L10n.text(R.string.last_30_days), 12f, Palette.secondary).apply { maxLines = 1 }
         val traffic = text("—", 15f, Palette.text, 500); val until = text("—", 15f, Palette.text, 500)
         val strip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(4.dp, 0, 4.dp, 0) }
-        for ((title, value) in listOf(L10n.text(R.string.last_30_days) to traffic, L10n.text(R.string.valid_until_label) to until)) strip.addView(LinearLayout(this).apply {
+        for ((title, value) in listOf(trafficTitle to traffic, text(L10n.text(R.string.valid_until_label), 12f, Palette.secondary).apply { maxLines = 1 } to until)) strip.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(text(title, 12f, Palette.secondary).apply { maxLines = 1 })
+            addView(title)
             addView(value.apply { maxLines = 1 }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
         }, LinearLayout.LayoutParams(0, -2, 1f))
         add(strip, top = 16)
-        fun show(data: JSONObject) { traffic.text = totalTraffic(data)?.let { bytes(it) } ?: "—"; until.text = L10n.date(data.optString("expiresAt")) }
+        fun show(data: JSONObject) {
+            val access = AccountAccess.from(data)
+            trafficTitle.text = L10n.text(if (access.metered) R.string.traffic_left else R.string.last_30_days)
+            traffic.text = if (access.metered) bytes(access.remainingBytes) else totalTraffic(data)?.let { bytes(it) } ?: "—"
+            traffic.setTextColor(when { access.state == "exhausted" -> Palette.danger; access.low -> Palette.fair; else -> Palette.text })
+            until.text = L10n.date(data.optString("expiresAt"))
+            until.setTextColor(when { access.state == "expired" -> Palette.danger; access.ending -> Palette.fair; else -> Palette.text })
+        }
         accountData?.let { show(it) }
         Thread {
             val data = try { api.request("account") } catch (_: Exception) { null } ?: return@Thread

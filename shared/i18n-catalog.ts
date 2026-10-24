@@ -13,7 +13,6 @@ export const catalog: Record<string, readonly [en: string, ru: string]> = {
   "最近 {0} 天总流量": ["Total traffic · last {0} days", "Общий трафик · за последние {0} дн."],
   "成功：{0} / 处理中：{1} / 异常：{2}": ["Succeeded: {0} / In progress: {1} / Issues: {2}", "Успешно: {0} / Выполняется: {1} / Ошибок: {2}"],
   "已授权设备：{0} / {1}": ["Authorized devices: {0} / {1}", "Авторизованные устройства: {0} / {1}"],
-  "留空额度跟随系统默认，留空有效期表示不限期。": ["Leave the limit blank for the system default, or the expiry blank for no expiry.", "Пустой лимит означает значение по умолчанию, пустой срок — без ограничения срока."],
   "解除中，预计 {0} 后释放额度": ["Revoking access. The slot is expected to be released after {0}.", "Доступ отзывается. Ожидаемое освобождение места после {0}."],
   "当前节点": ["Current server", "Текущий сервер"],
   "全部系统": ["All systems", "Все системы"],

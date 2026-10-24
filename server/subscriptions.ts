@@ -9,6 +9,7 @@ import { assertCredentialUsable, manageCredentialAccess } from "./credential-acc
 import { createSecretMaterial, readSecretMaterial } from "./secret-materials";
 import { proxyName, renderSubscription, renderV2raySubscription, type RoutingMode, type SubscriptionFormat, type SubscriptionProxy } from "./subscription-format";
 import { realityUserIdentities } from "./reality";
+import { accountAccess } from "./entitlements";
 
 type Subscription = { id: string; credential_id: string; token_hash: string; token_secret_id: string | null; private_key_secret_id: string | null; created_at: string; updated_at: string; last_fetched_at: string | null };
 let lockPool: Pool | undefined;
@@ -170,6 +171,9 @@ export async function downloadSubscription(token: string, options: { format?: Su
     const format = options.format || "clash";
     const content = format === "v2ray" ? renderV2raySubscription(proxies) : renderSubscription(proxies, { mode: options.mode, group: options.group });
     await dbExec("UPDATE subscriptions SET last_fetched_at=$1 WHERE id=$2", [new Date().toISOString(),sub.id]);
-    return { content, format, count: proxies.length, expiresAt: credential.expires_at };
+    // Clients such as Clash show this as the plan's usage and end date.
+    const access = await accountAccess(credential.user_id);
+    const ends = [access.until, credential.expires_at].filter((value): value is string => Boolean(value)).map((value) => Date.parse(value));
+    return { content, format, count: proxies.length, expiresAt: ends.length ? new Date(Math.min(...ends)).toISOString() : null, usedBytes: access.usedBytes, quotaBytes: access.quotaBytes };
   });
 }

@@ -9,7 +9,7 @@ enum AccessFailure: LocalizedError {
         return ["DEVICE_LIMIT_REACHED":L10n.text("device_limit_reached_account_hint"),
                 "DEVICE_REVOKED":L10n.text("access_for_this_device_has_been_revoked_contact_your"),
                 "AUTH_REQUIRED":L10n.text("your_session_has_expired_sign_in_again"), "INVALID_CREDENTIALS":L10n.text("incorrect_email_or_password"),
-                "NODE_UNAVAILABLE":L10n.text("this_location_is_unavailable_try_another"), "MEMBERSHIP_EXPIRED":L10n.text("membership_expired_hint"),
+                "NODE_UNAVAILABLE":L10n.text("this_location_is_unavailable_try_another"), "MEMBERSHIP_EXPIRED":L10n.text("membership_expired_hint"), "QUOTA_EXHAUSTED":L10n.text("quota_exhausted_hint"),
                 "MANAGED_ACCESS_REQUIRED":L10n.text("ask_your_administrator_to_enable_veilbird_client_access"),
                 "CLIENT_ACCESS_NOT_ENABLED":L10n.text("client_access_is_not_enabled_on_the_server"),
                 "KEYCHAIN_UNAVAILABLE":L10n.text("secure_storage_is_unavailable_unlock_your_device_and_try"),

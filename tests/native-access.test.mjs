@@ -98,8 +98,13 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     assert.equal(again.status,200);loser.token=again.data.accessToken;
     const back=await call("connect",await proof(loser,"connect",{...input,publicKey:randomBytes(32).toString("base64")}),loser.token);
     assert.equal(back.status,200,JSON.stringify(back.data));
-    await pool.query("UPDATE users SET membership_expires_at=$2 WHERE id=$1",[user,new Date(Date.now()-1000).toISOString()]);
+    await pool.query("UPDATE users SET access_until=$2 WHERE id=$1",[user,new Date(Date.now()-1000).toISOString()]);
     assert.equal((await call("connect",await proof(loser,"connect",input),loser.token)).data.code,"MEMBERSHIP_EXPIRED");
+    // A grant whose traffic is used up: a different code, so the apps can say why.
+    await pool.query("UPDATE users SET access_until=NULL,access_ok=FALSE WHERE id=$1",[user]);
+    await pool.query("INSERT INTO access_grants(id,user_id,source,starts_at,quota_bytes,used_bytes) VALUES($1,$2,'admin',now(),1024,1024)",[`${user}_grant`,user]);
+    assert.equal((await call("connect",await proof(loser,"connect",input),loser.token)).data.code,"QUOTA_EXHAUSTED");
+    assert.equal((await call("account",undefined,loser.token)).data.access.state,"exhausted");
     // Migration must not turn native internal devices into exportable credentials.
     execFileSync(process.execPath,["scripts/migrate.mjs"],{env,stdio:"pipe"});
     assert.equal(Number((await pool.query("SELECT COUNT(*) FROM access_credentials WHERE user_id=$1",[user])).rows[0].count),0);

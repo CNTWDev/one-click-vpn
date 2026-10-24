@@ -232,7 +232,7 @@ test("Agent operations expose release, recover expired tasks and preserve live t
     assert.equal((await fetch(`${base}/api/nodes/agent-release`)).status, 401);
     const release = await fetch(`${base}/api/nodes/agent-release`, { headers });
     assert.equal(release.status, 200);
-    assert.equal((await release.json()).version, "agent 2.13.0");
+    assert.equal((await release.json()).version, "agent 2.14.0");
     const timestamp = new Date().toISOString();
     await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at)
       VALUES ($1,'Operations','Test','127.0.0.9','root','password','','','',$2,$2)`, [nodeId,timestamp]);
@@ -254,6 +254,87 @@ test("Agent operations expose release, recover expired tasks and preserve live t
     assert.equal((await pool.query("SELECT status FROM node_actions WHERE id=$1", [`${nodeId}_live`])).rows[0].status, "running");
   } finally {
     await pool.query("DELETE FROM nodes WHERE id=$1", [nodeId]);
+    await pool.end();
+  }
+});
+
+test("account access: welcome traffic, metering, exhaustion, stacked grants and plans", integrationOptions, async () => {
+  const pool = new pg.Pool({ connectionString: databaseUrl });
+  const json = { "Content-Type": "application/json" };
+  const GB = 1024 ** 3, day = 86_400_000;
+  // An owner bearer session written directly; signing in again would spend the owner's login rate limit.
+  const owner = `quota-owner-${Date.now()}`, stamp = new Date().toISOString(), later = new Date(Date.now() + day).toISOString();
+  await pool.query(`INSERT INTO device_sessions (id,user_id,access_token_hash,refresh_token_hash,access_expires_at,refresh_expires_at,created_at)
+    SELECT $1,id,$2,$3,$4,$4,$5 FROM users WHERE email='owner@example.com'`, [owner, createHash("sha256").update(owner).digest("hex"), createHash("sha256").update(`${owner}-r`).digest("hex"), later, stamp]);
+  const admin = { ...json, Authorization: `Bearer ${owner}` };
+  const email = `metered-${Date.now()}@example.com`;
+  assert.equal((await fetch(`${base}/api/v1/auth/register`, { method: "POST", headers: json, body: JSON.stringify({ email, password: "test-password-123", displayName: "Metered" }) })).status, 202);
+  const userId = await userIdFor(email, owner);
+  const access = async () => (await (await fetch(`${base}/api/v1/admin/users/${userId}/access`, { headers: admin })).json());
+  const act = async (body) => { const response = await fetch(`${base}/api/v1/admin/users/${userId}/access`, { method: "POST", headers: admin, body: JSON.stringify(body) }); assert.equal(response.status, 200, await response.clone().text()); return response.json(); };
+  const nodeId = `node_quota_${Date.now()}`, agentToken = `agent-quota-${Date.now()}`;
+  let credentialId;
+  try {
+    let view = await access();
+    assert.equal(view.access.state, "active");
+    assert.equal(view.access.until, null, "the welcome gift has no end date");
+    assert.equal(view.access.quotaBytes, 10 * GB);
+    assert.equal(view.grants[0].source, "welcome");
+    assert.equal((await fetch(`${base}/api/v1/admin/users/${userId}/status`, { method: "POST", headers: admin, body: JSON.stringify({ status: "active" }) })).status, 200);
+    // A WireGuard credential of this account, written directly: another sign-in would run into the login rate limit.
+    const identityKey = Buffer.from(x25519.getPublicKey(x25519.utils.randomSecretKey())).toString("base64");
+    const timestamp = new Date().toISOString();
+    credentialId = `cred_quota_${Date.now()}`;
+    await pool.query("INSERT INTO devices (id,user_id,display_name,platform,app_version,public_key,status,created_at,updated_at) VALUES ($1,$2,'Phone','web','credential-1.0.0',$3,'active',$4,$4)", [`dev_${credentialId}`, userId, identityKey, timestamp]);
+    await pool.query("INSERT INTO access_credentials (id,user_id,device_id,display_name,protocol,identity_key,status,created_at,updated_at) VALUES ($1,$2,$3,'Phone','wireguard',$4,'active',$5,$5)", [credentialId, userId, `dev_${credentialId}`, identityKey, timestamp]);
+    await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at,agent_token_hash)
+      VALUES ($1,'Quota','Test','127.0.0.3','root','password','','','',$2,$2,$3)`, [nodeId, timestamp, createHash("sha256").update(agentToken).digest("hex")]);
+    const beat = (rxBytes, txBytes) => fetch(`${base}/api/v1/agent/heartbeat`, { method: "POST", headers: json, body: JSON.stringify({ nodeId, token: agentToken, version: "agent test",
+      usageSnapshots: [{ protocol: "wireguard", identityKey, rxBytes, txBytes, lastHandshakeAt: new Date().toISOString(), counterEpoch: "boot-1" }] }) });
+    assert.equal((await beat(1000, 4000)).status, 200);
+    view = await access();
+    assert.equal(view.access.usedBytes, 5000, "both directions count against the quota");
+    // Leave 1 KB of the 10 GB and send 2 KB: the account runs out and the overrun stays recorded.
+    await pool.query("UPDATE access_grants SET used_bytes=quota_bytes-1024 WHERE user_id=$1 AND source='welcome'", [userId]);
+    assert.equal((await beat(2000, 5048)).status, 200);
+    view = await access();
+    assert.equal(view.access.state, "exhausted");
+    assert.equal(view.access.remainingBytes, 0);
+    assert.equal((await pool.query("SELECT access_ok FROM users WHERE id=$1", [userId])).rows[0].access_ok, false);
+    const month = await act({ action: "grant", planId: "month" });
+    assert.equal(month.access.state, "active");
+    assert.equal(month.access.quotaBytes, null, "an unlimited grant in force means no quota");
+    assert.ok(Math.abs(Date.parse(month.access.until) - Date.now() - 30 * day) < 60_000);
+    const stacked = await act({ action: "grant", planId: "month" });
+    assert.ok(Math.abs(Date.parse(stacked.access.until) - Date.now() - 60 * day) < 60_000, "a renewal starts where the current month ends");
+    assert.equal(stacked.access.upcoming, 1);
+    // Unlimited grants absorb traffic first, the welcome quota is left alone.
+    assert.equal((await beat(3000, 6048)).status, 200);
+    const firstMonth = stacked.grants.find((grant) => grant.planId === "month" && grant.state === "active");
+    assert.equal((await access()).grants.find((grant) => grant.id === firstMonth.id).usedBytes, 2000);
+    const pulled = await act({ action: "revoke", grantId: firstMonth.id });
+    assert.ok(Math.abs(Date.parse(pulled.access.until) - Date.now() - 30 * day) < 60_000, "revoking pulls the next month forward");
+    const gift = await act({ action: "grant", days: 7, quotaGb: 2, gift: true, note: "活动" });
+    assert.equal(gift.grants[0].source, "gift");
+    assert.equal(gift.grants[0].quotaBytes, 2 * GB);
+    assert.equal((await fetch(`${base}/api/v1/admin/users/${userId}/access`, { method: "POST", headers: admin, body: JSON.stringify({ action: "grant", days: 0 }) })).status, 400);
+    // Plans: a new welcome plan replaces the old one; the list shows access per account.
+    const plans = await fetch(`${base}/api/v1/admin/plans`, { method: "POST", headers: admin, body: JSON.stringify({ name: "Trial 5 GB", durationDays: 3, quotaBytes: 5 * GB, isWelcome: true }) });
+    assert.equal(plans.status, 200);
+    const list = (await plans.json()).plans;
+    assert.equal(list.filter((plan) => plan.isWelcome).length, 1);
+    assert.equal(list.find((plan) => plan.isWelcome).name, "Trial 5 GB");
+    await fetch(`${base}/api/v1/admin/plans`, { method: "POST", headers: admin, body: JSON.stringify({ id: "welcome", name: "新用户赠送", quotaBytes: 10 * GB, isWelcome: true }) });
+    const users = (await (await fetch(`${base}/api/v1/admin/users`, { headers: admin })).json()).users;
+    assert.equal(users.find((user) => user.id === userId).access.state, "active");
+    assert.equal(users.find((user) => user.email === "owner@example.com").access.until, null);
+  } finally {
+    await pool.query("DELETE FROM traffic_daily WHERE node_id = $1", [nodeId]);
+    await pool.query("DELETE FROM nodes WHERE id = $1", [nodeId]);
+    const deviceId = credentialId && (await pool.query("DELETE FROM access_credentials WHERE id = $1 RETURNING device_id", [credentialId])).rows[0]?.device_id;
+    if (deviceId) await pool.query("DELETE FROM devices WHERE id = $1", [deviceId]);
+    await pool.query("DELETE FROM access_plans WHERE name = 'Trial 5 GB'");
+    await pool.query("DELETE FROM device_sessions WHERE id = $1", [owner]);
     await pool.end();
   }
 });

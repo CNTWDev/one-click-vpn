@@ -1,6 +1,12 @@
 import { addAudit, dbExec, dbQuery, findUserById } from "./db";
 import { findAccessCredential, listConnectionProfiles, listVpnServices } from "./control-db";
 import { rebuildDesiredState, revokeCredentialAndReconcile } from "./control-plane";
+import { accessSql } from "./entitlements";
+
+/** The account has no time or traffic left; subscriptions answer 403 with this message. */
+export class AccessEndedError extends Error {
+  constructor() { super("账号已到期或流量已用完，请联系管理员续期"); this.name = "AccessEndedError"; }
+}
 
 export type CredentialAction = "enable" | "disable" | "revoke" | "delete";
 
@@ -11,6 +17,7 @@ export async function assertCredentialUsable(id: string) {
     throw new Error("Credential is disabled, expired or revoked");
   }
   if ((await findUserById(credential.user_id))?.status !== "active") throw new Error("Account is not active");
+  if (!(await dbQuery<{ ok: boolean }>(`SELECT ${accessSql()} AS ok FROM users u WHERE u.id=$1`, [credential.user_id]))[0]?.ok) throw new AccessEndedError();
   if ((await dbQuery<{native_only:boolean}>("SELECT native_only FROM users WHERE id=$1", [credential.user_id]))[0]?.native_only) throw new Error("Please connect using the TrackNothing app");
   return credential;
 }

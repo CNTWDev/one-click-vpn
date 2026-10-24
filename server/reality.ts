@@ -6,6 +6,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readSecretMaterial, createSecretMaterial, findSecretMaterialByKind } from "./secret-materials";
 import { hashToken } from "./crypto";
 import { nativeUserRows } from "./native-users";
+import { accessSql } from "./entitlements";
 
 export type RealitySettings = { node_id: string; server_name: string; public_key: string; short_id: string; secret_id: string; previous_server_names?: string };
 export async function realitySettings(nodeId: string) {
@@ -59,7 +60,7 @@ async function realityUserRows(nodeId: string) {
     JOIN users u ON u.id=c.user_id JOIN connection_profiles p ON p.credential_id=c.id
     WHERE p.node_id=$1 AND p.protocol='vless' AND p.status='active' AND p.expires_at>$2
     AND c.status='active' AND NOT c.user_disabled AND NOT c.admin_disabled AND c.deleted_at IS NULL
-    AND (c.expires_at IS NULL OR c.expires_at>$2) AND u.status='active' AND NOT u.native_only ORDER BY c.identity_key`, [nodeId,new Date().toISOString()]);
+    AND (c.expires_at IS NULL OR c.expires_at>$2) AND ${accessSql()} AND NOT u.native_only ORDER BY c.identity_key`, [nodeId,new Date().toISOString()]);
   // TrackNothing app devices fall back to this node's VLESS port when UDP is blocked.
   return [...rows, ...await nativeUserRows()];
 }

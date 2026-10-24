@@ -1,4 +1,17 @@
+/** What an account may use right now; see server/entitlements.ts. */
+export type AccountAccess = {
+  state: "active" | "expired" | "exhausted" | "none"; until: string | null; endedAt: string | null;
+  quotaBytes: number | null; usedBytes: number; remainingBytes: number | null; deviceLimit: number | null; upcoming: number;
+};
+export type AccessGrant = {
+  id: string; source: "admin" | "gift" | "welcome" | "order" | "migration"; planId: string | null; planName: string;
+  state: "active" | "upcoming" | "expired" | "exhausted" | "revoked"; startsAt: string; endsAt: string | null;
+  quotaBytes: number | null; usedBytes: number; deviceLimit: number | null; reference: string | null; note: string; createdAt: string; revokedAt: string | null;
+};
+export type AccessPlan = { id: string; name: string; durationDays: number | null; quotaBytes: number | null; deviceLimit: number | null; isWelcome: boolean; enabled: boolean; sortOrder: number };
+
 export type AdminUser = {
+  access?: AccountAccess | null;
   id: string;
   email: string;
   displayName: string;

@@ -396,7 +396,7 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .data-table td.nowrap { white-space: nowrap; }
 /* Version numbers and the node row actions stay on one line; the other columns give way. */
 .data-table td b.mono { white-space: nowrap; }
-@media (min-width: 1101px) { .node-table td .row-actions { flex-wrap: nowrap; } }
+@media (min-width: 1101px) { .node-table td .row-actions, .user-table td .row-actions { flex-wrap: nowrap; } }
 .data-table td small { margin-top: 2px; color: var(--text-2); font-size: 13px; line-height: 1.45; }
 .data-table td .pill + small { margin-top: 4px; }
 .data-table time { color: var(--text-2); font-size: 13px; }

@@ -120,6 +120,7 @@
   <data name="quality_poor" xml:space="preserve"><value>Poor</value></data>
   <data name="quality_unreachable" xml:space="preserve"><value>Unreachable</value></data>
   <data name="quit_app" xml:space="preserve"><value>Quit</value></data>
+  <data name="quota_exhausted_hint" xml:space="preserve"><value>Your traffic is used up. Contact your administrator to add more.</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>Refresh devices</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Refresh locations</value></data>
   <data name="retest_latency" xml:space="preserve"><value>Test again</value></data>
@@ -166,6 +167,7 @@
   <data name="this_location_is_unavailable_try_another" xml:space="preserve"><value>This location is unavailable. Try another.</value></data>
   <data name="too_many_attempts_try_again_later" xml:space="preserve"><value>Too many attempts. Try again later.</value></data>
   <data name="traffic_30_days" xml:space="preserve"><value>Traffic · 30 days</value></data>
+  <data name="traffic_left" xml:space="preserve"><value>Traffic left</value></data>
   <data name="tunnel_enabled" xml:space="preserve"><value>Tunnel enabled</value></data>
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>Unable to connect. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>Unable to reach the service. Check your network and try again.</value></data>

@@ -2,12 +2,13 @@ import { addAudit, dbQuery } from "./db";
 import { defaultLimit, transaction } from "./native-access";
 import { NativeError } from "./native-proof";
 import { rebuildDesiredState } from "./control-plane";
+import { accountAccess } from "./entitlements";
 
 export type PortalDevice = { id: string; name: string; platform: string; lastSeenAt: string; connected: boolean; region: string | null };
 
-/** What the Portal home shows: membership expiry and the apps signed in to this account. */
+/** What the Portal home shows: the account's access (period, traffic) and the apps signed in to it. */
 export async function portalAccount(userId: string) {
-  const user = (await dbQuery<{ membership_expires_at: string | null; native_device_limit: number | null }>("SELECT membership_expires_at,native_device_limit FROM users WHERE id=$1", [userId]))[0];
+  const user = (await dbQuery<{ native_device_limit: number | null; access_device_limit: number | null }>("SELECT native_device_limit,access_device_limit FROM users WHERE id=$1", [userId]))[0];
   if (!user) throw new NativeError("USER_NOT_FOUND", 404);
   // A live lease means the app is connected right now; its node gives the region.
   const devices = await dbQuery<PortalDevice>(`SELECT e.id,e.device_name AS name,e.platform,e.last_seen_at AS "lastSeenAt",
@@ -16,7 +17,8 @@ export async function portalAccount(userId: string) {
     LEFT JOIN LATERAL (SELECT node_id FROM native_leases WHERE enrollment_id=e.id AND expires_at>now() ORDER BY expires_at DESC LIMIT 1) l ON true
     LEFT JOIN nodes n ON n.id=l.node_id LEFT JOIN regions r ON r.id=n.region_id
     WHERE e.user_id=$1 AND e.status='active' ORDER BY connected DESC,e.last_seen_at DESC`, [userId]);
-  return { expiresAt: user.membership_expires_at, deviceLimit: user.native_device_limit ?? defaultLimit(), devices };
+  const access = await accountAccess(userId);
+  return { expiresAt: access.state === "active" ? access.until : access.endedAt, access, deviceLimit: user.native_device_limit ?? user.access_device_limit ?? defaultLimit(), devices };
 }
 
 /** Signs one app out: its login sessions end, its tunnel stops, and its device slot frees once the last lease lapses. */

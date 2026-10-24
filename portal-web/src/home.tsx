@@ -15,7 +15,12 @@ import "./home.css";
 
 type User = { email: string; displayName: string };
 type Device = { id: string; name: string; platform: string; lastSeenAt: string; connected: boolean; region: string | null };
-type Account = { expiresAt: string | null; deviceLimit: number; devices: Device[] };
+type Access = { state: "active" | "expired" | "exhausted" | "none"; until: string | null; quotaBytes: number | null; usedBytes: number; remainingBytes: number | null };
+type Account = { expiresAt: string | null; access: Access; deviceLimit: number; devices: Device[] };
+
+const SOON_DAYS = 7;
+/** Whole days left until an end date, or null when the access has no end. */
+const daysLeft = (until: string | null) => until ? Math.max(0, Math.ceil((Date.parse(until) - Date.now()) / 86_400_000)) : null;
 type Usage = { totals: { totalBytes: number; uploadBytes?: number; downloadBytes?: number }; daily?: { day: string; totalBytes: number }[] };
 type Releases = { releases: ClientRelease[]; history: ClientRelease[] };
 
@@ -137,17 +142,26 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
       </section>;
 
   const devices = account?.devices || [];
+  const access = account?.access, quota = access?.quotaBytes ?? null, left = daysLeft(account?.expiresAt ?? null);
+  const paused = access && access.state !== "active";
+  const ending = access?.state === "active" && left !== null && left <= SOON_DAYS;
+  const low = access?.state === "active" && quota !== null && (access.remainingBytes || 0) <= quota * 0.1;
   return <main className="dashboard home">
     {dialog}{toasts}
     <Topbar user={user} onLogout={onLogout} />
     {hero}
 
+    {paused && <p className="callout warning home-access-notice" role="status">{access.state === "exhausted" ? t("流量已用完，暂时无法连接。请联系管理员增加流量。") : access.state === "expired" ? t("账号已到期，暂时无法连接。请联系管理员续期。") : t("账号暂未开通使用权限，请联系管理员。")}</p>}
     <section className="card home-stats" aria-label={t("账号概况")}>
-      <div><small>{t("有效期至")}</small>{account ? account.expiresAt ? <strong className="pixel-figure">{isoDate(account.expiresAt)}</strong> : <strong>{t("长期有效")}</strong> : <Skeleton height={30} width="60%" />}
-        {account?.expiresAt && <span className="home-stat-note">{date(account.expiresAt)}</span>}</div>
-      <div><small>{t("近 30 天流量")}</small>
+      <div><small>{access?.state === "expired" ? t("已到期") : t("有效期至")}</small>{account ? account.expiresAt ? <strong className={`pixel-figure${ending ? " warning-text" : ""}`}>{isoDate(account.expiresAt)}</strong> : <strong>{t("长期有效")}</strong> : <Skeleton height={30} width="60%" />}
+        {account?.expiresAt && <span className={`home-stat-note${ending ? " warning-text" : ""}`}>{ending ? t("还剩 {0} 天", [left ?? 0]) : date(account.expiresAt)}</span>}</div>
+      {quota !== null && access ? <div><small>{t("剩余流量")}</small>
+        <span className="home-traffic"><strong className={`pixel-figure${low ? " warning-text" : ""}`}>{figure(access.remainingBytes || 0)[0]}<span className="unit">{figure(access.remainingBytes || 0)[1]}</span></strong>
+          <i className={`home-quota${low ? " low" : ""}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (access.usedBytes / quota) * 100)}%` }} /></i></span>
+        <span className="home-stat-note">{t("已用 {0} / {1} · 全部节点合计", [formatBytes(access.usedBytes), formatBytes(quota)])}</span></div>
+      : <div><small>{t("近 30 天流量")}</small>
         {usage ? <span className="home-traffic"><strong className="pixel-figure">{figure(usage.totals.totalBytes)[0]}<span className="unit">{figure(usage.totals.totalBytes)[1]}</span></strong><UsageBlocks values={lastDays(usage)} /></span> : <Skeleton height={30} width="40%" />}
-        {usage && <span className="home-stat-note mono">↓ {formatBytes(usage.totals.downloadBytes || 0)} · ↑ {formatBytes(usage.totals.uploadBytes || 0)}</span>}</div>
+        {usage && <span className="home-stat-note mono">↓ {formatBytes(usage.totals.downloadBytes || 0)} · ↑ {formatBytes(usage.totals.uploadBytes || 0)}</span>}</div>}
       <div><small>{t("已登录设备")}</small>{account ? <strong className="pixel-figure">{devices.length}<span className="unit">/ {account.deviceLimit}</span></strong> : <Skeleton height={30} width="40%" />}
         {account && <a className="home-stat-note" href="#devices-title">{t("我的设备")}</a>}</div>
     </section>

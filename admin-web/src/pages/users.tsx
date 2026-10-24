@@ -1,5 +1,6 @@
 import { consoleLanguage, t, useConsoleLanguage } from "../i18n";
 import { useState } from "react";
+import { AccessPanel, accessSummary } from "./account-access";
 import { NativeAccessPanel } from "./native-access";
 import { api } from "../api";
 import { useConfirm } from "../confirm-dialog";
@@ -25,9 +26,14 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
   const [resetLink, setResetLink] = useState<{ user: AdminUser; url: string } | null>(null);
   const visibleConnections = (accessOverview?.credentials || []).filter((item) => connectionFilter === "all" || (connectionFilter === "subscription" ? !!item.subscriptionId : !item.subscriptionId));
   const time = (value?: string | null) => value ? new Date(value).getTime() || 0 : 0;
-  const visible = users.filter((user) => (filter === "all" || user.status === filter) && includesText(search, user.displayName, user.email))
+  const accessEnded = (user: AdminUser) => user.status === "active" && user.access?.state !== "active";
+  const accessEnding = (user: AdminUser) => user.status === "active" && accessSummary(user.access).tone === "warning";
+  const matches = (user: AdminUser) => filter === "all" || (filter === "ending" ? accessEnding(user) : filter === "ended" ? accessEnded(user) : user.status === filter);
+  const until = (user: AdminUser) => user.access?.state === "active" ? user.access.until ? time(user.access.until) : Number.MAX_SAFE_INTEGER : 0;
+  const visible = users.filter((user) => matches(user) && includesText(search, user.displayName, user.email))
     .sort((left, right) => sort === "name" ? left.displayName.localeCompare(right.displayName, consoleLanguage.locale())
       : sort === "traffic" ? (right.accessSummary?.totalBytes || 0) - (left.accessSummary?.totalBytes || 0)
+        : sort === "until" ? until(left) - until(right)
         : sort === "activity" ? time(right.accessSummary?.lastActivityAt) - time(left.accessSummary?.lastActivityAt)
           : time(right.createdAt) - time(left.createdAt));
   const pending = users.filter((user) => user.status === "pending");
@@ -158,7 +164,8 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
   }
 
   const statusLabels: Record<string, string> = { active: t("已启用"), pending: t("待审核"), suspended: t("已停用"), rejected: t("已拒绝") };
-  const chips = [["all", t("全部")], ["pending", t("待审核")], ["active", t("已启用")], ["suspended", t("已停用")], ["rejected", t("已拒绝")]].map(([value, label]) => ({ value, label, count: value === "all" ? users.length : users.filter((user) => user.status === value).length }));
+  const chips = [["all", t("全部")], ["pending", t("待审核")], ["active", t("已启用")], ["suspended", t("已停用")], ["rejected", t("已拒绝")], ["ending", t("即将到期")], ["ended", t("已失效")]].map(([value, label]) => ({ value, label, count: value === "all" ? users.length : users.filter((user) => value === "ending" ? accessEnding(user) : value === "ended" ? accessEnded(user) : user.status === value).length }))
+    .filter((chip) => chip.count > 0 || !["ending", "ended"].includes(chip.value) || chip.value === filter);
   const allPendingSelected = selectablePending.length > 0 && selectablePending.every((user) => selected.has(user.id));
   function rowActions(user: AdminUser) {
     const items: MenuItem[] = [];
@@ -176,19 +183,19 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
   }
 
   return <>
-    <PageHeader title={t("账号管理")} description={t("新凭据默认有效 365 天，旧证书保留原期限。停用或撤销可提前终止使用；换发后需用户重新导入配置。")} actions={<button className="button ghost" onClick={() => void onRefresh()}><Icon name="refresh" size={16} />{t("刷新")}</button>} />
+    <PageHeader title={t("账号管理")} description={t("账号能否连接由权益决定：有效期和流量按全部节点合计。停用账号或撤销凭据会立即终止使用。")} actions={<button className="button ghost" onClick={() => void onRefresh()}><Icon name="refresh" size={16} />{t("刷新")}</button>} />
     <InlineNotice notice={notice} />
     {pending.length > 0 && filter !== "pending" && <div className="inline-notice warning"><span><b>{t("{0} 个账号等待审核。", [pending.length])}</b> {t("可勾选后批量通过或拒绝。")}</span><button className="button ghost small" onClick={() => setFilter("pending")}>{t("查看待审核")}</button></div>}
     <section className="panel flush table-panel">
-      <TableToolbar search={search} onSearch={setSearch} placeholder={t("搜索名称或邮箱")} chips={chips} chip={filter} onChip={setFilter} sort={sort} onSort={setSort} sortOptions={[["created", t("注册时间（最新）")], ["name", t("名称")], ["traffic", t("近 30 天流量")], ["activity", t("最近活动")]]} />
+      <TableToolbar search={search} onSearch={setSearch} placeholder={t("搜索名称或邮箱")} chips={chips} chip={filter} onChip={setFilter} sort={sort} onSort={setSort} sortOptions={[["created", t("注册时间（最新）")], ["name", t("名称")], ["until", t("到期时间（最近）")], ["traffic", t("近 30 天流量")], ["activity", t("最近活动")]]} />
       <BatchBar count={selectedPending.length} unit={t("个待审核账号")} onClear={() => setSelected(new Set())}>
         <button className="button primary small" disabled={Boolean(busy)} onClick={() => void batchReview("active")}>{t("批量通过")}</button>
         <button className="button danger small" disabled={Boolean(busy)} onClick={() => void batchReview("rejected")}>{t("批量拒绝")}</button>
       </BatchBar>
-      <div className="table-wrap"><table className="data-table cards user-table"><thead><tr><th className="check"><input type="checkbox" aria-label={t("选择全部待审核账号")} title={t("仅待审核账号可批量处理")} disabled={!selectablePending.length} checked={allPendingSelected} onChange={(event) => setSelected(event.target.checked ? new Set(selectablePending.map((user) => user.id)) : new Set())} /></th><th>{t("用户")}</th><th>{t("访问资产")}</th><th>{t("近 30 天流量")}</th><th>{t("状态")}</th><th>{t("注册时间")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visible.map((user) => <tr key={user.id} className={selected.has(user.id) ? "selected" : ""}>
+      <div className="table-wrap"><table className="data-table cards user-table"><thead><tr><th className="check"><input type="checkbox" aria-label={t("选择全部待审核账号")} title={t("仅待审核账号可批量处理")} disabled={!selectablePending.length} checked={allPendingSelected} onChange={(event) => setSelected(event.target.checked ? new Set(selectablePending.map((user) => user.id)) : new Set())} /></th><th>{t("用户")}</th><th>{t("权益")}</th><th>{t("近 30 天流量")}</th><th>{t("状态")}</th><th>{t("注册时间")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visible.map((user) => <tr key={user.id} className={selected.has(user.id) ? "selected" : ""}>
         <td className="check">{user.status === "pending" ? <input type="checkbox" aria-label={t("选择 {0}", [user.email])} checked={selected.has(user.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(user.id); else next.delete(user.id); return next; })} /> : null}</td>
         <td className="cell-main"><div className="user-cell"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><span><b>{user.displayName}{user.role === "owner" && <em className="role-tag">{t("所有者")}</em>}</b><small>{user.email}</small></span></div></td>
-        <td className="m-hide"><b>{t("{0} / {1} 份凭据", [user.accessSummary?.activeCredentialCount || 0, user.accessSummary?.credentialCount || 0])}</b><small>{t("{0} 份有效配置 · {1} 张有效证书", [user.accessSummary?.activeProfileCount || 0, user.accessSummary?.activeCertificateCount || 0])}</small></td>
+        <td className="m-hide access-cell">{(() => { const summary = accessSummary(user.access); return <><b className={summary.tone === "neutral" || user.status !== "active" ? "" : `tone-text ${summary.tone}`}>{summary.title}</b><small>{summary.detail}</small></>; })()}</td>
         <td className="m-hide"><b>{formatBytes(user.accessSummary?.totalBytes)}</b><small>{t("最后活动")} <Time value={user.accessSummary?.lastActivityAt} /></small></td>
         <td className="cell-status"><Pill value={user.status} label={statusLabels[user.status]} tone={user.status === "pending" ? "warning" : undefined} />{user.rejectionReason && <small>{user.rejectionReason}</small>}</td>
         <td className="m-hide"><Time value={user.createdAt} /></td>
@@ -199,8 +206,9 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
     {resetLink && <Modal title={t("重置密码链接")} description={t("发给 {0}，对方打开后自己设置新密码。24 小时内有效，只能使用一次。", [resetLink.user.email])} onClose={() => setResetLink(null)} footer={<div className="form-actions"><button className="button primary" onClick={() => void copyResetLink()}>{t("复制链接")}</button></div>}>
       <input readOnly value={resetLink.url} aria-label={t("重置密码链接")} onFocus={(event) => event.currentTarget.select()} />
     </Modal>}
-    {credentialOwner && <Modal title={t("{0} 的访问资产", [credentialOwner.displayName])} description={t("{0} · 公开证书可查看和下载，私钥不会返回管理端。", [credentialOwner.email])} onClose={() => { setCredentialOwner(null); setAccessOverview(null); }} wide>
-      <details><summary>{t("客户端授权设备与会员额度")}</summary><NativeAccessPanel userId={credentialOwner.id}/></details>
+    {credentialOwner && <Modal title={t("{0} 的访问详情", [credentialOwner.displayName])} description={t("{0} · 公开证书可查看和下载，私钥不会返回管理端。", [credentialOwner.email])} onClose={() => { setCredentialOwner(null); setAccessOverview(null); }} wide>
+      <AccessPanel userId={credentialOwner.id} onChanged={() => void onRefresh()} />
+      <details className="native-access-details"><summary>{t("客户端授权设备")}</summary><NativeAccessPanel userId={credentialOwner.id}/></details>
       <InlineNotice notice={notice} />
       <div className="account-access-toolbar">
         <div className="access-toolbar-main">

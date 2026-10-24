@@ -3,6 +3,7 @@ import { allowSubscriptionFetch } from "../../../server/rate-limit";
 import { hashToken } from "../../../server/crypto";
 import { routingMode, subscriptionFormat } from "../../../server/subscription-format";
 import { proxyGroupName, siteForRequest } from "../../../server/sites";
+import { AccessEndedError } from "../../../server/credential-access";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "no-store, private", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" };
@@ -18,8 +19,10 @@ export async function GET(request: Request) {
     const yaml = result.format === "clash";
     return new Response(result.content, { headers: { ...headers, "Content-Type": yaml ? "application/yaml; charset=utf-8" : "text/plain; charset=utf-8",
       "Content-Disposition": `attachment; filename="${encodeURIComponent(group)}.${yaml ? "yaml" : "txt"}"`, "profile-update-interval": "1",
-      ...(result.expiresAt ? { "subscription-userinfo": `expire=${Math.floor(new Date(result.expiresAt).getTime()/1000)}` } : {}) } });
-  } catch {
+      "subscription-userinfo": [`upload=0`, `download=${result.usedBytes}`, ...(result.quotaBytes ? [`total=${result.quotaBytes}`] : []),
+        ...(result.expiresAt ? [`expire=${Math.floor(new Date(result.expiresAt).getTime()/1000)}`] : [])].join("; ") } });
+  } catch (error) {
+    if (error instanceof AccessEndedError) return new Response(error.message, { status: 403, headers });
     // Never return an empty successful config (clients would replace working nodes), SQL errors, tokens or keys.
     return new Response("订阅不可用或节点正在同步。请确认访问权限，稍后刷新。", { status: 503, headers: { ...headers, "Retry-After": "30" } });
   }

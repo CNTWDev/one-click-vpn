@@ -26,14 +26,15 @@ const RegionsPage = lazy(() => import("./pages/regions").then((module) => ({ def
 const ControllerPage = lazy(() => import("./pages/controller").then((module) => ({ default: module.ControllerPage })));
 const ReleasesPage = lazy(() => import("./pages/releases").then((module) => ({ default: module.ReleasesPage })));
 const SitesPage = lazy(() => import("./pages/sites").then((module) => ({ default: module.SitesPage })));
+const PlansPage = lazy(() => import("./pages/plans").then((module) => ({ default: module.PlansPage })));
 const LogsPage = lazy(() => import("./pages/logs").then((module) => ({ default: module.LogsPage })));
 
-type PageId = "overview" | "topology" | "users" | "subscriptions" | "nodes" | "services" | "regions" | "controller" | "sites" | "logs" | "releases";
+type PageId = "overview" | "topology" | "users" | "plans" | "subscriptions" | "nodes" | "services" | "regions" | "controller" | "sites" | "logs" | "releases";
 type NavItem = { id: PageId; icon: IconName; label: string };
 const navigation: Array<{ group: string; items: NavItem[] }> = [
   { group: "监控", items: [{ id: "overview", icon: "overview", label: "运维总览" }, { id: "topology", icon: "topology", label: "全球拓扑" }, { id: "logs", icon: "logs", label: "运行日志" }] },
   { group: "基础设施", items: [{ id: "nodes", icon: "nodes", label: "节点运维" }, { id: "services", icon: "services", label: "VPN 服务" }, { id: "regions", icon: "regions", label: "区域管理" }, { id: "controller", icon: "controller", label: "Controller" }, { id: "sites", icon: "sites", label: "站点" }] },
-  { group: "用户", items: [{ id: "users", icon: "users", label: "账号管理" }, { id: "subscriptions", icon: "subscriptions", label: "订阅管理" }] },
+  { group: "用户", items: [{ id: "users", icon: "users", label: "账号管理" }, { id: "plans", icon: "plans", label: "套餐" }, { id: "subscriptions", icon: "subscriptions", label: "订阅管理" }] },
   { group: "客户端", items: [{ id: "releases", icon: "download", label: "客户端发布" }] },
 ];
 const pages = navigation.flatMap((section) => section.items.map((item) => ({ ...item, group: section.group })));
@@ -156,6 +157,7 @@ function App() {
           {page === "overview" && <OverviewPage users={users} nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
           {page === "topology" && <TopologyPage nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
           {page === "users" && <UsersPage users={users} onRefresh={refreshCore} />}
+          {page === "plans" && <PlansPage />}
           {page === "subscriptions" && <SubscriptionPanel api={api} admin />}
           {page === "nodes" && <NodesPage nodes={nodes} regions={regions} loading={dataLoading} onRefresh={refreshCore} />}
           {page === "services" && <ServicesPage nodes={nodes} />}

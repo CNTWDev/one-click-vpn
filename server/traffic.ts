@@ -2,9 +2,12 @@ import { dbQuery, withTransaction } from "./db";
 import { X509Certificate } from "node:crypto";
 import { credentialSyncStatus } from "./credential-access";
 import { EXPIRY_WARNING_DAYS } from "./credential-validity";
+import { chargeTraffic } from "./entitlements";
+import { writeOperationalLog } from "./operational-logs";
 
 export type UsageSnapshot = {
-  protocol: "wireguard" | "openvpn" | "vless";
+  // stealth = the apps' Hysteria2 / XHTTP fallback, counted per device by Agent 2.14+.
+  protocol: "wireguard" | "openvpn" | "vless" | "stealth";
   identityKey: string;
   sessionKey?: string;
   rxBytes: number;
@@ -46,7 +49,7 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
   const observedAt = now();
   const valid = snapshots.slice(0, MAX_SNAPSHOTS).flatMap((snapshot) => {
     const identityKey = typeof snapshot.identityKey === "string" ? snapshot.identityKey.trim().slice(0, 512) : "";
-    if (!identityKey || !["wireguard", "openvpn", "vless"].includes(snapshot.protocol)) return [];
+    if (!identityKey || !["wireguard", "openvpn", "vless", "stealth"].includes(snapshot.protocol)) return [];
     const sessionKey = snapshot.protocol === "openvpn" && typeof snapshot.sessionKey === "string" ? snapshot.sessionKey.trim().slice(0, 512) : "";
     return [{ snapshot, identityKey, sessionKey }];
   });
@@ -57,7 +60,7 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
      FROM traffic_counters WHERE node_id = $1`, [nodeId],
   );
   const previousByKey = new Map<string, PreviousCounter>(previousRows.map((row) => [counterKey(row.protocol, row.identity_key, row.session_key), row]));
-  const wireguardKeys = [...new Set(valid.filter((item) => item.snapshot.protocol === "wireguard" || item.snapshot.protocol === "vless").map((item) => item.identityKey))];
+  const wireguardKeys = [...new Set(valid.filter((item) => item.snapshot.protocol !== "openvpn").map((item) => item.identityKey))];
   const openvpnSubjects = [...new Set(valid.filter((item) => item.snapshot.protocol === "openvpn").map((item) => `CN=${item.identityKey}`))];
   const wireguardOwners = new Map<string, Owner>();
   if (wireguardKeys.length) {
@@ -70,7 +73,7 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
     const native = await dbQuery<Owner & {identity_key:string}>(`SELECT l.public_key AS identity_key,l.device_id,NULL AS credential_id,e.user_id
       FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id WHERE l.node_id=$1 AND l.public_key=ANY($2::text[])`,[nodeId,wireguardKeys]);
     for (const row of native) wireguardOwners.set(row.identity_key,row);
-    // App devices on VLESS report their enrollment UUID (see native-users.ts); the device is the lease on this node.
+    // App devices on VLESS and stealth report their enrollment UUID (see native-users.ts); the device is the lease on this node.
     const nativeVless = await dbQuery<Owner & {identity_key:string}>(`SELECT DISTINCT ON (e.id) substring(e.id from 5) AS identity_key,l.device_id,NULL AS credential_id,e.user_id
       FROM native_enrollments e JOIN native_leases l ON l.enrollment_id=e.id AND l.node_id=$1 WHERE substring(e.id from 5)=ANY($2::text[]) ORDER BY e.id`,[nodeId,wireguardKeys]);
     for (const row of nativeVless) if (!wireguardOwners.has(row.identity_key)) wireguardOwners.set(row.identity_key,row);
@@ -88,6 +91,8 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
 
   const seenCredentials = new Set<string>();
   const seenDevices = new Set<string>();
+  // Every counted byte also comes off the account's grants (entitlements.ts).
+  const bytesByUser = new Map<string, number>();
   await withTransaction(async (exec) => {
     await exec("UPDATE traffic_counters SET connected = 0 WHERE node_id = $1 AND protocol = 'openvpn'", [nodeId]);
     for (const { snapshot, identityKey, sessionKey } of valid) {
@@ -124,6 +129,7 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
         seenDevices.add(owner.device_id);
       }
       if (!owner || !hasTraffic) continue;
+      bytesByUser.set(owner.user_id, (bytesByUser.get(owner.user_id) || 0) + uploadDelta + downloadDelta);
       await exec(`INSERT INTO traffic_daily
         (day, user_id, device_id, credential_id, node_id, protocol, upload_bytes, download_bytes, first_seen_at, last_seen_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
@@ -140,6 +146,10 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
     }
     if (seenDevices.size) await exec("UPDATE devices SET last_seen_at = $1 WHERE id = ANY($2::text[])", [observedAt, [...seenDevices]]);
   });
+  // Accounts that just ran out leave every node on its next heartbeat (this node's comes right after).
+  for (const userId of await chargeTraffic(bytesByUser)) {
+    await writeOperationalLog({ component: "controller", level: "info", message: "account.quota_exhausted", action: "account.quota_exhausted", target: { type: "user", id: userId } }).catch(() => undefined);
+  }
 }
 
 function range(input: { from?: string; to?: string }): { from: string; to: string } {

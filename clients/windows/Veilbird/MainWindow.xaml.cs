@@ -381,7 +381,7 @@ public partial class MainWindow : Window {
         f.Switch.IsChecked=connection.Active;f.Switch.IsEnabled=!busy||connection.Active;
         var place=Location();
         f.Badge.Content=Look.Badge(place.Code,28);f.Location.Text=place.Title;f.LocationDetail.Text=place.Detail;
-        f.Usage.Text=UsageText();f.Until.Text=accountData is null?"—":L10n.Date(accountData["expiresAt"]?.GetValue<string>());
+        ShowFigures(f.Usage,f.Until);
     }
 
     // ---- Actions ----
@@ -592,9 +592,18 @@ public partial class MainWindow : Window {
     }
     private async Task QuietNodes() {try {await LoadNodes();badgeKey="";UpdateLive();} catch {/* codes fall back to initials */}}
     private string UsageText()=>accountData?["traffic"] is { } traffic?Bytes(Number(traffic["uploadBytes"])+Number(traffic["downloadBytes"])):"—";
-    private void ShowUsage() {
-        if(usageTotal is not null) usageTotal.Text=UsageText();
-        if(usageUntil is not null) usageUntil.Text=accountData is null?"—":L10n.Date(accountData["expiresAt"]?.GetValue<string>());
+    private void ShowUsage() {if(usageTotal is not null&&usageUntil is not null) ShowFigures(usageTotal,usageUntil);}
+    /// Traffic left (or used in the last 30 days) and the end of the access period, tinted when either is running
+    /// out or has run out. Traffic quotas count all nodes together.
+    private void ShowFigures(TextBlock traffic,TextBlock until) {
+        var access=accountData?["access"];var state=access?["state"]?.GetValue<string>()??"active";
+        long? quota=access?["quotaBytes"] is { } q?Number(q):null;
+        if(traffic.Parent is StackPanel cell&&cell.Children[0] is TextBlock title) title.Text=L10n.Text(quota is null?"last_30_days":"traffic_left");
+        if(quota is { } total) {var left=Number(access?["remainingBytes"]);traffic.Text=Bytes(left);traffic.Foreground=state=="exhausted"?Look.Danger:state=="active"&&left<=total/10?Look.Fair:Look.Text;}
+        else {traffic.Text=UsageText();traffic.Foreground=Look.Text;}
+        until.Text=accountData is null?"—":L10n.Date(accountData["expiresAt"]?.GetValue<string>());
+        var soon=access?["until"]?.GetValue<string>() is { } end&&DateTimeOffset.TryParse(end,System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out var date)&&date-DateTimeOffset.UtcNow<=TimeSpan.FromDays(7);
+        until.Foreground=state=="expired"?Look.Danger:state=="active"&&soon?Look.Fair:Look.Text;
     }
     private RingState State() {
         var active=connection.Active;

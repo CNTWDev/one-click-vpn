@@ -118,6 +118,7 @@
   <string name="quality_poor">Плохо</string>
   <string name="quality_unreachable">Недоступен</string>
   <string name="quit_app">Выйти</string>
+  <string name="quota_exhausted_hint">Трафик закончился. Обратитесь к администратору, чтобы добавить трафик.</string>
   <string name="refresh_devices">Обновить устройства</string>
   <string name="refresh_locations">Обновить локации</string>
   <string name="retest_latency">Проверить</string>
@@ -164,6 +165,7 @@
   <string name="this_location_is_unavailable_try_another">Локация недоступна. Попробуйте другую.</string>
   <string name="too_many_attempts_try_again_later">Слишком много попыток. Повторите позже.</string>
   <string name="traffic_30_days">Трафик · 30 дней</string>
+  <string name="traffic_left">Остаток трафика</string>
   <string name="tunnel_enabled">Туннель включён</string>
   <string name="unable_to_connect_check_your_network_and_try_again">Не удалось подключиться. Проверьте сеть и повторите.</string>
   <string name="unable_to_reach_the_service_check_your_network_and">Сервис недоступен. Проверьте сеть и повторите.</string>

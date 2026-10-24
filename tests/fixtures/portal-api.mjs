@@ -37,6 +37,7 @@ const history = [{ platform: "windows", arch: "x64", version: "1.1.3", build: 11
 export const otherSite = { id: "site_b", name: "Northern Lights Secure Access", isDefault: false, portalOrigin: "https://portal.northern.example", consoleOrigin: "", apiOrigin: "https://sub.northern.example",
   logoSvg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#6f90ff"/></svg>' };
 
+const soon = new Date(Date.now() + 5 * 86400000).toISOString();
 export function portalApi({ signedIn = true, empty = false, site = null } = {}) {
   let session = signedIn;
   return (pathname, method) => {
@@ -47,7 +48,9 @@ export function portalApi({ signedIn = true, empty = false, site = null } = {}) 
     if (pathname === "/api/v1/availability") return [200, { regions, nodes }];
     if (pathname === "/api/v1/credentials") return [200, method === "POST" ? { credential: credentials[1] } : { credentials: empty ? [] : credentials }];
     if (pathname === "/api/v1/profiles") return [200, method === "POST" ? { profile: profiles[0] } : { profiles: empty ? [] : profiles }];
-    if (pathname === "/api/v1/account") return [200, { expiresAt: "2027-10-24T00:00:00Z", deviceLimit: 3, devices: empty ? [] : [
+    if (pathname === "/api/v1/account") return [200, { ...(empty
+      ? { expiresAt: "2026-10-20T00:00:00Z", access: { state: "expired", until: null, endedAt: "2026-10-20T00:00:00Z", quotaBytes: null, usedBytes: 0, remainingBytes: null } }
+      : { expiresAt: soon, access: { state: "active", until: soon, endedAt: null, quotaBytes: 100 * GB, usedBytes: 93.4 * GB, remainingBytes: 6.6 * GB } }), deviceLimit: 3, devices: empty ? [] : [
       { id: "enr_1", name: "Aleksandra's ThinkPad X1 Carbon Gen 12 (office)", platform: "windows", lastSeenAt: now, connected: true, region: "São Paulo Metropolitan Area" },
       { id: "enr_2", name: "Pixel 8", platform: "android", lastSeenAt: ago(130), connected: false, region: null },
     ] }];
