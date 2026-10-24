@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     level: cleanText(url.searchParams.get("level"), 16) || undefined,
     source: cleanText(url.searchParams.get("source"), 16) || undefined,
     search: cleanText(url.searchParams.get("q"), 200) || undefined,
+    before: cleanText(url.searchParams.get("before"), 24) || undefined,
     hours: Number.isFinite(hours) ? hours : 24,
     limit: Number(url.searchParams.get("limit") || 200),
   });
