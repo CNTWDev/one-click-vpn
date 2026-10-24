@@ -10,6 +10,8 @@
 .portal-language-list button[aria-checked="true"]::after { content: ""; width: 10px; height: 5px; margin: -3px 2px 0 0; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); }
 .portal-language-list hr { margin: 6px 4px; border: 0; border-top: 1px solid var(--border); }
 html:not(:lang(zh)) .auth-intro h1 { font-size: clamp(36px, 5vw, 68px); letter-spacing: -.025em; }
+@media (max-width: 780px) { html:not(:lang(zh)) .auth-intro h1 { font-size: 34px; } }
+@media (max-width: 380px) { html:not(:lang(zh)) .auth-intro h1 { font-size: 26px; } }
 html:not(:lang(zh)) .kicker { letter-spacing: .08em; }
 html :is(.auth-layout, .center-page, .dashboard) :is(h1, h2, h3) { letter-spacing: -.02em; line-height: 1.2; }
 .mode-switch button, .client-picker label, .subscription-heading > div { min-width: 0; overflow-wrap: anywhere; }
