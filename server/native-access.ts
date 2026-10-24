@@ -55,13 +55,22 @@ export async function nativeAccount(session: Session) {
 async function candidates() {
   return (await selectVpnServices({protocol:"wireguard"})).filter(({node})=>node.capabilities.nativeLeaseEnforcement === 1);
 }
+/** Node CPU percent from a heartbeat under 3 minutes old; clients use it to steer away from busy nodes. */
+function nodeLoad(metrics: string | null | undefined): number | null {
+  try {
+    const value=JSON.parse(metrics||"null") as {collectedAt?:string;cpuPercent?:number}|null;
+    if(!value || typeof value.cpuPercent!=="number" || !Number.isFinite(value.cpuPercent)) return null;
+    if(!value.collectedAt || Date.now()-new Date(value.collectedAt).getTime()>180_000) return null;
+    return Math.max(0,Math.min(100,Math.round(value.cpuPercent)));
+  } catch { return null; }
+}
 export async function nativeNodes() {
   // WireGuard ignores unknown peers, so clients time a TCP connect to the same host's REALITY port instead.
   // Nodes without one have no probe and keep the server's least-loaded order behind measured nodes.
   const tcp=new Map((await selectVpnServices({protocol:"vless"})).map(({node,service})=>[node.id,service.listen_port]));
   return {nodes:(await candidates()).map(({node})=>{
     const port=tcp.get(node.id);
-    return {id:node.id,name:node.name,region:node.region,protocol:"wireguard",probe:port?{host:node.public_endpoint||node.ip,port}:null};
+    return {id:node.id,name:node.name,region:node.region,protocol:"wireguard",probe:port?{host:node.public_endpoint||node.ip,port}:null,load:nodeLoad(node.metrics_json)};
   })};
 }
 export async function nativeChallenge(session: Session, body: Record<string,unknown>) {

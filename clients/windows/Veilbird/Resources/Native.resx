@@ -15,6 +15,7 @@
   <data name="ask_your_administrator_to_enable_veilbird_client_access" xml:space="preserve"><value>Ask your administrator to enable Veilbird client access.</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>Authorized devices</value></data>
   <data name="authorizing_and_connecting" xml:space="preserve"><value>Authorizing and connecting…</value></data>
+  <data name="auto_detail" xml:space="preserve"><value>Picked by latency, stability and load</value></data>
   <data name="automatic" xml:space="preserve"><value>Automatic</value></data>
   <data name="automatic_recommended" xml:space="preserve"><value>Automatic · Recommended</value></data>
   <data name="available_location" xml:space="preserve"><value>Available location</value></data>
@@ -41,6 +42,7 @@
   <data name="connection_connected" xml:space="preserve"><value>Connected</value></data>
   <data name="connection_interrupted_try_again" xml:space="preserve"><value>Connection interrupted. Try again.</value></data>
   <data name="connection_not_available_yet" xml:space="preserve"><value>Connection not available yet</value></data>
+  <data name="connection_stats" xml:space="preserve"><value>{0}  ·  ↓ {1}  ↑ {2} Mbps</value></data>
   <data name="connection_unavailable" xml:space="preserve"><value>Connection unavailable</value></data>
   <data name="current_page" xml:space="preserve"><value>, current page</value></data>
   <data name="development_build_the_windows_tunnel_service_is_not_integrated" xml:space="preserve"><value>Development build: the Windows tunnel service is not integrated. You can sign in, view locations and manage devices, but cannot connect to a VPN.</value></data>
@@ -73,6 +75,7 @@
   <data name="location" xml:space="preserve"><value>Location</value></data>
   <data name="location_unavailable_select_another" xml:space="preserve"><value>Location unavailable. Select another.</value></data>
   <data name="locations" xml:space="preserve"><value>Locations</value></data>
+  <data name="measuring_latency" xml:space="preserve"><value>Testing…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>Your access has expired. Contact your administrator to renew it.</value></data>
   <data name="my_account" xml:space="preserve"><value>My account</value></data>
   <data name="my_veilbird" xml:space="preserve"><value>My Veilbird</value></data>
@@ -83,10 +86,17 @@
   <data name="no_locations_available_refresh_or_contact_your_administrator" xml:space="preserve"><value>No locations available. Refresh or contact your administrator.</value></data>
   <data name="no_matching_locations_change_your_search_or_refresh_later" xml:space="preserve"><value>No matching locations. Change your search or refresh later.</value></data>
   <data name="no_matching_locations_try_another_search" xml:space="preserve"><value>No matching locations. Try another search.</value></data>
+  <data name="node_load" xml:space="preserve"><value>Load {0}%</value></data>
+  <data name="node_quality_detail" xml:space="preserve"><value>Jitter {0} ms · Loss {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Not connected</value></data>
   <data name="password" xml:space="preserve"><value>Password</value></data>
+  <data name="quality_fair" xml:space="preserve"><value>Fair</value></data>
+  <data name="quality_good" xml:space="preserve"><value>Good</value></data>
+  <data name="quality_poor" xml:space="preserve"><value>Poor</value></data>
+  <data name="quality_unreachable" xml:space="preserve"><value>Unreachable</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>Refresh devices</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Refresh locations</value></data>
+  <data name="retest_latency" xml:space="preserve"><value>Test again</value></data>
   <data name="revoke_access" xml:space="preserve"><value>Revoke access</value></data>
   <data name="revoke_this_device_s_access" xml:space="preserve"><value>Revoke this device's access?</value></data>
   <data name="revoking_access_the_slot_is_released_in_about_5" xml:space="preserve"><value>Revoking access. The slot is released in about 5 minutes at most.</value></data>
@@ -101,6 +111,8 @@
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Sign in to Veilbird. No imports or configuration needed.</value></data>
   <data name="sign_out" xml:space="preserve"><value>Sign out</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Simulator build · Verify VPN connections on a signed physical-device build</value></data>
+  <data name="tap_to_change" xml:space="preserve"><value>Tap to change location</value></data>
+  <data name="test_after_disconnecting" xml:space="preserve"><value>Disconnect to test or change locations</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>The simulator is for UI testing only. Test the VPN on a signed physical-device build.</value></data>
   <data name="this_development_build_lacks_signing_entitlements_configure_your_developer" xml:space="preserve"><value>This development build lacks signing entitlements. Configure your developer team and sign it first.</value></data>
   <data name="this_device" xml:space="preserve"><value> · This device</value></data>

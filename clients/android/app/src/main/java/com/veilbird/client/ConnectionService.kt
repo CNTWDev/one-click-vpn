@@ -18,7 +18,12 @@ object ConnectionStateStore {
     @Volatile var messageId = R.string.not_connected
     val message: String get() = L10n.text(messageId)
     @Volatile var node = L10n.text(R.string.automatic)
-    @Volatile var bytes = ""
+    @Volatile var nodeId = ""
+    /** elapsedRealtime of the first confirmed handshake; 0 while connecting or disconnected. */
+    @Volatile var since = 0L
+    /** Bytes per second over the last tick. */
+    @Volatile var rxRate = 0L
+    @Volatile var txRate = 0L
 }
 class ConnectionService : Service(), Tunnel {
     private val worker = Executors.newSingleThreadScheduledExecutor()
@@ -32,6 +37,10 @@ class ConnectionService : Service(), Tunnel {
     private var renewAt = 0L
     private var stopping = false
     private var startedAt = 0L
+    private var lastRx = -1L
+    private var lastTx = 0L
+    private var lastSample = 0L
+    private var notified = ""
     override fun getName() = "veilbird"
     override fun onStateChange(state: Tunnel.State) { if (state == Tunnel.State.DOWN) ConnectionStateStore.active = false }
     override fun onBind(intent: Intent?): IBinder? = null
@@ -44,12 +53,13 @@ class ConnectionService : Service(), Tunnel {
         if (ConnectionStateStore.active) return START_NOT_STICKY
         startForeground(1, notification(L10n.text(R.string.connecting)))
         ConnectionStateStore.active = true; ConnectionStateStore.messageId = R.string.authorizing_and_connecting
+        ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L
         nodeId = intent?.getStringExtra("nodeId") ?: ""
         worker.execute {
             try {
                 if (nodeId.isEmpty()) chooseFastest()
                 connect()
-                worker.scheduleWithFixedDelay({ tick() }, 2, 5, TimeUnit.SECONDS)
+                worker.scheduleWithFixedDelay({ tick() }, 2, 2, TimeUnit.SECONDS)
                 api.report("")
             } catch (e: Exception) { api.report((e as? ApiFailure)?.code ?: "CONNECT_FAILED", nodeId); stopConnection(friendlyResource(e)) }
         }
@@ -57,7 +67,7 @@ class ConnectionService : Service(), Tunnel {
     }
     /** Measured before the tunnel exists; if the list cannot be loaded the server picks the least-loaded node. */
     private fun chooseFastest() {
-        val ranked = try { Latency.rank(api.request("nodes").getJSONArray("nodes")).map { it.first.getString("id") } } catch (_: Exception) { emptyList() }
+        val ranked = try { Latency.rank(api.request("nodes").getJSONArray("nodes"), attempts = 3).map { it.first.getString("id") } } catch (_: Exception) { emptyList() }
         nodeId = ranked.firstOrNull() ?: ""
         fallbacks.clear(); fallbacks.addAll(ranked.drop(1).take(2))
     }
@@ -74,6 +84,7 @@ class ConnectionService : Service(), Tunnel {
         api.report(code, nodeId)
         try { backend.setState(this, Tunnel.State.DOWN, null) } catch (_: Exception) { }
         nodeId = fallbacks.removeAt(0); ConnectionStateStore.messageId = R.string.authorizing_and_connecting
+        ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L
         return true
     }
     private fun bringUp() {
@@ -100,7 +111,7 @@ class ConnectionService : Service(), Tunnel {
         val input = JSONObject().put("publicKey", keyPair.publicKey.toBase64())
         if (nodeId.isNotEmpty()) input.put("nodeId", nodeId)
         val lease = api.action("connect", input)
-        nodeId = lease.getString("nodeId")
+        nodeId = lease.getString("nodeId"); ConnectionStateStore.nodeId = nodeId
         val remaining = (Instant.parse(lease.getString("expiresAt")).toEpochMilli() - System.currentTimeMillis()).coerceAtMost(300000)
         if (remaining <= 0) throw ApiFailure("ACCESS_EXPIRED")
         deadline = SystemClock.elapsedRealtime() + remaining; renewAt = SystemClock.elapsedRealtime() + 90000
@@ -125,8 +136,10 @@ class ConnectionService : Service(), Tunnel {
             }
             val stats = backend.getStatistics(this)
             val handshake = stats.peers().maxOfOrNull { stats.peer(it)?.latestHandshakeEpochMillis() ?: 0 } ?: 0
-            if (handshake > 0 && System.currentTimeMillis() - handshake < 180000) ConnectionStateStore.messageId = R.string.connected_status
-            else {
+            if (handshake > 0 && System.currentTimeMillis() - handshake < 180000) {
+                ConnectionStateStore.messageId = R.string.connected_status
+                if (ConnectionStateStore.since == 0L) ConnectionStateStore.since = SystemClock.elapsedRealtime()
+            } else {
                 ConnectionStateStore.messageId = R.string.confirming_connection_status
                 // A spare node gets a shorter wait: the next one is likely to answer sooner than this one recovers.
                 if (SystemClock.elapsedRealtime() - startedAt > (if (fallbacks.isEmpty()) 45000 else 20000)) {
@@ -137,8 +150,15 @@ class ConnectionService : Service(), Tunnel {
                     api.report("HANDSHAKE_TIMEOUT", nodeId); stopConnection(R.string.this_location_is_not_responding_try_another); return
                 }
             }
-            ConnectionStateStore.bytes = "↑ ${stats.totalTx() / 1024} KB   ↓ ${stats.totalRx() / 1024} KB"
-            getSystemService(NotificationManager::class.java).notify(1, notification(ConnectionStateStore.message))
+            val now = SystemClock.elapsedRealtime()
+            // Counters restart with a new tunnel after failover; skip that sample instead of showing a negative rate.
+            if (lastRx >= 0 && stats.totalRx() >= lastRx && stats.totalTx() >= lastTx && now > lastSample) {
+                ConnectionStateStore.rxRate = (stats.totalRx() - lastRx) * 1000 / (now - lastSample)
+                ConnectionStateStore.txRate = (stats.totalTx() - lastTx) * 1000 / (now - lastSample)
+            }
+            lastRx = stats.totalRx(); lastTx = stats.totalTx(); lastSample = now
+            val text = ConnectionStateStore.message
+            if (text != notified) { notified = text; getSystemService(NotificationManager::class.java).notify(1, notification(text)) }
         } catch (_: Exception) { api.report("TUNNEL_ERROR", nodeId); stopConnection(R.string.connection_interrupted_try_again) }
     }
     private fun notification(text: String): Notification {
@@ -150,7 +170,8 @@ class ConnectionService : Service(), Tunnel {
         if (stopping) return
         stopping = true
         try { backend.setState(this, Tunnel.State.DOWN, null) } catch (_: Exception) { }
-        ConnectionStateStore.active = false; ConnectionStateStore.messageId = message; ConnectionStateStore.bytes = ""
+        ConnectionStateStore.active = false; ConnectionStateStore.messageId = message
+        ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L
         try { api.action("disconnect", JSONObject()) } catch (_: Exception) { }
         stopForeground(STOP_FOREGROUND_REMOVE); stopSelf()
     }

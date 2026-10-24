@@ -13,6 +13,7 @@
   <string name="ask_your_administrator_to_enable_veilbird_client_access">Ask your administrator to enable Veilbird client access.</string>
   <string name="authorized_devices">Authorized devices</string>
   <string name="authorizing_and_connecting">Authorizing and connecting…</string>
+  <string name="auto_detail">Picked by latency, stability and load</string>
   <string name="automatic">Automatic</string>
   <string name="automatic_recommended">Automatic · Recommended</string>
   <string name="available_location">Available location</string>
@@ -39,6 +40,7 @@
   <string name="connection_connected">Connected</string>
   <string name="connection_interrupted_try_again">Connection interrupted. Try again.</string>
   <string name="connection_not_available_yet">Connection not available yet</string>
+  <string name="connection_stats">%1$s  ·  ↓ %2$s  ↑ %3$s Mbps</string>
   <string name="connection_unavailable">Connection unavailable</string>
   <string name="current_page">, current page</string>
   <string name="development_build_the_windows_tunnel_service_is_not_integrated">Development build: the Windows tunnel service is not integrated. You can sign in, view locations and manage devices, but cannot connect to a VPN.</string>
@@ -71,6 +73,7 @@
   <string name="location">Location</string>
   <string name="location_unavailable_select_another">Location unavailable. Select another.</string>
   <string name="locations">Locations</string>
+  <string name="measuring_latency">Testing…</string>
   <string name="membership_expired_hint">Your access has expired. Contact your administrator to renew it.</string>
   <string name="my_account">My account</string>
   <string name="my_veilbird">My Veilbird</string>
@@ -81,10 +84,17 @@
   <string name="no_locations_available_refresh_or_contact_your_administrator">No locations available. Refresh or contact your administrator.</string>
   <string name="no_matching_locations_change_your_search_or_refresh_later">No matching locations. Change your search or refresh later.</string>
   <string name="no_matching_locations_try_another_search">No matching locations. Try another search.</string>
+  <string name="node_load">Load %1$s%%</string>
+  <string name="node_quality_detail">Jitter %1$s ms · Loss %2$s%%</string>
   <string name="not_connected">Not connected</string>
   <string name="password">Password</string>
+  <string name="quality_fair">Fair</string>
+  <string name="quality_good">Good</string>
+  <string name="quality_poor">Poor</string>
+  <string name="quality_unreachable">Unreachable</string>
   <string name="refresh_devices">Refresh devices</string>
   <string name="refresh_locations">Refresh locations</string>
+  <string name="retest_latency">Test again</string>
   <string name="revoke_access">Revoke access</string>
   <string name="revoke_this_device_s_access">Revoke this device\'s access?</string>
   <string name="revoking_access_the_slot_is_released_in_about_5">Revoking access. The slot is released in about 5 minutes at most.</string>
@@ -99,6 +109,8 @@
   <string name="sign_in_to_veilbird_no_imports_or_configuration_needed">Sign in to Veilbird. No imports or configuration needed.</string>
   <string name="sign_out">Sign out</string>
   <string name="simulator_build_verify_vpn_connections_on_a_signed_physical">Simulator build · Verify VPN connections on a signed physical-device build</string>
+  <string name="tap_to_change">Tap to change location</string>
+  <string name="test_after_disconnecting">Disconnect to test or change locations</string>
   <string name="the_simulator_is_for_ui_testing_only_test_the">The simulator is for UI testing only. Test the VPN on a signed physical-device build.</string>
   <string name="this_development_build_lacks_signing_entitlements_configure_your_developer">This development build lacks signing entitlements. Configure your developer team and sign it first.</string>
   <string name="this_device"> · This device</string>

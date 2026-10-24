@@ -668,5 +668,65 @@
     "zh": "{0} ms",
     "en": "{0} ms",
     "ru": "{0} мс"
+  },
+  "quality_good": {
+    "zh": "优",
+    "en": "Good",
+    "ru": "Хорошо"
+  },
+  "quality_fair": {
+    "zh": "良",
+    "en": "Fair",
+    "ru": "Средне"
+  },
+  "quality_poor": {
+    "zh": "差",
+    "en": "Poor",
+    "ru": "Плохо"
+  },
+  "quality_unreachable": {
+    "zh": "不可达",
+    "en": "Unreachable",
+    "ru": "Недоступен"
+  },
+  "node_quality_detail": {
+    "zh": "抖动 {0} ms · 丢包 {1}%",
+    "en": "Jitter {0} ms · Loss {1}%",
+    "ru": "Джиттер {0} мс · Потери {1}%"
+  },
+  "node_load": {
+    "zh": "负载 {0}%",
+    "en": "Load {0}%",
+    "ru": "Нагрузка {0}%"
+  },
+  "retest_latency": {
+    "zh": "重新测速",
+    "en": "Test again",
+    "ru": "Проверить"
+  },
+  "measuring_latency": {
+    "zh": "测速中…",
+    "en": "Testing…",
+    "ru": "Проверка…"
+  },
+  "auto_detail": {
+    "zh": "按延迟、稳定性和负载自动选择",
+    "en": "Picked by latency, stability and load",
+    "ru": "По задержке, стабильности и нагрузке"
+  },
+  "tap_to_change": {
+    "zh": "点击更换节点",
+    "en": "Tap to change location",
+    "ru": "Нажмите, чтобы сменить"
+  },
+  "connection_stats": {
+    "zh": "{0} · ↓ {1} ↑ {2} Mbps",
+    "en": "{0}  ·  ↓ {1}  ↑ {2} Mbps",
+    "ru": "{0}  ·  ↓ {1}  ↑ {2} Мбит/с"
+  },
+  "test_after_disconnecting": {
+    "zh": "断开连接后可重新测速和更换节点",
+    "en": "Disconnect to test or change locations",
+    "ru": "Отключитесь, чтобы проверить или сменить локацию"
   }
 }

@@ -29,6 +29,9 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     await pool.query("INSERT INTO node_protocols(node_id,protocol,updated_at) VALUES($1,'vless',$2)",[node,stamp]);
     await pool.query("UPDATE nodes SET agent_capabilities_json=$2 WHERE id=$1",[node,JSON.stringify({nativeLeaseEnforcement:1,connectivity:{protocols:{wireguard:{runtimeActive:true,listening:true},vless:{runtimeActive:true,listening:true}}}})]);
     assert.deepEqual((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).probe,{host:"192.0.2.1",port:443});
+    assert.equal((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).load,null,"no heartbeat metrics yet");
+    await pool.query("UPDATE nodes SET metrics_json=$2 WHERE id=$1",[node,JSON.stringify({collectedAt:new Date().toISOString(),cpuPercent:37.6})]);
+    assert.equal((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).load,38);
     const proof=async(client,action,request)=>{const c=await call("challenge",{action,request},client.token);assert.equal(c.status,200);return {challengeId:c.data.id,request,signature:sign("sha256",Buffer.from(c.data.payload,"base64url"),{key:client.keys.privateKey,dsaEncoding:"ieee-p1363"}).toString("base64url")};};
     const input={nodeId:node,publicKey:randomBytes(32).toString("base64")};
     const payload=await proof(a,"connect",input);

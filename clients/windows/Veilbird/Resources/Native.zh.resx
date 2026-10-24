@@ -15,6 +15,7 @@
   <data name="ask_your_administrator_to_enable_veilbird_client_access" xml:space="preserve"><value>请联系管理员开通 Veilbird 客户端访问。</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>授权设备</value></data>
   <data name="authorizing_and_connecting" xml:space="preserve"><value>正在授权并连接…</value></data>
+  <data name="auto_detail" xml:space="preserve"><value>按延迟、稳定性和负载自动选择</value></data>
   <data name="automatic" xml:space="preserve"><value>自动选择</value></data>
   <data name="automatic_recommended" xml:space="preserve"><value>自动选择 · 推荐</value></data>
   <data name="available_location" xml:space="preserve"><value>可用位置</value></data>
@@ -41,6 +42,7 @@
   <data name="connection_connected" xml:space="preserve"><value>已连接</value></data>
   <data name="connection_interrupted_try_again" xml:space="preserve"><value>连接已中断，请重试。</value></data>
   <data name="connection_not_available_yet" xml:space="preserve"><value>连接尚未开放</value></data>
+  <data name="connection_stats" xml:space="preserve"><value>{0} · ↓ {1} ↑ {2} Mbps</value></data>
   <data name="connection_unavailable" xml:space="preserve"><value>连接尚不可用</value></data>
   <data name="current_page" xml:space="preserve"><value>，当前页面</value></data>
   <data name="development_build_the_windows_tunnel_service_is_not_integrated" xml:space="preserve"><value>开发版：Windows 隧道服务尚未集成。本版本可登录、查看节点和管理授权设备，但不能建立 VPN。</value></data>
@@ -73,6 +75,7 @@
   <data name="location" xml:space="preserve"><value>连接位置</value></data>
   <data name="location_unavailable_select_another" xml:space="preserve"><value>节点不可用，请重新选择</value></data>
   <data name="locations" xml:space="preserve"><value>节点</value></data>
+  <data name="measuring_latency" xml:space="preserve"><value>测速中…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>账号已到期，请联系管理员续期。</value></data>
   <data name="my_account" xml:space="preserve"><value>我的账号</value></data>
   <data name="my_veilbird" xml:space="preserve"><value>我的 Veilbird</value></data>
@@ -83,10 +86,17 @@
   <data name="no_locations_available_refresh_or_contact_your_administrator" xml:space="preserve"><value>暂无可用节点，请刷新或联系管理员。</value></data>
   <data name="no_matching_locations_change_your_search_or_refresh_later" xml:space="preserve"><value>没有可用的匹配位置，请更换关键词或稍后刷新。</value></data>
   <data name="no_matching_locations_try_another_search" xml:space="preserve"><value>没有匹配的位置，试试其他关键词。</value></data>
+  <data name="node_load" xml:space="preserve"><value>负载 {0}%</value></data>
+  <data name="node_quality_detail" xml:space="preserve"><value>抖动 {0} ms · 丢包 {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>未连接</value></data>
   <data name="password" xml:space="preserve"><value>密码</value></data>
+  <data name="quality_fair" xml:space="preserve"><value>良</value></data>
+  <data name="quality_good" xml:space="preserve"><value>优</value></data>
+  <data name="quality_poor" xml:space="preserve"><value>差</value></data>
+  <data name="quality_unreachable" xml:space="preserve"><value>不可达</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>刷新设备状态</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>刷新节点</value></data>
+  <data name="retest_latency" xml:space="preserve"><value>重新测速</value></data>
   <data name="revoke_access" xml:space="preserve"><value>解除授权</value></data>
   <data name="revoke_this_device_s_access" xml:space="preserve"><value>解除这台设备的授权？</value></data>
   <data name="revoking_access_the_slot_is_released_in_about_5" xml:space="preserve"><value>解除中，最多约 5 分钟后释放额度。</value></data>
@@ -101,6 +111,8 @@
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>登录 Veilbird，无需导入或配置。</value></data>
   <data name="sign_out" xml:space="preserve"><value>退出登录</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>模拟器开发版 · 连接功能需在已签名的真机版本验证</value></data>
+  <data name="tap_to_change" xml:space="preserve"><value>点击更换节点</value></data>
+  <data name="test_after_disconnecting" xml:space="preserve"><value>断开连接后可重新测速和更换节点</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>模拟器仅用于界面测试，请使用已签名的真机版本测试 VPN。</value></data>
   <data name="this_development_build_lacks_signing_entitlements_configure_your_developer" xml:space="preserve"><value>当前开发包缺少签名授权，需配置开发者团队并签名后使用。</value></data>
   <data name="this_device" xml:space="preserve"><value> · 本机</value></data>

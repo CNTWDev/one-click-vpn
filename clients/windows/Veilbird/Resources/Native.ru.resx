@@ -15,6 +15,7 @@
   <data name="ask_your_administrator_to_enable_veilbird_client_access" xml:space="preserve"><value>Попросите администратора включить доступ через клиент Veilbird.</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>Авторизованные устройства</value></data>
   <data name="authorizing_and_connecting" xml:space="preserve"><value>Авторизация и подключение…</value></data>
+  <data name="auto_detail" xml:space="preserve"><value>По задержке, стабильности и нагрузке</value></data>
   <data name="automatic" xml:space="preserve"><value>Автоматически</value></data>
   <data name="automatic_recommended" xml:space="preserve"><value>Автоматически · Рекомендуется</value></data>
   <data name="available_location" xml:space="preserve"><value>Доступная локация</value></data>
@@ -41,6 +42,7 @@
   <data name="connection_connected" xml:space="preserve"><value>Подключено</value></data>
   <data name="connection_interrupted_try_again" xml:space="preserve"><value>Подключение прервано. Повторите попытку.</value></data>
   <data name="connection_not_available_yet" xml:space="preserve"><value>Подключение пока недоступно</value></data>
+  <data name="connection_stats" xml:space="preserve"><value>{0}  ·  ↓ {1}  ↑ {2} Мбит/с</value></data>
   <data name="connection_unavailable" xml:space="preserve"><value>Подключение недоступно</value></data>
   <data name="current_page" xml:space="preserve"><value>, текущая страница</value></data>
   <data name="development_build_the_windows_tunnel_service_is_not_integrated" xml:space="preserve"><value>Версия для разработки: туннель Windows ещё не интегрирован. Можно войти, просматривать локации и управлять устройствами, но подключение к VPN недоступно.</value></data>
@@ -73,6 +75,7 @@
   <data name="location" xml:space="preserve"><value>Локация</value></data>
   <data name="location_unavailable_select_another" xml:space="preserve"><value>Локация недоступна. Выберите другую.</value></data>
   <data name="locations" xml:space="preserve"><value>Локации</value></data>
+  <data name="measuring_latency" xml:space="preserve"><value>Проверка…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>Срок доступа истёк. Обратитесь к администратору для продления.</value></data>
   <data name="my_account" xml:space="preserve"><value>Мой аккаунт</value></data>
   <data name="my_veilbird" xml:space="preserve"><value>Мой Veilbird</value></data>
@@ -83,10 +86,17 @@
   <data name="no_locations_available_refresh_or_contact_your_administrator" xml:space="preserve"><value>Нет доступных локаций. Обновите или обратитесь к администратору.</value></data>
   <data name="no_matching_locations_change_your_search_or_refresh_later" xml:space="preserve"><value>Локации не найдены. Измените запрос или обновите позже.</value></data>
   <data name="no_matching_locations_try_another_search" xml:space="preserve"><value>Локации не найдены. Попробуйте другой запрос.</value></data>
+  <data name="node_load" xml:space="preserve"><value>Нагрузка {0}%</value></data>
+  <data name="node_quality_detail" xml:space="preserve"><value>Джиттер {0} мс · Потери {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Не подключено</value></data>
   <data name="password" xml:space="preserve"><value>Пароль</value></data>
+  <data name="quality_fair" xml:space="preserve"><value>Средне</value></data>
+  <data name="quality_good" xml:space="preserve"><value>Хорошо</value></data>
+  <data name="quality_poor" xml:space="preserve"><value>Плохо</value></data>
+  <data name="quality_unreachable" xml:space="preserve"><value>Недоступен</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>Обновить устройства</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Обновить локации</value></data>
+  <data name="retest_latency" xml:space="preserve"><value>Проверить</value></data>
   <data name="revoke_access" xml:space="preserve"><value>Отозвать доступ</value></data>
   <data name="revoke_this_device_s_access" xml:space="preserve"><value>Отозвать доступ устройства?</value></data>
   <data name="revoking_access_the_slot_is_released_in_about_5" xml:space="preserve"><value>Доступ отзывается. Место освободится примерно в течение 5 минут.</value></data>
@@ -101,6 +111,8 @@
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Войдите в Veilbird. Импорт и настройка не нужны.</value></data>
   <data name="sign_out" xml:space="preserve"><value>Выйти</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Версия для симулятора · Проверяйте VPN на подписанной сборке для устройства</value></data>
+  <data name="tap_to_change" xml:space="preserve"><value>Нажмите, чтобы сменить</value></data>
+  <data name="test_after_disconnecting" xml:space="preserve"><value>Отключитесь, чтобы проверить или сменить локацию</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>Симулятор предназначен только для интерфейса. Проверяйте VPN на подписанной сборке для устройства.</value></data>
   <data name="this_development_build_lacks_signing_entitlements_configure_your_developer" xml:space="preserve"><value>В сборке отсутствуют разрешения подписи. Настройте команду разработчика и подпишите сборку.</value></data>
   <data name="this_device" xml:space="preserve"><value> · Это устройство</value></data>
