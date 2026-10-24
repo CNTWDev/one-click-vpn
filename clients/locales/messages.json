@@ -958,5 +958,15 @@
     "zh": "打开主窗口",
     "en": "Open main window",
     "ru": "Открыть окно"
+  },
+  "traffic_left": {
+    "zh": "剩余流量",
+    "en": "Traffic left",
+    "ru": "Остаток трафика"
+  },
+  "quota_exhausted_hint": {
+    "zh": "流量已用完，请联系管理员增加流量。",
+    "en": "Your traffic is used up. Contact your administrator to add more.",
+    "ru": "Трафик закончился. Обратитесь к администратору, чтобы добавить трафик."
   }
 }

@@ -118,6 +118,7 @@
   <string name="quality_poor">差</string>
   <string name="quality_unreachable">不可达</string>
   <string name="quit_app">退出</string>
+  <string name="quota_exhausted_hint">流量已用完，请联系管理员增加流量。</string>
   <string name="refresh_devices">刷新设备状态</string>
   <string name="refresh_locations">刷新节点</string>
   <string name="retest_latency">重新测速</string>
@@ -164,6 +165,7 @@
   <string name="this_location_is_unavailable_try_another">节点暂时不可用，请换一个节点重试。</string>
   <string name="too_many_attempts_try_again_later">操作太频繁，请稍后重试。</string>
   <string name="traffic_30_days">近 30 天流量</string>
+  <string name="traffic_left">剩余流量</string>
   <string name="tunnel_enabled">隧道已启用</string>
   <string name="unable_to_connect_check_your_network_and_try_again">暂时无法连接，请检查网络后重试。</string>
   <string name="unable_to_reach_the_service_check_your_network_and">暂时无法连接服务，请检查网络后重试。</string>

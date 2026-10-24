@@ -118,6 +118,7 @@
   <string name="quality_poor">Poor</string>
   <string name="quality_unreachable">Unreachable</string>
   <string name="quit_app">Quit</string>
+  <string name="quota_exhausted_hint">Your traffic is used up. Contact your administrator to add more.</string>
   <string name="refresh_devices">Refresh devices</string>
   <string name="refresh_locations">Refresh locations</string>
   <string name="retest_latency">Test again</string>
@@ -164,6 +165,7 @@
   <string name="this_location_is_unavailable_try_another">This location is unavailable. Try another.</string>
   <string name="too_many_attempts_try_again_later">Too many attempts. Try again later.</string>
   <string name="traffic_30_days">Traffic · 30 days</string>
+  <string name="traffic_left">Traffic left</string>
   <string name="tunnel_enabled">Tunnel enabled</string>
   <string name="unable_to_connect_check_your_network_and_try_again">Unable to connect. Check your network and try again.</string>
   <string name="unable_to_reach_the_service_check_your_network_and">Unable to reach the service. Check your network and try again.</string>

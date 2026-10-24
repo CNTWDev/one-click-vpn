@@ -120,6 +120,7 @@
   <data name="quality_poor" xml:space="preserve"><value>差</value></data>
   <data name="quality_unreachable" xml:space="preserve"><value>不可达</value></data>
   <data name="quit_app" xml:space="preserve"><value>退出</value></data>
+  <data name="quota_exhausted_hint" xml:space="preserve"><value>流量已用完，请联系管理员增加流量。</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>刷新设备状态</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>刷新节点</value></data>
   <data name="retest_latency" xml:space="preserve"><value>重新测速</value></data>
@@ -166,6 +167,7 @@
   <data name="this_location_is_unavailable_try_another" xml:space="preserve"><value>节点暂时不可用，请换一个节点重试。</value></data>
   <data name="too_many_attempts_try_again_later" xml:space="preserve"><value>操作太频繁，请稍后重试。</value></data>
   <data name="traffic_30_days" xml:space="preserve"><value>近 30 天流量</value></data>
+  <data name="traffic_left" xml:space="preserve"><value>剩余流量</value></data>
   <data name="tunnel_enabled" xml:space="preserve"><value>隧道已启用</value></data>
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>暂时无法连接，请检查网络后重试。</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>暂时无法连接服务，请检查网络后重试。</value></data>

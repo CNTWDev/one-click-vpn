@@ -18,6 +18,8 @@ public sealed class AccessFailure(string code) : Exception(code) {
         "MANAGED_ACCESS_REQUIRED" => L10n.Text("ask_your_administrator_to_enable_veilbird_client_access"),
         "CLIENT_UPDATE_REQUIRED" => L10n.Text("client_update_required"),
         "NODE_UNAVAILABLE" => L10n.Text("this_location_is_unavailable_try_another"),
+        "MEMBERSHIP_EXPIRED" => L10n.Text("membership_expired_hint"),
+        "QUOTA_EXHAUSTED" => L10n.Text("quota_exhausted_hint"),
         "ACCESS_EXPIRED" => L10n.Text("connection_authorization_expired_connect_again"),
         _ => L10n.Text("unable_to_reach_the_service_check_your_network_or")
     };

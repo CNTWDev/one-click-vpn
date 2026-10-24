@@ -2692,6 +2692,29 @@
         }
       }
     },
+    "quota_exhausted_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your traffic is used up. Contact your administrator to add more."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流量已用完，请联系管理员增加流量。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Трафик закончился. Обратитесь к администратору, чтобы добавить трафик."
+          }
+        }
+      }
+    },
     "refresh_devices": {
       "extractionState": "manual",
       "localizations": {
@@ -3746,6 +3769,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Трафик · 30 дней"
+          }
+        }
+      }
+    },
+    "traffic_left": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traffic left"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剩余流量"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Остаток трафика"
           }
         }
       }

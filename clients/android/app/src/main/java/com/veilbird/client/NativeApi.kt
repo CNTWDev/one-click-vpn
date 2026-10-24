@@ -122,6 +122,7 @@ fun friendlyResource(error: Throwable): Int = when ((error as? ApiFailure)?.code
     "INVALID_CREDENTIALS" -> R.string.incorrect_email_or_password
     "AUTH_REQUIRED" -> R.string.your_session_has_expired_sign_in_again
     "MEMBERSHIP_EXPIRED" -> R.string.your_access_has_expired_contact_your_administrator_to_renew
+    "QUOTA_EXHAUSTED" -> R.string.quota_exhausted_hint
     "ACCOUNT_UNAVAILABLE" -> R.string.your_account_is_not_active_contact_your_administrator
     "MANAGED_ACCESS_REQUIRED" -> R.string.ask_your_administrator_to_enable_veilbird_client_access
     "NODE_UNAVAILABLE", "NODE_FULL" -> R.string.this_location_is_unavailable_choose_another_or_use_automatic

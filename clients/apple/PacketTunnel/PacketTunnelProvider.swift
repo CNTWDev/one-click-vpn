@@ -184,7 +184,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         // After sleep the lease may already have lapsed: one renewal attempt before closing the tunnel.
         if Date()>=renewAt || Date()>=deadline {
             do {_ = try await acquire()}
-            catch AccessFailure.code(let code) where ["AUTH_REQUIRED","DEVICE_REVOKED","MEMBERSHIP_EXPIRED","ACCOUNT_UNAVAILABLE","MANAGED_ACCESS_REQUIRED","CLIENT_UPDATE_REQUIRED"].contains(code) {await fail(code);return}
+            catch AccessFailure.code(let code) where ["AUTH_REQUIRED","DEVICE_REVOKED","MEMBERSHIP_EXPIRED","QUOTA_EXHAUSTED","ACCOUNT_UNAVAILABLE","MANAGED_ACCESS_REQUIRED","CLIENT_UPDATE_REQUIRED"].contains(code) {await fail(code);return}
             catch {Journal.add("lease: renewal failed, retrying");renewAt=Date().addingTimeInterval(15)}
             if Date()>=deadline {await fail("LEASE_RENEWAL_FAILED","ACCESS_EXPIRED");return}
         } else if !leaseReady,await status() {
