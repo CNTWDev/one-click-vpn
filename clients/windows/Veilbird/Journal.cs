@@ -4,8 +4,8 @@ namespace Veilbird;
 
 /// <summary>
 /// Diagnostic log of the connection process, opened from a hidden entry (7 taps on the version).
-/// Only what the app writes: steps, node names, transport names, timings and error codes; never keys,
-/// tokens, addresses or visited sites. Two files of 256 KB rotate and lines older than 7 days are
+/// Only what the app writes: steps, node names, transport names, timings, error codes and error texts
+/// scrubbed of addresses (Scrub); never keys, tokens, addresses or visited sites. Two files of 256 KB rotate and lines older than 7 days are
 /// dropped, so the log never grows past 512 KB.
 /// </summary>
 public static class Journal {
@@ -16,6 +16,15 @@ public static class Journal {
     private static string Current=>Path.Combine(Folder,"veilbird.log");
     private static string Previous=>Path.Combine(Folder,"veilbird.1.log");
 
+    /// An error text without anything that names a place: URLs, IP addresses, host names and long tokens
+    /// become "…" (same rule as the server's scrubDetail). At most 200 characters.
+    public static string Scrub(string? text) {
+        var value=text??"";
+        foreach(var pattern in new[]{@"(?i)[a-z][a-z0-9+.-]*://\S+",@"\b\d{1,3}(\.\d{1,3}){3}(:\d+)?\b",@"(?i)\[?\b(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}\]?(:\d+)?",
+            @"(?i)\b(?:[a-z0-9-]+\.)+[a-z]{2,}(:\d+)?\b",@"[A-Za-z0-9+/=_-]{24,}"}) value=System.Text.RegularExpressions.Regex.Replace(value,pattern,"…");
+        value=System.Text.RegularExpressions.Regex.Replace(value,@"\s+"," ").Trim();
+        return value.Length>200?value[..200]:value;
+    }
     public static void Add(string message) {
         lock(Gate) {
             try {

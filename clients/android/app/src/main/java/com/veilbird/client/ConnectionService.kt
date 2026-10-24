@@ -67,10 +67,12 @@ class ConnectionService : VpnService() {
         ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L
         // Always-on VPN starts the service without extras: use the location chosen in the app.
         nodeId = intent?.getStringExtra("nodeId") ?: getSharedPreferences("preferences", MODE_PRIVATE).getString("nodeId", "")!!
+        api.attempt = java.util.UUID.randomUUID().toString().replace("-", "").take(16)
         worker.execute {
             try {
                 network = Transports.networkKey(this)
-                Journal.add("connect: start, network ${network}, routing ${routing()}")
+                // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
+                Journal.add("connect: start ${api.attempt}, network ${network}, routing ${routing()}")
                 if (nodeId.isEmpty()) chooseFastest()
                 connect()
                 worker.scheduleWithFixedDelay({ tick() }, 2, 2, TimeUnit.SECONDS)
@@ -84,8 +86,10 @@ class ConnectionService : VpnService() {
     private fun code(e: Exception) = when (e) { is ApiFailure -> e.code; is Unreachable -> "HANDSHAKE_TIMEOUT"; else -> "CONNECT_FAILED" }
     private fun fail(e: Exception) {
         if (stopping) { Journal.add("connect: cancelled"); return }
-        Journal.add("connect: failed ${code(e)}" + if (e !is ApiFailure && e !is Unreachable) " (${e.javaClass.simpleName})" else "")
-        api.report(code(e), nodeId)
+        // Unexpected errors keep their (scrubbed) text: a class name alone like "proxyerror" says too little.
+        val detail = if (e !is ApiFailure && e !is Unreachable) listOf(e.javaClass.simpleName, Journal.scrub(e.message)).filter { it.isNotEmpty() }.joinToString(": ") else ""
+        Journal.add("connect: failed ${code(e)}" + if (detail.isNotEmpty()) " ($detail)" else "")
+        api.report(code(e), nodeId, detail)
         stopConnection(if (e is Unreachable) R.string.this_location_is_not_responding_try_another else friendlyResource(e))
     }
     /** Measured before the tunnel exists; if the list cannot be loaded the server picks the least-loaded node. */
@@ -215,7 +219,10 @@ class ConnectionService : VpnService() {
             Core.rate().split(' ').let { (up, down) -> ConnectionStateStore.txRate = up.toLong(); ConnectionStateStore.rxRate = down.toLong() }
             val text = ConnectionStateStore.message
             if (text != notified) { notified = text; getSystemService(NotificationManager::class.java).notify(1, notification(text)) }
-        } catch (e: Exception) { Journal.add("tunnel: error ${e.javaClass.simpleName}"); api.report("TUNNEL_ERROR", nodeId); stopConnection(R.string.connection_interrupted_try_again) }
+        } catch (e: Exception) {
+            val detail = listOf(e.javaClass.simpleName, Journal.scrub(e.message)).filter { it.isNotEmpty() }.joinToString(": ")
+            Journal.add("tunnel: error $detail"); api.report("TUNNEL_ERROR", nodeId, detail); stopConnection(R.string.connection_interrupted_try_again)
+        }
     }
     private fun notification(text: String): Notification {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)

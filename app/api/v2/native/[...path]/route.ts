@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readJson } from "../../../../../server/http";
 import { NativeError } from "../../../../../server/native-proof";
+import { writeOperationalLog } from "../../../../../server/operational-logs";
 import { clientHeader,recordDiagnostics,recordEnrollmentClient,recordSessionClient,requireSupportedClient } from "../../../../../server/native-clients";
 import { parseClientAgent,type ClientPlatform } from "../../../../../shared/client-releases";
 import { nativeAccount,nativeChallenge,nativeConnect,nativeEnd,nativeLogin,nativeLogout,nativeNodes,nativeSession,nativeStatus } from "../../../../../server/native-access";
@@ -43,6 +44,10 @@ async function handle(request:Request) {
   } catch(error) {
     const known=error instanceof NativeError;
     if(!known) console.error("Native API operation failed", error instanceof Error?error.name:"unknown");
+    // Refusals of a connect (and any unexpected failure) go to the runtime log with the attempt's request id.
+    const path=new URL(request.url).pathname.split("/native/")[1]||"";
+    if(!known||["connect","challenge"].includes(path)||path.startsWith("status/")) void writeOperationalLog({component:"api",level:known?"warning":"error",
+      message:`App API ${request.method} ${path.replace(/^status\/.*/,"status")}: ${known?error.code:`unexpected ${error instanceof Error?error.message:String(error)}`}`.slice(0,1000)});
     return NextResponse.json({code:known?error.code:"SERVICE_UNAVAILABLE",...(known?error.details:{})},{status:known?error.status:503,headers:{"Cache-Control":"no-store"}});
   }
 }

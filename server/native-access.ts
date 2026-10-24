@@ -8,6 +8,7 @@ import { rebuildDesiredState, selectVpnServices } from "./control-plane";
 import { ipv4Address, ipv4Pool } from "./ipv4-pool";
 import { ensureNativeSecret, nativeProxies } from "./stealth";
 import { accessSql, accountAccess } from "./entitlements";
+import { writeOperationalLog } from "./operational-logs";
 
 export type Session = { id: string; user_id: string; identity_jwk: string; identity_thumbprint: string; device_name: string; platform: string };
 type Entitlement = { status: string; native_only: boolean; device_limit: number; allowed: boolean; exhausted: boolean; access_until: Date | null };
@@ -165,16 +166,30 @@ export async function nativeConnect(session:Session,body:Record<string,unknown>)
   if(recorded!==1) throw new NativeError("CONNECTION_SUPERSEDED",409);
   for(const old of result.old) await rebuildDesiredState(old,"wireguard").catch(()=>undefined);
   const applied=(await dbQuery<{applied_revision:number}>("SELECT applied_revision FROM observed_configs WHERE node_id=$1 AND protocol='wireguard' AND status IN ('applied','succeeded')",[node.id]))[0];
-  return {leaseId:result.id,enrollmentId:result.enrollmentId,expiresAt:result.expiresAt,nodeId:node.id,nodeName:node.name,revision:desired.revision,ready:!!applied && applied.applied_revision>=desired.revision,
+  const ready=!!applied && applied.applied_revision>=desired.revision;
+  const fallback=await fallbackProxies(node,result.enrollmentId);
+  // One line per connect, under the request id the app sends for the whole attempt (Console → 运行日志).
+  void writeOperationalLog({component:"api",nodeId:node.id,actor:{id:session.user_id},action:"native.connect",level:fallback.reason?"warning":"info",
+    message:`App ${session.platform} connect: node ${node.name}, WireGuard ${ready?"ready":`pending (revision ${desired.revision})`}, transports ${["wireguard",...fallback.proxies.map(p=>String(p.name))].join(" > ")}${fallback.reason?`; ${fallback.reason}`:""}`,
+    fields:{leaseId:result.id,revision:desired.revision}});
+  return {leaseId:result.id,enrollmentId:result.enrollmentId,expiresAt:result.expiresAt,nodeId:node.id,nodeName:node.name,revision:desired.revision,ready,
     wireguard:{address:result.address,serverPublicKey:node.server_public_key,endpoint:`${node.public_endpoint||node.ip}:${service.listen_port}`,dns:service.dns,allowedIps:["0.0.0.0/0","::/0"],mtu:1280},
     // Fallback transports for networks that block WireGuard, as mihomo proxies (Android 1.1+ races them).
-    proxies:await fallbackProxies(node,result.enrollmentId)};
+    proxies:fallback.proxies};
 }
-async function fallbackProxies(node:{id:string;ip:string;public_endpoint:string|null},enrollmentId:string) {
+/** The other transports, and why some are missing (logged, never sent to the app). */
+async function fallbackProxies(node:{id:string;ip:string;public_endpoint:string|null},enrollmentId:string):Promise<{proxies:Array<Record<string,unknown>>;reason:string}> {
   const pick=async(protocol:"vless"|"stealth")=>(await selectVpnServices({protocol})).find((item)=>item.node.id===node.id)?.service;
-  try { await ensureNativeSecret(enrollmentId); return await nativeProxies(node,enrollmentId,{vless:await pick("vless"),stealth:await pick("stealth")}); }
+  try {
+    await ensureNativeSecret(enrollmentId);
+    const services={vless:await pick("vless"),stealth:await pick("stealth")};
+    const proxies=await nativeProxies(node,enrollmentId,services);
+    const missing=[!services.vless&&"no healthy VLESS REALITY service",!services.stealth&&"no healthy stealth service (Agent 2.12+, standard policy, UDP+TCP 8443)",
+      (services.vless||services.stealth)&&!proxies.length&&"REALITY keys missing"].filter(Boolean);
+    return {proxies,reason:missing.length?`fallback limited: ${missing.join(", ")}`:""};
+  }
   // WireGuard alone still connects; a missing fallback must never fail the connection.
-  catch { return []; }
+  catch(error) { return {proxies:[],reason:`fallback failed: ${error instanceof Error?error.message:String(error)}`}; }
 }
 export async function nativeStatus(session:Session,leaseId:string) {
   const row=(await dbQuery(`SELECT l.node_id,l.expires_at,l.required_revision,e.status,${accessSql()} AS allowed FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id JOIN users u ON u.id=e.user_id WHERE l.id=$1 AND e.user_id=$2 AND e.identity_thumbprint=$3`,[leaseId,session.user_id,session.identity_thumbprint]))[0];

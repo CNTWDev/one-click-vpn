@@ -49,10 +49,13 @@ public sealed class NativeApi : IDisposable {
         File.WriteAllBytes(temporary,ProtectedData.Protect(data,null,DataProtectionScope.CurrentUser));
         File.Move(temporary,path,true);
     }
+    /// Set for one connection attempt: the server's runtime log lines for it carry the same id.
+    public string? Attempt {get;set;}
     public async Task<JsonObject> Request(string path,JsonObject? body=null) {
         if(!Uri.TryCreate(Origin,UriKind.Absolute,out var origin)||origin.Scheme!="https"||origin.UserInfo!=""||origin.Query!=""||origin.Fragment!=""||origin.AbsolutePath!="/") throw new AccessFailure("SERVER_REQUIRED");
         using var request=new HttpRequestMessage(body is null?HttpMethod.Get:HttpMethod.Post,new Uri(origin,"/api/v2/native/"+path));
         request.Headers.TryAddWithoutValidation("X-Veilbird-Client",ClientAgent);
+        if(Attempt is { } attempt) request.Headers.TryAddWithoutValidation("X-Request-Id",attempt);
         if(path!="login" && Read("token") is { } token) request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",Encoding.UTF8.GetString(token));
         if(body is not null) request.Content=JsonContent.Create(body);
         using var response=await client.SendAsync(request,HttpCompletionOption.ResponseHeadersRead);
@@ -92,10 +95,12 @@ public sealed class NativeApi : IDisposable {
         var signature=identity.SignData(bytes,HashAlgorithmName.SHA256,DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
         return await Request(action,new JsonObject {["challengeId"]=challenge["id"]!.GetValue<string>(),["signature"]=B64(signature),["request"]=input.DeepClone()});
     }
-    /// Connection failure codes for the Console's diagnostics (no keys, addresses or traffic); best effort.
-    public async Task Report(string code,string nodeId="") {
+    /// Connection failure codes and scrubbed error texts for the Console (no keys, addresses or traffic); best effort.
+    public async Task Report(string code,string nodeId="",string detail="") {
         var item=new JsonObject {["code"]=code,["at"]=DateTimeOffset.UtcNow.ToString("O")};
         if(nodeId.Length>0) item["nodeId"]=nodeId;
+        if(detail.Length>0) item["detail"]=detail;
+        if(Attempt is { } attempt) item["attempt"]=attempt;
         try {await Request("diagnostics",new JsonObject {["events"]=new JsonArray(item)});} catch {/* diagnostics never block connecting */}
     }
     public async Task Logout() {try {await Request("logout",new JsonObject());}finally {Save("token",null);}}
