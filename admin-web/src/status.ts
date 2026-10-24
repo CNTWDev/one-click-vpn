@@ -36,5 +36,5 @@ export function worstTone(tones: Tone[]): Tone {
   return tones.reduce<Tone>((worst, tone) => rank[tone] > rank[worst] ? tone : worst, N);
 }
 
-export const protocolNames: Record<string, string> = { wireguard: "WireGuard", openvpn: "OpenVPN", vless: "VLESS" };
+export const protocolNames: Record<string, string> = { wireguard: "WireGuard", openvpn: "OpenVPN", vless: "VLESS", stealth: "Hysteria2 / XHTTP" };
 export const protocolName = (value: string) => protocolNames[value] || value;

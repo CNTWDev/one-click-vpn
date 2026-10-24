@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import { portalApi } from "./fixtures/portal-api.mjs";
+import { otherSite, portalApi } from "./fixtures/portal-api.mjs";
 import { auditLayout, installWideFont } from "./fixtures/layout-audit.mjs";
 
 // The Portal's sign-in, request-access, onboarding and dashboard states, in every locale, at desktop / tablet / phone
@@ -14,7 +14,9 @@ const widths = [1440, 1100, 820, 390, 320];
 const views = [
   { name: "login", api: { signedIn: false }, ready: ".auth-panel" },
   { name: "register", api: { signedIn: false }, ready: ".auth-panel", open: (page) => page.locator(".auth-panel button.ghost.wide").click() },
+  { name: "login-other-site", api: { signedIn: false, site: otherSite }, ready: ".auth-panel" },
   { name: "onboarding", api: { empty: true }, ready: ".dashboard" },
+  { name: "dashboard-other-site", api: { site: otherSite }, ready: ".dashboard .list-item" },
   { name: "dashboard", ready: ".dashboard .list-item" },
   { name: "connection-openvpn", ready: ".dashboard .list-item", open: (page) => page.locator(".dashboard .list-item").nth(2).click() },
   { name: "new-subscription", ready: ".dashboard .list-item", open: (page) => page.locator(".topbar-tools ~ * button.primary, .dashboard button.primary").first().click() },

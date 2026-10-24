@@ -33,9 +33,14 @@ const releases = [
 ];
 const history = [{ platform: "windows", arch: "x64", version: "1.1.3", build: 11, distribution: "direct", url: "https://downloads.example.com/Veilbird-1.1.3-windows-x64.exe", sha256: "c".repeat(64), minOs: "Windows 10 1809", publishedAt: ago(20000) }];
 
-export function portalApi({ signedIn = true, empty = false } = {}) {
+/** A second brand with a long name and its own logo, to check the Portal on another site's domain. */
+export const otherSite = { id: "site_b", name: "Northern Lights Secure Access", isDefault: false, portalOrigin: "https://portal.northern.example", consoleOrigin: "", apiOrigin: "https://sub.northern.example",
+  logoSvg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#6f90ff"/></svg>' };
+
+export function portalApi({ signedIn = true, empty = false, site = null } = {}) {
   let session = signedIn;
   return (pathname, method) => {
+    if (pathname === "/api/v1/site") return site ? [200, site] : [404, { error: "Not found" }];
     if (pathname === "/api/v1/auth/me") return session ? [200, { user }] : [401, { error: "Authentication required" }];
     if (pathname === "/api/v1/auth/web-login") { session = true; return [200, { user }]; }
     if (pathname === "/api/v1/auth/register") return [202, { status: "received" }];

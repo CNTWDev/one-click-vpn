@@ -17,7 +17,7 @@ usage() {
   cat <<'USAGE'
 Usage: sudo ./one-click-uninstall.sh [--check] [--yes] [--no-backup]
 
-Permanently removes this Veilbird installation's containers, local images,
+Permanently removes this TrackNothing installation's containers, local images,
 PostgreSQL/MinIO/Loki volumes, .env, environment backups, and local DB backups.
 
 The source tree, host Nginx configuration, TLS certificates, and DNS are kept.
@@ -56,7 +56,7 @@ cd "$APP_DIR"
 
 if [ "$check_only" = "yes" ]; then
   compose config --quiet
-  echo "Veilbird uninstall preflight passed."
+  echo "TrackNothing uninstall preflight passed."
   echo "Project: $APP_DIR"
   echo "Environment: $APP_DIR/.env"
   echo "No data was removed."
@@ -77,13 +77,13 @@ esac
 [ -n "$api_domain" ] || api_domain="api.$default_base_domain"
 
 echo ""
-echo "Veilbird destructive uninstall"
+echo "TrackNothing destructive uninstall"
 echo "Project: $APP_DIR"
 echo ""
 echo "This will permanently remove:"
-echo "  - Veilbird Controller, Portal, Admin, PostgreSQL, MinIO, and Loki containers"
+echo "  - TrackNothing Controller, Portal, Admin, PostgreSQL, MinIO, and Loki containers"
 echo "  - this Compose project's PostgreSQL, MinIO, and Loki volumes"
-echo "  - locally built Veilbird images"
+echo "  - locally built TrackNothing images"
 echo "  - $APP_DIR/.env and .env.backup*"
 echo "  - $APP_DIR/backups"
 echo ""
@@ -152,7 +152,7 @@ elif [ "$assume_yes" = "no" ]; then
   echo "No recovery package will be created."
 fi
 
-echo "Stopping Veilbird and deleting project volumes..."
+echo "Stopping TrackNothing and deleting project volumes..."
 compose down --volumes --remove-orphans --rmi local
 
 rm -f -- "$APP_DIR/.env"
@@ -167,7 +167,7 @@ case "$base_domain" in
 esac
 
 echo ""
-echo "Veilbird runtime data and .env were removed successfully."
+echo "TrackNothing runtime data and .env were removed successfully."
 [ -n "$recovery_dir" ] && echo "Recovery package: $recovery_dir"
 echo ""
 echo "Reinstall with:"

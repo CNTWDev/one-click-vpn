@@ -55,7 +55,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     const noChinese = async () => assert.doesNotMatch(await page.locator("main").evaluate((main) => { const copy = main.cloneNode(true); copy.querySelectorAll(".portal-language-menu").forEach((node) => node.remove()); document.body.append(copy); const text = copy.innerText; copy.remove(); return text; }), /[\u3400-\u9fff]/u);
     const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.goto(base);
-    await page.getByRole("heading", { name: "Вход в Veilbird" }).waitFor();
+    await page.getByRole("heading", { name: "Вход в TrackNothing" }).waitFor();
     assert.equal(await languagePreference(), "system");
     assert.equal(await page.locator("html").getAttribute("lang"), "ru-RU");
     await noChinese();
@@ -66,7 +66,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await chooseLanguage("en");
     await page.getByText("Invalid email or password", { exact: true }).waitFor();
     await page.reload();
-    await page.getByRole("heading", { name: "Sign in to Veilbird" }).waitFor();
+    await page.getByRole("heading", { name: "Sign in to TrackNothing" }).waitFor();
     assert.equal(await languagePreference(), "en");
     await page.getByRole("button", { name: "New here? Request access" }).click();
     await page.getByLabel("Name", { exact: true }).fill("Test User");
@@ -143,7 +143,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await secondPage.close();
     await chooseLanguage("en");
     // Downloads are always open (no disclosure to click) and sit before the region map.
-    await page.getByRole("heading", { name: "Download Veilbird", level: 2 }).waitFor();
+    await page.getByRole("heading", { name: "Download TrackNothing", level: 2 }).waitFor();
     assert.equal(await page.getByText("Not released yet", { exact: true }).count(), 4);
     assert.equal(await page.locator(".client-downloads details.disclosure:not(.release-history)").count(), 0);
     let catalogUnavailable = true;
@@ -181,9 +181,9 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await blockedPage.addInitScript(() => { Object.defineProperty(window, "localStorage", { get() { throw new Error("Storage blocked"); } }); });
     await blockedPage.route("**/api/**", (route) => route.fulfill({ status: 401, contentType: "application/json", body: "{}" }));
     await blockedPage.goto(base);
-    await blockedPage.getByRole("heading", { name: "Sign in to Veilbird" }).waitFor();
+    await blockedPage.getByRole("heading", { name: "Sign in to TrackNothing" }).waitFor();
     await blockedPage.getByRole("button", { name: "Language", exact: true }).click();
     await blockedPage.getByRole("menuitemradio", { name: "Русский" }).click();
-    await blockedPage.getByRole("heading", { name: "Вход в Veilbird" }).waitFor();
+    await blockedPage.getByRole("heading", { name: "Вход в TrackNothing" }).waitFor();
   } finally { await browser?.close(); child.kill("SIGTERM"); }
 });

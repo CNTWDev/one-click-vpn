@@ -23,6 +23,17 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     let ready=false;for(let i=0;i<100;i++){if(await fetch(base+"account").then(()=>true).catch(()=>false)){ready=true;break;}await new Promise(r=>setTimeout(r,100));}assert.ok(ready);
     const login=async()=>{const keys=generateKeyPairSync("ec",{namedCurve:"P-256"});const r=await call("login",{email:`${user}@example.com`,password,identityKey:keys.publicKey.export({format:"jwk"}),platform:"android",deviceName:"Phone"});assert.equal(r.status,200,JSON.stringify(r.data));return {keys,token:r.data.accessToken};};
     const a=await login(),b=await login();
+    // Latency probes need a TCP port on the same host; a WireGuard-only node has none.
+    assert.equal((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).probe,null);
+    await pool.query("INSERT INTO vpn_services(node_id,protocol,transport,listen_port,subnet,status,created_at,updated_at) VALUES($1,'vless','tcp',443,'',$2,$3,$3)",[node,"healthy",stamp]);
+    await pool.query("INSERT INTO node_protocols(node_id,protocol,updated_at) VALUES($1,'vless',$2)",[node,stamp]);
+    await pool.query("UPDATE nodes SET agent_capabilities_json=$2 WHERE id=$1",[node,JSON.stringify({nativeLeaseEnforcement:1,connectivity:{protocols:{wireguard:{runtimeActive:true,listening:true},vless:{runtimeActive:true,listening:true}}}})]);
+    assert.deepEqual((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).probe,{host:"192.0.2.1",port:443});
+    await pool.query("INSERT INTO secret_materials(id,kind,owner_node_id,ciphertext,iv,tag,fingerprint,created_at,updated_at) VALUES($1,'reality_server',$2,'x','x','x','x',$3,$3)",[`${node}_reality`,node,stamp]);
+    await pool.query("INSERT INTO reality_settings(node_id,server_name,public_key,short_id,secret_id) VALUES($1,'www.example.com','AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','0123456789abcdef',$2)",[node,`${node}_reality`]);
+    assert.equal((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).load,null,"no heartbeat metrics yet");
+    await pool.query("UPDATE nodes SET metrics_json=$2 WHERE id=$1",[node,JSON.stringify({collectedAt:new Date().toISOString(),cpuPercent:37.6})]);
+    assert.equal((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).load,38);
     const proof=async(client,action,request)=>{const c=await call("challenge",{action,request},client.token);assert.equal(c.status,200);return {challengeId:c.data.id,request,signature:sign("sha256",Buffer.from(c.data.payload,"base64url"),{key:client.keys.privateKey,dsaEncoding:"ieee-p1363"}).toString("base64url")};};
     const input={nodeId:node,publicKey:randomBytes(32).toString("base64")};
     const payload=await proof(a,"connect",input);
@@ -31,9 +42,13 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     assert.deepEqual(results.map(r=>r.status).sort(),[200,409],JSON.stringify(results));
     const winner=results[0].status===200?a:b,loser=winner===a?b:a,result=results.find(r=>r.status===200).data;
     assert.ok(result.wireguard.address);assert.equal(result.ready,false);assert.ok(result.wireguard.dns.length);
+    // REALITY on the node gives the app its TCP fallback, keyed by a per-device secret that the node's user list carries.
+    const fallback=result.proxies.find(p=>p.name==="reality");
+    assert.match(fallback.uuid,/^[0-9a-f-]{36}$/);assert.equal(fallback.port,443);assert.equal(fallback.flow,"xtls-rprx-vision");
+    assert.equal(result.proxies.some(p=>p.name==="hysteria2"),false,"no stealth service on this node");
     const internalDevice=(await pool.query("SELECT device_id FROM native_leases WHERE id=$1",[result.leaseId])).rows[0].device_id;
     await assert.rejects(pool.query(`INSERT INTO connection_profiles(id,device_id,node_id,protocol,transport,revision,endpoint_json,issued_at,expires_at,updated_at)
-      VALUES($1,$2,$3,'wireguard','udp',1,'{}',$4,$4,$4)`,[`${user}_bypass`,internalDevice,node,stamp]),/Veilbird app/);
+      VALUES($1,$2,$3,'wireguard','udp',1,'{}',$4,$4,$4)`,[`${user}_bypass`,internalDevice,node,stamp]),/TrackNothing app/);
     assert.equal(Number((await pool.query("SELECT COUNT(*) FROM native_enrollments WHERE user_id=$1",[user])).rows[0].count),1);
     assert.equal((await call("connect",payload,a.token)).status,403,"proof cannot replay");
     assert.equal((await call(`status/${result.leaseId}`,undefined,loser.token)).status,403);
@@ -59,6 +74,9 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     assert.equal(second.revision,first.revision,"renewal must not enqueue a reconcile");
     assert.ok(Date.parse(second.expiresAt)>Date.parse(first.expiresAt));
     assert.equal(second.ready,true);
+    assert.deepEqual(second.proxies,[],"VLESS stopped reporting active: no fallback is offered");
+    const listed=(await pool.query("SELECT COUNT(*)::int AS n FROM native_enrollments e JOIN secret_materials s ON s.kind='native_secret:'||e.id WHERE e.user_id=$1 AND e.status='active'",[user])).rows[0].n;
+    assert.equal(listed,1,"one secret per active device");
     assert.equal((await call(`status/${second.leaseId}`,undefined,loser.token)).data.ready,true);
     const report=await call("diagnostics",{events:[{code:"HANDSHAKE_TIMEOUT",at:new Date().toISOString(),nodeId:node},{code:"bad code",at:new Date().toISOString()},{code:"OLD",at:"2000-01-01T00:00:00Z"}]},loser.token);
     assert.deepEqual([report.status,report.data.accepted],[200,1],"only well-formed recent codes are stored");

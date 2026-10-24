@@ -25,12 +25,12 @@ function run(command,args,{required=true,quiet=false}={}) {
 const action=process.argv[2]||"doctor",platform=process.argv[3]||"all";
 try {
   if(action==="doctor") {
-    const checks=[['Node',process.execPath,['--version']],['Java',env.JAVA_HOME?path.join(env.JAVA_HOME,'bin/java'):'java',['-version']],['.NET',dotnet,['--version']]];
-    if(process.platform==="darwin")checks.push(['Xcode','xcodebuild',['-version']],['XcodeGen','xcodegen',['--version']],['Go','go',['version']]);
+    const checks=[['Node',process.execPath,['--version']],['Java',env.JAVA_HOME?path.join(env.JAVA_HOME,'bin/java'):'java',['-version']],['.NET',dotnet,['--version']],['Go (shared core)','go',['version']]];
+    if(process.platform==="darwin")checks.push(['Xcode','xcodebuild',['-version']],['XcodeGen','xcodegen',['--version']]);
     for(const [name,command,args] of checks) {const result=run(command,args,{required:false,quiet:true});console.log(`${name}: ${result.status===0?'OK':'MISSING'}`);}
     console.log(`Android SDK: ${env.ANDROID_HOME&&existsSync(env.ANDROID_HOME)?'OK':'MISSING'}`);
     if(process.platform==="darwin") {const result=run('security',['find-identity','-v','-p','codesigning'],{required:false,quiet:true});console.log(`Apple signing: ${/\b[1-9]\d* valid identities found/.test(result.stdout||'')?'IDENTITY FOUND (profile/entitlements still need verification)':'NOT CONFIGURED'}`);}
-    console.log('Development checks only. Production release additionally requires Windows tunnel integration, platform signing and real-device VPN acceptance.');
+    console.log('Development checks only. Production release additionally requires platform signing and real-device VPN acceptance.');
   } else if(action==="build") {
     if(!['all','android','apple','windows'].includes(platform))throw new Error('Unknown platform');
     run(process.platform==='win32'?'npm.cmd':'npm',['run','build']);

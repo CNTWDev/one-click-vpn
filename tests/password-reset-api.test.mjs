@@ -68,7 +68,7 @@ test("Password reset: admin link and email link set a new password once and sign
 
     // Mail settings live in Console; the password is write-only.
     assert.equal((await fetch(base + "/api/v1/admin/mail-settings", { method: "PUT", headers: json, body: "{}" })).status, 403);
-    const mailSettings = { provider: "smtp", host: "127.0.0.1", port: sink.port, username: "no-reply@example.com", fromName: "Veilbird", password: "smtp-secret" };
+    const mailSettings = { provider: "smtp", host: "127.0.0.1", port: sink.port, username: "no-reply@example.com", fromName: "TrackNothing", password: "smtp-secret" };
     const saved = await (await fetch(base + "/api/v1/admin/mail-settings", { method: "PUT", headers: admin, body: JSON.stringify(mailSettings) })).json();
     assert.equal(saved.settings.passwordSet, true);
     assert.doesNotMatch(JSON.stringify(saved), /smtp-secret/);
@@ -77,7 +77,7 @@ test("Password reset: admin link and email link set a new password once and sign
     assert.deepEqual(await (await fetch(base + "/api/v1/auth/password-reset")).json(), { email: true });
     assert.equal((await post("/api/v1/admin/mail-settings/test", {}, admin)).status, 200);
     assert.equal(sink.messages.length, 1);
-    assert.match(sink.messages.shift(), /From: Veilbird <no-reply@example\.com>/);
+    assert.match(sink.messages.shift(), /From: TrackNothing <no-reply@example\.com>/);
 
     // Email link: same reply for unknown addresses, the mail carries a working link in the chosen language.
     assert.equal((await post("/api/v1/auth/password-reset", { email: "nobody@example.com", language: "ru" })).status, 202);

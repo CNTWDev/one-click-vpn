@@ -75,6 +75,11 @@ const logs = [
   { timestamp: ago(9), labels: { node: "n2", level: "warning", component: "agent", source: "system" }, message: "disk usage above 80% on /var/lib/docker" },
 ];
 
+const sites = [
+  { id: "default", name: "TrackNothing", portalDomain: "app.tracknothing.com", consoleDomain: "console.tracknothing.com", apiDomain: "api.tracknothing.com", logoSvg: "", mailFromName: "", isDefault: true },
+  { id: "site_b", name: "Northern Lights Secure Access", portalDomain: "portal.very-long-brand-name.example.net", consoleDomain: "admin.very-long-brand-name.example.net", apiDomain: "subscriptions.very-long-brand-name.example.net", mailFromName: "Northern Lights", isDefault: false,
+    logoSvg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#6f90ff"/></svg>' },
+];
 const release = (id, platform, channel, version, build, extra = {}) => ({ id, platform, arch: "universal", channel, version, build, status: "published", distribution: "direct", url: `https://downloads.example.com/veilbird/${platform}/${version}/Veilbird-${version}-${platform}-universal-release.bin`, sha256: "a".repeat(64), sizeBytes: 48234567, minOs: platform === "android" ? "Android 8.0" : platform === "windows" ? "Windows 10 1809" : "13.0", notes: "Fixes reconnect after network change.", publishedAt: "2026-10-06T00:00:00Z", createdAt: "2026-10-06T00:00:00Z", createdBy: "release-token", rolloutPercent: channel === "beta" ? 20 : 100, ...extra });
 
 export function consoleApi({ signedIn = true } = {}) {
@@ -85,13 +90,22 @@ export function consoleApi({ signedIn = true } = {}) {
     if (pathname === "/api/auth/logout") { session = false; return [200, {}]; }
     if (pathname === "/api/v1/admin/users") return [200, { users }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/credentials$/.test(pathname)) return [200, access];
-    if (pathname === "/api/v1/admin/mail-settings") return [200, { settings: { provider: "aliyun", host: "smtpdm-ap-southeast-1.aliyun.com", port: 465, username: "no-reply@notifications.very-long-company-domain.example", fromName: "Veilbird", passwordSet: true, updatedAt: now } }];
+    if (pathname === "/api/v1/admin/mail-settings") return [200, { settings: { provider: "aliyun", host: "smtpdm-ap-southeast-1.aliyun.com", port: 465, username: "no-reply@notifications.very-long-company-domain.example", fromName: "TrackNothing", passwordSet: true, updatedAt: now } }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/password-reset$/.test(pathname)) return [200, { url: `https://app.very-long-subdomain.example.com/#reset=usr_6f1c2d3e-4b5a-6978-8a9b-0c1d2e3f4a5b.1792000000.${"x".repeat(43)}`, expiresAt: "2026-10-24T10:00:00Z" }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/native-access$/.test(pathname)) return [200, { enabled: true, devices: [], credentials: [] }];
     if (pathname === "/api/nodes") return [200, { nodes }];
     if (pathname === "/api/nodes/agent-release") return [200, { version: "2.10.0", revision: "test" }];
     if (/^\/api\/nodes\/[^/]+$/.test(pathname) && method === "GET") return [200, { node: nodes.find((n) => pathname.endsWith(n.id)), actions, actionEvents, reconcile: { observed: [{ protocol: "vless", appliedRevision: 14, status: "applied", lastError: "", updatedAt: now }], tasks: [{ id: "task_1", protocol: "vless", taskType: "apply", desiredRevision: 15, status: "failed", attempts: 3, lastError: "xray: failed to bind 0.0.0.0:443", createdAt: ago(20), startedAt: ago(19), finishedAt: ago(18) }] }, connectivity }];
     if (pathname === "/api/regions") return [200, { regions }];
+    if (pathname === "/api/v1/site") return [200, { id: "default", name: "TrackNothing", logoSvg: "", isDefault: true, portalOrigin: "https://app.example.com", consoleOrigin: "https://console.example.com", apiOrigin: "https://api.example.com" }];
+    if (pathname === "/api/v1/admin/sites") return [200, { sites }];
+    if (pathname === "/api/v1/admin/agent-domain") return [200, { domain: "", origin: "https://agent.very-long-infrastructure-domain.example.net", source: "environment", environmentOrigin: "https://agent.very-long-infrastructure-domain.example.net",
+      nodes: nodes.map((node, index) => ({ id: node.id, name: node.name, status: index === 4 ? "offline" : "online", version: "agent 2.13.0", controllerOrigin: index < 2 ? "https://agent.very-long-infrastructure-domain.example.net" : index === 2 ? "" : "https://api.example.com" })) }];
+    if (/^\/api\/v1\/admin\/sites\/[^/]+\/check$/.test(pathname)) return [200, { checks: [
+      { role: "portal", domain: sites[1].portalDomain, status: "ok", detail: "" },
+      { role: "api", domain: sites[1].apiDomain, status: "unreachable", detail: "getaddrinfo ENOTFOUND subscriptions.very-long-brand-name.example.net" },
+      { role: "console", domain: sites[1].consoleDomain, status: "other-site", detail: "TrackNothing" },
+    ] }];
     if (pathname === "/api/controller") return [200, { settings: { display_name: "VEILBIRD", location_label: "Frankfurt am Main, Germany", latitude: 50.11, longitude: 8.68, location_source: "manual" }, status: "healthy", publicOrigin: "https://console.very-long-subdomain.example.com", publicHost: "console.very-long-subdomain.example.com", publicIp: "192.0.2.1", build: "9089cc4", runtime: { uptimeSeconds: 450000, nodeVersion: "22.13.0", rssBytes: 183e6, heapUsedBytes: 92e6, load1: 0.25, observedAt: now } }];
     if (pathname === "/api/vpn-services") return [200, { services }];
     if (pathname === "/api/deployment-policy") return [200, { standard: { version: 2, protocols: [{ protocol: "wireguard", transport: "udp", listenPort: 51820, configSchemaVersion: 1 }, { protocol: "vless", transport: "tcp", listenPort: 443, configSchemaVersion: 2 }, { protocol: "openvpn", transport: "udp", listenPort: 1194, configSchemaVersion: 1 }] }, counts: { totalNodes: 5, standardNodes: 4, customNodes: 1, agentOnlyNodes: 0, driftedNodes: 1, eligibleNodes: 1, blockedNodes: 0 }, driftedNodes: [{ id: "n5", name: nodes[4].name, currentVersion: 1, status: "offline", missingProtocols: ["vless"], eligible: false, reason: "Node is offline" }], rollouts: [{ id: "ro_1", fromVersion: 1, toVersion: 2, mode: "auto", status: "completed", totalTargets: 4, queuedTargets: 0, succeededTargets: 4, blockedTargets: 0, failedTargets: 0, createdAt: ago(3000) }] }];

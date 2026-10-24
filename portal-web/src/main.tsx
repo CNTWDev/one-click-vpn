@@ -1,5 +1,7 @@
 import { useI18n } from "../../shared/i18n";
 import { Brand } from "./brand";
+import { applySiteToDocument, loadSite, useSite } from "../../shared/site";
+import { PRODUCT_NAME } from "../../shared/brand-name";
 import { PortalLanguage, PortalLanguagePicker } from "./language";
 import "./language.css";
 import { errorText } from "../../shared/i18n-errors";
@@ -68,7 +70,8 @@ function Auth({ mode, onMode, onUser, notice }: {
     }
   }
 
-  const title = mode === "login" ? t("登录 Veilbird") : mode === "register" ? t("申请使用 VPN") : t("找回密码");
+  const siteName = useSite()?.name || PRODUCT_NAME;
+  const title = mode === "login" ? t("登录 {0}", [siteName]) : mode === "register" ? t("申请使用 VPN") : t("找回密码");
   const subtitle = mode === "login" ? t("使用已审核的账号继续，获取你的订阅链接。") : mode === "register" ? t("提交后由管理员人工审核。")
     : resetSent ? t("如果该邮箱已注册，重置链接很快会发到邮箱，1 小时内有效。")
       : resetByEmail === false ? t("请联系管理员，为你生成重置密码的链接。") : t("输入注册邮箱，我们会发送重置链接。");
@@ -162,10 +165,11 @@ export default function App() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void api<{ user: User }>("/api/v1/auth/me")
-        .then((result) => setUser(result.user))
-        .catch(() => undefined)
-        .finally(() => setLoading(false));
+      // The site (name, logo) loads alongside the session so the first screen already shows the right brand.
+      void Promise.all([
+        api<{ user: User }>("/api/v1/auth/me").then((result) => setUser(result.user)).catch(() => undefined),
+        loadSite().then((site) => applySiteToDocument(site)),
+      ]).finally(() => setLoading(false));
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -178,7 +182,7 @@ export default function App() {
 
   if (resetToken) return <><PortalLanguagePicker floating /><ResetPassword token={resetToken} onDone={finishReset} /></>;
   if (user?.status === "active" && !loading) return <CredentialDashboard user={user} onLogout={() => void logout()} />;
-  return <><PortalLanguagePicker floating />{loading ? <main className="center-page" aria-busy="true"><Brand /><span className="loader" aria-label={t("正在连接 Veilbird…")} /></main>
+  return <><PortalLanguagePicker floating />{loading ? <main className="center-page" aria-busy="true"><Brand /><span className="loader" aria-label={t("正在连接…")} /></main>
     : !user ? <Auth mode={mode} onMode={setMode} onUser={setUser} notice={notice} /> : <Pending user={user} onLogout={() => void logout()} />}</>;
 }
 

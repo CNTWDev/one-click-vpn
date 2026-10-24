@@ -23,7 +23,7 @@ android {
     productFlavors {
         create("prod") {
             dimension = "environment"
-            manifestPlaceholders["appLabel"] = "Veilbird"
+            manifestPlaceholders["appLabel"] = "TrackNothing"
             // Published APKs are prod builds; they update themselves from the stable channel.
             buildConfigField("boolean", "SELF_UPDATE", "true")
         }
@@ -31,7 +31,7 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            manifestPlaceholders["appLabel"] = "Veilbird Dev"
+            manifestPlaceholders["appLabel"] = "TrackNothing Dev"
             buildConfigField("boolean", "SELF_UPDATE", "false")
         }
     }
@@ -57,8 +57,13 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions { jvmTarget = "17" }
+    // WireGuard runs inside the embedded core (libs/veilbird-core.aar); the library's own engine is not shipped.
+    packaging { jniLibs { excludes += "**/libwg-go.so" } }
 }
 dependencies {
+    // Built by clients/core/build-android.sh (gomobile bind of mihomo); CI builds it before Gradle.
+    implementation(files("libs/veilbird-core.aar"))
+    // Only for Curve25519 key pairs: the private key never leaves the device.
     implementation("com.wireguard.android:tunnel:1.0.20260102")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }

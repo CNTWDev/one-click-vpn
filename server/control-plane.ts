@@ -1,6 +1,7 @@
 import { x25519 } from "@noble/curves/ed25519.js";
 import { realitySettings, realityUsersSecret, realityClientSecretId } from "./reality";
 import { ensureRealityService } from "./service-prerequisites";
+import { stealthDesiredState } from "./stealth";
 import { withReconcileLock } from "./reconcile-lock";
 import { addAudit } from "./db";
 import { renderMihomoWireGuard } from "./protocols/mihomo";
@@ -130,6 +131,7 @@ async function buildDesiredStateLocked(nodeId: string, protocol: Protocol, optio
     listenPort: service.listen_port,
     subnet: service.subnet,
     reality: protocol === "vless" ? await vlessDesiredReality(nodeId, service.listen_port) : undefined,
+    stealth: protocol === "stealth" ? await stealthDesiredState(nodeId, service.listen_port) : undefined,
     peers: await listActivePeers(nodeId, protocol),
     openvpn,
   });

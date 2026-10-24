@@ -232,7 +232,7 @@ test("Agent operations expose release, recover expired tasks and preserve live t
     assert.equal((await fetch(`${base}/api/nodes/agent-release`)).status, 401);
     const release = await fetch(`${base}/api/nodes/agent-release`, { headers });
     assert.equal(release.status, 200);
-    assert.equal((await release.json()).version, "agent 2.11.0");
+    assert.equal((await release.json()).version, "agent 2.13.0");
     const timestamp = new Date().toISOString();
     await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at)
       VALUES ($1,'Operations','Test','127.0.0.9','root','password','','','',$2,$2)`, [nodeId,timestamp]);

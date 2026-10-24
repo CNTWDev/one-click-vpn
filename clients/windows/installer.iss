@@ -1,5 +1,5 @@
-; Veilbird installer (Inno Setup 6). Built by build.ps1 -Installer; installs per machine into Program Files,
-; because the WireGuard tunnel service runs this executable as SYSTEM and must not live in a user-writable folder.
+; TrackNothing installer (Inno Setup 6). Built by build.ps1 -Installer; installs per machine into Program Files,
+; because the app and its core run with administrator rights and must not live in a user-writable folder.
 ; Running a newer installer over an older one upgrades in place (same AppId).
 #ifndef Version
   #define Version "0.0.0"
@@ -13,10 +13,10 @@
 
 [Setup]
 AppId={{6C5E8F64-2C1B-4C55-9C35-7B1C0E5A9B21}
-AppName=Veilbird
+AppName=TrackNothing
 AppVersion={#Version}
 VersionInfoVersion={#Version}.{#Build}
-AppPublisher=Veilbird
+AppPublisher=TrackNothing
 DefaultDirName={autopf}\Veilbird
 DisableProgramGroupPage=yes
 DisableDirPage=yes
@@ -32,7 +32,7 @@ MinVersion=10.0
 SetupIconFile=Veilbird\Assets\Veilbird.ico
 UninstallDisplayIcon={app}\Veilbird.exe
 OutputDir=artifacts
-OutputBaseFilename=Veilbird-{#Version}-{#Build}-{#Runtime}-setup
+OutputBaseFilename=TrackNothing-{#Version}-{#Build}-{#Runtime}-setup
 Compression=lzma2
 SolidCompression=yes
 CloseApplications=yes
@@ -45,13 +45,19 @@ Name: "ru"; MessagesFile: "compiler:Languages\Russian.isl"
 [Files]
 Source: "artifacts\{#Runtime}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
+[InstallDelete]
+; Shortcuts from before the TrackNothing rename; the install folder and Veilbird.exe keep their names so upgrades stay in place.
+Type: files; Name: "{autoprograms}\Veilbird.lnk"
+Type: files; Name: "{autodesktop}\Veilbird.lnk"
+
 [Icons]
-Name: "{autoprograms}\Veilbird"; Filename: "{app}\Veilbird.exe"
-Name: "{autodesktop}\Veilbird"; Filename: "{app}\Veilbird.exe"
+Name: "{autoprograms}\TrackNothing"; Filename: "{app}\Veilbird.exe"
+Name: "{autodesktop}\TrackNothing"; Filename: "{app}\Veilbird.exe"
 
 [Run]
-Filename: "{app}\Veilbird.exe"; Description: "Veilbird"; Flags: nowait postinstall skipifsilent shellexec
+Filename: "{app}\Veilbird.exe"; Description: "TrackNothing"; Flags: nowait postinstall skipifsilent shellexec
 
 [UninstallRun]
-; Stops a tunnel left running by the app before its files are removed.
+; Stops the core (and with it the tunnel), and a tunnel service left by versions before the built-in core.
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM veilbird-core.exe"; Flags: runhidden; RunOnceId: "StopCore"
 Filename: "{sys}\sc.exe"; Parameters: "stop ""WireGuardTunnel$Veilbird"""; Flags: runhidden; RunOnceId: "StopTunnel"

@@ -1,6 +1,10 @@
 package com.veilbird.client
 
 import android.app.Activity
+import android.animation.Animator
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
+import android.animation.ValueAnimator
 import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
@@ -10,10 +14,15 @@ import android.graphics.drawable.RippleDrawable
 import android.content.res.ColorStateList
 import android.view.Gravity
 import android.view.View
+import android.view.animation.DecelerateInterpolator
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.text.format.DateUtils
 import android.text.InputType
 import android.text.TextWatcher
 import android.text.Editable
@@ -22,7 +31,10 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import com.wireguard.android.backend.GoBackend
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.net.VpnService
+import android.widget.Toast
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
@@ -47,10 +59,43 @@ class MainActivity : Activity() {
     private val muted = Color.rgb(91, 105, 112)
     private val canvas = Color.rgb(248, 246, 238)
     private val mint = Color.rgb(226, 247, 240)
+    private val good = Color.rgb(0, 140, 96)
+    private val fair = Color.rgb(196, 132, 0)
+    private val poor = Color.rgb(190, 60, 45)
+    private var power: TextView? = null
+    private var ring: View? = null
+    private var pulseAnimator: Animator? = null
+    private var poweredOn: Boolean? = null
+    private var lastView = ""
+    // The last account summary, so the home page shows usage at once and refreshes it quietly.
+    private var accountData: JSONObject? = null
+    private var stats: TextView? = null
+    private var nodeTitle: TextView? = null
+    private var nodeDetail: TextView? = null
+    private var nodeDot: View? = null
     private val refresh = object : Runnable {
         override fun run() {
-            status?.text = ConnectionStateStore.message + "\n" + (if (ConnectionStateStore.active) ConnectionStateStore.node else if (selectedId.isEmpty()) L10n.text(R.string.automatic_recommended) else selectedName) + "\n" + ConnectionStateStore.bytes
-            connectButton?.text = if (ConnectionStateStore.active) L10n.text(R.string.disconnect_action) else L10n.text(R.string.connect_action)
+            val active = ConnectionStateStore.active
+            status?.text = ConnectionStateStore.message
+            connectButton?.text = if (active) L10n.text(R.string.disconnect_action) else L10n.text(R.string.connect_action)
+            power?.apply {
+                val on = active && ConnectionStateStore.since > 0
+                if (poweredOn != on) {
+                    // The fill eases to teal once connected; the first paint of the page is immediate.
+                    val fill = background as GradientDrawable
+                    if (poweredOn == null) fill.setColor(if (on) teal else mint)
+                    else ValueAnimator.ofArgb(if (on) mint else teal, if (on) teal else mint).apply { duration = 260; addUpdateListener { fill.setColor(it.animatedValue as Int) }; start() }
+                    setTextColor(if (on) Color.WHITE else teal); poweredOn = on
+                }
+                val connecting = active && !on
+                if (connecting != (pulseAnimator != null)) pulse(connecting)
+            }
+            stats?.apply {
+                val since = ConnectionStateStore.since
+                visibility = if (active && since > 0) View.VISIBLE else View.INVISIBLE
+                if (since > 0) text = L10n.text(R.string.connection_stats, DateUtils.formatElapsedTime((SystemClock.elapsedRealtime() - since) / 1000), mbps(ConnectionStateStore.rxRate), mbps(ConnectionStateStore.txRate))
+            }
+            showCurrentNode()
             if (visible) handler.postDelayed(this, 1000)
         }
     }
@@ -59,133 +104,298 @@ class MainActivity : Activity() {
         val settings = getSharedPreferences("preferences", MODE_PRIVATE)
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", L10n.text(R.string.automatic_recommended))!!
         render(); checkForUpdate()
+        // The Quick Settings tile could not start the VPN from the background: connect now that the app is open.
+        if (intent?.getBooleanExtra("connect", false) == true && api.secret("token") != null && !ConnectionStateStore.active) {
+            val consent = VpnService.prepare(this); if (consent != null) startActivityForResult(consent, 10) else startConnection()
+        }
     }
     override fun onResume() { super.onResume(); visible = true; handler.post(refresh) }
-    override fun onPause() { visible = false; handler.removeCallbacks(refresh); super.onPause() }
+    override fun onPause() { visible = false; handler.removeCallbacks(refresh); pulse(false); super.onPause() }
     override fun onDestroy() { executor.shutdown(); super.onDestroy() }
-    private fun rounded(color: Int, radius: Int = 20) = GradientDrawable().apply { setColor(color); cornerRadius = radius.dp.toFloat() }
-    private fun surface(color: Int, radius: Int = 20) = RippleDrawable(ColorStateList.valueOf(Color.argb(35, 0, 80, 65)), rounded(color, radius), rounded(Color.WHITE, radius))
-    private fun label(text: String, size: Float = 16f) = TextView(this).apply {
-        this.text = text; textSize = size; setTextColor(if (size >= 20) ink else muted)
-        if (size >= 20) typeface = Typeface.create("sans-serif", Typeface.BOLD)
-        setPadding(0, 8.dp, 0, 12.dp); setLineSpacing(3.dp.toFloat(), 1f)
+    private fun rounded(color: Int, radius: Int = 16) = GradientDrawable().apply { setColor(color); cornerRadius = radius.dp.toFloat() }
+    private fun surface(color: Int, radius: Int = 16) = RippleDrawable(ColorStateList.valueOf(Color.argb(35, 0, 80, 65)), rounded(color, radius), rounded(Color.WHITE, radius))
+    private fun label(text: String, size: Float = 15f) = TextView(this).apply {
+        this.text = text; textSize = size; setTextColor(if (size >= 18) ink else muted)
+        if (size >= 18) typeface = Typeface.create("sans-serif", Typeface.BOLD)
+        setPadding(0, 4.dp, 0, 8.dp); setLineSpacing(2.dp.toFloat(), 1f)
     }
     private fun styleButton(view: Button, primary: Boolean = false, danger: Boolean = false) = view.apply {
-        minHeight = 56.dp; textSize = 16f; isAllCaps = false; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        background = surface(if (primary) teal else if (danger) Color.rgb(255, 238, 234) else mint, 18)
+        minHeight = 48.dp; minimumHeight = 48.dp; textSize = 15f; isAllCaps = false; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        background = surface(if (primary) teal else if (danger) Color.rgb(255, 238, 234) else mint, 14)
         setTextColor(if (primary) Color.WHITE else if (danger) Color.rgb(163, 49, 37) else teal)
-        setPadding(18.dp, 14.dp, 18.dp, 14.dp)
+        setPadding(16.dp, 10.dp, 16.dp, 10.dp)
         stateListAnimator = null
     }
     private fun button(text: String, action: () -> Unit): Button = styleButton(Button(this), text in listOf(L10n.text(R.string.connect_action), L10n.text(R.string.disconnect_action), L10n.text(R.string.sign_in_and_start)), text in listOf(L10n.text(R.string.revoke_access), L10n.text(R.string.sign_out))).apply {
         this.text = text; setOnClickListener { if (!busy) action() }
-    }.also { content.addView(it, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp; bottomMargin = 8.dp }) }
+    }.also { content.addView(it, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp; bottomMargin = 6.dp }) }
     private fun card(title: String, detail: String) {
         content.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; background = rounded(Color.WHITE, 24); setPadding(20.dp, 12.dp, 20.dp, 12.dp)
-            addView(label(title, 21f)); addView(label(detail, 15f))
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp; bottomMargin = 12.dp })
+            orientation = LinearLayout.VERTICAL; background = rounded(Color.WHITE, 16); setPadding(16.dp, 8.dp, 16.dp, 8.dp)
+            addView(label(title, 18f)); addView(label(detail, 14f))
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4.dp; bottomMargin = 8.dp })
     }
     private fun field(hint: String, value: String = "", password: Boolean = false, uri: Boolean = false) = EditText(this).apply {
         this.hint = hint; setText(value); setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT or when {password -> InputType.TYPE_TEXT_VARIATION_PASSWORD; uri -> InputType.TYPE_TEXT_VARIATION_URI; else -> InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS}
-        textSize = 16f; setTextColor(ink); setHintTextColor(muted); setPadding(18.dp, 12.dp, 18.dp, 12.dp)
-        background = rounded(Color.WHITE, 16).apply { setStroke(1.dp, Color.rgb(222, 226, 220)) }
-    }.also { content.addView(it, LinearLayout.LayoutParams(-1, 58.dp).apply { bottomMargin = 14.dp }) }
+        textSize = 15f; setTextColor(ink); setHintTextColor(muted); setPadding(14.dp, 8.dp, 14.dp, 8.dp)
+        background = rounded(Color.WHITE, 12).apply { setStroke(1.dp, Color.rgb(222, 226, 220)) }
+    }.also { content.addView(it, LinearLayout.LayoutParams(-1, 48.dp).apply { bottomMargin = 10.dp }) }
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
+    private fun mbps(bytesPerSecond: Long) = String.format(L10n.locale, "%.1f", bytesPerSecond * 8 / 1_000_000.0)
+    private fun gradeColor(quality: Quality?) = when (quality?.grade) {
+        R.string.quality_good -> good; R.string.quality_fair -> fair; R.string.quality_poor -> poor; else -> Color.rgb(190, 196, 192)
+    }
+    private fun dot(color: Int) = View(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(color) } }
+    /** "86 ms · Good", or the grade alone when nothing answered. */
+    private fun summary(quality: Quality) = quality.latency?.let { L10n.text(R.string.latency_ms, L10n.number(it)) + " · " + L10n.text(quality.grade) } ?: L10n.text(quality.grade)
+    /** A tappable list row: status dot, title with a muted detail line, and an optional value on the right. */
+    private fun row(title: String, detail: String, dotColor: Int, trailing: String = "", trailingColor: Int = muted, selected: Boolean = false, onClick: () -> Unit): LinearLayout {
+        val titleView = label(title, 15f).apply { setTextColor(ink); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); setPadding(0, 0, 0, 0); maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
+        val detailView = label(detail, 13f).apply { setPadding(0, 2.dp, 0, 0); visibility = if (detail.isEmpty()) View.GONE else View.VISIBLE }
+        val dotView = dot(dotColor)
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = 56.dp
+            background = surface(if (selected) mint else Color.WHITE, 14); setPadding(14.dp, 8.dp, 14.dp, 8.dp)
+            isClickable = true; setOnClickListener { if (!busy) onClick() }
+            addView(dotView, LinearLayout.LayoutParams(10.dp, 10.dp).apply { marginEnd = 12.dp })
+            addView(LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; addView(titleView); addView(detailView) }, LinearLayout.LayoutParams(0, -2, 1f))
+            if (trailing.isNotEmpty()) addView(label(trailing, 15f).apply { setTextColor(trailingColor); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); setPadding(12.dp, 0, 0, 0) })
+            tag = Triple(titleView, detailView, dotView)
+        }
+    }
+    private fun showCurrentNode() {
+        val title = nodeTitle ?: return
+        val active = ConnectionStateStore.active
+        val id = if (active) ConnectionStateStore.nodeId else selectedId
+        val quality = Latency.recent[id].takeIf { id.isNotEmpty() }
+        title.text = when { active -> ConnectionStateStore.node; selectedId.isEmpty() -> L10n.text(R.string.automatic_recommended); else -> selectedName }
+        nodeDetail?.text = when {
+            quality != null -> summary(quality)
+            !active && selectedId.isEmpty() -> L10n.text(R.string.auto_detail)
+            else -> L10n.text(R.string.tap_to_change)
+        }
+        nodeDot?.background = (nodeDot?.background as? GradientDrawable)?.apply { setColor(if (quality == null && !active && selectedId.isEmpty()) teal else gradeColor(quality)) }
+    }
+    /** Code, flag and the language's own name; "system" follows the phone. */
+    private val languages get() = listOf(Triple("system", "🌐", L10n.text(R.string.language_system)), Triple("zh", "🇨🇳", "简体中文"), Triple("en", "🇺🇸", "English"), Triple("ru", "🇷🇺", "Русский"))
+    private fun currentLanguage() = L10n.preference.substringBefore('-').let { code -> languages.firstOrNull { it.first == code } ?: languages[0] }
+    private fun chooseLanguage() {
+        val current = currentLanguage().first
+        AlertDialog.Builder(this).setTitle(L10n.text(R.string.language))
+            .setSingleChoiceItems(languages.map { "${it.second}   ${it.third}" }.toTypedArray(), languages.indexOfFirst { it.first == current }) { dialog, which ->
+                dialog.dismiss(); if (languages[which].first != current) { L10n.select(languages[which].first); if (android.os.Build.VERSION.SDK_INT < 33) recreate() }
+            }.setNegativeButton(L10n.text(R.string.cancel), null).show()
+    }
+    /** A settings row: name on the left, current value on the right. */
+    private fun settingRow(title: String, value: String, onClick: () -> Unit) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = 52.dp
+            background = surface(Color.WHITE, 14); setPadding(14.dp, 8.dp, 14.dp, 8.dp)
+            isClickable = true; setOnClickListener { if (!busy) onClick() }; contentDescription = "$title: $value"
+        }
+        row.addView(label(title, 15f).apply { setTextColor(ink); setPadding(0, 0, 0, 0); maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
+        row.addView(label("$value  ›", 14f).apply { setPadding(12.dp, 0, 0, 0); maxLines = 1 })
+        content.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp; bottomMargin = 6.dp })
+    }
+    private fun bytes(value: Long) = android.text.format.Formatter.formatShortFileSize(this, value)
+    /** Below the connect button: what this account has used and how long it runs. */
+    private fun usage() {
+        val traffic = label("—", 15f); val until = label("—", 15f)
+        val strip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; background = rounded(Color.WHITE, 14); setPadding(16.dp, 10.dp, 16.dp, 10.dp) }
+        for ((title, value) in listOf(L10n.text(R.string.traffic_30_days) to traffic, L10n.text(R.string.valid_until_label) to until)) strip.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(label(title, 12f).apply { setPadding(0, 0, 0, 2.dp); maxLines = 1 })
+            addView(value.apply { setTextColor(ink); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); setPadding(0, 0, 0, 0); maxLines = 1 })
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        content.addView(strip, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 10.dp })
+        fun show(data: JSONObject) {
+            val used = data.optJSONObject("traffic")?.let { (it.optString("uploadBytes", "0").toLongOrNull() ?: 0) + (it.optString("downloadBytes", "0").toLongOrNull() ?: 0) }
+            traffic.text = used?.let { bytes(it) } ?: "—"; until.text = L10n.date(data.optString("expiresAt"))
+        }
+        accountData?.let { show(it) }
+        Thread {
+            val data = try { api.request("account") } catch (_: Exception) { null } ?: return@Thread
+            runOnUiThread { accountData = data; if (!isDestroyed && traffic.isAttachedToWindow) show(data) }
+        }.start()
+    }
+    /** A soft ring breathes out of the power button while connecting. Off when the system disables animations. */
+    private fun pulse(on: Boolean) {
+        pulseAnimator?.cancel(); pulseAnimator = null; ring?.alpha = 0f
+        val target = ring ?: return
+        if (!on || !ValueAnimator.areAnimatorsEnabled()) return
+        pulseAnimator = ObjectAnimator.ofPropertyValuesHolder(target, PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.38f), PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.38f), PropertyValuesHolder.ofFloat(View.ALPHA, 0.7f, 0f)).apply {
+            duration = 1400; repeatCount = ValueAnimator.INFINITE; interpolator = DecelerateInterpolator(); start()
+        }
+    }
     private fun render() {
-        status = null; connectButton = null
-        val side = maxOf(24.dp, (resources.displayMetrics.widthPixels - 640.dp) / 2)
-        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 24.dp, side, 24.dp) }
+        pulse(false); status = null; connectButton = null; power = null; ring = null; poweredOn = null; stats = null; nodeTitle = null; nodeDetail = null; nodeDot = null
+        val side = maxOf(16.dp, (resources.displayMetrics.widthPixels - 560.dp) / 2)
+        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 12.dp, side, 16.dp) }
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(canvas); fitsSystemWindows = true }
         root.addView(ScrollView(this).apply { isFillViewport = true; addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
-        content.addView(label("Veilbird", 22f))
-        button(L10n.text(R.string.language)) {
-            val values = listOf("system", "en", "zh", "ru")
-            AlertDialog.Builder(this).setTitle(L10n.text(R.string.language))
-                .setSingleChoiceItems(arrayOf(L10n.text(R.string.language_system), "English", "简体中文", "Русский"), values.indexOf(L10n.preference.substringBefore('-'))) { dialog, which ->
-                    dialog.dismiss(); L10n.select(values[which]); if (android.os.Build.VERSION.SDK_INT < 33) recreate()
-                }.setNegativeButton(L10n.text(R.string.cancel), null).show()
-        }
-        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { isIndeterminate = true; indeterminateTintList = ColorStateList.valueOf(teal); visibility = if (busy) View.VISIBLE else View.GONE }
-        content.addView(progress, LinearLayout.LayoutParams(-1, 4.dp))
-        if (announcement.isNotBlank()) content.addView(label(announcement, 15f).apply { setTextColor(ink); background = rounded(mint, 18); setPadding(18.dp, 14.dp, 18.dp, 14.dp) }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12.dp })
+        val signedIn = api.secret("token") != null
+        // A new page eases in (short fade and rise); re-renders of the same page stay still.
+        val view = if (signedIn) page else "login"
+        if (view != lastView) { content.alpha = 0f; content.translationY = 8.dp.toFloat(); content.animate().alpha(1f).translationY(0f).setDuration(200).setInterpolator(DecelerateInterpolator()).start() }
+        lastView = view
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        header.addView(label("TrackNothing", 18f).apply { setPadding(0, 0, 0, 0) }, LinearLayout.LayoutParams(0, -2, 1f))
+        // Before sign-in the only language entry is this small globe; afterwards it is a row on the account page.
+        if (!signedIn) header.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_language); imageTintList = ColorStateList.valueOf(muted); setPadding(10.dp, 10.dp, 10.dp, 10.dp)
+            background = surface(canvas, 20); contentDescription = L10n.text(R.string.language); setOnClickListener { if (!busy) chooseLanguage() }
+        }, LinearLayout.LayoutParams(44.dp, 44.dp))
+        content.addView(header, LinearLayout.LayoutParams(-1, 44.dp))
+        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { isIndeterminate = true; indeterminateTintList = ColorStateList.valueOf(teal); visibility = if (busy) View.VISIBLE else View.INVISIBLE }
+        content.addView(progress, LinearLayout.LayoutParams(-1, 4.dp).apply { bottomMargin = 4.dp })
+        if (announcement.isNotBlank()) content.addView(label(announcement, 14f).apply { setTextColor(ink); background = rounded(mint, 14); setPadding(14.dp, 10.dp, 14.dp, 10.dp) }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 8.dp })
         update?.let { available ->
             card(L10n.text(R.string.update_available, available.version), L10n.text(if (available.mandatory) R.string.update_required_detail else R.string.update_available_detail))
             button(L10n.text(R.string.update_now)) { installUpdate(available) }
         }
-        if (api.secret("token") == null) { login(); return }
-        val nav = LinearLayout(this).apply { setPadding(12.dp, 10.dp, 12.dp, 10.dp); setBackgroundColor(Color.WHITE) }
+        if (!signedIn) { accountData = null; login(); return }
+        val nav = LinearLayout(this).apply { setPadding(8.dp, 6.dp, 8.dp, 6.dp); setBackgroundColor(Color.WHITE) }
         for ((tab, title) in listOf("connect" to L10n.text(R.string.connect_tab), "nodes" to L10n.text(R.string.locations), "account" to L10n.text(R.string.account))) nav.addView(styleButton(Button(this)).apply {
-            text = title; isSelected = tab == page; background = surface(if (isSelected) mint else Color.WHITE, 16)
+            text = title; isSelected = tab == page; background = surface(if (isSelected) mint else Color.WHITE, 12)
             setTextColor(if (isSelected) teal else muted); contentDescription = title + if (isSelected) L10n.text(R.string.current_page) else ""
+            maxLines = 1; setPadding(4.dp, 0, 4.dp, 0)
             setOnClickListener { if (!busy) { page = tab; render() } }
-        }, LinearLayout.LayoutParams(0, 56.dp, 1f).apply { marginStart = 4.dp; marginEnd = 4.dp })
+        }, LinearLayout.LayoutParams(0, 48.dp, 1f).apply { marginStart = 4.dp; marginEnd = 4.dp })
         root.addView(nav)
         when (page) {
-            "connect" -> {
-                content.addView(label(L10n.text(R.string.connect_with_ease), 30f))
-                content.addView(label(L10n.text(R.string.choose_a_location_veilbird_takes_care_of_the_rest)))
-                content.addView(label("⏻", 64f).apply { gravity = Gravity.CENTER; setTextColor(teal); background = rounded(mint, 80); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(144.dp, 144.dp).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = 24.dp; bottomMargin = 16.dp })
-                status = label(ConnectionStateStore.message, 20f).apply { gravity = Gravity.CENTER; background = rounded(Color.WHITE, 24); setPadding(18.dp, 22.dp, 18.dp, 22.dp) }.also { content.addView(it, LinearLayout.LayoutParams(-1, -2)) }
-                if (update?.mandatory != true || ConnectionStateStore.active) connectButton = button(if (ConnectionStateStore.active) L10n.text(R.string.disconnect_action) else L10n.text(R.string.connect_action)) {
-                    if (ConnectionStateStore.active) startService(Intent(this, ConnectionService::class.java).setAction("disconnect"))
-                    else { val consent = GoBackend.VpnService.prepare(this); if (consent != null) startActivityForResult(consent, 10) else startConnection() }
-                }
-                button(L10n.text(R.string.change_location)) { page = "nodes"; render() }
-                content.addView(label(L10n.text(R.string.a_location_is_selected_automatically_allow_the_system_vpn)))
-            }
+            "connect" -> home()
             "nodes" -> nodes()
+            "logs" -> logs()
             else -> account()
         }
+        handler.removeCallbacks(refresh); if (visible) handler.post(refresh)
+    }
+    /** Everything needed to connect fits on one phone screen: state, current location, one button. */
+    private fun home() {
+        val badge = FrameLayout(this).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS }
+        ring = View(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setStroke(2.dp, teal) }; alpha = 0f }
+        badge.addView(ring, FrameLayout.LayoutParams(96.dp, 96.dp, Gravity.CENTER))
+        power = label("⏻", 36f).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, 0); background = rounded(mint, 48); setTextColor(teal) }
+        badge.addView(power, FrameLayout.LayoutParams(96.dp, 96.dp, Gravity.CENTER))
+        content.addView(badge, LinearLayout.LayoutParams(136.dp, 136.dp).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = 2.dp })
+        status = label(ConnectionStateStore.message, 20f).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, 0) }.also { content.addView(it, LinearLayout.LayoutParams(-1, -2)) }
+        stats = label("", 13f).apply { gravity = Gravity.CENTER; setPadding(0, 4.dp, 0, 0); visibility = View.INVISIBLE; maxLines = 1 }.also { content.addView(it, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 16.dp }) }
+        val current = row("", " ", teal, "›", muted) { page = "nodes"; render() }
+        @Suppress("UNCHECKED_CAST") (current.tag as Triple<TextView, TextView, View>).let { (t, d, v) -> nodeTitle = t; nodeDetail = d; nodeDot = v }
+        current.contentDescription = L10n.text(R.string.tap_to_change)
+        content.addView(current, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 6.dp })
+        if (update?.mandatory != true || ConnectionStateStore.active) connectButton = button(if (ConnectionStateStore.active) L10n.text(R.string.disconnect_action) else L10n.text(R.string.connect_action)) {
+            if (ConnectionStateStore.active) startService(Intent(this, ConnectionService::class.java).setAction("disconnect"))
+            else { val consent = VpnService.prepare(this); if (consent != null) startActivityForResult(consent, 10) else startConnection() }
+        }.apply { minHeight = 52.dp; minimumHeight = 52.dp }
+        usage()
+        showCurrentNode()
     }
     private fun login() {
-        content.addView(label(L10n.text(R.string.your_world_one_tap_away), 34f)); content.addView(label(L10n.text(R.string.sign_in_to_veilbird_no_imports_or_configuration_needed)))
-        card(L10n.text(R.string.your_location_your_connection), L10n.text(R.string.connect_automatically_or_choose_your_own_location))
+        content.addView(label(L10n.text(R.string.your_world_one_tap_away), 26f).apply { setPadding(0, 12.dp, 0, 4.dp) })
+        content.addView(label(L10n.text(R.string.sign_in_to_veilbird_no_imports_or_configuration_needed)))
         val server = if (BuildConfig.API_ORIGIN.isEmpty()) field(L10n.text(R.string.server_address_url), api.origin, uri = true) else null
-        content.addView(label(L10n.text(R.string.email), 14f)); val email = field(L10n.text(R.string.enter_email))
-        content.addView(label(L10n.text(R.string.password), 14f)); val password = field(L10n.text(R.string.enter_password), password = true)
+        content.addView(label(L10n.text(R.string.email), 13f)); val email = field(L10n.text(R.string.enter_email))
+        content.addView(label(L10n.text(R.string.password), 13f)); val password = field(L10n.text(R.string.enter_password), password = true)
         button(L10n.text(R.string.sign_in_and_start)) {
             val origin = server?.text?.toString(); val address = email.text.toString(); val secret = password.text.toString()
             if (address.isBlank() || secret.isEmpty()) { alert(L10n.text(R.string.enter_your_email_and_password)); return@button }
             work({ if (origin != null) api.origin = origin; api.login(address, secret) }) { password.setText(""); render(); checkForUpdate() }
         }
     }
+    private var measuring = false
     private fun nodes() {
-        content.addView(label(L10n.text(R.string.where_would_you_like_to_connect), 28f))
-        content.addView(label(if (ConnectionStateStore.active) L10n.text(R.string.disconnect_before_changing_location) else L10n.text(R.string.choose_a_location_then_connect_from_the_home_screen)))
-        button(L10n.text(R.string.automatic_recommended)) { select("", L10n.text(R.string.automatic_recommended)) }
-        work({ api.request("nodes") }) { data ->
-            val nodes = data.getJSONArray("nodes")
-            if (nodes.length() == 0) content.addView(label(L10n.text(R.string.no_locations_available_refresh_later_or_contact_your_administrator)))
-            val search = field(L10n.text(R.string.search_locations_or_regions)).apply { inputType = InputType.TYPE_CLASS_TEXT }
-            val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            content.addView(list)
-            fun filter(query: String) {
-                list.removeAllViews()
-                for (i in 0 until nodes.length()) {
-                    val node = nodes.getJSONObject(i)
-                    if (!(node.getString("name") + " " + node.optString("region")).contains(query, ignoreCase = true)) continue
-                    list.addView(styleButton(Button(this)).apply {
-                        text = node.getString("name") + if (node.getString("id") == selectedId) " ✓" else ""
-                        background = surface(if (node.getString("id") == selectedId) mint else Color.WHITE, 22)
-                        gravity = Gravity.CENTER_VERTICAL or Gravity.START
-                        minHeight = 56.dp; isAllCaps = false
-                        setOnClickListener { if (!busy) select(node.getString("id"), node.getString("name")) }
-                    }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12.dp })
-                }
-                if (list.childCount == 0 && nodes.length() > 0) list.addView(label(L10n.text(R.string.no_matching_locations_try_another_search)))
-            }
-            filter("")
-            search.addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { filter(s.toString()) }
-                override fun afterTextChanged(s: Editable?) {}
-            })
-            button(L10n.text(R.string.refresh_locations)) { render() }
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        header.addView(label(L10n.text(R.string.locations), 20f).apply { setPadding(0, 0, 0, 0) }, LinearLayout.LayoutParams(0, -2, 1f))
+        val retest = label(L10n.text(if (measuring) R.string.measuring_latency else R.string.retest_latency), 14f).apply {
+            setTextColor(teal); setPadding(12.dp, 10.dp, 12.dp, 10.dp); background = surface(canvas, 12)
         }
+        header.addView(retest)
+        content.addView(header, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 4.dp })
+        routingChoice()
+        val auto = row(L10n.text(R.string.automatic_recommended), L10n.text(R.string.auto_detail), teal, if (selectedId.isEmpty()) "✓" else "", teal, selectedId.isEmpty()) { select("", L10n.text(R.string.automatic_recommended)) }
+        content.addView(auto, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 8.dp })
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        work({ api.request("nodes").getJSONArray("nodes") }) { nodes ->
+            var query = ""
+            var ranked: List<Pair<JSONObject, Quality?>> = Latency.unmeasured(nodes).map { (node, _) -> node to Latency.recent[node.getString("id")] }
+                .sortedBy { it.second?.score ?: Long.MAX_VALUE }
+            if (nodes.length() == 0) content.addView(label(L10n.text(R.string.no_locations_available_refresh_later_or_contact_your_administrator)))
+            if (nodes.length() > 6) field(L10n.text(R.string.search_locations_or_regions)).apply {
+                inputType = InputType.TYPE_CLASS_TEXT
+                addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { query = s.toString(); show(list, ranked, query) }
+                    override fun afterTextChanged(s: Editable?) {}
+                })
+            }
+            content.addView(list)
+            show(list, ranked, query)
+            fun measure() {
+                if (measuring) return
+                measuring = true; retest.text = L10n.text(R.string.measuring_latency); progress?.visibility = View.VISIBLE
+                Thread {
+                    val result = try { Latency.rank(nodes) } catch (_: Exception) { null }
+                    runOnUiThread {
+                        measuring = false
+                        if (isDestroyed) return@runOnUiThread
+                        if (!busy) progress?.visibility = View.INVISIBLE
+                        retest.text = L10n.text(R.string.retest_latency)
+                        if (result != null && list.isAttachedToWindow) { ranked = result; show(list, ranked, query) }
+                    }
+                }.start()
+            }
+            retest.setOnClickListener { measure() }
+            // Fresh results are kept for the session; opening the page again does not probe every node again.
+            // The app is outside its own VPN, so probes measure the direct path even while connected.
+            if (ranked.any { it.second == null }) measure()
+        }
+    }
+    /** Smart (mainland China direct) or global routing; applies from the next connection. */
+    private fun routingChoice() {
+        val prefs = getSharedPreferences("preferences", MODE_PRIVATE)
+        val mode = prefs.getString("routing", "smart")!!
+        val choice = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; background = rounded(Color.WHITE, 12); setPadding(4.dp, 4.dp, 4.dp, 4.dp) }
+        for ((value, title) in listOf("smart" to R.string.routing_smart, "global" to R.string.routing_global)) choice.addView(TextView(this).apply {
+            text = L10n.text(title); textSize = 14f; gravity = Gravity.CENTER; maxLines = 1
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            val selected = value == mode
+            setTextColor(if (selected) teal else muted); background = surface(if (selected) mint else Color.WHITE, 10)
+            contentDescription = L10n.text(title) + if (selected) L10n.text(R.string.current_page) else ""
+            setOnClickListener {
+                if (busy || selected) return@setOnClickListener
+                if (ConnectionStateStore.active) { alert(L10n.text(R.string.disconnect_before_changing_routing)); return@setOnClickListener }
+                prefs.edit().putString("routing", value).apply(); render()
+            }
+        }, LinearLayout.LayoutParams(0, 36.dp, 1f))
+        content.addView(choice, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4.dp })
+        content.addView(label(L10n.text(if (mode == "smart") R.string.routing_smart_detail else R.string.routing_global_detail), 13f).apply { setPadding(4.dp, 4.dp, 4.dp, 4.dp) })
+    }
+    private fun show(list: LinearLayout, ranked: List<Pair<JSONObject, Quality?>>, query: String) {
+        list.removeAllViews()
+        for ((node, quality) in ranked) {
+            val region = node.optString("region")
+            if (!(node.getString("name") + " " + region).contains(query, ignoreCase = true)) continue
+            val id = node.getString("id")
+            val detail = listOfNotNull(
+                region.takeIf { it.isNotBlank() && it != "null" },
+                quality?.takeIf { it.latency != null }?.let { L10n.text(R.string.node_quality_detail, L10n.number(it.jitter), L10n.number(it.loss)) },
+                (quality?.load ?: node.takeUnless { it.isNull("load") }?.optInt("load"))?.let { L10n.text(R.string.node_load, L10n.number(it)) },
+            ).joinToString(" · ")
+            val trailing = when {
+                quality == null -> if (measuring) "…" else ""
+                quality.latency == null -> L10n.text(R.string.quality_unreachable)
+                else -> L10n.text(R.string.latency_ms, L10n.number(quality.latency))
+            }
+            list.addView(row(node.getString("name"), detail, gradeColor(quality), trailing, if (quality == null) muted else gradeColor(quality), id == selectedId) {
+                select(id, node.getString("name"))
+            }.apply { contentDescription = node.getString("name") + ", " + (quality?.let { summary(it) } ?: "") + if (id == selectedId) L10n.text(R.string.current_page) else "" },
+                LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 6.dp })
+        }
+        if (list.childCount == 0 && ranked.isNotEmpty()) list.addView(label(L10n.text(R.string.no_matching_locations_try_another_search)))
     }
     private fun select(id: String, name: String) {
         if (ConnectionStateStore.active) { alert(L10n.text(R.string.disconnect_before_selecting_another_location)); return }
@@ -193,12 +403,12 @@ class MainActivity : Activity() {
         getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("nodeId", id).putString("nodeName", name).apply()
     }
     private fun account() {
-        content.addView(label(L10n.text(R.string.my_veilbird), 28f))
-        content.addView(label(L10n.text(R.string.your_account_usage_and_devices_in_one_place)))
+        content.addView(label(L10n.text(R.string.my_veilbird), 20f).apply { setPadding(0, 0, 0, 8.dp) })
         work({ api.request("account") }) { data ->
+            accountData = data
             card(data.getString("name"), data.getString("email") + "\n" + L10n.text(R.string.account_valid_until, L10n.date(data.optString("expiresAt"))))
             data.optJSONObject("traffic")?.let { traffic -> card(L10n.text(R.string.traffic_30_days), "↑ ${android.text.format.Formatter.formatFileSize(this, traffic.optString("uploadBytes", "0").toLongOrNull() ?: 0)}   ↓ ${android.text.format.Formatter.formatFileSize(this, traffic.optString("downloadBytes", "0").toLongOrNull() ?: 0)}") }
-            content.addView(label(L10n.text(R.string.account_device_quota, L10n.number(data.getInt("used")), L10n.number(data.getInt("limit"))), 22f))
+            content.addView(label(L10n.text(R.string.account_device_quota, L10n.number(data.getInt("used")), L10n.number(data.getInt("limit"))), 18f).apply { setPadding(0, 8.dp, 0, 4.dp) })
             content.addView(label(L10n.text(R.string.new_devices_are_added_on_their_first_connection_when)))
             val devices = data.getJSONArray("devices")
             var deviceCount = 0
@@ -219,19 +429,59 @@ class MainActivity : Activity() {
             }
             if (deviceCount == 0) content.addView(label(L10n.text(R.string.no_authorized_devices_yet_they_appear_after_their_first)))
             button(L10n.text(R.string.refresh_devices)) { render() }
+            settingRow(L10n.text(R.string.language), currentLanguage().let { "${it.second} ${it.third}" }) { chooseLanguage() }
             button(L10n.text(R.string.sign_out)) {
                 if (ConnectionStateStore.active) { alert(L10n.text(R.string.disconnect_the_vpn_before_signing_out)); return@button }
                 work({ try { api.request("logout", JSONObject()) } finally { api.saveSecret("token", null) } }) { render() }
             }
+            // The diagnostic log has no visible entry: seven taps on the version open it.
+            var taps = 0; var firstTap = 0L
+            content.addView(label(L10n.text(R.string.version_label, BuildConfig.VERSION_NAME), 12f).apply {
+                gravity = Gravity.CENTER; setPadding(0, 12.dp, 0, 12.dp)
+                setOnClickListener {
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - firstTap > 4000) { taps = 0; firstTap = now }
+                    if (++taps >= 7) { taps = 0; page = "logs"; render() }
+                }
+            }, LinearLayout.LayoutParams(-1, -2))
         }
+    }
+    private fun logs() {
+        val log = Journal.read()
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        header.addView(label(L10n.text(R.string.logs_title), 20f).apply { setPadding(0, 0, 0, 0) }, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(label(L10n.text(R.string.back_action), 14f).apply {
+            setTextColor(teal); setPadding(12.dp, 10.dp, 12.dp, 10.dp); background = surface(canvas, 12); setOnClickListener { page = "account"; render() }
+        })
+        content.addView(header, LinearLayout.LayoutParams(-1, -2))
+        content.addView(label(L10n.text(R.string.logs_detail), 13f))
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        for ((title, action) in listOf<Pair<Int, () -> Unit>>(
+            R.string.copy_action to {
+                getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("TrackNothing", log))
+                Toast.makeText(this, L10n.text(R.string.copied), Toast.LENGTH_SHORT).show()
+            },
+            R.string.share_action to { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, log), null)) },
+            R.string.clear_action to { Journal.clear(); render() },
+        )) actions.addView(styleButton(Button(this), danger = title == R.string.clear_action).apply {
+            this.text = L10n.text(title); maxLines = 1; setPadding(4.dp, 0, 4.dp, 0); isEnabled = log.isNotEmpty() || title == R.string.clear_action
+            setOnClickListener { action() }
+        }, LinearLayout.LayoutParams(0, 44.dp, 1f).apply { marginEnd = 6.dp })
+        content.addView(actions, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 8.dp })
+        // Newest first: the last attempt is what someone opening the log is looking for.
+        content.addView(TextView(this).apply {
+            this.text = if (log.isEmpty()) L10n.text(R.string.logs_empty) else log.lines().reversed().joinToString("\n")
+            textSize = 11f; typeface = Typeface.MONOSPACE; setTextColor(ink); setTextIsSelectable(true)
+            background = rounded(Color.WHITE, 12); setPadding(12.dp, 10.dp, 12.dp, 10.dp)
+        }, LinearLayout.LayoutParams(-1, -2))
     }
     private fun <T> work(task: () -> T, success: (T) -> Unit) {
         if (busy) return
         busy = true
         progress?.visibility = View.VISIBLE
         executor.execute {
-            try { val result = task(); runOnUiThread { busy = false; progress?.visibility = View.GONE; if (!isDestroyed) success(result) } }
-            catch (e: Exception) { runOnUiThread { busy = false; progress?.visibility = View.GONE; if (!isDestroyed) { if ((e as? ApiFailure)?.code == "AUTH_REQUIRED") { api.saveSecret("token", null); render() }; if ((e as? ApiFailure)?.code == "CLIENT_UPDATE_REQUIRED") checkForUpdate(); alert(friendly(e)) } } }
+            try { val result = task(); runOnUiThread { busy = false; if (!measuring) progress?.visibility = View.INVISIBLE; if (!isDestroyed) success(result) } }
+            catch (e: Exception) { runOnUiThread { busy = false; if (!measuring) progress?.visibility = View.INVISIBLE; if (!isDestroyed) { if ((e as? ApiFailure)?.code == "AUTH_REQUIRED") { api.saveSecret("token", null); render() }; if ((e as? ApiFailure)?.code == "CLIENT_UPDATE_REQUIRED") checkForUpdate(); alert(friendly(e)) } } }
         }
     }
     /** Background check; failures are silent because the next launch checks again. */
@@ -248,7 +498,7 @@ class MainActivity : Activity() {
         status?.text = L10n.text(R.string.update_downloading)
         work({ updater.downloadAndInstall(available) }) {}
     }
-    private fun alert(message: String) { AlertDialog.Builder(this).setTitle("Veilbird").setMessage(message).setPositiveButton(L10n.text(R.string.got_it), null).show() }
+    private fun alert(message: String) { AlertDialog.Builder(this).setTitle("TrackNothing").setMessage(message).setPositiveButton(L10n.text(R.string.got_it), null).show() }
     private fun startConnection() { startForegroundService(Intent(this, ConnectionService::class.java).putExtra("nodeId", selectedId)) }
     @Deprecated("Activity result compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

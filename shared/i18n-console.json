@@ -107,9 +107,9 @@
     "Manage regions →",
     "Управление регионами →"
   ],
-  "Veilbird 全球 VPN 节点分布图": [
-    "Veilbird global VPN node map",
-    "Карта узлов VPN Veilbird"
+  "TrackNothing 全球 VPN 节点分布图": [
+    "TrackNothing global VPN node map",
+    "Карта узлов VPN TrackNothing"
   ],
   "{0}，{1} 个节点，{2} 个在线": [
     "{0}, {1} nodes, {2} online",
@@ -615,13 +615,13 @@
     "Saved. Revocation requires synchronization; offline nodes may take about 5 minutes. Slots remain occupied until then.",
     "Сохранено. Отзыв требует синхронизации; недоступным узлам может потребоваться около 5 минут. До этого места остаются занятыми."
   ],
-  "Veilbird 授权设备": [
-    "Veilbird authorized devices",
-    "Авторизованные устройства Veilbird"
+  "TrackNothing 授权设备": [
+    "TrackNothing authorized devices",
+    "Авторизованные устройства TrackNothing"
   ],
-  "所有账号都能用 Veilbird 客户端登录连接，客户端设备数受下面的上限限制。选择「仅 Veilbird」会同时停用该账号的订阅和第三方配置。": [
-    "Every account can sign in and connect with the Veilbird app; app devices count toward the limit below. “Veilbird only” also turns off this account’s subscriptions and third-party configurations.",
-    "Любой аккаунт может входить и подключаться в приложении Veilbird; устройства приложения учитываются в лимите ниже. «Только Veilbird» также отключает подписки и сторонние конфигурации аккаунта."
+  "所有账号都能用 TrackNothing 客户端登录连接，客户端设备数受下面的上限限制。选择「仅 TrackNothing」会同时停用该账号的订阅和第三方配置。": [
+    "Every account can sign in and connect with the TrackNothing app; app devices count toward the limit below. “TrackNothing only” also turns off this account’s subscriptions and third-party configurations.",
+    "Любой аккаунт может входить и подключаться в приложении TrackNothing; устройства приложения учитываются в лимите ниже. «Только TrackNothing» также отключает подписки и сторонние конфигурации аккаунта."
   ],
   "访问方式": [
     "Access mode",
@@ -631,9 +631,9 @@
     "Client and subscriptions",
     "Клиент и подписки"
   ],
-  "仅 Veilbird · 严格授权设备": [
-    "Veilbird only · authorized devices",
-    "Только Veilbird · авторизованные устройства"
+  "仅 TrackNothing · 严格授权设备": [
+    "TrackNothing only · authorized devices",
+    "Только TrackNothing · авторизованные устройства"
   ],
   "设备上限": [
     "Device limit",
@@ -1047,9 +1047,9 @@
     "OpenVPN only",
     "Только OpenVPN"
   ],
-  "标准模板自动部署 WireGuard、OpenVPN、VLESS。REALITY 目标只需在平台配置一次；未配置时其他协议仍可正常部署。": [
-    "The standard template deploys WireGuard, OpenVPN and VLESS automatically. Configure a REALITY target once for the platform; other protocols can still deploy without it.",
-    "Стандартный шаблон автоматически развёртывает WireGuard, OpenVPN и VLESS. Цель REALITY настраивается один раз для платформы; без неё остальные протоколы по-прежнему доступны."
+  "标准模板自动部署 WireGuard、OpenVPN、VLESS 和抗封锁通道。REALITY 目标只需在平台配置一次；未配置时其他协议仍可正常部署。": [
+    "The standard template deploys WireGuard, OpenVPN, VLESS and the stealth transports automatically. Configure a REALITY target once for the platform; other protocols can still deploy without it.",
+    "Стандартный шаблон автоматически развёртывает WireGuard, OpenVPN, VLESS и скрытые транспорты. Цель REALITY настраивается один раз для платформы; без неё остальные протоколы по-прежнему доступны."
   ],
   "新凭据（可留空）": [
     "New credentials (optional)",
@@ -1087,9 +1087,9 @@
     "No manual fingerprint generation or entry",
     "Не нужно создавать или вводить отпечаток вручную"
   ],
-  "添加时，Controller 会通过 SSH 自动读取并固定主机公钥，同时在服务器上读取或生成持久的 Veilbird 节点 ID。发现重复节点、复用的 SSH host key 或重复 IP/端口时会停止部署。": [
-    "When adding a server, Controller retrieves and pins its SSH public key, then reads or creates a persistent Veilbird node ID. Deployment stops if it detects duplicate nodes, reused SSH host keys or duplicate IP/port pairs.",
-    "При добавлении Controller получает и закрепляет открытый ключ SSH, затем читает или создаёт постоянный ID узла Veilbird. Развёртывание останавливается при обнаружении дубликатов узлов, ключей SSH или пар IP/порт."
+  "添加时，Controller 会通过 SSH 自动读取并固定主机公钥，同时在服务器上读取或生成持久的 TrackNothing 节点 ID。发现重复节点、复用的 SSH host key 或重复 IP/端口时会停止部署。": [
+    "When adding a server, Controller retrieves and pins its SSH public key, then reads or creates a persistent TrackNothing node ID. Deployment stops if it detects duplicate nodes, reused SSH host keys or duplicate IP/port pairs.",
+    "При добавлении Controller получает и закрепляет открытый ключ SSH, затем читает или создаёт постоянный ID узла TrackNothing. Развёртывание останавливается при обнаружении дубликатов узлов, ключей SSH или пар IP/порт."
   ],
   "首次连接采用 TOFU；后续部署和修复必须匹配已固定的主机指纹与节点 ID。": [
     "The first connection uses TOFU. Later deployments and repairs must match the pinned host fingerprint and node ID.",
@@ -1659,9 +1659,9 @@
     "No VPN services yet. They will appear after server deployment.",
     "Служб VPN пока нет. Они появятся после развёртывания серверов."
   ],
-  "标准模板自动部署 WireGuard、OpenVPN 和 VLESS，无需逐个协议启用；老标准节点可用“批量同步策略”补齐。自定义及仅 Agent 节点不会被自动覆盖。默认需放行 UDP 51820、UDP 1194、TCP 443。": [
-    "The standard template deploys WireGuard, OpenVPN and VLESS automatically; no need to enable them individually. Use Sync policy in bulk for older standard servers. Custom and Agent-only servers are not overwritten. Default ports: UDP 51820, UDP 1194, TCP 443.",
-    "Стандартный шаблон автоматически развёртывает WireGuard, OpenVPN и VLESS. Для старых стандартных серверов используйте массовую синхронизацию политики. Пользовательские серверы и серверы только с Agent не изменяются. Порты по умолчанию: UDP 51820, UDP 1194, TCP 443."
+  "标准模板自动部署 WireGuard、OpenVPN、VLESS 和抗封锁通道（Hysteria2 / XHTTP，仅供 App），无需逐个协议启用；老标准节点可用“批量同步策略”补齐。自定义及仅 Agent 节点不会被自动覆盖。默认需放行 UDP 51820、UDP 1194、TCP 443，以及 UDP 和 TCP 8443。": [
+    "The standard template deploys WireGuard, OpenVPN, VLESS and the stealth transports (Hysteria2 / XHTTP, app only) automatically; no need to enable them individually. Use Sync policy in bulk for older standard servers. Custom and Agent-only servers are not overwritten. Default ports: UDP 51820, UDP 1194, TCP 443, and UDP and TCP 8443.",
+    "Стандартный шаблон автоматически развёртывает WireGuard, OpenVPN, VLESS и скрытые транспорты (Hysteria2 / XHTTP, только для приложения). Для старых стандартных серверов используйте массовую синхронизацию политики. Пользовательские серверы и серверы только с Agent не изменяются. Порты по умолчанию: UDP 51820, UDP 1194, TCP 443, а также UDP и TCP 8443."
   ],
   "Standard 策略 v": [
     "Standard policy v",
@@ -2299,9 +2299,9 @@
     "Client releases",
     "Выпуски клиентов"
   ],
-  "登记、发布和撤回 Veilbird 客户端；门户下载、固定下载链接和客户端更新检查都读取这里。": [
-    "Register, publish and withdraw Veilbird clients. Portal downloads, permanent download links and client update checks all read from here.",
-    "Регистрация, публикация и отзыв клиентов Veilbird. Загрузки на портале, постоянные ссылки и проверка обновлений используют эти данные."
+  "登记、发布和撤回 TrackNothing 客户端；门户下载、固定下载链接和客户端更新检查都读取这里。": [
+    "Register, publish and withdraw TrackNothing clients. Portal downloads, permanent download links and client update checks all read from here.",
+    "Регистрация, публикация и отзыв клиентов TrackNothing. Загрузки на портале, постоянные ссылки и проверка обновлений используют эти данные."
   ],
   "安装包存储：S3 兼容对象存储（{0}）": [
     "Installer storage: S3-compatible object storage ({0}).",
@@ -2854,5 +2854,253 @@
   "发布后为测试版": [
     "Goes to beta when published",
     "После публикации — бета"
+  ],
+  "站点": [
+    "Sites",
+    "Сайты"
+  ],
+  "同一套账号和节点，按访问域名显示不同的名称和 Logo。": [
+    "One set of accounts and nodes, shown under a different name and logo per domain.",
+    "Одни и те же аккаунты и узлы под разными названиями и логотипами для каждого домена."
+  ],
+  "站点列表": [
+    "Sites",
+    "Сайты"
+  ],
+  "还没有站点。部署时配置的域名会在下次更新后自动成为默认站点。": [
+    "No sites yet. The domains set at deployment become the default site after the next update.",
+    "Сайтов пока нет. Домены из развёртывания станут сайтом по умолчанию после следующего обновления."
+  ],
+  "默认": [
+    "Default",
+    "По умолчанию"
+  ],
+  "用户访问": [
+    "Portal",
+    "Портал"
+  ],
+  "订阅 / API": [
+    "Subscription / API",
+    "Подписка / API"
+  ],
+  "管理后台": [
+    "Console",
+    "Консоль"
+  ],
+  "已连通": [
+    "Reachable",
+    "Доступен"
+  ],
+  "指向了其他站点：{0}": [
+    "Points to another site: {0}",
+    "Ведёт на другой сайт: {0}"
+  ],
+  "无法访问：{0}": [
+    "Unreachable: {0}",
+    "Недоступен: {0}"
+  ],
+  "检查中…": [
+    "Checking…",
+    "Проверка…"
+  ],
+  "检查域名": [
+    "Check domains",
+    "Проверить домены"
+  ],
+  "设为默认": [
+    "Make default",
+    "Сделать основным"
+  ],
+  "删除站点": [
+    "Delete site",
+    "Удалить сайт"
+  ],
+  "在宝塔添加站点": [
+    "Add the site in BaoTa",
+    "Добавьте сайт в BaoTa"
+  ],
+  "在 DNS 把这几个域名解析到本服务器。": [
+    "Point these domains to this server in DNS.",
+    "Направьте эти домены на этот сервер в DNS."
+  ],
+  "宝塔 → 网站 → 添加站点，每个域名建一个。": [
+    "BaoTa → Website → Add site, one per domain.",
+    "BaoTa → Сайты → Добавить сайт, по одному на домен."
+  ],
+  "每个网站的反向代理目标：": [
+    "Reverse proxy target for each:",
+    "Цель обратного прокси для каждого:"
+  ],
+  "反向代理的“发送域名”填 {0}，系统靠它识别站点。": [
+    "Set the proxy's “Send domain” to {0}; this is how the site is recognized.",
+    "В прокси укажите «Отправляемый домен» {0} — по нему определяется сайт."
+  ],
+  "SSL → Let's Encrypt 申请证书，然后点“检查域名”。": [
+    "SSL → Let's Encrypt for a certificate, then click “Check domains”.",
+    "SSL → Let's Encrypt для сертификата, затем нажмите «Проверить домены»."
+  ],
+  "编辑站点": [
+    "Edit site",
+    "Изменить сайт"
+  ],
+  "新建站点": [
+    "New site",
+    "Новый сайт"
+  ],
+  "站点名称": [
+    "Site name",
+    "Название сайта"
+  ],
+  "用户访问域名": [
+    "Portal domain",
+    "Домен портала"
+  ],
+  "订阅 / API 域名": [
+    "Subscription / API domain",
+    "Домен подписки / API"
+  ],
+  "订阅链接使用这个域名。": [
+    "Subscription links use this domain.",
+    "Ссылки подписки используют этот домен."
+  ],
+  "管理后台域名": [
+    "Console domain",
+    "Домен консоли"
+  ],
+  "邮件发件人名称": [
+    "Email sender name",
+    "Имя отправителя писем"
+  ],
+  "留空则用邮件设置里的名称": [
+    "Empty uses the mail settings name",
+    "Пусто — имя из настроек почты"
+  ],
+  "Logo": [
+    "Logo",
+    "Логотип"
+  ],
+  "自定义 SVG": [
+    "Custom SVG",
+    "Свой SVG"
+  ],
+  "默认图标": [
+    "Default icon",
+    "Значок по умолчанию"
+  ],
+  "上传 SVG": [
+    "Upload SVG",
+    "Загрузить SVG"
+  ],
+  "移除": [
+    "Remove",
+    "Убрать"
+  ],
+  "保存站点": [
+    "Save site",
+    "Сохранить сайт"
+  ],
+  "Logo 需小于 48 KB。": [
+    "The logo must be under 48 KB.",
+    "Логотип должен быть меньше 48 КБ."
+  ],
+  "请选择 SVG 格式的 Logo。": [
+    "Choose an SVG logo.",
+    "Выберите логотип в формате SVG."
+  ],
+  "站点已更新。": [
+    "Site updated.",
+    "Сайт обновлён."
+  ],
+  "站点已创建。按左侧说明在宝塔添加这几个域名。": [
+    "Site created. Add its domains in BaoTa as described on the left.",
+    "Сайт создан. Добавьте его домены в BaoTa, как описано слева."
+  ],
+  "设为默认站点": [
+    "Make default site",
+    "Сделать сайтом по умолчанию"
+  ],
+  "未绑定的域名和客户端 App 将显示 {0}。": [
+    "Unbound domains and the client apps will show {0}.",
+    "Непривязанные домены и приложения будут показывать {0}."
+  ],
+  "默认站点已更改。": [
+    "Default site changed.",
+    "Сайт по умолчанию изменён."
+  ],
+  "删除后，{0} 的域名将显示默认站点。账号和节点不受影响。": [
+    "After deletion, {0}'s domains show the default site. Accounts and nodes are not affected.",
+    "После удаления домены {0} покажут сайт по умолчанию. Аккаунты и узлы не затрагиваются."
+  ],
+  "站点已删除。": [
+    "Site deleted.",
+    "Сайт удалён."
+  ],
+  "Agent 域名已保存。节点会在下次心跳时自动切换。": [
+    "Agent domain saved. Nodes switch on their next heartbeat.",
+    "Домен Agent сохранён. Узлы переключатся при следующем heartbeat."
+  ],
+  "离线": [
+    "Offline",
+    "Не в сети"
+  ],
+  "Agent 版本较旧，升级 Agent 后自动切换": [
+    "Older Agent; switches after Upgrade Agent",
+    "Старый Agent; переключится после обновления Agent"
+  ],
+  "切换中，新域名不通时每 10 分钟重试": [
+    "Switching; retries every 10 min if the new domain fails",
+    "Переключается; при недоступности повтор каждые 10 мин"
+  ],
+  "Agent 接入域名": [
+    "Agent domain",
+    "Домен Agent"
+  ],
+  "所有站点共用，只用于节点安装和心跳。增删站点、更换站点域名都不影响节点。": [
+    "Shared by all sites and used only for node installs and heartbeats. Adding sites or changing site domains never affects nodes.",
+    "Общий для всех сайтов, нужен только для установки узлов и heartbeat. Добавление сайтов и смена их доменов не затрагивают узлы."
+  ],
+  "当前域名": [
+    "Current",
+    "Текущий"
+  ],
+  "（在这里设置）": [
+    "(set here)",
+    "(задан здесь)"
+  ],
+  "（来自部署配置）": [
+    "(from deployment config)",
+    "(из конфигурации развёртывания)"
+  ],
+  "还没有节点": [
+    "No nodes yet",
+    "Узлов пока нет"
+  ],
+  "全部 {0} 个节点已使用当前域名": [
+    "All {0} nodes use the current domain",
+    "Все узлы ({0}) используют текущий домен"
+  ],
+  "还有 {0} 个节点": [
+    "{0} more nodes",
+    "Ещё узлов: {0}"
+  ],
+  "新的 Agent 域名": [
+    "New Agent domain",
+    "Новый домен Agent"
+  ],
+  "检查并保存": [
+    "Check and save",
+    "Проверить и сохранить"
+  ],
+  "恢复部署配置": [
+    "Use deployment config",
+    "Вернуть из конфигурации"
+  ],
+  "先在宝塔把新域名反向代理到 {0}，申请好证书再保存。旧域名保留到所有节点切换完成。": [
+    "First reverse-proxy the new domain to {0} in BaoTa and issue its certificate, then save. Keep the old domain until every node has switched.",
+    "Сначала в BaoTa настройте обратный прокси нового домена на {0} и выпустите сертификат, затем сохраните. Старый домен держите, пока все узлы не переключатся."
+  ],
+  "Agent 接入": [
+    "Agent",
+    "Agent"
   ]
 }

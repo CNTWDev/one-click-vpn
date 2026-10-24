@@ -3,6 +3,7 @@ import { addAudit, findUserById } from "../../../../../../../server/db";
 import { ADMIN_LINK_TTL_SECONDS, createResetLink } from "../../../../../../../server/password-reset";
 import { requestAdmin } from "../../../../../../../server/request-auth";
 import { jsonError } from "../../../../../../../server/http";
+import { siteBrand, siteForRequest } from "../../../../../../../server/sites";
 
 export const runtime = "nodejs";
 
@@ -15,7 +16,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!target) return jsonError("User not found", 404);
   if (target.role === "owner") return jsonError("Reset the owner password on the server with scripts/reset-admin-password.sh");
   if (target.status !== "active" && target.status !== "pending") return jsonError("Only active or pending accounts can reset their password");
-  const link = await createResetLink(id, ADMIN_LINK_TTL_SECONDS);
+  const link = await createResetLink(id, ADMIN_LINK_TTL_SECONDS, siteBrand(await siteForRequest(request)).portalOrigin);
   if (!link) return jsonError("User not found", 404);
   await addAudit({ actorUserId: admin.id, action: "user.password_reset_link", targetType: "user", targetId: id });
   return NextResponse.json(link);

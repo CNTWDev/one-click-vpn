@@ -122,7 +122,7 @@ async function accessApplied(profileId: string, nodeId: string, protocol: "wireg
   return applied.applied_revision >= Number(row?.included_revision ?? desired.revision);
 }
 
-export async function downloadSubscription(token: string, options: { format?: SubscriptionFormat; mode?: RoutingMode } = {}) {
+export async function downloadSubscription(token: string, options: { format?: SubscriptionFormat; mode?: RoutingMode; group?: string } = {}) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("订阅不可用");
   const initial = (await dbQuery<Subscription>("SELECT * FROM subscriptions WHERE token_hash=$1", [hashToken(token)]))[0];
   if (!initial) throw new Error("订阅不可用");
@@ -168,7 +168,7 @@ export async function downloadSubscription(token: string, options: { format?: Su
     // Re-check revocations that may have arrived through the legacy credential/account management endpoints.
     await assertCredentialUsable(credential.id);
     const format = options.format || "clash";
-    const content = format === "v2ray" ? renderV2raySubscription(proxies) : renderSubscription(proxies, { mode: options.mode });
+    const content = format === "v2ray" ? renderV2raySubscription(proxies) : renderSubscription(proxies, { mode: options.mode, group: options.group });
     await dbExec("UPDATE subscriptions SET last_fetched_at=$1 WHERE id=$2", [new Date().toISOString(),sub.id]);
     return { content, format, count: proxies.length, expiresAt: credential.expires_at };
   });

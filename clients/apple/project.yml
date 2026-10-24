@@ -5,14 +5,14 @@ options:
     iOS: "16.0"
     macOS: "13.0"
 packages:
-  WireGuardKit:
-    path: .dependencies/wireguard-apple
   VeilbirdCore:
     path: .
 settings:
   base:
     SWIFT_VERSION: "5.0"
     INFOPLIST_KEY_VeilbirdKeychainGroup: $(AppIdentifierPrefix)com.veilbird.client.dev.shared
+    # Shared by the app and its tunnel: the diagnostic log, routing choice and blocked-transport memory.
+    INFOPLIST_KEY_VeilbirdAppGroup: group.com.veilbird.client.dev
     INFOPLIST_KEY_VeilbirdAPIOrigin: $(VEILBIRD_API_ORIGIN)
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
@@ -29,7 +29,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.veilbird.client.dev.ios
         PRODUCT_NAME: Veilbird
         TARGETED_DEVICE_FAMILY: "1,2"
-        INFOPLIST_KEY_CFBundleDisplayName: Veilbird
+        INFOPLIST_KEY_CFBundleDisplayName: TrackNothing
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
     dependencies:
@@ -40,6 +40,7 @@ targets:
       properties:
         com.apple.developer.networking.networkextension: [packet-tunnel-provider]
         keychain-access-groups: [$(AppIdentifierPrefix)com.veilbird.client.dev.shared]
+        com.apple.security.application-groups: [group.com.veilbird.client.dev]
   Veilbird-macOS:
     type: application
     platform: macOS
@@ -48,7 +49,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.veilbird.client.dev.macos
         PRODUCT_NAME: Veilbird
-        INFOPLIST_KEY_CFBundleDisplayName: Veilbird
+        INFOPLIST_KEY_CFBundleDisplayName: TrackNothing
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - package: VeilbirdCore
@@ -60,16 +61,18 @@ targets:
         com.apple.security.network.client: true
         com.apple.developer.networking.networkextension: [packet-tunnel-provider]
         keychain-access-groups: [$(AppIdentifierPrefix)com.veilbird.client.dev.shared]
+        com.apple.security.application-groups: [group.com.veilbird.client.dev]
   VeilbirdTunnel-iOS:
     type: app-extension
     platform: iOS
     sources: [PacketTunnel, Shared]
     dependencies:
-      - package: WireGuardKit
-    preBuildScripts:
-      - name: WireGuard Go bridge
-        script: bash "$SRCROOT/scripts/build-bridge.sh"
-        basedOnDependencyAnalysis: false
+      # The shared mihomo core (clients/core/build-apple.sh); same transports and routing as Android and Windows.
+      - framework: .deps/TunnelCore.xcframework
+        embed: false
+      - sdk: libresolv.tbd
+      - sdk: SystemConfiguration.framework
+      - sdk: Security.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.veilbird.client.dev.ios.tunnel
@@ -86,16 +89,18 @@ targets:
       properties:
         com.apple.developer.networking.networkextension: [packet-tunnel-provider]
         keychain-access-groups: [$(AppIdentifierPrefix)com.veilbird.client.dev.shared]
+        com.apple.security.application-groups: [group.com.veilbird.client.dev]
   VeilbirdTunnel-macOS:
     type: app-extension
     platform: macOS
     sources: [PacketTunnel, Shared]
     dependencies:
-      - package: WireGuardKit
-    preBuildScripts:
-      - name: WireGuard Go bridge
-        script: bash "$SRCROOT/scripts/build-bridge.sh"
-        basedOnDependencyAnalysis: false
+      # The shared mihomo core (clients/core/build-apple.sh); same transports and routing as Android and Windows.
+      - framework: .deps/TunnelCore.xcframework
+        embed: false
+      - sdk: libresolv.tbd
+      - sdk: SystemConfiguration.framework
+      - sdk: Security.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.veilbird.client.dev.macos.tunnel
@@ -113,6 +118,7 @@ targets:
         com.apple.security.network.client: true
         com.apple.developer.networking.networkextension: [packet-tunnel-provider]
         keychain-access-groups: [$(AppIdentifierPrefix)com.veilbird.client.dev.shared]
+        com.apple.security.application-groups: [group.com.veilbird.client.dev]
 schemes:
   Veilbird-iOS:
     build:

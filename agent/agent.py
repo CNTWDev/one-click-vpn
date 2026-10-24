@@ -45,6 +45,9 @@ OPENVPN_STATUS = OPENVPN_DIR / "status.tsv"
 OPENVPN_REVOKED_DIR = OPENVPN_DIR / "revoked"
 VLESS_CONFIG = STATE_DIR / "vless.json"
 XRAY_PATH = Path("/opt/northstar-agent/bin/xray")
+MIHOMO_PATH = Path("/opt/northstar-agent/bin/mihomo")
+STEALTH_DIR = STATE_DIR / "stealth"
+STEALTH_CONFIG = STEALTH_DIR / "config.yaml"
 AGENT_DIR = Path("/opt/northstar-agent")
 VLESS_RESTART_DUE = STATE_DIR / "vless-restart-due"
 # Default REALITY target pool: large TLS 1.3 + HTTP/2 sites. Each node probes them and the
@@ -1075,6 +1078,167 @@ def vless_usage_snapshots():
     return [{**user, "counterEpoch": epoch} for user in users.values()]
 
 
+def ensure_mihomo():
+    if MIHOMO_PATH.exists():
+        return
+    releases = {
+        # "compatible" runs on every x86-64 CPU; the default build needs x86-64-v3.
+        "x86_64": ("amd64-compatible", "386508bfb1c72c43b6a0eda73708ecdce82546581b0ebcb16366c53757c622b6"),
+        "aarch64": ("arm64", "ba408b317080ee265c46cb923a50018c1b82cbd708551cdd46a1e3e307396187"),
+        "arm64": ("arm64", "ba408b317080ee265c46cb923a50018c1b82cbd708551cdd46a1e3e307396187"),
+    }
+    if platform.system() != "Linux" or platform.machine() not in releases:
+        raise RuntimeError("the stealth service requires Linux amd64 or arm64")
+    arch, checksum = releases[platform.machine()]
+    url = f"https://github.com/MetaCubeX/mihomo/releases/download/v1.19.33/mihomo-linux-{arch}-v1.19.33.gz"
+    with urllib.request.urlopen(url, timeout=60) as response:
+        archive = response.read(64 * 1024 * 1024 + 1)
+    if len(archive) > 64 * 1024 * 1024 or hashlib.sha256(archive).hexdigest() != checksum:
+        raise RuntimeError("mihomo release checksum verification failed")
+    import gzip
+    binary = gzip.decompress(archive)
+    MIHOMO_PATH.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with tempfile.NamedTemporaryFile(dir=MIHOMO_PATH.parent, delete=False) as temporary:
+        temporary.write(binary)
+        temp_path = Path(temporary.name)
+    temp_path.chmod(0o700)
+    temp_path.replace(MIHOMO_PATH)
+
+
+UUID_PATTERN = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
+PRIVATE_NETWORKS = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "169.254.0.0/16", "100.64.0.0/10", "0.0.0.0/8", "224.0.0.0/4"]
+
+
+def stealth_config(desired, server, reality, users, target):
+    """mihomo as a server: Hysteria2 (Salamander) on UDP and VLESS REALITY XHTTP on TCP, same port."""
+    port = desired.get("listenPort")
+    if not isinstance(port, int) or isinstance(port, bool) or port < 1 or port > 65535:
+        raise ValueError("invalid stealth listen port")
+    if not isinstance(users, list) or len(users) > 4096:
+        raise ValueError("invalid stealth users")
+    for user in users:
+        if not isinstance(user, dict) or not UUID_PATTERN.fullmatch(str(user.get("id", ""))) or not UUID_PATTERN.fullmatch(str(user.get("email", ""))):
+            raise ValueError("invalid stealth user")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", server.get("obfsPassword", "")) or not re.fullmatch(r"/[A-Za-z0-9_-]{8,32}", server.get("xhttpPath", "")):
+        raise ValueError("invalid stealth server parameters")
+    if "BEGIN CERTIFICATE" not in server.get("certificate", "") or "PRIVATE KEY" not in server.get("privateKey", ""):
+        raise ValueError("invalid stealth certificate")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{43}", reality.get("privateKey", "")) or not re.fullmatch(r"[0-9a-f]{16}", reality.get("shortId", "")):
+        raise ValueError("invalid REALITY server keys")
+    return {
+        "log-level": "warning", "ipv6": True, "mode": "rule", "find-process-mode": "off",
+        "listeners": [
+            {"name": "hysteria2", "type": "hysteria2", "listen": "0.0.0.0", "port": port,
+             "users": {user["email"]: user["id"] for user in users},
+             "obfs": "salamander", "obfs-password": server["obfsPassword"],
+             "certificate": server["certificate"], "private-key": server["privateKey"], "alpn": ["h3"]},
+            {"name": "xhttp", "type": "vless", "listen": "0.0.0.0", "port": port,
+             "users": [{"username": user["email"], "uuid": user["id"], "flow": ""} for user in users],
+             "xhttp-config": {"path": server["xhttpPath"]},
+             "reality-config": {"dest": target, "private-key": reality["privateKey"], "short-id": [reality["shortId"]],
+                                "server-names": reality_server_names(reality)}},
+        ],
+        # Same egress policy as the VLESS node: never into the node's own private networks.
+        "rules": [f"IP-CIDR,{network},REJECT,no-resolve" for network in PRIVATE_NETWORKS] + ["IP-CIDR6,fc00::/7,REJECT,no-resolve", "IP-CIDR6,fe80::/10,REJECT,no-resolve", "MATCH,DIRECT"],
+    }
+
+
+def stealth_listen_port():
+    try:
+        return json.loads(STEALTH_CONFIG.read_text())["listeners"][0]["port"] if STEALTH_CONFIG.exists() else None
+    except (ValueError, KeyError, IndexError):
+        return None
+
+
+def stealth_target():
+    try:
+        return json.loads(STEALTH_CONFIG.read_text())["listeners"][1]["reality-config"]["dest"] if STEALTH_CONFIG.exists() else None
+    except (ValueError, KeyError, IndexError):
+        return None
+
+
+def refresh_stealth_target():
+    """Follow a REALITY target whose address stopped answering, as refresh_reality_target does for Xray."""
+    current = stealth_target()
+    if not current or not command_succeeds(["systemctl", "is-active", "--quiet", "northstar-stealth"]):
+        return
+    config = json.loads(STEALTH_CONFIG.read_text())
+    reality = config["listeners"][1]["reality-config"]
+    target = validated_reality_target(reality["server-names"][0], current)
+    if target == current:
+        return
+    reality["dest"] = target
+    old_text = STEALTH_CONFIG.read_text()
+    atomic_write(STEALTH_CONFIG, json.dumps(config))
+    try:
+        run_fixed(["systemctl", "restart", "northstar-stealth"])
+        run_fixed(["systemctl", "is-active", "--quiet", "northstar-stealth"])
+    except Exception:
+        atomic_write(STEALTH_CONFIG, old_text)
+        run_optional(["systemctl", "restart", "northstar-stealth"])
+        raise
+
+
+def stealth_sync_config(desired):
+    server = json.loads(request_node_secret(desired.get("serverSecretId")))
+    reality = json.loads(request_node_secret(desired.get("realitySecretId")))
+    users = json.loads(request_node_secret(desired.get("usersSecretId")))
+    ensure_mihomo()
+    target = validated_reality_target(reality.get("serverName"), stealth_target())
+    config = stealth_config(desired, server, reality, users, target)
+    port = config["listeners"][0]["port"]
+    old_port = stealth_listen_port()
+    if old_port != port and (socket_listening("tcp", port) or socket_listening("udp", port)):
+        raise RuntimeError("stealth port is occupied; choose another port")
+    STEALTH_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    text = json.dumps(config)
+    candidate = STEALTH_DIR / "candidate.yaml"
+    atomic_write(candidate, text)
+    try:
+        run_fixed([str(MIHOMO_PATH), "-t", "-d", str(STEALTH_DIR), "-f", str(candidate)])
+    finally:
+        candidate.unlink(missing_ok=True)
+    observed = {"observedHash": hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest(), "observedStatus": "applied"}
+    active = command_succeeds(["systemctl", "is-active", "--quiet", "northstar-stealth"])
+    if active and STEALTH_CONFIG.exists() and STEALTH_CONFIG.read_text() == text:
+        return observed
+    atomic_write(STEALTH_CONFIG, text)
+    unit = f"""[Unit]
+Description=Northstar stealth transports (Hysteria2, VLESS REALITY XHTTP)
+After=network-online.target
+[Service]
+ExecStart={MIHOMO_PATH} -d {STEALTH_DIR} -f {STEALTH_CONFIG}
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths={STEALTH_DIR}
+[Install]
+WantedBy=multi-user.target
+"""
+    atomic_write(Path("/etc/systemd/system/northstar-stealth.service"), unit, 0o644)
+    run_fixed(["systemctl", "daemon-reload"])
+    run_fixed(["systemctl", "enable", "northstar-stealth"])
+    # Restarting also closes the sessions of devices whose access was removed.
+    run_fixed(["systemctl", "restart", "northstar-stealth"])
+    run_fixed(["systemctl", "is-active", "--quiet", "northstar-stealth"])
+    for transport in ("tcp", "udp"):
+        replace_input_rule(f"northstar-stealth-{transport}", (transport, old_port) if old_port else None, (transport, port))
+    return observed
+
+
+def disable_stealth():
+    run_optional(["systemctl", "disable", "--now", "northstar-stealth"])
+    old_port = stealth_listen_port()
+    if old_port:
+        for transport in ("tcp", "udp"):
+            replace_input_rule(f"northstar-stealth-{transport}", (transport, old_port), None)
+    STEALTH_CONFIG.unlink(missing_ok=True)
+    return {"observedHash": hashlib.sha256(b"stealth-disabled").hexdigest(), "observedStatus": "disabled"}
+
+
 def apply_task(task):
     task_type = task.get("taskType")
     payload = task.get("payload") or {}
@@ -1087,6 +1251,10 @@ def apply_task(task):
             replace_input_rule("northstar-vless", ("tcp", old["inbounds"][0]["port"]), None)
             VLESS_CONFIG.unlink()
         return {"observedHash": hashlib.sha256(b"vless-disabled").hexdigest(), "observedStatus": "disabled"}
+    if task_type in ("ApplyStealthServer", "RestartStealth"):
+        return stealth_sync_config(payload)
+    if task_type == "DisableStealth":
+        return disable_stealth()
     if task_type == "ApplyWireGuardPeers":
         return wireguard_sync_config(payload)
     if task_type == "ApplyOpenVpnServer":
@@ -1115,6 +1283,9 @@ def capabilities():
     if platform.system() == "Linux" and platform.machine() in ("x86_64", "aarch64", "arm64"):
         protocols.append("vless")
         transports["vless"] = ["tcp"]
+        # Installed on explicit ApplyStealthServer, like the VLESS runtime.
+        protocols.append("stealth")
+        transports["stealth"] = ["udp", "tcp"]
     native_enforcement = 1 if native_watchdog_ready and command_succeeds(["systemctl", "is-active", "northstar-native-expiry.timer"]) and not command_succeeds(["systemctl", "is-failed", "northstar-native-expiry.service"]) else 0
     return {
         "protocols": protocols,
@@ -1131,6 +1302,7 @@ def capabilities():
         "connectivity": connectivity_snapshot(),
         "upgradePending": upgrade_pending(),
         "realityProbe": reality_probe,
+        "controllerOrigin": CONTROLLER,
     }
 
 
@@ -1203,8 +1375,12 @@ def connectivity_snapshot():
     openvpn_ready = shutil.which("openvpn") is not None
     wireguard_transport, wireguard_port = configured_listener(WIREGUARD_CONFIG, 51820, "udp")
     openvpn_transport, openvpn_port = configured_listener(OPENVPN_CONFIG, 1194, "udp")
+    stealth_port = stealth_listen_port() or 8443
+    stealth_udp, stealth_tcp = socket_listening("udp", stealth_port), socket_listening("tcp", stealth_port)
+    stealth_listening = None if stealth_udp is None or stealth_tcp is None else stealth_udp and stealth_tcp
     protocol_specs = {
         "vless": {"transport": "tcp", "port": vless_port, "comment": "northstar-vless"},
+        "stealth": {"transport": "udp", "port": stealth_port, "comment": "northstar-stealth-udp"},
         "wireguard": {"transport": wireguard_transport, "port": wireguard_port, "comment": VPN_PORTS["wireguard"]["comment"]},
         "openvpn": {"transport": openvpn_transport, "port": openvpn_port, "comment": VPN_PORTS["openvpn"]["comment"]},
     }
@@ -1213,6 +1389,11 @@ def connectivity_snapshot():
         "protocols": {
             "vless": {"installed": XRAY_PATH.exists(), "runtimeActive": command_succeeds(["systemctl", "is-active", "--quiet", "northstar-vless"]) if XRAY_PATH.exists() else False,
                       "listening": socket_listening("tcp", vless_port), "port": vless_port, "transport": "tcp"},
+            "stealth": {"installed": MIHOMO_PATH.exists(),
+                        "runtimeActive": command_succeeds(["systemctl", "is-active", "--quiet", "northstar-stealth"]) if MIHOMO_PATH.exists() else False,
+                        # Both transports must listen; TCP alone would hide a broken Hysteria2 listener.
+                        "listening": stealth_listening,
+                        "port": stealth_port, "transport": "udp"},
             "wireguard": {
                 "installed": wireguard_ready,
                 "interfaceActive": command_succeeds(["wg", "show", "northstar"]) if wireguard_ready else False,
@@ -1446,7 +1627,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.11.0",
+        "version": "agent 2.13.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
@@ -1456,7 +1637,48 @@ def heartbeat():
         confirm_staged_upgrade()
     except Exception as error:
         log_failure("Agent upgrade confirmation", error)
+    try:
+        adopt_controller_origin(response.get("controllerOrigin"))
+    except Exception as error:
+        log_failure("Agent domain switch", error)
     return response
+
+
+CONTROLLER_ORIGIN_PATTERN = re.compile(r"^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$")
+CONFIG_ENV = AGENT_DIR / "config.env"
+controller_switch_retry_at = 0
+
+
+def adopt_controller_origin(target):
+    """Move to the Agent domain the Controller announces, only after an authenticated heartbeat there succeeds.
+
+    The old domain stays in config.env until then, so a wrong or unreachable domain never strands the node.
+    """
+    global CONTROLLER, controller_switch_retry_at
+    if not isinstance(target, str):
+        return False
+    target = target.rstrip("/")
+    if target == CONTROLLER or not CONTROLLER_ORIGIN_PATTERN.match(target) or time.time() < controller_switch_retry_at:
+        return False
+    controller_switch_retry_at = time.time() + 600
+    previous = CONTROLLER
+    CONTROLLER = target
+    try:
+        request_json("/api/v1/agent/heartbeat", {"nodeId": NODE_ID, "token": TOKEN, "hostname": socket.gethostname(),
+                                                 "version": "agent 2.13.0", "capabilities": capabilities()})
+        lines = CONFIG_ENV.read_text().splitlines()
+        lines = [f"NORTHSTAR_CONTROLLER_URL={target}" if line.startswith("NORTHSTAR_CONTROLLER_URL=") else line for line in lines]
+        if f"NORTHSTAR_CONTROLLER_URL={target}" not in lines:
+            lines.insert(0, f"NORTHSTAR_CONTROLLER_URL={target}")
+        staged = CONFIG_ENV.with_name("config.env.next")
+        staged.write_text("\n".join(lines) + "\n")
+        staged.chmod(0o600)
+        os.replace(staged, CONFIG_ENV)
+    except Exception as error:
+        CONTROLLER = previous
+        raise RuntimeError(f"staying on {previous}; {target} is not usable yet: {error}") from error
+    print(f"northstar-agent moved to Agent domain {target} (was {previous})", file=sys.stderr, flush=True)
+    return True
 
 
 def poll_tasks():
@@ -1551,6 +1773,10 @@ def main():
                 refresh_reality_target()
             except Exception as error:
                 log_failure("REALITY target refresh", error)
+            try:
+                refresh_stealth_target()
+            except Exception as error:
+                log_failure("stealth target refresh", error)
         if now >= request_backoff_until and now - last_task_poll >= 5:
             last_task_poll = now
             try:
