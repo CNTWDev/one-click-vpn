@@ -3394,5 +3394,29 @@
   "新注册用户自动获得": [
     "Given to new sign-ups",
     "Выдаётся новым пользователям"
+  ],
+  "流量已用完，暂时无法连接。请联系管理员增加流量。": [
+    "Your traffic is used up, so you can't connect right now. Contact your administrator to add more.",
+    "Трафик закончился, поэтому подключиться сейчас нельзя. Обратитесь к администратору, чтобы добавить трафик."
+  ],
+  "账号已到期，暂时无法连接。请联系管理员续期。": [
+    "Your access has ended, so you can't connect right now. Contact your administrator to renew.",
+    "Срок доступа истёк, поэтому подключиться сейчас нельзя. Обратитесь к администратору, чтобы продлить."
+  ],
+  "账号暂未开通使用权限，请联系管理员。": [
+    "Your account doesn't have access yet. Contact your administrator.",
+    "У аккаунта пока нет доступа. Обратитесь к администратору."
+  ],
+  "还剩 {0} 天": [
+    "{0} days left",
+    "Осталось дней: {0}"
+  ],
+  "剩余流量": [
+    "Traffic left",
+    "Остаток трафика"
+  ],
+  "已用 {0} / {1} · 全部节点合计": [
+    "{0} of {1} used · all servers",
+    "Использовано {0} из {1} · все серверы"
   ]
 }
