@@ -737,6 +737,29 @@
         }
       }
     },
+    "connect_from_app_first": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect once in TrackNothing first."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先在 TrackNothing 里连接一次。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сначала подключитесь один раз в TrackNothing."
+          }
+        }
+      }
+    },
     "connect_tab": {
       "extractionState": "manual",
       "localizations": {
@@ -2163,6 +2186,29 @@
         }
       }
     },
+    "open_app": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open TrackNothing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 TrackNothing"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть TrackNothing"
+          }
+        }
+      }
+    },
     "password": {
       "extractionState": "manual",
       "localizations": {
@@ -2274,6 +2320,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Недоступен"
+          }
+        }
+      }
+    },
+    "quit_app": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выйти"
           }
         }
       }
@@ -2554,6 +2623,29 @@
         }
       }
     },
+    "running_in_tray": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TrackNothing keeps running in the tray. Click the icon to switch."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TrackNothing 仍在托盘运行，点击图标即可切换。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TrackNothing работает в трее. Нажмите на значок, чтобы переключить."
+          }
+        }
+      }
+    },
     "search_locations_or_regions": {
       "extractionState": "manual",
       "localizations": {
@@ -2803,6 +2895,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Нажмите, чтобы сменить"
+          }
+        }
+      }
+    },
+    "test_after_disconnecting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latency is tested while disconnected. Showing the last results."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接中无法测速，显示的是上次结果。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Задержка проверяется без подключения. Показаны последние результаты."
           }
         }
       }

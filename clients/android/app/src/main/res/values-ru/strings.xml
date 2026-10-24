@@ -33,6 +33,7 @@
   <string name="connect_automatically_or_choose_your_own_location">Подключайтесь автоматически или выбирайте локацию.</string>
   <string name="connect_automatically_or_pick_a_location">Автоматически или с выбором локации</string>
   <string name="connect_freely">Подключайтесь свободно</string>
+  <string name="connect_from_app_first">Сначала подключитесь один раз в TrackNothing.</string>
   <string name="connect_tab">Подключение</string>
   <string name="connect_with_ease">Подключайтесь легко.</string>
   <string name="connected_status">Подключено</string>
@@ -95,11 +96,13 @@
   <string name="node_load">Нагрузка %1$s%%</string>
   <string name="node_quality_detail">Джиттер %1$s мс · Потери %2$s%%</string>
   <string name="not_connected">Не подключено</string>
+  <string name="open_app">Открыть TrackNothing</string>
   <string name="password">Пароль</string>
   <string name="quality_fair">Средне</string>
   <string name="quality_good">Хорошо</string>
   <string name="quality_poor">Плохо</string>
   <string name="quality_unreachable">Недоступен</string>
+  <string name="quit_app">Выйти</string>
   <string name="refresh_devices">Обновить устройства</string>
   <string name="refresh_locations">Обновить локации</string>
   <string name="retest_latency">Проверить</string>
@@ -112,6 +115,7 @@
   <string name="routing_global_detail">Весь трафик через TrackNothing</string>
   <string name="routing_smart">Умная</string>
   <string name="routing_smart_detail">Сайты материкового Китая напрямую, остальное через TrackNothing</string>
+  <string name="running_in_tray">TrackNothing работает в трее. Нажмите на значок, чтобы переключить.</string>
   <string name="search_locations_or_regions">Поиск локаций или регионов</string>
   <string name="secure_storage_is_unavailable_unlock_your_device_and_try">Защищённое хранилище недоступно. Разблокируйте устройство и повторите.</string>
   <string name="select_an_available_location_for_you">Самая быстрая локация, при сбое — следующая</string>
@@ -123,6 +127,7 @@
   <string name="sign_out">Выйти</string>
   <string name="simulator_build_verify_vpn_connections_on_a_signed_physical">Версия для симулятора · Проверяйте VPN на подписанной сборке для устройства</string>
   <string name="tap_to_change">Нажмите, чтобы сменить</string>
+  <string name="test_after_disconnecting">Задержка проверяется без подключения. Показаны последние результаты.</string>
   <string name="the_simulator_is_for_ui_testing_only_test_the">Симулятор предназначен только для интерфейса. Проверяйте VPN на подписанной сборке для устройства.</string>
   <string name="this_development_build_lacks_signing_entitlements_configure_your_developer">В сборке отсутствуют разрешения подписи. Настройте команду разработчика и подпишите сборку.</string>
   <string name="this_device"> · Это устройство</string>

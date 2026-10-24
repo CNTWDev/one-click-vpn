@@ -1,14 +1,15 @@
 # TrackNothing 原生客户端工作区
 
-状态：**开发验证阶段，不是正式可分发版本**。Android / Apple 已接入登录、账号设备管理、自动/指定节点和 WireGuard 引擎；Android APK、Mac 和 iOS 模拟器构建已验证，真机联网尚未验收。Windows 已接入登录、节点列表、授权设备管理和 WireGuard 隧道服务（官方 embeddable tunnel service），尚待真机验收。CI 不自动发布开发产物。
+状态：**开发验证阶段，不是正式可分发版本**。三端共用同一个 mihomo 内核（`core/`）和同一套策略：WireGuard → Hysteria2 → REALITY → XHTTP 自动降级、节点综合评分、智能分流 / 全局、隐藏诊断日志。Windows 托盘、Mac 菜单栏可一键连接 / 断开和切换路由；Android 有下拉快捷开关；iPhone / Mac 有「快捷指令」连接 / 断开。真机联网尚未验收。CI 不自动发布开发产物。
 
 统一入口：`npm run clients:doctor` 检查本机工具；`npm run clients:build -- android` / `apple` / `windows` 构建后台、两个网页端与指定客户端；不指定平台构建全部。此命令**不部署服务器、不上传安装包**。正式一键联合发布尚未完成，不能把一次开发构建当成正式发布。
 
 | 目录 | 平台 | 技术与职责 |
 | --- | --- | --- |
-| `android/` | Android | Kotlin 原生 UI、WireGuard GoBackend、前台连接服务、Android Keystore 身份签名与加密会话 |
-| `apple/` | iPhone、iPad、Mac | SwiftUI 共享界面和 Swift Package；独立 iOS/macOS App 与 Packet Tunnel Extension |
-| `windows/` | Windows x64/ARM64 | .NET 10 WPF、DPAPI 用户级密钥保护；WireGuard 官方 tunnel.dll + wireguard.dll 作为独立 Windows 服务运行（路由、DNS、防泄漏防火墙），App 以管理员身份启动以管理该服务；Inno Setup 安装到 Program Files |
+| `core/` | 全平台 | Go + mihomo 共用内核：Android AAR、Apple `TunnelCore.xcframework`（gomobile），Windows `veilbird-core.exe`（子进程，标准输入输出通信，App 退出即停止） |
+| `android/` | Android | Kotlin 原生 UI、VpnService + 内嵌内核、前台连接服务、快捷开关磁贴、Android Keystore 身份签名与加密会话 |
+| `apple/` | iPhone、iPad、Mac | SwiftUI 共享界面和 Swift Package；独立 iOS/macOS App 与 Packet Tunnel Extension（内核在扩展里运行）；Mac 为固定大小小窗口 + 菜单栏图标 |
+| `windows/` | Windows x64/ARM64 | .NET 10 WPF 固定大小小窗口 + 托盘图标、DPAPI 用户级密钥保护；内核自建 wintun 虚拟网卡和路由，App 以管理员身份启动；关闭窗口留在托盘；Inno Setup 安装到 Program Files |
 | `contracts/` | 全平台 | 设备身份、连接授权和发布清单约定；不将订阅或证书数量当作设备数 |
 
 详细设计见 [客户端架构](../docs/architecture/04-clients.md)。跨端共享接口语义与测试向量，不强行共享系统 VPN 实现。
@@ -28,8 +29,8 @@ Portal、Console 和三类原生客户端支持中文、英文、俄语，默认
 ## 开发构建命令
 
 - Android：JDK 17+、Android SDK 35、Gradle 8.14.5；`cd clients/android && ./gradlew :app:assembleDebug`。完整 wrapper 已加入并固定发行包 SHA-256。`VEILBIRD_API_ORIGIN` 在构建时内置服务地址；未设置的开发包需要填写 HTTPS 地址。APK 位于 `app/build/outputs/apk/debug/app-debug.apk`，仅用于测试。
-- Apple：完整 Xcode、XcodeGen、Go 1.24.4；执行 `bash clients/apple/scripts/build.sh ios` 或 `macos`。iOS 使用模拟器 ad-hoc 签名；macOS 包含 arm64/x64，未签名。WireGuardKit 固定上游提交，构建脚本应用 tools-version 与 SDK 头文件兼容补丁；Go bridge 在独立临时目录构建以支持项目路径含空格。这些开发产物不能用于真机 VPN 验收或正式分发。
-- Windows：Windows + .NET 10 SDK；`pwsh clients/windows/build.ps1 -Runtime win-x64`，ARM64 使用 `win-arm64`。先由 `build-tunnel.ps1` 按固定版本构建 wireguard-windows 的 tunnel.dll 并取得签名的 wireguard.dll，再生成自包含 ZIP；加 `-Version -Build -Installer` 生成安装程序 `TrackNothing-<版本>-<构建号>-<runtime>-setup.exe`（未做代码签名，首次运行 SmartScreen 会提示）。
+- Apple：完整 Xcode、XcodeGen、Go（版本见 `core/go.mod`）；执行 `bash clients/apple/scripts/build.sh ios` 或 `macos`，脚本先用 `core/build-apple.sh` 生成 `TunnelCore.xcframework`（内核未变时跳过）。iOS 使用模拟器 ad-hoc 签名；macOS 未签名。这些开发产物不能用于真机 VPN 验收或正式分发。
+- Windows：Windows + .NET 10 SDK；`pwsh clients/windows/build.ps1 -Runtime win-x64`，ARM64 使用 `win-arm64`。需要 Go（版本见 `core/go.mod`）：先交叉编译 `veilbird-core.exe`，再生成自包含 ZIP；加 `-Version -Build -Installer` 生成安装程序 `TrackNothing-<版本>-<构建号>-<runtime>-setup.exe`（未做代码签名，首次运行 SmartScreen 会提示）。
 - GitHub Actions：手动运行 `Native client development builds`。三平台独立构建，只上传开发 artifacts，不创建公开 Release。
 
 ## 用户下载与正式发布

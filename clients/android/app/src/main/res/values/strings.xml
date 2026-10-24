@@ -33,6 +33,7 @@
   <string name="connect_automatically_or_choose_your_own_location">Connect automatically or choose your own location.</string>
   <string name="connect_automatically_or_pick_a_location">Connect automatically or pick a location</string>
   <string name="connect_freely">Connect freely</string>
+  <string name="connect_from_app_first">Connect once in TrackNothing first.</string>
   <string name="connect_tab">Connect</string>
   <string name="connect_with_ease">Connect with ease.</string>
   <string name="connected_status">Connected</string>
@@ -95,11 +96,13 @@
   <string name="node_load">Load %1$s%%</string>
   <string name="node_quality_detail">Jitter %1$s ms · Loss %2$s%%</string>
   <string name="not_connected">Not connected</string>
+  <string name="open_app">Open TrackNothing</string>
   <string name="password">Password</string>
   <string name="quality_fair">Fair</string>
   <string name="quality_good">Good</string>
   <string name="quality_poor">Poor</string>
   <string name="quality_unreachable">Unreachable</string>
+  <string name="quit_app">Quit</string>
   <string name="refresh_devices">Refresh devices</string>
   <string name="refresh_locations">Refresh locations</string>
   <string name="retest_latency">Test again</string>
@@ -112,6 +115,7 @@
   <string name="routing_global_detail">All traffic goes through TrackNothing</string>
   <string name="routing_smart">Smart</string>
   <string name="routing_smart_detail">Sites in mainland China go direct, the rest through TrackNothing</string>
+  <string name="running_in_tray">TrackNothing keeps running in the tray. Click the icon to switch.</string>
   <string name="search_locations_or_regions">Search locations or regions</string>
   <string name="secure_storage_is_unavailable_unlock_your_device_and_try">Secure storage is unavailable. Unlock your device and try again.</string>
   <string name="select_an_available_location_for_you">Fastest location, switches if one fails</string>
@@ -123,6 +127,7 @@
   <string name="sign_out">Sign out</string>
   <string name="simulator_build_verify_vpn_connections_on_a_signed_physical">Simulator build · Verify VPN connections on a signed physical-device build</string>
   <string name="tap_to_change">Tap to change location</string>
+  <string name="test_after_disconnecting">Latency is tested while disconnected. Showing the last results.</string>
   <string name="the_simulator_is_for_ui_testing_only_test_the">The simulator is for UI testing only. Test the VPN on a signed physical-device build.</string>
   <string name="this_development_build_lacks_signing_entitlements_configure_your_developer">This development build lacks signing entitlements. Configure your developer team and sign it first.</string>
   <string name="this_device"> · This device</string>

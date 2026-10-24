@@ -21,9 +21,9 @@ Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次�
 
 4. 所有正常账号都能直接登录客户端并连接，订阅照常可用；每个账号默认最多 3 台客户端设备（`.env` 的 `VEILBIRD_NATIVE_DEVICE_LIMIT`，也可在账号「访问详情」里单独设置）。如果服务器 `.env` 里有 `VEILBIRD_NATIVE_ACCESS_ENABLED=0`，改成 `1` 或删掉这一行，再运行 `sudo ./one-click-update.sh`。
 
-不需要 Google Play、Google 开发者账号或代码混淆：自签名 APK 可以直接安装，用户首次安装时允许「安装未知来源应用」即可。Windows 安装程序未做代码签名，首次运行时 SmartScreen 会提示「更多信息 → 仍要运行」；以后想去掉这个提示，可以买代码签名证书（如 Azure Trusted Signing）。App 每次启动会请求一次管理员权限，用于启动 VPN 服务。
+不需要 Google Play、Google 开发者账号或代码混淆：自签名 APK 可以直接安装，用户首次安装时允许「安装未知来源应用」即可。Windows 安装程序未做代码签名，首次运行时 SmartScreen 会提示「更多信息 → 仍要运行」；以后想去掉这个提示，可以买代码签名证书（如 Azure Trusted Signing）。App 每次启动会请求一次管理员权限，用于创建虚拟网卡和路由。
 
-Android 版内嵌 mihomo 内核（`clients/android/core`）。CI 先用 Go 和 Android NDK 运行 `clients/android/core/build.sh` 生成 `app/libs/veilbird-core.aar`，再跑 Gradle；本机构建同理，先装 Go（版本见 `core/go.mod`）和 NDK 27，设置 `ANDROID_NDK_HOME` 后运行该脚本。
+三端内嵌同一个 mihomo 内核（`clients/core`）。Android：CI 先用 Go 和 Android NDK 运行 `clients/core/build-android.sh` 生成 `app/libs/veilbird-core.aar`，再跑 Gradle；本机构建同理，先装 Go（版本见 `clients/core/go.mod`）和 NDK 27，设置 `ANDROID_NDK_HOME` 后运行该脚本。Windows：`build.ps1` 自动用 Go 编译 `veilbird-core.exe` 并打进安装包。Apple：`scripts/build.sh` 自动生成 `TunnelCore.xcframework`。
 
 ## 每次发版
 

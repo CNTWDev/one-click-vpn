@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -29,6 +31,14 @@ var (
 	lock    sync.Mutex
 	running bool
 )
+
+func init() {
+	// iOS gives a packet tunnel extension about 50 MB: keep the Go heap well below it.
+	if runtime.GOOS == "ios" {
+		debug.SetMemoryLimit(32 << 20)
+		debug.SetGCPercent(50)
+	}
+}
 
 // idle replaces a running configuration on Stop: no tun, no listeners, no proxies.
 const idle = "mode: direct\nlog-level: silent\nipv6: false\n"

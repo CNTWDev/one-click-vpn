@@ -1,9 +1,10 @@
-module github.com/cntwdev/veilbird/clients/android/core
+module github.com/cntwdev/veilbird/clients/core
 
 go 1.26.0
 
 require (
 	github.com/metacubex/mihomo v1.19.33
+	golang.org/x/crypto v0.58.0
 	golang.org/x/mobile v0.0.0-20261011034528-197770444867
 )
 
@@ -129,7 +130,6 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go4.org/mem v0.0.0-20240501181205-ae6ca9944745 // indirect
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb // indirect
-	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e // indirect
 	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/net v0.61.0 // indirect

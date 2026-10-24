@@ -35,6 +35,7 @@
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>Connect automatically or choose your own location.</value></data>
   <data name="connect_automatically_or_pick_a_location" xml:space="preserve"><value>Connect automatically or pick a location</value></data>
   <data name="connect_freely" xml:space="preserve"><value>Connect freely</value></data>
+  <data name="connect_from_app_first" xml:space="preserve"><value>Connect once in TrackNothing first.</value></data>
   <data name="connect_tab" xml:space="preserve"><value>Connect</value></data>
   <data name="connect_with_ease" xml:space="preserve"><value>Connect with ease.</value></data>
   <data name="connected_status" xml:space="preserve"><value>Connected</value></data>
@@ -97,11 +98,13 @@
   <data name="node_load" xml:space="preserve"><value>Load {0}%</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>Jitter {0} ms · Loss {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="open_app" xml:space="preserve"><value>Open TrackNothing</value></data>
   <data name="password" xml:space="preserve"><value>Password</value></data>
   <data name="quality_fair" xml:space="preserve"><value>Fair</value></data>
   <data name="quality_good" xml:space="preserve"><value>Good</value></data>
   <data name="quality_poor" xml:space="preserve"><value>Poor</value></data>
   <data name="quality_unreachable" xml:space="preserve"><value>Unreachable</value></data>
+  <data name="quit_app" xml:space="preserve"><value>Quit</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>Refresh devices</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Refresh locations</value></data>
   <data name="retest_latency" xml:space="preserve"><value>Test again</value></data>
@@ -114,6 +117,7 @@
   <data name="routing_global_detail" xml:space="preserve"><value>All traffic goes through TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>Smart</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>Sites in mainland China go direct, the rest through TrackNothing</value></data>
+  <data name="running_in_tray" xml:space="preserve"><value>TrackNothing keeps running in the tray. Click the icon to switch.</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>Search locations or regions</value></data>
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>Secure storage is unavailable. Unlock your device and try again.</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>Fastest location, switches if one fails</value></data>
@@ -125,6 +129,7 @@
   <data name="sign_out" xml:space="preserve"><value>Sign out</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Simulator build · Verify VPN connections on a signed physical-device build</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>Tap to change location</value></data>
+  <data name="test_after_disconnecting" xml:space="preserve"><value>Latency is tested while disconnected. Showing the last results.</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>The simulator is for UI testing only. Test the VPN on a signed physical-device build.</value></data>
   <data name="this_development_build_lacks_signing_entitlements_configure_your_developer" xml:space="preserve"><value>This development build lacks signing entitlements. Configure your developer team and sign it first.</value></data>
   <data name="this_device" xml:space="preserve"><value> · This device</value></data>

@@ -793,5 +793,30 @@
     "zh": "返回",
     "en": "Back",
     "ru": "Назад"
+  },
+  "open_app": {
+    "zh": "打开 TrackNothing",
+    "en": "Open TrackNothing",
+    "ru": "Открыть TrackNothing"
+  },
+  "quit_app": {
+    "zh": "退出",
+    "en": "Quit",
+    "ru": "Выйти"
+  },
+  "running_in_tray": {
+    "zh": "TrackNothing 仍在托盘运行，点击图标即可切换。",
+    "en": "TrackNothing keeps running in the tray. Click the icon to switch.",
+    "ru": "TrackNothing работает в трее. Нажмите на значок, чтобы переключить."
+  },
+  "test_after_disconnecting": {
+    "zh": "连接中无法测速，显示的是上次结果。",
+    "en": "Latency is tested while disconnected. Showing the last results.",
+    "ru": "Задержка проверяется без подключения. Показаны последние результаты."
+  },
+  "connect_from_app_first": {
+    "zh": "请先在 TrackNothing 里连接一次。",
+    "en": "Connect once in TrackNothing first.",
+    "ru": "Сначала подключитесь один раз в TrackNothing."
   }
 }
