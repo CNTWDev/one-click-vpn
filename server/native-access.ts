@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { addAudit, dbExec, dbQuery, findUserByEmail, getDb } from "./db";
 import { verifyPassword } from "./password";
-import { allowLoginAttempt } from "./rate-limit";
+import { allowLoginAttempt, recordAuthFailure } from "./rate-limit";
 import { canonical, digest, identity, NativeError, verifyNativeProof } from "./native-proof";
 import { rebuildDesiredState, selectVpnServices } from "./control-plane";
 import { ipv4Address, ipv4Pool } from "./ipv4-pool";
@@ -24,7 +24,7 @@ export async function nativeLogin(request: Request, body: Record<string, unknown
   if (!allowLoginAttempt(request, email)) throw new NativeError("RATE_LIMITED", 429);
   const user = await findUserByEmail(email);
   const valid=await verifyPassword(typeof body.password==="string"?body.password:"",user?.password_hash);
-  if (!user || !valid) throw new NativeError("INVALID_CREDENTIALS", 401);
+  if (!user || !valid) { recordAuthFailure(request, "wrong-password"); throw new NativeError("INVALID_CREDENTIALS", 401); }
   if (user.status !== "active") throw new NativeError("ACCOUNT_UNAVAILABLE", 403);
   const key = identity(body.identityKey);
   if (!["android", "ios", "macos", "windows"].includes(String(body.platform))) throw new NativeError("INVALID_PLATFORM");

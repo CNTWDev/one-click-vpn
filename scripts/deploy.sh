@@ -270,6 +270,9 @@ else
   fi
 fi
 
+# Host Nginx 429s floods for this deployment's hostnames before they reach the containers.
+sh "$SCRIPT_DIR/setup-nginx-limits.sh" || echo "Warning: Nginx request limits were not updated; deployment is unaffected." >&2
+
 # Cleanup runs only after a healthy deploy, so a failed one still has its previous images.
 sh "$SCRIPT_DIR/prune-docker.sh" || echo "Warning: Docker cleanup failed; deployment is unaffected." >&2
 

@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const body = await readJson(request);
     const nodeId = cleanText(body.nodeId, 128);
     const token = agentTokenFromRequest(request, cleanText(body.token, 512));
-    const node = await authenticateAgent(nodeId, token);
+    const node = await authenticateAgent(nodeId, token, request);
     if (!node) return jsonError("Invalid agent credentials", 401);
     const capabilities = body.capabilities && typeof body.capabilities === "object" && !Array.isArray(body.capabilities)
       ? body.capabilities as Record<string, unknown>
