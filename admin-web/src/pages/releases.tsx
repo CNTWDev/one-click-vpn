@@ -106,7 +106,9 @@ export function ReleasesPage() {
   }
   async function act(release: Release, action: "publish" | "promote" | "withdraw" | "delete") {
     const label = `${platformNames[release.platform]} ${release.version} (${release.build})`;
-    if (action !== "publish" && !(await confirm(action === "promote"
+    if ((action !== "publish" || release.channel === "stable") && !(await confirm(action === "publish"
+      ? { title: t("发布正式版"), message: t("{0} 将成为正式版，固定下载链接和客户端更新检查会立即指向它。", [label]), confirmLabel: t("发布") }
+      : action === "promote"
       ? { title: t("晋升为正式版"), message: t("{0} 将成为正式版，固定下载链接和客户端更新检查会立即指向它。", [label]), confirmLabel: t("晋升正式版") }
       : action === "withdraw"
         ? { title: t("撤回版本"), message: t("撤回 {0}？固定下载链接会回到上一个已发布版本。", [label]), confirmLabel: t("撤回"), danger: true }
@@ -230,17 +232,20 @@ export function ReleasesPage() {
       </section>
       <section className="panel flush"><div className="panel-head padded"><h2>{t("版本历史")}</h2></div>
         <div className="table-toolbar"><div className="chips" role="group" aria-label={t("平台")}>{(["all", ...Object.keys(platformNames)] as Array<"all" | Platform>).map((value) => <button key={value} type="button" className={platformFilter === value ? "active" : ""} aria-pressed={platformFilter === value} onClick={() => setPlatformFilter(value)}>{value === "all" ? t("全部") : platformNames[value]}<em>{data.releases.filter((item) => value === "all" || item.platform === value).length}</em></button>)}</div></div>
-        {visibleReleases.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("版本")}</th><th>{t("平台")}</th><th>{t("渠道")}</th><th>{t("状态")}</th><th>{t("灰度")}</th><th>{t("安装包")}</th><th>{t("发布时间")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visibleReleases.map((release) => <tr key={release.id}>
+        {visibleReleases.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("版本")}</th><th>{t("平台")}</th><th>{t("状态")}</th><th>{t("灰度")}</th><th>{t("安装包")}</th><th>{t("发布时间")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visibleReleases.map((release) => <tr key={release.id}>
           <td><b>{release.version}</b><small>{t("构建 {0}", [release.build])}</small>{release.notes && <small>{release.notes}</small>}</td>
           <td>{platformNames[release.platform]} · {release.arch}<small><br />{release.minOs}</small></td>
-          <td><Pill value={release.channel} label={release.channel === "stable" ? t("正式版") : t("测试版")} tone={release.channel === "stable" ? "success" : "progress"} /></td>
-          <td><Pill value={release.status} label={release.status === "published" ? t("已发布") : release.status === "draft" ? t("草稿") : t("已撤回")} tone={release.status === "published" ? "success" : release.status === "draft" ? "neutral" : "warning"} /></td>
+          {/* One state per row: users only see published builds, so a draft shows where it will go instead of a channel badge. */}
+          <td>{release.status === "published"
+            ? <Pill value={release.channel} label={release.channel === "stable" ? t("正式版") : t("测试版")} tone={release.channel === "stable" ? "success" : "progress"} />
+            : <Pill value={release.status} label={release.status === "draft" ? t("草稿") : t("已撤回")} tone={release.status === "draft" ? "neutral" : "warning"} />}
+            {release.status === "draft" && <small style={{ display: "block", marginTop: 6, whiteSpace: "nowrap" }}>{release.channel === "stable" ? t("发布后为正式版") : t("发布后为测试版")}</small>}</td>
           <td>{release.status !== "withdrawn" && <div className="row-actions"><input type="number" min={1} max={100} style={{ width: 80 }} aria-label={t("灰度比例 (%)")} title={t("灰度比例 (%)")} value={rollouts[release.id] ?? "100"} onChange={(event) => setRollouts({ ...rollouts, [release.id]: event.target.value })} /><small>%</small>
               <button className="button ghost small" disabled={busy || String(release.rolloutPercent) === (rollouts[release.id] ?? "100")} onClick={() => void saveRollout(release)}>{t("保存")}</button></div>}</td>
           <td><a href={release.url} target="_blank" rel="noopener noreferrer">{release.distribution === "direct" ? formatBytes(release.sizeBytes) : release.distribution}</a>{release.sha256 && <small><br /><code title={release.sha256}>{release.sha256.slice(0, 12)}…</code></small>}</td>
           <td>{release.publishedAt ? formatTime(release.publishedAt) : "—"}</td>
           <td className="align-right cell-actions"><div className="row-actions">
-            {release.status !== "published" && <button className="button ghost small" disabled={busy} onClick={() => void act(release, "publish")}>{release.channel === "stable" ? t("发布正式版") : t("发布测试版")}</button>}
+            {release.status !== "published" && <button className="button ghost small" disabled={busy} onClick={() => void act(release, "publish")}>{t("发布")}</button>}
             {release.channel === "beta" && release.status !== "withdrawn" && !release.version.includes("-") && release.distribution !== "testflight" && <button className="button primary small" disabled={busy} onClick={() => void act(release, "promote")}>{t("晋升正式版")}</button>}
             {release.status === "published" && <button className="button danger small" disabled={busy} onClick={() => void act(release, "withdraw")}>{t("撤回")}</button>}
             {release.status === "draft" && <button className="button danger small" disabled={busy} onClick={() => void act(release, "delete")}>{t("删除")}</button>}

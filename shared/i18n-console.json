@@ -2387,10 +2387,6 @@
     "Publish stable",
     "Опубликовать стабильную"
   ],
-  "发布测试版": [
-    "Publish beta",
-    "Опубликовать бету"
-  ],
   "还没有登记任何版本。可以用 npm run release:client 上传，或在下方手动登记。": [
     "No releases yet. Upload with npm run release:client, or register one manually below.",
     "Выпусков пока нет. Загрузите через npm run release:client или зарегистрируйте вручную ниже."
@@ -2846,6 +2842,18 @@
   "下一页": [
     "Next",
     "Далее"
+  ],
+  "发布": [
+    "Publish",
+    "Опубликовать"
+  ],
+  "发布后为正式版": [
+    "Goes to stable when published",
+    "После публикации — стабильная"
+  ],
+  "发布后为测试版": [
+    "Goes to beta when published",
+    "После публикации — бета"
   ],
   "站点": [
     "Sites",
