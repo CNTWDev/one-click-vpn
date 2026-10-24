@@ -9,21 +9,25 @@ import { api, isUnauthorized } from "./api";
 import { Brand } from "./brand";
 import { detectPlatform, formatBytes } from "./format";
 import { PortalLanguagePicker } from "./language";
-import { DataStream, PixelRing, UsageBlocks } from "./pixel";
+import { DataStream, HeroRing, UsageBlocks } from "./pixel";
 import { Icon, InlineError, Skeleton, Time, useToasts } from "./ui";
 import "./home.css";
 
 type User = { email: string; displayName: string };
 type Device = { id: string; name: string; platform: string; lastSeenAt: string; connected: boolean; region: string | null };
 type Account = { expiresAt: string | null; deviceLimit: number; devices: Device[] };
-type Usage = { totals: { totalBytes: number }; daily?: { day: string; totalBytes: number }[] };
+type Usage = { totals: { totalBytes: number; uploadBytes?: number; downloadBytes?: number }; daily?: { day: string; totalBytes: number }[] };
 type Releases = { releases: ClientRelease[]; history: ClientRelease[] };
 
 const platformNames: Record<ClientPlatform, string> = { android: "Android", ios: "iPhone / iPad", macos: "macOS", windows: "Windows" };
+/** Three-letter tiles in the pixel face, in place of device icons. */
+const platformCodes: Record<ClientPlatform, string> = { android: "AND", ios: "IOS", macos: "MAC", windows: "WIN" };
 const devicePlatform: Partial<Record<string, ClientPlatform>> = { android: "android", ios: "ios", mac: "macos", windows: "windows" };
-const deviceIcon = (platform: string) => platform === "windows" || platform === "macos"
-  ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>
-  : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5" /><path d="M11 18h2" /></svg>;
+
+/** A byte count split into number and unit, so the number can take the pixel face. */
+const figure = (bytes: number) => { const [value, unit = ""] = formatBytes(bytes).split(" "); return [value, unit] as const; };
+/** Dates as figures read the same in every language: 2027-03-01. */
+const isoDate = (value: string) => { const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? value : `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`; };
 
 /** Daily totals for the last 30 days, oldest first, with empty days as zero. */
 function lastDays(usage: Usage) {
@@ -79,7 +83,8 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
   const mine = devicePlatform[detectPlatform()];
   const latest = (platform: ClientPlatform) => (releases?.releases || []).filter((item) => item.platform === platform);
   /** One build per platform: this device's architecture, else a universal build, else the first. */
-  const pick = (platform: ClientPlatform) => { const items = latest(platform); return items.find((item) => item.arch === arch) || items.find((item) => item.arch === "universal") || items[0]; };
+  // This device's architecture applies to its own platform only; other platforms lead with their common build.
+  const pick = (platform: ClientPlatform) => { const items = latest(platform), want = platform === mine ? arch : "x64"; return items.find((item) => item.arch === want) || items.find((item) => item.arch === "universal") || items[0]; };
   const href = (item: ClientRelease, current = true) => item.distribution === "direct" && current ? `/download/${item.platform}/${item.arch}` : item.url;
   const action = (item: ClientRelease, name: string) => item.distribution === "app-store" ? t("在 App Store 获取") : item.distribution === "testflight" ? t("通过 TestFlight 安装") : t("下载 {0} 版", [name]);
   const meta = (item: ClientRelease) => [item.version, item.arch === "universal" ? "" : item.arch, item.sizeBytes ? formatBytes(item.sizeBytes) : ""].filter(Boolean).join(" · ");
@@ -100,38 +105,35 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
     } finally { setBusy(""); }
   }
 
+  const preview = <div className="home-preview" aria-hidden="true">
+    <HeroRing />
+    <span className="home-stream"><DataStream /><DataStream count={12} salt={1} className="dim" /></span>
+  </div>;
   const hero = !releases
-    ? <section className="card home-hero" aria-busy={!releaseError}>{releaseError
+    ? <section className="home-hero" aria-busy={!releaseError}>{releaseError
       ? <InlineError message={t("暂时无法获取客户端版本，请稍后重试。")} onRetry={loadReleases} />
-      : <div className="home-hero-text"><Skeleton width={120} /><Skeleton height={34} width="70%" /><Skeleton width="50%" /><Skeleton height={48} width={220} /></div>}</section>
+      : <div className="home-hero-text"><Skeleton width={120} /><Skeleton height={34} width="70%" /><Skeleton width="50%" /><Skeleton height={48} width={220} /></div>}{preview}</section>
     : featured && mine
-      ? <section className="card home-hero" aria-labelledby="home-title">
+      ? <section className="home-hero" aria-labelledby="home-title">
         <div className="home-hero-text">
-          <p className="muted">{t("{0}，你好", [user.displayName])}</p>
+          <p className="home-meta">{[platformNames[mine], meta(featured)].join(" · ")}</p>
           <h1 id="home-title">{t("在 {0} 上使用 {1}", [platformNames[mine], siteName])}</h1>
           <p className="home-lead">{t("下载安装后，用这个账号登录即可。")}</p>
           <div className="home-download">
             <a className="primary large" href={href(featured)} target="_blank" rel="noopener noreferrer">{Icon.download()}{action(featured, platformNames[mine])}</a>
-            <span className="muted">{meta(featured)}</span>
+            {latest(mine).filter((item) => item !== featured).map((item) => <a key={item.arch} href={href(item)} target="_blank" rel="noopener noreferrer">{t("下载 {0} 版", [item.arch])}</a>)}
           </div>
-          {latest(mine).filter((item) => item !== featured).map((item) => <p className="muted" key={item.arch}>
-            {t("其他架构：")}<a href={href(item)} target="_blank" rel="noopener noreferrer">{t("下载 {0} 版", [item.arch])}</a>
-          </p>)}
         </div>
-        <div className="home-preview" aria-hidden="true">
-          <PixelRing />
-          <b>{t("一键连接")}</b>
-          <DataStream />
-          <span className="home-preview-row">{t("自动选择最快的节点")}</span>
-        </div>
+        {preview}
       </section>
-      : <section className="card home-hero" aria-labelledby="home-title">
+      : <section className="home-hero" aria-labelledby="home-title">
         <div className="home-hero-text">
           <p className="muted">{t("{0}，你好", [user.displayName])}</p>
           <h1 id="home-title">{mine ? t("{0} 版即将推出", [platformNames[mine]]) : t("下载 {0} 客户端", [siteName])}</h1>
           <p className="home-lead">{t("可以先在下面的设备上使用，用同一个账号登录。")}</p>
           <div className="home-download"><button type="button" className="secondary wrap" onClick={onManual}>{t("在这台设备上用其他客户端")}</button></div>
         </div>
+        {preview}
       </section>;
 
   const devices = account?.devices || [];
@@ -140,10 +142,14 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
     <Topbar user={user} onLogout={onLogout} />
     {hero}
 
-    <section className="home-stats" aria-label={t("账号概况")}>
-      <div className="card"><small>{t("有效期至")}</small><strong>{account ? account.expiresAt ? date(account.expiresAt) : t("长期有效") : <Skeleton height={26} width="60%" />}</strong></div>
-      <div className="card"><small>{t("近 30 天流量")}</small><strong className="pixel-figure">{usage ? formatBytes(usage.totals.totalBytes) : <Skeleton height={26} width="40%" />}</strong>{usage && <UsageBlocks values={lastDays(usage)} />}</div>
-      <div className="card"><small>{t("已登录设备")}</small><strong>{account ? t("{0} / {1} 台", [devices.length, account.deviceLimit]) : <Skeleton height={26} width="40%" />}</strong></div>
+    <section className="card home-stats" aria-label={t("账号概况")}>
+      <div><small>{t("有效期至")}</small>{account ? account.expiresAt ? <strong className="pixel-figure">{isoDate(account.expiresAt)}</strong> : <strong>{t("长期有效")}</strong> : <Skeleton height={30} width="60%" />}
+        {account?.expiresAt && <span className="home-stat-note">{date(account.expiresAt)}</span>}</div>
+      <div><small>{t("近 30 天流量")}</small>
+        {usage ? <span className="home-traffic"><strong className="pixel-figure">{figure(usage.totals.totalBytes)[0]}<span className="unit">{figure(usage.totals.totalBytes)[1]}</span></strong><UsageBlocks values={lastDays(usage)} /></span> : <Skeleton height={30} width="40%" />}
+        {usage && <span className="home-stat-note mono">↓ {formatBytes(usage.totals.downloadBytes || 0)} · ↑ {formatBytes(usage.totals.uploadBytes || 0)}</span>}</div>
+      <div><small>{t("已登录设备")}</small>{account ? <strong className="pixel-figure">{devices.length}<span className="unit">/ {account.deviceLimit}</span></strong> : <Skeleton height={30} width="40%" />}
+        {account && <a className="home-stat-note" href="#devices-title">{t("我的设备")}</a>}</div>
     </section>
     {accountError && <InlineError message={accountError} onRetry={() => void loadAccount()} />}
 
@@ -153,7 +159,7 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
         <ul>{others.map((platform) => {
           const item = releases ? pick(platform) : undefined;
           return <li key={platform}>
-            <span className="home-icon">{deviceIcon(platform)}</span>
+            <span className={`home-code${item ? "" : " off"}`} aria-hidden="true">{platformCodes[platform]}</span>
             <span className="home-row-main"><b>{platformNames[platform]}</b><small>{!releases ? <Skeleton height={12} width={90} /> : item ? meta(item) : t("即将推出")}</small></span>
             {item && <a className="secondary small" href={href(item)} target="_blank" rel="noopener noreferrer">{item.distribution === "direct" ? t("下载") : t("获取")}</a>}
           </li>;
@@ -183,11 +189,11 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
       </section>
     </div>
 
-    <button type="button" className="card home-manual" onClick={onManual}>
+    <button type="button" className="home-manual" onClick={onManual}>
       <span><b>{t("使用其他客户端")}</b><small>{t("Clash、Shadowrocket、WireGuard、OpenVPN 等，手动导入订阅或配置")}</small></span>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
     </button>
-    <footer>{t("{0} · 账号仅供本人使用，请勿分享。", [siteName])}</footer>
+    <footer className="home-footer"><span className="home-footer-mark" aria-hidden="true">{siteName.toUpperCase()}</span><span>{t("{0} · 账号仅供本人使用，请勿分享。", [siteName])}</span></footer>
   </main>;
 }
 

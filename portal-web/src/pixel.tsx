@@ -7,44 +7,48 @@ function ringCells(n: number, radius: number) {
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (Math.abs(Math.hypot(x - c, y - c) - radius) <= 0.55) cells.push([x, y]);
   return cells;
 }
-const RING_PATH = cellsPath(ringCells(41, 18), 0.83);
 // The mark sits in the middle of the ring at 80/246 of its width, as in the apps.
 const MARK_SCALE = 41 * 80 / 246 / 16;
 const MARK_PATH = cellsPath(MARK_CELLS);
 
-/** The apps' connect ring in its connected state, over a faint halftone glow: a still picture of "one tap". */
-export function PixelRing() {
-  return <span className="pixel-ring" aria-hidden="true">
+const RING_CELLS = ringCells(41, 18);
+/**
+ * The hero's large ring, as in the apps once connected: every dot lit over a halftone halo, the ∅ mark inside, and
+ * every thirteenth dot dimming briefly on its own six-second beat (still under reduced motion).
+ */
+export function HeroRing() {
+  return <span className="hero-ring" aria-hidden="true">
     <svg viewBox="0 0 41 41" shapeRendering="crispEdges">
-      <path d={RING_PATH} fill="currentColor" />
-      <path d={MARK_PATH} fill="currentColor" transform={`translate(${20.5 - 8 * MARK_SCALE} ${20.5 - 8 * MARK_SCALE}) scale(${MARK_SCALE})`} />
+      {RING_CELLS.map(([x, y], index) => <rect key={index} x={x} y={y} width={0.75} height={0.75}
+        className={index % 13 === 0 ? "twinkle" : undefined} style={index % 13 === 0 ? { animationDelay: `${-((x * 37 + y * 11) % 6000)}ms` } : undefined} />)}
+      <path d={MARK_PATH} transform={`translate(${20.5 - 8 * MARK_SCALE} ${20.5 - 8 * MARK_SCALE}) scale(${MARK_SCALE})`} />
     </svg>
   </span>;
 }
 
 const HEX = "0123456789ABCDEF";
 /** Each digit changes on its own slow beat (3–9 s), so about three change every second; same as the apps. */
-function digits(seconds: number) {
+function digits(seconds: number, count = 16, salt = 0) {
   let line = "";
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < count; i++) {
     const beat = Math.floor(seconds / (3 + i % 7));
-    let h = Math.imul(beat ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(i + 1, 0xc2b2ae35);
+    let h = Math.imul(beat ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(i + 1 + salt * 97, 0xc2b2ae35);
     h ^= h >>> 15; h = Math.imul(h, 0x27d4eb2f); h ^= h >>> 13;
-    line += HEX[(h >>> 0) % 16] + (i % 4 === 3 && i < 15 ? " " : "");
+    line += HEX[(h >>> 0) % 16] + (i % 4 === 3 && i < count - 1 ? " " : "");
   }
   return line;
 }
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 /** The "data stream" line: hex digits that slowly change, held still under reduced motion and in hidden tabs. */
-export function DataStream() {
+export function DataStream({ count = 16, salt = 0, className = "" }: { count?: number; salt?: number; className?: string }) {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
     if (reducedMotion()) return;
     const timer = window.setInterval(() => { if (!document.hidden) setNow(Math.floor(Date.now() / 1000)); }, 1000);
     return () => window.clearInterval(timer);
   }, []);
-  return <span className="pixel-stream" aria-hidden="true">{digits(now)}</span>;
+  return <span className={`pixel-stream ${className}`.trim()} aria-hidden="true">{digits(now, count, salt)}</span>;
 }
 
 /** 30 days of usage as columns of square blocks, the last seven days lit. */
