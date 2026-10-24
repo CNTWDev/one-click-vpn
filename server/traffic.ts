@@ -70,6 +70,10 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
     const native = await dbQuery<Owner & {identity_key:string}>(`SELECT l.public_key AS identity_key,l.device_id,NULL AS credential_id,e.user_id
       FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id WHERE l.node_id=$1 AND l.public_key=ANY($2::text[])`,[nodeId,wireguardKeys]);
     for (const row of native) wireguardOwners.set(row.identity_key,row);
+    // App devices on VLESS report their enrollment UUID (see native-users.ts); the device is the lease on this node.
+    const nativeVless = await dbQuery<Owner & {identity_key:string}>(`SELECT DISTINCT ON (e.id) substring(e.id from 5) AS identity_key,l.device_id,NULL AS credential_id,e.user_id
+      FROM native_enrollments e JOIN native_leases l ON l.enrollment_id=e.id AND l.node_id=$1 WHERE substring(e.id from 5)=ANY($2::text[]) ORDER BY e.id`,[nodeId,wireguardKeys]);
+    for (const row of nativeVless) if (!wireguardOwners.has(row.identity_key)) wireguardOwners.set(row.identity_key,row);
   }
   const openvpnOwners = new Map<string, Owner>();
   if (openvpnSubjects.length) {

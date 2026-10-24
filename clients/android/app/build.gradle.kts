@@ -57,8 +57,13 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions { jvmTarget = "17" }
+    // WireGuard runs inside the embedded core (libs/veilbird-core.aar); the library's own engine is not shipped.
+    packaging { jniLibs { excludes += "**/libwg-go.so" } }
 }
 dependencies {
+    // Built by core/build.sh (gomobile bind of mihomo); CI builds it before Gradle.
+    implementation(files("libs/veilbird-core.aar"))
+    // Only for Curve25519 key pairs: the private key never leaves the device.
     implementation("com.wireguard.android:tunnel:1.0.20260102")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }

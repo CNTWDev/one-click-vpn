@@ -287,8 +287,22 @@ sudo grep -E '^(NORTHSTAR_CONTROLLER_URL|NORTHSTAR_NODE_ID)=' \
 ```
 
 The Agent reports health, resource usage, VPN service state, and traffic counters.
-WireGuard normally uses UDP `51820`; OpenVPN normally uses UDP `1194`. Open those
-ports in the Edge Node firewall/security group separately from the Controller.
+WireGuard normally uses UDP `51820`; OpenVPN normally uses UDP `1194`; VLESS
+REALITY uses TCP `443`; the stealth transports for the Veilbird apps (Hysteria2 and
+VLESS REALITY XHTTP, one mihomo process, Agent 2.12+) use UDP **and** TCP `8443`.
+Open those ports in the Edge Node firewall/security group separately from the Controller.
+
+## Veilbird app transports
+
+The Android app prefers WireGuard (lightest; Apple and Windows use only WireGuard for now). When it is blocked they fall back, without any
+user choice, to Hysteria2 with Salamander obfuscation (UDP, no QUIC fingerprint), then
+VLESS REALITY Vision on TCP 443, then VLESS REALITY over XHTTP. Each enrolled device has
+one secret that is its VLESS UUID and Hysteria2 password on every node; revoking the
+device or an expired membership removes it from every node on the next heartbeat.
+The stealth service reuses the node's REALITY keys and target, so it deploys after
+VLESS. AmneziaWG is not used: it needs a kernel module or a separately built userspace
+daemon on every node, and Hysteria2 with Salamander covers the same "UDP without a
+signature" case.
 
 ## Dynamic subscriptions and VLESS + REALITY
 
@@ -381,16 +395,22 @@ sample may be lost on a restart.
 
 Subscription links serve Clash/Mihomo YAML by default and a base64 `vless://` list
 (`format=v2ray`) for Shadowrocket, v2rayN/v2rayNG and similar clients; the format is also
-picked from the client's User-Agent. Routing defaults to `mode=smart` (private networks and
-mainland China direct via GEOSITE/GEOIP rules, everything else through Veilbird);
-`mode=global` sends everything except private networks through the tunnel. Node names
+picked from the client's User-Agent. Every Clash profile has the same two choices: the
+`Veilbird` group defaults to `自动选择` (lowest latency, measured by the client every 5
+minutes, switching away from nodes that stop answering) or a fixed node, and the client's
+own Global switch also goes through Veilbird. Routing defaults to `mode=smart` (private
+networks and mainland China direct, everything else through Veilbird) using three small
+rule sets (~0.6 MB, MetaCubeX `meta-rules-dat` via jsdelivr) that the client downloads
+through the tunnel and refreshes daily; if they cannot be downloaded the profile still
+works and simply proxies that traffic. `mode=global` sends everything except private
+networks through the tunnel. Node names
 read `🇯🇵 Tokyo · node-name` and stay stable when nodes are added. Fixed-node VLESS
 profiles also export a single share link (`/api/v1/profiles/{id}/download?format=uri`).
 
 For validation, `npm test` covers unit and integration hooks. Supply a disposable
 `VEILBIRD_TEST_DATABASE_URL` to run PostgreSQL/API tests, and optionally
 `VEILBIRD_TEST_XRAY` / `VEILBIRD_TEST_MIHOMO` paths to validate generated configs
-with real binaries (`VEILBIRD_TEST_MIHOMO_GEODATA` adds the smart-routing rules check). These checks do not replace iPhone/Android and live-node acceptance tests.
+with real binaries (both routing modes must load offline). These checks do not replace iPhone/Android and live-node acceptance tests.
 
 ## Local development setup
 

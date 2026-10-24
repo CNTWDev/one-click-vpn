@@ -46,6 +46,8 @@ public partial class MainWindow : Window {
     private void Connect()=>Work(async()=>{
         keys=Tunnel.NewKeypair();leaseNodeId=nodeId;statusKey="authorizing_and_connecting";Render();
         try {
+            // Automatic: the fastest node measured from this PC, before the tunnel exists; if the list fails the server picks.
+            if(leaseNodeId.Length==0) try {leaseNodeId=(await Latency.Rank((await api.Request("nodes"))["nodes"]!.AsArray())).FirstOrDefault().Node?["id"]?.GetValue<string>()??"";} catch {/* least-loaded fallback */}
             var lease=await Acquire();
             await Task.Run(()=>Tunnel.Start(lease,keys.Private));
         } catch(Exception error) {
@@ -141,8 +143,9 @@ public partial class MainWindow : Window {
             var result=await api.Request("nodes");Button(L10n.Text("automatic_recommended"),()=>{nodeId="";nodeName="";page="connect";Render();});
             Text(L10n.Text("search_locations_or_regions"),14);var search=new TextBox {Margin=new Thickness(0,8,0,16)};AutomationProperties.SetName(search,L10n.Text("search_locations_or_regions"));ContentPanel.Children.Add(search);
             var list=new StackPanel();ContentPanel.Children.Add(list);
-            void Filter() {list.Children.Clear();foreach(var node in result["nodes"]!.AsArray()) {var name=node!["name"]!.GetValue<string>();var id=node["id"]!.GetValue<string>();var region=node["region"]?.GetValue<string>()??"";if(!(name+" "+region).Contains(search.Text,StringComparison.OrdinalIgnoreCase))continue;
-                var item=new Button {Content=name+(name==nodeName?"  ✓":"  ›"),HorizontalContentAlignment=HorizontalAlignment.Left,Background=Brush(name==nodeName?"#E2F7F0":"#FFFFFF"),Margin=new Thickness(0,0,0,12)};item.Click+=(_,_)=>{nodeId=id;nodeName=name;page="connect";Render();};list.Children.Add(item);}
+            var ranked=await Latency.Rank(result["nodes"]!.AsArray());
+            void Filter() {list.Children.Clear();foreach(var (node,ms) in ranked) {var name=node["name"]!.GetValue<string>();var id=node["id"]!.GetValue<string>();var region=node["region"]?.GetValue<string>()??"";if(!(name+" "+region).Contains(search.Text,StringComparison.OrdinalIgnoreCase))continue;
+                var item=new Button {Content=name+(ms is { } latency?"  ·  "+L10n.Text("latency_ms",latency.ToString("N0",L10n.Culture)):"")+(name==nodeName?"  ✓":"  ›"),HorizontalContentAlignment=HorizontalAlignment.Left,Background=Brush(name==nodeName?"#E2F7F0":"#FFFFFF"),Margin=new Thickness(0,0,0,12)};item.Click+=(_,_)=>{nodeId=id;nodeName=name;page="connect";Render();};list.Children.Add(item);}
                 if(list.Children.Count==0)list.Children.Add(new TextBlock {Text=L10n.Text("no_matching_locations_change_your_search_or_refresh_later"),Margin=new Thickness(0,16,0,16)});
             } Filter();search.TextChanged+=(_,_)=>Filter();Button(L10n.Text("refresh_locations"),()=>Render());
         });

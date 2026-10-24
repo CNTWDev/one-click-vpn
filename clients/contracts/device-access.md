@@ -23,9 +23,20 @@
 | POST `/api/v2/native/disconnect` | 签名请求，过期当前安装实例的所有节点租约，不释放设备名额 |
 | GET `/api/v2/native/status/{leaseId}` | 验证租约仍有效及节点配置是否已应用，不代表客户端实际隧道握手成功 |
 | POST `/api/v2/native/logout` | 删除登录会话；客户端应先断开连接 |
-| GET `/api/v2/native/nodes` | 返回当前账号允许访问且协议已部署的节点 |
+| GET `/api/v2/native/nodes` | 返回当前账号允许访问且协议已部署的节点，按负载排序；`probe` 为测延迟用的 TCP 地址（同一主机的 REALITY 端口），没有则为 null；`load` 为节点 CPU 百分比（0–100，无新鲜心跳为 null） |
 
 所有生产接口 HTTPS。签名算法 ES256；身份公钥采用 JWK（kty EC、crv P-256、x/y Base64URL）。签名载荷为服务端 payload 解码后的精确字节，客户端不自行重新序列化 JSON；签名为 IEEE P1363 原始 r||s（64 bytes）后 Base64URL。challenge 绑定会话、目的、请求摘要与有效期，原子消费；签名失败也消费挑战。集成测试覆盖重放、请求篡改、跨身份访问和并发额度；仍需三端真机签名互操作验收。
+
+## 节点选择
+
+三端一致：「自动」与「指定节点」。
+
+- 自动（Android）：打开节点列表或连接前，客户端对每个节点的 `probe` 做 TCP 连接计时（节点列表 5 次、连接前 3 次，每次 ≤1.5 秒；前两次都失败即判为不可达），得到延迟中位数、抖动（相邻两次差值的平均）和丢包率。服务端的 `load`（节点 CPU 百分比，心跳超过 3 分钟则为 null）参与排序。综合分 = 延迟 + 2×抖动 + 10×丢包百分比 + 负载 ≥85% 时 +150，越低越好；测不到的节点排在后面并保持服务端顺序。连接时把综合分最好的 nodeId 发给服务端。节点连不上时自动换下一个节点，最多尝试 3 个。节点列表显示色点（优 / 良 / 差 / 不可达）、延迟、抖动、丢包和负载。
+- 自动（Apple / Windows，Windows 只选最快节点，暂不自动换）：对每个节点的 `probe` 做 2 次 TCP 连接计时（每次 ≤1.5 秒，取最小值），按延迟从低到高排列；测不到的节点排在后面并保持服务端顺序。握手未完成（还有备选节点时等 20 秒，否则 45 秒）或节点不可用时，自动换下一个节点，最多尝试 3 个。
+- 指定节点：只连所选节点，不自动切换；不可用时提示用户换一个。
+- 传输（Android）：App 内嵌 mihomo 内核（`clients/android/core`，gomobile 打包），自建 VpnService 把 tun 交给内核，App 自身不走 VPN（测速和 API 走原网络，连接中也能测速）。`connect` 响应除 WireGuard 外带 `proxies`：节点开了 VLESS REALITY 时有 `reality`（TCP 443），开了抗封锁通道（`stealth` 服务）时还有 `hysteria2`（UDP 8443，Salamander 混淆，证书指纹固定）和 `xhttp`（REALITY over XHTTP，TCP 8443）。每台设备一个密钥（`native_secret:<enrollmentId>`），同时是 VLESS UUID 和 Hysteria2 密码。顺序 WireGuard → Hysteria2 → REALITY → XHTTP，连接时并行测试全部，fallback 组用第一个能通的；WireGuard 就绪后流量自动回到 WireGuard。某协议在一个网络上不通而别的能通，就在该网络（运营商代码或 Wi-Fi 的 DNS/网关哈希）把它排到最后，保留 7 天。每 30 秒复测，连续两次全不通则换节点（自动模式）或断开。Apple / Windows 目前只有 WireGuard。
+- 路由（Android）：节点页可选「智能分流」（默认，私有网段和中国大陆域名/IP 直连，规则集与订阅相同，经隧道下载）或「全局」；断开后切换，下次连接生效。Apple / Windows 为全局（`0.0.0.0/0, ::/0`）。
+- 诊断日志（Android）：「我的」底部版本号 4 秒内点 7 次进入。只记连接步骤：网络标签哈希、节点名、协议名、耗时、错误码；不记密钥、令牌、地址和访问的网站（内核日志不导出）。两个 256 KB 文件轮转，超过 7 天的行丢弃。可复制、分享、清空。
 
 ## 准入与撤销事务
 
