@@ -1,4 +1,5 @@
 import { t, useConsoleLanguage } from "../i18n";
+import { PasswordInput } from "../../../shared/password-input";
 import { type FormEvent, useEffect, useState } from "react";
 import { api } from "../api";
 import { useConfirm } from "../confirm-dialog";
@@ -68,7 +69,7 @@ export function MailSettingsPanel() {
       {form.provider === "aliyun" && <small>{t("海外区域请改为对应地址，例如新加坡：smtpdm-ap-southeast-1.aliyun.com。")}</small>}
       <label>{t("发信地址")}<input required type="email" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} placeholder="no-reply@mail.example.com" /></label>
       <label>{t("发件人名称")}<input value={form.fromName} onChange={(event) => setForm({ ...form, fromName: event.target.value })} placeholder="TrackNothing" /></label>
-      <label>{t("SMTP 密码")}<input type="password" autoComplete="new-password" required={!settings} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={settings ? t("留空则保持不变") : ""} /></label>
+      <label>{t("SMTP 密码")}<PasswordInput showLabel={t("显示密码")} hideLabel={t("隐藏密码")} autoComplete="new-password" required={!settings} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={settings ? t("留空则保持不变") : ""} /></label>
       {form.provider === "aliyun" && <small>{t("在阿里云邮件推送控制台创建发信地址并设置 SMTP 密码，发信域名需完成 SPF / DKIM 验证。")}</small>}
       <div className="form-actions mail-actions">
         {settings && <button type="button" className="button ghost danger-text" disabled={Boolean(busy)} onClick={() => void disable()}>{t("停用")}</button>}

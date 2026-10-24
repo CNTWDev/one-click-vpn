@@ -1,5 +1,6 @@
 import { useI18n } from "../../shared/i18n";
 import { Brand } from "./brand";
+import { PasswordInput } from "../../shared/password-input";
 import { applySiteToDocument, loadSite, useSite } from "../../shared/site";
 import { PRODUCT_NAME } from "../../shared/brand-name";
 import { PortalLanguage, PortalLanguagePicker } from "./language";
@@ -92,7 +93,7 @@ function Auth({ mode, onMode, onUser, notice }: {
       {askEmail && <label>{t("邮箱")}<input type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="you@example.com" /></label>}
       {mode !== "forgot" && <div className="field">
         <div className="field-head"><label htmlFor="auth-password">{t("密码")}</label>{mode === "login" && <button type="button" className="ghost compact" onClick={() => switchMode("forgot")}>{t("忘记密码？")}</button>}</div>
-        <input id="auth-password" type="password" minLength={12} required value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={t("至少 12 位")} />
+        <PasswordInput showLabel={t("显示密码")} hideLabel={t("隐藏密码")} id="auth-password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={12} required value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={t("至少 12 位")} />
       </div>}
       {error && <p className="inline-error" role="alert">{errorText(error, t)}</p>}
       {askEmail && <button className="primary large wide" disabled={busy}>{busy ? t("处理中…") : mode === "login" ? t("登录") : mode === "register" ? t("提交申请") : t("发送重置链接")}</button>}
@@ -122,7 +123,7 @@ function ResetPassword({ token, onDone }: { token: string; onDone: (changed: boo
   return <main className="center-page"><Brand /><form className="auth-panel" onSubmit={submit}>
     <h2>{t("设置新密码")}</h2>
     <p className="muted">{t("设置后，所有设备需要用新密码重新登录。")}</p>
-    <label>{t("新密码")}<input type="password" autoComplete="new-password" minLength={12} required autoFocus value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t("至少 12 位")} /></label>
+    <label>{t("新密码")}<PasswordInput showLabel={t("显示密码")} hideLabel={t("隐藏密码")} autoComplete="new-password" minLength={12} required autoFocus value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t("至少 12 位")} /></label>
     {error && <p className="inline-error" role="alert">{errorText(error, t)}</p>}
     <button className="primary large wide" disabled={busy}>{busy ? t("处理中…") : t("保存新密码")}</button>
     <button type="button" className="ghost wide" onClick={() => onDone(false)}>{t("返回登录")}</button>

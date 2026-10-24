@@ -14,6 +14,7 @@ import type { AdminUser, ControllerInfo, NodeRecord, Region } from "./types";
 import "./styles.css";
 import "./credential-usage.css";
 import { SubscriptionPanel } from "../../shared/subscription-panel";
+import { PasswordInput } from "../../shared/password-input";
 
 // Each console page is its own chunk, fetched the first time it is opened.
 const OverviewPage = lazy(() => import("./pages/overview").then((module) => ({ default: module.OverviewPage })));
@@ -66,7 +67,7 @@ function Login({ onUser }: { onUser: (user: AdminUser) => void }) {
     <form onSubmit={submit}>
       <h1>{t("管理控制台")}</h1><p>{t("账号审核、节点部署与修复、VPN 服务和运行诊断。")}</p>
       <label>{t("管理员邮箱")}<input type="email" required autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-      <label>{t("密码")}<input type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+      <label>{t("密码")}<PasswordInput showLabel={t("显示密码")} hideLabel={t("隐藏密码")} required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
       <button type="submit" disabled={busy}>{busy ? t("登录中…") : t("登录 Console")} →</button>
       {error && <div className="login-error" role="alert">{error}</div>}
     </form>

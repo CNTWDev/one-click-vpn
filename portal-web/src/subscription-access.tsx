@@ -1,4 +1,5 @@
 import { useI18n } from "../../shared/i18n";
+import { PasswordInput } from "../../shared/password-input";
 import { useImperativeHandle, useState, type FormEvent, type Ref } from "react";
 import { api } from "./api";
 import { importUrls, subscriptionLink, type RoutingMode, type SubscriptionFormat } from "./format";
@@ -81,7 +82,7 @@ export function SubscriptionAccess({ id, protocol, disabled, initialToken = "", 
     <Modal open={!!pending} title={pending === "reset" ? t("重置订阅链接") : t("验证登录密码")} onClose={() => { if (!busy) { setPending(null); setPassword(""); } }}>
       <form className="stack" onSubmit={verify}>
         <p>{pending === "reset" ? t("旧链接会立即失效，所有客户端需要重新导入；已下载的配置不受影响。链接泄露时请删除整个连接。") : t("订阅链接包含访问权限，验证后即可导入。链接不会保存在浏览器中。")}</p>
-        <label>{t("登录密码")}<input type="password" autoComplete="current-password" required maxLength={1024} autoFocus value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+        <label>{t("登录密码")}<PasswordInput showLabel={t("显示密码")} hideLabel={t("隐藏密码")} autoComplete="current-password" required maxLength={1024} autoFocus value={password} onChange={(event) => setPassword(event.target.value)} /></label>
         {error && <InlineError message={error} />}
         <div className="dialog-actions"><button type="button" className="secondary" disabled={busy} onClick={() => { setPending(null); setPassword(""); }}>{t("取消")}</button><button className={pending === "reset" ? "danger" : "primary"} disabled={busy}>{busy ? t("验证中…") : pending === "reset" ? t("验证并重置") : t("验证并继续")}</button></div>
       </form>
