@@ -6,11 +6,15 @@ import { Icon } from "../icons";
 import { useQueryParam } from "../router";
 import { useToast } from "../toast";
 import type { NodeRecord, OperationalLogLine } from "../types";
-import { Empty, formatTime, InlineNotice, type Notice, PageHeader, Pill, TableToolbar } from "./shared";
+import { Empty, formatTime, InlineNotice, type Notice, PageHeader, Pagination, Pill, TableToolbar, useCursorPages } from "./shared";
+
+const PAGE_SIZE = 50;
 
 export function LogsPage({ nodes }: { nodes: NodeRecord[] }) {
   useConsoleLanguage();
   const [logs, setLogs] = useState<OperationalLogLine[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | undefined>();
+  const [counts, setCounts] = useState<Record<string, number> | undefined>();
   const [available, setAvailable] = useState(true);
   const [nodeId, setNodeId] = useQueryParam("node");
   const [level, setLevel] = useQueryParam("level", "all");
@@ -22,27 +26,39 @@ export function LogsPage({ nodes }: { nodes: NodeRecord[] }) {
   const confirm = useConfirm();
   const toast = useToast();
   const request = useRef(0);
+  const panel = useRef<HTMLElement>(null);
+  const pages = useCursorPages(JSON.stringify([nodeId, level, source, hours, search.trim()]));
+  const cursor = pages.cursor;
 
   const refresh = useCallback(async () => {
     const id = ++request.current;
     setBusy(true); setNotice(null);
     try {
-      const params = new URLSearchParams({ hours, limit: "300" });
+      const params = new URLSearchParams({ hours, limit: String(PAGE_SIZE) });
+      if (cursor) params.set("before", cursor);
       if (nodeId) params.set("nodeId", nodeId);
       if (level !== "all") params.set("level", level);
       if (source !== "all") params.set("source", source);
       if (search.trim()) params.set("q", search.trim());
-      const result = await api<{ logs: OperationalLogLine[]; available: boolean }>(`/api/logs?${params}`);
+      const result = await api<{ logs: OperationalLogLine[]; available: boolean; nextCursor?: string; counts?: Record<string, number> }>(`/api/logs?${params}`);
       if (id !== request.current) return;
-      setLogs(result.logs || []); setAvailable(result.available !== false);
+      setLogs(result.logs || []); setAvailable(result.available !== false); setNextCursor(result.nextCursor);
+      // Totals come with the first page only; later pages keep them.
+      if (!cursor) setCounts(result.counts);
     } catch (error) { if (id === request.current) setNotice({ tone: "error", message: (error as Error).message }); }
     finally { if (id === request.current) setBusy(false); }
-  }, [hours, nodeId, level, source, search]);
+  }, [hours, nodeId, level, source, search, cursor]);
   // Filters apply on their own (debounced) — there is no separate "查询" step.
   useEffect(() => {
     const timer = window.setTimeout(() => void refresh(), 300);
     return () => window.clearTimeout(timer);
   }, [refresh]);
+  // A new page starts at its first line, not wherever the previous page was scrolled to.
+  const firstPage = useRef(true);
+  useEffect(() => {
+    if (firstPage.current) { firstPage.current = false; return; }
+    panel.current?.scrollIntoView({ block: "start" });
+  }, [pages.page]);
 
   async function purge() {
     const confirmation = nodeId ? "PURGE NODE LOGS" : "PURGE SYSTEM LOGS";
@@ -64,19 +80,20 @@ export function LogsPage({ nodes }: { nodes: NodeRecord[] }) {
   const shown = logs;
   const nodeName = (id?: string) => !id || id === "controller" ? "Controller" : nodes.find((node) => node.id === id)?.name || id;
   const follow = (id: string) => { setSearch(id); setLevel("all"); setSource("all"); setNodeId(""); };
-  const counts = (value: string) => level === "all" || level === value ? logs.filter((log) => value === "all" || (log.labels.level || "info") === value).length : undefined;
+  const total = (value: string) => counts ? value === "all" ? Object.values(counts).reduce((sum, count) => sum + count, 0) : counts[value] || 0 : undefined;
   return <>
     <PageHeader title={t("运行日志")} description={t("记录用户关键操作和系统事件。点请求或任务 ID，可查看同一次操作的全部日志。")} actions={<><button className="button ghost" disabled={busy} onClick={() => void refresh()}><Icon name="refresh" size={16} />{busy ? t("加载中…") : t("刷新")}</button><button className="button danger" onClick={() => void purge()}>{nodeId ? t("清除节点日志") : t("清除全部日志")}</button></>} />
     <InlineNotice notice={notice} onRetry={notice?.tone === "error" ? () => void refresh() : undefined} />
     {!available && <InlineNotice notice={{ tone: "info", message: t("日志服务（Loki）当前不可用。在服务器上运行 sudo ./one-click-update.sh 可自动修复；节点恢复操作不受影响。") }} />}
-    <section className="panel flush table-panel log-panel">
-      <TableToolbar search={search} onSearch={setSearch} placeholder={t("搜索消息、用户、IP 或请求 ID")} chips={[["all", t("全部")], ["info", t("信息")], ["warning", t("警告")], ["error", t("错误")]].map(([value, label]) => ({ value, label, count: counts(value) }))} chip={level} onChip={setLevel}>
+    <section ref={panel} className="panel flush table-panel log-panel">
+      <TableToolbar search={search} onSearch={setSearch} placeholder={t("搜索消息、用户、IP 或请求 ID")} chips={[["all", t("全部")], ["info", t("信息")], ["warning", t("警告")], ["error", t("错误")]].map(([value, label]) => ({ value, label, count: total(value) }))} chip={level} onChip={setLevel}>
         <div className="log-filters"><select className="toolbar-select" aria-label={t("来源")} value={source} onChange={(event) => setSource(event.target.value)}><option value="all">{t("全部来源")}</option><option value="user">{t("用户操作")}</option><option value="system">{t("系统事件")}</option></select>
         <select className="toolbar-select" aria-label={t("节点")} value={nodeId} onChange={(event) => setNodeId(event.target.value)}><option value="">{t("全部节点 / Controller")}</option>{nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select>
         <select className="toolbar-select" aria-label={t("时间范围")} value={hours} onChange={(event) => setHours(event.target.value)}><option value="1">{t("最近 1 小时")}</option><option value="6">{t("最近 6 小时")}</option><option value="24">{t("最近 24 小时")}</option><option value="168">{t("最近 7 天")}</option><option value="720">{t("最近 30 天")}</option></select></div>
       </TableToolbar>
       {shown.length ? <div className={`log-list ${busy ? "refreshing" : ""}`}>{shown.map((log, index) => <LogEntry key={`${log.timestamp}:${index}`} log={log} nodeName={nodeName} onFollow={follow} />)}</div>
         : busy ? <div className="skeleton-block" role="status" aria-label={t("正在查询日志")}><i /><i /><i /></div> : <Empty action={search || level !== "all" || source !== "all" || nodeId ? <button className="button ghost" onClick={() => { setSearch(""); setLevel("all"); setSource("all"); setNodeId(""); }}>{t("清除筛选")}</button> : undefined}>{t("当前筛选范围内没有日志。")}</Empty>}
+      <Pagination {...pages.pagination(shown.length, nextCursor, total(level))} />
     </section>
   </>;
 }

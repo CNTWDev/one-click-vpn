@@ -165,7 +165,7 @@ export function TableToolbar({ search, onSearch, placeholder, chips, chip, onChi
   useConsoleLanguage();
   return <div className="table-toolbar">
     <label className="search-field"><Icon name="search" size={16} /><input type="search" value={search} onChange={(event) => onSearch(event.target.value)} placeholder={placeholder} aria-label={placeholder} />{search && <button type="button" aria-label={t("清除搜索")} onClick={() => onSearch("")}><Icon name="close" size={14} /></button>}</label>
-    {chips && <div className="chips" role="group" aria-label={t("筛选")}>{chips.map((item) => <button key={item.value} type="button" className={chip === item.value ? "active" : ""} aria-pressed={chip === item.value} onClick={() => onChip?.(item.value)}>{item.label}{item.count !== undefined && <em>{item.count}</em>}</button>)}</div>}
+    {chips && <div className="chips" role="group" aria-label={t("筛选")}>{chips.map((item) => <button key={item.value} type="button" className={chip === item.value ? "active" : ""} aria-pressed={chip === item.value} onClick={() => onChip?.(item.value)}>{item.label}{item.count !== undefined && <em>{item.count.toLocaleString(intlLocales[consoleLanguage.locale()])}</em>}</button>)}</div>}
     <span className="grow" />
     {children}
     {sortOptions && <label className="sort-field"><span>{t("排序")}</span><select value={sort} onChange={(event) => onSort?.(event.target.value)}>{sortOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
@@ -183,3 +183,66 @@ export const includesText = (query: string, ...values: Array<string | null | und
   const needle = query.trim().toLowerCase();
   return !needle || values.some((value) => value?.toLowerCase().includes(needle));
 };
+
+export type PaginationState = { from: number; to: number; total?: number; hasPrev: boolean; hasNext: boolean; onPrev: () => void; onNext: () => void };
+
+/**
+ * List footer shared by every Console list: "51–100 of 1,234" with previous / next.
+ * Renders nothing while everything fits on one page. Feed it from useCursorPages (server-paged
+ * APIs) or usePagedItems (lists already in memory).
+ */
+export function Pagination({ from, to, total, hasPrev, hasNext, onPrev, onNext }: PaginationState) {
+  useConsoleLanguage();
+  if (!hasPrev && !hasNext) return null;
+  const number = (value: number) => value.toLocaleString(intlLocales[consoleLanguage.locale()]);
+  return <nav className="pagination" aria-label={t("分页")}>
+    <span className="pagination-range">{total === undefined ? t("第 {0}–{1} 条", [number(from), number(to)]) : t("第 {0}–{1} 条，共 {2} 条", [number(from), number(to), number(total)])}</span>
+    <button type="button" className="button ghost small" disabled={!hasPrev} onClick={onPrev}><Icon name="chevron" size={16} />{t("上一页")}</button>
+    <button type="button" className="button ghost small" disabled={!hasNext} onClick={onNext}>{t("下一页")}<Icon name="chevron" size={16} /></button>
+  </nav>;
+}
+
+/**
+ * Page state for APIs that return a cursor to the next page (e.g. Runtime logs). It remembers the
+ * cursor and starting row of every visited page, so "previous" never re-walks the list, and
+ * returns to page 1 whenever `resetKey` (the serialized filters) changes.
+ */
+export function useCursorPages(resetKey: string) {
+  type Pages = { key: string; index: number; pages: Array<{ cursor?: string; offset: number }> };
+  const fresh = (): Pages => ({ key: resetKey, index: 0, pages: [{ offset: 0 }] });
+  const [stored, setStored] = useState<Pages>(fresh);
+  // State saved under other filters is simply ignored: changing filters is a return to page 1.
+  const state = stored.key === resetKey ? stored : fresh();
+  const current = state.pages[state.index];
+  return {
+    cursor: current.cursor,
+    page: state.index + 1,
+    pagination: (shown: number, nextCursor: string | undefined, total?: number): PaginationState => ({
+      from: shown ? current.offset + 1 : 0, to: current.offset + shown, total,
+      hasPrev: state.index > 0, hasNext: Boolean(nextCursor),
+      onPrev: () => setStored({ ...state, index: Math.max(state.index - 1, 0) }),
+      onNext: () => {
+        if (!nextCursor) return;
+        setStored({ ...state, index: state.index + 1, pages: [...state.pages.slice(0, state.index + 1), { cursor: nextCursor, offset: current.offset + shown }] });
+      },
+    }),
+  };
+}
+
+/** Client-side paging for a list already in memory; returns to page 1 whenever `resetKey` changes. */
+export function usePagedItems<T>(items: T[], pageSize: number, resetKey = "") {
+  const [stored, setStored] = useState({ key: resetKey, page: 1 });
+  const setPage = (page: number) => setStored({ key: resetKey, page });
+  const pages = Math.max(Math.ceil(items.length / pageSize), 1);
+  const current = Math.min(stored.key === resetKey ? stored.page : 1, pages);
+  const start = (current - 1) * pageSize;
+  const shown = items.slice(start, start + pageSize);
+  return {
+    items: shown,
+    pagination: {
+      from: shown.length ? start + 1 : 0, to: start + shown.length, total: items.length,
+      hasPrev: current > 1, hasNext: current < pages,
+      onPrev: () => setPage(current - 1), onNext: () => setPage(current + 1),
+    } satisfies PaginationState,
+  };
+}
