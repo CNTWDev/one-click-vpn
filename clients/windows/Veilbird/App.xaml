@@ -14,6 +14,7 @@
     <SolidColorBrush x:Key="Hover" Color="#0FECF1E8"/>
     <SolidColorBrush x:Key="Pressed" Color="#08ECF1E8"/>
     <FontFamily x:Key="Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+    <FontFamily x:Key="Dots">pack://application:,,,/Assets/Fonts/#Doto Black</FontFamily>
     <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{StaticResource Text}"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
     <!-- Default buttons are quiet rows and tiles: no fill of their own, a faint wash on hover. -->
     <Style TargetType="Button">

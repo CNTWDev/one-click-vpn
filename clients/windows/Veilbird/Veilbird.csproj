@@ -19,7 +19,7 @@
     <StartupObject>Veilbird.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup><Using Remove="System.Windows.Forms" /><Using Remove="System.Drawing" /></ItemGroup>
-  <ItemGroup><Resource Include="Assets\Veilbird.ico" /></ItemGroup>
+  <ItemGroup><Resource Include="Assets\Veilbird.ico" /><Resource Include="Assets\Fonts\Doto-Black.ttf" /></ItemGroup>
   <!-- veilbird-core.exe (the embedded mihomo core, clients/core) comes from build.ps1. -->
   <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\.deps\$(RuntimeIdentifier)\veilbird-core.exe')">
     <None Include="..\.deps\$(RuntimeIdentifier)\veilbird-core.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Link="veilbird-core.exe" />

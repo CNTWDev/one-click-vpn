@@ -51,67 +51,166 @@ public static class LoginTask {
 
 public enum RingState {Idle,Connecting,Connected,Failed}
 
-/// The palette and the small drawn pieces every page uses.
+/// The palette and the small drawn pieces every page uses, in the pixel language every TrackNothing client
+/// shares: the ∅ mark on a 16×16 grid, rings of square dots and the Doto dot-matrix face for figures.
 public static class Look {
     public static Brush Hex(string hex) {var brush=(Brush)new BrushConverter().ConvertFromString(hex)!;brush.Freeze();return brush;}
     public static readonly Brush Ground=Hex("#0D1310"),Surface=Hex("#151C17"),Raised=Hex("#1F2922"),Selected=Hex("#263127"),Text=Hex("#ECF1E8"),Secondary=Hex("#93A090"),Faint=Hex("#7F8B7C");
     public static readonly Brush Accent=Hex("#B7DC68"),OnAccent=Hex("#111912"),Danger=Hex("#F0907A"),Fair=Hex("#E2B85C"),Hairline=Hex("#0FECF1E8"),Edge=Hex("#1FECF1E8"),Off=Hex("#2E3A30");
     public static readonly FontFamily Icons=new("Segoe Fluent Icons, Segoe MDL2 Assets");
-    /// The ∅ mark: a circle crossed by a slash, drawn in a 48-unit box.
-    public static FrameworkElement Mark(double size,Brush color,double stroke=2.6) {
-        var canvas=new Canvas {Width=48,Height=48};
-        var circle=new Ellipse {Width=24,Height=24,Stroke=color,StrokeThickness=stroke};Canvas.SetLeft(circle,12);Canvas.SetTop(circle,12);
-        canvas.Children.Add(circle);
-        canvas.Children.Add(new Line {X1=13,Y1=35,X2=35,Y2=13,Stroke=color,StrokeThickness=stroke,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round});
+    /// Doto Black (SIL OFL, under Assets/Fonts), Latin only: wordmark, timers, totals and country codes.
+    public static readonly FontFamily Dots=new(new Uri("pack://application:,,,/"),"./Assets/Fonts/#Doto Black");
+    /// Same cells as scripts/brand-icons.py and the other clients.
+    public static readonly (int X,int Y)[] MarkCells="14,1 5,2 6,2 7,2 8,2 9,2 10,2 13,2 3,3 4,3 11,3 12,3 2,4 11,4 13,4 2,5 10,5 13,5 1,6 9,6 14,6 1,7 8,7 14,7 1,8 7,8 14,8 1,9 6,9 14,9 2,10 5,10 13,10 2,11 4,11 13,11 3,12 4,12 11,12 12,12 2,13 5,13 6,13 7,13 8,13 9,13 10,13 1,14"
+        .Split(' ').Select(cell=>{var xy=cell.Split(',');return (int.Parse(xy[0]),int.Parse(xy[1]));}).ToArray();
+    /// The mark as squares in a 16-unit box.
+    public static readonly Geometry MarkShape=Squares(MarkCells,0.86);
+    public static Geometry Squares(IEnumerable<(int X,int Y)> cells,double square) {
+        var geometry=new StreamGeometry();
+        using(var draw=geometry.Open())
+            foreach(var (x,y) in cells) {draw.BeginFigure(new Point(x,y),true,true);draw.PolyLineTo(new[]{new Point(x+square,y),new Point(x+square,y+square),new Point(x,y+square)},false,false);}
+        geometry.Freeze();return geometry;
+    }
+    /// Cells one cell wide on a circle of `radius` in an n×n grid, each with its clockwise position from the top (0…1).
+    public static (int X,int Y,double Turn)[] RingCells(int n,double radius) {
+        var c=(n-1)/2.0;var cells=new List<(int,int,double)>();
+        for(var y=0;y<n;y++) for(var x=0;x<n;x++) {
+            if(Math.Abs(Math.Sqrt((x-c)*(x-c)+(y-c)*(y-c))-radius)>0.55) continue;
+            var degrees=Math.Atan2(y-c,x-c)*180/Math.PI;
+            cells.Add((x,y,(degrees+450)%360/360));
+        }
+        return cells.ToArray();
+    }
+    /// The ∅ mark: an empty set drawn in square pixels.
+    public static FrameworkElement Mark(double size,Brush color) {
+        var canvas=new Canvas {Width=16,Height=16};
+        canvas.Children.Add(new System.Windows.Shapes.Path {Data=MarkShape,Fill=color});
         return new Viewbox {Width=size,Height=size,Child=canvas,IsHitTestVisible=false};
     }
-    public static FrameworkElement Logo(double size)=>new Border {Width=size,Height=size,CornerRadius=new CornerRadius(size/4),Background=Hex("#1A231C"),Child=Mark(size,Accent,3.5)};
+    /// "TRACKNOTHING" in the dot-matrix face, shown once per screen next to the mark.
+    public static TextBlock Wordmark(double size) {
+        var text=new TextBlock {Text="TRACKNOTHING",FontFamily=Dots,FontSize=size,Foreground=Text,VerticalAlignment=VerticalAlignment.Center};
+        AutomationProperties.SetName(text,"TrackNothing");
+        return text;
+    }
     public static TextBlock Icon(string glyph,double size,Brush color)=>new() {Text=glyph,FontFamily=Icons,FontSize=size,Foreground=color,VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center};
     /// A square tile with a two-letter country code, or the sparkle of automatic mode when code is null.
     public static Border Badge(string? code,double size=32,Brush? tint=null,string? glyph=null) {
         var content=glyph is not null?Icon(glyph,size*0.44,tint??Text)
             :code is null?new TextBlock {Text="✦",FontSize=size*0.46,Foreground=Accent,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}
-            :new TextBlock {Text=code,FontSize=size*0.37,FontWeight=FontWeights.SemiBold,Foreground=tint??Text,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
+            :new TextBlock {Text=code,FontFamily=Dots,FontSize=size*0.42,Foreground=tint??Accent,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
         return new Border {Width=size,Height=size,CornerRadius=new CornerRadius(size*0.19),Background=Raised,Child=content,VerticalAlignment=VerticalAlignment.Center};
     }
-    /// Three bars: how many are lit and in which color says how good a location is.
+    /// Three square bars: how many are lit and in which color says how good a location is.
     public static FrameworkElement Signal(int level,Brush color) {
         var bars=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,Height=12};
-        for(var i=0;i<3;i++) bars.Children.Add(new Rectangle {Width=3,Height=5+3.5*i,RadiusX=1,RadiusY=1,Fill=i<level?color:Off,VerticalAlignment=VerticalAlignment.Bottom,Margin=new Thickness(i==0?0:2.5,0,0,0)});
+        for(var i=0;i<3;i++) bars.Children.Add(new Rectangle {Width=3,Height=5+3.5*i,Fill=i<level?color:Off,VerticalAlignment=VerticalAlignment.Bottom,Margin=new Thickness(i==0?0:2.5,0,0,0)});
         return bars;
+    }
+    public const string StreamIdle="---- ---- ---- ----";
+    public static readonly Brush StreamOn=Hex("#7E9C4C"),StreamOff=Hex("#2E3B31");
+    /// The "data stream" under the ring: hex digits that each change on their own slow beat (3–9 s),
+    /// so about three change every second.
+    public static string Stream(DateTime now) {
+        var seconds=(long)(now-DateTime.UnixEpoch).TotalSeconds;const string hex="0123456789ABCDEF";
+        var line=new System.Text.StringBuilder();
+        for(var i=0;i<16;i++) {
+            var beat=(ulong)(seconds/(3+i%7));
+            var h=unchecked(beat*0x9E3779B97F4A7C15UL^(ulong)i*0xBF58476D1CE4E5B9UL);
+            h^=h>>31;
+            line.Append(hex[(int)(h%16)]);
+            if(i%4==3&&i<15) line.Append(' ');
+        }
+        return line.ToString();
     }
 }
 
-/// The connect button: a ring around a disk with the ∅ mark. While connecting an arc turns around the ring;
-/// a failure swaps the mark for a retry arrow.
-public sealed class Ring {
-    public readonly Grid View=new() {Width=188,Height=188};
-    private readonly Ellipse outer=new() {StrokeThickness=1},disk=new() {Width=154,Height=154};
-    private readonly System.Windows.Shapes.Path arc;
-    private readonly RotateTransform turn=new(0,94,94);
-    private readonly ContentControl mark=new() {IsHitTestVisible=false};
-    private RingState? state;
-    public Ring() {
-        var end=64.8*Math.PI/180;
-        var figure=new PathFigure {StartPoint=new Point(94,0.5)};
-        figure.Segments.Add(new ArcSegment(new Point(94+93.5*Math.Sin(end),94-93.5*Math.Cos(end)),new Size(93.5,93.5),0,false,SweepDirection.Clockwise,true));
-        var geometry=new PathGeometry();geometry.Figures.Add(figure);
-        arc=new System.Windows.Shapes.Path {Data=geometry,Stroke=Look.Accent,StrokeThickness=2,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,RenderTransform=turn,Visibility=Visibility.Collapsed};
-        View.Children.Add(outer);View.Children.Add(arc);View.Children.Add(disk);View.Children.Add(mark);
-        View.Background=Brushes.Transparent;
+/// The connect button: a ring of square dots around the ∅ mark, over a faint halftone glow. Dim when idle,
+/// a comet of lit dots turning while connecting (held still when Windows animations are off), every dot lit
+/// once connected, and a dark ring with the mark in red after a failure.
+public sealed class Ring:FrameworkElement {
+    private static readonly (int X,int Y,double Turn)[] Cells=Look.RingCells(41,18);
+    private static readonly Brush IdleDot=Look.Hex("#243026"),FailedDot=Look.Hex("#2B2420");
+    // The comet's fade, in 32 steps, so a frame allocates nothing.
+    private static readonly Brush[] Comet=Enumerable.Range(0,33).Select(i=>{var brush=new SolidColorBrush(Color.FromRgb(183,220,104)) {Opacity=i/32.0};brush.Freeze();return (Brush)brush;}).ToArray();
+    private readonly Stopwatch clock=Stopwatch.StartNew();
+    private RingState state=RingState.Idle;
+    private bool turning;
+    private Drawing? glow;
+    private double glowSide;
+    public FrameworkElement View=>this;
+    public Ring(double size=208) {
+        Width=Height=size;
+        Unloaded+=(_,_)=>Turn(false);
+        Loaded+=(_,_)=>Turn(state==RingState.Connecting&&animate);
     }
+    private bool animate;
     public void Set(RingState next,bool motion) {
-        if(state==next) return;
-        state=next;
-        outer.Stroke=Look.Hex(next switch {RingState.Connecting=>"#24B7DC68",RingState.Connected=>"#38B7DC68",RingState.Failed=>"#33F0907A",_=>"#14ECF1E8"});
-        disk.Fill=next switch {RingState.Connected=>Look.Hex("#17221A"),RingState.Failed=>Look.Hex("#1B1715"),_=>Look.Surface};
-        disk.Stroke=next switch {RingState.Connecting=>Look.Hex("#2EB7DC68"),RingState.Connected=>Look.Accent,RingState.Failed=>Look.Hex("#8CF0907A"),_=>Look.Hex("#1AECF1E8")};
-        disk.StrokeThickness=next switch {RingState.Connected=>2,RingState.Failed=>1.5,_=>1};
-        mark.Content=next==RingState.Failed?Look.Icon("",34,Look.Danger)
-            :Look.Mark(56,next switch {RingState.Idle=>Look.Secondary,RingState.Connecting=>Look.Hex("#B3B7DC68"),_=>Look.Accent});
-        arc.Visibility=next==RingState.Connecting?Visibility.Visible:Visibility.Collapsed;
-        if(next==RingState.Connecting&&motion) turn.BeginAnimation(RotateTransform.AngleProperty,new DoubleAnimation(0,360,TimeSpan.FromSeconds(1.6)) {RepeatBehavior=RepeatBehavior.Forever});
-        else turn.BeginAnimation(RotateTransform.AngleProperty,null);
+        if(state==next&&animate==motion) return;
+        if(state!=next) glow=null;
+        state=next;animate=motion;
+        Turn(next==RingState.Connecting&&motion&&IsLoaded);
+        InvalidateVisual();
+    }
+    private void Turn(bool on) {
+        if(on==turning) return;
+        turning=on;
+        if(on) CompositionTarget.Rendering+=OnFrame;else CompositionTarget.Rendering-=OnFrame;
+    }
+    private void OnFrame(object? sender,EventArgs e)=>InvalidateVisual();
+    protected override void OnRender(DrawingContext dc) {
+        double width=ActualWidth,height=ActualHeight,side=Math.Min(width,height),left=(width-side)/2,top=(height-side)/2;
+        dc.DrawRectangle(Brushes.Transparent,null,new Rect(0,0,width,height));
+        if(glow is null||glowSide!=side) {glow=Glow(side);glowSide=side;}
+        if(glow is not null) {dc.PushTransform(new TranslateTransform(left,top));dc.DrawDrawing(glow);dc.Pop();}
+        var cell=side/41;var square=cell*0.83;
+        double? head=turning?clock.Elapsed.TotalSeconds%1.6/1.6:null;
+        foreach(var (x,y,turn) in Cells) {
+            var brush=state switch {
+                RingState.Idle=>IdleDot,RingState.Failed=>FailedDot,RingState.Connected=>Look.Accent,
+                // A comet: full at its head, fading over the next 38% of the turn.
+                _=>head is { } h?Comet[(int)Math.Round(32*Tail((h-turn+1)%1))]:Comet[16],
+            };
+            dc.DrawRectangle(brush,null,new Rect(left+x*cell,top+y*cell,square,square));
+        }
+        var mark=side*80/246;
+        dc.PushTransform(new TranslateTransform(width/2-mark/2,height/2-mark/2));dc.PushTransform(new ScaleTransform(mark/16,mark/16));
+        dc.DrawGeometry(state switch {RingState.Idle=>Look.Faint,RingState.Failed=>Look.Danger,_=>Look.Accent},null,Look.MarkShape);
+        dc.Pop();dc.Pop();
+    }
+    private static double Tail(double behind)=>behind<0.38?1-0.88*behind/0.38:0.12;
+    /// Halftone dots that fade out from the centre; brighter the further the connection has come.
+    private Drawing? Glow(double side) {
+        var strength=state switch {RingState.Idle=>0.06,RingState.Connecting=>0.13,RingState.Connected=>0.22,_=>0.0};
+        if(strength<=0||side<=0) return null;
+        var group=new DrawingGroup();
+        using(var draw=group.Open()) {
+            double step=6,center=side/2,reach=side*0.62;
+            for(var y=center%step;y<side;y+=step) for(var x=center%step;x<side;x+=step) {
+                var fade=1-Math.Sqrt((x-center)*(x-center)+(y-center)*(y-center))/reach;
+                if(fade<=0) continue;
+                var brush=new SolidColorBrush(Color.FromRgb(183,220,104)) {Opacity=strength*Math.Min(1,fade*1.6)};brush.Freeze();
+                draw.DrawEllipse(brush,null,new Point(x,y),0.9,0.9);
+            }
+        }
+        group.Freeze();return group;
+    }
+}
+
+/// 30 days of usage as columns of square blocks; the last seven days in lime.
+public sealed class UsageBlocks:FrameworkElement {
+    private static readonly Brush Older=Look.Hex("#5E7550");
+    private readonly IReadOnlyList<long> values;
+    public UsageBlocks(IReadOnlyList<long> values) {this.values=values;IsHitTestVisible=false;}
+    protected override void OnRender(DrawingContext dc) {
+        if(values.Count==0) return;
+        double gap=3,width=(ActualWidth-gap*(values.Count-1))/values.Count,block=4,pitch=6;
+        var rows=Math.Max(1,(int)((ActualHeight+pitch-block)/pitch));var top=Math.Max(values.Max(),1);
+        for(var i=0;i<values.Count;i++) {
+            var lit=values[i]<=0?1:Math.Max(1,(int)Math.Round((double)rows*values[i]/top));
+            var brush=i>=values.Count-7?Look.Accent:Older;
+            for(var r=0;r<lit;r++) dc.DrawRectangle(brush,null,new Rect(i*(width+gap),ActualHeight-r*pitch-block,Math.Max(1,width),block));
+        }
     }
 }
 
@@ -138,8 +237,8 @@ public partial class MainWindow : Window {
     // Live parts of the connect page and the tray flyout.
     private Ring? ring;
     private Button? ringButton;
-    private TextBlock? statusTitle,statusDetail,usageTotal,usageUntil;
-    private Ellipse? statusDot;
+    private TextBlock? statusTitle,statusDetail,statusTimer,stream,usageTotal,usageUntil;
+    private Rectangle? statusDot;
     private (ContentControl Badge,TextBlock Title,TextBlock Detail)? location;
     private string badgeKey="";
     private Window? flyout;
@@ -152,7 +251,7 @@ public partial class MainWindow : Window {
 
     public MainWindow() {
         L10n.Initialize();InitializeComponent();api.Origin=api.SavedOrigin;
-        TitleLogo.Content=Look.Logo(16);
+        TitleLogo.Content=Look.Mark(16,Look.Accent);
         connection=new Connection(api,core);
         connection.Changed+=()=>Dispatcher.InvokeAsync(()=>{UpdateLive();UpdateTray();});
         refresh.Tick+=(_,_)=>UpdateLive();refresh.Start();
@@ -233,7 +332,7 @@ public partial class MainWindow : Window {
         window.Deactivated+=(_,_)=>{if(window.IsVisible) {window.Hide();flyoutHidden=DateTime.UtcNow;}};
         var root=new DockPanel {LastChildFill=false};
         var header=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,14)};
-        header.Children.Add(Look.Logo(18));header.Children.Add(new TextBlock {Text="TrackNothing",FontSize=13,FontWeight=FontWeights.SemiBold,Margin=new Thickness(8,0,0,0),VerticalAlignment=VerticalAlignment.Center});
+        var word=Look.Wordmark(14);word.Margin=new Thickness(8,0,0,0);header.Children.Add(Look.Mark(16,Look.Accent));header.Children.Add(word);
         DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
 
         var mark=new ContentControl {Width=40,Height=40};
@@ -276,7 +375,7 @@ public partial class MainWindow : Window {
             flyState=state;
             var on=state==RingState.Connected;
             f.Card.Background=on?Look.Hex("#17221A"):Look.Surface;f.Card.BorderBrush=on?Look.Hex("#4DB7DC68"):Look.Hairline;
-            f.Mark.Content=state==RingState.Failed?Look.Icon("",22,Look.Danger):Look.Mark(40,state==RingState.Idle?Look.Secondary:Look.Accent,3);
+            f.Mark.Content=Look.Mark(34,state switch {RingState.Idle=>Look.Faint,RingState.Failed=>Look.Danger,_=>Look.Accent});
         }
         f.Title.Text=StatusTitle(state);f.Detail.Text=StatusDetail(state);
         f.Switch.IsChecked=connection.Active;f.Switch.IsEnabled=!busy||connection.Active;
@@ -404,7 +503,7 @@ public partial class MainWindow : Window {
     // ---- Pages ----
     private void Render() {
         ContentPanel.Children.Clear();FullPanel.Children.Clear();NavigationPanel.Children.Clear();HeaderSlot.Content=null;
-        ring=null;ringButton=null;statusTitle=statusDetail=usageTotal=usageUntil=null;statusDot=null;location=null;badgeKey="";
+        ring=null;ringButton=null;statusTitle=statusDetail=statusTimer=stream=usageTotal=usageUntil=null;statusDot=null;location=null;badgeKey="";
         var view=api.SignedIn?page:"login";
         var full=view=="connect";
         Scroller.Visibility=full?Visibility.Collapsed:Visibility.Visible;FullPanel.Visibility=full?Visibility.Visible:Visibility.Collapsed;
@@ -464,13 +563,15 @@ public partial class MainWindow : Window {
         ring=new Ring();
         ringButton=new Button {Style=(Style)FindResource("Bare"),Content=ring.View,HorizontalAlignment=HorizontalAlignment.Center};
         ringButton.Click+=(_,_)=>Toggle();
-        statusDot=new Ellipse {Width=8,Height=8,Fill=Look.Accent,Margin=new Thickness(0,0,10,0),VerticalAlignment=VerticalAlignment.Center};
+        statusDot=new Rectangle {Width=8,Height=8,Fill=Look.Accent,Margin=new Thickness(0,0,10,0),VerticalAlignment=VerticalAlignment.Center};
         statusTitle=new TextBlock {FontSize=24,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.NoWrap};
-        var titleRow=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,28,0,0)};
+        var titleRow=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,20,0,0)};
         titleRow.Children.Add(statusDot);titleRow.Children.Add(statusTitle);
+        statusTimer=new TextBlock {FontFamily=Look.Dots,FontSize=30,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,8,0,0),Visibility=Visibility.Collapsed};
         statusDetail=new TextBlock {FontSize=13,Foreground=Look.Secondary,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(8,6,8,0),MaxHeight=40,TextTrimming=TextTrimming.CharacterEllipsis};
+        stream=new TextBlock {FontFamily=Look.Dots,FontSize=14,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,14,0,0)};
         var center=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
-        center.Children.Add(ringButton);center.Children.Add(titleRow);center.Children.Add(statusDetail);
+        center.Children.Add(ringButton);center.Children.Add(titleRow);center.Children.Add(statusTimer);center.Children.Add(statusDetail);center.Children.Add(stream);
         Grid.SetRow(center,1);layout.Children.Add(center);
 
         var badge=new ContentControl();
@@ -501,9 +602,12 @@ public partial class MainWindow : Window {
         return failed?RingState.Failed:RingState.Idle;
     }
     private string StatusTitle(RingState state)=>L10n.Text(state switch {RingState.Connected=>"connected_status",RingState.Connecting=>"connecting",RingState.Failed=>"connect_failed_title",_=>"not_connected"});
-    private string StatusDetail(RingState state)=>state switch {
+    /// Time since the connection came up, or null while it is not (yet) confirmed.
+    private string? Elapsed()=>connection.StatusKey!="confirming_connection_status"&&connection.Since is { } since?(DateTime.UtcNow-since).ToString(@"hh\:mm\:ss"):null;
+    /// The flyout's one line keeps time and rates together; the window shows the time large above the rates.
+    private string StatusDetail(RingState state,bool compact=true)=>state switch {
         RingState.Connected=>connection.StatusKey=="confirming_connection_status"?L10n.Text("confirming_connection_status")
-            :connection.Since is { } since?L10n.Text("connection_stats",(DateTime.UtcNow-since).ToString(@"hh\:mm\:ss"),Mbps(connection.RxRate),Mbps(connection.TxRate)):"",
+            :Elapsed() is { } time?compact?L10n.Text("connection_stats",time,Mbps(connection.RxRate),Mbps(connection.TxRate)):L10n.Text("connection_rates",Mbps(connection.RxRate),Mbps(connection.TxRate)):"",
         RingState.Connecting=>L10n.Text("finding_best_route"),
         RingState.Failed=>failure,
         _=>L10n.Text(update?.Mandatory==true?"update_required_detail":"tap_ring_to_connect"),
@@ -662,7 +766,7 @@ public partial class MainWindow : Window {
         Add(signOut,16,0);
         // The diagnostic log has no visible entry: seven clicks on the version open it.
         var taps=0;var first=DateTime.MinValue;
-        var version=Add(new TextBlock {Text="TrackNothing "+(System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)??"0"),FontSize=11,Foreground=Look.Faint,HorizontalAlignment=HorizontalAlignment.Center,Padding=new Thickness(12,6,12,6),Background=Brushes.Transparent},12,0);
+        var version=Add(new TextBlock {Text="TRACKNOTHING "+(System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)??"0"),FontFamily=Look.Dots,FontSize=12,Foreground=Look.Faint,HorizontalAlignment=HorizontalAlignment.Center,Padding=new Thickness(12,6,12,6),Background=Brushes.Transparent},12,0);
         version.MouseLeftButtonUp+=(_,_)=>{
             if(DateTime.UtcNow-first>TimeSpan.FromSeconds(4)) {taps=0;first=DateTime.UtcNow;}
             if(++taps>=7) {taps=0;page="logs";Render();}
@@ -688,17 +792,10 @@ public partial class MainWindow : Window {
         stack.Children.Add(header);
         var total=Bytes(down+up).Split(' ',2);
         var figure=new TextBlock {Margin=new Thickness(0,8,0,0)};
-        figure.Inlines.Add(new Run(total[0]) {FontSize=28,FontWeight=FontWeights.Bold});
+        figure.Inlines.Add(new Run(total[0]) {FontFamily=Look.Dots,FontSize=34});
         if(total.Length>1) figure.Inlines.Add(new Run(" "+total[1]) {FontSize=14,FontWeight=FontWeights.SemiBold,Foreground=Look.Secondary});
         stack.Children.Add(figure);
-        if(days.Count>0) {
-            var top=Math.Max(days.Max(),1);
-            var bars=new UniformGrid {Rows=1,Columns=days.Count,Height=36,Margin=new Thickness(0,10,0,0)};
-            for(var i=0;i<days.Count;i++)
-                bars.Children.Add(new Border {Height=Math.Max(3,36.0*days[i]/top),VerticalAlignment=VerticalAlignment.Bottom,CornerRadius=new CornerRadius(2),Margin=new Thickness(1.5,0,1.5,0),
-                    Background=i==days.Count-1?Look.Accent:Look.Hex("#52B7DC68")});
-            stack.Children.Add(bars);
-        }
+        if(days.Count>0) stack.Children.Add(new UsageBlocks(days) {Height=46,Margin=new Thickness(0,12,0,0)});
         var split=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,10,0,0)};
         split.Children.Add(Single(L10n.Text("download_amount",Bytes(down)),12,Look.Secondary));
         var upload=Single(L10n.Text("upload_amount",Bytes(up)),12,Look.Secondary);upload.Margin=new Thickness(20,0,0,0);split.Children.Add(upload);
@@ -770,8 +867,8 @@ public partial class MainWindow : Window {
             FontFamily=new FontFamily("Consolas"),FontSize=11,TextWrapping=TextWrapping.Wrap,Padding=new Thickness(0)}});
     }
     private void Login() {
-        var logo=Look.Logo(56);logo.HorizontalAlignment=HorizontalAlignment.Center;Add(logo,28,0);
-        Add(new TextBlock {Text="TrackNothing",FontSize=20,FontWeight=FontWeights.SemiBold,HorizontalAlignment=HorizontalAlignment.Center},14,0);
+        var logo=Look.Mark(72,Look.Accent);logo.HorizontalAlignment=HorizontalAlignment.Center;Add(logo,28,0);
+        var word=Look.Wordmark(26);word.HorizontalAlignment=HorizontalAlignment.Center;Add(word,18,0);
         Add(new TextBlock {Text=L10n.Text("sign_in_tagline"),FontSize=13,Foreground=Look.Secondary,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center},6,24);
         if(Notices() is { } notes) Add(notes,0,8);
         Add(Caption(L10n.Text("server_address")),0,6);var origin=Add(new TextBox {Text=api.Origin},0,12);
@@ -833,7 +930,15 @@ public partial class MainWindow : Window {
         }
         if(statusTitle is not null) statusTitle.Text=StatusTitle(state);
         if(statusDot is not null) statusDot.Visibility=state==RingState.Connected?Visibility.Visible:Visibility.Collapsed;
-        if(statusDetail is not null) statusDetail.Text=StatusDetail(state);
+        if(statusDetail is not null) statusDetail.Text=StatusDetail(state,false);
+        if(statusTimer is not null) {
+            var time=state==RingState.Connected?Elapsed():null;
+            statusTimer.Text=time??"";statusTimer.Visibility=time is null?Visibility.Collapsed:Visibility.Visible;
+        }
+        if(stream is not null) {
+            var running=state is RingState.Connecting or RingState.Connected;
+            stream.Text=running&&Motion?Look.Stream(DateTime.UtcNow):Look.StreamIdle;stream.Foreground=running?Look.StreamOn:Look.StreamOff;
+        }
         if(location is { } place) {
             var (title,detail,code)=Location();
             place.Title.Text=title;place.Detail.Text=detail;
