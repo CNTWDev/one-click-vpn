@@ -11,6 +11,7 @@ import { createRoot } from "react-dom/client";
 import { api } from "./api";
 import { CredentialDashboard } from "./credential-dashboard";
 import { Home } from "./home";
+import { DataStream } from "./pixel";
 import "./styles.css";
 import "./region-map.css";
 
@@ -86,6 +87,7 @@ function Auth({ mode, onMode, onUser, notice }: {
       <Brand />
       <h1>{t("连接到你")}<br /><span>{t("信任的网络。")}</span></h1>
       <p className="intro-copy">{apps ? t("审核通过后，下载客户端登录即可使用，无需导入配置。") : t("审核通过后一键创建订阅，导入客户端或扫码即用。")}</p>
+      <DataStream />
       <ul className="trust">{apps ? <li><b>{t("一个账号，所有设备")}</b><small>{t("手机和电脑用同一账号登录，自动选择节点")}</small></li> : <li><b>{t("一份订阅，全部节点")}</b><small>{t("客户端里随时切换，新节点自动出现")}</small></li>}<li><b>{t("人工审核")}</b><small>{t("仅限受邀和熟悉的用户使用")}</small></li></ul>
     </section>
     <form className="auth-panel" onSubmit={submit}>

@@ -9,13 +9,16 @@
 .home-lead { color: var(--text-2); font-size: 15px; }
 .home-download { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-top: 6px; }
 .home-download .muted { font-variant-numeric: tabular-nums; }
-.home-preview { display: grid; justify-items: center; gap: 14px; padding: 28px 24px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--border); }
-.home-ring { width: 120px; height: 120px; border-radius: 50%; display: grid; place-items: center; color: var(--accent); border: 2px solid var(--accent); box-shadow: 0 0 0 10px var(--accent-soft); }
-.home-preview-row { width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); color: var(--text-2); font-size: 13px; text-align: center; }
+/* A still of the app, always dark like the apps themselves. */
+.home-preview { display: grid; justify-items: center; gap: 12px; padding: 28px 24px; border-radius: var(--radius); background: #0d1310; border: 1px solid #1f2922; color: #ecf1e8; overflow: hidden; }
+.home-preview b { text-align: center; }
+.home-preview .pixel-stream { font-size: 13px; }
+.home-preview-row { width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); background: #151c17; color: #93a090; font-size: 13px; text-align: center; }
 .home-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.home-stats > .card { padding: 18px 22px; display: grid; gap: 2px; margin-top: 0; }
+.home-stats > .card { padding: 18px 22px; display: grid; gap: 2px; align-content: start; margin-top: 0; }
 .home .home-stats > .card, .home .home-columns > .card { margin-top: 0; }
 .home-stats small { color: var(--text-2); font-size: 13px; }
+.home-stats strong.pixel-figure { font-size: 26px; line-height: 1.25; }
 .home-stats strong { font-size: 22px; line-height: 1.35; font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
 .home-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
 .home-list h2 { font-size: 16px; margin-bottom: 8px; }
@@ -51,6 +54,8 @@
   .home-stats > .card { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 14px 20px; }
   .home-stats > .card + .card { border-top: 1px solid var(--border); }
   .home-stats strong { font-size: 15px; text-align: right; }
+  .home-stats strong.pixel-figure { font-size: 17px; }
+  .home-stats .pixel-blocks { display: none; }
   .home-list { padding: 20px; }
 }
 .manual-head { display: grid; gap: 6px; justify-items: start; min-width: 0; }

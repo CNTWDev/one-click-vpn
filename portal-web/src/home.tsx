@@ -3,20 +3,20 @@ import { clientPlatforms, type ClientPlatform, type ClientRelease } from "../../
 import { useI18n } from "../../shared/i18n";
 import { intlLocales } from "../../shared/i18n-core";
 import { PRODUCT_NAME } from "../../shared/brand-name";
-import { BrandMark } from "../../shared/brand";
 import { useSite } from "../../shared/site";
 import { useActionDialog } from "./action-dialog";
 import { api, isUnauthorized } from "./api";
 import { Brand } from "./brand";
 import { detectPlatform, formatBytes } from "./format";
 import { PortalLanguagePicker } from "./language";
+import { DataStream, PixelRing, UsageBlocks } from "./pixel";
 import { Icon, InlineError, Skeleton, Time, useToasts } from "./ui";
 import "./home.css";
 
 type User = { email: string; displayName: string };
 type Device = { id: string; name: string; platform: string; lastSeenAt: string; connected: boolean; region: string | null };
 type Account = { expiresAt: string | null; deviceLimit: number; devices: Device[] };
-type Usage = { totals: { totalBytes: number } };
+type Usage = { totals: { totalBytes: number }; daily?: { day: string; totalBytes: number }[] };
 type Releases = { releases: ClientRelease[]; history: ClientRelease[] };
 
 const platformNames: Record<ClientPlatform, string> = { android: "Android", ios: "iPhone / iPad", macos: "macOS", windows: "Windows" };
@@ -24,6 +24,16 @@ const devicePlatform: Partial<Record<string, ClientPlatform>> = { android: "andr
 const deviceIcon = (platform: string) => platform === "windows" || platform === "macos"
   ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>
   : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5" /><path d="M11 18h2" /></svg>;
+
+/** Daily totals for the last 30 days, oldest first, with empty days as zero. */
+function lastDays(usage: Usage) {
+  const perDay = new Map((usage.daily || []).map((row) => [String(row.day).slice(0, 10), row.totalBytes]));
+  return Array.from({ length: 30 }, (_, index) => {
+    const day = new Date(Date.now() - (29 - index) * 86_400_000);
+    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+    return perDay.get(key) || 0;
+  });
+}
 
 /** Desktop builds come per architecture; ARM Windows reports itself only through client hints. */
 function usePreferredArch() {
@@ -109,8 +119,9 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
           </p>)}
         </div>
         <div className="home-preview" aria-hidden="true">
-          <span className="home-ring"><BrandMark size={44} logoSvg={site?.logoSvg} /></span>
+          <PixelRing />
           <b>{t("一键连接")}</b>
+          <DataStream />
           <span className="home-preview-row">{t("自动选择最快的节点")}</span>
         </div>
       </section>
@@ -131,7 +142,7 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
 
     <section className="home-stats" aria-label={t("账号概况")}>
       <div className="card"><small>{t("有效期至")}</small><strong>{account ? account.expiresAt ? date(account.expiresAt) : t("长期有效") : <Skeleton height={26} width="60%" />}</strong></div>
-      <div className="card"><small>{t("近 30 天流量")}</small><strong>{usage ? formatBytes(usage.totals.totalBytes) : <Skeleton height={26} width="40%" />}</strong></div>
+      <div className="card"><small>{t("近 30 天流量")}</small><strong className="pixel-figure">{usage ? formatBytes(usage.totals.totalBytes) : <Skeleton height={26} width="40%" />}</strong>{usage && <UsageBlocks values={lastDays(usage)} />}</div>
       <div className="card"><small>{t("已登录设备")}</small><strong>{account ? t("{0} / {1} 台", [devices.length, account.deviceLimit]) : <Skeleton height={26} width="40%" />}</strong></div>
     </section>
     {accountError && <InlineError message={accountError} onRetry={() => void loadAccount()} />}
