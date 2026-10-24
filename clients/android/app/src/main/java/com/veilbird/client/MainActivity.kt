@@ -70,6 +70,8 @@ class MainActivity : Activity() {
     private var stateTitle: TextView? = null
     private var stateDot: View? = null
     private var stateDetail: TextView? = null
+    private var stateTimer: TextView? = null
+    private var stream: DataStream? = null
     private var nodeTitle: TextView? = null
     private var nodeDetail: TextView? = null
     private var nodeBadge: FrameLayout? = null
@@ -116,6 +118,8 @@ class MainActivity : Activity() {
         if (size >= 24) letterSpacing = -0.015f
         setLineSpacing(3.dp.toFloat(), 1f)
     }
+    /** "TRACKNOTHING" in the dot-matrix face: shown once per screen, next to the pixel mark. */
+    private fun wordmark(size: Float) = text("TRACKNOTHING", size).apply { typeface = Pixel.font(this@MainActivity); letterSpacing = 0.04f; contentDescription = "TrackNothing" }
     private fun icon(res: Int, color: Int, size: Int = 20) = ImageView(this).apply {
         setImageResource(res); imageTintList = ColorStateList.valueOf(color); scaleType = ImageView.ScaleType.FIT_CENTER
         layoutParams = LinearLayout.LayoutParams(size.dp, size.dp)
@@ -128,14 +132,14 @@ class MainActivity : Activity() {
     }
     /** A 36dp tile with a two-letter country code or an icon. */
     private fun badge(code: String?, iconRes: Int? = null, tint: Int = Palette.text) = FrameLayout(this).apply {
-        background = rounded(Palette.raised, 10)
+        background = rounded(Palette.raised, 8)
         fillBadge(this, code, iconRes, tint)
         layoutParams = LinearLayout.LayoutParams(36.dp, 36.dp).apply { marginEnd = 14.dp }
     }
     private fun fillBadge(badge: FrameLayout, code: String?, iconRes: Int?, tint: Int) {
         badge.removeAllViews()
         if (iconRes != null) badge.addView(icon(iconRes, tint, 18), FrameLayout.LayoutParams(18.dp, 18.dp, Gravity.CENTER))
-        else badge.addView(text(code ?: "", 13f, tint, 600).apply { gravity = Gravity.CENTER }, FrameLayout.LayoutParams(-1, -1))
+        else badge.addView(text(code ?: "", 15f, if (tint == Palette.text) Palette.accent else tint).apply { gravity = Gravity.CENTER; typeface = Pixel.font(this@MainActivity) }, FrameLayout.LayoutParams(-1, -1))
     }
     /** Title with an optional second line, filling the space between a badge and trailing views. */
     private fun titles(title: String, detail: String = "", titleColor: Int = Palette.text): LinearLayout = LinearLayout(this).apply {
@@ -196,7 +200,7 @@ class MainActivity : Activity() {
 
     // ---- Pages
     private fun render() {
-        ring = null; stateTitle = null; stateDot = null; stateDetail = null; nodeTitle = null; nodeDetail = null; nodeBadge = null
+        ring = null; stateTitle = null; stateDot = null; stateDetail = null; stateTimer = null; stream = null; nodeTitle = null; nodeDetail = null; nodeBadge = null
         val side = maxOf(20.dp, (resources.displayMetrics.widthPixels - 560.dp) / 2)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 4.dp, side, 20.dp) }
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Palette.ground); fitsSystemWindows = true }
@@ -256,8 +260,8 @@ class MainActivity : Activity() {
     private fun home() {
         add(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 0, 0)
-            addView(ImageView(this@MainActivity).apply { setImageResource(R.drawable.ic_mark) }, LinearLayout.LayoutParams(22.dp, 22.dp).apply { marginEnd = 10.dp })
-            addView(text("TrackNothing", 15f, Palette.text, 600))
+            addView(PixelMark(this@MainActivity), LinearLayout.LayoutParams(22.dp, 22.dp).apply { marginEnd = 10.dp })
+            addView(wordmark(18f))
         }, height = 48.dp)
         notices()
         spacer(1f)
@@ -267,13 +271,15 @@ class MainActivity : Activity() {
                 animate().scaleX(0.97f).scaleY(0.97f).setDuration(90).withEndAction { animate().scaleX(1f).scaleY(1f).setDuration(140).start() }.start()
                 if (!busy) toggleConnection()
             }
-        }.also { add(it, height = 216.dp, width = 216.dp, gravity = Gravity.CENTER_HORIZONTAL) }
+        }.also { add(it, height = 240.dp, width = 240.dp, gravity = Gravity.CENTER_HORIZONTAL) }
         val titleRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        stateDot = View(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Palette.accent) } }
+        stateDot = View(this).apply { setBackgroundColor(Palette.accent) }
         titleRow.addView(stateDot, LinearLayout.LayoutParams(8.dp, 8.dp).apply { marginEnd = 10.dp })
         stateTitle = text("", 26f, Palette.text, 600).also { titleRow.addView(it) }
-        add(titleRow, top = 36)
+        add(titleRow, top = 28)
+        stateTimer = text("", 34f).apply { gravity = Gravity.CENTER; typeface = Pixel.font(this@MainActivity); letterSpacing = 0.02f }.also { add(it, top = 10) }
         stateDetail = text("", 14f, Palette.secondary).apply { gravity = Gravity.CENTER; maxLines = 2 }.also { add(it, top = 8) }
+        stream = DataStream(this).also { add(it, top = 22) }
         spacer(1f)
         val node = row(68).apply { background = pressable(Palette.surface, 16); contentDescription = L10n.text(R.string.tap_to_change); setOnClickListener { if (!busy) { page = "nodes"; render() } } }
         nodeBadge = badge(null).also { node.addView(it) }
@@ -316,9 +322,12 @@ class MainActivity : Activity() {
         }
         stateTitle?.text = L10n.text(when (state) { ConnectRing.State.CONNECTED -> R.string.connected_status; ConnectRing.State.CONNECTING -> R.string.connecting; ConnectRing.State.FAILED -> R.string.connect_failed_title; else -> R.string.not_connected })
         stateDot?.visibility = if (state == ConnectRing.State.CONNECTED) View.VISIBLE else View.GONE
+        val elapsed = if (state == ConnectRing.State.CONNECTED) DateUtils.formatElapsedTime((SystemClock.elapsedRealtime() - since) / 1000) else ""
+        stateTimer?.apply { text = elapsed; visibility = if (elapsed.isEmpty()) View.GONE else View.VISIBLE }
+        stream?.running = state == ConnectRing.State.CONNECTING || state == ConnectRing.State.CONNECTED
         stateDetail?.text = when (state) {
             ConnectRing.State.CONNECTED -> if (ConnectionStateStore.messageId == R.string.confirming_connection_status) ConnectionStateStore.message
-                else L10n.text(R.string.connection_stats, DateUtils.formatElapsedTime((SystemClock.elapsedRealtime() - since) / 1000), mbps(ConnectionStateStore.rxRate), mbps(ConnectionStateStore.txRate))
+                else L10n.text(R.string.connection_rates, mbps(ConnectionStateStore.rxRate), mbps(ConnectionStateStore.txRate))
             ConnectRing.State.CONNECTING -> L10n.text(R.string.finding_best_route)
             ConnectRing.State.FAILED -> ConnectionStateStore.message
             else -> L10n.text(if (update?.mandatory == true) R.string.update_required_detail else R.string.tap_ring_to_connect)
@@ -368,8 +377,8 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(-2, 40.dp))
         add(header, height = 48.dp)
         notices()
-        add(ImageView(this).apply { setImageResource(R.drawable.ic_mark); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, height = 64.dp, width = 64.dp, top = 56, gravity = Gravity.CENTER_HORIZONTAL)
-        add(text("TrackNothing", 24f, Palette.text, 600).apply { gravity = Gravity.CENTER; accessibilityHeading() }, top = 16)
+        add(PixelMark(this), height = 96.dp, width = 96.dp, top = 48, gravity = Gravity.CENTER_HORIZONTAL)
+        add(wordmark(30f).apply { gravity = Gravity.CENTER; accessibilityHeading() }, top = 22)
         add(text(L10n.text(R.string.sign_in_tagline), 14f, Palette.secondary).apply { gravity = Gravity.CENTER }, top = 8, bottom = 44)
         val server = if (BuildConfig.API_ORIGIN.isEmpty()) {
             fieldLabel(L10n.text(R.string.server_address))
@@ -496,7 +505,7 @@ class MainActivity : Activity() {
                     unreachable -> L10n.text(R.string.quality_unreachable)
                     else -> ms(quality)!!
                 }
-                if (latency.isNotEmpty()) addView(text(latency, 13f, if (unreachable) Palette.faint else Palette.secondary), LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
+                if (latency.isNotEmpty()) addView(text(latency, 13f, if (unreachable) Palette.faint else Palette.secondary).apply { typeface = Typeface.MONOSPACE }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
                 if (quality != null && !unreachable) addView(SignalBars(this@MainActivity).apply {
                     level = when (quality.grade) { R.string.quality_good -> 3; R.string.quality_fair -> 2; else -> 1 }
                     color = when (quality.grade) { R.string.quality_good -> Palette.accent; R.string.quality_fair -> Palette.fair; else -> Palette.danger }
@@ -560,7 +569,8 @@ class MainActivity : Activity() {
             }, height = 54.dp, top = 16)
             // The diagnostic log has no visible entry: seven taps on the version open it.
             var taps = 0; var firstTap = 0L
-            add(text("TrackNothing " + BuildConfig.VERSION_NAME, 12f, Palette.faint).apply {
+            add(text("TRACKNOTHING " + BuildConfig.VERSION_NAME, 13f, Palette.faint).apply {
+                typeface = Pixel.font(this@MainActivity); letterSpacing = 0.12f
                 gravity = Gravity.CENTER; setPadding(0, 16.dp, 0, 8.dp)
                 setOnClickListener {
                     val now = SystemClock.elapsedRealtime()
@@ -587,13 +597,13 @@ class MainActivity : Activity() {
             styled.setSpan(AbsoluteSizeSpan(16, true), split, total.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             styled.setSpan(ForegroundColorSpan(Palette.secondary), split, total.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
-        card.addView(text(styled, 34f, Palette.text, 600), LinearLayout.LayoutParams(-2, -2).apply { topMargin = 14.dp })
+        card.addView(text(styled, 42f).apply { typeface = Pixel.font(this@MainActivity) }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 14.dp })
         val perDay = HashMap<String, Long>()
         traffic.optJSONArray("days")?.let { days -> for (i in 0 until days.length()) days.optJSONObject(i)?.let { perDay[it.optString("day")] = it.optString("bytes", "0").toLongOrNull() ?: 0 } }
         if (perDay.isNotEmpty()) {
             val today = LocalDate.now()
             card.addView(UsageBars(this).apply { values = (29 downTo 0).map { perDay[today.minusDays(it.toLong()).toString()] ?: 0L }; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO },
-                LinearLayout.LayoutParams(-1, 40.dp).apply { topMargin = 14.dp })
+                LinearLayout.LayoutParams(-1, 58.dp).apply { topMargin = 14.dp })
         }
         card.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL

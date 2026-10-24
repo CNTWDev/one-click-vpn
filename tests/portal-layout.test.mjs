@@ -17,6 +17,8 @@ const views = [
   { name: "login-other-site", api: { signedIn: false, site: otherSite }, ready: ".auth-panel" },
   { name: "home", ready: ".home .home-list li" },
   { name: "home-empty", api: { empty: true }, ready: ".home .home-empty" },
+  // A Windows visitor gets the featured download with the app preview (ring and data stream) beside it.
+  { name: "home-windows", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36", ready: ".home .home-list li" },
   { name: "home-details", ready: ".home .home-list li", open: (page) => page.locator(".home details > summary").click() },
   { name: "onboarding", api: { empty: true }, hash: "#manual", ready: ".dashboard" },
   { name: "dashboard-other-site", api: { site: otherSite }, ready: ".dashboard .list-item" },
@@ -39,7 +41,7 @@ test("Portal layout: no overflow, spill or overlap in any state, locale or width
     for (let n = 0; n < 60; n++) { if (await fetch(`${base}/health`).then(r => r.ok).catch(() => false)) break; await new Promise(r => setTimeout(r, 100)); }
     browser = await chromium.launch({ headless: true, ...(process.env.VEILBIRD_TEST_BROWSER ? { executablePath: process.env.VEILBIRD_TEST_BROWSER } : {}) });
     for (const locale of locales) for (const view of views) {
-      const context = await browser.newContext({ locale, viewport: { width: widths[0], height: 900 }, reducedMotion: "reduce" });
+      const context = await browser.newContext({ locale, viewport: { width: widths[0], height: 900 }, reducedMotion: "reduce", ...(view.userAgent ? { userAgent: view.userAgent } : {}) });
       context.setDefaultTimeout(10000);
       await installWideFont(context);
       const api = portalApi(view.api);

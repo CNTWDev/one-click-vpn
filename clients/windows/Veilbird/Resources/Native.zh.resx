@@ -49,6 +49,7 @@
   <data name="connection_connected" xml:space="preserve"><value>已连接</value></data>
   <data name="connection_interrupted_try_again" xml:space="preserve"><value>连接已中断，请重试。</value></data>
   <data name="connection_not_available_yet" xml:space="preserve"><value>连接尚未开放</value></data>
+  <data name="connection_rates" xml:space="preserve"><value>↓ {0}  ↑ {1} Mbps</value></data>
   <data name="connection_stats" xml:space="preserve"><value>{0} · ↓ {1} ↑ {2} Mbps</value></data>
   <data name="connection_unavailable" xml:space="preserve"><value>连接尚不可用</value></data>
   <data name="copied" xml:space="preserve"><value>已复制</value></data>

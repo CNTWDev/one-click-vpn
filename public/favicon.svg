@@ -1,5 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="15" fill="#111912"/>
-  <circle cx="32" cy="32" r="17" stroke="#B7DC68" stroke-width="5.5"/>
-  <path d="M47 13L17 51" stroke="#B7DC68" stroke-width="5.5" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#111912"/>
+  <path fill="#B7DC68" d="M53,7.5h3v3h-3zM21.5,11h3v3h-3zM25,11h3v3h-3zM28.5,11h3v3h-3zM32,11h3v3h-3zM35.5,11h3v3h-3zM39,11h3v3h-3zM49.5,11h3v3h-3zM14.5,14.5h3v3h-3zM18,14.5h3v3h-3zM42.5,14.5h3v3h-3zM46,14.5h3v3h-3zM11,18h3v3h-3zM42.5,18h3v3h-3zM49.5,18h3v3h-3zM11,21.5h3v3h-3zM39,21.5h3v3h-3zM49.5,21.5h3v3h-3zM7.5,25h3v3h-3zM35.5,25h3v3h-3zM53,25h3v3h-3zM7.5,28.5h3v3h-3zM32,28.5h3v3h-3zM53,28.5h3v3h-3zM7.5,32h3v3h-3zM28.5,32h3v3h-3zM53,32h3v3h-3zM7.5,35.5h3v3h-3zM25,35.5h3v3h-3zM53,35.5h3v3h-3zM11,39h3v3h-3zM21.5,39h3v3h-3zM49.5,39h3v3h-3zM11,42.5h3v3h-3zM18,42.5h3v3h-3zM49.5,42.5h3v3h-3zM14.5,46h3v3h-3zM18,46h3v3h-3zM42.5,46h3v3h-3zM46,46h3v3h-3zM11,49.5h3v3h-3zM21.5,49.5h3v3h-3zM25,49.5h3v3h-3zM28.5,49.5h3v3h-3zM32,49.5h3v3h-3zM35.5,49.5h3v3h-3zM39,49.5h3v3h-3zM7.5,53h3v3h-3z"/>
 </svg>

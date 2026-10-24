@@ -362,8 +362,8 @@ struct ClientView:View {
                     }.buttonStyle(.plain).accessibilityLabel(L10n.text("language")+": "+currentLanguage.name))
                 }.frame(height:44)
                 notices
-                LogoTile(size:mac ? 52:64).padding(.top,mac ? 24:56)
-                Text("TrackNothing").font(.system(size:mac ? 20:24,weight:.semibold)).padding(.top,16).accessibilityAddTraits(.isHeader)
+                PixelMark(size:mac ? 72:96).padding(.top,mac ? 20:48)
+                Wordmark(size:mac ? 24:30).padding(.top,mac ? 16:22).accessibilityAddTraits(.isHeader)
                 Text(L10n.text("sign_in_tagline")).font(.system(size:mac ? 13:15)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).padding(.top,6)
                 VStack(alignment:.leading,spacing:8) {
                     if (Bundle.main.object(forInfoDictionaryKey:"VeilbirdAPIOrigin") as? String ?? "").isEmpty {
@@ -401,10 +401,10 @@ struct ClientView:View {
     }
     private var connectionView:some View {
         let state=ringState
-        let size:CGFloat=mac ? 184:216
+        let size:CGFloat=mac ? 186:240
         return VStack(spacing:0) {
             #if os(iOS)
-            HStack(spacing:10) {LogoTile(size:22);Text("TrackNothing").font(.system(size:17,weight:.semibold));Spacer()}.frame(height:44)
+            HStack(spacing:10) {PixelMark(size:22);Wordmark(size:19);Spacer()}.frame(height:44)
             #endif
             notices
             Spacer(minLength:16)
@@ -412,12 +412,13 @@ struct ClientView:View {
                 .accessibilityLabel(L10n.text(state == .idle ? "connect_action":(state == .failed ? "retry_action":"disconnect_action")))
             VStack(spacing:8) {
                 HStack(spacing:10) {
-                    if state == .connected {Circle().fill(VeilbirdStyle.accent).frame(width:8,height:8)}
+                    if state == .connected {Rectangle().fill(VeilbirdStyle.accent).frame(width:8,height:8)}
                     Text(L10n.text(state == .connected ? "connected_status":(state == .connecting ? "connecting":(state == .failed ? "connect_failed_title":"not_connected"))))
                         .font(.system(size:mac ? 22:28,weight:.bold))
                 }
                 stateDetail(state).font(.system(size:mac ? 13:15)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).monospacedDigit().lineLimit(2)
-            }.padding(.top,mac ? 28:36).animation(reduceMotion ? nil:.easeInOut(duration:0.2),value:state)
+                DataStream(running:state == .connecting || state == .connected,size:mac ? 14:15).padding(.top,mac ? 12:16)
+            }.padding(.top,mac ? 24:28).animation(reduceMotion ? nil:.easeInOut(duration:0.2),value:state)
             Spacer(minLength:16)
             Button {tab=1} label:{currentLocationRow}.buttonStyle(RowButton())
                 .background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius+4)).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius+4))
@@ -430,8 +431,12 @@ struct ClientView:View {
         case .connected:
             if model.status == "connection_confirming" {Text(L10n.text("connection_confirming"))}
             else if let since=model.since {
-                TimelineView(.periodic(from:since,by:1)) {context in
-                    Text(L10n.text("connection_stats",Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond)),mbps(model.rxRate),mbps(model.txRate)))
+                VStack(spacing:8) {
+                    TimelineView(.periodic(from:since,by:1)) {context in
+                        Text(verbatim:Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond)))
+                            .font(Pixel.font(mac ? 26:34)).foregroundStyle(VeilbirdStyle.text)
+                    }
+                    Text(L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))).font(.system(size:mac ? 12:13,design:.monospaced))
                 }
             }
         case .connecting:Text(L10n.text("finding_best_route"))
@@ -631,7 +636,7 @@ struct ClientView:View {
                 } label:{Text(L10n.text("sign_out")).font(.system(size:VeilbirdStyle.body)).foregroundStyle(VeilbirdStyle.danger).frame(maxWidth:.infinity).frame(height:mac ? 40:50)}
                     .buttonStyle(RowButton()).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
                 // The diagnostic log has no visible entry: seven taps on the version open it.
-                Text("TrackNothing "+(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")).font(.system(size:mac ? 11:12)).foregroundStyle(VeilbirdStyle.faint)
+                Text(verbatim:"TRACKNOTHING "+(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")).font(Pixel.font(mac ? 12:13)).tracking(1.5).foregroundStyle(VeilbirdStyle.faint)
                     .frame(maxWidth:.infinity).padding(.vertical,4).contentShape(Rectangle()).onTapGesture {
                         if Date().timeIntervalSince(firstTap)>4 {versionTaps=0;firstTap=Date()}
                         versionTaps+=1
@@ -652,7 +657,7 @@ struct ClientView:View {
                     if !days.isEmpty {Text(L10n.text("daily")).font(.system(size:mac ? 11:12)).foregroundStyle(VeilbirdStyle.secondary)}
                 }
                 totalText(bytes(down+up))
-                if !days.isEmpty {UsageBars(values:days).frame(height:mac ? 32:40)}
+                if !days.isEmpty {UsageBars(values:days).frame(height:mac ? 46:58)}
                 HStack(spacing:20) {
                     Text(L10n.text("download_amount",bytes(down)));Text(L10n.text("upload_amount",bytes(up)))
                 }.font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()
@@ -662,7 +667,7 @@ struct ClientView:View {
     /// "143 GB": the number large, its unit small and muted.
     private func totalText(_ value:String)->some View {
         let parts=value.split(separator:" ",maxSplits:1).map(String.init)
-        return (Text(parts.first ?? value).font(.system(size:mac ? 28:34,weight:.bold))
+        return (Text(parts.first ?? value).font(Pixel.font(mac ? 34:42))
             + Text(parts.count>1 ? " "+parts[1]:"").font(.system(size:mac ? 14:17,weight:.medium)).foregroundColor(VeilbirdStyle.secondary)).monospacedDigit()
     }
     private func dailyUsage(_ traffic:[String:Any])->[Int64] {
@@ -768,20 +773,23 @@ struct MenuBarView:View {
         let state:RingState=model.connected ? (on ? .connected:.connecting):(model.failed ? .failed:.idle)
         VStack(alignment:.leading,spacing:0) {
             HStack(spacing:8) {
-                LogoTile(size:18)
-                Text("TrackNothing").font(.system(size:13,weight:.semibold))
+                PixelMark(size:16)
+                Wordmark(size:14)
                 Spacer()
-                if on {Circle().fill(VeilbirdStyle.accent).frame(width:6,height:6)}
+                if on {Rectangle().fill(VeilbirdStyle.accent).frame(width:6,height:6)}
                 Text(L10n.text(on ? "connected_status":(model.connected ? "connecting":(model.failed ? "connect_failed_title":"not_connected")))).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary)
             }.padding(.horizontal,4)
             if model.signedIn {
                 VStack(spacing:12) {
-                    Button {model.work {try await model.toggle()}} label:{ConnectRing(state:state,size:120)}.buttonStyle(.plain)
+                    Button {model.work {try await model.toggle()}} label:{ConnectRing(state:state,size:126)}.buttonStyle(.plain)
                         .accessibilityLabel(L10n.text(model.connected ? "disconnect_action":"connect_action"))
                     if let since=model.since {
-                        TimelineView(.periodic(from:since,by:1)) {context in
-                            Text(L10n.text("connection_stats",Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond)),mbps(model.rxRate),mbps(model.txRate)))
-                        }.font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()
+                        HStack(alignment:.firstTextBaseline,spacing:12) {
+                            TimelineView(.periodic(from:since,by:1)) {context in
+                                Text(verbatim:Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond))).font(Pixel.font(22)).foregroundStyle(VeilbirdStyle.text)
+                            }
+                            Text(L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))).font(.system(size:11,design:.monospaced)).foregroundStyle(VeilbirdStyle.secondary)
+                        }
                     } else {
                         Text(model.failed ? model.failure:L10n.text("tap_ring_to_connect")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).lineLimit(2)
                     }

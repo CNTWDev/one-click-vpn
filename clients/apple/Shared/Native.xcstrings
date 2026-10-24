@@ -1059,6 +1059,29 @@
         }
       }
     },
+    "connection_rates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↓ %1$@  ↑ %2$@ Mbps"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↓ %1$@  ↑ %2$@ Mbps"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↓ %1$@  ↑ %2$@ Мбит/с"
+          }
+        }
+      }
+    },
     "connection_stats": {
       "extractionState": "manual",
       "localizations": {
