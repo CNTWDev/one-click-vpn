@@ -109,7 +109,8 @@ code { font-family: var(--mono); font-size: .92em; }
 .login h1 { margin: 0 0 8px; font-size: 28px; line-height: 1.2; }
 .login p { margin: 0 0 24px; color: var(--text-2); font-size: 14px; line-height: 1.65; }
 .login label { display: block; color: var(--text-2); font-size: 13px; margin-top: 16px; }
-.login label input { margin-top: 7px; }
+.login label input, .login label .password-input { margin-top: 7px; }
+.login label .password-input input { margin-top: 0; }
 .login form > button { width: 100%; height: 44px; margin-top: 24px; border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-contrast); font-weight: 700; }
 .login-error { margin-top: 14px; color: var(--danger); font-size: 13px; }
 
@@ -437,7 +438,7 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .modal-foot .inline-notice { margin-bottom: 12px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .form-grid label, .stack-form label { display: block; color: var(--text-2); font-size: 13px; font-weight: 500; }
-.form-grid label > input, .form-grid label > select, .form-grid label > textarea, .stack-form label > input, .stack-form label > select { margin-top: 6px; }
+.form-grid label > .password-input, .form-grid label > input, .form-grid label > select, .form-grid label > textarea, .stack-form label > input, .stack-form label > select { margin-top: 6px; }
 .form-grid label > small, .stack-form > small, .stack-form label > small { display: block; margin-top: 6px; color: var(--text-3); font-size: 13px; font-weight: 400; line-height: 1.55; overflow-wrap: anywhere; }
 .stack-form input[readonly] { color: var(--text-2); background: var(--surface-2); cursor: default; }
 .stack-form { display: grid; gap: 16px; }

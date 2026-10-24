@@ -67,6 +67,12 @@ export function auditLayout() {
     }
   }
 
+  // A field's padding is reserved for adornments placed inside it (search icon, show-password button); only its text area must stay clear.
+  const textBox = (el, r) => {
+    if (!/^(input|textarea)$/i.test(el.tagName)) return r;
+    const style = getComputedStyle(el);
+    return { left: r.left + parseFloat(style.paddingLeft), right: r.right - parseFloat(style.paddingRight), top: r.top, bottom: r.bottom };
+  };
   // 2. Overlapping content. "Pieces" are text runs plus things that paint on their own.
   const pieces = [];
   const leafSelector = "button, input, select, textarea, img, svg, canvas, video, progress, meter, [role=progressbar], .meter i, .pill, .badge, .tag";
@@ -79,7 +85,7 @@ export function auditLayout() {
     // A control cut off by an overflow:hidden box (not a scroller the user can scroll) is partly unusable.
     const partlyShown = r.right > clip.left && r.left < clip.right;
     if (partlyShown && (r.right > clip.right + 2 || r.left < clip.left - 2) && !scrollable(el)) issues.push({ kind: "clipped", detail: `${describe(el)} is cut off (${Math.round(r.left)}–${Math.round(r.right)}px, visible ${Math.round(clip.left)}–${Math.round(clip.right)}px)` });
-    pieces.push({ el, rect: intersect(r, clip) });
+    pieces.push({ el, rect: intersect(textBox(el, r), clip) });
   }
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
