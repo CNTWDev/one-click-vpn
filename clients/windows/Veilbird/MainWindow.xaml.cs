@@ -3,15 +3,96 @@ using System.Windows.Controls;
 using System.Text.Json.Nodes;
 using System.Windows.Media;
 using System.Windows.Automation;
+using System.Windows.Threading;
 namespace Veilbird;
 public partial class MainWindow : Window {
     private readonly NativeApi api=new();
-    private string page="connect",nodeName="";
+    private string page="connect",nodeId="",nodeName="";
+    // Active connection: the lease is renewed every 90 s while the tunnel service carries traffic.
+    private bool active,ticking;
+    private string leaseNodeId="",leaseNodeName="",statusKey="not_connected",traffic="";
+    private (string Public,string Private) keys;
+    private DateTime deadline,renewAt,startedAt;
+    private readonly DispatcherTimer timer=new() {Interval=TimeSpan.FromSeconds(5)};
     private bool busy;
     private (string Version,bool Mandatory,Uri Download)? update;
     private string announcement="";
     private static Brush Brush(string hex)=>(Brush)new BrushConverter().ConvertFromString(hex)!;
-    public MainWindow() {L10n.Initialize();InitializeComponent();api.Origin=api.SavedOrigin;Render();Closed+=(_,_)=>api.Dispose();CheckForUpdate();}
+    public MainWindow() {
+        L10n.Initialize();InitializeComponent();api.Origin=api.SavedOrigin;
+        // A tunnel left by a crashed session has no lease any more: remove it before showing "not connected".
+        try {Tunnel.Stop();} catch {/* nothing to clean up */}
+        timer.Tick+=(_,_)=>Tick();
+        Closing+=(_,_)=>{if(active)Disconnect("disconnected",wait:true);};
+        Closed+=(_,_)=>api.Dispose();
+        Render();CheckForUpdate();
+    }
+    private async Task<JsonObject> Acquire() {
+        var input=new JsonObject {["publicKey"]=keys.Public};
+        if(leaseNodeId.Length>0) input["nodeId"]=leaseNodeId;
+        var lease=await api.Action("connect",input);
+        leaseNodeId=lease["nodeId"]!.GetValue<string>();leaseNodeName=lease["nodeName"]?.GetValue<string>()??"";
+        var remaining=DateTimeOffset.Parse(lease["expiresAt"]!.GetValue<string>(),System.Globalization.CultureInfo.InvariantCulture)-DateTimeOffset.UtcNow;
+        if(remaining<=TimeSpan.Zero) throw new AccessFailure("ACCESS_EXPIRED");
+        deadline=DateTime.UtcNow+(remaining<TimeSpan.FromMinutes(5)?remaining:TimeSpan.FromMinutes(5));renewAt=DateTime.UtcNow.AddSeconds(90);
+        // The node applies the new peer within seconds; connect only once it reports ready.
+        for(var attempt=0;attempt<15;attempt++) {
+            if(DateTime.UtcNow>=deadline) throw new AccessFailure("ACCESS_EXPIRED");
+            if((await api.Request("status/"+lease["leaseId"]!.GetValue<string>()))["ready"]?.GetValue<bool>()==true) return lease;
+            await Task.Delay(1000);
+        }
+        throw new AccessFailure("NODE_UNAVAILABLE");
+    }
+    private void Connect()=>Work(async()=>{
+        keys=Tunnel.NewKeypair();leaseNodeId=nodeId;statusKey="authorizing_and_connecting";Render();
+        try {
+            // Automatic: the fastest node measured from this PC, before the tunnel exists; if the list fails the server picks.
+            if(leaseNodeId.Length==0) try {leaseNodeId=(await Latency.Rank((await api.Request("nodes"))["nodes"]!.AsArray())).FirstOrDefault().Node?["id"]?.GetValue<string>()??"";} catch {/* least-loaded fallback */}
+            var lease=await Acquire();
+            await Task.Run(()=>Tunnel.Start(lease,keys.Private));
+        } catch(Exception error) {
+            await api.Report(error is AccessFailure failure?failure.Code:"CONNECT_FAILED",leaseNodeId);
+            await Task.Run(Tunnel.Stop);statusKey="not_connected";
+            if(error is AccessFailure) throw;
+            throw new AccessFailure("CONNECT_FAILED");
+        }
+        active=true;startedAt=DateTime.UtcNow;statusKey="confirming_connection_status";timer.Start();
+    });
+    private async void Tick() {
+        if(!active||ticking) return;
+        ticking=true;
+        try {await Check();} finally {ticking=false;}
+    }
+    private async Task Check() {
+        if(DateTime.UtcNow>=renewAt||DateTime.UtcNow>=deadline) {
+            renewAt=DateTime.UtcNow.AddSeconds(15);
+            try {await Acquire();}
+            catch(AccessFailure error) when (error.Code is "AUTH_REQUIRED" or "DEVICE_REVOKED" or "MEMBERSHIP_EXPIRED" or "ACCOUNT_UNAVAILABLE" or "MANAGED_ACCESS_REQUIRED" or "CLIENT_UPDATE_REQUIRED") {
+                await api.Report(error.Code,leaseNodeId);Disconnect("connection_authorization_expired_connect_again");MessageBox.Show(error.Message,"Veilbird");return;
+            }
+            catch {/* retried in 15 s until the lease runs out */}
+            if(!active) return;
+            if(DateTime.UtcNow>=deadline) {await api.Report("LEASE_RENEWAL_FAILED",leaseNodeId);Disconnect("connection_authorization_expired_connect_again");return;}
+        }
+        if(!Tunnel.Running) {await api.Report("TUNNEL_ERROR",leaseNodeId);Disconnect("connection_interrupted_try_again");return;}
+        var stats=Tunnel.Stats();
+        if(stats is { Handshake: { } handshake } && DateTime.UtcNow-handshake<TimeSpan.FromMinutes(3)) statusKey="connected_status";
+        else {
+            statusKey="confirming_connection_status";
+            if(DateTime.UtcNow-startedAt>TimeSpan.FromSeconds(45)) {await api.Report("HANDSHAKE_TIMEOUT",leaseNodeId);Disconnect("this_location_is_not_responding_try_another");return;}
+        }
+        traffic=stats is { } s?$"↑ {Bytes((double)s.Tx)}   ↓ {Bytes((double)s.Rx)}":"";
+        if(page=="connect"&&!busy) Render();
+    }
+    private void Disconnect(string message,bool wait=false) {
+        active=false;timer.Stop();statusKey=message;traffic="";
+        var stop=Task.Run(()=>{try {Tunnel.Stop();} catch {/* already gone */}});
+        // Off the UI thread, so closing the window can wait for it without a deadlock.
+        var release=Task.Run(()=>api.Action("disconnect",new JsonObject()));
+        if(wait) {try {Task.WaitAll([stop,release],TimeSpan.FromSeconds(5));} catch {/* the lease also expires on its own */}}
+        else _=release.ContinueWith(_=>{},TaskScheduler.Default);
+        if(!wait&&IsLoaded) Render();
+    }
     private async void CheckForUpdate() {
         try {
             if(await api.LatestRelease() is not { } found) return;
@@ -33,7 +114,7 @@ public partial class MainWindow : Window {
     }
     private void Render() {
         ContentPanel.Children.Clear();NavigationPanel.Children.Clear();Text("Veilbird",22);
-        Title=L10n.Text("development_title");BusyLabel.Text=L10n.Text("working");Language=System.Windows.Markup.XmlLanguage.GetLanguage(L10n.Culture.IetfLanguageTag);
+        Title="Veilbird";BusyLabel.Text=L10n.Text("working");Language=System.Windows.Markup.XmlLanguage.GetLanguage(L10n.Culture.IetfLanguageTag);
         Text(L10n.Text("language"),14);
         var languages=new[]{"system","en","zh","ru"};
         var picker=new ComboBox {ItemsSource=new[]{L10n.Text("language_system"),"English","简体中文","Русский"},SelectedIndex=Array.IndexOf(languages,L10n.Preference),MinHeight=44,Margin=new Thickness(0,0,0,12)};
@@ -50,18 +131,21 @@ public partial class MainWindow : Window {
         foreach(var (id,name) in new[]{("connect",L10n.Text("connect_tab")),("nodes",L10n.Text("locations")),("account",L10n.Text("account"))}) {var b=new Button {Content=name,MinHeight=52,Margin=new Thickness(4),Background=Brush(page==id?"#E2F7F0":"#FFFFFF")};AutomationProperties.SetName(b,name+(page==id?L10n.Text("current_page"):""));b.Click+=(_,_)=>{if(!busy){page=id;Render();}};NavigationPanel.Children.Add(b);}
         if(page=="connect") {
             Text(L10n.Text("connect_with_ease"),32);Text(L10n.Text("choose_a_location_veilbird_takes_care_of_the_rest"));
-            Card(L10n.Text("connection_not_available_yet"),L10n.Text("windows_development_build_vpn_service_integration_in_progress"));
-            Button(L10n.Text("connection_unavailable"),()=>{},false);
-            Text(L10n.Text("development_build_the_windows_tunnel_service_is_not_integrated"));
-            Card(L10n.Text("location"),string.IsNullOrEmpty(nodeName)?L10n.Text("automatic_recommended"):nodeName);Button(L10n.Text("change_location"),()=>{page="nodes";Render();});
+            Card(L10n.Text(statusKey),active?$"{leaseNodeName}\n{traffic}".Trim():L10n.Text("a_location_is_selected_automatically_allow_the_system_vpn"));
+            if(update?.Mandatory!=true||active) {
+                var main=Button(L10n.Text(active?"disconnect_action":"connect_action"),()=>{if(active)Disconnect("disconnected");else Connect();});
+                main.Background=Brush("#007A64");main.Foreground=Brush("#FFFFFF");main.MinHeight=56;
+            }
+            Card(L10n.Text("location"),string.IsNullOrEmpty(nodeName)?L10n.Text("automatic_recommended"):nodeName);
+            Button(L10n.Text("change_location"),()=>{if(active)MessageBox.Show(L10n.Text("disconnect_before_changing_location"),"Veilbird");else{page="nodes";Render();}});
         } else if(page=="nodes") Work(async()=>{
             Text(L10n.Text("where_would_you_like_to_connect"),30);Text(L10n.Text("choose_a_location_then_return_to_connect"));
-            var result=await api.Request("nodes");Button(L10n.Text("automatic_recommended"),()=>{nodeName="";page="connect";Render();});
+            var result=await api.Request("nodes");Button(L10n.Text("automatic_recommended"),()=>{nodeId="";nodeName="";page="connect";Render();});
             Text(L10n.Text("search_locations_or_regions"),14);var search=new TextBox {Margin=new Thickness(0,8,0,16)};AutomationProperties.SetName(search,L10n.Text("search_locations_or_regions"));ContentPanel.Children.Add(search);
             var list=new StackPanel();ContentPanel.Children.Add(list);
             var ranked=await Latency.Rank(result["nodes"]!.AsArray());
-            void Filter() {list.Children.Clear();foreach(var (node,ms) in ranked) {var name=node["name"]!.GetValue<string>();var region=node["region"]?.GetValue<string>()??"";if(!(name+" "+region).Contains(search.Text,StringComparison.OrdinalIgnoreCase))continue;
-                var item=new Button {Content=name+(ms is { } latency?"  ·  "+L10n.Text("latency_ms",latency.ToString("N0",L10n.Culture)):"")+(name==nodeName?"  ✓":"  ›"),HorizontalContentAlignment=HorizontalAlignment.Left,Background=Brush(name==nodeName?"#E2F7F0":"#FFFFFF"),Margin=new Thickness(0,0,0,12)};item.Click+=(_,_)=>{nodeName=name;page="connect";Render();};list.Children.Add(item);}
+            void Filter() {list.Children.Clear();foreach(var (node,ms) in ranked) {var name=node["name"]!.GetValue<string>();var id=node["id"]!.GetValue<string>();var region=node["region"]?.GetValue<string>()??"";if(!(name+" "+region).Contains(search.Text,StringComparison.OrdinalIgnoreCase))continue;
+                var item=new Button {Content=name+(ms is { } latency?"  ·  "+L10n.Text("latency_ms",latency.ToString("N0",L10n.Culture)):"")+(name==nodeName?"  ✓":"  ›"),HorizontalContentAlignment=HorizontalAlignment.Left,Background=Brush(name==nodeName?"#E2F7F0":"#FFFFFF"),Margin=new Thickness(0,0,0,12)};item.Click+=(_,_)=>{nodeId=id;nodeName=name;page="connect";Render();};list.Children.Add(item);}
                 if(list.Children.Count==0)list.Children.Add(new TextBlock {Text=L10n.Text("no_matching_locations_change_your_search_or_refresh_later"),Margin=new Thickness(0,16,0,16)});
             } Filter();search.TextChanged+=(_,_)=>Filter();Button(L10n.Text("refresh_locations"),()=>Render());
         });
@@ -76,7 +160,7 @@ public partial class MainWindow : Window {
                 if(device["status"]!.GetValue<string>()=="revoking")Text(L10n.Text("revoking_access_the_slot_is_released_in_about_5"));
                 else Button(L10n.Text("revoke_access"),()=>{if(MessageBox.Show(L10n.Text("this_device_will_lose_access_revoke_authorization"),"Veilbird",MessageBoxButton.YesNo)==MessageBoxResult.Yes)Work(async()=>{await api.Action("revoke",new JsonObject {["enrollmentId"]=device["id"]!.GetValue<string>()});page="connect";Render();});});
             }
-            Button(L10n.Text("refresh_devices"),()=>Render());Button(L10n.Text("sign_out"),()=>Work(async()=>{await api.Logout();Render();}));
+            Button(L10n.Text("refresh_devices"),()=>Render());Button(L10n.Text("sign_out"),()=>{if(active){MessageBox.Show(L10n.Text("disconnect_the_vpn_before_signing_out"),"Veilbird");return;}Work(async()=>{await api.Logout();Render();});});
         });
     }
     private void Login() {
@@ -88,5 +172,6 @@ public partial class MainWindow : Window {
         AutomationProperties.SetName(origin,L10n.Text("server_address"));AutomationProperties.SetName(email,L10n.Text("email"));AutomationProperties.SetName(password,L10n.Text("password"));
         var login=Button(L10n.Text("sign_in_and_start"),()=>{if(string.IsNullOrWhiteSpace(email.Text)||password.Password.Length==0){MessageBox.Show(L10n.Text("enter_your_email_and_password"),"Veilbird");return;}Work(async()=>{api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password.Password);password.Clear();page="connect";Render();CheckForUpdate();});});login.Background=Brush("#007A64");login.Foreground=Brush("#FFFFFF");login.IsDefault=true;
     }
-    private static string Bytes(JsonNode? value) {double.TryParse(value?.ToString(),out var bytes);string[] units={"B","KB","MB","GB","TB"};var i=0;while(bytes>=1024&&i<units.Length-1){bytes/=1024;i++;}return $"{bytes:0.#} {units[i]}";}
+    private static string Bytes(JsonNode? value) {double.TryParse(value?.ToString(),out var bytes);return Bytes(bytes);}
+    private static string Bytes(double bytes) {string[] units={"B","KB","MB","GB","TB"};var i=0;while(bytes>=1024&&i<units.Length-1){bytes/=1024;i++;}return $"{bytes:0.#} {units[i]}";}
 }

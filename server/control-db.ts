@@ -255,10 +255,11 @@ export async function createDevice(input: {
   return (await findDevice(id))!;
 }
 
+/** Devices for subscriptions and exported configs; Veilbird app devices (native-1) are managed as enrollments instead. */
 export async function listDevices(userId?: string): Promise<Device[]> {
   return userId
-    ? dbQuery<Device>("SELECT * FROM devices WHERE user_id = $1 ORDER BY created_at DESC", [userId])
-    : dbQuery<Device>("SELECT * FROM devices ORDER BY created_at DESC");
+    ? dbQuery<Device>("SELECT * FROM devices WHERE user_id = $1 AND app_version <> 'native-1' ORDER BY created_at DESC", [userId])
+    : dbQuery<Device>("SELECT * FROM devices WHERE app_version <> 'native-1' ORDER BY created_at DESC");
 }
 
 export async function findDevice(id: string): Promise<Device | undefined> {
@@ -760,6 +761,6 @@ export async function listActivePeers(nodeId: string, protocol: Protocol): Promi
 export async function listNativeLeasePeers(nodeId: string): Promise<Array<{ publicKey: string; allowedIps: string[]; persistentKeepaliveSeconds: number; expiresAt: number }>> {
   const native = await dbQuery<{public_key:string;address:string;expires_at:Date}>(`SELECT l.public_key,l.address,l.expires_at FROM native_leases l
     JOIN native_enrollments e ON e.id=l.enrollment_id JOIN users u ON u.id=e.user_id WHERE l.node_id=$1 AND l.expires_at>now()
-    AND e.status='active' AND u.status='active' AND u.native_only AND (u.membership_expires_at IS NULL OR u.membership_expires_at>$2)`,[nodeId,now()]);
+    AND e.status='active' AND u.status='active' AND (u.membership_expires_at IS NULL OR u.membership_expires_at>$2)`,[nodeId,now()]);
   return native.map(row=>({publicKey:row.public_key,allowedIps:[row.address],persistentKeepaliveSeconds:25,expiresAt:Math.floor(new Date(row.expires_at).getTime()/1000)}));
 }

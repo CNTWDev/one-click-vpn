@@ -619,17 +619,17 @@
     "Veilbird authorized devices",
     "Авторизованные устройства Veilbird"
   ],
-  "设备额度与会员有效期仅对 Veilbird 模式生效。兼容模式无法限制第三方配置复制后的设备数量。": [
-    "Device limits and membership expiry apply only in Veilbird mode. Compatibility mode cannot limit devices using copied third-party configurations.",
-    "Лимит устройств и срок подписки действуют только в режиме Veilbird. Режим совместимости не ограничивает устройства с копиями сторонних конфигураций."
+  "所有账号都能用 Veilbird 客户端登录连接，客户端设备数受下面的上限限制。选择「仅 Veilbird」会同时停用该账号的订阅和第三方配置。": [
+    "Every account can sign in and connect with the Veilbird app; app devices count toward the limit below. “Veilbird only” also turns off this account’s subscriptions and third-party configurations.",
+    "Любой аккаунт может входить и подключаться в приложении Veilbird; устройства приложения учитываются в лимите ниже. «Только Veilbird» также отключает подписки и сторонние конфигурации аккаунта."
   ],
   "访问方式": [
     "Access mode",
     "Режим доступа"
   ],
-  "兼容模式 · 保留第三方客户端": [
-    "Compatibility · allow third-party clients",
-    "Совместимость · сторонние клиенты"
+  "客户端和订阅都可用": [
+    "Client and subscriptions",
+    "Клиент и подписки"
   ],
   "仅 Veilbird · 严格授权设备": [
     "Veilbird only · authorized devices",
@@ -909,7 +909,7 @@
   ],
   "自定义": [
     "Custom",
-    "Пользовательский"
+    "Свой"
   ],
   "仅 Agent": [
     "Agent only",
@@ -2826,5 +2826,25 @@
   "留空则保持不变": [
     "Leave blank to keep",
     "Пусто — без изменений"
+  ],
+  "分页": [
+    "Pagination",
+    "Страницы"
+  ],
+  "第 {0}–{1} 条": [
+    "{0}–{1}",
+    "{0}–{1}"
+  ],
+  "第 {0}–{1} 条，共 {2} 条": [
+    "{0}–{1} of {2}",
+    "{0}–{1} из {2}"
+  ],
+  "上一页": [
+    "Previous",
+    "Назад"
+  ],
+  "下一页": [
+    "Next",
+    "Далее"
   ]
 }
