@@ -15,13 +15,16 @@ const views = [
   { name: "login", api: { signedIn: false }, ready: ".auth-panel" },
   { name: "register", api: { signedIn: false }, ready: ".auth-panel", open: (page) => page.locator(".auth-panel button.ghost.wide").click() },
   { name: "login-other-site", api: { signedIn: false, site: otherSite }, ready: ".auth-panel" },
-  { name: "onboarding", api: { empty: true }, ready: ".dashboard" },
+  { name: "home", ready: ".home .home-list li" },
+  { name: "home-empty", api: { empty: true }, ready: ".home .home-empty" },
+  { name: "home-details", ready: ".home .home-list li", open: (page) => page.locator(".home details > summary").click() },
+  { name: "onboarding", api: { empty: true }, hash: "#manual", ready: ".dashboard" },
   { name: "dashboard-other-site", api: { site: otherSite }, ready: ".dashboard .list-item" },
-  { name: "dashboard", ready: ".dashboard .list-item" },
-  { name: "connection-openvpn", ready: ".dashboard .list-item", open: (page) => page.locator(".dashboard .list-item").nth(2).click() },
-  { name: "new-subscription", ready: ".dashboard .list-item", open: (page) => page.locator(".topbar-tools ~ * button.primary, .dashboard button.primary").first().click() },
-  { name: "new-single", ready: ".dashboard .list-item", open: async (page) => { await page.locator(".dashboard button.primary").first().click(); await page.locator(".mode-switch button").nth(1).click(); } },
-  { name: "details-open", ready: ".dashboard .list-item", open: async (page) => { for (const summary of await page.locator("details:not([open]) > summary").all()) await summary.click().catch(() => {}); } },
+  { name: "dashboard", hash: "#manual", ready: ".dashboard .list-item" },
+  { name: "connection-openvpn", hash: "#manual", ready: ".dashboard .list-item", open: (page) => page.locator(".dashboard .list-item").nth(2).click() },
+  { name: "new-subscription", hash: "#manual", ready: ".dashboard .list-item", open: (page) => page.locator(".topbar-tools ~ * button.primary, .dashboard button.primary").first().click() },
+  { name: "new-single", hash: "#manual", ready: ".dashboard .list-item", open: async (page) => { await page.locator(".dashboard button.primary").first().click(); await page.locator(".mode-switch button").nth(1).click(); } },
+  { name: "details-open", hash: "#manual", ready: ".dashboard .list-item", open: async (page) => { for (const summary of await page.locator("details:not([open]) > summary").all()) await summary.click().catch(() => {}); } },
 ];
 
 test("Portal layout: no overflow, spill or overlap in any state, locale or width", { skip: !process.env.VEILBIRD_TEST_PLAYWRIGHT, timeout: 600000 }, async () => {
@@ -46,7 +49,7 @@ test("Portal layout: no overflow, spill or overlap in any state, locale or width
       });
       const page = await context.newPage();
       page.on("pageerror", (error) => errors.push(`${locale} ${view.name}: ${error.message}`));
-      await page.goto(base);
+      await page.goto(base + (view.hash || ""));
       await page.locator(view.ready).first().waitFor();
       if (view.open) await view.open(page);
       for (const width of widths) {

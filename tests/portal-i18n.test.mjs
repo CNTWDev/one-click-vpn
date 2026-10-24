@@ -38,7 +38,7 @@ test("All Portal translations exist, preserve placeholders and have nonempty EN/
       assert.doesNotMatch(value, /[\u3400-\u9fff]/u, key);
     }
   }
-  const files = ["main.tsx", "credential-dashboard.tsx", "action-dialog.tsx", "subscription-access.tsx", "region-map.tsx", "language.tsx", "client-downloads.tsx", "onboarding.tsx", "node-creator.tsx", "ui.tsx"].map((name) => `portal-web/src/${name}`);
+  const files = ["main.tsx", "credential-dashboard.tsx", "action-dialog.tsx", "subscription-access.tsx", "region-map.tsx", "language.tsx", "home.tsx", "onboarding.tsx", "node-creator.tsx", "ui.tsx"].map((name) => `portal-web/src/${name}`);
   files.push("shared/subscription-panel.tsx");
   for (const file of files) {
     const source = await fs.readFile(file, "utf8");

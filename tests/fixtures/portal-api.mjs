@@ -47,6 +47,10 @@ export function portalApi({ signedIn = true, empty = false, site = null } = {}) 
     if (pathname === "/api/v1/availability") return [200, { regions, nodes }];
     if (pathname === "/api/v1/credentials") return [200, method === "POST" ? { credential: credentials[1] } : { credentials: empty ? [] : credentials }];
     if (pathname === "/api/v1/profiles") return [200, method === "POST" ? { profile: profiles[0] } : { profiles: empty ? [] : profiles }];
+    if (pathname === "/api/v1/account") return [200, { expiresAt: "2027-10-24T00:00:00Z", deviceLimit: 3, devices: empty ? [] : [
+      { id: "enr_1", name: "Aleksandra's ThinkPad X1 Carbon Gen 12 (office)", platform: "windows", lastSeenAt: now, connected: true, region: "São Paulo Metropolitan Area" },
+      { id: "enr_2", name: "Pixel 8", platform: "android", lastSeenAt: ago(130), connected: false, region: null },
+    ] }];
     if (pathname === "/api/v1/usage/summary") return [200, { totals: { totalBytes: 44.9 * GB, uploadBytes: 3.2 * GB, downloadBytes: 41.7 * GB }, daily, updatedAt: now }];
     if (pathname === "/api/v1/subscriptions") return [200, { subscriptions: [] }];
     if (pathname === "/api/v1/client-releases") return [200, { releases, history }];

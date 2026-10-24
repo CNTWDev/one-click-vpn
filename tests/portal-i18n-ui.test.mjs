@@ -39,6 +39,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
       }
       else if (pathname.endsWith("/activate")) body = { profile: { id: "profile", protocol: "wireguard", status: "active" } };
       else if (pathname.endsWith("/download")) { await route.fulfill({ contentType: "text/plain", body: "# Test configuration" }); return; }
+      else if (pathname === "/api/v1/account") body = { expiresAt: null, deviceLimit: 3, devices: [{ id: "enr", name: "Pixel 8", platform: "android", lastSeenAt: now, connected: true, region: "Singapore" }] };
       else if (pathname === "/api/v1/usage/summary") body = { totals: { totalBytes: 4096, uploadBytes: 2048, downloadBytes: 2048 }, daily: [] };
       else if (pathname === "/api/v1/subscriptions") {
         if (method === "POST") { created = route.request().postDataJSON(); body = { token: "test-token", credentialId: "new-sub" }; }
@@ -84,6 +85,10 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await page.getByLabel("Электронная почта").fill("test@example.com");
     await page.getByLabel("Пароль", { exact: true }).fill("test-password-123");
     await page.getByRole("button", { name: "Войти", exact: true }).click();
+    // Home is the app download; subscriptions and configs sit one click away.
+    await page.getByRole("heading", { name: "Мои устройства", level: 2 }).waitFor();
+    await noChinese();
+    await page.locator(".home-manual").click();
     await page.getByRole("heading", { name: "Мои подключения", level: 2 }).waitFor();
     await page.getByRole("button", { name: /Копировать ссылку/ }).click();
     await page.getByLabel("Пароль аккаунта").fill("incorrect");
@@ -142,31 +147,33 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await page.getByRole("heading", { name: "Мои подключения", level: 2 }).waitFor();
     await secondPage.close();
     await chooseLanguage("en");
-    // Downloads are always open (no disclosure to click) and sit before the region map.
-    await page.getByRole("heading", { name: "Download TrackNothing", level: 2 }).waitFor();
-    assert.equal(await page.getByText("Not released yet", { exact: true }).count(), 4);
-    assert.equal(await page.locator(".client-downloads details.disclosure:not(.release-history)").count(), 0);
+    // Home: one row per platform, unreleased ones say so; versions and checksums sit behind one disclosure.
+    await page.getByRole("button", { name: "Back to home", exact: true }).click();
+    await page.getByRole("heading", { name: "Download TrackNothing", level: 1 }).waitFor();
+    assert.equal(await page.getByText("Coming soon", { exact: true }).count(), 4);
+    await page.getByText("In use · Singapore", { exact: true }).waitFor();
     let catalogUnavailable = true;
     await page.route("**/api/v1/client-releases?**", (route) => route.fulfill({
       status: catalogUnavailable ? 503 : 200, contentType: "application/json",
-      body: JSON.stringify(catalogUnavailable ? { code: "CLIENT_RELEASES_UNAVAILABLE" } : { releases: [{ platform: "windows", arch: "x64", version: "1.0.0", distribution: "direct", url: "https://downloads.example.com/veilbird.exe", sha256: "a".repeat(64), minOs: "Windows 10" }],
+      body: JSON.stringify(catalogUnavailable ? { code: "CLIENT_RELEASES_UNAVAILABLE" } : { releases: [{ platform: "windows", arch: "x64", version: "1.0.0", build: 10, distribution: "direct", url: "https://downloads.example.com/veilbird.exe", sha256: "a".repeat(64), minOs: "Windows 10", publishedAt: "2026-10-01T00:00:00Z" }],
         history: [{ platform: "windows", arch: "x64", version: "0.9.0", build: 9, distribution: "direct", url: "https://downloads.example.com/veilbird-0.9.exe", sha256: "b".repeat(64), minOs: "Windows 10", publishedAt: "2026-09-01T00:00:00Z" }] }),
     }));
     await page.reload();
     await page.getByText("Could not load client releases. Please try again later.", { exact: true }).waitFor();
     catalogUnavailable = false;
     await page.getByRole("button", { name: "Retry", exact: true }).click();
-    await page.getByRole("link", { name: "Download installer", exact: true }).first().waitFor();
-    assert.equal(await page.getByRole("link", { name: "Download installer", exact: true }).first().getAttribute("href"), "/download/windows/x64", "permanent link, so a cached page never serves a stale installer");
-    await page.locator(".release-history summary").filter({ hasText: "Earlier versions" }).click();
-    assert.equal(await page.locator(".release-history a").getAttribute("href"), "https://downloads.example.com/veilbird-0.9.exe", "earlier versions link to their own immutable file");
+    await page.locator(".home-list li").filter({ hasText: "Windows" }).getByRole("link", { name: "Download", exact: true }).waitFor();
+    assert.equal(await page.locator(".home-list li").filter({ hasText: "Windows" }).getByRole("link").getAttribute("href"), "/download/windows/x64", "permanent link, so a cached page never serves a stale installer");
+    await page.locator("summary").filter({ hasText: "Version details and earlier versions" }).click();
+    assert.equal(await page.locator(".home-versions a").nth(1).getAttribute("href"), "https://downloads.example.com/veilbird-0.9.exe", "earlier versions link to their own immutable file");
     await page.setViewportSize({ width: 390, height: 844 });
     await noOverflow();
     await chooseLanguage("ru");
-    await page.getByRole("link", { name: "Скачать установочный файл", exact: true }).first().waitFor();
+    await page.getByRole("heading", { name: "Мои устройства", level: 2 }).waitFor();
     await noChinese();
-    await page.locator(".client-downloads").screenshot({ path: path.join(directory, "downloads-ru-mobile.png") });
+    await page.screenshot({ path: path.join(directory, "home-ru-mobile.png"), fullPage: true });
     firstRun = true;
+    await page.goto(`${base}/#manual`);
     await page.reload();
     await page.getByRole("heading", { name: "Три шага для начала" }).waitFor();
     await noChinese();
