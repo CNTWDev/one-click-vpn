@@ -588,6 +588,14 @@ details[open] > summary .chev { transform: rotate(180deg); }
 .site-logo-actions { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .site-logo-field small { color: var(--text-3); font-size: 12px; }
 .site-logo-actions label.button { display: inline-flex; align-items: center; cursor: pointer; }
+.agent-domain .form-note { margin-bottom: 14px; }
+.agent-domain code { font-family: var(--mono); font-size: 12px; color: var(--text); }
+.agent-domain-waiting { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.agent-domain-waiting li { display: flex; flex-wrap: wrap; gap: 0 8px; }
+.agent-domain-waiting li span { color: var(--text-3); }
+.agent-domain-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.agent-domain-form input { flex: 1 1 220px; min-width: 0; }
+.agent-domain-hint { display: block; margin-top: 8px; color: var(--text-3); font-size: 12px; line-height: 1.55; }
 @media (max-width: 1180px) {
   .site-list article { flex-wrap: wrap; }
   .site-list .row-actions { width: 100%; justify-content: flex-start; padding-left: 54px; }

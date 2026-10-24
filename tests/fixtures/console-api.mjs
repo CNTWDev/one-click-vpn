@@ -99,6 +99,8 @@ export function consoleApi({ signedIn = true } = {}) {
     if (pathname === "/api/regions") return [200, { regions }];
     if (pathname === "/api/v1/site") return [200, { id: "default", name: "TrackNothing", logoSvg: "", isDefault: true, portalOrigin: "https://app.example.com", consoleOrigin: "https://console.example.com", apiOrigin: "https://api.example.com" }];
     if (pathname === "/api/v1/admin/sites") return [200, { sites }];
+    if (pathname === "/api/v1/admin/agent-domain") return [200, { domain: "", origin: "https://agent.very-long-infrastructure-domain.example.net", source: "environment", environmentOrigin: "https://agent.very-long-infrastructure-domain.example.net",
+      nodes: nodes.map((node, index) => ({ id: node.id, name: node.name, status: index === 4 ? "offline" : "online", version: "agent 2.13.0", controllerOrigin: index < 2 ? "https://agent.very-long-infrastructure-domain.example.net" : index === 2 ? "" : "https://api.example.com" })) }];
     if (/^\/api\/v1\/admin\/sites\/[^/]+\/check$/.test(pathname)) return [200, { checks: [
       { role: "portal", domain: sites[1].portalDomain, status: "ok", detail: "" },
       { role: "api", domain: sites[1].apiDomain, status: "unreachable", detail: "getaddrinfo ENOTFOUND subscriptions.very-long-brand-name.example.net" },

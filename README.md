@@ -105,9 +105,24 @@ domain and name the Clash group after it, and password-reset emails link to its 
 Unknown hostnames get the default site. The first site is created automatically from
 `VEILBIRD_PORTAL_DOMAIN`, `VEILBIRD_ADMIN_DOMAIN` and `VEILBIRD_API_DOMAIN`.
 
-The Agent keeps using `VEILBIRD_AGENT_ORIGIN` (the deployment's own API domain), so adding,
-renaming or deleting sites never touches the nodes. The native apps are built for the
-default site; other sites offer subscriptions and hide the app downloads.
+The native apps are built for the default site; other sites offer subscriptions and hide
+the app downloads.
+
+### Agent domain
+
+Nodes install and heartbeat through one Agent domain that belongs to no site, so adding,
+renaming or deleting sites never touches the nodes. It starts as `VEILBIRD_AGENT_ORIGIN`
+(the API domain at install time) and can be moved in Console → 站点 → **Agent 接入域名**:
+
+1. Point a hostname such as `agent.example.com` at this server and add it in BaoTa as a
+   reverse proxy to `http://127.0.0.1:3000` (`$host` forwarded) with a certificate.
+2. Enter it in Console. Saving is refused until `https://<domain>/api/v1/agent/whoami`
+   answers as this deployment.
+3. Every heartbeat announces the domain. Agent 2.13+ sends one heartbeat through it and
+   rewrites `NORTHSTAR_CONTROLLER_URL` only if that succeeds (otherwise it stays on the old
+   domain and retries every 10 minutes). Older Agents switch after **升级 Agent**; new
+   installs and 重装/修复 use the new domain directly.
+4. Keep the old domain until the panel shows every node on the new one.
 
 To add a site: create it in Console, point its DNS records at this server, then add one
 reverse-proxy website per hostname in Nginx / BaoTa: Portal → `http://127.0.0.1:3100`,
