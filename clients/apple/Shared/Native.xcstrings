@@ -3474,6 +3474,29 @@
         }
       }
     },
+    "valid_until_label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valid until"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有效期至"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Действует до"
+          }
+        }
+      }
+    },
     "version_label": {
       "extractionState": "manual",
       "localizations": {

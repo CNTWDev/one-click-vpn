@@ -161,6 +161,7 @@ struct ClientView:View {
             HStack {
                 Text("TrackNothing").font(.headline)
                 Spacer()
+                if !model.signedIn {languageButton}
                 if model.busy || model.measuring {ProgressView().controlSize(.small).tint(VeilbirdStyle.accent)}
             }.padding(.horizontal,20).padding(.top,14).padding(.bottom,6)
             ScrollView {
@@ -208,20 +209,27 @@ struct ClientView:View {
     private var languages:[(code:String,flag:String,name:String)] {
         [("system","🌐",L10n.text("language_system")),("zh-Hans","🇨🇳","简体中文"),("en","🇺🇸","English"),("ru","🇷🇺","Русский")]
     }
-    /// The language as one full-width row at the top: flag and name; a tap lists all languages.
-    private var languageBar:some View {
-        let current=languages.first {$0.code==language} ?? languages[0]
-        let bar=Button {choosingLanguage=true} label:{
-            HStack(spacing:12) {
-                Text(current.flag).font(.title3)
-                Text(current.name).font(.subheadline.weight(.semibold)).lineLimit(1)
+    private var currentLanguage:(code:String,flag:String,name:String) {languages.first {$0.code==language} ?? languages[0]}
+    /// Before sign-in the only language entry: a small globe in the header.
+    private var languageButton:some View {
+        languageChooser(Button {choosingLanguage=true} label:{
+            Image(systemName:"globe").font(.body).foregroundStyle(VeilbirdStyle.muted).frame(width:36,height:36).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityLabel(L10n.text("language")+": "+currentLanguage.name))
+    }
+    /// Signed in, language is a settings row on the account page: name on the left, current value on the right.
+    private var languageRow:some View {
+        languageChooser(Button {choosingLanguage=true} label:{
+            HStack {
+                Text(L10n.text("language")).font(.subheadline)
                 Spacer(minLength:8)
-                Text(L10n.text("language")+"  ›").font(.callout).foregroundStyle(VeilbirdStyle.muted).lineLimit(1)
-            }.padding(.horizontal,14).frame(minHeight:50).frame(maxWidth:.infinity,alignment:.leading)
-            .background(Color.white,in:RoundedRectangle(cornerRadius:12)).contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityLabel(L10n.text("language")+": "+current.name)
+                Text(currentLanguage.flag+" "+currentLanguage.name+"  ›").font(.subheadline).foregroundStyle(VeilbirdStyle.muted).lineLimit(1)
+            }.padding(.horizontal,14).frame(minHeight:48).frame(maxWidth:.infinity).background(Color.white,in:RoundedRectangle(cornerRadius:12)).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityLabel(L10n.text("language")+": "+currentLanguage.name))
+    }
+    /// The list of languages: a popover on the Mac, a choice sheet on iPhone; picking one switches at once.
+    @ViewBuilder private func languageChooser<Content:View>(_ trigger:Content)->some View {
         #if os(macOS)
-        return bar.popover(isPresented:$choosingLanguage,arrowEdge:.bottom) {
+        trigger.popover(isPresented:$choosingLanguage,arrowEdge:.bottom) {
             VStack(spacing:2) {
                 ForEach(languages,id:\.code) {item in
                     Button {language=item.code;choosingLanguage=false} label:{
@@ -232,11 +240,26 @@ struct ClientView:View {
             }.padding(6)
         }
         #else
-        return bar.confirmationDialog(L10n.text("language"),isPresented:$choosingLanguage,titleVisibility:.visible) {
+        trigger.confirmationDialog(L10n.text("language"),isPresented:$choosingLanguage,titleVisibility:.visible) {
             ForEach(languages,id:\.code) {item in Button((item.code==language ? "✓ ":"")+item.flag+"  "+item.name) {language=item.code}}
             Button(L10n.text("cancel"),role:.cancel) {}
         }
         #endif
+    }
+    /// Below the connect button: what this account has used and how long it runs.
+    private var usageStrip:some View {
+        let traffic=model.account["traffic"] as? [String:Any]
+        let used=traffic.map {(Int64(String(describing:$0["uploadBytes"] ?? "0")) ?? 0)+(Int64(String(describing:$0["downloadBytes"] ?? "0")) ?? 0)}
+        return HStack(alignment:.top,spacing:12) {
+            usageCell(L10n.text("traffic_30_days"),used.map {ByteCountFormatter.string(fromByteCount:$0,countStyle:.binary)} ?? "—")
+            usageCell(L10n.text("valid_until_label"),model.account.isEmpty ? "—":L10n.date(model.account["expiresAt"] as? String))
+        }.padding(.horizontal,16).padding(.vertical,10).background(Color.white,in:RoundedRectangle(cornerRadius:12)).padding(.top,6)
+    }
+    private func usageCell(_ title:String,_ value:String)->some View {
+        VStack(alignment:.leading,spacing:2) {
+            Text(title).font(.caption).foregroundStyle(VeilbirdStyle.muted).lineLimit(1)
+            Text(value).font(.subheadline.weight(.semibold)).lineLimit(1).monospacedDigit()
+        }.frame(maxWidth:.infinity,alignment:.leading)
     }
     private func navigationItem(_ title:String,_ icon:String,_ index:Int)->some View {
         let selected=tab==index || (tab==3 && index==2)
@@ -246,8 +269,7 @@ struct ClientView:View {
     }
     private var loginView:some View {
         VStack(alignment:.leading,spacing:14) {
-            languageBar
-            Text(L10n.text("your_world_one_tap_away")).font(.title.bold()).padding(.top,4)
+            Text(L10n.text("your_world_one_tap_away")).font(.title.bold()).padding(.top,8)
             Text(L10n.text("sign_in_to_veilbird_no_imports_or_configuration_needed")).font(.callout).foregroundStyle(VeilbirdStyle.muted)
             if (Bundle.main.object(forInfoDictionaryKey:"VeilbirdAPIOrigin") as? String ?? "").isEmpty {Text(L10n.text("development_server_address")).font(.caption.bold());TextField("https://…",text:$model.origin).literalInput().veilbirdField()}
             Text(L10n.text("email")).font(.caption.bold());TextField(L10n.text("enter_email"),text:$email).literalInput().veilbirdField()
@@ -291,7 +313,8 @@ struct ClientView:View {
             if model.update?.mandatory != true || model.connected {
                 Button(model.connected ? L10n.text("disconnect_action"):L10n.text("connect_action")) {model.work {try await model.toggle()}}.buttonStyle(VeilbirdButton(primary:true))
             }
-        }.frame(maxWidth:.infinity)
+            usageStrip
+        }.frame(maxWidth:.infinity).task {try? await model.loadAccount()}
     }
     /// A list row: status dot, title with a muted detail line, and an optional value on the right.
     private func row(_ title:String,_ detail:String,dot:Color,trailing:String,trailingColor:Color=VeilbirdStyle.muted,selected:Bool)->some View {
@@ -341,7 +364,6 @@ struct ClientView:View {
     private var accountView:some View {
         VStack(alignment:.leading,spacing:10) {
             Text(L10n.text("my_veilbird")).font(.title3.bold())
-            languageBar
             VStack(alignment:.leading,spacing:6) {
                 Text(model.account["name"] as? String ?? L10n.text("my_account")).font(.headline)
                 Text(model.account["email"] as? String ?? "").font(.caption).foregroundStyle(VeilbirdStyle.muted)
@@ -358,7 +380,8 @@ struct ClientView:View {
                     revoking ? L10n.text("revoking_slot_released_when_the_old_connection_expires"):device["platform"] as? String ?? "",dot:VeilbirdStyle.accent,
                     trailing:revoking ? "":L10n.text("revoke_access"),trailingColor:.red,selected:false)}.buttonStyle(.plain)
             }
-            Button(L10n.text("sign_out"),role:.destructive) {model.work {_ = try? await model.api().request("logout",[:]);try SecureStorage.write("token",nil);model.signedIn=false}}
+            languageRow
+            Button(L10n.text("sign_out"),role:.destructive) {model.work {_ = try? await model.api().request("logout",[:]);try SecureStorage.write("token",nil);model.signedIn=false;model.account=[:]}}
                 .frame(maxWidth:.infinity).padding(.vertical,12).background(Color(red:1,green:0.93,blue:0.92),in:RoundedRectangle(cornerRadius:12)).buttonStyle(.plain).foregroundStyle(.red).disabled(model.connected)
             if model.connected {Text(L10n.text("disconnect_before_signing_out_hint")).font(.caption).foregroundStyle(VeilbirdStyle.muted)}
             // The diagnostic log has no visible entry: seven taps on the version open it.

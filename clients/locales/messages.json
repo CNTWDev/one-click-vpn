@@ -818,5 +818,10 @@
     "zh": "请先在 TrackNothing 里连接一次。",
     "en": "Connect once in TrackNothing first.",
     "ru": "Сначала подключитесь один раз в TrackNothing."
+  },
+  "valid_until_label": {
+    "zh": "有效期至",
+    "en": "Valid until",
+    "ru": "Действует до"
   }
 }

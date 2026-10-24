@@ -152,6 +152,7 @@
   <string name="update_open_download">Скачать</string>
   <string name="update_required_detail">Эта версия больше не поддерживается. Обновите приложение, чтобы продолжить подключаться.</string>
   <string name="valid_until">\nДействует до · </string>
+  <string name="valid_until_label">Действует до</string>
   <string name="version_label">Версия %1$s</string>
   <string name="vpn_connection">VPN-подключение</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
