@@ -330,7 +330,7 @@ Open those ports in the Edge Node firewall/security group separately from the Co
 
 ## TrackNothing app transports
 
-The Android app prefers WireGuard (lightest; Apple and Windows use only WireGuard for now). When it is blocked they fall back, without any
+All TrackNothing apps (Android, iPhone/Mac, Windows) embed the same mihomo core and prefer WireGuard (lightest). When it is blocked they fall back, without any
 user choice, to Hysteria2 with Salamander obfuscation (UDP, no QUIC fingerprint), then
 VLESS REALITY Vision on TCP 443, then VLESS REALITY over XHTTP. Each enrolled device has
 one secret that is its VLESS UUID and Hysteria2 password on every node; revoking the

@@ -61,7 +61,7 @@ android {
     packaging { jniLibs { excludes += "**/libwg-go.so" } }
 }
 dependencies {
-    // Built by core/build.sh (gomobile bind of mihomo); CI builds it before Gradle.
+    // Built by clients/core/build-android.sh (gomobile bind of mihomo); CI builds it before Gradle.
     implementation(files("libs/veilbird-core.aar"))
     // Only for Curve25519 key pairs: the private key never leaves the device.
     implementation("com.wireguard.android:tunnel:1.0.20260102")

@@ -1,5 +1,5 @@
 ; TrackNothing installer (Inno Setup 6). Built by build.ps1 -Installer; installs per machine into Program Files,
-; because the WireGuard tunnel service runs this executable as SYSTEM and must not live in a user-writable folder.
+; because the app and its core run with administrator rights and must not live in a user-writable folder.
 ; Running a newer installer over an older one upgrades in place (same AppId).
 #ifndef Version
   #define Version "0.0.0"
@@ -58,5 +58,6 @@ Name: "{autodesktop}\TrackNothing"; Filename: "{app}\Veilbird.exe"
 Filename: "{app}\Veilbird.exe"; Description: "TrackNothing"; Flags: nowait postinstall skipifsilent shellexec
 
 [UninstallRun]
-; Stops a tunnel left running by the app before its files are removed.
+; Stops the core (and with it the tunnel), and a tunnel service left by versions before the built-in core.
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM veilbird-core.exe"; Flags: runhidden; RunOnceId: "StopCore"
 Filename: "{sys}\sc.exe"; Parameters: "stop ""WireGuardTunnel$Veilbird"""; Flags: runhidden; RunOnceId: "StopTunnel"

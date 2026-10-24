@@ -17,6 +17,11 @@
         </service>
         <!-- The WireGuard library is only used for key generation; its own VPN service is not part of the app. -->
         <service android:name="com.wireguard.android.backend.GoBackend$VpnService" tools:node="remove" />
+        <!-- Quick Settings tile: connect or disconnect from the notification shade. -->
+        <service android:name=".ToggleTile" android:exported="true" android:label="${appLabel}" android:icon="@android:drawable/ic_lock_lock" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+            <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE" android:value="true" />
+        </service>
         <receiver android:name=".UpdateInstallReceiver" android:exported="false" />
     </application>
 </manifest>

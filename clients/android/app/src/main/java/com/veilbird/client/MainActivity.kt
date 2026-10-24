@@ -83,6 +83,10 @@ class MainActivity : Activity() {
         val settings = getSharedPreferences("preferences", MODE_PRIVATE)
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", L10n.text(R.string.automatic_recommended))!!
         render(); checkForUpdate()
+        // The Quick Settings tile could not start the VPN from the background: connect now that the app is open.
+        if (intent?.getBooleanExtra("connect", false) == true && api.secret("token") != null && !ConnectionStateStore.active) {
+            val consent = VpnService.prepare(this); if (consent != null) startActivityForResult(consent, 10) else startConnection()
+        }
     }
     override fun onResume() { super.onResume(); visible = true; handler.post(refresh) }
     override fun onPause() { visible = false; handler.removeCallbacks(refresh); super.onPause() }

@@ -7,7 +7,7 @@ case "${1:-}" in
   *) echo 'Usage: bash scripts/build.sh ios|macos' >&2; exit 2 ;;
 esac
 command -v xcodegen >/dev/null || { echo 'Install XcodeGen and full Xcode first.' >&2; exit 1; }
-bash scripts/prepare-wireguard.sh
+bash ../core/build-apple.sh
 xcodegen generate
 xcodebuild -project Veilbird.xcodeproj -scheme "$scheme" -destination "$destination" -derivedDataPath "artifacts/$scheme" "CODE_SIGNING_ALLOWED=$signing" CODE_SIGN_IDENTITY=- build
 echo 'Development only (simulator ad-hoc signature / unsigned Mac). A developer team, production signing and physical-device VPN tests are required before distribution.'

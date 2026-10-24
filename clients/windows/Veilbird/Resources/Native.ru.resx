@@ -35,6 +35,7 @@
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>Подключайтесь автоматически или выбирайте локацию.</value></data>
   <data name="connect_automatically_or_pick_a_location" xml:space="preserve"><value>Автоматически или с выбором локации</value></data>
   <data name="connect_freely" xml:space="preserve"><value>Подключайтесь свободно</value></data>
+  <data name="connect_from_app_first" xml:space="preserve"><value>Сначала подключитесь один раз в TrackNothing.</value></data>
   <data name="connect_tab" xml:space="preserve"><value>Подключение</value></data>
   <data name="connect_with_ease" xml:space="preserve"><value>Подключайтесь легко.</value></data>
   <data name="connected_status" xml:space="preserve"><value>Подключено</value></data>
@@ -97,11 +98,13 @@
   <data name="node_load" xml:space="preserve"><value>Нагрузка {0}%</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>Джиттер {0} мс · Потери {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Не подключено</value></data>
+  <data name="open_app" xml:space="preserve"><value>Открыть TrackNothing</value></data>
   <data name="password" xml:space="preserve"><value>Пароль</value></data>
   <data name="quality_fair" xml:space="preserve"><value>Средне</value></data>
   <data name="quality_good" xml:space="preserve"><value>Хорошо</value></data>
   <data name="quality_poor" xml:space="preserve"><value>Плохо</value></data>
   <data name="quality_unreachable" xml:space="preserve"><value>Недоступен</value></data>
+  <data name="quit_app" xml:space="preserve"><value>Выйти</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>Обновить устройства</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Обновить локации</value></data>
   <data name="retest_latency" xml:space="preserve"><value>Проверить</value></data>
@@ -114,6 +117,7 @@
   <data name="routing_global_detail" xml:space="preserve"><value>Весь трафик через TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>Умная</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>Сайты материкового Китая напрямую, остальное через TrackNothing</value></data>
+  <data name="running_in_tray" xml:space="preserve"><value>TrackNothing работает в трее. Нажмите на значок, чтобы переключить.</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>Поиск локаций или регионов</value></data>
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>Защищённое хранилище недоступно. Разблокируйте устройство и повторите.</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>Самая быстрая локация, при сбое — следующая</value></data>
@@ -125,6 +129,7 @@
   <data name="sign_out" xml:space="preserve"><value>Выйти</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Версия для симулятора · Проверяйте VPN на подписанной сборке для устройства</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>Нажмите, чтобы сменить</value></data>
+  <data name="test_after_disconnecting" xml:space="preserve"><value>Задержка проверяется без подключения. Показаны последние результаты.</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>Симулятор предназначен только для интерфейса. Проверяйте VPN на подписанной сборке для устройства.</value></data>
   <data name="this_development_build_lacks_signing_entitlements_configure_your_developer" xml:space="preserve"><value>В сборке отсутствуют разрешения подписи. Настройте команду разработчика и подпишите сборку.</value></data>
   <data name="this_device" xml:space="preserve"><value> · Это устройство</value></data>

@@ -35,6 +35,7 @@
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>自动选择可用位置，也能自由指定节点。</value></data>
   <data name="connect_automatically_or_pick_a_location" xml:space="preserve"><value>自动选择位置，也能自由指定</value></data>
   <data name="connect_freely" xml:space="preserve"><value>随心连接</value></data>
+  <data name="connect_from_app_first" xml:space="preserve"><value>请先在 TrackNothing 里连接一次。</value></data>
   <data name="connect_tab" xml:space="preserve"><value>连接</value></data>
   <data name="connect_with_ease" xml:space="preserve"><value>连接，自在一点。</value></data>
   <data name="connected_status" xml:space="preserve"><value>已连接</value></data>
@@ -97,11 +98,13 @@
   <data name="node_load" xml:space="preserve"><value>负载 {0}%</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>抖动 {0} ms · 丢包 {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>未连接</value></data>
+  <data name="open_app" xml:space="preserve"><value>打开 TrackNothing</value></data>
   <data name="password" xml:space="preserve"><value>密码</value></data>
   <data name="quality_fair" xml:space="preserve"><value>良</value></data>
   <data name="quality_good" xml:space="preserve"><value>优</value></data>
   <data name="quality_poor" xml:space="preserve"><value>差</value></data>
   <data name="quality_unreachable" xml:space="preserve"><value>不可达</value></data>
+  <data name="quit_app" xml:space="preserve"><value>退出</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>刷新设备状态</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>刷新节点</value></data>
   <data name="retest_latency" xml:space="preserve"><value>重新测速</value></data>
@@ -114,6 +117,7 @@
   <data name="routing_global_detail" xml:space="preserve"><value>全部流量经过 TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>智能分流</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>国内网站直连，其余经过 TrackNothing</value></data>
+  <data name="running_in_tray" xml:space="preserve"><value>TrackNothing 仍在托盘运行，点击图标即可切换。</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>搜索节点或地区</value></data>
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>无法访问安全存储，请解锁设备后重试。</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>选延迟最低的节点，连不上自动换</value></data>
@@ -125,6 +129,7 @@
   <data name="sign_out" xml:space="preserve"><value>退出登录</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>模拟器开发版 · 连接功能需在已签名的真机版本验证</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>点击更换节点</value></data>
+  <data name="test_after_disconnecting" xml:space="preserve"><value>连接中无法测速，显示的是上次结果。</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>模拟器仅用于界面测试，请使用已签名的真机版本测试 VPN。</value></data>
   <data name="this_development_build_lacks_signing_entitlements_configure_your_developer" xml:space="preserve"><value>当前开发包缺少签名授权，需配置开发者团队并签名后使用。</value></data>
   <data name="this_device" xml:space="preserve"><value> · 本机</value></data>

@@ -74,11 +74,11 @@ jobs:
           gradle-version: '8.14.5'
       - uses: actions/setup-go@v5
         with:
-          go-version-file: clients/android/core/go.mod
-          cache-dependency-path: clients/android/core/go.sum
+          go-version-file: clients/core/go.mod
+          cache-dependency-path: clients/core/go.sum
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
       # The embedded core (mihomo) as an AAR; Gradle links it from app/libs.
-      - run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash clients/android/core/build.sh
+      - run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash clients/core/build-android.sh
       - name: Restore signing key
         env:
           KEYSTORE: ${{ secrets.VEILBIRD_ANDROID_KEYSTORE_BASE64 }}
@@ -125,6 +125,11 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      # The shared core (veilbird-core.exe) is cross-built with Go by build.ps1.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: clients/core/go.mod
+          cache-dependency-path: clients/core/go.sum
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
