@@ -36,14 +36,14 @@ Portal、Console 和三类原生客户端支持中文、英文、俄语，默认
 
 发布记录保存在数据库 `client_releases`，在控制台「客户端 → 客户端发布」管理。门户下载、固定下载链接和客户端更新检查都读取这里；旧的 `VEILBIRD_CLIENT_RELEASES_JSON` 仍作为只读清单合并展示。
 
-流程：
+流程（一步步操作见 [RELEASING.md](RELEASING.md)）：
 
 1. 改版本：编辑 `clients/version.json` 的 `version`（三端共用的对外版本号）。构建号由 CI 运行序号提供，更新检查只比较构建号。
-2. 推送标签 `client-v<version>`（或手动运行 Actions「Client release」）：CI 构建签名的 Android prod APK（以及勾选时的 Windows x64/arm64），上传并**发布到测试版**。所需变量和密钥列在 `.github/workflows/client-release.yml` 顶部；Controller 需要 `VEILBIRD_RELEASE_STORAGE=s3`。
+2. 推送标签 `client-v<version>`（或手动运行 Actions「Client release」）：CI 构建签名的 Android prod APK（以及勾选时的 Windows x64/arm64），安装包始终保存为该次运行的 Artifacts，可下载后在控制台上传；配置了 `VEILBIRD_RELEASE_API` 和 `VEILBIRD_RELEASE_TOKEN` 时 CI 直接上传并**发布到测试版**。所需变量和密钥列在 `.github/workflows/client-release.yml` 顶部；本地存储和 S3 都支持。
 3. 在控制台「客户端发布」先给测试版设置灰度比例（1–100%，默认 100），再点「晋升正式版」；已安装的客户端按安装随机 ID 分桶，只有落在比例内的才会收到更新提示，匿名的固定下载链接始终给全量正式版。确认没问题后把比例调到 100%。
 4. 需要强制升级时设置最低构建号（只能指向全量发布的正式版）。
 
-本地手动发布同样可用：`VEILBIRD_RELEASE_API=https://api.example.com VEILBIRD_RELEASE_TOKEN=… npm run release:client -- --platform android --version 1.2.0 --build 12 --min-os "Android 8.0" --file app-release.apk --publish`。`--file` 通过预签名 URL 直传对象存储（需要 `VEILBIRD_RELEASE_STORAGE=s3`）；也可以用 `--url` 登记已经托管在别处的 HTTPS 地址，或在控制台手动登记。
+本地手动发布同样可用：`VEILBIRD_RELEASE_API=https://api.example.com VEILBIRD_RELEASE_TOKEN=… npm run release:client -- --platform android --version 1.2.0 --build 12 --min-os "Android 8.0" --file app-release.apk --publish`。`--file` 在 S3 模式下通过预签名 URL 直传对象存储，默认本地存储下分块上传到 Controller 数据卷；也可以用 `--url` 登记已经托管在别处的 HTTPS 地址，或在控制台手动登记。
 
 Controller 下载一次安装包，记录**实际**的 SHA-256 和大小，不采信上传方提供的值。构建号对同一平台/架构不可重复。
 

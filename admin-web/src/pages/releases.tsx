@@ -46,6 +46,13 @@ const extensions = ".apk,.aab,.zip,.dmg,.pkg,.msix,.msixbundle,.exe,.msi";
 const defaultArch: Record<Platform, string> = { android: "universal", ios: "universal", macos: "universal", windows: "x64" };
 const minOsHint: Record<Platform, string> = { android: "Android 8.0", ios: "iOS 16", macos: "macOS 13", windows: "Windows 10" };
 
+/** CI names installers Veilbird-<version>-<build>[-win-<arch>].apk|.zip; picking one fills the form. */
+function parseInstallerName(name: string): { platform: Platform; arch: string; version: string; build: string } | null {
+  const match = name.match(/^Veilbird-(\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?)-(\d+)(?:-win-(x64|arm64))?\.(apk|zip)$/i);
+  if (!match || (match[4].toLowerCase() === "apk") === !!match[3]) return null;
+  return match[3] ? { platform: "windows", arch: match[3], version: match[1], build: match[2] } : { platform: "android", arch: "universal", version: match[1], build: match[2] };
+}
+
 async function readError(response: Response) {
   const body = await response.json().catch(() => ({})) as { error?: string };
   return new Error(body.error || t("请求失败（HTTP {0}）", [response.status]));
@@ -117,6 +124,18 @@ export function ReleasesPage() {
   async function saveRollout(release: Release) {
     const percent = Number(rollouts[release.id]);
     await run(() => api(`/api/v1/admin/client-releases/${release.id}`, { method: "POST", body: JSON.stringify({ action: "rollout", percent }) }), t("已更新"));
+  }
+  function fillFromInstaller(input: HTMLInputElement) {
+    const parsed = input.files?.[0] && parseInstallerName(input.files[0].name), form = input.form;
+    if (!parsed || !form) return;
+    setFormPlatform(parsed.platform);
+    // Arch and minimum OS remount when the platform changes, so fill them after that render.
+    requestAnimationFrame(() => {
+      const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null;
+      for (const [name, value] of [["arch", parsed.arch], ["version", parsed.version], ["build", parsed.build]]) { const element = field(name); if (element) element.value = value; }
+      const minOs = field("minOs");
+      if (minOs && !minOs.value) minOs.value = minOsHint[parsed.platform];
+    });
   }
   /** Sends the installer to the configured storage and returns its storage key. */
   async function uploadInstaller(file: File, meta: Record<string, string | number>) {
@@ -198,7 +217,7 @@ export function ReleasesPage() {
           <label>{t("渠道")}<select name="channel" defaultValue="beta"><option value="beta">{t("测试版")}</option><option value="stable">{t("正式版")}</option></select></label>
           <label>{t("最低系统版本")}<input name="minOs" required key={formPlatform} placeholder={minOsHint[formPlatform]} /></label>
           {source === "upload"
-            ? <label className="span-2">{t("安装包文件")}<input name="installer" type="file" required accept={extensions} /><small>{t("支持 .apk、.aab、.zip、.dmg、.pkg、.msix、.exe、.msi，最大 1 GB。iPhone / iPad 请改用「填写下载地址」登记 App Store 或 TestFlight 链接。")}</small></label>
+            ? <label className="span-2">{t("安装包文件")}<input name="installer" type="file" required accept={extensions} onChange={(event) => fillFromInstaller(event.currentTarget)} /><small>{t("支持 .apk、.aab、.zip、.dmg、.pkg、.msix、.exe、.msi，最大 1 GB。iPhone / iPad 请改用「填写下载地址」登记 App Store 或 TestFlight 链接。")}</small></label>
             : <>
               <label>{t("分发方式")}<select name="distribution" defaultValue="direct"><option value="direct">{t("直接下载")}</option><option value="app-store">App Store</option><option value="testflight">TestFlight</option></select></label>
               <label>{t("下载地址")}<input name="url" type="url" required placeholder="https://downloads.example.com/…" /></label>
