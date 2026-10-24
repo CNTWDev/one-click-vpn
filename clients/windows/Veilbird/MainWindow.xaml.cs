@@ -46,6 +46,8 @@ public partial class MainWindow : Window {
     private void Connect()=>Work(async()=>{
         keys=Tunnel.NewKeypair();leaseNodeId=nodeId;statusKey="authorizing_and_connecting";Render();
         try {
+            // Automatic: the fastest node measured from this PC, before the tunnel exists; if the list fails the server picks.
+            if(leaseNodeId.Length==0) try {leaseNodeId=(await Latency.Rank((await api.Request("nodes"))["nodes"]!.AsArray())).FirstOrDefault().Node?["id"]?.GetValue<string>()??"";} catch {/* least-loaded fallback */}
             var lease=await Acquire();
             await Task.Run(()=>Tunnel.Start(lease,keys.Private));
         } catch(Exception error) {
