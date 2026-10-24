@@ -143,19 +143,22 @@ services:
     environment:
       MINIO_ROOT_PASSWORD: ${VEILBIRD_LOG_STORAGE_PASSWORD:?VEILBIRD_LOG_STORAGE_PASSWORD is required}
     entrypoint: ["/bin/sh", "-ec"]
-    command: |
-      attempts=0
-      until mc alias set local http://minio:9000 northstar "$$MINIO_ROOT_PASSWORD"; do
-        attempts=$$((attempts + 1))
-        [ "$$attempts" -lt 60 ] || { echo "MinIO did not accept credentials within 120 seconds" >&2; exit 1; }
-        sleep 2
-      done
-      attempts=0
-      until mc mb --ignore-existing local/northstar-logs; do
-        attempts=$$((attempts + 1))
-        [ "$$attempts" -lt 60 ] || { echo "MinIO bucket initialization did not complete within 120 seconds" >&2; exit 1; }
-        sleep 2
-      done
+    # A list keeps the script as ONE argument to "sh -c". A plain string is word-split by Compose,
+    # so sh ran only "attempts=0", exited 0 and never created the bucket.
+    command:
+      - |
+        attempts=0
+        until mc alias set local http://minio:9000 northstar "$$MINIO_ROOT_PASSWORD"; do
+          attempts=$$((attempts + 1))
+          [ "$$attempts" -lt 60 ] || { echo "MinIO did not accept credentials within 120 seconds" >&2; exit 1; }
+          sleep 2
+        done
+        attempts=0
+        until mc mb --ignore-existing local/northstar-logs; do
+          attempts=$$((attempts + 1))
+          [ "$$attempts" -lt 60 ] || { echo "MinIO bucket initialization did not complete within 120 seconds" >&2; exit 1; }
+          sleep 2
+        done
 
   loki:
     image: grafana/loki:3.6.1
