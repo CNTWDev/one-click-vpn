@@ -287,8 +287,22 @@ sudo grep -E '^(NORTHSTAR_CONTROLLER_URL|NORTHSTAR_NODE_ID)=' \
 ```
 
 The Agent reports health, resource usage, VPN service state, and traffic counters.
-WireGuard normally uses UDP `51820`; OpenVPN normally uses UDP `1194`. Open those
-ports in the Edge Node firewall/security group separately from the Controller.
+WireGuard normally uses UDP `51820`; OpenVPN normally uses UDP `1194`; VLESS
+REALITY uses TCP `443`; the stealth transports for the Veilbird apps (Hysteria2 and
+VLESS REALITY XHTTP, one mihomo process, Agent 2.12+) use UDP **and** TCP `8443`.
+Open those ports in the Edge Node firewall/security group separately from the Controller.
+
+## Veilbird app transports
+
+The Android app prefers WireGuard (lightest; Apple and Windows use only WireGuard for now). When it is blocked they fall back, without any
+user choice, to Hysteria2 with Salamander obfuscation (UDP, no QUIC fingerprint), then
+VLESS REALITY Vision on TCP 443, then VLESS REALITY over XHTTP. Each enrolled device has
+one secret that is its VLESS UUID and Hysteria2 password on every node; revoking the
+device or an expired membership removes it from every node on the next heartbeat.
+The stealth service reuses the node's REALITY keys and target, so it deploys after
+VLESS. AmneziaWG is not used: it needs a kernel module or a separately built userspace
+daemon on every node, and Hysteria2 with Salamander covers the same "UDP without a
+signature" case.
 
 ## Dynamic subscriptions and VLESS + REALITY
 

@@ -6,6 +6,7 @@ import { allowLoginAttempt } from "./rate-limit";
 import { canonical, digest, identity, NativeError, verifyNativeProof } from "./native-proof";
 import { rebuildDesiredState, selectVpnServices } from "./control-plane";
 import { ipv4Address, ipv4Pool } from "./ipv4-pool";
+import { ensureNativeSecret, nativeProxies } from "./stealth";
 
 export type Session = { id: string; user_id: string; identity_jwk: string; identity_thumbprint: string; device_name: string; platform: string };
 type Entitlement = { status: string; native_only: boolean; native_device_limit: number | null; membership_expires_at: string | null };
@@ -55,13 +56,22 @@ export async function nativeAccount(session: Session) {
 async function candidates() {
   return (await selectVpnServices({protocol:"wireguard"})).filter(({node})=>node.capabilities.nativeLeaseEnforcement === 1);
 }
+/** Node CPU percent from a heartbeat under 3 minutes old; clients use it to steer away from busy nodes. */
+function nodeLoad(metrics: string | null | undefined): number | null {
+  try {
+    const value=JSON.parse(metrics||"null") as {collectedAt?:string;cpuPercent?:number}|null;
+    if(!value || typeof value.cpuPercent!=="number" || !Number.isFinite(value.cpuPercent)) return null;
+    if(!value.collectedAt || Date.now()-new Date(value.collectedAt).getTime()>180_000) return null;
+    return Math.max(0,Math.min(100,Math.round(value.cpuPercent)));
+  } catch { return null; }
+}
 export async function nativeNodes() {
   // WireGuard ignores unknown peers, so clients time a TCP connect to the same host's REALITY port instead.
   // Nodes without one have no probe and keep the server's least-loaded order behind measured nodes.
   const tcp=new Map((await selectVpnServices({protocol:"vless"})).map(({node,service})=>[node.id,service.listen_port]));
   return {nodes:(await candidates()).map(({node})=>{
     const port=tcp.get(node.id);
-    return {id:node.id,name:node.name,region:node.region,protocol:"wireguard",probe:port?{host:node.public_endpoint||node.ip,port}:null};
+    return {id:node.id,name:node.name,region:node.region,protocol:"wireguard",probe:port?{host:node.public_endpoint||node.ip,port}:null,load:nodeLoad(node.metrics_json)};
   })};
 }
 export async function nativeChallenge(session: Session, body: Record<string,unknown>) {
@@ -140,7 +150,15 @@ export async function nativeConnect(session:Session,body:Record<string,unknown>)
   for(const old of result.old) await rebuildDesiredState(old,"wireguard").catch(()=>undefined);
   const applied=(await dbQuery<{applied_revision:number}>("SELECT applied_revision FROM observed_configs WHERE node_id=$1 AND protocol='wireguard' AND status IN ('applied','succeeded')",[node.id]))[0];
   return {leaseId:result.id,enrollmentId:result.enrollmentId,expiresAt:result.expiresAt,nodeId:node.id,nodeName:node.name,revision:desired.revision,ready:!!applied && applied.applied_revision>=desired.revision,
-    wireguard:{address:result.address,serverPublicKey:node.server_public_key,endpoint:`${node.public_endpoint||node.ip}:${service.listen_port}`,dns:service.dns,allowedIps:["0.0.0.0/0","::/0"],mtu:1280}};
+    wireguard:{address:result.address,serverPublicKey:node.server_public_key,endpoint:`${node.public_endpoint||node.ip}:${service.listen_port}`,dns:service.dns,allowedIps:["0.0.0.0/0","::/0"],mtu:1280},
+    // Fallback transports for networks that block WireGuard, as mihomo proxies (Android 1.1+ races them).
+    proxies:await fallbackProxies(node,result.enrollmentId)};
+}
+async function fallbackProxies(node:{id:string;ip:string;public_endpoint:string|null},enrollmentId:string) {
+  const pick=async(protocol:"vless"|"stealth")=>(await selectVpnServices({protocol})).find((item)=>item.node.id===node.id)?.service;
+  try { await ensureNativeSecret(enrollmentId); return await nativeProxies(node,enrollmentId,{vless:await pick("vless"),stealth:await pick("stealth")}); }
+  // WireGuard alone still connects; a missing fallback must never fail the connection.
+  catch { return []; }
 }
 export async function nativeStatus(session:Session,leaseId:string) {
   const row=(await dbQuery(`SELECT l.node_id,l.expires_at,l.required_revision,e.status,u.status AS account_status,u.native_only,u.membership_expires_at FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id JOIN users u ON u.id=e.user_id WHERE l.id=$1 AND e.user_id=$2 AND e.identity_thumbprint=$3`,[leaseId,session.user_id,session.identity_thumbprint]))[0];

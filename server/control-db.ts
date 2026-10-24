@@ -5,7 +5,7 @@ import { hashToken } from "./crypto";
 import { defaultCredentialExpiry } from "./credential-validity";
 
 export type Platform = "web" | "macos" | "ios" | "android" | "windows" | "linux";
-export type Protocol = "wireguard" | "openvpn" | "ikev2" | "vless";
+export type Protocol = "wireguard" | "openvpn" | "ikev2" | "vless" | "stealth";
 export type DeviceStatus = "pending" | "active" | "revoked";
 export type ProfileStatus = "issued" | "active" | "expired" | "revoked";
 export type CredentialStatus = "active" | "revoked" | "expired";

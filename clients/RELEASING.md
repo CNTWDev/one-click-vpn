@@ -23,6 +23,8 @@ Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次�
 
 不需要 Google Play、Google 开发者账号或代码混淆：自签名 APK 可以直接安装，用户首次安装时允许「安装未知来源应用」即可。Windows 安装程序未做代码签名，首次运行时 SmartScreen 会提示「更多信息 → 仍要运行」；以后想去掉这个提示，可以买代码签名证书（如 Azure Trusted Signing）。App 每次启动会请求一次管理员权限，用于启动 VPN 服务。
 
+Android 版内嵌 mihomo 内核（`clients/android/core`）。CI 先用 Go 和 Android NDK 运行 `clients/android/core/build.sh` 生成 `app/libs/veilbird-core.aar`，再跑 Gradle；本机构建同理，先装 Go（版本见 `core/go.mod`）和 NDK 27，设置 `ANDROID_NDK_HOME` 后运行该脚本。
+
 ## 每次发版
 
 1. 改 `clients/version.json` 的版本号，提交后推送标签 `client-v<版本号>`；或在 GitHub → Actions →「Client release」→ Run workflow。
