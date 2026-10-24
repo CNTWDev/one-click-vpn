@@ -2,9 +2,9 @@
 
 ## 当前工程状态（2026-10-06）
 
-产品名为 **Veilbird**。客户端尚未对外发版，技术标识已统一为 Veilbird：Android 包名 `com.veilbird.client`、Apple Bundle ID `com.veilbird.client.*` 与 `VeilbirdCore` 等 target、Windows `Veilbird.exe` 与 `Veilbird` 命名空间、`VEILBIRD_*` 环境变量、`X-Veilbird-Client` 请求头。节点端的 systemd 服务与目录（`northstar-agent` 等）和数据库名暂保持不变，避免已部署节点失联。原生工程位于 `clients/android`、`clients/apple`、`clients/windows`；Apple 覆盖 iOS/iPadOS 和 macOS。工程构建方式与发布步骤见 [客户端工作区](../../clients/README.md)。
+产品名为 **TrackNothing**（2026-10 由 Veilbird 更名）。更名只改了用户看得到的名字和图标；技术标识仍是 Veilbird，因为安卓包名一改，已安装的用户就无法原地升级：Android 包名 `com.veilbird.client`、Apple Bundle ID `com.veilbird.client.*` 与 `VeilbirdCore` 等 target、Windows `Veilbird.exe`、`Veilbird` 命名空间与隧道服务名、`VEILBIRD_*` 环境变量、`X-Veilbird-Client` 请求头。节点端的 systemd 服务与目录（`northstar-agent` 等）和数据库名暂保持不变，避免已部署节点失联。原生工程位于 `clients/android`、`clients/apple`、`clients/windows`；Apple 覆盖 iOS/iPadOS 和 macOS。工程构建方式与发布步骤见 [客户端工作区](../../clients/README.md)。
 
-已经实现：Android / Apple 登录、自动/指定节点、设备管理与 WireGuard 引擎；服务端签名挑战、账号锁下的设备额度、短期租约；Agent 独立到期 watchdog；后台账号设备设置；正式版本清单读取 API 和门户下载入口。Windows 已接入账号与设备 API，隧道仍未实现。
+已经实现：Android / Apple 登录、自动/指定节点、设备管理与 WireGuard 引擎；服务端签名挑战、账号锁下的设备额度、短期租约；Agent 独立到期 watchdog；后台账号设备设置；正式版本清单读取 API 和门户下载入口。三端共用 mihomo 内核（`clients/core`），传输与路由策略一致。
 
 尚未完成：Windows 隧道服务、正式签名安装包、真机端到端验证、旧账号安全迁移及自动联合发布。数据库迁移新增表与默认关闭的账号开关，不改变老用户连接方式。原生 API 总开关默认关闭；不能将开发构建通过理解为生产 VPN 已验收。
 
@@ -24,7 +24,7 @@ Protocol-specific native engines
 ## 2. macOS 和 iPhone
 
 ```text
-Veilbird App
+TrackNothing App
   ├── Login / Device / Profile UI
   ├── API Client
   ├── Keychain / App Group storage
@@ -41,7 +41,7 @@ Veilbird App
 ## 3. Android
 
 ```text
-Veilbird Android App
+TrackNothing Android App
   ├── Native Android UI
   ├── API Client
   ├── Android Keystore

@@ -16,7 +16,7 @@ export function routingMode(requested: string | null): RoutingMode {
 }
 
 /** Clash/Mihomo YAML shared by subscriptions and single-profile exports. */
-export function renderSubscription(proxies: SubscriptionProxy[], options: { mode?: RoutingMode } = {}): string {
+export function renderSubscription(proxies: SubscriptionProxy[], options: { mode?: RoutingMode; group?: string } = {}): string {
   return renderMihomoConfig(proxies, options);
 }
 

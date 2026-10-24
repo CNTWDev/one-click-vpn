@@ -7,6 +7,7 @@ import { getProtocolAdapter, listProtocolAdapters } from "../../../../../server/
 import { reconcileEnabledVpnServices } from "../../../../../server/vpn-services";
 import { recordTrafficSnapshots, type UsageSnapshot } from "../../../../../server/traffic";
 import { dbExec } from "../../../../../server/db";
+import { currentAgentOrigin } from "../../../../../server/agent-domain";
 
 export const runtime = "nodejs";
 
@@ -89,7 +90,8 @@ export async function POST(request: Request) {
       }
     }
     await reconcileEnabledVpnServices(nodeId);
-    return NextResponse.json({ ok: true, nextPollSeconds: 5 });
+    // Agents 2.13+ move to this origin on their own once a heartbeat there succeeds.
+    return NextResponse.json({ ok: true, nextPollSeconds: 5, controllerOrigin: await currentAgentOrigin() });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Invalid heartbeat");
   }

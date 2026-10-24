@@ -9,7 +9,7 @@ import { InlineNotice, type Notice, Pill } from "./shared";
 type MailSettings = { provider: "aliyun" | "smtp"; host: string; port: number; username: string; fromName: string; passwordSet: boolean; updatedAt: string };
 
 const ALIYUN_HOST = "smtpdm.aliyun.com";
-const empty = { provider: "aliyun" as MailSettings["provider"], host: ALIYUN_HOST, port: "465", username: "", password: "", fromName: "Veilbird" };
+const empty = { provider: "aliyun" as MailSettings["provider"], host: ALIYUN_HOST, port: "465", username: "", password: "", fromName: "TrackNothing" };
 
 /** Outgoing mail for "forgot password". Aliyun DirectMail is the preset; any SMTP service fits the same fields. */
 export function MailSettingsPanel() {
@@ -68,7 +68,7 @@ export function MailSettingsPanel() {
       </div>
       {form.provider === "aliyun" && <small>{t("海外区域请改为对应地址，例如新加坡：smtpdm-ap-southeast-1.aliyun.com。")}</small>}
       <label>{t("发信地址")}<input required type="email" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} placeholder="no-reply@mail.example.com" /></label>
-      <label>{t("发件人名称")}<input value={form.fromName} onChange={(event) => setForm({ ...form, fromName: event.target.value })} placeholder="Veilbird" /></label>
+      <label>{t("发件人名称")}<input value={form.fromName} onChange={(event) => setForm({ ...form, fromName: event.target.value })} placeholder="TrackNothing" /></label>
       <label>{t("SMTP 密码")}<PasswordInput showLabel={t("显示密码")} hideLabel={t("隐藏密码")} autoComplete="new-password" required={!settings} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={settings ? t("留空则保持不变") : ""} /></label>
       {form.provider === "aliyun" && <small>{t("在阿里云邮件推送控制台创建发信地址并设置 SMTP 密码，发信域名需完成 SPF / DKIM 验证。")}</small>}
       <div className="form-actions mail-actions">

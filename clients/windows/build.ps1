@@ -3,11 +3,17 @@ param(
   # Release builds pass both; the fourth assembly field is the build number update checks compare.
   [string]$Version = '',
   [int]$Build = 0,
-  # Also produce Veilbird-<version>-<build>-<runtime>-setup.exe (Inno Setup), the file users install.
+  # Also produce TrackNothing-<version>-<build>-<runtime>-setup.exe (Inno Setup), the file users install.
   [switch]$Installer
 )
 $ErrorActionPreference = 'Stop'
-& (Join-Path $PSScriptRoot 'build-tunnel.ps1') -Runtime $Runtime
+# The embedded core (mihomo, clients/core) as veilbird-core.exe; Veilbird.csproj ships it next to Veilbird.exe.
+$deps = Join-Path $PSScriptRoot ".deps/$Runtime"
+New-Item -ItemType Directory -Force $deps | Out-Null
+$env:GOOS = 'windows'; $env:GOARCH = @{ 'win-x64' = 'amd64'; 'win-arm64' = 'arm64' }[$Runtime]; $env:CGO_ENABLED = '0'
+go build -C (Join-Path $PSScriptRoot '../core') -tags with_gvisor -trimpath -ldflags '-s -w -buildid=' -o (Join-Path $deps 'veilbird-core.exe') ./cmd/veilbird-core
+if ($LASTEXITCODE -ne 0) { throw 'core build failed' }
+Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED
 $output = Join-Path $PSScriptRoot "artifacts/$Runtime"
 $properties = @()
 if ($Version -and $Build -gt 0) {
@@ -15,9 +21,9 @@ if ($Version -and $Build -gt 0) {
   $properties = @("-p:Version=$Version", "-p:AssemblyVersion=$Version.$Build", "-p:FileVersion=$Version.$Build")
 }
 dotnet publish (Join-Path $PSScriptRoot 'Veilbird/Veilbird.csproj') -c Release -r $Runtime --self-contained true -o $output @properties
-if ($LASTEXITCODE -ne 0) { throw 'Veilbird build failed' }
-foreach ($library in 'tunnel.dll', 'wireguard.dll') { if (-not (Test-Path "$output/$library")) { throw "$library missing from the build output" } }
-$name = if ($properties.Count) { "Veilbird-$Version-$Build-$Runtime.zip" } else { "Veilbird-dev-$Runtime.zip" }
+if ($LASTEXITCODE -ne 0) { throw 'TrackNothing build failed' }
+if (-not (Test-Path "$output/veilbird-core.exe")) { throw 'veilbird-core.exe missing from the build output' }
+$name = if ($properties.Count) { "TrackNothing-$Version-$Build-$Runtime.zip" } else { "TrackNothing-dev-$Runtime.zip" }
 Compress-Archive -Path "$output/*" -DestinationPath (Join-Path $PSScriptRoot "artifacts/$name") -Force
 Write-Host "Built $name (not code-signed)."
 if ($Installer) {
@@ -26,5 +32,5 @@ if ($Installer) {
   if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
   & $iscc /Q "/DVersion=$Version" "/DBuild=$Build" "/DRuntime=$Runtime" (Join-Path $PSScriptRoot 'installer.iss')
   if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
-  Write-Host "Built Veilbird-$Version-$Build-$Runtime-setup.exe (not code-signed)."
+  Write-Host "Built TrackNothing-$Version-$Build-$Runtime-setup.exe (not code-signed)."
 }

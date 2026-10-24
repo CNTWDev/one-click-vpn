@@ -15,6 +15,7 @@ enum AccessFailure: LocalizedError {
                 "KEYCHAIN_UNAVAILABLE":L10n.text("secure_storage_is_unavailable_unlock_your_device_and_try"),
                 "KEYCHAIN_SIGNATURE_REQUIRED":L10n.text("this_development_build_lacks_signing_entitlements_configure_your_developer"),
                 "SIMULATOR_UNSUPPORTED":L10n.text("the_simulator_is_for_ui_testing_only_test_the"),
+                "CONNECT_FROM_APP_FIRST":L10n.text("connect_from_app_first"),
                 "SERVER_REQUIRED":L10n.text("enter_a_valid_https_server_address"),
                 "ACCOUNT_UNAVAILABLE":L10n.text("your_account_is_not_active"), "ACCESS_EXPIRED":L10n.text("connection_authorization_expired_connect_again"),
                 "RATE_LIMITED":L10n.text("too_many_attempts_try_again_later"), "CLIENT_UPDATE_REQUIRED":L10n.text("client_update_required"), "INVALID_RESPONSE":L10n.text("invalid_server_response_try_again_later")] [code] ?? L10n.text("unable_to_connect_check_your_network_and_try_again")

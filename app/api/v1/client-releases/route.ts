@@ -14,10 +14,10 @@ export async function GET(request: Request) {
     const all = await publicReleases();
     const releases = latestClientReleases(all, channel);
     // ?history=1 adds older published builds so the Portal can offer previous versions.
-    return NextResponse.json({ product: "Veilbird", releases, ...(params.get("history") === "1" ? { history: clientReleaseHistory(all, channel) } : {}) }, { headers });
+    return NextResponse.json({ product: "TrackNothing", releases, ...(params.get("history") === "1" ? { history: clientReleaseHistory(all, channel) } : {}) }, { headers });
   } catch {
     // Never print manifest contents: operators may have accidentally included secrets.
-    console.error("Veilbird client releases unavailable");
+    console.error("TrackNothing client releases unavailable");
     return NextResponse.json({ code: "CLIENT_RELEASES_UNAVAILABLE" }, { status: 503, headers });
   }
 }

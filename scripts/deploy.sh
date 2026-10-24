@@ -39,7 +39,7 @@ esac
 
 if [ "$mode" = "deploy" ] && [ "$service_explicit" = "no" ] && [ -t 0 ] && [ -t 1 ]; then
   echo ""
-  echo "Veilbird deployment wizard"
+  echo "TrackNothing deployment wizard"
   echo "Choose what you want to update:"
   echo "  1) all         Controller + Portal + Admin + static target (recommended for releases)"
   echo "  2) veilbird    Controller/API only"

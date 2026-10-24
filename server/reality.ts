@@ -5,6 +5,7 @@ import { encryptSecret } from "./crypto";
 import { createHash, randomUUID } from "node:crypto";
 import { readSecretMaterial, createSecretMaterial, findSecretMaterialByKind } from "./secret-materials";
 import { hashToken } from "./crypto";
+import { nativeUserRows } from "./native-users";
 
 export type RealitySettings = { node_id: string; server_name: string; public_key: string; short_id: string; secret_id: string; previous_server_names?: string };
 export async function realitySettings(nodeId: string) {
@@ -51,7 +52,7 @@ function parsePreviousNames(value: string | undefined): string[] {
 }
 
 async function realityUserRows(nodeId: string) {
-  return dbQuery<{ secret_id: string; email: string; fingerprint: string }>(`SELECT DISTINCT COALESCE(s.private_key_secret_id, k.id) AS secret_id, c.identity_key AS email, material.fingerprint FROM access_credentials c
+  const rows = await dbQuery<{ secret_id: string; email: string; fingerprint: string }>(`SELECT DISTINCT COALESCE(s.private_key_secret_id, k.id) AS secret_id, c.identity_key AS email, material.fingerprint FROM access_credentials c
     LEFT JOIN subscriptions s ON s.credential_id=c.id
     LEFT JOIN secret_materials k ON k.kind='vless_client:' || c.id AND k.owner_node_id IS NULL
     JOIN secret_materials material ON material.id=COALESCE(s.private_key_secret_id, k.id)
@@ -59,6 +60,8 @@ async function realityUserRows(nodeId: string) {
     WHERE p.node_id=$1 AND p.protocol='vless' AND p.status='active' AND p.expires_at>$2
     AND c.status='active' AND NOT c.user_disabled AND NOT c.admin_disabled AND c.deleted_at IS NULL
     AND (c.expires_at IS NULL OR c.expires_at>$2) AND u.status='active' AND NOT u.native_only ORDER BY c.identity_key`, [nodeId,new Date().toISOString()]);
+  // TrackNothing app devices fall back to this node's VLESS port when UDP is blocked.
+  return [...rows, ...await nativeUserRows()];
 }
 
 async function decryptUsers(rows: Awaited<ReturnType<typeof realityUserRows>>) {

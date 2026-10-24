@@ -46,9 +46,9 @@ const extensions = ".apk,.aab,.zip,.dmg,.pkg,.msix,.msixbundle,.exe,.msi";
 const defaultArch: Record<Platform, string> = { android: "universal", ios: "universal", macos: "universal", windows: "x64" };
 const minOsHint: Record<Platform, string> = { android: "Android 8.0", ios: "iOS 16", macos: "macOS 13", windows: "Windows 10" };
 
-/** CI names installers Veilbird-<version>-<build>.apk and Veilbird-<version>-<build>-win-<arch>-setup.exe; picking one fills the form. */
+/** CI names installers TrackNothing-<version>-<build>.apk and TrackNothing-<version>-<build>-win-<arch>-setup.exe; picking one fills the form (older Veilbird-* files still match). */
 function parseInstallerName(name: string): { platform: Platform; arch: string; version: string; build: string } | null {
-  const match = name.match(/^Veilbird-(\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?)-(\d+)(?:-win-(x64|arm64)(?:-setup)?)?\.(apk|zip|exe)$/i);
+  const match = name.match(/^(?:TrackNothing|Veilbird)-(\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?)-(\d+)(?:-win-(x64|arm64)(?:-setup)?)?\.(apk|zip|exe)$/i);
   if (!match || (match[4].toLowerCase() === "apk") === !!match[3]) return null;
   return match[3] ? { platform: "windows", arch: match[3], version: match[1], build: match[2] } : { platform: "android", arch: "universal", version: match[1], build: match[2] };
 }
@@ -185,7 +185,7 @@ export function ReleasesPage() {
   const copy = (path: string) => { void navigator.clipboard?.writeText(new URL(path, window.location.origin).href); toast(t("已复制")); };
 
   return <>
-    <PageHeader title={t("客户端发布")} description={t("上传、发布和撤回 Veilbird 客户端，并保留每个平台的历史版本；门户下载、固定下载链接和客户端更新检查都读取这里。")}
+    <PageHeader title={t("客户端发布")} description={t("上传、发布和撤回 TrackNothing 客户端，并保留每个平台的历史版本；门户下载、固定下载链接和客户端更新检查都读取这里。")}
       actions={<button className="button ghost" disabled={busy} onClick={() => void refresh()}><Icon name="refresh" size={16} />{busy ? t("加载中…") : t("刷新")}</button>} />
     <InlineNotice notice={notice} />
     {data && <>

@@ -32,11 +32,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14.5'
-      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: clients/core/go.mod
+          cache-dependency-path: clients/core/go.sum
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
+      # The embedded core (mihomo) as an AAR; Gradle links it from app/libs.
+      - run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash clients/core/build-android.sh
       - run: gradle -p clients/android :app:assembleDevDebug :app:assembleProdDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Veilbird-android-development-only
+          name: TrackNothing-android-development-only
           path: clients/android/app/build/outputs/apk/dev/debug/*.apk
           if-no-files-found: error
   apple:
@@ -48,8 +54,8 @@ jobs:
       - run: brew install xcodegen
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.4'
-          cache: false
+          go-version-file: clients/core/go.mod
+          cache-dependency-path: clients/core/go.sum
       - run: bash clients/apple/scripts/build.sh ios
       - run: bash clients/apple/scripts/build.sh macos
       - run: |
@@ -57,7 +63,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent clients/apple/artifacts/Veilbird-macOS/Build/Products/Debug clients/apple/artifacts/Veilbird-macos-unsigned.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: Veilbird-apple-development-only
+          name: TrackNothing-apple-development-only
           path: clients/apple/artifacts/*.zip
           if-no-files-found: error
   windows:
@@ -71,10 +77,15 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      # The shared core (veilbird-core.exe) is cross-built with Go by build.ps1.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: clients/core/go.mod
+          cache-dependency-path: clients/core/go.sum
       - shell: pwsh
         run: ./clients/windows/build.ps1 -Runtime ${{ matrix.runtime }}
       - uses: actions/upload-artifact@v4
         with:
-          name: Veilbird-${{ matrix.runtime }}-development-only
+          name: TrackNothing-${{ matrix.runtime }}-development-only
           path: clients/windows/artifacts/*.zip
           if-no-files-found: error

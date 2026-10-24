@@ -3,6 +3,8 @@ import { PasswordInput } from "../../shared/password-input";
 import { useImperativeHandle, useState, type FormEvent, type Ref } from "react";
 import { api } from "./api";
 import { importUrls, subscriptionLink, type RoutingMode, type SubscriptionFormat } from "./format";
+import { useSite } from "../../shared/site";
+import { PRODUCT_NAME } from "../../shared/brand-name";
 import { AppIcon, Icon, InlineError, Modal, QrCode, type Notify } from "./ui";
 
 type Action = "clash" | "hiddify" | "shadowrocket" | "copy" | "qr" | "reset";
@@ -18,7 +20,9 @@ export function SubscriptionAccess({ id, protocol, disabled, initialToken = "", 
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [qr, setQr] = useState<SubscriptionFormat | null>(null);
   const vless = protocol === "vless";
-  const link = (format: SubscriptionFormat = "clash", value = token) => value ? subscriptionLink(value, { format, mode }) : "";
+  // Subscriptions are served from the site's API hostname, which also names the profile inside the client.
+  const site = useSite();
+  const link = (format: SubscriptionFormat = "clash", value = token) => value ? subscriptionLink(value, { format, mode }, site?.apiOrigin) : "";
   useImperativeHandle(ref, () => ({ resetLink: () => { setError(""); setPassword(""); setPending("reset"); } }), []);
 
   function copy(text: string) {
@@ -29,7 +33,7 @@ export function SubscriptionAccess({ id, protocol, disabled, initialToken = "", 
   function run(action: Action, value: string) {
     const clash = link("clash", value);
     if (action === "clash" || action === "hiddify") {
-      window.location.assign(importUrls[action](clash));
+      window.location.assign(importUrls[action](clash, site?.name || PRODUCT_NAME));
       notify(t("正在打开 {0}。没有反应？请先安装客户端，或复制链接手动添加。", [action === "clash" ? "Clash Verge" : "Hiddify"]));
     }
     if (action === "shadowrocket") setQr("v2ray");
@@ -89,7 +93,7 @@ export function SubscriptionAccess({ id, protocol, disabled, initialToken = "", 
         {qrLink && <QrCode text={qrLink} label={t("订阅链接二维码")} />}
         <p className="hint">{qr === "v2ray" ? t("Shadowrocket：首页右上角扫码；v2rayNG：右上角 ＋ → 扫描二维码。") : t("Hiddify：点 ＋ → 扫描二维码。Clash 类客户端可复制链接后在「订阅 / 配置」中添加。")}{mode === "global" ? t(" 当前为全局代理。") : t(" 当前为智能分流。")}</p>
         <input readOnly aria-label={t("二维码中的链接")} value={qrLink} onFocus={(event) => event.target.select()} />
-        <div className="dialog-actions">{qr === "v2ray" && <a className="secondary" href={importUrls.shadowrocket(qrLink)}>{t("在 Shadowrocket 中打开")}</a>}<button type="button" className="primary" onClick={() => copy(qrLink)}>{Icon.copy(16)}{t("复制链接")}</button></div>
+        <div className="dialog-actions">{qr === "v2ray" && <a className="secondary" href={importUrls.shadowrocket(qrLink, site?.name || PRODUCT_NAME)}>{t("在 Shadowrocket 中打开")}</a>}<button type="button" className="primary" onClick={() => copy(qrLink)}>{Icon.copy(16)}{t("复制链接")}</button></div>
       </div>
     </Modal>
   </section>;
