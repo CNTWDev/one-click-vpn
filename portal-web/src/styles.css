@@ -181,7 +181,7 @@ button.wide { white-space: normal; text-align: center; padding-block: 8px; }
 .auth-panel .muted { margin-top: -8px; }
 .auth-panel label { display: grid; gap: 7px; color: var(--text-2); font-size: 13px; font-weight: 600; }
 .auth-panel .field { display: grid; gap: 7px; }
-.auth-panel .field-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-2); font-size: 13px; font-weight: 600; }
+.auth-panel .field-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; color: var(--text-2); font-size: 13px; font-weight: 600; }
 .auth-panel .ghost.compact { min-height: 0; margin: -4px -8px; padding: 4px 8px; font-size: 13px; font-weight: 600; color: var(--accent); }
 .auth-panel .inline-success { margin: 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--success) 30%, transparent); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--success); font-size: 13px; line-height: 1.6; }
 .center-page .auth-panel { margin: 0; color: var(--text); }
@@ -345,7 +345,7 @@ footer { color: var(--text-2); text-align: center; font-size: 12px; padding-top:
   .list { padding: 0 0 16px; border-right: 0; border-bottom: 1px solid var(--border); }
   .steps { grid-template-columns: minmax(0, 1fr); }
 }
-@media (max-width: 780px) {
+@media (max-width: 900px) {
   .auth-layout { grid-template-columns: minmax(0, 1fr); }
   .auth-intro { padding: 32px 20px 48px; }
   .auth-intro h1 { margin: 32px 0 14px; font-size: 34px; }
