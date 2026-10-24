@@ -111,6 +111,8 @@
   <data name="node_quality_detail" xml:space="preserve"><value>抖动 {0} ms · 丢包 {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>未连接</value></data>
   <data name="open_app" xml:space="preserve"><value>打开 TrackNothing</value></data>
+  <data name="open_at_login" xml:space="preserve"><value>登录时启动</value></data>
+  <data name="open_main_window" xml:space="preserve"><value>打开主窗口</value></data>
   <data name="password" xml:space="preserve"><value>密码</value></data>
   <data name="quality_fair" xml:space="preserve"><value>良</value></data>
   <data name="quality_good" xml:space="preserve"><value>优</value></data>
@@ -140,6 +142,8 @@
   <data name="server_address" xml:space="preserve"><value>服务地址</value></data>
   <data name="server_address_url" xml:space="preserve"><value>服务地址 https://…</value></data>
   <data name="share_action" xml:space="preserve"><value>分享</value></data>
+  <data name="shortcuts" xml:space="preserve"><value>快捷指令</value></data>
+  <data name="shortcuts_detail" xml:space="preserve"><value>连接 / 断开</value></data>
   <data name="show_password" xml:space="preserve"><value>显示密码</value></data>
   <data name="sign_in_action" xml:space="preserve"><value>登录</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>登录并开始</value></data>

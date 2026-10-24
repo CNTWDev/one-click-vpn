@@ -111,6 +111,8 @@
   <data name="node_quality_detail" xml:space="preserve"><value>Jitter {0} ms · Loss {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Not connected</value></data>
   <data name="open_app" xml:space="preserve"><value>Open TrackNothing</value></data>
+  <data name="open_at_login" xml:space="preserve"><value>Open at login</value></data>
+  <data name="open_main_window" xml:space="preserve"><value>Open main window</value></data>
   <data name="password" xml:space="preserve"><value>Password</value></data>
   <data name="quality_fair" xml:space="preserve"><value>Fair</value></data>
   <data name="quality_good" xml:space="preserve"><value>Good</value></data>
@@ -140,6 +142,8 @@
   <data name="server_address" xml:space="preserve"><value>Server address</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Server address https://…</value></data>
   <data name="share_action" xml:space="preserve"><value>Share</value></data>
+  <data name="shortcuts" xml:space="preserve"><value>Shortcuts</value></data>
+  <data name="shortcuts_detail" xml:space="preserve"><value>Connect / Disconnect</value></data>
   <data name="show_password" xml:space="preserve"><value>Show password</value></data>
   <data name="sign_in_action" xml:space="preserve"><value>Sign in</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>Sign in and start</value></data>

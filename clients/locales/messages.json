@@ -933,5 +933,25 @@
     "zh": "隐藏密码",
     "en": "Hide password",
     "ru": "Скрыть пароль"
+  },
+  "open_at_login": {
+    "zh": "登录时启动",
+    "en": "Open at login",
+    "ru": "Запускать при входе"
+  },
+  "shortcuts": {
+    "zh": "快捷指令",
+    "en": "Shortcuts",
+    "ru": "Быстрые команды"
+  },
+  "shortcuts_detail": {
+    "zh": "连接 / 断开",
+    "en": "Connect / Disconnect",
+    "ru": "Подключить / Отключить"
+  },
+  "open_main_window": {
+    "zh": "打开主窗口",
+    "en": "Open main window",
+    "ru": "Открыть окно"
   }
 }

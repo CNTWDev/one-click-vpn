@@ -109,6 +109,8 @@
   <string name="node_quality_detail">抖动 %1$s ms · 丢包 %2$s%%</string>
   <string name="not_connected">未连接</string>
   <string name="open_app">打开 TrackNothing</string>
+  <string name="open_at_login">登录时启动</string>
+  <string name="open_main_window">打开主窗口</string>
   <string name="password">密码</string>
   <string name="quality_fair">良</string>
   <string name="quality_good">优</string>
@@ -138,6 +140,8 @@
   <string name="server_address">服务地址</string>
   <string name="server_address_url">服务地址 https://…</string>
   <string name="share_action">分享</string>
+  <string name="shortcuts">快捷指令</string>
+  <string name="shortcuts_detail">连接 / 断开</string>
   <string name="show_password">显示密码</string>
   <string name="sign_in_action">登录</string>
   <string name="sign_in_and_start">登录并开始</string>

@@ -109,6 +109,8 @@
   <string name="node_quality_detail">Jitter %1$s ms · Loss %2$s%%</string>
   <string name="not_connected">Not connected</string>
   <string name="open_app">Open TrackNothing</string>
+  <string name="open_at_login">Open at login</string>
+  <string name="open_main_window">Open main window</string>
   <string name="password">Password</string>
   <string name="quality_fair">Fair</string>
   <string name="quality_good">Good</string>
@@ -138,6 +140,8 @@
   <string name="server_address">Server address</string>
   <string name="server_address_url">Server address https://…</string>
   <string name="share_action">Share</string>
+  <string name="shortcuts">Shortcuts</string>
+  <string name="shortcuts_detail">Connect / Disconnect</string>
   <string name="show_password">Show password</string>
   <string name="sign_in_action">Sign in</string>
   <string name="sign_in_and_start">Sign in and start</string>

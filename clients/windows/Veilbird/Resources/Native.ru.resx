@@ -111,6 +111,8 @@
   <data name="node_quality_detail" xml:space="preserve"><value>Джиттер {0} мс · Потери {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Не подключено</value></data>
   <data name="open_app" xml:space="preserve"><value>Открыть TrackNothing</value></data>
+  <data name="open_at_login" xml:space="preserve"><value>Запускать при входе</value></data>
+  <data name="open_main_window" xml:space="preserve"><value>Открыть окно</value></data>
   <data name="password" xml:space="preserve"><value>Пароль</value></data>
   <data name="quality_fair" xml:space="preserve"><value>Средне</value></data>
   <data name="quality_good" xml:space="preserve"><value>Хорошо</value></data>
@@ -140,6 +142,8 @@
   <data name="server_address" xml:space="preserve"><value>Адрес сервера</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Адрес сервера https://…</value></data>
   <data name="share_action" xml:space="preserve"><value>Поделиться</value></data>
+  <data name="shortcuts" xml:space="preserve"><value>Быстрые команды</value></data>
+  <data name="shortcuts_detail" xml:space="preserve"><value>Подключить / Отключить</value></data>
   <data name="show_password" xml:space="preserve"><value>Показать пароль</value></data>
   <data name="sign_in_action" xml:space="preserve"><value>Войти</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>Войти и начать</value></data>

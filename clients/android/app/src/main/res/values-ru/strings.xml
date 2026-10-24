@@ -109,6 +109,8 @@
   <string name="node_quality_detail">Джиттер %1$s мс · Потери %2$s%%</string>
   <string name="not_connected">Не подключено</string>
   <string name="open_app">Открыть TrackNothing</string>
+  <string name="open_at_login">Запускать при входе</string>
+  <string name="open_main_window">Открыть окно</string>
   <string name="password">Пароль</string>
   <string name="quality_fair">Средне</string>
   <string name="quality_good">Хорошо</string>
@@ -138,6 +140,8 @@
   <string name="server_address">Адрес сервера</string>
   <string name="server_address_url">Адрес сервера https://…</string>
   <string name="share_action">Поделиться</string>
+  <string name="shortcuts">Быстрые команды</string>
+  <string name="shortcuts_detail">Подключить / Отключить</string>
   <string name="show_password">Показать пароль</string>
   <string name="sign_in_action">Войти</string>
   <string name="sign_in_and_start">Войти и начать</string>
