@@ -165,7 +165,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         deadline=Date().addingTimeInterval(remaining);renewAt=Date().addingTimeInterval(90)
         nodeId=node;nodeName=lease["nodeName"] as? String ?? "";leaseId=id;leaseReady=lease["ready"] as? Bool == true
         if !initial {if !leaseReady {leaseReady=await status()};return lease}
-        let spare=!((lease["proxies"] as? [Any]) ?? []).isEmpty
+        let spare = !((lease["proxies"] as? [Any]) ?? []).isEmpty
         var attempt=0
         while !leaseReady && attempt<(spare ? 3:15) {
             try await Task.sleep(nanoseconds:1_000_000_000);leaseReady=await status();attempt+=1
