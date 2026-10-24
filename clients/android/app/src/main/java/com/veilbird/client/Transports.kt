@@ -30,7 +30,10 @@ object Transports {
      * mobile data, or a hash of the Wi-Fi network's DNS servers, domain and gateway. Nothing that
      * names the network is stored.
      */
-    fun networkKey(context: Context): String {
+    fun networkKey(context: Context): String = try { readNetworkKey(context) } catch (_: SecurityException) { "unknown" }
+
+    /** Only a hint for transport memory: a failure to read the network must never stop a connection. */
+    private fun readNetworkKey(context: Context): String {
         val manager = context.getSystemService(ConnectivityManager::class.java)
         @Suppress("DEPRECATION")
         val networks = manager.allNetworks.mapNotNull { network -> manager.getNetworkCapabilities(network)?.let { network to it } }
