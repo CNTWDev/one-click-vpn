@@ -90,9 +90,9 @@
     "ru": "Изменить локацию  ›"
   },
   "a_location_is_selected_automatically_allow_the_system_vpn": {
-    "zh": "默认自动选择可用节点。第一次连接需要允许系统 VPN 权限。",
-    "en": "A location is selected automatically. Allow the system VPN permission on your first connection.",
-    "ru": "Локация выбирается автоматически. При первом подключении разрешите использование VPN."
+    "zh": "默认自动选择延迟最低的节点。第一次连接需要允许系统 VPN 权限。",
+    "en": "The fastest location is selected automatically. Allow the system VPN permission on your first connection.",
+    "ru": "Самая быстрая локация выбирается автоматически. При первом подключении разрешите использование VPN."
   },
   "your_world_one_tap_away": {
     "zh": "世界很大，\n一点即达。",
@@ -445,9 +445,9 @@
     "ru": "Выберите локацию и подключитесь с главного экрана."
   },
   "select_an_available_location_for_you": {
-    "zh": "为你选择可用节点",
-    "en": "Select an available location for you",
-    "ru": "Выбор доступной локации"
+    "zh": "选延迟最低的节点，连不上自动换",
+    "en": "Fastest location, switches if one fails",
+    "ru": "Самая быстрая локация, при сбое — следующая"
   },
   "available_location": {
     "zh": "可用位置",
@@ -663,5 +663,10 @@
     "zh": "公告",
     "en": "Announcement",
     "ru": "Объявление"
+  },
+  "latency_ms": {
+    "zh": "{0} ms",
+    "en": "{0} ms",
+    "ru": "{0} мс"
   }
 }

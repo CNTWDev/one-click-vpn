@@ -34,7 +34,11 @@ struct VeilbirdApp: App {
         };busy=false}
     }
     func load() async throws {
-        let api=try api();account=try await api.request("account");nodes=(try await api.request("nodes"))["nodes"] as? [[String:Any]] ?? []
+        let api=try api();account=try await api.request("account")
+        let listed=(try await api.request("nodes"))["nodes"] as? [[String:Any]] ?? []
+        // While connected, probes would run through the tunnel, so the list keeps the server's order.
+        if connected {nodes=listed;return}
+        nodes=await Latency.rank(listed).map {item in var node=item.node;node["latencyMs"]=item.ms;return node}
     }
     func restore() async {
         do {
@@ -195,7 +199,7 @@ struct ClientView:View {
             HStack {Image(systemName:"magnifyingglass");TextField(L10n.text("search_locations_or_regions"),text:$search).textFieldStyle(.plain)}.veilbirdCard()
             if model.connected {Label(L10n.text("disconnect_before_changing_location"),systemImage:"info.circle").font(.callout).foregroundStyle(VeilbirdStyle.muted)}
             nodeRow(L10n.text("automatic"),L10n.text("select_an_available_location_for_you"),id:"")
-            ForEach(filteredNodes.indices,id:\.self) {i in let node=filteredNodes[i];nodeRow(node["name"] as? String ?? L10n.text("locations"),node["region"] as? String ?? L10n.text("available_location"),id:node["id"] as? String ?? "")}
+            ForEach(filteredNodes.indices,id:\.self) {i in let node=filteredNodes[i];nodeRow(node["name"] as? String ?? L10n.text("locations"),[node["region"] as? String ?? L10n.text("available_location"),(node["latencyMs"] as? Int).map {L10n.text("latency_ms",L10n.number($0))}].compactMap {$0}.joined(separator:" · "),id:node["id"] as? String ?? "")}
             if filteredNodes.isEmpty {Text(model.nodes.isEmpty ? L10n.text("no_locations_available_refresh_or_contact_your_administrator"):L10n.text("no_matching_locations_try_another_search")).foregroundStyle(VeilbirdStyle.muted).veilbirdCard()}
             Button {model.work {try await model.load()}} label:{Label(L10n.text("refresh_locations"),systemImage:"arrow.clockwise")}.buttonStyle(VeilbirdButton())
         }

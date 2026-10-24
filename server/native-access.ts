@@ -56,7 +56,13 @@ async function candidates() {
   return (await selectVpnServices({protocol:"wireguard"})).filter(({node})=>node.capabilities.nativeLeaseEnforcement === 1);
 }
 export async function nativeNodes() {
-  return {nodes:(await candidates()).map(({node})=>({id:node.id,name:node.name,region:node.region,protocol:"wireguard"}))};
+  // WireGuard ignores unknown peers, so clients time a TCP connect to the same host's REALITY port instead.
+  // Nodes without one have no probe and keep the server's least-loaded order behind measured nodes.
+  const tcp=new Map((await selectVpnServices({protocol:"vless"})).map(({node,service})=>[node.id,service.listen_port]));
+  return {nodes:(await candidates()).map(({node})=>{
+    const port=tcp.get(node.id);
+    return {id:node.id,name:node.name,region:node.region,protocol:"wireguard",probe:port?{host:node.public_endpoint||node.ip,port}:null};
+  })};
 }
 export async function nativeChallenge(session: Session, body: Record<string,unknown>) {
   if (!["connect","disconnect","revoke"].includes(String(body.action)) || !body.request || typeof body.request!=="object" || Array.isArray(body.request)) throw new NativeError("INVALID_REQUEST");

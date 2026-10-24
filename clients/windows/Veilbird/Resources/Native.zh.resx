@@ -3,7 +3,7 @@
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
-  <data name="a_location_is_selected_automatically_allow_the_system_vpn" xml:space="preserve"><value>默认自动选择可用节点。第一次连接需要允许系统 VPN 权限。</value></data>
+  <data name="a_location_is_selected_automatically_allow_the_system_vpn" xml:space="preserve"><value>默认自动选择延迟最低的节点。第一次连接需要允许系统 VPN 权限。</value></data>
   <data name="access_for_this_device_has_been_revoked_contact_your" xml:space="preserve"><value>这台设备的授权已解除，请联系管理员。</value></data>
   <data name="account" xml:space="preserve"><value>我的</value></data>
   <data name="account_device_quota" xml:space="preserve"><value>授权设备   {0} / {1}</value></data>
@@ -69,6 +69,7 @@
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>服务器响应无效，请稍后重试。</value></data>
   <data name="language" xml:space="preserve"><value>语言</value></data>
   <data name="language_system" xml:space="preserve"><value>跟随系统</value></data>
+  <data name="latency_ms" xml:space="preserve"><value>{0} ms</value></data>
   <data name="location" xml:space="preserve"><value>连接位置</value></data>
   <data name="location_unavailable_select_another" xml:space="preserve"><value>节点不可用，请重新选择</value></data>
   <data name="locations" xml:space="preserve"><value>节点</value></data>
@@ -93,7 +94,7 @@
   <data name="revoking_slot_released_when_the_old_connection_expires" xml:space="preserve"><value>解除中 · 等待旧连接到期后释放额度</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>搜索节点或地区</value></data>
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>无法访问安全存储，请解锁设备后重试。</value></data>
-  <data name="select_an_available_location_for_you" xml:space="preserve"><value>为你选择可用节点</value></data>
+  <data name="select_an_available_location_for_you" xml:space="preserve"><value>选延迟最低的节点，连不上自动换</value></data>
   <data name="server_address" xml:space="preserve"><value>服务地址</value></data>
   <data name="server_address_url" xml:space="preserve"><value>服务地址 https://…</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>登录并开始</value></data>

@@ -3,7 +3,7 @@
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
-  <data name="a_location_is_selected_automatically_allow_the_system_vpn" xml:space="preserve"><value>Локация выбирается автоматически. При первом подключении разрешите использование VPN.</value></data>
+  <data name="a_location_is_selected_automatically_allow_the_system_vpn" xml:space="preserve"><value>Самая быстрая локация выбирается автоматически. При первом подключении разрешите использование VPN.</value></data>
   <data name="access_for_this_device_has_been_revoked_contact_your" xml:space="preserve"><value>Доступ устройства отозван. Обратитесь к администратору.</value></data>
   <data name="account" xml:space="preserve"><value>Аккаунт</value></data>
   <data name="account_device_quota" xml:space="preserve"><value>Устройства   {0} / {1}</value></data>
@@ -69,6 +69,7 @@
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>Некорректный ответ сервера. Повторите позже.</value></data>
   <data name="language" xml:space="preserve"><value>Язык</value></data>
   <data name="language_system" xml:space="preserve"><value>Как в системе</value></data>
+  <data name="latency_ms" xml:space="preserve"><value>{0} мс</value></data>
   <data name="location" xml:space="preserve"><value>Локация</value></data>
   <data name="location_unavailable_select_another" xml:space="preserve"><value>Локация недоступна. Выберите другую.</value></data>
   <data name="locations" xml:space="preserve"><value>Локации</value></data>
@@ -93,7 +94,7 @@
   <data name="revoking_slot_released_when_the_old_connection_expires" xml:space="preserve"><value>Отзыв · Место освободится после истечения старого подключения</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>Поиск локаций или регионов</value></data>
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>Защищённое хранилище недоступно. Разблокируйте устройство и повторите.</value></data>
-  <data name="select_an_available_location_for_you" xml:space="preserve"><value>Выбор доступной локации</value></data>
+  <data name="select_an_available_location_for_you" xml:space="preserve"><value>Самая быстрая локация, при сбое — следующая</value></data>
   <data name="server_address" xml:space="preserve"><value>Адрес сервера</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Адрес сервера https://…</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>Войти и начать</value></data>

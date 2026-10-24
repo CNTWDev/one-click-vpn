@@ -25,6 +25,8 @@ class ConnectionService : Service(), Tunnel {
     private lateinit var api: NativeApi
     private lateinit var backend: GoBackend
     private var nodeId = ""
+    // Automatic mode only: the next-fastest nodes, tried when the current one cannot be reached.
+    private val fallbacks = mutableListOf<String>()
     private val keyPair = KeyPair()
     private var deadline = 0L
     private var renewAt = 0L
@@ -45,28 +47,54 @@ class ConnectionService : Service(), Tunnel {
         nodeId = intent?.getStringExtra("nodeId") ?: ""
         worker.execute {
             try {
-                val lease = acquire()
-                val wg = lease.getJSONObject("wireguard")
-                val dns = wg.getJSONArray("dns")
-                val config = """
-                    [Interface]
-                    PrivateKey = ${keyPair.privateKey.toBase64()}
-                    Address = ${wg.getString("address")}
-                    DNS = ${(0 until dns.length()).joinToString(", ") { dns.getString(it) }}
-                    MTU = 1280
-                    [Peer]
-                    PublicKey = ${wg.getString("serverPublicKey")}
-                    Endpoint = ${wg.getString("endpoint")}
-                    AllowedIPs = 0.0.0.0/0, ::/0
-                    PersistentKeepalive = 25
-                """.trimIndent()
-                backend.setState(this, Tunnel.State.UP, Config.parse(config.byteInputStream()))
-                startedAt = SystemClock.elapsedRealtime(); ConnectionStateStore.messageId = R.string.confirming_connection_status
+                if (nodeId.isEmpty()) chooseFastest()
+                connect()
                 worker.scheduleWithFixedDelay({ tick() }, 2, 5, TimeUnit.SECONDS)
                 api.report("")
             } catch (e: Exception) { api.report((e as? ApiFailure)?.code ?: "CONNECT_FAILED", nodeId); stopConnection(friendlyResource(e)) }
         }
         return START_NOT_STICKY
+    }
+    /** Measured before the tunnel exists; if the list cannot be loaded the server picks the least-loaded node. */
+    private fun chooseFastest() {
+        val ranked = try { Latency.rank(api.request("nodes").getJSONArray("nodes")).map { it.first.getString("id") } } catch (_: Exception) { emptyList() }
+        nodeId = ranked.firstOrNull() ?: ""
+        fallbacks.clear(); fallbacks.addAll(ranked.drop(1).take(2))
+    }
+    /** Connects to nodeId; in automatic mode a node that cannot be used is replaced by the next fastest one. */
+    private fun connect() {
+        while (true) {
+            try { bringUp(); return } catch (e: ApiFailure) {
+                if (e.code !in listOf("NODE_UNAVAILABLE", "NODE_FULL") || !nextNode(e.code)) throw e
+            }
+        }
+    }
+    private fun nextNode(code: String): Boolean {
+        if (fallbacks.isEmpty()) return false
+        api.report(code, nodeId)
+        try { backend.setState(this, Tunnel.State.DOWN, null) } catch (_: Exception) { }
+        nodeId = fallbacks.removeAt(0); ConnectionStateStore.messageId = R.string.authorizing_and_connecting
+        return true
+    }
+    private fun bringUp() {
+        val lease = acquire()
+        val wg = lease.getJSONObject("wireguard")
+        val dns = wg.getJSONArray("dns")
+        val config = """
+            [Interface]
+            PrivateKey = ${keyPair.privateKey.toBase64()}
+            Address = ${wg.getString("address")}
+            DNS = ${(0 until dns.length()).joinToString(", ") { dns.getString(it) }}
+            MTU = 1280
+            [Peer]
+            PublicKey = ${wg.getString("serverPublicKey")}
+            Endpoint = ${wg.getString("endpoint")}
+            AllowedIPs = 0.0.0.0/0, ::/0
+            PersistentKeepalive = 25
+        """.trimIndent()
+        backend.setState(this, Tunnel.State.UP, Config.parse(config.byteInputStream()))
+        ConnectionStateStore.active = true
+        startedAt = SystemClock.elapsedRealtime(); ConnectionStateStore.messageId = R.string.confirming_connection_status
     }
     private fun acquire(): JSONObject {
         val input = JSONObject().put("publicKey", keyPair.publicKey.toBase64())
@@ -100,7 +128,14 @@ class ConnectionService : Service(), Tunnel {
             if (handshake > 0 && System.currentTimeMillis() - handshake < 180000) ConnectionStateStore.messageId = R.string.connected_status
             else {
                 ConnectionStateStore.messageId = R.string.confirming_connection_status
-                if (SystemClock.elapsedRealtime() - startedAt > 45000) { api.report("HANDSHAKE_TIMEOUT", nodeId); stopConnection(R.string.this_location_is_not_responding_try_another); return }
+                // A spare node gets a shorter wait: the next one is likely to answer sooner than this one recovers.
+                if (SystemClock.elapsedRealtime() - startedAt > (if (fallbacks.isEmpty()) 45000 else 20000)) {
+                    if (nextNode("HANDSHAKE_TIMEOUT")) {
+                        try { connect() } catch (e: Exception) { api.report((e as? ApiFailure)?.code ?: "CONNECT_FAILED", nodeId); stopConnection(friendlyResource(e)) }
+                        return
+                    }
+                    api.report("HANDSHAKE_TIMEOUT", nodeId); stopConnection(R.string.this_location_is_not_responding_try_another); return
+                }
             }
             ConnectionStateStore.bytes = "↑ ${stats.totalTx() / 1024} KB   ↓ ${stats.totalRx() / 1024} KB"
             getSystemService(NotificationManager::class.java).notify(1, notification(ConnectionStateStore.message))

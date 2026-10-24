@@ -7,19 +7,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A location is selected automatically. Allow the system VPN permission on your first connection."
+            "value": "The fastest location is selected automatically. Allow the system VPN permission on your first connection."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "默认自动选择可用节点。第一次连接需要允许系统 VPN 权限。"
+            "value": "默认自动选择延迟最低的节点。第一次连接需要允许系统 VPN 权限。"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Локация выбирается автоматически. При первом подключении разрешите использование VPN."
+            "value": "Самая быстрая локация выбирается автоматически. При первом подключении разрешите использование VPN."
           }
         }
       }
@@ -1519,6 +1519,29 @@
         }
       }
     },
+    "latency_ms": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ms"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ms"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ мс"
+          }
+        }
+      }
+    },
     "location": {
       "extractionState": "manual",
       "localizations": {
@@ -2077,19 +2100,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Select an available location for you"
+            "value": "Fastest location, switches if one fails"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "为你选择可用节点"
+            "value": "选延迟最低的节点，连不上自动换"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Выбор доступной локации"
+            "value": "Самая быстрая локация, при сбое — следующая"
           }
         }
       }

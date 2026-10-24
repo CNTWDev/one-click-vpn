@@ -157,26 +157,29 @@ class MainActivity : Activity() {
         content.addView(label(L10n.text(R.string.where_would_you_like_to_connect), 28f))
         content.addView(label(if (ConnectionStateStore.active) L10n.text(R.string.disconnect_before_changing_location) else L10n.text(R.string.choose_a_location_then_connect_from_the_home_screen)))
         button(L10n.text(R.string.automatic_recommended)) { select("", L10n.text(R.string.automatic_recommended)) }
-        work({ api.request("nodes") }) { data ->
-            val nodes = data.getJSONArray("nodes")
-            if (nodes.length() == 0) content.addView(label(L10n.text(R.string.no_locations_available_refresh_later_or_contact_your_administrator)))
+        // While connected, probes would run through the tunnel, so the list keeps the server's order.
+        val measure = !ConnectionStateStore.active
+        work({
+            val nodes = api.request("nodes").getJSONArray("nodes")
+            if (measure) Latency.rank(nodes) else (0 until nodes.length()).map { nodes.getJSONObject(it) to (null as Long?) }
+        }) { ranked ->
+            if (ranked.isEmpty()) content.addView(label(L10n.text(R.string.no_locations_available_refresh_later_or_contact_your_administrator)))
             val search = field(L10n.text(R.string.search_locations_or_regions)).apply { inputType = InputType.TYPE_CLASS_TEXT }
             val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             content.addView(list)
             fun filter(query: String) {
                 list.removeAllViews()
-                for (i in 0 until nodes.length()) {
-                    val node = nodes.getJSONObject(i)
+                for ((node, latency) in ranked) {
                     if (!(node.getString("name") + " " + node.optString("region")).contains(query, ignoreCase = true)) continue
                     list.addView(styleButton(Button(this)).apply {
-                        text = node.getString("name") + if (node.getString("id") == selectedId) " ✓" else ""
+                        text = node.getString("name") + (latency?.let { "  ·  " + L10n.text(R.string.latency_ms, L10n.number(it)) } ?: "") + if (node.getString("id") == selectedId) " ✓" else ""
                         background = surface(if (node.getString("id") == selectedId) mint else Color.WHITE, 22)
                         gravity = Gravity.CENTER_VERTICAL or Gravity.START
                         minHeight = 56.dp; isAllCaps = false
                         setOnClickListener { if (!busy) select(node.getString("id"), node.getString("name")) }
                     }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12.dp })
                 }
-                if (list.childCount == 0 && nodes.length() > 0) list.addView(label(L10n.text(R.string.no_matching_locations_try_another_search)))
+                if (list.childCount == 0 && ranked.isNotEmpty()) list.addView(label(L10n.text(R.string.no_matching_locations_try_another_search)))
             }
             filter("")
             search.addTextChangedListener(object : TextWatcher {

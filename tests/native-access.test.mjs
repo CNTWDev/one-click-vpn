@@ -23,6 +23,12 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     let ready=false;for(let i=0;i<100;i++){if(await fetch(base+"account").then(()=>true).catch(()=>false)){ready=true;break;}await new Promise(r=>setTimeout(r,100));}assert.ok(ready);
     const login=async()=>{const keys=generateKeyPairSync("ec",{namedCurve:"P-256"});const r=await call("login",{email:`${user}@example.com`,password,identityKey:keys.publicKey.export({format:"jwk"}),platform:"android",deviceName:"Phone"});assert.equal(r.status,200,JSON.stringify(r.data));return {keys,token:r.data.accessToken};};
     const a=await login(),b=await login();
+    // Latency probes need a TCP port on the same host; a WireGuard-only node has none.
+    assert.equal((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).probe,null);
+    await pool.query("INSERT INTO vpn_services(node_id,protocol,transport,listen_port,subnet,status,created_at,updated_at) VALUES($1,'vless','tcp',443,'',$2,$3,$3)",[node,"healthy",stamp]);
+    await pool.query("INSERT INTO node_protocols(node_id,protocol,updated_at) VALUES($1,'vless',$2)",[node,stamp]);
+    await pool.query("UPDATE nodes SET agent_capabilities_json=$2 WHERE id=$1",[node,JSON.stringify({nativeLeaseEnforcement:1,connectivity:{protocols:{wireguard:{runtimeActive:true,listening:true},vless:{runtimeActive:true,listening:true}}}})]);
+    assert.deepEqual((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).probe,{host:"192.0.2.1",port:443});
     const proof=async(client,action,request)=>{const c=await call("challenge",{action,request},client.token);assert.equal(c.status,200);return {challengeId:c.data.id,request,signature:sign("sha256",Buffer.from(c.data.payload,"base64url"),{key:client.keys.privateKey,dsaEncoding:"ieee-p1363"}).toString("base64url")};};
     const input={nodeId:node,publicKey:randomBytes(32).toString("base64")};
     const payload=await proof(a,"connect",input);

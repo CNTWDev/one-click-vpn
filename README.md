@@ -381,16 +381,22 @@ sample may be lost on a restart.
 
 Subscription links serve Clash/Mihomo YAML by default and a base64 `vless://` list
 (`format=v2ray`) for Shadowrocket, v2rayN/v2rayNG and similar clients; the format is also
-picked from the client's User-Agent. Routing defaults to `mode=smart` (private networks and
-mainland China direct via GEOSITE/GEOIP rules, everything else through Veilbird);
-`mode=global` sends everything except private networks through the tunnel. Node names
+picked from the client's User-Agent. Every Clash profile has the same two choices: the
+`Veilbird` group defaults to `自动选择` (lowest latency, measured by the client every 5
+minutes, switching away from nodes that stop answering) or a fixed node, and the client's
+own Global switch also goes through Veilbird. Routing defaults to `mode=smart` (private
+networks and mainland China direct, everything else through Veilbird) using three small
+rule sets (~0.6 MB, MetaCubeX `meta-rules-dat` via jsdelivr) that the client downloads
+through the tunnel and refreshes daily; if they cannot be downloaded the profile still
+works and simply proxies that traffic. `mode=global` sends everything except private
+networks through the tunnel. Node names
 read `🇯🇵 Tokyo · node-name` and stay stable when nodes are added. Fixed-node VLESS
 profiles also export a single share link (`/api/v1/profiles/{id}/download?format=uri`).
 
 For validation, `npm test` covers unit and integration hooks. Supply a disposable
 `VEILBIRD_TEST_DATABASE_URL` to run PostgreSQL/API tests, and optionally
 `VEILBIRD_TEST_XRAY` / `VEILBIRD_TEST_MIHOMO` paths to validate generated configs
-with real binaries (`VEILBIRD_TEST_MIHOMO_GEODATA` adds the smart-routing rules check). These checks do not replace iPhone/Android and live-node acceptance tests.
+with real binaries (both routing modes must load offline). These checks do not replace iPhone/Android and live-node acceptance tests.
 
 ## Local development setup
 

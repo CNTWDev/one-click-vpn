@@ -14,6 +14,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     }
     private var api:NativeAPI?
     private var nodeId=""
+    // Automatic mode only: the next-fastest nodes, tried when the current one cannot be reached.
+    private var fallbacks:[String]=[]
     private let privateKey=PrivateKey()
     private var graceUntil=Date.distantPast
     private var wokeFlag=false
@@ -26,10 +28,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             do {
                 guard let configuration=(protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration,let origin=configuration["origin"] as? String else {throw AccessFailure.code("SERVER_REQUIRED")}
                 api=try NativeAPI(origin:origin);nodeId=configuration["nodeId"] as? String ?? ""
-                let tunnel=try await acquire()
+                if nodeId.isEmpty {await chooseFastest()}
+                let tunnel=try await acquireWithFallback()
                 try Task.checkCancellation()
                 try await withCheckedThrowingContinuation {(continuation:CheckedContinuation<Void,Error>) in adapter.start(tunnelConfiguration:tunnel) {error in if let error {continuation.resume(throwing:error)} else {continuation.resume()}}}
-                graceUntil=Date().addingTimeInterval(45);completionHandler(nil)
+                graceUntil=Date().addingTimeInterval(handshakeWait);completionHandler(nil)
             } catch {
                 if case AccessFailure.code(let code)=error {await report(code)} else {await report("CONNECT_FAILED")}
                 completionHandler(error);return
@@ -52,7 +55,36 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                     guard line.hasPrefix("last_handshake_time_sec=") else {return nil};return Double(line.dropFirst("last_handshake_time_sec=".count))
                 }.max() ?? 0
                 if latest>0 && Date().timeIntervalSince1970-latest<180 {state="connection_connected"}
-                else {state="connection_confirming";if Date()>graceUntil {await fail("HANDSHAKE_TIMEOUT","NODE_UNAVAILABLE");return}}
+                else {
+                    state="connection_confirming"
+                    guard Date()>graceUntil else {continue}
+                    guard !fallbacks.isEmpty else {await fail("HANDSHAKE_TIMEOUT","NODE_UNAVAILABLE");return}
+                    await report("HANDSHAKE_TIMEOUT");nodeId=fallbacks.removeFirst()
+                    do {
+                        let tunnel=try await acquireWithFallback()
+                        try await withCheckedThrowingContinuation {(continuation:CheckedContinuation<Void,Error>) in adapter.update(tunnelConfiguration:tunnel) {error in if let error {continuation.resume(throwing:error)} else {continuation.resume()}}}
+                        refresh=Date().addingTimeInterval(90);graceUntil=Date().addingTimeInterval(handshakeWait)
+                    } catch AccessFailure.code(let code) {await fail(code);return}
+                    catch {await fail("TUNNEL_ERROR","NODE_UNAVAILABLE");return}
+                }
+            }
+        }
+    }
+    /// A spare node gets a shorter wait: the next one is likely to answer sooner than this one recovers.
+    private var handshakeWait:TimeInterval {fallbacks.isEmpty ? 45:20}
+    /// Measured before the tunnel exists (the extension's own traffic bypasses it anyway).
+    /// If the list cannot be loaded the server picks the least-loaded node.
+    private func chooseFastest() async {
+        guard let api,let nodes=try? await api.request("nodes")["nodes"] as? [[String:Any]] else {return}
+        let ranked=await Latency.rank(nodes).compactMap {$0.node["id"] as? String}
+        nodeId=ranked.first ?? "";fallbacks=Array(ranked.dropFirst().prefix(2))
+    }
+    /// In automatic mode a node that cannot be used is replaced by the next fastest one.
+    private func acquireWithFallback() async throws -> TunnelConfiguration {
+        while true {
+            do {return try await acquire()}
+            catch AccessFailure.code(let code) where ["NODE_UNAVAILABLE","NODE_FULL"].contains(code) && !fallbacks.isEmpty {
+                await report(code);nodeId=fallbacks.removeFirst()
             }
         }
     }
