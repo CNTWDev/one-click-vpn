@@ -1,0 +1,58 @@
+/* Portal home: the app download first, then account facts, platforms and devices, manual setup last. */
+.home > * + * { margin-top: 16px; }
+.home .topbar + * { margin-top: 28px; }
+.home-hero { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 40px; align-items: center; padding: 40px; }
+.home-hero:not(:has(.home-preview)) { grid-template-columns: minmax(0, 1fr); }
+.home-hero-text { display: grid; gap: 14px; justify-items: start; min-width: 0; }
+.home-hero-text > * { margin: 0; max-width: 100%; }
+.home-hero h1 { font-size: 32px; line-height: 1.25; overflow-wrap: break-word; }
+.home-lead { color: var(--text-2); font-size: 15px; }
+.home-download { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-top: 6px; }
+.home-download .muted { font-variant-numeric: tabular-nums; }
+.home-preview { display: grid; justify-items: center; gap: 14px; padding: 28px 24px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--border); }
+.home-ring { width: 120px; height: 120px; border-radius: 50%; display: grid; place-items: center; color: var(--accent); border: 2px solid var(--accent); box-shadow: 0 0 0 10px var(--accent-soft); }
+.home-preview-row { width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); color: var(--text-2); font-size: 13px; text-align: center; }
+.home-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.home-stats > .card { padding: 18px 22px; display: grid; gap: 2px; margin-top: 0; }
+.home .home-stats > .card, .home .home-columns > .card { margin-top: 0; }
+.home-stats small { color: var(--text-2); font-size: 13px; }
+.home-stats strong { font-size: 22px; line-height: 1.35; font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+.home-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.home-list h2 { font-size: 16px; margin-bottom: 8px; }
+.home-list ul { list-style: none; margin: 0; padding: 0; }
+.home-list ul > li { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 10px 0; border-top: 1px solid var(--border); }
+.home-list > .hint { margin-top: 8px; }
+.home-empty { padding: 16px 0 4px; border-top: 1px solid var(--border); }
+.home-icon { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-2); }
+.home-row-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.home-row-main b { font-weight: 600; overflow-wrap: anywhere; }
+.home-row-main small { color: var(--text-2); font-size: 12px; line-height: 1.45; }
+.home-row-main code { color: var(--text-2); font-size: 11px; overflow-wrap: anywhere; }
+.home-list > .disclosure { border-top: 1px solid var(--border); }
+.home-versions > li { align-items: flex-start; }
+.home-manual { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; text-align: left; color: var(--text-2); cursor: pointer; font: inherit; }
+.home-manual:hover { border-color: var(--border-strong); }
+.home-manual > span { display: grid; gap: 2px; min-width: 0; }
+.home-manual b { color: var(--text); font-weight: 600; }
+.home-manual small { font-size: 13px; }
+.home-manual svg { flex: none; }
+.back-link { align-self: flex-start; }
+@media (max-width: 900px) {
+  .home-hero { grid-template-columns: minmax(0, 1fr); padding: 28px 24px; }
+  .home-preview { display: none; }
+  .home-columns { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .home-hero { padding: 24px 20px; }
+  .home-hero h1 { font-size: 24px; }
+  .home-download, .home-download > .primary { width: 100%; }
+  .home-download { justify-content: center; }
+  .home-stats { grid-template-columns: minmax(0, 1fr); gap: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow); }
+  .home-stats > .card { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 14px 20px; }
+  .home-stats > .card + .card { border-top: 1px solid var(--border); }
+  .home-stats strong { font-size: 15px; text-align: right; }
+  .home-list { padding: 20px; }
+}
+.manual-head { display: grid; gap: 6px; justify-items: start; min-width: 0; }
+.manual-head .back-link { margin-left: -12px; }
+.home .secondary.wrap { white-space: normal; text-align: center; min-height: 42px; height: auto; padding-block: 8px; }

@@ -35,6 +35,8 @@ export async function nativeLogin(request: Request, body: Record<string, unknown
   await dbExec(`INSERT INTO native_sessions (id,token_hash,user_id,identity_jwk,identity_thumbprint,device_name,platform,expires_at)
     VALUES ($1,$2,$3,$4,$5,$6,$7,now()+make_interval(days=>$8))`,
   [id,digest(token),user.id,JSON.stringify(key.jwk),key.thumbprint,String(body.deviceName || body.platform).slice(0,80),body.platform,sessionDays()]);
+  // Signing in again with the password re-admits a device that was signed out earlier; it counts against the limit on connect.
+  await dbExec("DELETE FROM native_enrollments WHERE user_id=$1 AND identity_thumbprint=$2 AND (status='revoked' OR (status='revoking' AND release_after<=now()))",[user.id,key.thumbprint]);
   await addAudit({ actorUserId: user.id, action: "native.login", targetType: "native_session", targetId: id });
   return { accessToken: token, expiresAt: new Date(Date.now()+sessionDays()*86400000).toISOString() };
 }

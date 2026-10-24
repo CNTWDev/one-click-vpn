@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { api } from "./api";
 import { CredentialDashboard } from "./credential-dashboard";
+import { Home } from "./home";
 import "./styles.css";
 import "./region-map.css";
 
@@ -70,9 +71,11 @@ function Auth({ mode, onMode, onUser, notice }: {
     }
   }
 
-  const siteName = useSite()?.name || PRODUCT_NAME;
+  const site = useSite(), siteName = site?.name || PRODUCT_NAME;
+  // Only the default site has its own apps; other sites still hand out subscriptions.
+  const apps = site?.isDefault !== false;
   const title = mode === "login" ? t("登录 {0}", [siteName]) : mode === "register" ? t("申请使用 VPN") : t("找回密码");
-  const subtitle = mode === "login" ? t("使用已审核的账号继续，获取你的订阅链接。") : mode === "register" ? t("提交后由管理员人工审核。")
+  const subtitle = mode === "login" ? apps ? t("登录后下载客户端，用同一账号即可使用。") : t("使用已审核的账号继续，获取你的订阅链接。") : mode === "register" ? t("提交后由管理员人工审核。")
     : resetSent ? t("如果该邮箱已注册，重置链接很快会发到邮箱，1 小时内有效。")
       : resetByEmail === false ? t("请联系管理员，为你生成重置密码的链接。") : t("输入注册邮箱，我们会发送重置链接。");
   const askEmail = mode !== "forgot" || (resetByEmail && !resetSent);
@@ -81,8 +84,8 @@ function Auth({ mode, onMode, onUser, notice }: {
     <section className="auth-intro">
       <Brand />
       <h1>{t("连接到你")}<br /><span>{t("信任的网络。")}</span></h1>
-      <p className="intro-copy">{t("审核通过后一键创建订阅，导入客户端或扫码即用。")}</p>
-      <ul className="trust"><li><b>{t("一份订阅，全部节点")}</b><small>{t("客户端里随时切换，新节点自动出现")}</small></li><li><b>{t("人工审核")}</b><small>{t("仅限受邀和熟悉的用户使用")}</small></li></ul>
+      <p className="intro-copy">{apps ? t("审核通过后，下载客户端登录即可使用，无需导入配置。") : t("审核通过后一键创建订阅，导入客户端或扫码即用。")}</p>
+      <ul className="trust">{apps ? <li><b>{t("一个账号，所有设备")}</b><small>{t("手机和电脑用同一账号登录，自动选择节点")}</small></li> : <li><b>{t("一份订阅，全部节点")}</b><small>{t("客户端里随时切换，新节点自动出现")}</small></li>}<li><b>{t("人工审核")}</b><small>{t("仅限受邀和熟悉的用户使用")}</small></li></ul>
     </section>
     <form className="auth-panel" onSubmit={submit}>
       <h2>{title}</h2>
@@ -134,7 +137,7 @@ function Pending({ user, onLogout }: { user: User; onLogout: () => void }) {
   return <main className="center-page"><Brand /><div className="status-card">
     <span className="status-icon">…</span>
     <h1>{t("等待管理员审核")}</h1>
-    <p>{t("账号")} <b>{user.email}</b> {t("已提交。审核通过后即可登录，一键创建订阅。")}</p>
+    <p>{t("账号")} <b>{user.email}</b> {t("已提交。审核通过后即可登录使用。")}</p>
     {!user.id && <p className="muted">{t("如果这个邮箱之前已经注册过，请直接返回登录。")}</p>}
     {user.status === "rejected" && <p className="inline-error">{t("申请未通过：")}{user.rejectionReason || t("请联系管理员")}</p>}
     <button className="secondary" onClick={onLogout}>{t("返回")}</button>
@@ -142,6 +145,7 @@ function Pending({ user, onLogout }: { user: User; onLogout: () => void }) {
 }
 
 const readResetToken = () => /^#reset=([\w.-]+)$/.exec(window.location.hash)?.[1] || "";
+const readManual = () => window.location.hash === "#manual";
 
 export default function App() {
   const { t } = useI18n();
@@ -150,9 +154,11 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [resetToken, setResetToken] = useState(readResetToken);
   const [notice, setNotice] = useState("");
+  const [manual, setManual] = useState(readManual);
+  const site = useSite();
 
   useEffect(() => {
-    const follow = () => { const token = readResetToken(); if (token) setResetToken(token); };
+    const follow = () => { const token = readResetToken(); if (token) setResetToken(token); setManual(readManual()); };
     window.addEventListener("hashchange", follow);
     return () => window.removeEventListener("hashchange", follow);
   }, []);
@@ -181,7 +187,13 @@ export default function App() {
   }
 
   if (resetToken) return <><PortalLanguagePicker floating /><ResetPassword token={resetToken} onDone={finishReset} /></>;
-  if (user?.status === "active" && !loading) return <CredentialDashboard user={user} onLogout={() => void logout()} />;
+  if (user?.status === "active" && !loading) {
+    // The apps are built for the default site only; other sites keep subscriptions as their home.
+    if (site?.isDefault === false) return <CredentialDashboard user={user} onLogout={() => void logout()} />;
+    // #manual keeps the browser's Back button working between the two pages.
+    const go = (next: boolean) => { if (next) window.location.hash = "manual"; else window.history.replaceState(null, "", window.location.pathname + window.location.search); setManual(next); window.scrollTo(0, 0); };
+    return manual ? <CredentialDashboard user={user} onLogout={() => void logout()} onBack={() => go(false)} /> : <Home user={user} onLogout={() => void logout()} onManual={() => go(true)} />;
+  }
   return <><PortalLanguagePicker floating />{loading ? <main className="center-page" aria-busy="true"><Brand /><span className="loader" aria-label={t("正在连接…")} /></main>
     : !user ? <Auth mode={mode} onMode={setMode} onUser={setUser} notice={notice} /> : <Pending user={user} onLogout={() => void logout()} />}</>;
 }

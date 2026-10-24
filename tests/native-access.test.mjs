@@ -81,6 +81,23 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     const report=await call("diagnostics",{events:[{code:"HANDSHAKE_TIMEOUT",at:new Date().toISOString(),nodeId:node},{code:"bad code",at:new Date().toISOString()},{code:"OLD",at:"2000-01-01T00:00:00Z"}]},loser.token);
     assert.deepEqual([report.status,report.data.accepted],[200,1],"only well-formed recent codes are stored");
     assert.equal((await call("diagnostics",{events:[]})).status,401);
+    // Portal: the account page lists the signed-in app and can sign it out; signing in with the password brings it back.
+    const portal="http://127.0.0.1:3397/api/v1/";
+    const web=await fetch(portal+"auth/web-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:`${user}@example.com`,password})});
+    assert.equal(web.status,200);const cookie=web.headers.get("set-cookie").split(";")[0];
+    const listed2=await (await fetch(portal+"account",{headers:{cookie}})).json();
+    assert.equal(listed2.deviceLimit,1);assert.equal(listed2.devices.length,1);assert.equal(listed2.devices[0].connected,true);
+    const enrollmentId=listed2.devices[0].id;
+    assert.equal((await fetch(portal+`account/devices/${enrollmentId}`,{method:"DELETE"})).status,401);
+    assert.equal((await fetch(portal+"account/devices/enr_missing",{method:"DELETE",headers:{cookie}})).status,404);
+    const signedOut=await fetch(portal+`account/devices/${enrollmentId}`,{method:"DELETE",headers:{cookie}});
+    assert.equal(signedOut.status,200);assert.deepEqual((await signedOut.json()).devices,[]);
+    assert.equal((await call("account",undefined,loser.token)).status,401,"the app's login session ends");
+    await pool.query("UPDATE native_enrollments SET release_after=now()-interval '1 second' WHERE id=$1",[enrollmentId]);
+    const again=await call("login",{email:`${user}@example.com`,password,identityKey:loser.keys.publicKey.export({format:"jwk"}),platform:"android",deviceName:"Phone"});
+    assert.equal(again.status,200);loser.token=again.data.accessToken;
+    const back=await call("connect",await proof(loser,"connect",{...input,publicKey:randomBytes(32).toString("base64")}),loser.token);
+    assert.equal(back.status,200,JSON.stringify(back.data));
     await pool.query("UPDATE users SET membership_expires_at=$2 WHERE id=$1",[user,new Date(Date.now()-1000).toISOString()]);
     assert.equal((await call("connect",await proof(loser,"connect",input),loser.token)).data.code,"MEMBERSHIP_EXPIRED");
     // Migration must not turn native internal devices into exportable credentials.

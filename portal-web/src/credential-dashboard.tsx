@@ -1,7 +1,5 @@
 import { useI18n } from "../../shared/i18n";
-import { Brand } from "./brand";
-import { PortalLanguagePicker } from "./language";
-import { ClientDownloads } from "./client-downloads";
+import { Topbar } from "./home";
 import { intlLocales } from "../../shared/i18n-core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActionDialog } from "./action-dialog";
@@ -32,7 +30,8 @@ type Credential = {
 type Usage = { totals: { uploadBytes: number; downloadBytes: number; totalBytes: number }; daily: Array<{ day: string; totalBytes: number }>; updatedAt?: string };
 type Issue = { message: string; retry?: () => void };
 
-export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
+/** Subscriptions, single-node configs and certificates for third-party clients. `onBack` is set when it sits behind the app-first home. */
+export function CredentialDashboard({ user, onLogout, onBack }: { user: User; onLogout: () => void; onBack?: () => void }) {
   const { t, locale } = useI18n();
   const site = useSite();
   const siteName = site?.name || PRODUCT_NAME;
@@ -179,10 +178,14 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
   }
 
   const hero = <section className="hero">
-    <div>
+    {onBack ? <div className="manual-head">
+      <button type="button" className="ghost small back-link" onClick={onBack}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>{t("返回首页")}</button>
+      <h1>{t("其他客户端")}</h1>
+      <p className="hero-stats">{t("为 Clash、Hiddify、Shadowrocket、WireGuard、OpenVPN 等手动导入。用 {0} 客户端不需要这些。", [siteName])}</p>
+    </div> : <div>
       <h1>{!loaded ? loadError ? t("{0}，你好", [user.displayName]) : <Skeleton height={34} width={240} /> : credentials.length ? t("{0}，你好", [user.displayName]) : t("{0}，欢迎使用 {1}", [user.displayName, siteName])}</h1>
       {loaded && credentials.length > 0 && <p className="hero-stats">{t("{0} 个连接 · {1} 个在线 · 近 30 天 {2}", [credentials.length, onlineCount, formatBytes(usage?.totals.totalBytes)])}</p>}
-    </div>
+    </div>}
     {loaded && credentials.length > 0 && <button type="button" className={creating ? "secondary" : "primary"} onClick={() => creating ? setCreating("") : openCreator("subscription")}>{creating ? t("收起") : <>{Icon.plus()}{t("新建连接")}</>}</button>}
   </section>;
 
@@ -272,16 +275,14 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
 
   return <main className="dashboard">
     {dialog}{toasts}
-    <header className="topbar"><Brand /><div className="topbar-tools"><PortalLanguagePicker /><div className="account" title={user.email}><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b></div><button type="button" className="ghost small" onClick={onLogout}>{t("退出")}</button></div></div></header>
+    <Topbar user={user} onLogout={onLogout} />
     {hero}
     {creator}
     {connections}
-    {loaded && credentials.length > 0 && <section className="card usage-panel" aria-labelledby="usage-title">
+    {!onBack && loaded && credentials.length > 0 && <section className="card usage-panel" aria-labelledby="usage-title">
       <div className="section-head"><h2 id="usage-title">{t("流量趋势 · 近 14 天")}</h2><span className="updated">{t("累计")} {formatBytes(recentTotal)} · ↑ {formatBytes(usage?.totals.uploadBytes)} ↓ {formatBytes(usage?.totals.downloadBytes)}</span></div>
       {recentTotal > 0 ? <div className="bars" role="img" title={t("按连接汇总，日期为 UTC，不区分安装在哪台设备。")} aria-label={t("近 14 天流量，累计 {0}", [formatBytes(recentTotal)])}>{recentDays.map((day) => <div key={day.day} title={`${day.day} · ${formatBytes(day.totalBytes)}`}><i style={{ height: `${day.totalBytes > 0 ? Math.max(2, day.totalBytes / maxDay * 100) : 0}%` }} /><small>{day.day.slice(5)}</small></div>)}</div> : <p className="hint">{t("开始连接后，这里会显示流量趋势。")}</p>}
     </section>}
-    {/* The apps are built for the default site only; other sites offer subscriptions until they get their own builds. */}
-    {site?.isDefault !== false && <ClientDownloads />}
     {loaded && <details className="disclosure panel"><summary>{t("可用区域地图")}<span>{regions.length}{t("个区域")}</span></summary><RegionMap regions={regions} selectedRegionId={regionId} onSelect={(id) => { setRegionId(id); openCreator("single"); }} /></details>}
     <Modal open={!!qr} title={qr?.title || t("二维码")} onClose={() => setQr(null)}>{qr && <div className="stack center"><QrCode text={qr.text} label={qr.title} /><p className="hint">{qr.hint}</p><div className="dialog-actions"><button type="button" className="primary" onClick={() => { void navigator.clipboard.writeText(qr.text).then(() => notify(t("已复制。"))).catch(() => notify(t("浏览器不允许自动复制。"), "error")); }}>{Icon.copy(16)}{t("复制内容")}</button></div></div>}</Modal>
     <footer>{t("{0} · 配置仅供本人使用，请勿分享或上传第三方转换网站。", [siteName])}</footer>
