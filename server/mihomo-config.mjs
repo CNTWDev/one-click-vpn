@@ -4,18 +4,19 @@ const privateNetworks = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.6
 // download leaves the profile usable (that traffic is proxied) and is retried, whereas a missing
 // geo database stops the whole profile from loading. Fetched through the tunnel, refreshed daily.
 const ruleSets = "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo";
-const ruleSet = (kind, name, behavior) => ({ type: "http", behavior, format: "mrs", url: `${ruleSets}/${kind}/${name}.mrs`,
-  path: `./veilbird-rules/${kind}-${name}.mrs`, interval: 86400, proxy: "TrackNothing" });
+const ruleSet = (kind, name, behavior, group) => ({ type: "http", behavior, format: "mrs", url: `${ruleSets}/${kind}/${name}.mrs`,
+  path: `./veilbird-rules/${kind}-${name}.mrs`, interval: 86400, proxy: group });
 
 /** Fixed YAML keys + JSON flow values: no interpolation of user data into YAML syntax. */
 /**
  * @param {Array<Record<string, unknown> & { name: string; type: string }>} proxies
- * @param {{ mode?: "smart" | "global" }} [options]
+ * @param {{ mode?: "smart" | "global"; group?: string }} [options] `group` names the main selector after the site (no commas).
  */
 export function renderMihomoConfig(proxies, options = {}) {
   if (!proxies.length) throw new Error("节点尚未就绪，请稍后刷新订阅");
   const names = proxies.map((proxy) => proxy.name);
   const smart = (options.mode || "smart") === "smart";
+  const group = options.group || "TrackNothing";
   const config = {
     "mixed-port": 7890, "allow-lan": false, "bind-address": "127.0.0.1", mode: "rule", "log-level": "warning", ipv6: false,
     dns: { enable: true, ipv6: false, "enhanced-mode": "redir-host", "respect-rules": true,
@@ -27,18 +28,18 @@ export function renderMihomoConfig(proxies, options = {}) {
     proxies,
     "proxy-groups": [
       // Default: lowest measured latency, switching away from a node that stops answering.
-      { name: "TrackNothing", type: "select", proxies: ["自动选择", ...names] },
+      { name: group, type: "select", proxies: ["自动选择", ...names] },
       { name: "自动选择", type: "url-test", proxies: names, url: "https://www.gstatic.com/generate_204", interval: 300, tolerance: 50 },
       // The client's own "Global" switch uses this group; without it Mihomo defaults to DIRECT.
-      // It follows the TrackNothing choice unless a node is picked here.
-      { name: "GLOBAL", type: "select", proxies: ["TrackNothing", "自动选择", ...names] },
+      // It follows the main group's choice unless a node is picked here.
+      { name: "GLOBAL", type: "select", proxies: [group, "自动选择", ...names] },
     ],
     ...(smart ? { "rule-providers": {
-      private_domain: ruleSet("geosite", "private", "domain"), cn_domain: ruleSet("geosite", "cn", "domain"), cn_ip: ruleSet("geoip", "cn", "ipcidr"),
+      private_domain: ruleSet("geosite", "private", "domain", group), cn_domain: ruleSet("geosite", "cn", "domain", group), cn_ip: ruleSet("geoip", "cn", "ipcidr", group),
     } } : {}),
     rules: smart
-      ? [...privateNetworks.map((cidr) => `IP-CIDR,${cidr},DIRECT,no-resolve`), "RULE-SET,private_domain,DIRECT", "RULE-SET,cn_domain,DIRECT", "RULE-SET,cn_ip,DIRECT", "MATCH,TrackNothing"]
-      : [...privateNetworks.map((cidr) => `IP-CIDR,${cidr},DIRECT,no-resolve`), "MATCH,TrackNothing"],
+      ? [...privateNetworks.map((cidr) => `IP-CIDR,${cidr},DIRECT,no-resolve`), "RULE-SET,private_domain,DIRECT", "RULE-SET,cn_domain,DIRECT", "RULE-SET,cn_ip,DIRECT", `MATCH,${group}`]
+      : [...privateNetworks.map((cidr) => `IP-CIDR,${cidr},DIRECT,no-resolve`), `MATCH,${group}`],
   };
   return Object.entries(config).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join("\n") + "\n";
 }

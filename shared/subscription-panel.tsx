@@ -3,6 +3,8 @@ import { errorText } from "./i18n-errors";
 import { useI18n } from "./i18n";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import "./subscription-panel.css";
+import { useSite } from "./site";
+import { PRODUCT_NAME } from "./brand-name";
 
 type Item = { id: string; credential_id: string; display_name: string; email: string; protocol: string; status: string; user_disabled: boolean; admin_disabled: boolean; account_status: string; expires_at: string; last_fetched_at: string | null; total_bytes: string; synced_nodes: number };
 type Api = <T>(path: string, init?: RequestInit) => Promise<T>;
@@ -42,7 +44,8 @@ export function SubscriptionPanel({ api, admin = false, createOnly = false, avai
   const refresh = useCallback(async () => { const result = await api<{ subscriptions: Item[] }>(endpoint); setItems(result.subscriptions); }, [api, endpoint]);
   // createOnly embeds just the form: no list, so no fetch, no polling and no refresh button.
   useEffect(() => { if (createOnly) return; void refresh().catch((e: Error) => setError(e.message)); const timer = setInterval(() => { void refresh().catch(() => {}); }, 30000); return () => clearInterval(timer); }, [refresh, createOnly]);
-  function showLink(token: string) { setLink(`${window.location.origin}/api/subscription?token=${encodeURIComponent(token)}`); }
+  const site = useSite();
+  function showLink(token: string) { setLink(`${site?.apiOrigin || window.location.origin}/api/subscription?token=${encodeURIComponent(token)}`); }
   async function create(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError(""); setNotice("");
     try {
@@ -62,7 +65,8 @@ export function SubscriptionPanel({ api, admin = false, createOnly = false, avai
   }
   async function copy() { try { await navigator.clipboard.writeText(link); setNotice(message("订阅链接已复制，请在客户端中添加远程订阅。")); } catch { setError("无法自动复制，请选中下方链接手动复制。"); } }
   const selected = clients.find((c) => c.id === client)!;
-  const importUrl = client === "hiddify" ? `hiddify://import?url=${encodeURIComponent(link)}&name=TrackNothing` : `clash://install-config?url=${encodeURIComponent(link)}&name=TrackNothing`;
+  const profileName = encodeURIComponent(site?.name || PRODUCT_NAME);
+  const importUrl = client === "hiddify" ? `hiddify://import?url=${encodeURIComponent(link)}&name=${profileName}` : `clash://install-config?url=${encodeURIComponent(link)}&name=${profileName}`;
   return <section className="subscription-panel" aria-label={admin ? t("订阅管理") : t("动态订阅")}>
     {!createOnly && <div className="subscription-heading"><div><p className="subscription-kicker">{t("ONE IMPORT · ALL NODES")}</p><h2>{admin ? t("订阅管理") : t("一次导入，随时换节点")}</h2><p>{admin ? t("按账号管理订阅访问权限。流量与连接凭据统一归集。") : t("自动获取可用节点，在客户端切换；新增节点刷新后即可出现。")}</p></div><button disabled={busy} onClick={() => void refresh().catch((e: Error) => setError(e.message))}>{t("刷新状态")}</button></div>}
     {error && <p className="subscription-error" role="alert">{errorText(error, t)}</p>}{notice && <p className="subscription-notice" role="status">{translateMessage(notice, t)}</p>}

@@ -352,6 +352,11 @@ footer { color: var(--text-2); text-align: center; font-size: 12px; padding-top:
   .trust { margin-top: 24px; }
   .auth-panel { margin: -24px auto 32px; position: relative; padding: 26px 20px; }
 }
+@media (max-width: 640px) {
+  /* Leave room for the floating language menu; a long site name wraps instead of running under it. */
+  .auth-intro .brand { padding-right: 120px; }
+  .auth-intro .brand > span:last-child { min-width: 0; overflow-wrap: anywhere; line-height: 1.3; }
+}
 @media (max-width: 380px) {
   .auth-intro h1 { font-size: 26px; }
   /* The wordmark is twelve letters; tighten it so it clears the floating language menu. */

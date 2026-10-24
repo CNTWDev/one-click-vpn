@@ -15,6 +15,8 @@ import { RegionMap } from "./region-map";
 import { SubscriptionAccess, type SubscriptionAccessHandle } from "./subscription-access";
 import { AppIcon, Icon, InlineError, Menu, Modal, ProtocolBadge, QrCode, Skeleton, Time, useToasts } from "./ui";
 import { SubscriptionPanel } from "../../shared/subscription-panel";
+import { useSite } from "../../shared/site";
+import { PRODUCT_NAME } from "../../shared/brand-name";
 
 type User = { email: string; displayName: string };
 type Credential = {
@@ -32,6 +34,8 @@ type Issue = { message: string; retry?: () => void };
 
 export function CredentialDashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const { t, locale } = useI18n();
+  const site = useSite();
+  const siteName = site?.name || PRODUCT_NAME;
   const dayLabel = (value?: string | null) => t(formatDay(value, "长期有效", intlLocales[locale]));
 const stateLabel = (value: string) => ({ disabled: t("已停用"), "admin-disabled": t("管理员已停用"), "account-disabled": t("账号已停用"), online: t("在线"), offline: t("离线"), "never-connected": t("尚未连接"), "telemetry-delayed": t("状态未知"), revoked: t("已撤销"), expired: t("已过期") } as Record<string, string>)[value] || value;
 const statusLabel = (value: string) => ({ active: t("有效"), issued: t("待启用"), revoked: t("已撤销"), expired: t("已过期") } as Record<string, string>)[value] || value;
@@ -176,7 +180,7 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
 
   const hero = <section className="hero">
     <div>
-      <h1>{!loaded ? loadError ? t("{0}，你好", [user.displayName]) : <Skeleton height={34} width={240} /> : credentials.length ? t("{0}，你好", [user.displayName]) : t("{0}，欢迎使用 TrackNothing", [user.displayName])}</h1>
+      <h1>{!loaded ? loadError ? t("{0}，你好", [user.displayName]) : <Skeleton height={34} width={240} /> : credentials.length ? t("{0}，你好", [user.displayName]) : t("{0}，欢迎使用 {1}", [user.displayName, siteName])}</h1>
       {loaded && credentials.length > 0 && <p className="hero-stats">{t("{0} 个连接 · {1} 个在线 · 近 30 天 {2}", [credentials.length, onlineCount, formatBytes(usage?.totals.totalBytes)])}</p>}
     </div>
     {loaded && credentials.length > 0 && <button type="button" className={creating ? "secondary" : "primary"} onClick={() => creating ? setCreating("") : openCreator("subscription")}>{creating ? t("收起") : <>{Icon.plus()}{t("新建连接")}</>}</button>}
@@ -276,9 +280,10 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
       <div className="section-head"><h2 id="usage-title">{t("流量趋势 · 近 14 天")}</h2><span className="updated">{t("累计")} {formatBytes(recentTotal)} · ↑ {formatBytes(usage?.totals.uploadBytes)} ↓ {formatBytes(usage?.totals.downloadBytes)}</span></div>
       {recentTotal > 0 ? <div className="bars" role="img" title={t("按连接汇总，日期为 UTC，不区分安装在哪台设备。")} aria-label={t("近 14 天流量，累计 {0}", [formatBytes(recentTotal)])}>{recentDays.map((day) => <div key={day.day} title={`${day.day} · ${formatBytes(day.totalBytes)}`}><i style={{ height: `${day.totalBytes > 0 ? Math.max(2, day.totalBytes / maxDay * 100) : 0}%` }} /><small>{day.day.slice(5)}</small></div>)}</div> : <p className="hint">{t("开始连接后，这里会显示流量趋势。")}</p>}
     </section>}
-    <ClientDownloads />
+    {/* The apps are built for the default site only; other sites offer subscriptions until they get their own builds. */}
+    {site?.isDefault !== false && <ClientDownloads />}
     {loaded && <details className="disclosure panel"><summary>{t("可用区域地图")}<span>{regions.length}{t("个区域")}</span></summary><RegionMap regions={regions} selectedRegionId={regionId} onSelect={(id) => { setRegionId(id); openCreator("single"); }} /></details>}
     <Modal open={!!qr} title={qr?.title || t("二维码")} onClose={() => setQr(null)}>{qr && <div className="stack center"><QrCode text={qr.text} label={qr.title} /><p className="hint">{qr.hint}</p><div className="dialog-actions"><button type="button" className="primary" onClick={() => { void navigator.clipboard.writeText(qr.text).then(() => notify(t("已复制。"))).catch(() => notify(t("浏览器不允许自动复制。"), "error")); }}>{Icon.copy(16)}{t("复制内容")}</button></div></div>}</Modal>
-    <footer>{t("TrackNothing · 配置仅供本人使用，请勿分享或上传第三方转换网站。")}</footer>
+    <footer>{t("{0} · 配置仅供本人使用，请勿分享或上传第三方转换网站。", [siteName])}</footer>
   </main>;
 }
