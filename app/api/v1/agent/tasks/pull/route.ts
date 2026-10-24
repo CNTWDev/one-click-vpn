@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     const body = await readJson(request);
     const nodeId = cleanText(body.nodeId, 128);
     const token = agentTokenFromRequest(request, cleanText(body.token, 512));
-    if (!(await authenticateAgent(nodeId, token))) return jsonError("Invalid agent credentials", 401);
+    if (!(await authenticateAgent(nodeId, token, request))) return jsonError("Invalid agent credentials", 401);
     const limit = Math.min(Math.max(Number(body.limit || 10), 1), 20);
     const tasks = await pullReconcileTasks(nodeId, limit);
     const nativePeers = body.nativePeers === true ? { nativePeers: await listNativeLeasePeers(nodeId) } : {};

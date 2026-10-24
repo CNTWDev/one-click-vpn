@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const body = await readJson(request);
     const nodeId = cleanText(body.nodeId, 128);
     const token = agentTokenFromRequest(request, cleanText(body.token, 512));
-    if (!(await authenticateAgent(nodeId, token))) return jsonError("Invalid agent credentials", 401);
+    if (!(await authenticateAgent(nodeId, token, request))) return jsonError("Invalid agent credentials", 401);
     const taskId = cleanText(body.taskId, 128);
     const status = body.status === "succeeded" ? "succeeded" : body.status === "failed" ? "failed" : null;
     if (!taskId || !status) return jsonError("taskId and status are required");

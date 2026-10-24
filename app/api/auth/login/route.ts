@@ -3,7 +3,7 @@ import { addAudit, findUserByEmail } from "../../../../server/db";
 import { createLoginSession, sessionCookie } from "../../../../server/auth";
 import { verifyPassword } from "../../../../server/password";
 import { jsonError, readJson, cleanText } from "../../../../server/http";
-import { allowLoginAttempt } from "../../../../server/rate-limit";
+import { allowLoginAttempt, recordAuthFailure } from "../../../../server/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -15,6 +15,7 @@ export async function POST(request: Request) {
     if (!allowLoginAttempt(request, email)) return jsonError("Too many login attempts", 429);
     const user = await findUserByEmail(email);
     if (!(await verifyPassword(password, user?.password_hash)) || !user) {
+      recordAuthFailure(request, "wrong-password");
       await addAudit({ action: "auth.login.failed", metadata: { email } });
       return jsonError("Invalid email or password", 401);
     }

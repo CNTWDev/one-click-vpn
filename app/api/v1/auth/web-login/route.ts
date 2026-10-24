@@ -4,7 +4,7 @@ import { createLoginSession, portalSessionCookie } from "../../../../../server/a
 import { publicUser } from "../../../../../server/device-auth";
 import { verifyPassword } from "../../../../../server/password";
 import { cleanText, jsonError, readJson } from "../../../../../server/http";
-import { allowLoginAttempt } from "../../../../../server/rate-limit";
+import { allowLoginAttempt, recordAuthFailure } from "../../../../../server/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     if (!allowLoginAttempt(request, email)) return jsonError("Too many login attempts", 429);
     const user = await findUserByEmail(email);
     if (!(await verifyPassword(password, user?.password_hash)) || !user) {
+      recordAuthFailure(request, "wrong-password");
       await addAudit({ action: "portal.auth.login.failed", metadata: { email } });
       return jsonError("Invalid email or password", 401);
     }

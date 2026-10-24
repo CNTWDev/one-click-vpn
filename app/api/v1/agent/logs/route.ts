@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     const body = await readJson(request);
     const nodeId = cleanText(body.nodeId, 128);
     const token = agentTokenFromRequest(request, cleanText(body.token, 512));
-    if (!(await authenticateAgent(nodeId, token))) return jsonError("Invalid agent credentials", 401);
+    if (!(await authenticateAgent(nodeId, token, request))) return jsonError("Invalid agent credentials", 401);
     const entries = Array.isArray(body.entries) ? body.entries.slice(0, 20) : [];
     for (const entry of entries) {
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;

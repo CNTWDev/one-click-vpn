@@ -1,3 +1,4 @@
+import { setBanListener } from "./rate-limit";
 import { currentTrace } from "./trace";
 
 /**
@@ -73,6 +74,12 @@ export async function writeOperationalLog(input: OperationalLogInput): Promise<v
     // Operational telemetry is intentionally lossy when the separate log store is unavailable.
   }
 }
+
+// Bans are rare and worth seeing in Console → 日志; the limiter itself stays import-free for proxy.ts.
+setBanListener((address, reason) => {
+  void writeOperationalLog({ component: "api", level: "warning", action: "abuse.address_banned", source: "system",
+    message: `Blocked ${address} for 1 hour after repeated failed authentication (${reason})`, fields: { address, reason } });
+});
 
 export type OperationalLogLine = {
   timestamp: string;

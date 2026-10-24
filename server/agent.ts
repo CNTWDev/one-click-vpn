@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { findNode, updateNode } from "./db";
 import { hashToken } from "./crypto";
+import { recordAuthFailure } from "./rate-limit";
 import { updateNodeControlMetadata } from "./control-db";
 import { recordNodeNetworkCounters, type NodeNetworkRate } from "./node-traffic";
 
@@ -42,9 +43,15 @@ export function agentTokenFromRequest(request: Request, fallback = ""): string {
   return fallback;
 }
 
-export async function authenticateAgent(nodeId: string, token: string) {
+export async function authenticateAgent(nodeId: string, token: string, request?: Request) {
   const node = await findNode(nodeId);
-  if (!node || !tokenMatches(token, node.agent_token_hash)) return null;
+  // Only unknown node ids count towards a ban: a reinstalled node's old Agent keeps polling with a
+  // stale token until it is replaced, and must not lock the node's address out for an hour.
+  if (!node) {
+    if (request) recordAuthFailure(request, "unknown-agent");
+    return null;
+  }
+  if (!tokenMatches(token, node.agent_token_hash)) return null;
   return node;
 }
 

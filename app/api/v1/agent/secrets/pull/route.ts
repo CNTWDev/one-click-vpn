@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const nodeId = cleanText(body.nodeId, 128);
     const token = agentTokenFromRequest(request, cleanText(body.token, 512));
     const secretId = cleanText(body.secretId, 160);
-    if (!(await authenticateAgent(nodeId, token))) return jsonError("Invalid agent credentials", 401);
+    if (!(await authenticateAgent(nodeId, token, request))) return jsonError("Invalid agent credentials", 401);
     const value = await readSecretMaterial(secretId, nodeId);
     if (!value) return jsonError("Secret is unavailable for this node", 404);
     return NextResponse.json({ value });

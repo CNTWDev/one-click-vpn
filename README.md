@@ -94,6 +94,25 @@ Nginx sends all `app.example.com` traffic to Portal and all `console.example.com
 traffic to Admin. Their `/api` requests stay on the Docker network. The separate
 `api.example.com` host is only for native clients and remote Edge Agents.
 
+### Request limits
+
+Two layers stop scripts that hammer the API, without extra services:
+
+- **Nginx** (`scripts/setup-nginx-limits.sh`, run by every deploy): for this deployment's hostnames only
+  (from `.env`, Console → 站点 and the Agent domain), 20 requests/s per IP (burst 40), 30 connections per IP,
+  and 10 sign-in/register/reset requests per minute per IP. It writes `veilbird-limits.conf` into the
+  directory Nginx includes in its `http` block (BaoTa: `/www/server/panel/vhost/nginx`, otherwise
+  `/etc/nginx/conf.d`; override with `--nginx-config-dir`). Other websites on the same Nginx are not
+  affected. If `nginx -t` fails the previous configuration is restored. Re-run it after adding a site.
+- **Controller** (`proxy.ts`, `server/rate-limit.ts`): token buckets per IP, per signed-in session, per
+  app session (status polling separately), per Agent address, for public endpoints and for installer
+  downloads (30/hour). 40 failed authentications (wrong passwords, retries after a sign-in 429, unknown
+  Agent node ids) within 10 minutes block that IP for 1 hour; the block is logged in Console → 日志
+  (`abuse.address_banned`). Counters are in memory and reset when the Controller restarts.
+
+Behind a CDN every visitor arrives from the CDN's addresses: set `VEILBIRD_NGINX_LIMITS=no` and configure
+Nginx `real_ip` first. `VEILBIRD_RATE_LIMIT=off` disables the Controller limits.
+
 ## Sites (several brands on one deployment)
 
 Console → **站点** lists the brands this deployment serves. Every site shares the same
