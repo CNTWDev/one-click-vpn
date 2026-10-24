@@ -926,7 +926,7 @@ public partial class MainWindow : Window {
         if(ring is not null&&ringButton is not null) {
             ring.Set(state,Motion);
             ringButton.IsEnabled=!busy||connection.Active;
-            AutomationProperties.SetName(ringButton,L10n.Text(state switch {RingState.Idle=>"connect_action",RingState.Failed=>"retry_action",_=>"disconnect_action"}));
+            AutomationProperties.SetName(ringButton,L10n.Text(state switch {RingState.Idle=>"connect_action",RingState.Failed=>"retry_action",RingState.Connecting=>"cancel",_=>"disconnect_action"}));
         }
         if(statusTitle is not null) statusTitle.Text=StatusTitle(state);
         if(statusDot is not null) statusDot.Visibility=state==RingState.Connected?Visibility.Visible:Visibility.Collapsed;

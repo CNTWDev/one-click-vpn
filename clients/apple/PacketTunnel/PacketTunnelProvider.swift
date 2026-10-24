@@ -51,6 +51,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             } catch {
                 var code="CONNECT_FAILED"
                 if case AccessFailure.code(let known)=error {code=known}
+                if Task.isCancelled {Journal.add("connect: cancelled");CoreStop();completionHandler(error);return}
                 Journal.add("connect: failed \(code)");await report(code)
                 CoreStop();completionHandler(error);return
             }
@@ -92,7 +93,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private func connectWithFallback() async throws {
         while true {
             do {try await bringUp();return}
-            catch AccessFailure.code(let code) where ["NODE_UNAVAILABLE","NODE_FULL","HANDSHAKE_TIMEOUT"].contains(code) && !fallbacks.isEmpty {await nextNode(code)}
+            catch AccessFailure.code(let code) where ["NODE_UNAVAILABLE","NODE_FULL","HANDSHAKE_TIMEOUT"].contains(code) && !fallbacks.isEmpty && !Task.isCancelled {await nextNode(code)}
         }
     }
     private func nextNode(_ code:String) async {
@@ -113,13 +114,17 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         CoreStop()
         let configuration=try Transports.config(proxies:proxies,order:transports,fd:fd,smart:smart)
         var failure:NSError?
+        // Disconnect pressed while connecting cancels this task: stop before and after the core starts.
+        try Task.checkCancellation()
         _ = CoreStart(home,configuration,&failure)
+        if Task.isCancelled {CoreStop();throw CancellationError()}
         if failure != nil {throw AccessFailure.code("TUNNEL_ERROR")}
         if !(await probe(initial:true)) {
             // WireGuard waits for the node to add this device; give it the rest of the readiness window.
             while !leaseReady && Date().timeIntervalSince(started)<15 {try await Task.sleep(nanoseconds:1_000_000_000);leaseReady=await status()}
             guard leaseReady,await probe(initial:true) else {throw AccessFailure.code("HANDSHAKE_TIMEOUT")}
         }
+        try Task.checkCancellation()
         publish {$0["status"]="connection_connected";$0["since"]=Date().timeIntervalSince1970;$0["node"]=self.nodeName;$0["nodeId"]=self.nodeId}
         Journal.add("connect: ready in \(Int(Date().timeIntervalSince(started)*1000)) ms via \(carrying)")
     }

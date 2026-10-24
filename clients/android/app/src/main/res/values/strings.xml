@@ -79,7 +79,7 @@
   <string name="enter_email">Enter email</string>
   <string name="enter_password">Enter password</string>
   <string name="enter_your_email_and_password">Enter your email and password.</string>
-  <string name="finding_best_route">Finding the best route</string>
+  <string name="finding_best_route">Finding the best route · Tap to cancel</string>
   <string name="got_it">Got it</string>
   <string name="hide_password">Hide password</string>
   <string name="incorrect_email_or_password">Incorrect email or password.</string>

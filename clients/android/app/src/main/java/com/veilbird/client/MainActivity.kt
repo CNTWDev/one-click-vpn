@@ -318,7 +318,7 @@ class MainActivity : Activity() {
         val state = when { active && since > 0 -> ConnectRing.State.CONNECTED; active -> ConnectRing.State.CONNECTING; failed() -> ConnectRing.State.FAILED; else -> ConnectRing.State.IDLE }
         ring?.apply {
             this.state = state
-            contentDescription = L10n.text(when (state) { ConnectRing.State.IDLE -> R.string.connect_action; ConnectRing.State.FAILED -> R.string.retry_action; else -> R.string.disconnect_action })
+            contentDescription = L10n.text(when (state) { ConnectRing.State.IDLE -> R.string.connect_action; ConnectRing.State.FAILED -> R.string.retry_action; ConnectRing.State.CONNECTING -> R.string.cancel; else -> R.string.disconnect_action })
         }
         stateTitle?.text = L10n.text(when (state) { ConnectRing.State.CONNECTED -> R.string.connected_status; ConnectRing.State.CONNECTING -> R.string.connecting; ConnectRing.State.FAILED -> R.string.connect_failed_title; else -> R.string.not_connected })
         stateDot?.visibility = if (state == ConnectRing.State.CONNECTED) View.VISIBLE else View.GONE
