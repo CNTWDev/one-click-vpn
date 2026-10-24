@@ -44,7 +44,7 @@ class ConnectionService : VpnService() {
     private var leaseReady = false
     private var deadline = 0L
     private var renewAt = 0L
-    private var stopping = false
+    @Volatile private var stopping = false
     private var network = ""
     private var transports = listOf<String>()
     private var carrying = ""
@@ -59,7 +59,8 @@ class ConnectionService : VpnService() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("vpn", L10n.text(R.string.vpn_connection), NotificationManager.IMPORTANCE_LOW))
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == "disconnect") { worker.execute { stopConnection(R.string.disconnected) }; return START_NOT_STICKY }
+        // Not queued behind the worker: a tap while still connecting cancels the attempt at once.
+        if (intent?.action == "disconnect") { Thread { stopConnection(R.string.disconnected) }.start(); return START_NOT_STICKY }
         if (ConnectionStateStore.active) return START_NOT_STICKY
         startForeground(1, notification(L10n.text(R.string.connecting)))
         ConnectionStateStore.active = true; ConnectionStateStore.messageId = R.string.authorizing_and_connecting
@@ -84,6 +85,7 @@ class ConnectionService : VpnService() {
     private fun routing() = getSharedPreferences("preferences", MODE_PRIVATE).getString("routing", "smart")!!
     private fun code(e: Exception) = when (e) { is ApiFailure -> e.code; is Unreachable -> "HANDSHAKE_TIMEOUT"; else -> "CONNECT_FAILED" }
     private fun fail(e: Exception) {
+        if (stopping) { Journal.add("connect: cancelled"); return }
         // Unexpected errors keep their (scrubbed) text: a class name alone like "proxyerror" says too little.
         val detail = if (e !is ApiFailure && e !is Unreachable) listOf(e.javaClass.simpleName, Journal.scrub(e.message)).filter { it.isNotEmpty() }.joinToString(": ") else ""
         Journal.add("connect: failed ${code(e)}" + if (detail.isNotEmpty()) " ($detail)" else "")
@@ -101,6 +103,7 @@ class ConnectionService : VpnService() {
     private fun connect() {
         while (true) {
             try { bringUp(); return } catch (e: Exception) {
+                if (stopping) throw e
                 val replaceable = e is Unreachable || (e as? ApiFailure)?.code in listOf("NODE_UNAVAILABLE", "NODE_FULL")
                 if (!replaceable || !nextNode(code(e))) throw e
             }
@@ -132,11 +135,13 @@ class ConnectionService : VpnService() {
             .establish() ?: throw ApiFailure("VPN_PERMISSION_REQUIRED")
         // mihomo owns the descriptor from here and closes it on stop.
         Core.start(home, Transports.config(proxies, transports, tun.detachFd(), routing() == "smart"))
+        if (stopping) { Core.stop(); throw ApiFailure("CANCELLED") }
         if (!probe(initial = true)) {
             // WireGuard waits for the node to add this device; give it the rest of the readiness window.
             while (!leaseReady && SystemClock.elapsedRealtime() - started < 15000) { Thread.sleep(1000); leaseReady = status() }
             if (!leaseReady || !probe(initial = true)) throw Unreachable()
         }
+        if (stopping) { Core.stop(); throw ApiFailure("CANCELLED") }
         ConnectionStateStore.messageId = R.string.connected_status; ConnectionStateStore.since = SystemClock.elapsedRealtime()
         Journal.add("connect: ready in ${SystemClock.elapsedRealtime() - started} ms via ${carrying.ifEmpty { "?" }}")
     }
@@ -224,7 +229,7 @@ class ConnectionService : VpnService() {
         val stop = PendingIntent.getService(this, 1, Intent(this, ConnectionService::class.java).setAction("disconnect"), PendingIntent.FLAG_IMMUTABLE)
         return Notification.Builder(this, "vpn").setContentTitle("TrackNothing").setContentText(text).setSmallIcon(android.R.drawable.ic_lock_lock).setContentIntent(open).setOngoing(true).addAction(Notification.Action.Builder(null, L10n.text(R.string.disconnect_status), stop).build()).build()
     }
-    private fun stopConnection(message: Int) {
+    @Synchronized private fun stopConnection(message: Int) {
         if (stopping) return
         stopping = true
         try { Core.stop() } catch (_: Exception) { }

@@ -79,7 +79,7 @@
   <string name="enter_email">Введите почту</string>
   <string name="enter_password">Введите пароль</string>
   <string name="enter_your_email_and_password">Введите почту и пароль.</string>
-  <string name="finding_best_route">Подбираем лучший маршрут</string>
+  <string name="finding_best_route">Подбираем лучший маршрут · Нажмите, чтобы отменить</string>
   <string name="got_it">Понятно</string>
   <string name="hide_password">Скрыть пароль</string>
   <string name="incorrect_email_or_password">Неверная почта или пароль.</string>
