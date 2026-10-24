@@ -14,7 +14,12 @@
     <ApplicationIcon>Assets\Veilbird.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <StartupObject>Veilbird.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup><Resource Include="Assets\Veilbird.ico" /></ItemGroup>
+  <!-- tunnel.dll / wireguard.dll come from build-tunnel.ps1 (wireguard-windows embeddable service). -->
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\.deps\$(RuntimeIdentifier)')">
+    <None Include="..\.deps\$(RuntimeIdentifier)\*.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
+  </ItemGroup>
   <ItemGroup><PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" /></ItemGroup>
 </Project>

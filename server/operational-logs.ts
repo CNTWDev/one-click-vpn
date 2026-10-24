@@ -87,7 +87,29 @@ export type OperationalLogLine = {
   request?: string;
   details?: Record<string, unknown>;
 };
-export type OperationalLogQuery = { logs: OperationalLogLine[]; available: boolean };
+export type OperationalLogQuery = {
+  logs: OperationalLogLine[];
+  available: boolean;
+  /** Pass back as `before` to get the next (older) page; absent on the last page. */
+  nextCursor?: string;
+  /** Matching lines per level in the whole time window (first page only; ignores the level filter). */
+  counts?: Record<string, number>;
+};
+
+type LogFilter = { nodeId?: string; level?: string; source?: string; search?: string; hours?: number };
+
+function logSelector(input: LogFilter, withLevel: boolean): string {
+  const selector = [`service="northstar"`];
+  if (input.nodeId) selector.push(`node="${labelValue(input.nodeId)}"`);
+  if (withLevel && input.level && ["info", "warning", "error"].includes(input.level)) selector.push(`level="${input.level}"`);
+  if (input.source === "user") selector.push(`source="user"`);
+  if (input.source === "system") selector.push(`source!="user"`);
+  return `{${selector.join(",")}}${input.search ? ` ${lineFilter(input.search)}` : ""}`;
+}
+
+function windowHours(input: LogFilter): number {
+  return Math.min(Math.max(Math.trunc(input.hours || 24), 1), 24 * 31);
+}
 
 const KNOWN_KEYS = new Set(["time", "message", "traceId", "actionId", "action", "actor", "target", "ip", "userAgent", "request"]);
 
@@ -102,19 +124,18 @@ export function lineFilter(text: string): string {
   return `|~ "(?i)${regex.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
 
-export async function queryOperationalLogs(input: { nodeId?: string; level?: string; source?: string; search?: string; hours?: number; limit?: number }): Promise<OperationalLogQuery> {
+export async function queryOperationalLogs(input: LogFilter & { limit?: number; before?: string }): Promise<OperationalLogQuery> {
   const url = lokiUrl();
   if (!url) return { logs: [], available: false };
-  const selector = [`service="northstar"`];
-  if (input.nodeId) selector.push(`node="${labelValue(input.nodeId)}"`);
-  if (input.level && ["info", "warning", "error"].includes(input.level)) selector.push(`level="${input.level}"`);
-  if (input.source === "user") selector.push(`source="user"`);
-  if (input.source === "system") selector.push(`source!="user"`);
-  const query = `{${selector.join(",")}}${input.search ? ` ${lineFilter(input.search)}` : ""}`;
+  const query = logSelector(input, true);
   const limit = Math.min(Math.max(input.limit || 200, 1), 500);
-  const end = Date.now() * 1_000_000;
-  const start = end - Math.min(Math.max(input.hours || 24, 1), 24 * 31) * 60 * 60 * 1_000_000_000;
-  const params = new URLSearchParams({ query, start: String(start), end: String(end), limit: String(limit), direction: "BACKWARD" });
+  const now = Date.now() * 1_000_000;
+  const start = now - windowHours(input) * 60 * 60 * 1_000_000_000;
+  // Cursor paging: each page ends just before the oldest line of the previous one (Loki's end is exclusive).
+  const end = input.before && /^\d{1,20}$/.test(input.before) ? input.before : String(now);
+  // One extra line tells whether the page boundary splits lines that share a timestamp.
+  const params = new URLSearchParams({ query, start: String(start), end, limit: String(limit + 1), direction: "BACKWARD" });
+  const counts = input.before ? undefined : countOperationalLogs(url, input);
   try {
     const response = await fetch(`${url}/loki/api/v1/query_range?${params}`, { cache: "no-store", signal: AbortSignal.timeout(5_000) });
     if (!response.ok) return { logs: [], available: false };
@@ -138,9 +159,46 @@ export async function queryOperationalLogs(input: { nodeId?: string; level?: str
     // Loki returns one block per stream; interleave them newest first.
     // Nanosecond strings exceed Number precision; equal-length digit strings compare correctly as text.
     logs.sort((a, b) => b.ns.length - a.ns.length || (a.ns === b.ns ? 0 : a.ns < b.ns ? 1 : -1));
-    return { logs: logs.slice(0, limit).map((entry) => entry.line), available: true };
+    let page = logs.slice(0, limit);
+    let nextCursor: string | undefined;
+    if (logs.length > limit) {
+      const last = page[page.length - 1].ns;
+      nextCursor = last;
+      if (logs[limit].ns === last && page[0].ns !== last) {
+        // The boundary falls inside a group of same-nanosecond lines: move the whole group to the next page.
+        page = page.filter((entry) => entry.ns !== last);
+        nextCursor = incrementDigits(last);
+      }
+    }
+    return { logs: page.map((entry) => entry.line), available: true, nextCursor, counts: await counts };
   } catch {
     return { logs: [], available: false };
+  }
+}
+
+/** n + 1 for a decimal string too large for Number (nanosecond timestamps). */
+function incrementDigits(value: string): string {
+  const digits = value.split("");
+  for (let i = digits.length - 1; i >= 0; i--) {
+    if (digits[i] !== "9") { digits[i] = String(Number(digits[i]) + 1); return digits.join(""); }
+    digits[i] = "0";
+  }
+  return `1${digits.join("")}`;
+}
+
+/** One metric query instead of reading every line: how many lines match, per level, in the window. */
+async function countOperationalLogs(url: string, input: LogFilter): Promise<Record<string, number> | undefined> {
+  const params = new URLSearchParams({ query: `sum by (level) (count_over_time(${logSelector(input, false)} [${windowHours(input)}h]))`, time: String(Date.now() * 1_000_000) });
+  try {
+    const response = await fetch(`${url}/loki/api/v1/query?${params}`, { cache: "no-store", signal: AbortSignal.timeout(5_000) });
+    if (!response.ok) return undefined;
+    const payload = await response.json() as { data?: { result?: Array<{ metric: Record<string, string>; value: [number, string] }> } };
+    const counts: Record<string, number> = { info: 0, warning: 0, error: 0 };
+    for (const row of payload.data?.result || []) counts[row.metric.level || "info"] = (counts[row.metric.level || "info"] || 0) + (Number(row.value[1]) || 0);
+    return counts;
+  } catch {
+    // Totals are a convenience; the page still works without them.
+    return undefined;
   }
 }
 

@@ -42,6 +42,9 @@ function liveRate(node: NodeRecord): { rx: number; tx: number } | null {
 const blankNodeForm: NodeForm = { name: "", ip: "", regionId: "", sshUser: "root", sshPort: "22", secret: "", credentialType: "password", sshPrivilegeMode: "root", deploymentTemplate: "standard" };
 const statusRank = { danger: 0, warning: 1, progress: 2, neutral: 3, success: 4 };
 
+
+/** Names like "1.2.3.4@Singapore" wrap after the "@" before breaking inside a word. */
+const breakAfterAt = (name: string) => name.split("@").flatMap((part, index) => index ? ["@", <wbr key={index} />, part] : [part]);
 export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeRecord[]; regions: Region[]; loading: boolean; onRefresh: () => Promise<void> }) {
   useConsoleLanguage();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -303,12 +306,12 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
       </BatchBar>
       <div className="table-wrap"><table className="data-table cards node-table"><thead><tr><th className="check"><input type="checkbox" aria-label={t("选择全部节点")} checked={allSelected} onChange={(event) => setSelected(event.target.checked ? new Set(visible.map((node) => node.id)) : new Set())} /></th><th>{t("节点")}</th><th>{t("状态")}</th><th>Agent</th><th>{t("负载")}</th><th>{t("流量")}</th><th>{t("策略")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visible.map((node) => <tr key={node.id} className={selected.has(node.id) ? "selected" : ""}>
         <td className="check"><input type="checkbox" aria-label={t("选择 {0}", [node.name])} checked={selected.has(node.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(node.id); else next.delete(node.id); return next; })} /></td>
-        <td className="cell-main"><button className="node-detail-trigger" onClick={() => openDetail(node)}><StateDot value={node.status} /><span><b>{node.name}</b><small>{node.ip} · {node.place}</small></span></button></td>
+        <td className="cell-main"><button className="node-detail-trigger" onClick={() => openDetail(node)}><StateDot value={node.status} /><span><b>{breakAfterAt(node.name)}</b><small>{node.ip} · {node.place}</small></span></button></td>
         <td className="cell-status"><Pill value={node.status} /><small>{node.latency} · {node.last_seen}</small></td>
         <td className="m-hide"><b className="mono">{node.version || "—"}</b>{needsUpgrade(node) ? <button className="upgrade-chip" disabled={Boolean(busy)} onClick={() => void operate(node, "upgrade-agent")} title={t("点击升级 Agent")}>{t("升级到 {0}", [targetVersion])}</button> : <small>{node.ssh_user || "root"}@{node.ssh_port || 22}</small>}</td>
         <td className="m-hide">{node.metrics ? <div className="meters"><Meter label="CPU" value={node.metrics.cpuPercent} /><Meter label={t("内存")} value={node.metrics.memory.percent} /><Meter label={t("磁盘")} value={node.metrics.disk.percent} /></div> : <span className="muted">{t("暂无指标")}</span>}</td>
         <td className="m-hide nowrap" title={trafficTitle(node)}>{trafficCell(node)}</td>
-        <td className="m-hide nowrap"><b>{node.deployment_policy === "custom" ? t("自定义") : node.deployment_policy === "agent-only" ? t("仅 Agent") : node.deployment_policy === "standard" || !node.deployment_policy ? t("标准") : node.deployment_policy}</b><small>{t("策略 v")}{node.policy_version || 0}</small></td>
+        <td className="m-hide"><b>{node.deployment_policy === "custom" ? t("自定义") : node.deployment_policy === "agent-only" ? t("仅 Agent") : node.deployment_policy === "standard" || !node.deployment_policy ? t("标准") : node.deployment_policy}</b><small>{t("策略 v")}{node.policy_version || 0}</small></td>
         <td className="align-right cell-actions"><div className="row-actions"><button className="button ghost small" onClick={() => openDetail(node)}>{node.status === "provisioning" ? t("部署进度") : t("详情")}</button>{rowMenu(node)}</div></td>
       </tr>)}</tbody></table></div>
       {!visible.length && (loading && !nodes.length ? <div className="skeleton-block" role="status" aria-label={t("正在加载节点")}><i /><i /><i /></div> : nodes.length ? <Empty action={<button className="button ghost" onClick={() => { setSearch(""); setFilter("all"); }}>{t("清除筛选")}</button>}>{t("没有符合条件的节点。")}</Empty> : <Empty action={regions.length ? <button className="button primary" onClick={openCreate}>{t("添加第一台节点")}</button> : <a className="button primary" href="#/regions">{t("先创建区域")}</a>}>{t("尚未部署节点。")}</Empty>)}

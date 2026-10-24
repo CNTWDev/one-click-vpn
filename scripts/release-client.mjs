@@ -5,9 +5,10 @@
 //   npm run release:client -- --platform android --version 1.2.0 --build 12 --min-os "Android 8.0" \
 //     --file clients/android/app/build/outputs/apk/release/app-release.apk --publish
 //
-// --file uploads through a presigned URL (needs VEILBIRD_RELEASE_STORAGE=s3 on the Controller);
-// --url registers an installer already hosted elsewhere. The Controller downloads it once to verify.
-import { createHash } from "node:crypto";
+// --file uploads to whatever storage the Controller uses: a presigned URL with VEILBIRD_RELEASE_STORAGE=s3, otherwise
+// ordered chunks to its data volume (the default). --url registers an installer already hosted elsewhere
+// (or an App Store / TestFlight link with --distribution). The Controller verifies what it records.
+import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -25,21 +26,37 @@ if (!api || !token) fail("Set VEILBIRD_RELEASE_API (Controller origin) and VEILB
 if (!args.platform || !args.version || !args.build || !args["min-os"] || (!args.file && !args.url)) fail("Required: --platform --version --build --min-os and --file or --url");
 const arch = args.arch || (args.platform === "windows" ? "x64" : "universal"), build = Number(args.build);
 
-async function call(pathname, body) {
+async function call(pathname, body, { allow = [] } = {}) {
   const response = await fetch(`${api}${pathname}`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) fail(`${pathname}: HTTP ${response.status} ${data.error || data.code || ""}`);
+  if (!response.ok && !allow.includes(data.code)) fail(`${pathname}: HTTP ${response.status} ${data.error || data.code || ""}`);
   return data;
+}
+
+/** Local storage: the same ordered chunks the Console sends, each below the default Nginx body limit. */
+async function uploadChunks(bytes, fields) {
+  const chunk = 8 * 1024 * 1024, upload = randomUUID();
+  for (let offset = 0; ; offset += chunk) {
+    const final = offset + chunk >= bytes.byteLength;
+    const query = new URLSearchParams({ ...fields, build: String(fields.build), upload, offset: String(offset), ...(final ? { final: "1" } : {}) });
+    const response = await fetch(`${api}/api/v1/admin/client-releases/files?${query}`, { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/octet-stream" }, body: bytes.subarray(offset, offset + chunk) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) fail(`Upload failed: HTTP ${response.status} ${data.error || data.code || ""}`);
+    if (final) return data.storageKey;
+  }
 }
 
 const release = { platform: args.platform, arch, channel: args.channel, version: args.version, build, minOs: args["min-os"], notes: args.notes, distribution: args.distribution, publish: args.publish };
 if (args.file) {
   const bytes = await readFile(args.file), sha256 = createHash("sha256").update(bytes).digest("hex"), size = bytes.byteLength;
-  const upload = await call("/api/v1/admin/client-releases/uploads", { platform: args.platform, arch, version: args.version, build, fileName: path.basename(args.file) });
-  console.log(`Uploading ${path.basename(args.file)} (${(size / 1048576).toFixed(1)} MB)…`);
-  const put = await fetch(upload.uploadUrl, { method: "PUT", body: bytes });
-  if (!put.ok) fail(`Upload failed: HTTP ${put.status} ${await put.text()}`);
-  Object.assign(release, { storageKey: upload.storageKey, url: upload.publicUrl, sha256, sizeBytes: size });
+  const fields = { platform: args.platform, arch, version: args.version, build, fileName: path.basename(args.file) };
+  const upload = await call("/api/v1/admin/client-releases/uploads", fields, { allow: ["RELEASE_STORAGE_NOT_CONFIGURED"] });
+  console.log(`Uploading ${fields.fileName} (${(size / 1048576).toFixed(1)} MB)…`);
+  if (upload.uploadUrl) {
+    const put = await fetch(upload.uploadUrl, { method: "PUT", body: bytes });
+    if (!put.ok) fail(`Upload failed: HTTP ${put.status} ${await put.text()}`);
+    Object.assign(release, { storageKey: upload.storageKey, url: upload.publicUrl, sha256, sizeBytes: size });
+  } else Object.assign(release, { storageKey: await uploadChunks(bytes, fields), sha256, sizeBytes: size });
 } else release.url = args.url;
 
 console.log("Registering release; the Controller downloads the installer once to verify it…");
