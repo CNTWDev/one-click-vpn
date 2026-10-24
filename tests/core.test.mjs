@@ -42,7 +42,7 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(agent, /add\[add\.index\("-C"\)\] = operation/);
   assert.doesNotMatch(agent, /add\[1\] = operation/);
   assert.match(agent, /\/etc\/wireguard\/northstar\.conf/);
-  assert.match(agent, /agent 2\.10\.0/);
+  assert.match(agent, /agent 2\.11\.0/);
   assert.match(agent, /status-version 3/);
   assert.match(agent, /def openvpn_usage_snapshots/);
   assert.match(agent, /wireguard_usage_snapshots\(\) \+ openvpn_usage_snapshots\(\)/);
@@ -232,7 +232,7 @@ test("Agent operations expose release, recover expired tasks and preserve live t
     assert.equal((await fetch(`${base}/api/nodes/agent-release`)).status, 401);
     const release = await fetch(`${base}/api/nodes/agent-release`, { headers });
     assert.equal(release.status, 200);
-    assert.equal((await release.json()).version, "agent 2.10.0");
+    assert.equal((await release.json()).version, "agent 2.11.0");
     const timestamp = new Date().toISOString();
     await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at)
       VALUES ($1,'Operations','Test','127.0.0.9','root','password','','','',$2,$2)`, [nodeId,timestamp]);
@@ -386,6 +386,45 @@ test("agent heartbeats attribute traffic deltas to the owning credential", integ
     // Later tests count the owner's credentials, so leave none behind.
     const deviceId = (await pool.query("DELETE FROM access_credentials WHERE id = $1 RETURNING device_id", [credentialId])).rows[0]?.device_id;
     if (deviceId) await pool.query("DELETE FROM devices WHERE id = $1", [deviceId]);
+    await pool.end();
+  }
+});
+
+test("node heartbeats accumulate public-interface traffic per UTC month", integrationOptions, async () => {
+  const pool = new pg.Pool({ connectionString: databaseUrl });
+  const json = { "Content-Type": "application/json" };
+  const nodeId = `node_month_${Date.now()}`;
+  const agentToken = `agent-month-${Date.now()}`;
+  const timestamp = new Date().toISOString();
+  const metrics = (network) => ({ collectedAt: new Date().toISOString(), cpuPercent: 1, load1: 0, memory: {}, disk: {}, network });
+  const beat = (network) => fetch(`${base}/api/v1/agent/heartbeat`, { method: "POST", headers: json, body: JSON.stringify({ nodeId, token: agentToken, version: "agent test", metrics: metrics(network) }) });
+  const wan = (wanRxBytes, wanTxBytes, counterEpoch = "boot-1") => ({ rxBytes: 1, txBytes: 1, wanInterface: "eth0", wanRxBytes, wanTxBytes, counterEpoch });
+  try {
+    await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at,agent_token_hash)
+      VALUES ($1,'Monthly','Test','127.0.0.3','root','password','','','',$2,$2,$3)`, [nodeId, timestamp, createHash("sha256").update(agentToken).digest("hex")]);
+    assert.equal((await beat({ rxBytes: 5e9, txBytes: 5e9 })).status, 200); // Agent < 2.11: no public-interface counters, nothing recorded.
+    assert.equal((await pool.query("SELECT 1 FROM node_traffic_monthly WHERE node_id = $1", [nodeId])).rowCount, 0);
+    assert.equal((await beat(wan(9_000, 50_000))).status, 200); // Baseline only: bytes since boot are not attributed to this month.
+    assert.equal((await beat(wan(10_000, 80_000))).status, 200);
+    assert.equal((await beat(wan(400, 700, "boot-2"))).status, 200); // Reboot: counters restart from zero.
+    assert.equal((await beat(wan(100, 200, "boot-2"))).status, 200); // Counter reset without reboot.
+    const month = new Date().toISOString().slice(0, 7);
+    const rows = (await pool.query("SELECT month, rx_bytes::text, tx_bytes::text FROM node_traffic_monthly WHERE node_id = $1", [nodeId])).rows;
+    assert.deepEqual(rows, [{ month, rx_bytes: String(1_000 + 400 + 100), tx_bytes: String(30_000 + 700 + 200) }]);
+    const login = await fetch(`${base}/api/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ email: "owner@example.com", password: "test-password-123" }) });
+    const listed = await fetch(`${base}/api/nodes`, { headers: { Cookie: login.headers.get("set-cookie").split(";")[0] } });
+    const node = (await listed.json()).nodes.find((item) => item.id === nodeId);
+    assert.equal(node.monthlyTraffic.month, month);
+    assert.equal(node.monthlyTraffic.rxBytes, 1_500);
+    assert.equal(node.monthlyTraffic.txBytes, 30_900);
+    assert.equal(node.metrics.network.wanTxBytesPerSecond, undefined); // Back-to-back beats are too close for a meaningful rate.
+    await pool.query("UPDATE node_network_counters SET observed_at = now() - interval '30 seconds' WHERE node_id = $1", [nodeId]);
+    assert.equal((await beat(wan(30_100, 3_000_200, "boot-2"))).status, 200);
+    const rated = (await (await fetch(`${base}/api/nodes`, { headers: { Cookie: login.headers.get("set-cookie").split(";")[0] } })).json()).nodes.find((item) => item.id === nodeId);
+    assert.ok(Math.abs(rated.metrics.network.wanRxBytesPerSecond - 1_000) <= 40);
+    assert.ok(Math.abs(rated.metrics.network.wanTxBytesPerSecond - 100_000) <= 4_000);
+  } finally {
+    await pool.query("DELETE FROM nodes WHERE id = $1", [nodeId]);
     await pool.end();
   }
 });

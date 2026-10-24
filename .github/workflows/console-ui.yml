@@ -24,7 +24,7 @@ jobs:
       # Browser tests run only when VEILBIRD_TEST_PLAYWRIGHT points at playwright-core; it is not a project dependency.
       - run: npm install --no-save playwright-core@1.56 && npx playwright-core install --with-deps chromium
       - name: Layout and locale checks (Console and Portal, zh/en/ru, desktop to phone widths)
-        run: node --test tests/console-layout.test.mjs tests/console-i18n-ui.test.mjs tests/portal-layout.test.mjs tests/portal-i18n-ui.test.mjs
+        run: node --test tests/console-layout.test.mjs tests/console-i18n-ui.test.mjs tests/portal-layout.test.mjs tests/portal-i18n-ui.test.mjs tests/portal-password-reset-ui.test.mjs
         env:
           VEILBIRD_TEST_PLAYWRIGHT: ${{ github.workspace }}/node_modules/playwright-core/index.mjs
           VEILBIRD_LAYOUT_SHOTS: ${{ runner.temp }}/console-layout

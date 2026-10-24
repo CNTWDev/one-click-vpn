@@ -88,7 +88,7 @@ export type NodeMetrics = {
   load1: number;
   memory: { usedBytes: number; totalBytes: number; percent: number };
   disk: { usedBytes: number; totalBytes: number; percent: number };
-  network: { rxBytes: number; txBytes: number; rxBytesPerSecond: number; txBytesPerSecond: number };
+  network: { rxBytes: number; txBytes: number; rxBytesPerSecond: number; txBytesPerSecond: number; wanRxBytesPerSecond?: number; wanTxBytesPerSecond?: number };
 };
 
 export type NodeRecord = {
@@ -114,7 +114,11 @@ export type NodeRecord = {
   deployment_policy?: string;
   policy_version?: number;
   metrics?: NodeMetrics | null;
+  monthlyTraffic?: NodeMonthlyTraffic | null;
 };
+
+/** Public-interface bytes for the current UTC calendar month; tx (outbound) is what most clouds bill. */
+export type NodeMonthlyTraffic = { month: string; rxBytes: number; txBytes: number; trackedSince: string };
 
 export type Region = { id: string; name: string; country: string; code: string };
 
@@ -209,4 +213,9 @@ export type ControllerInfo = {
   runtime: { uptimeSeconds: number; nodeVersion: string; rssBytes: number; heapUsedBytes: number; load1: number; observedAt: string };
 };
 
-export type OperationalLogLine = { timestamp: string; labels: Record<string, string>; message: string; actionId?: string };
+export type OperationalLogLine = {
+  timestamp: string; labels: Record<string, string>; message: string;
+  traceId?: string; actionId?: string; action?: string;
+  actor?: { id: string; email?: string; role?: string }; target?: { type?: string; id?: string };
+  ip?: string; request?: string; details?: Record<string, unknown>;
+};

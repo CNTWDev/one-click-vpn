@@ -73,6 +73,8 @@ esac
 "$SCRIPT_DIR/check-env.sh"
 
 export VEILBIRD_BUILD_REV=$(git rev-parse --short HEAD)
+# A changed Loki config is a bind mount Compose cannot see; its checksum makes "up -d loki" recreate it.
+export VEILBIRD_LOKI_CONFIG_SHA=$(cksum < deploy/loki/loki.yml | cut -d ' ' -f 1)
 echo "Deploying build $VEILBIRD_BUILD_REV (service: $service)"
 
 echo "Starting PostgreSQL and waiting for it to become healthy..."
@@ -114,7 +116,10 @@ wait_for_healthy() {
 
 wait_for_healthy db
 echo "PostgreSQL is healthy. Preparing internal operational-log storage..."
-compose up -d minio minio-init
+compose up -d minio
+# Re-run the one-shot bucket setup on every deploy: an exit code from an earlier run says nothing
+# about whether the bucket still exists, and Loki crash-loops without it.
+compose up -d --force-recreate minio-init
 
 minio_init_id=$(compose ps --all --quiet minio-init)
 if [ -z "$minio_init_id" ]; then
@@ -225,6 +230,48 @@ if command -v curl >/dev/null 2>&1; then
       ;;
   esac
 fi
+
+# Runtime logs are optional for recovery, so a log store problem is a warning, not a failed deploy.
+loki_ready=""
+loki_crashed=""
+check_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+check_deadline=$(( $(date +%s) + 60 ))
+while :; do
+  elapsed=$(( 60 - (check_deadline - $(date +%s)) ))
+  if [ -t 1 ]; then
+    printf '\rChecking the log service (Loki)... %ss / 60s ' "$elapsed"
+  elif [ -z "${check_announced:-}" ]; then
+    echo "Checking the log service (Loki), up to 60 seconds..."
+    check_announced="yes"
+  fi
+  if compose exec -T veilbird node -e "fetch('http://loki:3100/ready',{signal:AbortSignal.timeout(2000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" </dev/null >/dev/null 2>&1; then
+    loki_ready="yes"
+    break
+  fi
+  # A startup error will not fix itself by waiting: report it right away.
+  if compose logs --no-color --since "$check_started" loki 2>/dev/null | grep -q "error running loki"; then
+    loki_crashed="yes"
+    break
+  fi
+  [ "$(date +%s)" -lt "$check_deadline" ] || break
+  sleep 1
+done
+if [ -t 1 ]; then echo ""; fi
+if [ -n "$loki_ready" ]; then
+  echo "Log service (Loki) is ready."
+else
+  echo "Warning: the log service (Loki) is not ready; Console Runtime logs stay empty until it is." >&2
+  compose ps --all loki minio minio-init >&2 || true
+  echo "Recent Loki output:" >&2
+  if [ -n "$loki_crashed" ]; then
+    compose logs --no-color --since "$check_started" loki 2>/dev/null | grep "error running loki" | tail -n 1 >&2 || true
+  else
+    compose logs --no-color --tail=40 loki >&2 || true
+  fi
+fi
+
+# Cleanup runs only after a healthy deploy, so a failed one still has its previous images.
+sh "$SCRIPT_DIR/prune-docker.sh" || echo "Warning: Docker cleanup failed; deployment is unaffected." >&2
 
 compose ps
 echo "Northstar deployment is healthy (service: $service)."

@@ -543,10 +543,6 @@
     "Deletion request accepted. The log service removes physical data asynchronously.",
     "Запрос удаления принят. Служба журналов удалит данные асинхронно."
   ],
-  "查询 Controller、Agent、部署和配置同步日志，用于定位节点故障。": [
-    "Search Controller, Agent, deployment and synchronization logs to diagnose node failures.",
-    "Поиск по журналам Controller, Agent, развёртывания и синхронизации для диагностики узлов."
-  ],
   "加载中…": [
     "Loading…",
     "Загрузка…"
@@ -562,14 +558,6 @@
   "日志": [
     "Logs",
     "Журналы"
-  ],
-  "运行日志存储尚未启用或当前不可用；这不会阻塞节点恢复操作。": [
-    "Log storage is disabled or unavailable. Node recovery is not blocked.",
-    "Хранилище журналов отключено или недоступно. Восстановление узлов не блокируется."
-  ],
-  "搜索消息、节点或 action ID": [
-    "Search messages, nodes or action IDs",
-    "Поиск сообщений, узлов или ID действий"
   ],
   "全部节点 / Controller": [
     "All nodes / Controller",
@@ -921,7 +909,7 @@
   ],
   "自定义": [
     "Custom",
-    "Пользовательский"
+    "Свой"
   ],
   "仅 Agent": [
     "Agent only",
@@ -1158,10 +1146,6 @@
   "资源": [
     "Resources",
     "Ресурсы"
-  ],
-  "内存 {0}% · 网络 ↓ {1}/s": [
-    "Memory {0}% · Network ↓ {1}/s",
-    "Память {0}% · Сеть ↓ {1}/с"
   ],
   "等待心跳上报": [
     "Waiting for heartbeat",
@@ -2614,5 +2598,253 @@
   "{0} 个节点": [
     "{0} servers",
     "Серверов: {0}"
+  ],
+  "本月流量": [
+    "This month",
+    "За месяц"
+  ],
+  "本月出站流量": [
+    "Outbound this month",
+    "Исходящий за месяц"
+  ],
+  "升级 Agent 后统计": [
+    "Upgrade Agent to track",
+    "Обновите Agent"
+  ],
+  "公网网卡流量，按 UTC 自然月累计，自 {0} 起": [
+    "Public interface traffic per UTC calendar month, tracked since {0}",
+    "Трафик внешнего интерфейса за календарный месяц (UTC), учёт с {0}"
+  ],
+  "出 {0}": [
+    "Out {0}",
+    "Исх. {0}"
+  ],
+  "入 {0}": [
+    "In {0}",
+    "Вх. {0}"
+  ],
+  "记录用户关键操作和系统事件。点请求或任务 ID，可查看同一次操作的全部日志。": [
+    "Key user actions and system events. Select a request or task ID to see every line from that operation.",
+    "Ключевые действия пользователей и системные события. Нажмите ID запроса или задачи, чтобы увидеть все записи этой операции."
+  ],
+  "日志服务（Loki）当前不可用。在服务器上运行 sudo ./one-click-update.sh 可自动修复；节点恢复操作不受影响。": [
+    "The log service (Loki) is unavailable. Run sudo ./one-click-update.sh on the server to repair it; node recovery is not affected.",
+    "Служба журналов (Loki) недоступна. Запустите на сервере sudo ./one-click-update.sh для восстановления; восстановление узлов это не блокирует."
+  ],
+  "搜索消息、用户、IP 或请求 ID": [
+    "Search text, user, IP or ID",
+    "Текст, пользователь, IP, ID"
+  ],
+  "来源": [
+    "Source",
+    "Источник"
+  ],
+  "全部来源": [
+    "All sources",
+    "Все источники"
+  ],
+  "用户操作": [
+    "User actions",
+    "Действия пользователей"
+  ],
+  "系统事件": [
+    "System events",
+    "Системные события"
+  ],
+  "部署": [
+    "Deployment",
+    "Развёртывание"
+  ],
+  "配置同步": [
+    "Config sync",
+    "Синхронизация конфигурации"
+  ],
+  "关键操作": [
+    "Key action",
+    "Ключевое действие"
+  ],
+  "未登录用户": [
+    "Signed-out user",
+    "Неавторизованный пользователь"
+  ],
+  "查看同一请求的全部日志": [
+    "Show every line from this request",
+    "Показать все записи этого запроса"
+  ],
+  "查看同一任务的全部日志": [
+    "Show every line from this task",
+    "Показать все записи этой задачи"
+  ],
+  "请求": [
+    "Request",
+    "Запрос"
+  ],
+  "任务": [
+    "Task",
+    "Задача"
+  ],
+  "{0}（请求 ID {1}）": [
+    "{0} (request ID {1})",
+    "{0} (ID запроса {1})"
+  ],
+  "网速": [
+    "Speed",
+    "Скорость"
+  ],
+  "升级 Agent 后显示": [
+    "Upgrade Agent to show",
+    "Обновите Agent"
+  ],
+  "公网网卡近 30 秒平均速率": [
+    "Public interface, average over the last 30 s",
+    "Публичный интерфейс, среднее за 30 с"
+  ],
+  "实时出站网速": [
+    "Current outbound speed",
+    "Текущая исходящая скорость"
+  ],
+  "内存 {0}% · 磁盘 {1}%": [
+    "Memory {0}% · Disk {1}%",
+    "Память {0}% · Диск {1}%"
+  ],
+  "流量": [
+    "Traffic",
+    "Трафик"
+  ],
+  "本月 {0}": [
+    "Month {0}",
+    "Месяц {0}"
+  ],
+  "近 30 秒：出 {0} · 入 {1}": [
+    "Last 30 s: out {0} · in {1}",
+    "За 30 с: исх. {0} · вх. {1}"
+  ],
+  "本月：出 {0} · 入 {1}（UTC 自然月，自 {2} 起）": [
+    "This month: out {0} · in {1} (UTC calendar month, since {2})",
+    "За месяц: исх. {0} · вх. {1} (месяц UTC, с {2})"
+  ],
+  "重置密码链接": [
+    "Password reset link",
+    "Ссылка для сброса пароля"
+  ],
+  "发给 {0}，对方打开后自己设置新密码。24 小时内有效，只能使用一次。": [
+    "Send this to {0}. They open it and choose a new password. Works once, expires in 24 hours.",
+    "Отправьте её {0}: по ссылке пользователь сам задаст новый пароль. Одноразовая, действует 24 часа."
+  ],
+  "复制链接": [
+    "Copy link",
+    "Скопировать ссылку"
+  ],
+  "重置链接已复制。": [
+    "Reset link copied.",
+    "Ссылка скопирована."
+  ],
+  "浏览器无法访问剪贴板，请手动复制链接。": [
+    "The browser can't access the clipboard. Copy the link manually.",
+    "Браузер не может открыть буфер обмена. Скопируйте ссылку вручную."
+  ],
+  "邮件设置已保存，建议发送一封测试邮件。": [
+    "Mail settings saved. Send a test email to check them.",
+    "Настройки почты сохранены. Отправьте тестовое письмо для проверки."
+  ],
+  "测试邮件已发送到 {0}，请检查收件箱。": [
+    "Test email sent to {0}. Check the inbox.",
+    "Тестовое письмо отправлено на {0}. Проверьте входящие."
+  ],
+  "发送失败：{0}": [
+    "Sending failed: {0}",
+    "Не удалось отправить: {0}"
+  ],
+  "停用邮件发送": [
+    "Turn off email",
+    "Отключить отправку почты"
+  ],
+  "停用后，用户忘记密码时需联系管理员获取重置链接。": [
+    "Users who forget their password will need to ask an administrator for a reset link.",
+    "Пользователям, забывшим пароль, придётся просить ссылку для сброса у администратора."
+  ],
+  "邮件发送已停用。": [
+    "Email turned off.",
+    "Отправка почты отключена."
+  ],
+  "邮件发送": [
+    "Email",
+    "Почта"
+  ],
+  "用于用户在 Portal 自助找回密码。": [
+    "Lets users reset a forgotten password from the Portal.",
+    "Позволяет пользователям самим сбросить забытый пароль в Portal."
+  ],
+  "服务商": [
+    "Provider",
+    "Провайдер"
+  ],
+  "阿里云邮件推送": [
+    "Alibaba Cloud DirectMail",
+    "Alibaba Cloud DirectMail"
+  ],
+  "其他 SMTP 服务": [
+    "Other SMTP service",
+    "Другой SMTP-сервис"
+  ],
+  "SMTP 服务器": [
+    "SMTP server",
+    "SMTP-сервер"
+  ],
+  "SMTP 端口": [
+    "SMTP port",
+    "SMTP-порт"
+  ],
+  "海外区域请改为对应地址，例如新加坡：smtpdm-ap-southeast-1.aliyun.com。": [
+    "For other regions use the regional server, e.g. Singapore: smtpdm-ap-southeast-1.aliyun.com.",
+    "Для других регионов укажите региональный сервер, например Сингапур: smtpdm-ap-southeast-1.aliyun.com."
+  ],
+  "发信地址": [
+    "Sender address",
+    "Адрес отправителя"
+  ],
+  "发件人名称": [
+    "Sender name",
+    "Имя отправителя"
+  ],
+  "SMTP 密码": [
+    "SMTP password",
+    "Пароль SMTP"
+  ],
+  "在阿里云邮件推送控制台创建发信地址并设置 SMTP 密码，发信域名需完成 SPF / DKIM 验证。": [
+    "Create the sender address and its SMTP password in the DirectMail console. The sending domain must pass SPF / DKIM verification.",
+    "Создайте адрес отправителя и SMTP-пароль в консоли DirectMail. Домен отправки должен пройти проверку SPF / DKIM."
+  ],
+  "发送中…": [
+    "Sending…",
+    "Отправка…"
+  ],
+  "发送测试邮件": [
+    "Send test email",
+    "Отправить тестовое письмо"
+  ],
+  "留空则保持不变": [
+    "Leave blank to keep",
+    "Пусто — без изменений"
+  ],
+  "分页": [
+    "Pagination",
+    "Страницы"
+  ],
+  "第 {0}–{1} 条": [
+    "{0}–{1}",
+    "{0}–{1}"
+  ],
+  "第 {0}–{1} 条，共 {2} 条": [
+    "{0}–{1} of {2}",
+    "{0}–{1} из {2}"
+  ],
+  "上一页": [
+    "Previous",
+    "Назад"
+  ],
+  "下一页": [
+    "Next",
+    "Далее"
   ]
 }

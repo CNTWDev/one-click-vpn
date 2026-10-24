@@ -2,12 +2,13 @@ import { timingSafeEqual } from "node:crypto";
 import { findNode, updateNode } from "./db";
 import { hashToken } from "./crypto";
 import { updateNodeControlMetadata } from "./control-db";
+import { recordNodeNetworkCounters, type NodeNetworkRate } from "./node-traffic";
 
 function metricNumber(value: unknown, max = Number.MAX_SAFE_INTEGER): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : 0;
 }
 
-function normalizeMetrics(input: unknown): string | null {
+function normalizeMetrics(input: unknown, wanRate: NodeNetworkRate | null): string | null {
   if (!input || typeof input !== "object" || Array.isArray(input)) return null;
   const value = input as Record<string, unknown>;
   const memory = value.memory && typeof value.memory === "object" ? value.memory as Record<string, unknown> : {};
@@ -22,6 +23,7 @@ function normalizeMetrics(input: unknown): string | null {
     network: {
       rxBytes: metricNumber(network.rxBytes), txBytes: metricNumber(network.txBytes),
       rxBytesPerSecond: metricNumber(network.rxBytesPerSecond), txBytesPerSecond: metricNumber(network.txBytesPerSecond),
+      ...(wanRate ? { wanRxBytesPerSecond: wanRate.rxBytesPerSecond, wanTxBytesPerSecond: wanRate.txBytesPerSecond } : {}),
     },
   });
 }
@@ -56,7 +58,9 @@ export async function recordAgentHeartbeat(input: {
   metrics?: unknown;
   activeUsers?: number;
 }): Promise<void> {
-  const normalizedMetrics = input.metrics === undefined ? undefined : normalizeMetrics(input.metrics);
+  // Rate comes from the stored public-interface sample, so it is overwritten each heartbeat and adds no rows.
+  const wanRate = input.metrics === undefined ? null : await recordNodeNetworkCounters(input.nodeId, input.metrics);
+  const normalizedMetrics = input.metrics === undefined ? undefined : normalizeMetrics(input.metrics, wanRate);
   await updateNode(input.nodeId, {
     status: "online",
     last_seen: "now",

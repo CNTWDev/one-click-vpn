@@ -99,6 +99,11 @@ CREATE TABLE IF NOT EXISTS controller_settings (
   location_label TEXT NOT NULL DEFAULT '', latitude DOUBLE PRECISION, longitude DOUBLE PRECISION,
   location_source TEXT NOT NULL DEFAULT 'unset', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mail_settings (
+  id TEXT PRIMARY KEY CHECK (id = 'primary'), provider TEXT NOT NULL, host TEXT NOT NULL, port INTEGER NOT NULL,
+  username TEXT NOT NULL, from_name TEXT NOT NULL DEFAULT '', password_ciphertext TEXT NOT NULL,
+  password_iv TEXT NOT NULL, password_tag TEXT NOT NULL, updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS node_actions (
   id TEXT PRIMARY KEY, node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   action TEXT NOT NULL, status TEXT NOT NULL, output TEXT NOT NULL DEFAULT '',
@@ -407,6 +412,15 @@ CREATE TABLE IF NOT EXISTS native_diagnostics (
   code TEXT NOT NULL, node_id TEXT, occurred_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS native_diagnostics_recent ON native_diagnostics(created_at DESC);
+CREATE TABLE IF NOT EXISTS node_network_counters (
+  node_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, interface TEXT NOT NULL, counter_epoch TEXT NOT NULL,
+  rx_bytes BIGINT NOT NULL, tx_bytes BIGINT NOT NULL, observed_at TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE IF NOT EXISTS node_traffic_monthly (
+  node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, month TEXT NOT NULL,
+  rx_bytes BIGINT NOT NULL DEFAULT 0, tx_bytes BIGINT NOT NULL DEFAULT 0,
+  tracked_since TIMESTAMPTZ NOT NULL, updated_at TIMESTAMPTZ NOT NULL, PRIMARY KEY (node_id, month)
+);
 `;
 
 try {

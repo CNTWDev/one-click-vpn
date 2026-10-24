@@ -19,14 +19,15 @@ const regions = [
   { id: "r4", name: "Malaysia", country: "Malaysia", code: "MY" },
   { id: "r5", name: "São Paulo Metropolitan Area", country: "Brazil", code: "BR" },
 ];
-const metrics = (cpu, mem, disk) => ({ collectedAt: now, cpuPercent: cpu, load1: cpu / 25, memory: { usedBytes: mem * 0.08 * GB, totalBytes: 8 * GB, percent: mem }, disk: { usedBytes: disk * 0.4 * GB, totalBytes: 40 * GB, percent: disk }, network: { rxBytes: 9e9, txBytes: 7e9, rxBytesPerSecond: 120000, txBytesPerSecond: 98000 } });
-const node = (id, name, region, ip, user, port, extra = {}) => ({ id, name, place: regions.find((r) => r.id === region).name, region_id: region, ip, ssh_user: user, ssh_port: port, ssh_privilege_mode: "auto", credential_type: "private_key", status: "online", latency: "38 ms", users: 3, traffic: "12.4 GB", version: "agent 2.10.0", last_seen: "now", host_fingerprint: "SHA256:" + "x".repeat(43), host_fingerprint_source: "ssh_tofu", node_identity: "node-" + id, identity_verified_at: now, deployment_policy: "standard", policy_version: 2, metrics: metrics(2, 17, 3), ...extra });
+const metrics = (cpu, mem, disk, wanTx = 1.6e6, wanRx = 1.4e6) => ({ collectedAt: now, cpuPercent: cpu, load1: cpu / 25, memory: { usedBytes: mem * 0.08 * GB, totalBytes: 8 * GB, percent: mem }, disk: { usedBytes: disk * 0.4 * GB, totalBytes: 40 * GB, percent: disk }, network: { rxBytes: 9e9, txBytes: 7e9, rxBytesPerSecond: 120000, txBytesPerSecond: 98000, wanRxBytesPerSecond: wanRx, wanTxBytesPerSecond: wanTx } });
+const monthly = (rxGb, txGb) => ({ month: now.slice(0, 7), rxBytes: rxGb * GB, txBytes: txGb * GB, trackedSince: now.slice(0, 8) + "01T00:00:04Z" });
+const node = (id, name, region, ip, user, port, extra = {}) => ({ id, name, place: regions.find((r) => r.id === region).name, region_id: region, ip, ssh_user: user, ssh_port: port, ssh_privilege_mode: "auto", credential_type: "private_key", status: "online", latency: "38 ms", users: 3, traffic: "12.4 GB", version: "agent 2.10.0", last_seen: "now", host_fingerprint: "SHA256:" + "x".repeat(43), host_fingerprint_source: "ssh_tofu", node_identity: "node-" + id, identity_verified_at: now, deployment_policy: "standard", policy_version: 2, metrics: metrics(2, 17, 3), monthlyTraffic: monthly(412.6, 438.9), ...extra });
 const nodes = [
   node("n1", "13.245.35.167@Cape Town", "r1", "13.245.35.167", "root", 10022, { metrics: metrics(2, 17, 3) }),
-  node("n2", "190.92.202.34@Singapore", "r2", "190.92.202.34", "root", 22, { metrics: metrics(3, 16, 18) }),
-  node("n3", "3.139.105.5(US)", "r3", "3.139.105.5", "ubuntu", 22, { metrics: metrics(2, 48, 3) }),
+  node("n2", "190.92.202.34@Singapore", "r2", "190.92.202.34", "root", 22, { metrics: metrics(3, 16, 18, 117.6e6, 112.9e6), monthlyTraffic: monthly(1843.2, 1907.5) }),
+  node("n3", "3.139.105.5(US)", "r3", "3.139.105.5", "ubuntu", 22, { metrics: metrics(2, 48, 3, 90, 40), monthlyTraffic: monthly(0.004, 0.006) }),
   node("n4", "Johor-bytedance", "r4", "101.47.28.201", "root", 22, { metrics: metrics(100, 94, 71) }),
-  node("n5", "sao-paulo-edge-gateway-primary-with-a-very-long-hostname", "r5", "2001:db8:85a3::8a2e:370:7334", "administrator", 65022, { status: "offline", last_seen: "2 days ago", metrics: null, deployment_policy: "custom", policy_version: 1, version: "agent 2.9.4" }),
+  node("n5", "sao-paulo-edge-gateway-primary-with-a-very-long-hostname", "r5", "2001:db8:85a3::8a2e:370:7334", "administrator", 65022, { status: "offline", last_seen: "2 days ago", metrics: null, monthlyTraffic: null, deployment_policy: "custom", policy_version: 1, version: "agent 2.9.4" }),
 ];
 
 const services = nodes.slice(0, 4).flatMap((n) => [
@@ -66,9 +67,12 @@ const subscriptions = [
 ];
 
 const logs = [
-  { timestamp: ago(1), labels: { node: "n1", level: "info", service: "agent" }, message: "heartbeat ok · reconcile revision 14 applied (wireguard, vless, openvpn)" },
-  { timestamp: ago(3), labels: { node: "n4", level: "error", service: "xray" }, message: "failed to bind 0.0.0.0:443: address already in use; a very long log line continues here with stack details /usr/local/bin/xray run -config /etc/northstar/xray/config.json", actionId: "act_1" },
-  { timestamp: ago(8), labels: { node: "n2", level: "warning", service: "agent" }, message: "disk usage above 80% on /var/lib/docker" },
+  { timestamp: ago(1), labels: { node: "n4", level: "info", component: "audit", source: "user" }, message: "node.upgrade-agent.queued", action: "node.upgrade-agent.queued", traceId: "5708c90d6f874045", actor: { id: "u2", email: "aleksandra.konstantinopolskaya@very-long-company-domain.example", role: "admin" }, target: { type: "node", id: "n4" }, ip: "2001:db8:85a3::8a2e:370:7334", request: "POST /api/nodes/n4/actions" },
+  { timestamp: ago(2), labels: { node: "n4", level: "info", component: "bootstrap", source: "system" }, message: "Uploading Agent 2.11.0 and verifying checksum", traceId: "5708c90d6f874045", actionId: "3f1c2a9e-7b44-4d0e-9a51-0c8e2f6d1b7a", details: { phase: "upload", action: "upgrade-agent" } },
+  { timestamp: ago(3), labels: { node: "n4", level: "error", component: "reconcile", source: "system" }, message: "failed to bind 0.0.0.0:443: address already in use; a very long log line continues here with stack details /usr/local/bin/xray run -config /etc/northstar/xray/config.json", traceId: "a7dece2875fe4cfd", details: { taskId: "task_1", status: "failed" } },
+  { timestamp: ago(5), labels: { node: "controller", level: "warning", component: "audit", source: "user" }, message: "auth.login.failed", action: "auth.login.failed", traceId: "e19824c3836d45af", ip: "198.51.100.7", request: "POST /api/auth/login", details: { metadata: { email: "unknown@example.com" } } },
+  { timestamp: ago(8), labels: { node: "controller", level: "warning", component: "api", source: "user" }, message: "Region code must contain 2 to 8 letters", traceId: "6f06b16223ac4e00", actor: { id: "owner", email: "owner@example.com", role: "owner" }, ip: "127.0.0.1", request: "POST /api/regions" },
+  { timestamp: ago(9), labels: { node: "n2", level: "warning", component: "agent", source: "system" }, message: "disk usage above 80% on /var/lib/docker" },
 ];
 
 const release = (id, platform, channel, version, build, extra = {}) => ({ id, platform, arch: "universal", channel, version, build, status: "published", distribution: "direct", url: `https://downloads.example.com/veilbird/${platform}/${version}/Veilbird-${version}-${platform}-universal-release.bin`, sha256: "a".repeat(64), sizeBytes: 48234567, minOs: platform === "android" ? "Android 8.0" : platform === "windows" ? "Windows 10 1809" : "13.0", notes: "Fixes reconnect after network change.", publishedAt: "2026-10-06T00:00:00Z", createdAt: "2026-10-06T00:00:00Z", createdBy: "release-token", rolloutPercent: channel === "beta" ? 20 : 100, ...extra });
@@ -81,6 +85,8 @@ export function consoleApi({ signedIn = true } = {}) {
     if (pathname === "/api/auth/logout") { session = false; return [200, {}]; }
     if (pathname === "/api/v1/admin/users") return [200, { users }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/credentials$/.test(pathname)) return [200, access];
+    if (pathname === "/api/v1/admin/mail-settings") return [200, { settings: { provider: "aliyun", host: "smtpdm-ap-southeast-1.aliyun.com", port: 465, username: "no-reply@notifications.very-long-company-domain.example", fromName: "Veilbird", passwordSet: true, updatedAt: now } }];
+    if (/^\/api\/v1\/admin\/users\/[^/]+\/password-reset$/.test(pathname)) return [200, { url: `https://app.very-long-subdomain.example.com/#reset=usr_6f1c2d3e-4b5a-6978-8a9b-0c1d2e3f4a5b.1792000000.${"x".repeat(43)}`, expiresAt: "2026-10-24T10:00:00Z" }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/native-access$/.test(pathname)) return [200, { enabled: true, devices: [], credentials: [] }];
     if (pathname === "/api/nodes") return [200, { nodes }];
     if (pathname === "/api/nodes/agent-release") return [200, { version: "2.10.0", revision: "test" }];
@@ -90,7 +96,7 @@ export function consoleApi({ signedIn = true } = {}) {
     if (pathname === "/api/vpn-services") return [200, { services }];
     if (pathname === "/api/deployment-policy") return [200, { standard: { version: 2, protocols: [{ protocol: "wireguard", transport: "udp", listenPort: 51820, configSchemaVersion: 1 }, { protocol: "vless", transport: "tcp", listenPort: 443, configSchemaVersion: 2 }, { protocol: "openvpn", transport: "udp", listenPort: 1194, configSchemaVersion: 1 }] }, counts: { totalNodes: 5, standardNodes: 4, customNodes: 1, agentOnlyNodes: 0, driftedNodes: 1, eligibleNodes: 1, blockedNodes: 0 }, driftedNodes: [{ id: "n5", name: nodes[4].name, currentVersion: 1, status: "offline", missingProtocols: ["vless"], eligible: false, reason: "Node is offline" }], rollouts: [{ id: "ro_1", fromVersion: 1, toVersion: 2, mode: "auto", status: "completed", totalTargets: 4, queuedTargets: 0, succeededTargets: 4, blockedTargets: 0, failedTargets: 0, createdAt: ago(3000) }] }];
     if (pathname === "/api/reality-defaults") return [200, { mode: "auto", serverName: "www.microsoft.com", candidates: ["www.microsoft.com", "www.apple.com", "dl.google.com"], checkedAt: now, updatedAt: now }];
-    if (pathname === "/api/logs") return [200, { logs, available: true }];
+    if (pathname === "/api/logs") return [200, { logs, available: true, nextCursor: "1792725817388486405", counts: { info: 11804, warning: 427, error: 39 } }];
     if (pathname.endsWith("/subscriptions")) return [200, { subscriptions, nodes: [] }];
     if (pathname === "/api/v1/admin/client-releases") return [200, {
       releases: [release("rel_1", "android", "beta", "1.2.0", 12), release("rel_2", "android", "stable", "1.1.3", 11), release("rel_3", "windows", "stable", "1.1.3", 11, { distribution: "external" }), release("rel_4", "macos", "beta", "1.2.0-rc.1", 12, { status: "withdrawn" }), release("rel_5", "ios", "stable", "1.1.3", 11, { distribution: "app_store", url: "https://apps.apple.com/app/id1234567890" })],

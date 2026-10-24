@@ -169,6 +169,13 @@ together with `sudo ./one-click-update.sh --service all`.
 database backup and do not restart the Controller. Use the full update when a
 change touches dependencies, migrations, Compose configuration, or shared code.
 
+Updates clean up after themselves so the disk does not fill over time: only the
+newest 10 database dumps in `./backups` are kept (`VEILBIRD_BACKUP_KEEP` in `.env`,
+`0` keeps all), each container keeps at most 30 MB of Docker output, and after a
+healthy deploy the untagged images left by the previous build and build cache older
+than 7 days are removed (`VEILBIRD_DOCKER_PRUNE=no` skips this). Copy important
+dumps off the server; they are not a substitute for off-site backups.
+
 When upgrading a legacy single-domain installation, deployment opens a one-time
 domain migration prompt and rewrites only the seven Portal/Admin/API origin keys.
 It backs up `.env` first; passwords and application secrets are preserved.
@@ -238,6 +245,19 @@ Controller host:
 ```bash
 sudo ./scripts/reset-admin-password.sh
 ```
+
+Users who forget their Portal password have two ways back, both through a
+one-time link that stops working once used (nothing is stored in the database):
+
+- **Console → Users → ⋯ → Password reset link** creates a link valid for 24
+  hours. Send it to the user; they choose the new password themselves.
+- **Forgot password?** on the Portal sign-in page emails a link valid for 1
+  hour. Turn it on in **Console → Controller → Email**: pick Alibaba Cloud
+  DirectMail (or any SMTP service), enter the sender address and its SMTP
+  password, save and send a test email. Without it the page asks the user to
+  contact the administrator.
+
+Setting a new password signs the account out of the Portal and native clients.
 
 ## Edge Node bootstrap
 
@@ -433,6 +453,14 @@ existing nodes receive the routing changes without rotating credentials.
   compares encrypted-material fingerprints before decrypting UUIDs. Superseded
   bundles are removed after a one-day grace period once no desired or retryable
   task references them.
+
+### Monthly node traffic and Agent 2.11
+
+Agent 2.11 reports byte counters of the node's default-route (public) interface. The
+Controller accumulates them per UTC calendar month and shows **outbound** (what most clouds
+bill) and inbound per node in Console → 节点运维. Tunnel interfaces are excluded so VPN
+traffic is not counted twice. Counting starts with the first heartbeat after **升级 Agent**;
+reboots and counter resets are handled automatically.
 
 ### Client releases and Agent 2.10
 

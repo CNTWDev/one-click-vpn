@@ -57,7 +57,7 @@ export type NodeMetrics = {
   load1: number;
   memory: { usedBytes: number; totalBytes: number; percent: number };
   disk: { usedBytes: number; totalBytes: number; percent: number };
-  network: { rxBytes: number; txBytes: number; rxBytesPerSecond: number; txBytesPerSecond: number };
+  network: { rxBytes: number; txBytes: number; rxBytesPerSecond: number; txBytesPerSecond: number; wanRxBytesPerSecond?: number; wanTxBytesPerSecond?: number };
 };
 
 export type DbRegion = {
@@ -153,13 +153,18 @@ export async function dbExec(text: string, values: unknown[] = []): Promise<numb
   return (await getDb().query(text, values)).rowCount || 0;
 }
 
-/** Runs `work` in one transaction; `exec` has the same contract as dbExec but uses the transaction's client. */
-export async function withTransaction<T>(work: (exec: (text: string, values?: unknown[]) => Promise<number>) => Promise<T>): Promise<T> {
+type TransactionQuery = <R extends QueryResultRow>(text: string, values?: unknown[]) => Promise<R[]>;
+
+/** Runs `work` in one transaction; `exec`/`query` match dbExec/dbQuery but use the transaction's client. */
+export async function withTransaction<T>(work: (exec: (text: string, values?: unknown[]) => Promise<number>, query: TransactionQuery) => Promise<T>): Promise<T> {
   await ensureReady();
   const client = await getDb().connect();
   try {
     await client.query("BEGIN");
-    const result = await work(async (text, values = []) => (await client.query(text, values)).rowCount || 0);
+    const result = await work(
+      async (text, values = []) => (await client.query(text, values)).rowCount || 0,
+      async <R extends QueryResultRow>(text: string, values: unknown[] = []) => (await client.query<R>(text, values)).rows,
+    );
     await client.query("COMMIT");
     return result;
   } catch (error) {
@@ -511,6 +516,29 @@ export async function addAudit(input: {
     randomUUID(), input.actorUserId || null, input.action, input.targetType || null,
     input.targetId || null, JSON.stringify(input.metadata || {}), now(),
   ]);
+  void mirrorAuditToLog(input);
+}
+
+/** Key user and system actions also go to the operational log, with the actor and request trace. */
+async function mirrorAuditToLog(input: Parameters<typeof addAudit>[0]): Promise<void> {
+  try {
+    const actor = input.actorUserId ? await findUserById(input.actorUserId) : undefined;
+    const metadataNode = typeof input.metadata?.nodeId === "string" ? input.metadata.nodeId : undefined;
+    await writeOperationalLog({
+      component: "audit",
+      level: /\.(failed|blocked|heartbeat_failed)$|\.skipped$|node-pending$/.test(input.action) ? "warning" : "info",
+      message: input.action,
+      action: input.action,
+      nodeId: input.targetType === "node" ? input.targetId : metadataNode,
+      actor: actor ? { id: actor.id, email: actor.email, role: actor.role } : input.actorUserId ? { id: input.actorUserId } : null,
+      target: { type: input.targetType, id: input.targetId },
+      // A failed sign-in has no actor yet but is still someone's action.
+      source: /(^|\.)auth\./.test(input.action) ? "user" : undefined,
+      fields: input.metadata && Object.keys(input.metadata).length ? { metadata: input.metadata } : undefined,
+    });
+  } catch {
+    // The audit row is already committed; the log mirror is best-effort.
+  }
 }
 
 export class NodeBusyError extends Error {

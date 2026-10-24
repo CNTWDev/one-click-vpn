@@ -19,22 +19,37 @@ type User = {
   rejectionReason?: string | null;
 };
 
+type AuthMode = "login" | "register" | "forgot";
+
 export 
-function Auth({ mode, onMode, onUser }: {
-  mode: "login" | "register";
-  onMode: (mode: "login" | "register") => void;
+function Auth({ mode, onMode, onUser, notice }: {
+  mode: AuthMode;
+  onMode: (mode: AuthMode) => void;
   onUser: (user: User) => void;
+  notice?: string;
 }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [form, setForm] = useState({ displayName: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetByEmail, setResetByEmail] = useState<boolean | null>(null);
+  const [resetSent, setResetSent] = useState(false);
+
+  function switchMode(next: AuthMode) {
+    setError(""); setResetSent(false); onMode(next);
+    if (next === "forgot" && resetByEmail === null) void api<{ email: boolean }>("/api/v1/auth/password-reset").then((result) => setResetByEmail(result.email)).catch(() => setResetByEmail(false));
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError("");
     try {
+      if (mode === "forgot") {
+        await api("/api/v1/auth/password-reset", { method: "POST", body: JSON.stringify({ email: form.email, language: locale }) });
+        setResetSent(true);
+        return;
+      }
       if (mode === "register") {
         // Registration never says whether the email already exists, so show the review screen for this address.
         await api<{ status: string }>("/api/v1/auth/register", { method: "POST", body: JSON.stringify(form) });
@@ -53,6 +68,12 @@ function Auth({ mode, onMode, onUser }: {
     }
   }
 
+  const title = mode === "login" ? t("登录 Veilbird") : mode === "register" ? t("申请使用 VPN") : t("找回密码");
+  const subtitle = mode === "login" ? t("使用已审核的账号继续，获取你的订阅链接。") : mode === "register" ? t("提交后由管理员人工审核。")
+    : resetSent ? t("如果该邮箱已注册，重置链接很快会发到邮箱，1 小时内有效。")
+      : resetByEmail === false ? t("请联系管理员，为你生成重置密码的链接。") : t("输入注册邮箱，我们会发送重置链接。");
+  const askEmail = mode !== "forgot" || (resetByEmail && !resetSent);
+
   return <main className="auth-layout">
     <section className="auth-intro">
       <Brand />
@@ -61,16 +82,48 @@ function Auth({ mode, onMode, onUser }: {
       <ul className="trust"><li><b>{t("一份订阅，全部节点")}</b><small>{t("客户端里随时切换，新节点自动出现")}</small></li><li><b>{t("人工审核")}</b><small>{t("仅限受邀和熟悉的用户使用")}</small></li></ul>
     </section>
     <form className="auth-panel" onSubmit={submit}>
-      <h2>{mode === "login" ? t("登录 Veilbird") : t("申请使用 VPN")}</h2>
-      <p className="muted">{mode === "login" ? t("使用已审核的账号继续，获取你的订阅链接。") : t("提交后由管理员人工审核。")}</p>
+      <h2>{title}</h2>
+      <p className="muted" aria-live="polite">{subtitle}</p>
+      {notice && mode === "login" && <p className="inline-success" role="status">{notice}</p>}
       {mode === "register" && <label>{t("称呼")}<input required value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder={t("例如：小王")} /></label>}
-      <label>{t("邮箱")}<input type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="you@example.com" /></label>
-      <label>{t("密码")}<input type="password" minLength={12} required value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={t("至少 12 位")} /></label>
+      {askEmail && <label>{t("邮箱")}<input type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="you@example.com" /></label>}
+      {mode !== "forgot" && <div className="field">
+        <div className="field-head"><label htmlFor="auth-password">{t("密码")}</label>{mode === "login" && <button type="button" className="ghost compact" onClick={() => switchMode("forgot")}>{t("忘记密码？")}</button>}</div>
+        <input id="auth-password" type="password" minLength={12} required value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={t("至少 12 位")} />
+      </div>}
       {error && <p className="inline-error" role="alert">{errorText(error, t)}</p>}
-      <button className="primary large wide" disabled={busy}>{busy ? t("处理中…") : mode === "login" ? t("登录") : t("提交申请")}</button>
-      <button type="button" className="ghost wide" onClick={() => onMode(mode === "login" ? "register" : "login")}>{mode === "login" ? t("还没有账号？申请使用") : t("已有账号？返回登录")}</button>
+      {askEmail && <button className="primary large wide" disabled={busy}>{busy ? t("处理中…") : mode === "login" ? t("登录") : mode === "register" ? t("提交申请") : t("发送重置链接")}</button>}
+      {mode === "forgot" ? <button type="button" className={`${askEmail ? "ghost" : "secondary"} wide`} onClick={() => switchMode("login")}>{t("返回登录")}</button>
+        : <button type="button" className="ghost wide" onClick={() => switchMode(mode === "login" ? "register" : "login")}>{mode === "login" ? t("还没有账号？申请使用") : t("已有账号？返回登录")}</button>}
     </form>
   </main>;
+}
+
+/** Opened from a reset link (/#reset=…). The token stays in the fragment so it never reaches server logs. */
+function ResetPassword({ token, onDone }: { token: string; onDone: (changed: boolean) => void }) {
+  const { t } = useI18n();
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true); setError("");
+    try {
+      await api("/api/v1/auth/password-reset/confirm", { method: "POST", body: JSON.stringify({ token, password }) });
+      onDone(true);
+    } catch (caught) { setError((caught as Error).message); }
+    finally { setBusy(false); }
+  }
+
+  return <main className="center-page"><Brand /><form className="auth-panel" onSubmit={submit}>
+    <h2>{t("设置新密码")}</h2>
+    <p className="muted">{t("设置后，所有设备需要用新密码重新登录。")}</p>
+    <label>{t("新密码")}<input type="password" autoComplete="new-password" minLength={12} required autoFocus value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t("至少 12 位")} /></label>
+    {error && <p className="inline-error" role="alert">{errorText(error, t)}</p>}
+    <button className="primary large wide" disabled={busy}>{busy ? t("处理中…") : t("保存新密码")}</button>
+    <button type="button" className="ghost wide" onClick={() => onDone(false)}>{t("返回登录")}</button>
+  </form></main>;
 }
 
 function Pending({ user, onLogout }: { user: User; onLogout: () => void }) {
@@ -85,11 +138,27 @@ function Pending({ user, onLogout }: { user: User; onLogout: () => void }) {
   </div></main>;
 }
 
+const readResetToken = () => /^#reset=([\w.-]+)$/.exec(window.location.hash)?.[1] || "";
+
 export default function App() {
   const { t } = useI18n();
   const [user, setUser] = useState<User | null>(null);
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<AuthMode>("login");
   const [loading, setLoading] = useState(true);
+  const [resetToken, setResetToken] = useState(readResetToken);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    const follow = () => { const token = readResetToken(); if (token) setResetToken(token); };
+    window.addEventListener("hashchange", follow);
+    return () => window.removeEventListener("hashchange", follow);
+  }, []);
+
+  function finishReset(changed: boolean) {
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    setResetToken(""); setUser(null); setMode("login");
+    setNotice(changed ? t("密码已更新，请用新密码登录。") : "");
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -107,9 +176,10 @@ export default function App() {
     setMode("login");
   }
 
+  if (resetToken) return <><PortalLanguagePicker floating /><ResetPassword token={resetToken} onDone={finishReset} /></>;
   if (user?.status === "active" && !loading) return <CredentialDashboard user={user} onLogout={() => void logout()} />;
   return <><PortalLanguagePicker floating />{loading ? <main className="center-page" aria-busy="true"><Brand /><span className="loader" aria-label={t("正在连接 Veilbird…")} /></main>
-    : !user ? <Auth mode={mode} onMode={setMode} onUser={setUser} /> : <Pending user={user} onLogout={() => void logout()} />}</>;
+    : !user ? <Auth mode={mode} onMode={setMode} onUser={setUser} notice={notice} /> : <Pending user={user} onLogout={() => void logout()} />}</>;
 }
 
 createRoot(document.getElementById("root")!).render(<PortalLanguage><App /></PortalLanguage>);

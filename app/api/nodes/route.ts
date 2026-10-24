@@ -6,6 +6,7 @@ import { cleanText, isValidIp, isValidPort, jsonError, readJson } from "../../..
 import { queueNodeBootstrap } from "../../../server/bootstrap";
 import { initializeVpnServices, type DeploymentTemplate } from "../../../server/vpn-services";
 import { STANDARD_POLICY_VERSION } from "../../../server/deployment-policy";
+import { currentMonthTrafficByNode } from "../../../server/node-traffic";
 import { credentialType as resolveCredentialType, discoverRemoteNode, privilegeMode, validateSshCredential } from "../../../server/remote-ssh";
 
 export const runtime = "nodejs";
@@ -13,7 +14,8 @@ export const runtime = "nodejs";
 export async function GET() {
   const user = await currentUser();
   if (!user) return jsonError("Authentication required", 401);
-  return NextResponse.json({ nodes: (await listNodes()).map(publicNode) });
+  const [nodes, monthlyTraffic] = await Promise.all([listNodes(), currentMonthTrafficByNode()]);
+  return NextResponse.json({ nodes: nodes.map((node) => ({ ...publicNode(node), monthlyTraffic: monthlyTraffic.get(node.id) || null })) });
 }
 
 export async function POST(request: Request) {
