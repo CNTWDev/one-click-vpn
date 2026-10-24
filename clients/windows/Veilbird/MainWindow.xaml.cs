@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
@@ -39,11 +40,17 @@ public partial class MainWindow : Window {
     private readonly DispatcherTimer refresh=new() {Interval=TimeSpan.FromSeconds(1)};
     private TextBlock? status,stats;
     private Border? power;
+    private Ellipse? pulse;
+    private bool? poweredOn;
+    private bool pulsing;
+    private string lastView="";
     private Button? mainButton;
     private (TextBlock Title,TextBlock Detail,Ellipse Dot)? currentNode;
     private static readonly Brush Ink=Brush("#182731"),Muted=Brush("#5B6970"),Teal=Brush("#007A64"),Mint=Brush("#E2F7F0"),White=Brush("#FFFFFF"),Canvas=Brush("#F8F6EE");
     private static readonly Brush Good=Brush("#008C60"),Fair=Brush("#C48400"),Poor=Brush("#BE3C2D"),Unknown=Brush("#BEC4C0");
     private static Brush Brush(string hex)=>(Brush)new BrushConverter().ConvertFromString(hex)!;
+    // Follows the Windows "Show animations" setting.
+    private static bool Motion=>SystemParameters.ClientAreaAnimation;
     private static bool Smart=>Settings.Get("routing","smart")=="smart";
 
     public MainWindow() {
@@ -167,7 +174,10 @@ public partial class MainWindow : Window {
     // ---- Pages ----
     private void Render() {
         ContentPanel.Children.Clear();NavigationPanel.Children.Clear();
-        status=null;stats=null;power=null;mainButton=null;currentNode=null;
+        status=null;stats=null;power=null;pulse=null;mainButton=null;currentNode=null;
+        var view=api.SignedIn?page:"login";
+        if(view!=lastView) Enter();
+        lastView=view;
         // Replacing the header link drops the old click handler with the old element.
         var header=(DockPanel)HeaderAction.Parent;var link=new TextBlock {Foreground=Teal,Cursor=Cursors.Hand,VerticalAlignment=VerticalAlignment.Center,Padding=new Thickness(8,6,8,6),Visibility=Visibility.Collapsed};
         DockPanel.SetDock(link,Dock.Right);header.Children.Remove(HeaderAction);header.Children.Add(link);HeaderAction=link;
@@ -179,7 +189,7 @@ public partial class MainWindow : Window {
             Add(Action(L10n.Text("update_open_download"),()=>System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(available.Download.AbsoluteUri) {UseShellExecute=true}),primary:available.Mandatory));
         }
         NavigationPanel.Visibility=api.SignedIn?Visibility.Visible:Visibility.Collapsed;
-        if(!api.SignedIn) {Link(L10n.Text("language"),ChooseLanguage);Login();return;}
+        if(!api.SignedIn) {Add(LanguageBar(),4,6);Login();return;}
         foreach(var (id,name) in new[]{("connect",L10n.Text("connect_tab")),("nodes",L10n.Text("locations")),("account",L10n.Text("account"))}) {
             var selected=page==id||(page=="logs"&&id=="account");
             var tab=new Button {Content=name,MinHeight=40,Margin=new Thickness(4,0,4,0),Background=selected?Mint:White,Foreground=selected?Teal:Muted};
@@ -196,8 +206,13 @@ public partial class MainWindow : Window {
     }
     /// Everything needed to connect fits in the window: state, current location, one button.
     private void Home() {
-        power=Add(new Border {Width=88,Height=88,CornerRadius=new CornerRadius(44),Background=Mint,HorizontalAlignment=HorizontalAlignment.Center,
-            Child=new TextBlock {Text="⏻",FontSize=34,Foreground=Teal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}},16,12);
+        // A soft ring breathes out of the button while connecting; the fill eases to teal once connected.
+        pulse=new Ellipse {Width=88,Height=88,Stroke=Teal,StrokeThickness=2,Opacity=0,RenderTransformOrigin=new Point(0.5,0.5),RenderTransform=new ScaleTransform(1,1)};
+        power=new Border {Width=88,Height=88,CornerRadius=new CornerRadius(44),Background=new SolidColorBrush(((SolidColorBrush)Mint).Color),
+            Child=new TextBlock {Text="⏻",FontSize=34,Foreground=Teal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};
+        poweredOn=null;pulsing=false;
+        var badge=new Grid {Width=124,Height=124,HorizontalAlignment=HorizontalAlignment.Center};badge.Children.Add(pulse);badge.Children.Add(power);
+        Add(badge,0,0);
         status=Add(new TextBlock {FontSize=19,FontWeight=FontWeights.Bold,Foreground=Ink,HorizontalAlignment=HorizontalAlignment.Center},0,2);
         stats=Add(new TextBlock {FontSize=12,Foreground=Muted,HorizontalAlignment=HorizontalAlignment.Center,Visibility=Visibility.Hidden},0,14);
         Add(Row("","",Teal,"›",Muted,false,()=>{page="nodes";Render();},out var title,out var detail,out var dot),0,8);
@@ -268,6 +283,7 @@ public partial class MainWindow : Window {
     }
     private void Account() {
         Add(Label(L10n.Text("my_veilbird"),17,true),0,6);
+        Add(LanguageBar(),0,8);
         Work(async()=>{
             var account=await api.Request("account");
             var card=new StackPanel();
@@ -289,7 +305,6 @@ public partial class MainWindow : Window {
                 },out _,out _,out _);
                 Add(row,0,6);
             }
-            Add(Action(L10n.Text("language"),ChooseLanguage),4,6);
             Add(Action(L10n.Text("sign_out"),()=>{
                 if(connection.Active) {Alert(L10n.Text("disconnect_the_vpn_before_signing_out"));return;}
                 Work(async()=>{await api.Logout();Render();});
@@ -330,21 +345,80 @@ public partial class MainWindow : Window {
         },primary:true),6);
         login.IsDefault=true;
     }
-    private void ChooseLanguage() {
-        var values=new[]{"system","en","zh","ru"};var names=new[]{L10n.Text("language_system"),"English","简体中文","Русский"};
-        var menu=new ContextMenu();
-        for(var i=0;i<values.Length;i++) {
-            var value=values[i];var item=new MenuItem {Header=names[i],IsCheckable=true,IsChecked=L10n.Preference==value};
-            item.Click+=(_,_)=>{L10n.Select(value);Render();UpdateTray();};menu.Items.Add(item);
+    private static readonly (string Code,string Name)[] Languages={("system",""),("zh","简体中文"),("en","English"),("ru","Русский")};
+    private static string LanguageName(string code)=>code=="system"?L10n.Text("language_system"):Languages.First(l=>l.Code==code).Name;
+    /// A small drawn flag (Windows has no colour flag emoji); a globe for "follow the system".
+    private static FrameworkElement Flag(string code) {
+        if(code=="system") return new TextBlock {Text="\uE774",FontFamily=new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),FontSize=16,Foreground=Teal,Width=22,TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
+        var face=new Grid {Width=22,Height=15};
+        if(code=="zh") {
+            face.Background=Brush("#DE2910");
+            face.Children.Add(new TextBlock {Text="★",FontSize=7,Foreground=Brush("#FFDE00"),Margin=new Thickness(3,1,0,0)});
+        } else if(code=="ru") {
+            var stripes=new UniformGrid {Columns=1};
+            foreach(var hex in new[]{"#FFFFFF","#0039A6","#D52B1E"}) stripes.Children.Add(new Border {Background=Brush(hex)});
+            face.Children.Add(stripes);
+        } else {
+            var stripes=new UniformGrid {Columns=1};
+            for(var i=0;i<7;i++) stripes.Children.Add(new Border {Background=Brush(i%2==0?"#B22234":"#FFFFFF")});
+            face.Children.Add(stripes);
+            face.Children.Add(new Border {Background=Brush("#3C3B6E"),Width=10,Height=8,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top});
+        }
+        return new Border {CornerRadius=new CornerRadius(3),BorderBrush=Brush("#DDE2DC"),BorderThickness=new Thickness(0.5),Child=face,VerticalAlignment=VerticalAlignment.Center,
+            Clip=new RectangleGeometry(new Rect(0,0,23,16),3,3)};
+    }
+    /// The language as one full-width row at the top: flag, name, and a menu of all languages on click.
+    private Button LanguageBar() {
+        var grid=new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});grid.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(1,GridUnitType.Star)});grid.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});
+        var flag=Flag(L10n.Preference);flag.Margin=new Thickness(0,0,12,0);grid.Children.Add(flag);
+        var name=new TextBlock {Text=LanguageName(L10n.Preference),FontSize=14,FontWeight=FontWeights.SemiBold,Foreground=Ink,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(name,1);grid.Children.Add(name);
+        var hint=new TextBlock {Text=L10n.Text("language")+"  ›",FontSize=13,Foreground=Muted,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(hint,2);grid.Children.Add(hint);
+        var bar=new Button {Content=grid,HorizontalContentAlignment=HorizontalAlignment.Stretch,Background=White,MinHeight=48,Padding=new Thickness(14,8,14,8)};
+        AutomationProperties.SetName(bar,L10n.Text("language")+": "+LanguageName(L10n.Preference));
+        bar.Click+=(_,_)=>ChooseLanguage(bar);
+        return bar;
+    }
+    private void ChooseLanguage(FrameworkElement anchor) {
+        var menu=new ContextMenu {PlacementTarget=anchor,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MinWidth=anchor.ActualWidth};
+        foreach(var (code,_) in Languages) {
+            var item=new MenuItem {Header=LanguageName(code),Icon=Flag(code),IsCheckable=true,IsChecked=L10n.Preference==code,Padding=new Thickness(4,8,4,8)};
+            item.Click+=(_,_)=>{if(L10n.Preference==code) return;L10n.Select(code);Render();UpdateTray();};menu.Items.Add(item);
         }
         menu.IsOpen=true;
+    }
+    /// The new page eases in: a short fade and an 8 px rise.
+    private void Enter() {
+        if(!Motion) {ContentPanel.BeginAnimation(OpacityProperty,null);ContentPanel.Opacity=1;return;}
+        var shift=new TranslateTransform(0,8);ContentPanel.RenderTransform=shift;
+        var ease=new CubicEase {EasingMode=EasingMode.EaseOut};
+        ContentPanel.BeginAnimation(OpacityProperty,new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(180)) {EasingFunction=ease});
+        shift.BeginAnimation(TranslateTransform.YProperty,new DoubleAnimation(8,0,TimeSpan.FromMilliseconds(220)) {EasingFunction=ease});
+    }
+    private void Pulse(bool on) {
+        if(pulse is null) return;
+        var scale=(ScaleTransform)pulse.RenderTransform;
+        if(!on||!Motion) {
+            pulse.BeginAnimation(OpacityProperty,null);scale.BeginAnimation(ScaleTransform.ScaleXProperty,null);scale.BeginAnimation(ScaleTransform.ScaleYProperty,null);pulse.Opacity=0;return;
+        }
+        var grow=new DoubleAnimation(1,1.38,TimeSpan.FromSeconds(1.4)) {RepeatBehavior=RepeatBehavior.Forever,EasingFunction=new QuadraticEase {EasingMode=EasingMode.EaseOut}};
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty,grow);scale.BeginAnimation(ScaleTransform.ScaleYProperty,grow);
+        pulse.BeginAnimation(OpacityProperty,new DoubleAnimation(0.7,0,TimeSpan.FromSeconds(1.4)) {RepeatBehavior=RepeatBehavior.Forever});
     }
 
     /// Live parts of the connect page, refreshed every second without rebuilding the page.
     private void UpdateLive() {
         var active=connection.Active;var connected=active&&connection.Since is not null;
         if(status is not null) status.Text=L10n.Text(connection.StatusKey);
-        if(power is not null) {power.Background=connected?Teal:Mint;((TextBlock)power.Child).Foreground=connected?White:Teal;}
+        if(power is not null) {
+            if(poweredOn!=connected) {
+                var target=((SolidColorBrush)(connected?Teal:Mint)).Color;
+                ((SolidColorBrush)power.Background).BeginAnimation(SolidColorBrush.ColorProperty,new ColorAnimation(target,TimeSpan.FromMilliseconds(poweredOn is null||!Motion?0:260)));
+                ((TextBlock)power.Child).Foreground=connected?White:Teal;poweredOn=connected;
+            }
+            var connecting=active&&!connected;
+            if(connecting!=pulsing) {pulsing=connecting;Pulse(connecting);}
+        }
         if(stats is not null) {
             stats.Visibility=connected?Visibility.Visible:Visibility.Hidden;
             if(connection.Since is { } since) stats.Text=L10n.Text("connection_stats",(DateTime.UtcNow-since).ToString(@"hh\:mm\:ss"),Mbps(connection.RxRate),Mbps(connection.TxRate));

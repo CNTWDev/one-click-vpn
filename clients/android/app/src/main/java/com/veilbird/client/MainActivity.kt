@@ -1,6 +1,10 @@
 package com.veilbird.client
 
 import android.app.Activity
+import android.animation.Animator
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
+import android.animation.ValueAnimator
 import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
@@ -10,6 +14,8 @@ import android.graphics.drawable.RippleDrawable
 import android.content.res.ColorStateList
 import android.view.Gravity
 import android.view.View
+import android.view.animation.DecelerateInterpolator
+import android.widget.FrameLayout
 import android.widget.ProgressBar
 import android.os.Bundle
 import android.os.Handler
@@ -56,6 +62,10 @@ class MainActivity : Activity() {
     private val fair = Color.rgb(196, 132, 0)
     private val poor = Color.rgb(190, 60, 45)
     private var power: TextView? = null
+    private var ring: View? = null
+    private var pulseAnimator: Animator? = null
+    private var poweredOn: Boolean? = null
+    private var lastView = ""
     private var stats: TextView? = null
     private var nodeTitle: TextView? = null
     private var nodeDetail: TextView? = null
@@ -67,7 +77,15 @@ class MainActivity : Activity() {
             connectButton?.text = if (active) L10n.text(R.string.disconnect_action) else L10n.text(R.string.connect_action)
             power?.apply {
                 val on = active && ConnectionStateStore.since > 0
-                background = rounded(if (on) teal else mint, 48); setTextColor(if (on) Color.WHITE else teal)
+                if (poweredOn != on) {
+                    // The fill eases to teal once connected; the first paint of the page is immediate.
+                    val fill = background as GradientDrawable
+                    if (poweredOn == null) fill.setColor(if (on) teal else mint)
+                    else ValueAnimator.ofArgb(if (on) mint else teal, if (on) teal else mint).apply { duration = 260; addUpdateListener { fill.setColor(it.animatedValue as Int) }; start() }
+                    setTextColor(if (on) Color.WHITE else teal); poweredOn = on
+                }
+                val connecting = active && !on
+                if (connecting != (pulseAnimator != null)) pulse(connecting)
             }
             stats?.apply {
                 val since = ConnectionStateStore.since
@@ -89,7 +107,7 @@ class MainActivity : Activity() {
         }
     }
     override fun onResume() { super.onResume(); visible = true; handler.post(refresh) }
-    override fun onPause() { visible = false; handler.removeCallbacks(refresh); super.onPause() }
+    override fun onPause() { visible = false; handler.removeCallbacks(refresh); pulse(false); super.onPause() }
     override fun onDestroy() { executor.shutdown(); super.onDestroy() }
     private fun rounded(color: Int, radius: Int = 16) = GradientDrawable().apply { setColor(color); cornerRadius = radius.dp.toFloat() }
     private fun surface(color: Int, radius: Int = 16) = RippleDrawable(ColorStateList.valueOf(Color.argb(35, 0, 80, 65)), rounded(color, radius), rounded(Color.WHITE, radius))
@@ -155,15 +173,40 @@ class MainActivity : Activity() {
         }
         nodeDot?.background = (nodeDot?.background as? GradientDrawable)?.apply { setColor(if (quality == null && !active && selectedId.isEmpty()) teal else gradeColor(quality)) }
     }
+    /** Code, flag and the language's own name; "system" follows the phone. */
+    private val languages get() = listOf(Triple("system", "🌐", L10n.text(R.string.language_system)), Triple("zh", "🇨🇳", "简体中文"), Triple("en", "🇺🇸", "English"), Triple("ru", "🇷🇺", "Русский"))
+    private fun currentLanguage() = L10n.preference.substringBefore('-').let { code -> languages.firstOrNull { it.first == code } ?: languages[0] }
     private fun chooseLanguage() {
-        val values = listOf("system", "en", "zh", "ru")
+        val current = currentLanguage().first
         AlertDialog.Builder(this).setTitle(L10n.text(R.string.language))
-            .setSingleChoiceItems(arrayOf(L10n.text(R.string.language_system), "English", "简体中文", "Русский"), values.indexOf(L10n.preference.substringBefore('-'))) { dialog, which ->
-                dialog.dismiss(); L10n.select(values[which]); if (android.os.Build.VERSION.SDK_INT < 33) recreate()
+            .setSingleChoiceItems(languages.map { "${it.second}   ${it.third}" }.toTypedArray(), languages.indexOfFirst { it.first == current }) { dialog, which ->
+                dialog.dismiss(); if (languages[which].first != current) { L10n.select(languages[which].first); if (android.os.Build.VERSION.SDK_INT < 33) recreate() }
             }.setNegativeButton(L10n.text(R.string.cancel), null).show()
     }
+    /** The language as one full-width row at the top: flag and name; a tap lists all languages. */
+    private fun languageBar() {
+        val (_, flag, name) = currentLanguage()
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = 52.dp
+            background = surface(Color.WHITE, 14); setPadding(14.dp, 8.dp, 14.dp, 8.dp)
+            isClickable = true; setOnClickListener { if (!busy) chooseLanguage() }; contentDescription = L10n.text(R.string.language) + ": " + name
+        }
+        bar.addView(TextView(this).apply { text = flag; textSize = 20f }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 12.dp })
+        bar.addView(label(name, 15f).apply { setTextColor(ink); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); setPadding(0, 0, 0, 0); maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
+        bar.addView(label(L10n.text(R.string.language) + "  ›", 14f).apply { setPadding(12.dp, 0, 0, 0); maxLines = 1 })
+        content.addView(bar, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 10.dp })
+    }
+    /** A soft ring breathes out of the power button while connecting. Off when the system disables animations. */
+    private fun pulse(on: Boolean) {
+        pulseAnimator?.cancel(); pulseAnimator = null; ring?.alpha = 0f
+        val target = ring ?: return
+        if (!on || !ValueAnimator.areAnimatorsEnabled()) return
+        pulseAnimator = ObjectAnimator.ofPropertyValuesHolder(target, PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.38f), PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.38f), PropertyValuesHolder.ofFloat(View.ALPHA, 0.7f, 0f)).apply {
+            duration = 1400; repeatCount = ValueAnimator.INFINITE; interpolator = DecelerateInterpolator(); start()
+        }
+    }
     private fun render() {
-        status = null; connectButton = null; power = null; stats = null; nodeTitle = null; nodeDetail = null; nodeDot = null
+        pulse(false); status = null; connectButton = null; power = null; ring = null; poweredOn = null; stats = null; nodeTitle = null; nodeDetail = null; nodeDot = null
         val side = maxOf(16.dp, (resources.displayMetrics.widthPixels - 560.dp) / 2)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 12.dp, side, 16.dp) }
         @Suppress("DEPRECATION")
@@ -172,12 +215,12 @@ class MainActivity : Activity() {
         root.addView(ScrollView(this).apply { isFillViewport = true; addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
         val signedIn = api.secret("token") != null
+        // A new page eases in (short fade and rise); re-renders of the same page stay still.
+        val view = if (signedIn) page else "login"
+        if (view != lastView) { content.alpha = 0f; content.translationY = 8.dp.toFloat(); content.animate().alpha(1f).translationY(0f).setDuration(200).setInterpolator(DecelerateInterpolator()).start() }
+        lastView = view
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         header.addView(label("TrackNothing", 18f).apply { setPadding(0, 0, 0, 0) }, LinearLayout.LayoutParams(0, -2, 1f))
-        // Signed in, the language setting lives on the account page; before that it is the only way to change it.
-        if (!signedIn) header.addView(label(L10n.text(R.string.language), 14f).apply {
-            setTextColor(teal); setPadding(12.dp, 10.dp, 12.dp, 10.dp); background = surface(canvas, 12); setOnClickListener { chooseLanguage() }
-        })
         content.addView(header, LinearLayout.LayoutParams(-1, 44.dp))
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { isIndeterminate = true; indeterminateTintList = ColorStateList.valueOf(teal); visibility = if (busy) View.VISIBLE else View.INVISIBLE }
         content.addView(progress, LinearLayout.LayoutParams(-1, 4.dp).apply { bottomMargin = 4.dp })
@@ -186,7 +229,7 @@ class MainActivity : Activity() {
             card(L10n.text(R.string.update_available, available.version), L10n.text(if (available.mandatory) R.string.update_required_detail else R.string.update_available_detail))
             button(L10n.text(R.string.update_now)) { installUpdate(available) }
         }
-        if (!signedIn) { login(); return }
+        if (!signedIn) { languageBar(); login(); return }
         val nav = LinearLayout(this).apply { setPadding(8.dp, 6.dp, 8.dp, 6.dp); setBackgroundColor(Color.WHITE) }
         for ((tab, title) in listOf("connect" to L10n.text(R.string.connect_tab), "nodes" to L10n.text(R.string.locations), "account" to L10n.text(R.string.account))) nav.addView(styleButton(Button(this)).apply {
             text = title; isSelected = tab == page; background = surface(if (isSelected) mint else Color.WHITE, 12)
@@ -205,8 +248,12 @@ class MainActivity : Activity() {
     }
     /** Everything needed to connect fits on one phone screen: state, current location, one button. */
     private fun home() {
-        power = label("⏻", 36f).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, 0); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO; background = rounded(mint, 48); setTextColor(teal) }
-        content.addView(power, LinearLayout.LayoutParams(96.dp, 96.dp).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = 20.dp; bottomMargin = 12.dp })
+        val badge = FrameLayout(this).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS }
+        ring = View(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setStroke(2.dp, teal) }; alpha = 0f }
+        badge.addView(ring, FrameLayout.LayoutParams(96.dp, 96.dp, Gravity.CENTER))
+        power = label("⏻", 36f).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, 0); background = rounded(mint, 48); setTextColor(teal) }
+        badge.addView(power, FrameLayout.LayoutParams(96.dp, 96.dp, Gravity.CENTER))
+        content.addView(badge, LinearLayout.LayoutParams(136.dp, 136.dp).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = 2.dp })
         status = label(ConnectionStateStore.message, 20f).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, 0) }.also { content.addView(it, LinearLayout.LayoutParams(-1, -2)) }
         stats = label("", 13f).apply { gravity = Gravity.CENTER; setPadding(0, 4.dp, 0, 0); visibility = View.INVISIBLE; maxLines = 1 }.also { content.addView(it, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 16.dp }) }
         val current = row("", " ", teal, "›", muted) { page = "nodes"; render() }
@@ -329,6 +376,7 @@ class MainActivity : Activity() {
     }
     private fun account() {
         content.addView(label(L10n.text(R.string.my_veilbird), 20f).apply { setPadding(0, 0, 0, 8.dp) })
+        languageBar()
         work({ api.request("account") }) { data ->
             card(data.getString("name"), data.getString("email") + "\n" + L10n.text(R.string.account_valid_until, L10n.date(data.optString("expiresAt"))))
             data.optJSONObject("traffic")?.let { traffic -> card(L10n.text(R.string.traffic_30_days), "↑ ${android.text.format.Formatter.formatFileSize(this, traffic.optString("uploadBytes", "0").toLongOrNull() ?: 0)}   ↓ ${android.text.format.Formatter.formatFileSize(this, traffic.optString("downloadBytes", "0").toLongOrNull() ?: 0)}") }
@@ -353,7 +401,6 @@ class MainActivity : Activity() {
             }
             if (deviceCount == 0) content.addView(label(L10n.text(R.string.no_authorized_devices_yet_they_appear_after_their_first)))
             button(L10n.text(R.string.refresh_devices)) { render() }
-            button(L10n.text(R.string.language)) { chooseLanguage() }
             button(L10n.text(R.string.sign_out)) {
                 if (ConnectionStateStore.active) { alert(L10n.text(R.string.disconnect_the_vpn_before_signing_out)); return@button }
                 work({ try { api.request("logout", JSONObject()) } finally { api.saveSecret("token", null) } }) { render() }

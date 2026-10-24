@@ -154,12 +154,13 @@ struct ClientView:View {
     @State private var tab=0
     @State private var versionTaps=0
     @State private var firstTap=Date.distantPast
+    @State private var choosingLanguage=false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body:some View {
         VStack(spacing:0) {
             HStack {
                 Text("TrackNothing").font(.headline)
                 Spacer()
-                if !model.signedIn {languageMenu}
                 if model.busy || model.measuring {ProgressView().controlSize(.small).tint(VeilbirdStyle.accent)}
             }.padding(.horizontal,20).padding(.top,14).padding(.bottom,6)
             ScrollView {
@@ -172,11 +173,14 @@ struct ClientView:View {
                             Link(L10n.text("update_open_download"),destination:update.url).buttonStyle(VeilbirdButton(primary:update.mandatory))
                         }.veilbirdCard()
                     }
-                    if !model.signedIn {loginView}
-                    else if tab==0 {connectionView}
-                    else if tab==1 {nodesView}
-                    else if tab==2 {accountView}
-                    else {logsView}
+                    // A new page eases in with a short fade and rise.
+                    Group {
+                        if !model.signedIn {loginView}
+                        else if tab==0 {connectionView}
+                        else if tab==1 {nodesView}
+                        else if tab==2 {accountView}
+                        else {logsView}
+                    }.id(model.signedIn ? tab:-1).transition(.asymmetric(insertion:.opacity.combined(with:.offset(y:8)),removal:.identity))
                     if !model.message.isEmpty {Label(model.message,systemImage:"exclamationmark.circle").foregroundStyle(.red).font(.caption).textSelection(.enabled).veilbirdCard()}
                     #if targetEnvironment(simulator)
                     Text(L10n.text("simulator_build_verify_vpn_connections_on_a_signed_physical")).font(.caption2).foregroundStyle(VeilbirdStyle.muted)
@@ -192,6 +196,7 @@ struct ClientView:View {
             }
         }.background(VeilbirdStyle.canvas).foregroundStyle(VeilbirdStyle.ink).tint(VeilbirdStyle.accent)
         .environment(\.locale, L10n.locale).preferredColorScheme(.light).disabled(model.busy)
+        .animation(reduceMotion ? nil:.easeOut(duration:0.2),value:tab).animation(reduceMotion ? nil:.easeOut(duration:0.2),value:model.signedIn)
         .task {await model.restore()}
         .alert(L10n.text("revoke_this_device_s_access"),isPresented:Binding(get:{revoke != nil},set:{if !$0 {revoke=nil}})) {
             Button(L10n.text("cancel"),role:.cancel) {revoke=nil}
@@ -199,15 +204,39 @@ struct ClientView:View {
         } message:{Text(L10n.text("this_device_will_lose_access_the_slot_is_released"))}
     }
 
-    private var languageMenu:some View {
-        Menu(L10n.text("language")) {
-            Picker(L10n.text("language"),selection:$language) {
-                Text(L10n.text("language_system")).tag("system")
-                Text("English").tag("en")
-                Text("简体中文").tag("zh-Hans")
-                Text("Русский").tag("ru")
-            }
-        }.font(.callout).fixedSize()
+    /// Code, flag and the language's own name; "system" follows the device.
+    private var languages:[(code:String,flag:String,name:String)] {
+        [("system","🌐",L10n.text("language_system")),("zh-Hans","🇨🇳","简体中文"),("en","🇺🇸","English"),("ru","🇷🇺","Русский")]
+    }
+    /// The language as one full-width row at the top: flag and name; a tap lists all languages.
+    private var languageBar:some View {
+        let current=languages.first {$0.code==language} ?? languages[0]
+        let bar=Button {choosingLanguage=true} label:{
+            HStack(spacing:12) {
+                Text(current.flag).font(.title3)
+                Text(current.name).font(.subheadline.weight(.semibold)).lineLimit(1)
+                Spacer(minLength:8)
+                Text(L10n.text("language")+"  ›").font(.callout).foregroundStyle(VeilbirdStyle.muted).lineLimit(1)
+            }.padding(.horizontal,14).frame(minHeight:50).frame(maxWidth:.infinity,alignment:.leading)
+            .background(Color.white,in:RoundedRectangle(cornerRadius:12)).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityLabel(L10n.text("language")+": "+current.name)
+        #if os(macOS)
+        return bar.popover(isPresented:$choosingLanguage,arrowEdge:.bottom) {
+            VStack(spacing:2) {
+                ForEach(languages,id:\.code) {item in
+                    Button {language=item.code;choosingLanguage=false} label:{
+                        HStack(spacing:10) {Text(item.flag);Text(item.name);Spacer();if item.code==language {Image(systemName:"checkmark").foregroundStyle(VeilbirdStyle.accent)}}
+                            .padding(.horizontal,12).padding(.vertical,8).frame(width:220,alignment:.leading).contentShape(Rectangle())
+                    }.buttonStyle(.plain)
+                }
+            }.padding(6)
+        }
+        #else
+        return bar.confirmationDialog(L10n.text("language"),isPresented:$choosingLanguage,titleVisibility:.visible) {
+            ForEach(languages,id:\.code) {item in Button((item.code==language ? "✓ ":"")+item.flag+"  "+item.name) {language=item.code}}
+            Button(L10n.text("cancel"),role:.cancel) {}
+        }
+        #endif
     }
     private func navigationItem(_ title:String,_ icon:String,_ index:Int)->some View {
         let selected=tab==index || (tab==3 && index==2)
@@ -217,7 +246,8 @@ struct ClientView:View {
     }
     private var loginView:some View {
         VStack(alignment:.leading,spacing:14) {
-            Text(L10n.text("your_world_one_tap_away")).font(.title.bold()).padding(.top,8)
+            languageBar
+            Text(L10n.text("your_world_one_tap_away")).font(.title.bold()).padding(.top,4)
             Text(L10n.text("sign_in_to_veilbird_no_imports_or_configuration_needed")).font(.callout).foregroundStyle(VeilbirdStyle.muted)
             if (Bundle.main.object(forInfoDictionaryKey:"VeilbirdAPIOrigin") as? String ?? "").isEmpty {Text(L10n.text("development_server_address")).font(.caption.bold());TextField("https://…",text:$model.origin).literalInput().veilbirdField()}
             Text(L10n.text("email")).font(.caption.bold());TextField(L10n.text("enter_email"),text:$email).literalInput().veilbirdField()
@@ -248,9 +278,8 @@ struct ClientView:View {
         let title=model.connected && !model.nodeName.isEmpty ? model.nodeName:model.selected.isEmpty ? L10n.text("automatic_recommended"):(model.selectedName.isEmpty ? L10n.text("location"):model.selectedName)
         let detail=quality.map(summary) ?? (!model.connected && model.selected.isEmpty ? L10n.text("auto_detail"):L10n.text("tap_to_change"))
         return VStack(spacing:12) {
-            Image(systemName:"power").font(.system(size:34,weight:.medium)).foregroundStyle(on ? Color.white:VeilbirdStyle.accent)
-                .frame(width:88,height:88).background(on ? VeilbirdStyle.accent:VeilbirdStyle.mint,in:Circle()).accessibilityHidden(true).padding(.top,12)
-            Text(L10n.text(model.status)).font(.title3.bold())
+            PowerBadge(on:on,connecting:model.connected && model.since == nil).accessibilityHidden(true)
+            Text(L10n.text(model.status)).font(.title3.bold()).animation(reduceMotion ? nil:.easeInOut(duration:0.2),value:model.status)
             Group {
                 if let since=model.since {
                     TimelineView(.periodic(from:since,by:1)) {context in
@@ -312,6 +341,7 @@ struct ClientView:View {
     private var accountView:some View {
         VStack(alignment:.leading,spacing:10) {
             Text(L10n.text("my_veilbird")).font(.title3.bold())
+            languageBar
             VStack(alignment:.leading,spacing:6) {
                 Text(model.account["name"] as? String ?? L10n.text("my_account")).font(.headline)
                 Text(model.account["email"] as? String ?? "").font(.caption).foregroundStyle(VeilbirdStyle.muted)
@@ -328,11 +358,8 @@ struct ClientView:View {
                     revoking ? L10n.text("revoking_slot_released_when_the_old_connection_expires"):device["platform"] as? String ?? "",dot:VeilbirdStyle.accent,
                     trailing:revoking ? "":L10n.text("revoke_access"),trailingColor:.red,selected:false)}.buttonStyle(.plain)
             }
-            HStack(spacing:8) {
-                languageMenu.frame(maxWidth:.infinity).padding(.vertical,10).background(VeilbirdStyle.mint,in:RoundedRectangle(cornerRadius:12))
-                Button(L10n.text("sign_out"),role:.destructive) {model.work {_ = try? await model.api().request("logout",[:]);try SecureStorage.write("token",nil);model.signedIn=false}}
-                    .frame(maxWidth:.infinity).padding(.vertical,10).background(Color(red:1,green:0.93,blue:0.92),in:RoundedRectangle(cornerRadius:12)).buttonStyle(.plain).foregroundStyle(.red).disabled(model.connected)
-            }
+            Button(L10n.text("sign_out"),role:.destructive) {model.work {_ = try? await model.api().request("logout",[:]);try SecureStorage.write("token",nil);model.signedIn=false}}
+                .frame(maxWidth:.infinity).padding(.vertical,12).background(Color(red:1,green:0.93,blue:0.92),in:RoundedRectangle(cornerRadius:12)).buttonStyle(.plain).foregroundStyle(.red).disabled(model.connected)
             if model.connected {Text(L10n.text("disconnect_before_signing_out_hint")).font(.caption).foregroundStyle(VeilbirdStyle.muted)}
             // The diagnostic log has no visible entry: seven taps on the version open it.
             Text(L10n.text("version_label",Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")).font(.caption2).foregroundStyle(VeilbirdStyle.muted)
@@ -365,6 +392,29 @@ struct ClientView:View {
         }
     }
     private func bytes(_ value:Any?)->String {ByteCountFormatter.string(fromByteCount:Int64(String(describing:value ?? "0")) ?? 0,countStyle:.binary)}
+}
+
+/// The power button: the fill eases to teal once connected and a soft ring breathes out of it while connecting.
+struct PowerBadge:View {
+    let on:Bool
+    let connecting:Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse=false
+    var body:some View {
+        ZStack {
+            Circle().stroke(VeilbirdStyle.accent,lineWidth:2).frame(width:88,height:88)
+                .scaleEffect(pulse ? 1.38:1).opacity(connecting && !reduceMotion ? (pulse ? 0:0.7):0)
+            Image(systemName:"power").font(.system(size:34,weight:.medium)).foregroundStyle(on ? Color.white:VeilbirdStyle.accent)
+                .frame(width:88,height:88).background(on ? VeilbirdStyle.accent:VeilbirdStyle.mint,in:Circle())
+        }.frame(width:128,height:128)
+        .animation(reduceMotion ? nil:.easeInOut(duration:0.26),value:on)
+        .onAppear {restart()}.onChange(of:connecting) {_ in restart()}
+    }
+    private func restart() {
+        pulse=false
+        guard connecting && !reduceMotion else {return}
+        withAnimation(.easeOut(duration:1.4).repeatForever(autoreverses:false)) {pulse=true}
+    }
 }
 
 #if os(macOS)
