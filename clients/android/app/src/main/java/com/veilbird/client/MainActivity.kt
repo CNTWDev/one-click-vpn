@@ -681,7 +681,7 @@ class MainActivity : Activity() {
     // ---- Language: native names, no flags; a bottom sheet after sign-in and before it.
     private val languages get() = listOf("system" to L10n.text(R.string.language_system), "zh" to "简体中文", "en" to "English", "ru" to "Русский")
     private fun currentLanguage() = L10n.preference.substringBefore('-').let { code -> languages.firstOrNull { it.first == code } ?: languages[0] }
-    private fun shortLanguageName() = when (L10n.locale.language) { "zh" -> "中文"; "ru" -> "Русский"; else -> "English" }
+    private fun shortLanguageName() = when (L10n.locale.language) { "zh" -> "简体中文"; "ru" -> "Русский"; else -> "English" }
     private fun chooseLanguage() {
         val current = currentLanguage().first
         sheet(L10n.text(R.string.language), languages.map { it.second }, languages.indexOfFirst { it.first == current }) { which ->
