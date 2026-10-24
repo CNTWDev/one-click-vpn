@@ -409,7 +409,7 @@ struct ClientView:View {
             notices
             Spacer(minLength:16)
             Button {toggleConnection()} label:{ConnectRing(state:state,size:size)}.buttonStyle(.plain)
-                .accessibilityLabel(L10n.text(state == .idle ? "connect_action":(state == .failed ? "retry_action":"disconnect_action")))
+                .accessibilityLabel(L10n.text(state == .idle ? "connect_action":(state == .failed ? "retry_action":(state == .connecting ? "cancel":"disconnect_action"))))
             VStack(spacing:8) {
                 HStack(spacing:10) {
                     if state == .connected {Rectangle().fill(VeilbirdStyle.accent).frame(width:8,height:8)}
@@ -782,7 +782,7 @@ struct MenuBarView:View {
             if model.signedIn {
                 VStack(spacing:12) {
                     Button {model.work {try await model.toggle()}} label:{ConnectRing(state:state,size:126)}.buttonStyle(.plain)
-                        .accessibilityLabel(L10n.text(model.connected ? "disconnect_action":"connect_action"))
+                        .accessibilityLabel(L10n.text(model.connected ? (model.since == nil ? "cancel":"disconnect_action"):"connect_action"))
                     if let since=model.since {
                         HStack(alignment:.firstTextBaseline,spacing:12) {
                             TimelineView(.periodic(from:since,by:1)) {context in

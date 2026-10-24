@@ -79,7 +79,7 @@
   <string name="enter_email">输入邮箱</string>
   <string name="enter_password">输入密码</string>
   <string name="enter_your_email_and_password">请填写邮箱和密码。</string>
-  <string name="finding_best_route">正在选择最佳线路</string>
+  <string name="finding_best_route">正在选择最佳线路 · 轻触取消</string>
   <string name="got_it">知道了</string>
   <string name="hide_password">隐藏密码</string>
   <string name="incorrect_email_or_password">邮箱或密码不正确。</string>

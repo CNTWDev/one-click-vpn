@@ -81,7 +81,7 @@
   <data name="enter_email" xml:space="preserve"><value>Enter email</value></data>
   <data name="enter_password" xml:space="preserve"><value>Enter password</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Enter your email and password.</value></data>
-  <data name="finding_best_route" xml:space="preserve"><value>Finding the best route</value></data>
+  <data name="finding_best_route" xml:space="preserve"><value>Finding the best route · Tap to cancel</value></data>
   <data name="got_it" xml:space="preserve"><value>Got it</value></data>
   <data name="hide_password" xml:space="preserve"><value>Hide password</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Incorrect email or password.</value></data>

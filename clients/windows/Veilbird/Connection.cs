@@ -29,9 +29,17 @@ public sealed class Connection(NativeApi api,Core core) {
 
     private void Set(string status) {StatusKey=status;Changed?.Invoke();}
 
+    private Task? attempt;
     /// Connects to nodeId, or to the fastest node when it is empty. Throws AccessFailure when it cannot.
     public async Task Connect(string nodeId,bool smart) {
         if(Active) return;
+        // An attempt cancelled a moment ago may still be unwinding: let it finish before starting again.
+        if(attempt is {IsCompleted:false} previous) {try {await previous;} catch {/* already reported */}}
+        if(Active) return;
+        var current=Attempt(nodeId,smart);attempt=current;
+        await current;
+    }
+    private async Task Attempt(string nodeId,bool smart) {
         Active=true;Since=null;RxRate=TxRate=0;NodeId=nodeId;failures=0;Set("authorizing_and_connecting");
         try {
             keys=await Task.Run(core.NewKeypair);
@@ -65,7 +73,7 @@ public sealed class Connection(NativeApi api,Core core) {
     private async Task ConnectWithFallback(bool smart) {
         while(true) {
             try {await BringUp(smart);return;}
-            catch(AccessFailure error) when (error.Code is "NODE_UNAVAILABLE" or "NODE_FULL" or "HANDSHAKE_TIMEOUT"&&fallbacks.Count>0) {await NextNode(error.Code);}
+            catch(AccessFailure error) when (error.Code is "NODE_UNAVAILABLE" or "NODE_FULL" or "HANDSHAKE_TIMEOUT"&&fallbacks.Count>0&&Active) {await NextNode(error.Code);}
         }
     }
     private async Task NextNode(string code) {
@@ -81,12 +89,16 @@ public sealed class Connection(NativeApi api,Core core) {
         var blocked=Transports.Blocked(network);
         transports=Transports.Order(proxies.Select(p=>p["name"]!.GetValue<string>()),blocked);
         Journal.Add($"node: {NodeName}, transports {string.Join(" > ",transports)}"+(blocked.Count>0?$" (blocked here before: {string.Join(", ",blocked)})":""));
+        // Disconnect pressed while connecting cancels the attempt here, before the tunnel stays up.
+        if(!Active) throw new OperationCanceledException();
         await Task.Run(()=>core.Start(Transports.Config(proxies,transports,smart)));
+        if(!Active) throw new OperationCanceledException();
         if(!await Probe(initial:true)) {
             // WireGuard waits for the node to add this PC; give it the rest of the readiness window.
-            while(!leaseReady&&DateTime.UtcNow-started<TimeSpan.FromSeconds(15)) {await Task.Delay(1000);leaseReady=await Status();}
+            while(!leaseReady&&DateTime.UtcNow-started<TimeSpan.FromSeconds(15)) {await Task.Delay(1000);if(!Active) throw new OperationCanceledException();leaseReady=await Status();}
             if(!leaseReady||!await Probe(initial:true)) throw new AccessFailure("HANDSHAKE_TIMEOUT");
         }
+        if(!Active) throw new OperationCanceledException();
         Since=DateTime.UtcNow;Set("connected_status");
         Journal.Add($"connect: ready in {(int)(DateTime.UtcNow-started).TotalMilliseconds} ms via {carrying}");
     }

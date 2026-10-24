@@ -1801,19 +1801,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Finding the best route"
+            "value": "Finding the best route · Tap to cancel"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在选择最佳线路"
+            "value": "正在选择最佳线路 · 轻触取消"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Подбираем лучший маршрут"
+            "value": "Подбираем лучший маршрут · Нажмите, чтобы отменить"
           }
         }
       }

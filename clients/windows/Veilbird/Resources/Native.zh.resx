@@ -81,7 +81,7 @@
   <data name="enter_email" xml:space="preserve"><value>输入邮箱</value></data>
   <data name="enter_password" xml:space="preserve"><value>输入密码</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>请填写邮箱和密码。</value></data>
-  <data name="finding_best_route" xml:space="preserve"><value>正在选择最佳线路</value></data>
+  <data name="finding_best_route" xml:space="preserve"><value>正在选择最佳线路 · 轻触取消</value></data>
   <data name="got_it" xml:space="preserve"><value>知道了</value></data>
   <data name="hide_password" xml:space="preserve"><value>隐藏密码</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>邮箱或密码不正确。</value></data>

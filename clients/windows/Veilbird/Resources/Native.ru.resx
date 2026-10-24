@@ -81,7 +81,7 @@
   <data name="enter_email" xml:space="preserve"><value>Введите почту</value></data>
   <data name="enter_password" xml:space="preserve"><value>Введите пароль</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Введите почту и пароль.</value></data>
-  <data name="finding_best_route" xml:space="preserve"><value>Подбираем лучший маршрут</value></data>
+  <data name="finding_best_route" xml:space="preserve"><value>Подбираем лучший маршрут · Нажмите, чтобы отменить</value></data>
   <data name="got_it" xml:space="preserve"><value>Понятно</value></data>
   <data name="hide_password" xml:space="preserve"><value>Скрыть пароль</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Неверная почта или пароль.</value></data>
