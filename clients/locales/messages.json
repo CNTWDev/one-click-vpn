@@ -719,6 +719,11 @@
     "en": "Tap to change location",
     "ru": "Нажмите, чтобы сменить"
   },
+  "connection_rates": {
+    "zh": "↓ {0}  ↑ {1} Mbps",
+    "en": "↓ {0}  ↑ {1} Mbps",
+    "ru": "↓ {0}  ↑ {1} Мбит/с"
+  },
   "connection_stats": {
     "zh": "{0} · ↓ {1} ↑ {2} Mbps",
     "en": "{0}  ·  ↓ {1}  ↑ {2} Mbps",

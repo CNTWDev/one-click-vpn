@@ -49,6 +49,7 @@
   <data name="connection_connected" xml:space="preserve"><value>Подключено</value></data>
   <data name="connection_interrupted_try_again" xml:space="preserve"><value>Подключение прервано. Повторите попытку.</value></data>
   <data name="connection_not_available_yet" xml:space="preserve"><value>Подключение пока недоступно</value></data>
+  <data name="connection_rates" xml:space="preserve"><value>↓ {0}  ↑ {1} Мбит/с</value></data>
   <data name="connection_stats" xml:space="preserve"><value>{0}  ·  ↓ {1}  ↑ {2} Мбит/с</value></data>
   <data name="connection_unavailable" xml:space="preserve"><value>Подключение недоступно</value></data>
   <data name="copied" xml:space="preserve"><value>Скопировано</value></data>

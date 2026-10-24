@@ -47,6 +47,7 @@
   <string name="connection_connected">Connected</string>
   <string name="connection_interrupted_try_again">Connection interrupted. Try again.</string>
   <string name="connection_not_available_yet">Connection not available yet</string>
+  <string name="connection_rates">↓ %1$s  ↑ %2$s Mbps</string>
   <string name="connection_stats">%1$s  ·  ↓ %2$s  ↑ %3$s Mbps</string>
   <string name="connection_unavailable">Connection unavailable</string>
   <string name="copied">Copied</string>

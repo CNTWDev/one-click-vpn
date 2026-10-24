@@ -49,6 +49,7 @@
   <data name="connection_connected" xml:space="preserve"><value>Connected</value></data>
   <data name="connection_interrupted_try_again" xml:space="preserve"><value>Connection interrupted. Try again.</value></data>
   <data name="connection_not_available_yet" xml:space="preserve"><value>Connection not available yet</value></data>
+  <data name="connection_rates" xml:space="preserve"><value>↓ {0}  ↑ {1} Mbps</value></data>
   <data name="connection_stats" xml:space="preserve"><value>{0}  ·  ↓ {1}  ↑ {2} Mbps</value></data>
   <data name="connection_unavailable" xml:space="preserve"><value>Connection unavailable</value></data>
   <data name="copied" xml:space="preserve"><value>Copied</value></data>

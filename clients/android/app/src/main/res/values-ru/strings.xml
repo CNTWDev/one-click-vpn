@@ -47,6 +47,7 @@
   <string name="connection_connected">Подключено</string>
   <string name="connection_interrupted_try_again">Подключение прервано. Повторите попытку.</string>
   <string name="connection_not_available_yet">Подключение пока недоступно</string>
+  <string name="connection_rates">↓ %1$s  ↑ %2$s Мбит/с</string>
   <string name="connection_stats">%1$s  ·  ↓ %2$s  ↑ %3$s Мбит/с</string>
   <string name="connection_unavailable">Подключение недоступно</string>
   <string name="copied">Скопировано</string>
