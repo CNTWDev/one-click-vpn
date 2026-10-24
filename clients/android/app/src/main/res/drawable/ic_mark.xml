@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TrackNothing mark on its dark tile: the header and sign-in logo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+  <path android:fillColor="#FF1A231C" android:pathData="M12,0h24a12,12 0,0 1,12 12v24a12,12 0,0 1,-12 12h-24a12,12 0,0 1,-12 -12v-24a12,12 0,0 1,12 -12z"/>
+  <path android:strokeColor="#FFB7DC68" android:strokeWidth="3.2" android:pathData="M13,24a11,11 0,1 0,22 0a11,11 0,1 0,-22 0"/>
+  <path android:strokeColor="#FFB7DC68" android:strokeWidth="3.2" android:strokeLineCap="round" android:pathData="M14,34L34,14"/>
+</vector>

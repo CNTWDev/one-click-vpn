@@ -10,6 +10,9 @@ public static class Program {
         if(!first) {show.Set();return 0;}
         StopLegacyTunnel();
         var app=new App();app.InitializeComponent();
+        // Started by the "open at login" task with --background: only the tray icon appears.
+        var window=new MainWindow();app.MainWindow=window;
+        if(!args.Contains("--background")) window.Show();
         var waiter=new Thread(()=>{while(show.WaitOne()) app.Dispatcher.InvokeAsync(()=>(app.MainWindow as MainWindow)?.ShowFromTray());}) {IsBackground=true};
         waiter.Start();
         return app.Run();

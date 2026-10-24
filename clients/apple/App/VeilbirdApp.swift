@@ -7,6 +7,7 @@ import AppIntents
 import UIKit
 #else
 import AppKit
+import ServiceManagement
 #endif
 
 @main
@@ -18,8 +19,8 @@ struct VeilbirdApp: App {
         Window("TrackNothing",id:"main") {ClientView().environmentObject(model).frame(width:380,height:620)}
             .windowResizability(.contentSize)
         MenuBarExtra {MenuBarView().environmentObject(model)} label:{
-            Image(systemName:model.connected ? "shield.lefthalf.filled":"shield").accessibilityLabel("TrackNothing")
-        }
+            Image(systemName:model.connected ? "slash.circle.fill":"slash.circle").accessibilityLabel("TrackNothing")
+        }.menuBarExtraStyle(.window)
         #else
         WindowGroup {ClientView().environmentObject(model)}
         #endif
@@ -65,11 +66,21 @@ enum TunnelControl {
     /// (version, mandatory, download URL) when the release catalog has a newer build.
     @Published var update:(version:String,mandatory:Bool,url:URL)?
     @Published var announcement=""
+    /// Set when a connection attempt ended without connecting; the ring then offers a retry.
+    @Published var failed=false
+    @Published var failure=""
+    private var attempt:Date?
     @Published var origin=UserDefaults.standard.string(forKey:"origin") ?? (Bundle.main.object(forInfoDictionaryKey:"VeilbirdAPIOrigin") as? String ?? "")
     private var ticker:AnyCancellable?
     // Status is polled here, not in the window: on the Mac the menu bar keeps working after the window is closed.
     init() {ticker=Timer.publish(every:1,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in self?.refreshStatus()}}}
     var connected:Bool {[.connected,.connecting,.reasserting].contains(manager?.connection.status)}
+    /// The two-letter country code shown in a location's tile; the name's first letter when the node has none.
+    func code(_ id:String,name:String)->String {
+        let node=nodes.first {$0["id"] as? String == id}
+        if let code=node?["countryCode"] as? String,!code.isEmpty {return code.uppercased()}
+        return String(name.prefix(1)).uppercased()
+    }
     func api() throws -> NativeAPI {try NativeAPI(origin:origin)}
     func work(_ body:@escaping () async throws -> Void) {
         guard !busy else {return};busy=true;message=""
@@ -119,7 +130,8 @@ enum TunnelControl {
         #if targetEnvironment(simulator)
         throw AccessFailure.code("SIMULATOR_UNSUPPORTED")
         #else
-        if connected {manager?.connection.stopVPNTunnel();return}
+        if connected {attempt=nil;manager?.connection.stopVPNTunnel();return}
+        failed=false;attempt=Date()
         Journal.add("connect: requested from the app")
         manager=try await TunnelControl.start(origin:try api().origin,nodeId:selected,routing:routing)
         #endif
@@ -129,8 +141,14 @@ enum TunnelControl {
         case .connected:break
         case .connecting,.reasserting:status="connecting"
         case .disconnecting:status="disconnecting"
-        default:status="not_connected";since=nil;rxRate=0;txRate=0
+        default:
+            status="not_connected";since=nil;rxRate=0;txRate=0
+            // The tunnel went down on its own shortly after a requested start: show it as a failed attempt.
+            if let attempt,Date().timeIntervalSince(attempt)>2 {
+                self.attempt=nil;failed=true;failure=L10n.text("unable_to_connect_check_your_network_and_try_again")
+            }
         }
+        if manager?.connection.status == .connected {attempt=nil}
         guard manager?.connection.status == .connected,let session=manager?.connection as? NETunnelProviderSession else {return}
         try? session.sendProviderMessage(Data("status".utf8)) {data in
             guard let data,let state=try? JSONSerialization.jsonObject(with:data) as? [String:Any] else {return}
@@ -149,317 +167,674 @@ struct ClientView:View {
     @EnvironmentObject private var model:ClientModel
     @State private var email=""
     @State private var password=""
+    @State private var showPassword=false
     @State private var revoke:[String:Any]?
     @State private var search=""
     @State private var tab=0
     @State private var versionTaps=0
     @State private var firstTap=Date.distantPast
     @State private var choosingLanguage=false
+    #if os(macOS)
+    @State private var openAtLogin=SMAppService.mainApp.status == .enabled
+    #endif
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openURL) private var openURL
+    private let mac=VeilbirdStyle.mac
     var body:some View {
-        VStack(spacing:0) {
-            HStack {
-                Text("TrackNothing").font(.headline)
-                Spacer()
-                if !model.signedIn {languageButton}
-                if model.busy || model.measuring {ProgressView().controlSize(.small).tint(VeilbirdStyle.accent)}
-            }.padding(.horizontal,20).padding(.top,14).padding(.bottom,6)
-            ScrollView {
-                VStack(alignment:.leading,spacing:12) {
-                    if !model.announcement.isEmpty {Text(model.announcement).font(.callout).frame(maxWidth:.infinity,alignment:.leading).padding(12).background(VeilbirdStyle.mint,in:RoundedRectangle(cornerRadius:12))}
-                    if let update=model.update {
-                        VStack(alignment:.leading,spacing:6) {
-                            Text(L10n.text("update_available",update.version)).font(.subheadline.bold())
-                            Text(L10n.text(update.mandatory ? "update_required_detail":"update_available_detail")).font(.caption).foregroundStyle(VeilbirdStyle.muted)
-                            Link(L10n.text("update_open_download"),destination:update.url).buttonStyle(VeilbirdButton(primary:update.mandatory))
-                        }.veilbirdCard()
-                    }
+        ZStack {
+            VeilbirdStyle.ground.ignoresSafeArea()
+            VStack(spacing:0) {
+                if model.signedIn {
+                    #if os(macOS)
+                    if tab<3 {macNavigation}
+                    #endif
                     // A new page eases in with a short fade and rise.
                     Group {
-                        if !model.signedIn {loginView}
-                        else if tab==0 {connectionView}
-                        else if tab==1 {nodesView}
-                        else if tab==2 {accountView}
-                        else {logsView}
-                    }.id(model.signedIn ? tab:-1).transition(.asymmetric(insertion:.opacity.combined(with:.offset(y:8)),removal:.identity))
-                    if !model.message.isEmpty {Label(model.message,systemImage:"exclamationmark.circle").foregroundStyle(.red).font(.caption).textSelection(.enabled).veilbirdCard()}
-                    #if targetEnvironment(simulator)
-                    Text(L10n.text("simulator_build_verify_vpn_connections_on_a_signed_physical")).font(.caption2).foregroundStyle(VeilbirdStyle.muted)
+                        switch tab {
+                        case 0:connectionView
+                        case 1:nodesView
+                        case 2:accountView
+                        case 3:logsView
+                        default:devicesView
+                        }
+                    }.id(tab).transition(.asymmetric(insertion:.opacity.combined(with:.offset(y:8)),removal:.identity))
+                    .frame(maxWidth:560,maxHeight:.infinity).frame(maxWidth:.infinity)
+                    #if os(iOS)
+                    if tab<3 {tabBar}
                     #endif
-                }.padding(.horizontal,20).padding(.bottom,16).frame(maxWidth:560).frame(maxWidth:.infinity)
+                } else {loginView}
             }
-            if model.signedIn {
-                HStack(spacing:6) {
-                    navigationItem(L10n.text("connect_tab"),"power",0)
-                    navigationItem(L10n.text("locations"),"globe.asia.australia",1)
-                    navigationItem(L10n.text("account"),"person.crop.circle",2)
-                }.padding(.horizontal,12).padding(.vertical,8).frame(maxWidth:560).frame(maxWidth:.infinity).background(.white)
-            }
-        }.background(VeilbirdStyle.canvas).foregroundStyle(VeilbirdStyle.ink).tint(VeilbirdStyle.accent)
-        .environment(\.locale, L10n.locale).preferredColorScheme(.light).disabled(model.busy)
+        }
+        .overlay(alignment:.bottom) {messageBanner}
+        .foregroundStyle(VeilbirdStyle.text).tint(VeilbirdStyle.accent)
+        .environment(\.locale, L10n.locale).preferredColorScheme(.dark)
         .animation(reduceMotion ? nil:.easeOut(duration:0.2),value:tab).animation(reduceMotion ? nil:.easeOut(duration:0.2),value:model.signedIn)
         .task {await model.restore()}
         .alert(L10n.text("revoke_this_device_s_access"),isPresented:Binding(get:{revoke != nil},set:{if !$0 {revoke=nil}})) {
             Button(L10n.text("cancel"),role:.cancel) {revoke=nil}
             Button(L10n.text("revoke_access"),role:.destructive) {if let device=revoke {model.work {_ = try await model.api().action("revoke",["enrollmentId":device["id"] as? String ?? ""]);if device["isCurrent"] as? Bool == true {model.manager?.connection.stopVPNTunnel()};try await model.loadAccount()}};revoke=nil}
         } message:{Text(L10n.text("this_device_will_lose_access_the_slot_is_released"))}
+        #if os(iOS)
+        .sheet(isPresented:$choosingLanguage) {languageSheet.presentationDetents([.height(360)]).presentationDragIndicator(.visible)}
+        #endif
     }
 
-    /// Code, flag and the language's own name; "system" follows the device.
-    private var languages:[(code:String,flag:String,name:String)] {
-        [("system","🌐",L10n.text("language_system")),("zh-Hans","🇨🇳","简体中文"),("en","🇺🇸","English"),("ru","🇷🇺","Русский")]
+    // MARK: Pieces shared by the pages
+    private func pageTitle(_ title:String)->some View {
+        Text(title).font(.system(size:mac ? 20:34,weight:.bold)).accessibilityAddTraits(.isHeader)
+            .frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,4)
     }
-    private var currentLanguage:(code:String,flag:String,name:String) {languages.first {$0.code==language} ?? languages[0]}
-    /// Before sign-in the only language entry: a small globe in the header.
-    private var languageButton:some View {
-        languageChooser(Button {choosingLanguage=true} label:{
-            Image(systemName:"globe").font(.body).foregroundStyle(VeilbirdStyle.muted).frame(width:36,height:36).contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityLabel(L10n.text("language")+": "+currentLanguage.name))
-    }
-    /// Signed in, language is a settings row on the account page: name on the left, current value on the right.
-    private var languageRow:some View {
-        languageChooser(Button {choosingLanguage=true} label:{
+    private func subPageHeader(_ title:String,back:@escaping ()->Void)->some View {
+        ZStack {
+            Text(title).font(.system(size:mac ? 14:17,weight:.semibold)).accessibilityAddTraits(.isHeader)
             HStack {
-                Text(L10n.text("language")).font(.subheadline)
-                Spacer(minLength:8)
-                Text(currentLanguage.flag+" "+currentLanguage.name+"  ›").font(.subheadline).foregroundStyle(VeilbirdStyle.muted).lineLimit(1)
-            }.padding(.horizontal,14).frame(minHeight:48).frame(maxWidth:.infinity).background(Color.white,in:RoundedRectangle(cornerRadius:12)).contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityLabel(L10n.text("language")+": "+currentLanguage.name))
+                Button(action:back) {Image(systemName:"chevron.left").font(.system(size:mac ? 14:18,weight:.semibold)).frame(width:44,height:44).contentShape(Rectangle())}
+                    .buttonStyle(.plain).accessibilityLabel(L10n.text("back_action"))
+                Spacer()
+            }
+        }.frame(height:mac ? 40:52)
     }
-    /// The list of languages: a popover on the Mac, a choice sheet on iPhone; picking one switches at once.
+    private func caption(_ text:String)->some View {
+        Text(text).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).padding(.horizontal,4).frame(maxWidth:.infinity,alignment:.leading)
+    }
+    private func settingRow(_ title:String,_ value:String,action:@escaping ()->Void)->some View {
+        Button(action:action) {
+            HStack(spacing:8) {
+                Text(title).font(.system(size:VeilbirdStyle.body)).lineLimit(1)
+                Spacer(minLength:8)
+                Text(value).font(.system(size:VeilbirdStyle.body)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
+                Image(systemName:"chevron.right").font(.system(size:mac ? 10:13,weight:.semibold)).foregroundStyle(VeilbirdStyle.faint)
+            }.padding(.horizontal,16).frame(minHeight:mac ? 40:50)
+        }.buttonStyle(RowButton()).accessibilityLabel(title+": "+value)
+    }
+    @ViewBuilder private var messageBanner:some View {
+        if !model.message.isEmpty {
+            Text(model.message).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.text).textSelection(.enabled)
+                .padding(.horizontal,16).padding(.vertical,12).frame(maxWidth:520,alignment:.leading)
+                .background(VeilbirdStyle.raised,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+                .overlay(RoundedRectangle(cornerRadius:VeilbirdStyle.radius).stroke(VeilbirdStyle.danger.opacity(0.4)))
+                .padding(.horizontal,16).padding(.bottom,mac ? 16:96)
+                .onTapGesture {model.message=""}
+                .task(id:model.message) {try? await Task.sleep(nanoseconds:5_000_000_000);model.message=""}
+        }
+    }
+    /// Update and announcement notes: one compact card each, only when there is something to say.
+    @ViewBuilder private var notices:some View {
+        if let update=model.update {
+            HStack(spacing:12) {
+                VStack(alignment:.leading,spacing:3) {
+                    Text(L10n.text("update_available",update.version)).font(.system(size:VeilbirdStyle.body,weight:.medium))
+                    Text(L10n.text(update.mandatory ? "update_required_detail":"update_available_detail")).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary)
+                }
+                Spacer(minLength:8)
+                Link(L10n.text("update_now"),destination:update.url).font(.system(size:VeilbirdStyle.detail+1,weight:.semibold)).foregroundStyle(VeilbirdStyle.accent)
+            }.padding(14).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+        }
+        if !model.announcement.isEmpty {
+            Text(model.announcement).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).frame(maxWidth:.infinity,alignment:.leading)
+                .padding(14).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+        }
+    }
+    #if os(iOS)
+    private var tabBar:some View {
+        HStack(spacing:0) {
+            tabItem(L10n.text("connect_tab"),"slash.circle",0)
+            tabItem(L10n.text("locations"),"globe",1)
+            tabItem(L10n.text("account"),"person",2)
+        }.padding(.horizontal,12).padding(.top,7).padding(.bottom,2)
+        .background(VeilbirdStyle.ground.opacity(0.94).ignoresSafeArea(edges:.bottom))
+        .overlay(alignment:.top) {Rectangle().fill(VeilbirdStyle.hairline).frame(height:0.5)}
+    }
+    private func tabItem(_ title:String,_ icon:String,_ index:Int)->some View {
+        let selected=tab==index
+        return Button {tab=index} label:{
+            VStack(spacing:3) {Image(systemName:icon).font(.system(size:21));Text(title).font(.system(size:10,weight:.medium))}
+                .frame(maxWidth:.infinity,minHeight:44).foregroundStyle(selected ? VeilbirdStyle.accent:VeilbirdStyle.secondary).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
+    }
+    #else
+    /// The Mac window switches pages with a segmented control at the top, under the title bar.
+    private var macNavigation:some View {
+        HStack(spacing:2) {
+            ForEach([(0,"connect_tab"),(1,"locations"),(2,"account")],id:\.0) {item in
+                let index=item.0,key=item.1,selected=tab==index
+                Button {tab=index} label:{
+                    Text(L10n.text(key)).font(.system(size:12,weight:.medium)).padding(.horizontal,14).frame(height:24)
+                        .foregroundStyle(selected ? VeilbirdStyle.text:VeilbirdStyle.secondary)
+                        .background(selected ? VeilbirdStyle.selected:Color.clear,in:RoundedRectangle(cornerRadius:5)).contentShape(Rectangle())
+                }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
+            }
+        }.padding(2).background(Color(red:26/255,green:34/255,blue:28/255),in:RoundedRectangle(cornerRadius:7)).padding(.top,8).padding(.bottom,4)
+    }
+    #endif
+
+    // MARK: Language: native names, no flags
+    private var languages:[(code:String,name:String)] {
+        [("system",L10n.text("language_system")),("zh-Hans","简体中文"),("en","English"),("ru","Русский")]
+    }
+    private var currentLanguage:(code:String,name:String) {languages.first {$0.code==language} ?? languages[0]}
+    private var shortLanguageName:String {L10n.language == "zh-Hans" ? "简体中文":(L10n.language == "ru" ? "Русский":"English")}
+    #if os(iOS)
+    private var languageSheet:some View {
+        VStack(alignment:.leading,spacing:14) {
+            Text(L10n.text("language")).font(.system(size:17,weight:.semibold)).padding(.horizontal,4).padding(.top,24)
+            CardGroup {
+                ForEach(languages.indices,id:\.self) {i in
+                    if i>0 {Hairline()}
+                    Button {language=languages[i].code;choosingLanguage=false} label:{
+                        HStack {Text(languages[i].name).font(.system(size:17));Spacer();if languages[i].code==language {Image(systemName:"checkmark").font(.system(size:15,weight:.semibold)).foregroundStyle(VeilbirdStyle.accent)}}
+                            .padding(.horizontal,16).frame(minHeight:50)
+                    }.buttonStyle(RowButton()).accessibilityAddTraits(languages[i].code==language ? .isSelected:[])
+                }
+            }
+            Spacer()
+        }.padding(.horizontal,16).frame(maxWidth:.infinity).background(VeilbirdStyle.surface.ignoresSafeArea()).foregroundStyle(VeilbirdStyle.text).preferredColorScheme(.dark)
+    }
+    #endif
+    /// The list of languages: a popover on the Mac, a sheet on iPhone; picking one switches at once.
     @ViewBuilder private func languageChooser<Content:View>(_ trigger:Content)->some View {
         #if os(macOS)
         trigger.popover(isPresented:$choosingLanguage,arrowEdge:.bottom) {
             VStack(spacing:2) {
                 ForEach(languages,id:\.code) {item in
                     Button {language=item.code;choosingLanguage=false} label:{
-                        HStack(spacing:10) {Text(item.flag);Text(item.name);Spacer();if item.code==language {Image(systemName:"checkmark").foregroundStyle(VeilbirdStyle.accent)}}
-                            .padding(.horizontal,12).padding(.vertical,8).frame(width:220,alignment:.leading).contentShape(Rectangle())
+                        HStack(spacing:10) {Text(item.name);Spacer();if item.code==language {Image(systemName:"checkmark").foregroundStyle(VeilbirdStyle.accent)}}
+                            .padding(.horizontal,12).padding(.vertical,7).frame(width:200,alignment:.leading).contentShape(Rectangle())
                     }.buttonStyle(.plain)
                 }
             }.padding(6)
         }
         #else
-        trigger.confirmationDialog(L10n.text("language"),isPresented:$choosingLanguage,titleVisibility:.visible) {
-            ForEach(languages,id:\.code) {item in Button((item.code==language ? "✓ ":"")+item.flag+"  "+item.name) {language=item.code}}
-            Button(L10n.text("cancel"),role:.cancel) {}
-        }
+        trigger
         #endif
     }
-    /// Below the connect button: what this account has used and how long it runs.
-    private var usageStrip:some View {
-        let traffic=model.account["traffic"] as? [String:Any]
-        let used=traffic.map {(Int64(String(describing:$0["uploadBytes"] ?? "0")) ?? 0)+(Int64(String(describing:$0["downloadBytes"] ?? "0")) ?? 0)}
-        return HStack(alignment:.top,spacing:12) {
-            usageCell(L10n.text("traffic_30_days"),used.map {ByteCountFormatter.string(fromByteCount:$0,countStyle:.binary)} ?? "—")
-            usageCell(L10n.text("valid_until_label"),model.account.isEmpty ? "—":L10n.date(model.account["expiresAt"] as? String))
-        }.padding(.horizontal,16).padding(.vertical,10).background(Color.white,in:RoundedRectangle(cornerRadius:12)).padding(.top,6)
-    }
-    private func usageCell(_ title:String,_ value:String)->some View {
-        VStack(alignment:.leading,spacing:2) {
-            Text(title).font(.caption).foregroundStyle(VeilbirdStyle.muted).lineLimit(1)
-            Text(value).font(.subheadline.weight(.semibold)).lineLimit(1).monospacedDigit()
-        }.frame(maxWidth:.infinity,alignment:.leading)
-    }
-    private func navigationItem(_ title:String,_ icon:String,_ index:Int)->some View {
-        let selected=tab==index || (tab==3 && index==2)
-        return Button {tab=index} label:{VStack(spacing:3) {Image(systemName:icon).font(.body);Text(title).font(.caption2.bold())}.frame(maxWidth:.infinity).padding(.vertical,6)
-            .foregroundStyle(selected ? VeilbirdStyle.accent:VeilbirdStyle.muted).background(selected ? VeilbirdStyle.mint:Color.clear,in:RoundedRectangle(cornerRadius:12))}
-            .buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
-    }
+
+    // MARK: Sign-in
     private var loginView:some View {
-        VStack(alignment:.leading,spacing:14) {
-            Text(L10n.text("your_world_one_tap_away")).font(.title.bold()).padding(.top,8)
-            Text(L10n.text("sign_in_to_veilbird_no_imports_or_configuration_needed")).font(.callout).foregroundStyle(VeilbirdStyle.muted)
-            if (Bundle.main.object(forInfoDictionaryKey:"VeilbirdAPIOrigin") as? String ?? "").isEmpty {Text(L10n.text("development_server_address")).font(.caption.bold());TextField("https://…",text:$model.origin).literalInput().veilbirdField()}
-            Text(L10n.text("email")).font(.caption.bold());TextField(L10n.text("enter_email"),text:$email).literalInput().veilbirdField()
-            Text(L10n.text("password")).font(.caption.bold());SecureField(L10n.text("enter_password"),text:$password).veilbirdField().onSubmit {login()}
-            Button(L10n.text("sign_in_and_start")) {login()}.buttonStyle(VeilbirdButton(primary:true)).disabled(email.trimmingCharacters(in:.whitespaces).isEmpty || password.isEmpty)
-            Text(L10n.text("allow_the_system_to_add_a_vpn_on_first")).font(.caption).foregroundStyle(VeilbirdStyle.muted)
+        ScrollView {
+            VStack(spacing:0) {
+                HStack {
+                    Spacer()
+                    // Before sign-in the only language entry: a small globe and the language's name, top right.
+                    languageChooser(Button {choosingLanguage=true} label:{
+                        HStack(spacing:6) {Image(systemName:"globe");Text(shortLanguageName)}.font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary)
+                            .padding(.horizontal,10).frame(height:36).contentShape(Rectangle())
+                    }.buttonStyle(.plain).accessibilityLabel(L10n.text("language")+": "+currentLanguage.name))
+                }.frame(height:44)
+                notices
+                LogoTile(size:mac ? 52:64).padding(.top,mac ? 24:56)
+                Text("TrackNothing").font(.system(size:mac ? 20:24,weight:.semibold)).padding(.top,16).accessibilityAddTraits(.isHeader)
+                Text(L10n.text("sign_in_tagline")).font(.system(size:mac ? 13:15)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).padding(.top,6)
+                VStack(alignment:.leading,spacing:8) {
+                    if (Bundle.main.object(forInfoDictionaryKey:"VeilbirdAPIOrigin") as? String ?? "").isEmpty {
+                        caption(L10n.text("development_server_address"));TextField("https://…",text:$model.origin).literalInput().veilbirdField().padding(.bottom,6)
+                    }
+                    caption(L10n.text("email"));TextField("name@example.com",text:$email).literalInput().veilbirdField().padding(.bottom,6)
+                    caption(L10n.text("password"))
+                    ZStack(alignment:.trailing) {
+                        Group {
+                            if showPassword {TextField(L10n.text("enter_password"),text:$password).literalInput()}
+                            else {SecureField(L10n.text("enter_password"),text:$password)}
+                        }.veilbirdField().onSubmit {login()}
+                        Button {showPassword.toggle()} label:{Image(systemName:showPassword ? "eye.slash":"eye").foregroundStyle(VeilbirdStyle.secondary).frame(width:44,height:44).contentShape(Rectangle())}
+                            .buttonStyle(.plain).accessibilityLabel(L10n.text(showPassword ? "hide_password":"show_password")).padding(.trailing,4)
+                    }
+                    Button {login()} label:{
+                        if model.busy {ProgressView().controlSize(.small).tint(VeilbirdStyle.onAccent)} else {Text(L10n.text("sign_in_action"))}
+                    }.buttonStyle(PrimaryButton()).disabled(model.busy || email.trimmingCharacters(in:.whitespaces).isEmpty || password.isEmpty).padding(.top,22)
+                }.padding(.top,mac ? 28:44)
+            }.padding(.horizontal,mac ? 32:28).padding(.bottom,24).frame(maxWidth:460).frame(maxWidth:.infinity)
         }
     }
     private func login() {
         guard !email.trimmingCharacters(in:.whitespaces).isEmpty,!password.isEmpty else {return}
-        model.work {try await model.api().login(email:email.trimmingCharacters(in:.whitespaces),password:password);UserDefaults.standard.set(model.origin,forKey:"origin");password="";model.signedIn=true;try await model.loadNodes();await model.checkForUpdate()}
+        model.work {try await model.api().login(email:email.trimmingCharacters(in:.whitespaces),password:password);UserDefaults.standard.set(model.origin,forKey:"origin");password="";tab=0;model.signedIn=true;try await model.loadNodes();await model.checkForUpdate()}
     }
-    private func gradeColor(_ quality:Quality?)->Color {
-        switch quality?.grade {
-        case "quality_good":return Color(red:0,green:0.55,blue:0.38)
-        case "quality_fair":return Color(red:0.77,green:0.52,blue:0)
-        case "quality_poor":return Color(red:0.75,green:0.24,blue:0.18)
-        default:return Color(red:0.75,green:0.77,blue:0.75)
+
+    // MARK: Connect
+    private func summary(_ quality:Quality)->String {quality.latency.map {L10n.text("latency_ms",L10n.number($0))+" · "+L10n.text(quality.grade)} ?? L10n.text(quality.grade)}
+    private func ms(_ quality:Quality?)->String? {quality?.latency.map {L10n.text("latency_ms",L10n.number($0))}}
+    private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
+    private var ringState:RingState {
+        if model.connected {return model.since != nil ? .connected:.connecting}
+        return model.failed ? .failed:.idle
+    }
+    private var connectionView:some View {
+        let state=ringState
+        let size:CGFloat=mac ? 184:216
+        return VStack(spacing:0) {
+            #if os(iOS)
+            HStack(spacing:10) {LogoTile(size:22);Text("TrackNothing").font(.system(size:17,weight:.semibold));Spacer()}.frame(height:44)
+            #endif
+            notices
+            Spacer(minLength:16)
+            Button {toggleConnection()} label:{ConnectRing(state:state,size:size)}.buttonStyle(.plain)
+                .accessibilityLabel(L10n.text(state == .idle ? "connect_action":(state == .failed ? "retry_action":"disconnect_action")))
+            VStack(spacing:8) {
+                HStack(spacing:10) {
+                    if state == .connected {Circle().fill(VeilbirdStyle.accent).frame(width:8,height:8)}
+                    Text(L10n.text(state == .connected ? "connected_status":(state == .connecting ? "connecting":(state == .failed ? "connect_failed_title":"not_connected"))))
+                        .font(.system(size:mac ? 22:28,weight:.bold))
+                }
+                stateDetail(state).font(.system(size:mac ? 13:15)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).monospacedDigit().lineLimit(2)
+            }.padding(.top,mac ? 28:36).animation(reduceMotion ? nil:.easeInOut(duration:0.2),value:state)
+            Spacer(minLength:16)
+            Button {tab=1} label:{currentLocationRow}.buttonStyle(RowButton())
+                .background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius+4)).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius+4))
+                .accessibilityHint(L10n.text("tap_to_change"))
+            usageStrip.padding(.top,16)
+        }.padding(.horizontal,mac ? 20:16).padding(.bottom,20).task {try? await model.loadAccount()}
+    }
+    @ViewBuilder private func stateDetail(_ state:RingState)->some View {
+        switch state {
+        case .connected:
+            if model.status == "connection_confirming" {Text(L10n.text("connection_confirming"))}
+            else if let since=model.since {
+                TimelineView(.periodic(from:since,by:1)) {context in
+                    Text(L10n.text("connection_stats",Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond)),mbps(model.rxRate),mbps(model.txRate)))
+                }
+            }
+        case .connecting:Text(L10n.text("finding_best_route"))
+        case .failed:Text(model.failure)
+        case .idle:Text(L10n.text(model.update?.mandatory == true ? "update_required_detail":"tap_ring_to_connect"))
         }
     }
-    private func summary(_ quality:Quality)->String {quality.latency.map {L10n.text("latency_ms",L10n.number($0))+" · "+L10n.text(quality.grade)} ?? L10n.text(quality.grade)}
-    private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
-    /// Everything needed to connect fits on one screen: state, current location, one button.
-    private var connectionView:some View {
-        let on=model.connected && model.since != nil
+    private func toggleConnection() {
+        if !model.connected && model.update?.mandatory == true {model.message=L10n.text("update_required_detail");return}
+        model.work {try await model.toggle()}
+    }
+    private var currentLocationRow:some View {
         let id=model.connected ? model.connectedNodeId:model.selected
         let quality=id.isEmpty ? nil:Latency.recent(id)
-        let title=model.connected && !model.nodeName.isEmpty ? model.nodeName:model.selected.isEmpty ? L10n.text("automatic_recommended"):(model.selectedName.isEmpty ? L10n.text("location"):model.selectedName)
-        let detail=quality.map(summary) ?? (!model.connected && model.selected.isEmpty ? L10n.text("auto_detail"):L10n.text("tap_to_change"))
-        return VStack(spacing:12) {
-            PowerBadge(on:on,connecting:model.connected && model.since == nil).accessibilityHidden(true)
-            Text(L10n.text(model.status)).font(.title3.bold()).animation(reduceMotion ? nil:.easeInOut(duration:0.2),value:model.status)
-            Group {
-                if let since=model.since {
-                    TimelineView(.periodic(from:since,by:1)) {context in
-                        Text(L10n.text("connection_stats",Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond)),mbps(model.rxRate),mbps(model.txRate)))
-                    }
-                } else {Text(" ")}
-            }.font(.caption).foregroundStyle(VeilbirdStyle.muted).monospacedDigit().padding(.bottom,6)
-            Button {tab=1} label:{row(title,detail,dot:quality==nil && !model.connected && model.selected.isEmpty ? VeilbirdStyle.accent:gradeColor(quality),trailing:"›",selected:false)}.buttonStyle(.plain)
-            if model.update?.mandatory != true || model.connected {
-                Button(model.connected ? L10n.text("disconnect_action"):L10n.text("connect_action")) {model.work {try await model.toggle()}}.buttonStyle(VeilbirdButton(primary:true))
-            }
-            usageStrip
-        }.frame(maxWidth:.infinity).task {try? await model.loadAccount()}
-    }
-    /// A list row: status dot, title with a muted detail line, and an optional value on the right.
-    private func row(_ title:String,_ detail:String,dot:Color,trailing:String,trailingColor:Color=VeilbirdStyle.muted,selected:Bool)->some View {
-        HStack(spacing:12) {
-            Circle().fill(dot).frame(width:9,height:9)
-            VStack(alignment:.leading,spacing:2) {
-                Text(title).font(.subheadline.weight(.semibold)).lineLimit(1)
-                if !detail.isEmpty {Text(detail).font(.caption).foregroundStyle(VeilbirdStyle.muted).lineLimit(1)}
+        let automatic=model.selected.isEmpty
+        let title:String, detail:String, badge:Badge
+        if model.connected && !id.isEmpty {
+            title=model.nodeName.isEmpty ? L10n.text("location"):model.nodeName
+            detail=automatic ? (ms(quality).map {L10n.text("connected_automatic_detail",$0)} ?? L10n.text("automatic")):(quality.map(summary) ?? L10n.text("tap_to_change"))
+            badge=Badge(code:model.code(id,name:title))
+        } else if automatic {
+            title=L10n.text("automatic")
+            // The location automatic mode would pick now, when this session measured one.
+            let best=model.nodes.compactMap {node -> (String,Quality)? in
+                guard let id=node["id"] as? String,let q=Latency.recent(id),q.latency != nil else {return nil}
+                return (node["name"] as? String ?? "",q)
+            }.min {$0.1.score<$1.1.score}
+            detail=best.map {$0.0+" · "+(ms($0.1) ?? "")} ?? L10n.text("auto_detail")
+            badge=Badge(icon:"sparkles",tint:VeilbirdStyle.accent)
+        } else {
+            title=model.selectedName.isEmpty ? L10n.text("location"):model.selectedName
+            detail=quality.map(summary) ?? L10n.text("tap_to_change")
+            badge=Badge(code:model.code(id,name:title))
+        }
+        return HStack(spacing:14) {
+            badge
+            VStack(alignment:.leading,spacing:3) {
+                Text(title).font(.system(size:VeilbirdStyle.body,weight:.medium)).lineLimit(1)
+                Text(detail).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
             }
             Spacer(minLength:8)
-            Text(trailing).font(.subheadline.weight(.semibold)).foregroundStyle(trailingColor)
-        }.padding(.horizontal,14).padding(.vertical,10).frame(minHeight:52).frame(maxWidth:.infinity,alignment:.leading)
-        .background(selected ? VeilbirdStyle.mint:Color.white,in:RoundedRectangle(cornerRadius:12)).contentShape(Rectangle())
+            Image(systemName:"chevron.right").font(.system(size:mac ? 11:13,weight:.semibold)).foregroundStyle(VeilbirdStyle.faint)
+        }.padding(.horizontal,16).frame(height:mac ? 58:66)
     }
+    private func trafficTotal(_ traffic:[String:Any]?)->Int64? {
+        traffic.map {(Int64(String(describing:$0["uploadBytes"] ?? "0")) ?? 0)+(Int64(String(describing:$0["downloadBytes"] ?? "0")) ?? 0)}
+    }
+    private func bytes(_ value:Int64)->String {ByteCountFormatter.string(fromByteCount:value,countStyle:.binary)}
+    /// What this account has used and how long it runs: two quiet figures under the location.
+    private var usageStrip:some View {
+        HStack(alignment:.top,spacing:16) {
+            usageCell(L10n.text("last_30_days"),trafficTotal(model.account["traffic"] as? [String:Any]).map(bytes) ?? "—")
+            usageCell(L10n.text("valid_until_label"),model.account.isEmpty ? "—":L10n.date(model.account["expiresAt"] as? String))
+        }.padding(.horizontal,4)
+    }
+    private func usageCell(_ title:String,_ value:String)->some View {
+        VStack(alignment:.leading,spacing:4) {
+            Text(title).font(.system(size:mac ? 11:12)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
+            Text(value).font(.system(size:mac ? 14:16,weight:.medium)).lineLimit(1).monospacedDigit()
+        }.frame(maxWidth:.infinity,alignment:.leading)
+    }
+
+    // MARK: Locations
     private var filteredNodes:[[String:Any]] {model.nodes.filter {search.isEmpty || "\($0["name"] ?? "") \($0["region"] ?? "")".localizedCaseInsensitiveContains(search)}}
+    private func signal(_ quality:Quality)->(Int,Color) {
+        switch quality.grade {
+        case "quality_good":return (3,VeilbirdStyle.accent)
+        case "quality_fair":return (2,VeilbirdStyle.fair)
+        default:return (1,VeilbirdStyle.danger)
+        }
+    }
     private var nodesView:some View {
-        VStack(alignment:.leading,spacing:8) {
-            HStack {
-                Text(L10n.text("locations")).font(.title3.bold());Spacer()
-                Button(L10n.text(model.measuring ? "measuring_latency":"retest_latency")) {Task {await model.measure()}}.font(.callout).disabled(model.connected || model.measuring)
-            }
-            Picker(L10n.text("routing_smart"),selection:Binding(get:{model.routing},set:{value in if model.connected {model.message=L10n.text("disconnect_before_changing_routing")} else {model.routing=value}})) {
-                Text(L10n.text("routing_smart")).tag("smart");Text(L10n.text("routing_global")).tag("global")
-            }.pickerStyle(.segmented).labelsHidden()
-            Text(L10n.text(model.routing=="smart" ? "routing_smart_detail":"routing_global_detail")).font(.caption).foregroundStyle(VeilbirdStyle.muted)
-            if model.connected {Text(L10n.text("test_after_disconnecting")).font(.caption).foregroundStyle(VeilbirdStyle.muted)}
-            Button {choose("",name:"")} label:{row(L10n.text("automatic_recommended"),L10n.text("auto_detail"),dot:VeilbirdStyle.accent,trailing:model.selected.isEmpty ? "✓":"",trailingColor:VeilbirdStyle.accent,selected:model.selected.isEmpty)}.buttonStyle(.plain).padding(.vertical,4)
-            if model.nodes.count>6 {HStack {Image(systemName:"magnifyingglass").foregroundStyle(VeilbirdStyle.muted);TextField(L10n.text("search_locations_or_regions"),text:$search).textFieldStyle(.plain)}.padding(10).background(.white,in:RoundedRectangle(cornerRadius:10))}
-            ForEach(filteredNodes.indices,id:\.self) {i in
-                let node=filteredNodes[i],id=node["id"] as? String ?? "",name=node["name"] as? String ?? ""
-                let quality=Latency.recent(id)
-                let load=quality?.load ?? Latency.load(node)
-                let detail=[(node["region"] as? String).flatMap {$0.isEmpty ? nil:$0},
-                            quality.flatMap {$0.latency == nil ? nil:L10n.text("node_quality_detail",L10n.number($0.jitter),L10n.number($0.loss))},
-                            load.map {L10n.text("node_load",L10n.number($0))}].compactMap {$0}.joined(separator:" · ")
-                let trailing=quality.map {$0.latency.map {L10n.text("latency_ms",L10n.number($0))} ?? L10n.text("quality_unreachable")} ?? (model.measuring ? "…":"")
-                Button {choose(id,name:name)} label:{row(name,detail,dot:gradeColor(quality),trailing:trailing,trailingColor:quality == nil ? VeilbirdStyle.muted:gradeColor(quality),selected:model.selected==id)}
-                    .buttonStyle(.plain).accessibilityAddTraits(model.selected==id ? .isSelected:[])
-            }
-            if filteredNodes.isEmpty {Text(model.nodes.isEmpty ? L10n.text("no_locations_available_refresh_or_contact_your_administrator"):L10n.text("no_matching_locations_try_another_search")).font(.callout).foregroundStyle(VeilbirdStyle.muted)}
+        ScrollView {
+            VStack(alignment:.leading,spacing:0) {
+                HStack {
+                    pageTitle(L10n.text("locations"))
+                    if model.measuring {ProgressView().controlSize(.small).frame(width:44,height:44)}
+                    else {
+                        Button {Task {await model.measure()}} label:{Image(systemName:"arrow.clockwise").font(.system(size:mac ? 13:18,weight:.medium)).foregroundStyle(VeilbirdStyle.accent).frame(width:44,height:44).contentShape(Rectangle())}
+                            .buttonStyle(.plain).disabled(model.connected).accessibilityLabel(L10n.text("retest_latency"))
+                    }
+                }
+                HStack(spacing:2) {
+                    ForEach([("smart","routing_smart"),("global","routing_global")],id:\.0) {item in
+                        let value=item.0,key=item.1,selected=model.routing==value
+                        Button {if model.connected {model.message=L10n.text("disconnect_before_changing_routing")} else {model.routing=value}} label:{
+                            Text(L10n.text(key)).font(.system(size:mac ? 12:14,weight:selected ? .semibold:.regular)).frame(maxWidth:.infinity).frame(height:mac ? 26:34)
+                                .foregroundStyle(selected ? VeilbirdStyle.text:VeilbirdStyle.secondary)
+                                .background(selected ? VeilbirdStyle.selected:Color.clear,in:RoundedRectangle(cornerRadius:mac ? 5:8)).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
+                    }
+                }.padding(2).background(Color(red:26/255,green:34/255,blue:28/255),in:RoundedRectangle(cornerRadius:mac ? 7:10)).padding(.top,mac ? 8:12)
+                caption(L10n.text(model.routing=="smart" ? "routing_smart_detail":"routing_global_detail")).padding(.top,8)
+                if model.connected {caption(L10n.text("test_after_disconnecting")).padding(.top,4)}
+                if model.nodes.count>6 {
+                    HStack(spacing:8) {
+                        Image(systemName:"magnifyingglass").foregroundStyle(VeilbirdStyle.secondary)
+                        TextField(L10n.text("search_locations_or_regions"),text:$search).textFieldStyle(.plain).font(.system(size:VeilbirdStyle.body))
+                    }.padding(.horizontal,12).frame(height:mac ? 30:40).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:10)).padding(.top,16)
+                }
+                Button {choose("",name:"")} label:{
+                    HStack(spacing:14) {
+                        Badge(icon:"sparkles",tint:VeilbirdStyle.accent)
+                        VStack(alignment:.leading,spacing:2) {
+                            Text(L10n.text("automatic")).font(.system(size:VeilbirdStyle.body,weight:.medium))
+                            Text(L10n.text("select_an_available_location_for_you")).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
+                        }
+                        Spacer(minLength:8)
+                        if model.selected.isEmpty {Image(systemName:"checkmark").font(.system(size:mac ? 12:15,weight:.semibold)).foregroundStyle(VeilbirdStyle.accent)}
+                    }.padding(.horizontal,16).frame(minHeight:mac ? 52:64)
+                }.buttonStyle(RowButton()).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+                .overlay(RoundedRectangle(cornerRadius:VeilbirdStyle.radius).stroke(model.selected.isEmpty ? VeilbirdStyle.accent.opacity(0.45):Color.clear))
+                .clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).padding(.top,16)
+                .accessibilityAddTraits(model.selected.isEmpty ? .isSelected:[])
+                caption(L10n.text("all_locations")).padding(.top,20).padding(.bottom,8)
+                if filteredNodes.isEmpty {
+                    caption(model.nodes.isEmpty ? L10n.text("no_locations_available_refresh_or_contact_your_administrator"):L10n.text("no_matching_locations_try_another_search"))
+                } else {
+                    CardGroup {
+                        ForEach(filteredNodes.indices,id:\.self) {i in
+                            if i>0 {Hairline(inset:mac ? 60:66)}
+                            nodeRow(filteredNodes[i])
+                        }
+                    }
+                }
+            }.padding(.horizontal,16).padding(.top,mac ? 4:8).padding(.bottom,20)
         }.task {if model.nodes.isEmpty {model.work {try await model.loadNodes()}} else {await model.measure()}}
+    }
+    private func nodeRow(_ node:[String:Any])->some View {
+        let id=node["id"] as? String ?? "",name=node["name"] as? String ?? ""
+        let region=(node["region"] as? String).flatMap {$0.isEmpty || $0==name ? nil:$0}
+        let quality=Latency.recent(id)
+        let unreachable=quality != nil && quality?.latency == nil
+        let selected=model.selected==id
+        return Button {choose(id,name:name)} label:{
+            HStack(spacing:14) {
+                Badge(code:model.code(id,name:name),tint:unreachable ? VeilbirdStyle.faint:VeilbirdStyle.text)
+                VStack(alignment:.leading,spacing:2) {
+                    Text(name).font(.system(size:VeilbirdStyle.body)).lineLimit(1)
+                    if let region {Text(region).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)}
+                }.foregroundStyle(unreachable ? VeilbirdStyle.faint:VeilbirdStyle.text)
+                Spacer(minLength:8)
+                if let quality {
+                    if let text=ms(quality) {
+                        Text(text).font(.system(size:VeilbirdStyle.detail+1)).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()
+                        let (level,color)=signal(quality);SignalBars(level:level,color:color)
+                    } else {Text(L10n.text("quality_unreachable")).font(.system(size:VeilbirdStyle.detail+1)).foregroundStyle(VeilbirdStyle.faint)}
+                } else if model.measuring {Text("…").foregroundStyle(VeilbirdStyle.secondary)}
+                if selected {Image(systemName:"checkmark").font(.system(size:mac ? 12:15,weight:.semibold)).foregroundStyle(VeilbirdStyle.accent).padding(.leading,4)}
+            }.padding(.horizontal,16).frame(minHeight:mac ? 44:56)
+        }.buttonStyle(RowButton()).accessibilityLabel(name+", "+(quality.map(summary) ?? "")).accessibilityAddTraits(selected ? .isSelected:[])
     }
     private func choose(_ id:String,name:String) {
         if model.connected {model.message=L10n.text("disconnect_before_changing_location");return}
         model.selected=id;model.selectedName=name;tab=0
     }
+
+    // MARK: Account
     private var accountView:some View {
-        VStack(alignment:.leading,spacing:10) {
-            Text(L10n.text("my_veilbird")).font(.title3.bold())
-            VStack(alignment:.leading,spacing:6) {
-                Text(model.account["name"] as? String ?? L10n.text("my_account")).font(.headline)
-                Text(model.account["email"] as? String ?? "").font(.caption).foregroundStyle(VeilbirdStyle.muted)
-                Text(L10n.text("account_valid_until", L10n.date(model.account["expiresAt"] as? String))).font(.caption)
-                let traffic=model.account["traffic"] as? [String:Any] ?? [:]
-                Text(L10n.text("traffic_30_days")+"   ↑ \(bytes(traffic["uploadBytes"]))   ↓ \(bytes(traffic["downloadBytes"]))").font(.caption).monospacedDigit()
-            }.veilbirdCard()
-            HStack {Text(L10n.text("authorized_devices")).font(.subheadline.bold());Spacer();Text("\(L10n.number(model.account["used"] as? Int ?? 0)) / \(L10n.number(model.account["limit"] as? Int ?? 0))").font(.subheadline.bold()).foregroundStyle(VeilbirdStyle.accent)}
-            Text(L10n.text("new_devices_are_added_on_their_first_connection_when")).font(.caption).foregroundStyle(VeilbirdStyle.muted)
-            let devices=(model.account["devices"] as? [[String:Any]] ?? []).filter {$0["status"] as? String != "revoked"}
-            ForEach(devices.indices,id:\.self) {i in let device=devices[i]
-                let revoking=device["status"] as? String == "revoking"
-                Button {if !revoking {revoke=device}} label:{row((device["name"] as? String ?? L10n.text("device"))+(device["isCurrent"] as? Bool == true ? L10n.text("this_device"):""),
-                    revoking ? L10n.text("revoking_slot_released_when_the_old_connection_expires"):device["platform"] as? String ?? "",dot:VeilbirdStyle.accent,
-                    trailing:revoking ? "":L10n.text("revoke_access"),trailingColor:.red,selected:false)}.buttonStyle(.plain)
-            }
-            languageRow
-            Button(L10n.text("sign_out"),role:.destructive) {model.work {_ = try? await model.api().request("logout",[:]);try SecureStorage.write("token",nil);model.signedIn=false;model.account=[:]}}
-                .frame(maxWidth:.infinity).padding(.vertical,12).background(Color(red:1,green:0.93,blue:0.92),in:RoundedRectangle(cornerRadius:12)).buttonStyle(.plain).foregroundStyle(.red).disabled(model.connected)
-            if model.connected {Text(L10n.text("disconnect_before_signing_out_hint")).font(.caption).foregroundStyle(VeilbirdStyle.muted)}
-            // The diagnostic log has no visible entry: seven taps on the version open it.
-            Text(L10n.text("version_label",Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")).font(.caption2).foregroundStyle(VeilbirdStyle.muted)
-                .frame(maxWidth:.infinity).padding(.vertical,8).contentShape(Rectangle()).onTapGesture {
-                    if Date().timeIntervalSince(firstTap)>4 {versionTaps=0;firstTap=Date()}
-                    versionTaps+=1
-                    if versionTaps>=7 {versionTaps=0;tab=3}
+        let email=model.account["email"] as? String ?? ""
+        let name=(model.account["name"] as? String).flatMap {$0.isEmpty ? nil:$0} ?? email
+        return ScrollView {
+            VStack(alignment:.leading,spacing:20) {
+                #if os(iOS)
+                pageTitle(L10n.text("account"))
+                #endif
+                HStack(spacing:14) {
+                    Text(String(name.prefix(1)).uppercased()).font(.system(size:mac ? 16:19,weight:.semibold)).foregroundStyle(VeilbirdStyle.accent)
+                        .frame(width:mac ? 40:48,height:mac ? 40:48).background(VeilbirdStyle.raised,in:Circle())
+                    VStack(alignment:.leading,spacing:3) {
+                        Text(email).font(.system(size:mac ? 14:17,weight:.semibold)).lineLimit(1)
+                        Text(L10n.text("account_valid_until",L10n.date(model.account["expiresAt"] as? String))).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary)
+                    }
+                }.padding(.horizontal,4).opacity(model.account.isEmpty ? 0:1)
+                usageCard
+                CardGroup {
+                    settingRow(L10n.text("authorized_devices"),"\(L10n.number(model.account["used"] as? Int ?? 0)) / \(L10n.number(model.account["limit"] as? Int ?? 0))") {tab=4}
+                    Hairline()
+                    languageChooser(settingRow(L10n.text("language"),currentLanguage.name) {choosingLanguage=true})
+                    Hairline()
+                    #if os(iOS)
+                    settingRow(L10n.text("shortcuts"),L10n.text("shortcuts_detail")) {if let url=URL(string:"shortcuts://") {openURL(url)}}
+                    #else
+                    Toggle(isOn:Binding(get:{openAtLogin},set:{value in
+                        do {if value {try SMAppService.mainApp.register()} else {try SMAppService.mainApp.unregister()};openAtLogin=value} catch {model.message=error.localizedDescription}
+                    })) {Text(L10n.text("open_at_login")).font(.system(size:VeilbirdStyle.body))}
+                        .toggleStyle(.switch).controlSize(.small).tint(VeilbirdStyle.accent).padding(.horizontal,16).frame(minHeight:40)
+                    #endif
+                    Hairline()
+                    settingRow(L10n.text("check_for_updates"),model.update.map {L10n.text("update_available",$0.version)} ?? L10n.text("up_to_date")) {
+                        if let update=model.update {openURL(update.url)} else {Task {await model.checkForUpdate();if model.update == nil {model.message=L10n.text("up_to_date")}}}
+                    }
                 }
-        }.task {model.work {try await model.loadAccount()}}
+                Button {
+                    if model.connected {model.message=L10n.text("disconnect_the_vpn_before_signing_out");return}
+                    model.work {_ = try? await model.api().request("logout",[:]);try SecureStorage.write("token",nil);model.signedIn=false;model.account=[:];tab=0}
+                } label:{Text(L10n.text("sign_out")).font(.system(size:VeilbirdStyle.body)).foregroundStyle(VeilbirdStyle.danger).frame(maxWidth:.infinity).frame(height:mac ? 40:50)}
+                    .buttonStyle(RowButton()).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+                // The diagnostic log has no visible entry: seven taps on the version open it.
+                Text("TrackNothing "+(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")).font(.system(size:mac ? 11:12)).foregroundStyle(VeilbirdStyle.faint)
+                    .frame(maxWidth:.infinity).padding(.vertical,4).contentShape(Rectangle()).onTapGesture {
+                        if Date().timeIntervalSince(firstTap)>4 {versionTaps=0;firstTap=Date()}
+                        versionTaps+=1
+                        if versionTaps>=7 {versionTaps=0;tab=3}
+                    }
+            }.padding(.horizontal,16).padding(.top,mac ? 8:8).padding(.bottom,20)
+        }.task {if model.account.isEmpty {model.work {try await model.loadAccount()}} else {try? await model.loadAccount()}}
+    }
+    /// 30-day total, a bar per day, and the download / upload split.
+    @ViewBuilder private var usageCard:some View {
+        if let traffic=model.account["traffic"] as? [String:Any] {
+            let down=Int64(String(describing:traffic["downloadBytes"] ?? "0")) ?? 0, up=Int64(String(describing:traffic["uploadBytes"] ?? "0")) ?? 0
+            let days=dailyUsage(traffic)
+            VStack(alignment:.leading,spacing:mac ? 10:12) {
+                HStack {
+                    Text(L10n.text("traffic_30_days")).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary)
+                    Spacer()
+                    if !days.isEmpty {Text(L10n.text("daily")).font(.system(size:mac ? 11:12)).foregroundStyle(VeilbirdStyle.secondary)}
+                }
+                totalText(bytes(down+up))
+                if !days.isEmpty {UsageBars(values:days).frame(height:mac ? 32:40)}
+                HStack(spacing:20) {
+                    Text(L10n.text("download_amount",bytes(down)));Text(L10n.text("upload_amount",bytes(up)))
+                }.font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()
+            }.padding(16).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+        }
+    }
+    /// "143 GB": the number large, its unit small and muted.
+    private func totalText(_ value:String)->some View {
+        let parts=value.split(separator:" ",maxSplits:1).map(String.init)
+        return (Text(parts.first ?? value).font(.system(size:mac ? 28:34,weight:.bold))
+            + Text(parts.count>1 ? " "+parts[1]:"").font(.system(size:mac ? 14:17,weight:.medium)).foregroundColor(VeilbirdStyle.secondary)).monospacedDigit()
+    }
+    private func dailyUsage(_ traffic:[String:Any])->[Int64] {
+        guard let days=traffic["days"] as? [[String:Any]],!days.isEmpty else {return []}
+        var perDay:[String:Int64]=[:]
+        for day in days {perDay[day["day"] as? String ?? ""]=Int64(String(describing:day["bytes"] ?? "0")) ?? 0}
+        let formatter=DateFormatter();formatter.calendar=Calendar(identifier:.gregorian);formatter.locale=Locale(identifier:"en_US_POSIX");formatter.dateFormat="yyyy-MM-dd"
+        return (0..<30).reversed().map {offset in perDay[formatter.string(from:Date().addingTimeInterval(-Double(offset)*86400))] ?? 0}
+    }
+    private func platformName(_ value:String)->String? {
+        switch value.lowercased() {
+        case "android":return "Android"
+        case "ios":return "iOS"
+        case "ipados":return "iPadOS"
+        case "macos":return "macOS"
+        case "windows":return "Windows"
+        case "":return nil
+        default:return value
+        }
+    }
+    private var devicesView:some View {
+        let devices=(model.account["devices"] as? [[String:Any]] ?? []).filter {$0["status"] as? String != "revoked"}
+        return ScrollView {
+            VStack(alignment:.leading,spacing:10) {
+                subPageHeader(L10n.text("authorized_devices")) {tab=2}
+                HStack(alignment:.bottom) {
+                    Text(L10n.text("devices_used",L10n.number(model.account["used"] as? Int ?? 0),L10n.number(model.account["limit"] as? Int ?? 0))).font(.system(size:VeilbirdStyle.detail))
+                    Spacer(minLength:12)
+                    Text(L10n.text("devices_join_automatically")).font(.system(size:mac ? 11:12)).multilineTextAlignment(.trailing)
+                }.foregroundStyle(VeilbirdStyle.secondary).padding(.horizontal,4)
+                if devices.isEmpty {caption(L10n.text("no_authorized_devices_yet_they_appear_after_their_first"))}
+                else {
+                    CardGroup {
+                        ForEach(devices.indices,id:\.self) {i in
+                            if i>0 {Hairline(inset:mac ? 60:66)}
+                            deviceRow(devices[i])
+                        }
+                    }
+                }
+                caption(L10n.text("revoke_release_hint")).padding(.top,2)
+            }.padding(.horizontal,16).padding(.bottom,20)
+        }.task {try? await model.loadAccount()}
+    }
+    private func deviceRow(_ device:[String:Any])->some View {
+        let current=device["isCurrent"] as? Bool == true, revoking=device["status"] as? String == "revoking"
+        let platform=device["platform"] as? String ?? ""
+        let mobile=["android","ios","ipados"].contains(platform.lowercased())
+        let seen=(device["lastSeenAt"] as? String).flatMap {ISO8601DateFormatter().date(from:$0.replacingOccurrences(of:#"\.\d+"#,with:"",options:.regularExpression))}
+            .map {date -> String in let formatter=RelativeDateTimeFormatter();formatter.locale=L10n.locale;return formatter.localizedString(for:date,relativeTo:Date())}
+        let detail=[platformName(platform),current ? L10n.text("this_device").trimmingCharacters(in:CharacterSet(charactersIn:" ·")):seen].compactMap {$0}.joined(separator:" · ")
+        return HStack(spacing:14) {
+            Badge(icon:mobile ? "iphone":"laptopcomputer",tint:current ? VeilbirdStyle.accent:VeilbirdStyle.secondary)
+            VStack(alignment:.leading,spacing:2) {
+                Text(device["name"] as? String ?? L10n.text("device")).font(.system(size:VeilbirdStyle.body,weight:.medium)).lineLimit(1)
+                Text(detail).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
+            }
+            Spacer(minLength:8)
+            if revoking {Text(L10n.text("revoking_short")).font(.system(size:VeilbirdStyle.detail+1)).foregroundStyle(VeilbirdStyle.faint)}
+            else {
+                Button {revoke=device} label:{Text(L10n.text("revoke_short")).font(.system(size:VeilbirdStyle.detail+1)).foregroundStyle(VeilbirdStyle.danger).padding(.horizontal,8).frame(minHeight:36).contentShape(Rectangle())}
+                    .buttonStyle(.plain).accessibilityLabel(L10n.text("revoke_access")+": "+(device["name"] as? String ?? ""))
+            }
+        }.padding(.leading,16).padding(.trailing,8).frame(minHeight:mac ? 52:64)
     }
     private var logsView:some View {
         let log=Journal.read()
-        return VStack(alignment:.leading,spacing:10) {
-            HStack {Text(L10n.text("logs_title")).font(.title3.bold());Spacer();Button(L10n.text("back_action")) {tab=2}.font(.callout)}
-            Text(L10n.text("logs_detail")).font(.caption).foregroundStyle(VeilbirdStyle.muted)
-            HStack(spacing:8) {
-                Button(L10n.text("copy_action")) {
-                    #if os(iOS)
-                    UIPasteboard.general.string=log
-                    #else
-                    NSPasteboard.general.clearContents();NSPasteboard.general.setString(log,forType:.string)
-                    #endif
-                }.buttonStyle(VeilbirdButton()).disabled(log.isEmpty)
-                ShareLink(item:log) {Text(L10n.text("share_action")).frame(maxWidth:.infinity)}.buttonStyle(VeilbirdButton()).disabled(log.isEmpty)
-                Button(L10n.text("clear_action")) {Journal.clear();tab=2;tab=3}.buttonStyle(VeilbirdButton())
-            }
-            // Newest first: the last attempt is what someone opening the log is looking for.
-            Text(log.isEmpty ? L10n.text("logs_empty"):log.split(separator:"\n").reversed().joined(separator:"\n"))
-                .font(.system(size:11,design:.monospaced)).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading).padding(10).background(.white,in:RoundedRectangle(cornerRadius:12))
+        return ScrollView {
+            VStack(alignment:.leading,spacing:12) {
+                subPageHeader(L10n.text("logs_title")) {tab=2}
+                caption(L10n.text("logs_detail"))
+                HStack(spacing:8) {
+                    Button {
+                        #if os(iOS)
+                        UIPasteboard.general.string=log
+                        #else
+                        NSPasteboard.general.clearContents();NSPasteboard.general.setString(log,forType:.string)
+                        #endif
+                        model.message=L10n.text("copied")
+                    } label:{logAction(L10n.text("copy_action"))}.buttonStyle(.plain).disabled(log.isEmpty)
+                    ShareLink(item:log) {logAction(L10n.text("share_action"))}.buttonStyle(.plain).disabled(log.isEmpty)
+                    Button {Journal.clear();tab=2;tab=3} label:{logAction(L10n.text("clear_action"),color:VeilbirdStyle.danger)}.buttonStyle(.plain)
+                }
+                // Newest first: the last attempt is what someone opening the log is looking for.
+                Text(log.isEmpty ? L10n.text("logs_empty"):log.split(separator:"\n").reversed().joined(separator:"\n"))
+                    .font(.system(size:11,design:.monospaced)).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading).padding(12)
+                    .background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+            }.padding(.horizontal,16).padding(.bottom,20)
         }
     }
-    private func bytes(_ value:Any?)->String {ByteCountFormatter.string(fromByteCount:Int64(String(describing:value ?? "0")) ?? 0,countStyle:.binary)}
-}
-
-/// The power button: the fill eases to teal once connected and a soft ring breathes out of it while connecting.
-struct PowerBadge:View {
-    let on:Bool
-    let connecting:Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulse=false
-    var body:some View {
-        ZStack {
-            Circle().stroke(VeilbirdStyle.accent,lineWidth:2).frame(width:88,height:88)
-                .scaleEffect(pulse ? 1.38:1).opacity(connecting && !reduceMotion ? (pulse ? 0:0.7):0)
-            Image(systemName:"power").font(.system(size:34,weight:.medium)).foregroundStyle(on ? Color.white:VeilbirdStyle.accent)
-                .frame(width:88,height:88).background(on ? VeilbirdStyle.accent:VeilbirdStyle.mint,in:Circle())
-        }.frame(width:128,height:128)
-        .animation(reduceMotion ? nil:.easeInOut(duration:0.26),value:on)
-        .onAppear {restart()}.onChange(of:connecting) {_ in restart()}
-    }
-    private func restart() {
-        pulse=false
-        guard connecting && !reduceMotion else {return}
-        withAnimation(.easeOut(duration:1.4).repeatForever(autoreverses:false)) {pulse=true}
+    private func logAction(_ title:String,color:Color=VeilbirdStyle.text)->some View {
+        Text(title).font(.system(size:VeilbirdStyle.detail+1,weight:.medium)).foregroundStyle(color).frame(maxWidth:.infinity).frame(height:mac ? 32:44)
+            .background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
     }
 }
 
 #if os(macOS)
-/// The menu bar icon's menu: status, connect or disconnect, routing, the window and quit.
+/// The menu bar panel: one-click connect, the current location and usage, the window and quit.
 struct MenuBarView:View {
     @EnvironmentObject private var model:ClientModel
     @Environment(\.openWindow) private var openWindow
     var body:some View {
-        Text(L10n.text(model.status)+(model.connected && !model.nodeName.isEmpty ? " · "+model.nodeName:""))
-        Divider()
-        if model.signedIn {
-            Button(model.connected ? L10n.text("disconnect_action"):L10n.text("connect_action")) {model.work {try await model.toggle()}}
-            Picker(L10n.text("routing_smart"),selection:$model.routing) {
-                Text(L10n.text("routing_smart")).tag("smart");Text(L10n.text("routing_global")).tag("global")
-            }.pickerStyle(.inline).labelsHidden().disabled(model.connected)
-            Divider()
-        }
-        Button(L10n.text("open_app")) {openWindow(id:"main");NSApp.activate(ignoringOtherApps:true)}
-        Button(L10n.text("quit_app")) {NSApp.terminate(nil)}
+        let on=model.connected && model.since != nil
+        let state:RingState=model.connected ? (on ? .connected:.connecting):(model.failed ? .failed:.idle)
+        VStack(alignment:.leading,spacing:0) {
+            HStack(spacing:8) {
+                LogoTile(size:18)
+                Text("TrackNothing").font(.system(size:13,weight:.semibold))
+                Spacer()
+                if on {Circle().fill(VeilbirdStyle.accent).frame(width:6,height:6)}
+                Text(L10n.text(on ? "connected_status":(model.connected ? "connecting":(model.failed ? "connect_failed_title":"not_connected")))).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary)
+            }.padding(.horizontal,4)
+            if model.signedIn {
+                VStack(spacing:12) {
+                    Button {model.work {try await model.toggle()}} label:{ConnectRing(state:state,size:120)}.buttonStyle(.plain)
+                        .accessibilityLabel(L10n.text(model.connected ? "disconnect_action":"connect_action"))
+                    if let since=model.since {
+                        TimelineView(.periodic(from:since,by:1)) {context in
+                            Text(L10n.text("connection_stats",Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond)),mbps(model.rxRate),mbps(model.txRate)))
+                        }.font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()
+                    } else {
+                        Text(model.failed ? model.failure:L10n.text("tap_ring_to_connect")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).lineLimit(2)
+                    }
+                }.frame(maxWidth:.infinity).padding(.top,20).padding(.bottom,16)
+                Button {openMain()} label:{
+                    HStack(spacing:12) {
+                        if model.connected && !model.connectedNodeId.isEmpty {Badge(code:model.code(model.connectedNodeId,name:model.nodeName),size:30)}
+                        else if model.selected.isEmpty {Badge(icon:"sparkles",tint:VeilbirdStyle.accent,size:30)}
+                        else {Badge(code:model.code(model.selected,name:model.selectedName),size:30)}
+                        VStack(alignment:.leading,spacing:2) {
+                            Text(model.connected && !model.nodeName.isEmpty ? model.nodeName:(model.selected.isEmpty ? L10n.text("automatic"):model.selectedName)).font(.system(size:13,weight:.medium)).lineLimit(1)
+                            Text(L10n.text(model.routing=="smart" ? "routing_smart":"routing_global")).font(.system(size:11)).foregroundStyle(VeilbirdStyle.secondary)
+                        }
+                        Spacer(minLength:8)
+                        Image(systemName:"chevron.right").font(.system(size:10,weight:.semibold)).foregroundStyle(VeilbirdStyle.secondary)
+                    }.padding(.horizontal,12).frame(height:52)
+                }.buttonStyle(RowButton()).background(Color(red:26/255,green:34/255,blue:28/255),in:RoundedRectangle(cornerRadius:10)).clipShape(RoundedRectangle(cornerRadius:10))
+                HStack(alignment:.top,spacing:12) {
+                    cell(L10n.text("last_30_days"),traffic)
+                    cell(L10n.text("valid_until_label"),model.account.isEmpty ? "—":L10n.date(model.account["expiresAt"] as? String))
+                }.padding(.horizontal,6).padding(.vertical,12)
+            } else {
+                Text(L10n.text("sign_in_tagline")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).padding(.vertical,16).padding(.horizontal,4)
+            }
+            Rectangle().fill(VeilbirdStyle.hairline).frame(height:0.5).padding(.horizontal,4)
+            VStack(spacing:0) {
+                menuItem(L10n.text("open_app"),shortcut:"⌘O") {openMain()}.keyboardShortcut("o")
+                menuItem(L10n.text("quit_app"),shortcut:"⌘Q") {NSApp.terminate(nil)}.keyboardShortcut("q")
+            }.padding(.top,6)
+        }.padding(.horizontal,12).padding(.top,14).padding(.bottom,8).frame(width:320)
+        .background(Color(red:18/255,green:25/255,blue:21/255)).foregroundStyle(VeilbirdStyle.text).preferredColorScheme(.dark)
+        .environment(\.locale, L10n.locale).task {try? await model.loadAccount()}
     }
+    private var traffic:String {
+        let value=(model.account["traffic"] as? [String:Any]).map {(Int64(String(describing:$0["uploadBytes"] ?? "0")) ?? 0)+(Int64(String(describing:$0["downloadBytes"] ?? "0")) ?? 0)}
+        return value.map {ByteCountFormatter.string(fromByteCount:$0,countStyle:.binary)} ?? "—"
+    }
+    private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
+    private func cell(_ title:String,_ value:String)->some View {
+        VStack(alignment:.leading,spacing:2) {
+            Text(title).font(.system(size:11)).foregroundStyle(VeilbirdStyle.secondary)
+            Text(value).font(.system(size:13,weight:.medium)).monospacedDigit().lineLimit(1)
+        }.frame(maxWidth:.infinity,alignment:.leading)
+    }
+    private func menuItem(_ title:String,shortcut:String,action:@escaping ()->Void)->some View {
+        Button(action:action) {
+            HStack {Text(title);Spacer();Text(shortcut).foregroundStyle(VeilbirdStyle.faint)}.font(.system(size:13)).padding(.horizontal,8).frame(height:26).contentShape(Rectangle())
+        }.buttonStyle(RowButton()).clipShape(RoundedRectangle(cornerRadius:6))
+    }
+    private func openMain() {openWindow(id:"main");NSApp.activate(ignoringOtherApps:true)}
 }
 #endif
+
 
 /// Shortcuts and Siri: connect or disconnect with the saved location and routing.
 struct ConnectIntent:AppIntent {

@@ -8,6 +8,7 @@
   <data name="account" xml:space="preserve"><value>Аккаунт</value></data>
   <data name="account_device_quota" xml:space="preserve"><value>Устройства   {0} / {1}</value></data>
   <data name="account_valid_until" xml:space="preserve"><value>Действует до · {0}</value></data>
+  <data name="all_locations" xml:space="preserve"><value>Все локации</value></data>
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>При первом подключении разрешите добавление VPN. Управляйте устройствами в аккаунте.</value></data>
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>Для подключения разрешите использование VPN.</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>При первом подключении разрешите VPN</value></data>
@@ -22,6 +23,7 @@
   <data name="back_action" xml:space="preserve"><value>Назад</value></data>
   <data name="cancel" xml:space="preserve"><value>Отмена</value></data>
   <data name="change_location" xml:space="preserve"><value>Изменить локацию  ›</value></data>
+  <data name="check_for_updates" xml:space="preserve"><value>Проверить обновления</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>Выберите локацию и подключитесь с главного экрана.</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>Выберите локацию и вернитесь к подключению.</value></data>
   <data name="choose_a_location_veilbird_takes_care_of_the_rest" xml:space="preserve"><value>Выберите локацию. Остальное сделает TrackNothing.</value></data>
@@ -34,10 +36,12 @@
   <data name="connect_action" xml:space="preserve"><value>Подключиться</value></data>
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>Подключайтесь автоматически или выбирайте локацию.</value></data>
   <data name="connect_automatically_or_pick_a_location" xml:space="preserve"><value>Автоматически или с выбором локации</value></data>
+  <data name="connect_failed_title" xml:space="preserve"><value>Не удалось подключиться</value></data>
   <data name="connect_freely" xml:space="preserve"><value>Подключайтесь свободно</value></data>
   <data name="connect_from_app_first" xml:space="preserve"><value>Сначала подключитесь один раз в TrackNothing.</value></data>
   <data name="connect_tab" xml:space="preserve"><value>Подключение</value></data>
   <data name="connect_with_ease" xml:space="preserve"><value>Подключайтесь легко.</value></data>
+  <data name="connected_automatic_detail" xml:space="preserve"><value>Автоматически · {0}</value></data>
   <data name="connected_status" xml:space="preserve"><value>Подключено</value></data>
   <data name="connecting" xml:space="preserve"><value>Подключение…</value></data>
   <data name="connection_authorization_expired_connect_again" xml:space="preserve"><value>Срок разрешения подключения истёк. Подключитесь снова.</value></data>
@@ -50,6 +54,7 @@
   <data name="copied" xml:space="preserve"><value>Скопировано</value></data>
   <data name="copy_action" xml:space="preserve"><value>Копировать</value></data>
   <data name="current_page" xml:space="preserve"><value>, текущая страница</value></data>
+  <data name="daily" xml:space="preserve"><value>По дням</value></data>
   <data name="development_build_the_windows_tunnel_service_is_not_integrated" xml:space="preserve"><value>Версия для разработки: туннель Windows ещё не интегрирован. Можно войти, просматривать локации и управлять устройствами, но подключение к VPN недоступно.</value></data>
   <data name="development_server_address" xml:space="preserve"><value>Адрес сервера разработки</value></data>
   <data name="development_title" xml:space="preserve"><value>TrackNothing — Версия для разработки</value></data>
@@ -57,6 +62,8 @@
   <data name="device_limit_reached_account_hint" xml:space="preserve"><value>Достигнут лимит устройств. Отзовите старое устройство в аккаунте и повторите.</value></data>
   <data name="device_limit_reached_revoke_an_old_device_and_try" xml:space="preserve"><value>Достигнут лимит устройств. Отзовите старое устройство и повторите.</value></data>
   <data name="device_limit_reached_revoke_an_old_device_in_account" xml:space="preserve"><value>Достигнут лимит устройств. Отзовите старое устройство в аккаунте и повторите.</value></data>
+  <data name="devices_join_automatically" xml:space="preserve"><value>Новые устройства добавляются сами</value></data>
+  <data name="devices_used" xml:space="preserve"><value>Занято {0} из {1}</value></data>
   <data name="disconnect_action" xml:space="preserve"><value>Отключиться</value></data>
   <data name="disconnect_before_changing_location" xml:space="preserve"><value>Перед сменой локации отключитесь.</value></data>
   <data name="disconnect_before_changing_routing" xml:space="preserve"><value>Отключитесь, чтобы сменить режим маршрутизации.</value></data>
@@ -66,17 +73,22 @@
   <data name="disconnect_the_vpn_before_signing_out" xml:space="preserve"><value>Отключите VPN перед выходом.</value></data>
   <data name="disconnected" xml:space="preserve"><value>Отключено</value></data>
   <data name="disconnecting" xml:space="preserve"><value>Отключение…</value></data>
+  <data name="download_amount" xml:space="preserve"><value>↓ Приём {0}</value></data>
   <data name="email" xml:space="preserve"><value>Электронная почта</value></data>
   <data name="enter_a_valid_https_server_address" xml:space="preserve"><value>Введите корректный HTTPS-адрес сервера.</value></data>
   <data name="enter_an_https_server_address_first" xml:space="preserve"><value>Сначала введите HTTPS-адрес сервера.</value></data>
   <data name="enter_email" xml:space="preserve"><value>Введите почту</value></data>
   <data name="enter_password" xml:space="preserve"><value>Введите пароль</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Введите почту и пароль.</value></data>
+  <data name="finding_best_route" xml:space="preserve"><value>Подбираем лучший маршрут</value></data>
   <data name="got_it" xml:space="preserve"><value>Понятно</value></data>
+  <data name="hide_password" xml:space="preserve"><value>Скрыть пароль</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Неверная почта или пароль.</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>Некорректный ответ сервера. Повторите позже.</value></data>
   <data name="language" xml:space="preserve"><value>Язык</value></data>
   <data name="language_system" xml:space="preserve"><value>Как в системе</value></data>
+  <data name="last_30_days" xml:space="preserve"><value>За 30 дней</value></data>
+  <data name="last_active" xml:space="preserve"><value>{0} · {1}</value></data>
   <data name="latency_ms" xml:space="preserve"><value>{0} мс</value></data>
   <data name="location" xml:space="preserve"><value>Локация</value></data>
   <data name="location_unavailable_select_another" xml:space="preserve"><value>Локация недоступна. Выберите другую.</value></data>
@@ -99,6 +111,8 @@
   <data name="node_quality_detail" xml:space="preserve"><value>Джиттер {0} мс · Потери {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Не подключено</value></data>
   <data name="open_app" xml:space="preserve"><value>Открыть TrackNothing</value></data>
+  <data name="open_at_login" xml:space="preserve"><value>Запускать при входе</value></data>
+  <data name="open_main_window" xml:space="preserve"><value>Открыть окно</value></data>
   <data name="password" xml:space="preserve"><value>Пароль</value></data>
   <data name="quality_fair" xml:space="preserve"><value>Средне</value></data>
   <data name="quality_good" xml:space="preserve"><value>Хорошо</value></data>
@@ -108,10 +122,14 @@
   <data name="refresh_devices" xml:space="preserve"><value>Обновить устройства</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Обновить локации</value></data>
   <data name="retest_latency" xml:space="preserve"><value>Проверить</value></data>
+  <data name="retry_action" xml:space="preserve"><value>Повторить</value></data>
   <data name="revoke_access" xml:space="preserve"><value>Отозвать доступ</value></data>
+  <data name="revoke_release_hint" xml:space="preserve"><value>Место освобождается примерно через 5 минут после отзыва.</value></data>
+  <data name="revoke_short" xml:space="preserve"><value>Отозвать</value></data>
   <data name="revoke_this_device_s_access" xml:space="preserve"><value>Отозвать доступ устройства?</value></data>
   <data name="revoking_access_the_slot_is_released_in_about_5" xml:space="preserve"><value>Доступ отзывается. Место освободится примерно в течение 5 минут.</value></data>
   <data name="revoking_access_the_slot_is_usually_released_within_about" xml:space="preserve"><value>Доступ отзывается. Место обычно освобождается примерно через 5 минут.</value></data>
+  <data name="revoking_short" xml:space="preserve"><value>Отзывается</value></data>
   <data name="revoking_slot_released_when_the_old_connection_expires" xml:space="preserve"><value>Отзыв · Место освободится после истечения старого подключения</value></data>
   <data name="routing_global" xml:space="preserve"><value>Глобальная</value></data>
   <data name="routing_global_detail" xml:space="preserve"><value>Весь трафик через TrackNothing</value></data>
@@ -124,10 +142,16 @@
   <data name="server_address" xml:space="preserve"><value>Адрес сервера</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Адрес сервера https://…</value></data>
   <data name="share_action" xml:space="preserve"><value>Поделиться</value></data>
+  <data name="shortcuts" xml:space="preserve"><value>Быстрые команды</value></data>
+  <data name="shortcuts_detail" xml:space="preserve"><value>Подключить / Отключить</value></data>
+  <data name="show_password" xml:space="preserve"><value>Показать пароль</value></data>
+  <data name="sign_in_action" xml:space="preserve"><value>Войти</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>Войти и начать</value></data>
+  <data name="sign_in_tagline" xml:space="preserve"><value>Войдите — и всё готово.</value></data>
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Войдите в TrackNothing. Импорт и настройка не нужны.</value></data>
   <data name="sign_out" xml:space="preserve"><value>Выйти</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Версия для симулятора · Проверяйте VPN на подписанной сборке для устройства</value></data>
+  <data name="tap_ring_to_connect" xml:space="preserve"><value>Нажмите на кольцо, чтобы подключиться</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>Нажмите, чтобы сменить</value></data>
   <data name="test_after_disconnecting" xml:space="preserve"><value>Задержка проверяется без подключения. Показаны последние результаты.</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>Симулятор предназначен только для интерфейса. Проверяйте VPN на подписанной сборке для устройства.</value></data>
@@ -145,6 +169,7 @@
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>Не удалось подключиться. Проверьте сеть и повторите.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>Сервис недоступен. Проверьте сеть и повторите.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>Сервис недоступен. Проверьте сеть или обратитесь к администратору.</value></data>
+  <data name="up_to_date" xml:space="preserve"><value>Актуальная версия</value></data>
   <data name="update_allow_installs" xml:space="preserve"><value>Разрешите TrackNothing устанавливать обновления, затем вернитесь и снова нажмите «Обновить».</value></data>
   <data name="update_available" xml:space="preserve"><value>Доступна версия {0}</value></data>
   <data name="update_available_detail" xml:space="preserve"><value>Обновите приложение, чтобы получить новые функции и исправления.</value></data>
@@ -153,6 +178,7 @@
   <data name="update_now" xml:space="preserve"><value>Обновить</value></data>
   <data name="update_open_download" xml:space="preserve"><value>Скачать</value></data>
   <data name="update_required_detail" xml:space="preserve"><value>Эта версия больше не поддерживается. Обновите приложение, чтобы продолжить подключаться.</value></data>
+  <data name="upload_amount" xml:space="preserve"><value>↑ Отдача {0}</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 Действует до · </value></data>
   <data name="valid_until_label" xml:space="preserve"><value>Действует до</value></data>

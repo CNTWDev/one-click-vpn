@@ -61,3 +61,5 @@ Filename: "{app}\Veilbird.exe"; Description: "TrackNothing"; Flags: nowait posti
 ; Stops the core (and with it the tunnel), and a tunnel service left by versions before the built-in core.
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM veilbird-core.exe"; Flags: runhidden; RunOnceId: "StopCore"
 Filename: "{sys}\sc.exe"; Parameters: "stop ""WireGuardTunnel$Veilbird"""; Flags: runhidden; RunOnceId: "StopTunnel"
+; The "open at login" task the app may have created.
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""TrackNothing"" /F"; Flags: runhidden; RunOnceId: "RemoveLoginTask"
