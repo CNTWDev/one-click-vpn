@@ -1302,6 +1302,7 @@ def capabilities():
         "connectivity": connectivity_snapshot(),
         "upgradePending": upgrade_pending(),
         "realityProbe": reality_probe,
+        "controllerOrigin": CONTROLLER,
     }
 
 
@@ -1626,7 +1627,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.12.0",
+        "version": "agent 2.13.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
@@ -1636,7 +1637,48 @@ def heartbeat():
         confirm_staged_upgrade()
     except Exception as error:
         log_failure("Agent upgrade confirmation", error)
+    try:
+        adopt_controller_origin(response.get("controllerOrigin"))
+    except Exception as error:
+        log_failure("Agent domain switch", error)
     return response
+
+
+CONTROLLER_ORIGIN_PATTERN = re.compile(r"^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$")
+CONFIG_ENV = AGENT_DIR / "config.env"
+controller_switch_retry_at = 0
+
+
+def adopt_controller_origin(target):
+    """Move to the Agent domain the Controller announces, only after an authenticated heartbeat there succeeds.
+
+    The old domain stays in config.env until then, so a wrong or unreachable domain never strands the node.
+    """
+    global CONTROLLER, controller_switch_retry_at
+    if not isinstance(target, str):
+        return False
+    target = target.rstrip("/")
+    if target == CONTROLLER or not CONTROLLER_ORIGIN_PATTERN.match(target) or time.time() < controller_switch_retry_at:
+        return False
+    controller_switch_retry_at = time.time() + 600
+    previous = CONTROLLER
+    CONTROLLER = target
+    try:
+        request_json("/api/v1/agent/heartbeat", {"nodeId": NODE_ID, "token": TOKEN, "hostname": socket.gethostname(),
+                                                 "version": "agent 2.13.0", "capabilities": capabilities()})
+        lines = CONFIG_ENV.read_text().splitlines()
+        lines = [f"NORTHSTAR_CONTROLLER_URL={target}" if line.startswith("NORTHSTAR_CONTROLLER_URL=") else line for line in lines]
+        if f"NORTHSTAR_CONTROLLER_URL={target}" not in lines:
+            lines.insert(0, f"NORTHSTAR_CONTROLLER_URL={target}")
+        staged = CONFIG_ENV.with_name("config.env.next")
+        staged.write_text("\n".join(lines) + "\n")
+        staged.chmod(0o600)
+        os.replace(staged, CONFIG_ENV)
+    except Exception as error:
+        CONTROLLER = previous
+        raise RuntimeError(f"staying on {previous}; {target} is not usable yet: {error}") from error
+    print(f"northstar-agent moved to Agent domain {target} (was {previous})", file=sys.stderr, flush=True)
+    return True
 
 
 def poll_tasks():

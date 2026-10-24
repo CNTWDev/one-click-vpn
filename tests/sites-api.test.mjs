@@ -9,7 +9,7 @@ test("Sites: deployment domains seed the default site; each hostname gets its ow
   const base = "http://127.0.0.1:3196";
   const env = { ...process.env, NODE_ENV: "production", VEILBIRD_DATABASE_URL: databaseUrl, VEILBIRD_MASTER_KEY: Buffer.alloc(32, 7).toString("base64"),
     VEILBIRD_ADMIN_EMAIL: "owner@example.com", VEILBIRD_ADMIN_PASSWORD: "test-password-123", VEILBIRD_PUBLIC_ORIGIN: "https://app.example.com",
-    VEILBIRD_PORTAL_DOMAIN: "app.example.com", VEILBIRD_ADMIN_DOMAIN: "console.example.com", VEILBIRD_API_DOMAIN: "api.example.com" };
+    VEILBIRD_PORTAL_DOMAIN: "app.example.com", VEILBIRD_ADMIN_DOMAIN: "console.example.com", VEILBIRD_API_DOMAIN: "api.example.com", VEILBIRD_AGENT_ORIGIN: "https://agent.example.com" };
   const pool = new pg.Pool({ connectionString: databaseUrl });
   await pool.query("DROP TABLE IF EXISTS sites");
   await promisify(execFile)(process.execPath, ["scripts/migrate.mjs"], { env });
@@ -51,6 +51,16 @@ test("Sites: deployment domains seed the default site; each hostname gets its ow
     assert.equal((await call("DELETE", "/api/v1/admin/sites/default")).status, 200);
     assert.equal((await call("PUT", `/api/v1/admin/sites/${northern.id}`, { ...input, name: "Aurora" })).status, 200);
     assert.equal((await site("go.northern.example")).name, "Aurora");
+
+    // Agent domain belongs to no site: it falls back to the .env origin and only accepts a domain that reaches this deployment.
+    const whoami = await fetch(`${base}/api/v1/agent/whoami`).then((r) => r.json());
+    assert.match(whoami.controllerId, /^[0-9a-f]{16}$/);
+    const agentDomain = await call("GET", "/api/v1/admin/agent-domain").then((r) => r.json());
+    assert.deepEqual({ origin: agentDomain.origin, source: agentDomain.source }, { origin: "https://agent.example.com", source: "environment" });
+    const refused = await call("PUT", "/api/v1/admin/agent-domain", { domain: "agent.invalid" });
+    assert.equal(refused.status, 400);
+    assert.match((await refused.json()).error, /does not reach this deployment/);
+    assert.equal((await call("PUT", "/api/v1/admin/agent-domain", { domain: "" })).status, 200);
   } finally {
     // Other API tests share this database and expect the built-in site from their own .env origins.
     server.kill(); await pool.query("DELETE FROM sites"); await pool.end();

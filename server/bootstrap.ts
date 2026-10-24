@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { agentOrigin } from "./config";
+import { currentAgentOrigin } from "./agent-domain";
 import { decryptSecret, hashToken } from "./crypto";
 import { addAudit, addNodeAction, appendNodeActionEvent, bindNodeIdentity, countRunningNodeActions, findNode, finishNodeAction, startNodeAction, updateNode, updateNodeActionProgress } from "./db";
 import { ensureDefaultNodeProtocols, rebuildDesiredState } from "./control-plane";
@@ -153,7 +153,8 @@ export async function bootstrapNode(nodeId: string, actorUserId?: string, queued
     );
     const agentToken = randomBytes(32).toString("base64url");
     const source = Buffer.from(agentSource(), "utf8").toString("base64");
-    const controllerOrigin = shellQuote(agentOrigin());
+    const agentOrigin = await currentAgentOrigin();
+    const controllerOrigin = shellQuote(agentOrigin);
     const command = `set -eu
 progress() { printf 'NORTHSTAR_PROGRESS|%s|%s|%s\\n' "$1" "$2" "$3"; }
 progress connection 15 'SSH session established; checking node prerequisites'
@@ -299,7 +300,7 @@ if command -v wg >/dev/null 2>&1; then
   chmod 600 /opt/northstar-agent/state/wireguard/server.key
 fi
 cat > /opt/northstar-agent/config.env <<'NORTHSTAR_CONFIG'
-NORTHSTAR_CONTROLLER_URL=${agentOrigin()}
+NORTHSTAR_CONTROLLER_URL=${agentOrigin}
 NORTHSTAR_NODE_ID=${node.id}
 NORTHSTAR_AGENT_TOKEN=${agentToken}
 NORTHSTAR_AGENT_STATE_DIR=/opt/northstar-agent/state

@@ -4,6 +4,7 @@ import { BrandMark } from "../../../shared/brand";
 import { api } from "../api";
 import { useConfirm } from "../confirm-dialog";
 import { useToast } from "../toast";
+import { AgentDomainPanel } from "./agent-domain";
 import { Empty, InlineNotice, Menu, type Notice, PageHeader, Pill, StateDot } from "./shared";
 
 type Site = { id: string; name: string; portalDomain: string; consoleDomain: string; apiDomain: string; logoSvg: string; mailFromName: string; isDefault: boolean };
@@ -106,11 +107,12 @@ export function SitesPage() {
             </article>;
           })}</div> : null}
         </section>
+        <AgentDomainPanel />
         <section className="panel site-guide"><div className="panel-head"><h2>{t("在宝塔添加站点")}</h2></div>
           <ol>
             <li>{t("在 DNS 把这几个域名解析到本服务器。")}</li>
             <li>{t("宝塔 → 网站 → 添加站点，每个域名建一个。")}</li>
-            <li>{t("每个网站的反向代理目标：")}<table><tbody>{roles.map(({ role, label, port }) => <tr key={role}><th>{t(label)}</th><td><code>http://127.0.0.1:{port}</code></td></tr>)}</tbody></table></li>
+            <li>{t("每个网站的反向代理目标：")}<table><tbody>{[...roles, { role: "agent", label: "Agent 接入", port: 3000 }].map(({ role, label, port }) => <tr key={role}><th>{t(label)}</th><td><code>http://127.0.0.1:{port}</code></td></tr>)}</tbody></table></li>
             <li>{t("反向代理的“发送域名”填 {0}，系统靠它识别站点。", ["$host"])}</li>
             <li>{t("SSL → Let's Encrypt 申请证书，然后点“检查域名”。")}</li>
           </ol>

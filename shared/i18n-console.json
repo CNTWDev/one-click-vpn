@@ -3026,5 +3026,73 @@
   "站点已删除。": [
     "Site deleted.",
     "Сайт удалён."
+  ],
+  "Agent 域名已保存。节点会在下次心跳时自动切换。": [
+    "Agent domain saved. Nodes switch on their next heartbeat.",
+    "Домен Agent сохранён. Узлы переключатся при следующем heartbeat."
+  ],
+  "离线": [
+    "Offline",
+    "Не в сети"
+  ],
+  "Agent 版本较旧，升级 Agent 后自动切换": [
+    "Older Agent; switches after Upgrade Agent",
+    "Старый Agent; переключится после обновления Agent"
+  ],
+  "切换中，新域名不通时每 10 分钟重试": [
+    "Switching; retries every 10 min if the new domain fails",
+    "Переключается; при недоступности повтор каждые 10 мин"
+  ],
+  "Agent 接入域名": [
+    "Agent domain",
+    "Домен Agent"
+  ],
+  "所有站点共用，只用于节点安装和心跳。增删站点、更换站点域名都不影响节点。": [
+    "Shared by all sites and used only for node installs and heartbeats. Adding sites or changing site domains never affects nodes.",
+    "Общий для всех сайтов, нужен только для установки узлов и heartbeat. Добавление сайтов и смена их доменов не затрагивают узлы."
+  ],
+  "当前域名": [
+    "Current",
+    "Текущий"
+  ],
+  "（在这里设置）": [
+    "(set here)",
+    "(задан здесь)"
+  ],
+  "（来自部署配置）": [
+    "(from deployment config)",
+    "(из конфигурации развёртывания)"
+  ],
+  "还没有节点": [
+    "No nodes yet",
+    "Узлов пока нет"
+  ],
+  "全部 {0} 个节点已使用当前域名": [
+    "All {0} nodes use the current domain",
+    "Все узлы ({0}) используют текущий домен"
+  ],
+  "还有 {0} 个节点": [
+    "{0} more nodes",
+    "Ещё узлов: {0}"
+  ],
+  "新的 Agent 域名": [
+    "New Agent domain",
+    "Новый домен Agent"
+  ],
+  "检查并保存": [
+    "Check and save",
+    "Проверить и сохранить"
+  ],
+  "恢复部署配置": [
+    "Use deployment config",
+    "Вернуть из конфигурации"
+  ],
+  "先在宝塔把新域名反向代理到 {0}，申请好证书再保存。旧域名保留到所有节点切换完成。": [
+    "First reverse-proxy the new domain to {0} in BaoTa and issue its certificate, then save. Keep the old domain until every node has switched.",
+    "Сначала в BaoTa настройте обратный прокси нового домена на {0} и выпустите сертификат, затем сохраните. Старый домен держите, пока все узлы не переключатся."
+  ],
+  "Agent 接入": [
+    "Agent",
+    "Agent"
   ]
 }

@@ -453,6 +453,8 @@ try {
   await pool.query("ALTER TABLE controller_settings ALTER COLUMN display_name SET DEFAULT 'TrackNothing Controller'");
   await pool.query("UPDATE controller_settings SET display_name='TrackNothing Controller' WHERE display_name='Veilbird Controller'");
   await pool.query("UPDATE mail_settings SET from_name='TrackNothing' WHERE from_name='Veilbird'");
+  // Agent domain set in Console → 站点; empty means VEILBIRD_AGENT_ORIGIN from .env.
+  await pool.query("ALTER TABLE controller_settings ADD COLUMN IF NOT EXISTS agent_domain TEXT NOT NULL DEFAULT ''");
   // The first site is the deployment's own three hostnames; more sites are added in Console → 站点.
   const host = (value) => { try { return value ? new URL(value).hostname : ""; } catch { return ""; } };
   const portalDomain = process.env.VEILBIRD_PORTAL_DOMAIN?.trim() || host(process.env.VEILBIRD_PUBLIC_ORIGIN?.trim());
