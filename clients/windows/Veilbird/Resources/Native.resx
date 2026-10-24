@@ -8,6 +8,7 @@
   <data name="account" xml:space="preserve"><value>Account</value></data>
   <data name="account_device_quota" xml:space="preserve"><value>Authorized devices   {0} / {1}</value></data>
   <data name="account_valid_until" xml:space="preserve"><value>Valid until · {0}</value></data>
+  <data name="all_locations" xml:space="preserve"><value>All locations</value></data>
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>Allow the system to add a VPN on first connection. Manage authorized devices in Account.</value></data>
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>Allow the system VPN permission to connect.</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>Allow VPN access on your first connection</value></data>
@@ -22,6 +23,7 @@
   <data name="back_action" xml:space="preserve"><value>Back</value></data>
   <data name="cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="change_location" xml:space="preserve"><value>Change location  ›</value></data>
+  <data name="check_for_updates" xml:space="preserve"><value>Check for updates</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>Choose a location, then connect from the home screen.</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>Choose a location, then return to Connect.</value></data>
   <data name="choose_a_location_veilbird_takes_care_of_the_rest" xml:space="preserve"><value>Choose a location. TrackNothing takes care of the rest.</value></data>
@@ -34,10 +36,12 @@
   <data name="connect_action" xml:space="preserve"><value>Connect</value></data>
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>Connect automatically or choose your own location.</value></data>
   <data name="connect_automatically_or_pick_a_location" xml:space="preserve"><value>Connect automatically or pick a location</value></data>
+  <data name="connect_failed_title" xml:space="preserve"><value>Couldn't connect</value></data>
   <data name="connect_freely" xml:space="preserve"><value>Connect freely</value></data>
   <data name="connect_from_app_first" xml:space="preserve"><value>Connect once in TrackNothing first.</value></data>
   <data name="connect_tab" xml:space="preserve"><value>Connect</value></data>
   <data name="connect_with_ease" xml:space="preserve"><value>Connect with ease.</value></data>
+  <data name="connected_automatic_detail" xml:space="preserve"><value>Automatic · {0}</value></data>
   <data name="connected_status" xml:space="preserve"><value>Connected</value></data>
   <data name="connecting" xml:space="preserve"><value>Connecting…</value></data>
   <data name="connection_authorization_expired_connect_again" xml:space="preserve"><value>Connection authorization expired. Connect again.</value></data>
@@ -50,6 +54,7 @@
   <data name="copied" xml:space="preserve"><value>Copied</value></data>
   <data name="copy_action" xml:space="preserve"><value>Copy</value></data>
   <data name="current_page" xml:space="preserve"><value>, current page</value></data>
+  <data name="daily" xml:space="preserve"><value>Daily</value></data>
   <data name="development_build_the_windows_tunnel_service_is_not_integrated" xml:space="preserve"><value>Development build: the Windows tunnel service is not integrated. You can sign in, view locations and manage devices, but cannot connect to a VPN.</value></data>
   <data name="development_server_address" xml:space="preserve"><value>Development server address</value></data>
   <data name="development_title" xml:space="preserve"><value>TrackNothing — Development</value></data>
@@ -57,6 +62,8 @@
   <data name="device_limit_reached_account_hint" xml:space="preserve"><value>Device limit reached. Revoke an old device in Account and try again.</value></data>
   <data name="device_limit_reached_revoke_an_old_device_and_try" xml:space="preserve"><value>Device limit reached. Revoke an old device and try again.</value></data>
   <data name="device_limit_reached_revoke_an_old_device_in_account" xml:space="preserve"><value>Device limit reached. Revoke an old device in Account and try again.</value></data>
+  <data name="devices_join_automatically" xml:space="preserve"><value>New devices join on first connect</value></data>
+  <data name="devices_used" xml:space="preserve"><value>{0} of {1} used</value></data>
   <data name="disconnect_action" xml:space="preserve"><value>Disconnect</value></data>
   <data name="disconnect_before_changing_location" xml:space="preserve"><value>Disconnect before changing location.</value></data>
   <data name="disconnect_before_changing_routing" xml:space="preserve"><value>Disconnect before changing the routing mode.</value></data>
@@ -66,17 +73,22 @@
   <data name="disconnect_the_vpn_before_signing_out" xml:space="preserve"><value>Disconnect the VPN before signing out.</value></data>
   <data name="disconnected" xml:space="preserve"><value>Disconnected</value></data>
   <data name="disconnecting" xml:space="preserve"><value>Disconnecting…</value></data>
+  <data name="download_amount" xml:space="preserve"><value>↓ Down {0}</value></data>
   <data name="email" xml:space="preserve"><value>Email</value></data>
   <data name="enter_a_valid_https_server_address" xml:space="preserve"><value>Enter a valid HTTPS server address.</value></data>
   <data name="enter_an_https_server_address_first" xml:space="preserve"><value>Enter an HTTPS server address first.</value></data>
   <data name="enter_email" xml:space="preserve"><value>Enter email</value></data>
   <data name="enter_password" xml:space="preserve"><value>Enter password</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Enter your email and password.</value></data>
+  <data name="finding_best_route" xml:space="preserve"><value>Finding the best route</value></data>
   <data name="got_it" xml:space="preserve"><value>Got it</value></data>
+  <data name="hide_password" xml:space="preserve"><value>Hide password</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Incorrect email or password.</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>Invalid server response. Try again later.</value></data>
   <data name="language" xml:space="preserve"><value>Language</value></data>
   <data name="language_system" xml:space="preserve"><value>Follow system</value></data>
+  <data name="last_30_days" xml:space="preserve"><value>Last 30 days</value></data>
+  <data name="last_active" xml:space="preserve"><value>{0} · {1}</value></data>
   <data name="latency_ms" xml:space="preserve"><value>{0} ms</value></data>
   <data name="location" xml:space="preserve"><value>Location</value></data>
   <data name="location_unavailable_select_another" xml:space="preserve"><value>Location unavailable. Select another.</value></data>
@@ -108,10 +120,14 @@
   <data name="refresh_devices" xml:space="preserve"><value>Refresh devices</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Refresh locations</value></data>
   <data name="retest_latency" xml:space="preserve"><value>Test again</value></data>
+  <data name="retry_action" xml:space="preserve"><value>Try again</value></data>
   <data name="revoke_access" xml:space="preserve"><value>Revoke access</value></data>
+  <data name="revoke_release_hint" xml:space="preserve"><value>A revoked device frees its slot within about 5 minutes.</value></data>
+  <data name="revoke_short" xml:space="preserve"><value>Revoke</value></data>
   <data name="revoke_this_device_s_access" xml:space="preserve"><value>Revoke this device's access?</value></data>
   <data name="revoking_access_the_slot_is_released_in_about_5" xml:space="preserve"><value>Revoking access. The slot is released in about 5 minutes at most.</value></data>
   <data name="revoking_access_the_slot_is_usually_released_within_about" xml:space="preserve"><value>Revoking access. The slot is usually released within about 5 minutes.</value></data>
+  <data name="revoking_short" xml:space="preserve"><value>Revoking</value></data>
   <data name="revoking_slot_released_when_the_old_connection_expires" xml:space="preserve"><value>Revoking · Slot released when the old connection expires</value></data>
   <data name="routing_global" xml:space="preserve"><value>Global</value></data>
   <data name="routing_global_detail" xml:space="preserve"><value>All traffic goes through TrackNothing</value></data>
@@ -124,10 +140,14 @@
   <data name="server_address" xml:space="preserve"><value>Server address</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Server address https://…</value></data>
   <data name="share_action" xml:space="preserve"><value>Share</value></data>
+  <data name="show_password" xml:space="preserve"><value>Show password</value></data>
+  <data name="sign_in_action" xml:space="preserve"><value>Sign in</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>Sign in and start</value></data>
+  <data name="sign_in_tagline" xml:space="preserve"><value>Sign in and go. Nothing to set up.</value></data>
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Sign in to TrackNothing. No imports or configuration needed.</value></data>
   <data name="sign_out" xml:space="preserve"><value>Sign out</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Simulator build · Verify VPN connections on a signed physical-device build</value></data>
+  <data name="tap_ring_to_connect" xml:space="preserve"><value>Tap the ring to connect</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>Tap to change location</value></data>
   <data name="test_after_disconnecting" xml:space="preserve"><value>Latency is tested while disconnected. Showing the last results.</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>The simulator is for UI testing only. Test the VPN on a signed physical-device build.</value></data>
@@ -145,6 +165,7 @@
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>Unable to connect. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>Unable to reach the service. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>Unable to reach the service. Check your network or contact your administrator.</value></data>
+  <data name="up_to_date" xml:space="preserve"><value>Up to date</value></data>
   <data name="update_allow_installs" xml:space="preserve"><value>Allow TrackNothing to install updates, then come back and tap Update now again.</value></data>
   <data name="update_available" xml:space="preserve"><value>Version {0} is available</value></data>
   <data name="update_available_detail" xml:space="preserve"><value>Update to get the latest features and fixes.</value></data>
@@ -153,6 +174,7 @@
   <data name="update_now" xml:space="preserve"><value>Update now</value></data>
   <data name="update_open_download" xml:space="preserve"><value>Download</value></data>
   <data name="update_required_detail" xml:space="preserve"><value>This version is no longer supported. Update to keep connecting.</value></data>
+  <data name="upload_amount" xml:space="preserve"><value>↑ Up {0}</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 Valid until · </value></data>
   <data name="valid_until_label" xml:space="preserve"><value>Valid until</value></data>

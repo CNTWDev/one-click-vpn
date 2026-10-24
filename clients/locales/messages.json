@@ -823,5 +823,115 @@
     "zh": "有效期至",
     "en": "Valid until",
     "ru": "Действует до"
+  },
+  "connect_failed_title": {
+    "zh": "未能连接",
+    "en": "Couldn't connect",
+    "ru": "Не удалось подключиться"
+  },
+  "tap_ring_to_connect": {
+    "zh": "轻触圆环，一键连接",
+    "en": "Tap the ring to connect",
+    "ru": "Нажмите на кольцо, чтобы подключиться"
+  },
+  "finding_best_route": {
+    "zh": "正在选择最佳线路",
+    "en": "Finding the best route",
+    "ru": "Подбираем лучший маршрут"
+  },
+  "last_30_days": {
+    "zh": "近 30 天",
+    "en": "Last 30 days",
+    "ru": "За 30 дней"
+  },
+  "daily": {
+    "zh": "每日",
+    "en": "Daily",
+    "ru": "По дням"
+  },
+  "download_amount": {
+    "zh": "↓ 下载 {0}",
+    "en": "↓ Down {0}",
+    "ru": "↓ Приём {0}"
+  },
+  "upload_amount": {
+    "zh": "↑ 上传 {0}",
+    "en": "↑ Up {0}",
+    "ru": "↑ Отдача {0}"
+  },
+  "check_for_updates": {
+    "zh": "检查更新",
+    "en": "Check for updates",
+    "ru": "Проверить обновления"
+  },
+  "up_to_date": {
+    "zh": "已是最新",
+    "en": "Up to date",
+    "ru": "Актуальная версия"
+  },
+  "devices_used": {
+    "zh": "已用 {0} / {1}",
+    "en": "{0} of {1} used",
+    "ru": "Занято {0} из {1}"
+  },
+  "devices_join_automatically": {
+    "zh": "新设备首次连接自动加入",
+    "en": "New devices join on first connect",
+    "ru": "Новые устройства добавляются сами"
+  },
+  "revoke_short": {
+    "zh": "解除",
+    "en": "Revoke",
+    "ru": "Отозвать"
+  },
+  "revoking_short": {
+    "zh": "解除中",
+    "en": "Revoking",
+    "ru": "Отзывается"
+  },
+  "revoke_release_hint": {
+    "zh": "解除后约 5 分钟内释放名额。",
+    "en": "A revoked device frees its slot within about 5 minutes.",
+    "ru": "Место освобождается примерно через 5 минут после отзыва."
+  },
+  "sign_in_action": {
+    "zh": "登录",
+    "en": "Sign in",
+    "ru": "Войти"
+  },
+  "sign_in_tagline": {
+    "zh": "登录即可使用，无需任何配置",
+    "en": "Sign in and go. Nothing to set up.",
+    "ru": "Войдите — и всё готово."
+  },
+  "all_locations": {
+    "zh": "全部节点",
+    "en": "All locations",
+    "ru": "Все локации"
+  },
+  "connected_automatic_detail": {
+    "zh": "自动选择 · {0}",
+    "en": "Automatic · {0}",
+    "ru": "Автоматически · {0}"
+  },
+  "last_active": {
+    "zh": "{0} · {1}",
+    "en": "{0} · {1}",
+    "ru": "{0} · {1}"
+  },
+  "retry_action": {
+    "zh": "重试",
+    "en": "Try again",
+    "ru": "Повторить"
+  },
+  "show_password": {
+    "zh": "显示密码",
+    "en": "Show password",
+    "ru": "Показать пароль"
+  },
+  "hide_password": {
+    "zh": "隐藏密码",
+    "en": "Hide password",
+    "ru": "Скрыть пароль"
   }
 }

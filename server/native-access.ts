@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
-import { addAudit, dbExec, dbQuery, findUserByEmail, getDb } from "./db";
+import { addAudit, dbExec, dbQuery, findUserByEmail, getDb, listRegions } from "./db";
 import { verifyPassword } from "./password";
 import { allowLoginAttempt } from "./rate-limit";
 import { canonical, digest, identity, NativeError, verifyNativeProof } from "./native-proof";
@@ -50,7 +50,10 @@ export async function nativeAccount(session: Session) {
   const user = (await dbQuery<Entitlement & {email:string;display_name:string}>("SELECT email,display_name,status,native_only,native_device_limit,membership_expires_at FROM users WHERE id=$1",[session.user_id]))[0];
   const devices = await dbQuery(`SELECT id,device_name AS name,platform,status,created_at AS "createdAt",last_seen_at AS "lastSeenAt",release_after AS "releaseAfter",
     identity_thumbprint=$2 AS "isCurrent" FROM native_enrollments WHERE user_id=$1 ORDER BY created_at`,[session.user_id,session.identity_thumbprint]);
-  const traffic=(await dbQuery("SELECT COALESCE(SUM(upload_bytes),0)::text AS \"uploadBytes\",COALESCE(SUM(download_bytes),0)::text AS \"downloadBytes\" FROM traffic_daily WHERE user_id=$1 AND day >= $2",[session.user_id,new Date(Date.now()-29*86400000).toISOString().slice(0,10)]))[0];
+  const since=new Date(Date.now()-29*86400000).toISOString().slice(0,10);
+  const traffic=(await dbQuery<Record<string,unknown>>("SELECT COALESCE(SUM(upload_bytes),0)::text AS \"uploadBytes\",COALESCE(SUM(download_bytes),0)::text AS \"downloadBytes\" FROM traffic_daily WHERE user_id=$1 AND day >= $2",[session.user_id,since]))[0];
+  // Per-day totals for the small usage chart in the apps; days without traffic are absent.
+  traffic.days=await dbQuery("SELECT day::text AS day,(SUM(upload_bytes)+SUM(download_bytes))::text AS bytes FROM traffic_daily WHERE user_id=$1 AND day >= $2 GROUP BY day ORDER BY day",[session.user_id,since]);
   return { name:user.display_name,email:user.email,managed:user.native_only,limit:user.native_device_limit??defaultLimit(),limitSource:user.native_device_limit===null?"default":"override",used:devices.filter(d=>d.status!=="revoked").length,expiresAt:user.membership_expires_at,devices,traffic };
 }
 async function candidates() {
@@ -69,9 +72,12 @@ export async function nativeNodes() {
   // WireGuard ignores unknown peers, so clients time a TCP connect to the same host's REALITY port instead.
   // Nodes without one have no probe and keep the server's least-loaded order behind measured nodes.
   const tcp=new Map((await selectVpnServices({protocol:"vless"})).map(({node,service})=>[node.id,service.listen_port]));
+  // The country code labels each location in the apps (a two-letter badge).
+  const regions=new Map((await listRegions()).map((region)=>[region.id,region]));
   return {nodes:(await candidates()).map(({node})=>{
     const port=tcp.get(node.id);
-    return {id:node.id,name:node.name,region:node.region,protocol:"wireguard",probe:port?{host:node.public_endpoint||node.ip,port}:null,load:nodeLoad(node.metrics_json)};
+    const countryCode=node.region_id?regions.get(node.region_id)?.code?.toUpperCase()||null:null;
+    return {id:node.id,name:node.name,region:node.region,countryCode,protocol:"wireguard",probe:port?{host:node.public_endpoint||node.ip,port}:null,load:nodeLoad(node.metrics_json)};
   })};
 }
 export async function nativeChallenge(session: Session, body: Record<string,unknown>) {

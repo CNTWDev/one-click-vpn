@@ -8,6 +8,7 @@
   <data name="account" xml:space="preserve"><value>我的</value></data>
   <data name="account_device_quota" xml:space="preserve"><value>授权设备   {0} / {1}</value></data>
   <data name="account_valid_until" xml:space="preserve"><value>有效期 · {0}</value></data>
+  <data name="all_locations" xml:space="preserve"><value>全部节点</value></data>
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>首次连接时，请允许系统添加 VPN。授权设备可在「我的」中管理。</value></data>
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>允许系统 VPN 权限后才能连接。</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>首次连接需要允许系统 VPN 权限</value></data>
@@ -22,6 +23,7 @@
   <data name="back_action" xml:space="preserve"><value>返回</value></data>
   <data name="cancel" xml:space="preserve"><value>取消</value></data>
   <data name="change_location" xml:space="preserve"><value>更换连接位置  ›</value></data>
+  <data name="check_for_updates" xml:space="preserve"><value>检查更新</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>选好位置后，返回首页一键连接。</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>选择位置后，返回连接首页。</value></data>
   <data name="choose_a_location_veilbird_takes_care_of_the_rest" xml:space="preserve"><value>选好位置，剩下的交给 TrackNothing。</value></data>
@@ -34,10 +36,12 @@
   <data name="connect_action" xml:space="preserve"><value>一键连接</value></data>
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>自动选择可用位置，也能自由指定节点。</value></data>
   <data name="connect_automatically_or_pick_a_location" xml:space="preserve"><value>自动选择位置，也能自由指定</value></data>
+  <data name="connect_failed_title" xml:space="preserve"><value>未能连接</value></data>
   <data name="connect_freely" xml:space="preserve"><value>随心连接</value></data>
   <data name="connect_from_app_first" xml:space="preserve"><value>请先在 TrackNothing 里连接一次。</value></data>
   <data name="connect_tab" xml:space="preserve"><value>连接</value></data>
   <data name="connect_with_ease" xml:space="preserve"><value>连接，自在一点。</value></data>
+  <data name="connected_automatic_detail" xml:space="preserve"><value>自动选择 · {0}</value></data>
   <data name="connected_status" xml:space="preserve"><value>已连接</value></data>
   <data name="connecting" xml:space="preserve"><value>正在连接…</value></data>
   <data name="connection_authorization_expired_connect_again" xml:space="preserve"><value>连接授权已过期，请重新连接。</value></data>
@@ -50,6 +54,7 @@
   <data name="copied" xml:space="preserve"><value>已复制</value></data>
   <data name="copy_action" xml:space="preserve"><value>复制</value></data>
   <data name="current_page" xml:space="preserve"><value>，当前页面</value></data>
+  <data name="daily" xml:space="preserve"><value>每日</value></data>
   <data name="development_build_the_windows_tunnel_service_is_not_integrated" xml:space="preserve"><value>开发版：Windows 隧道服务尚未集成。本版本可登录、查看节点和管理授权设备，但不能建立 VPN。</value></data>
   <data name="development_server_address" xml:space="preserve"><value>开发服务地址</value></data>
   <data name="development_title" xml:space="preserve"><value>TrackNothing — 开发版</value></data>
@@ -57,6 +62,8 @@
   <data name="device_limit_reached_account_hint" xml:space="preserve"><value>授权设备已满，请在「账号」解除旧设备的授权后重试。</value></data>
   <data name="device_limit_reached_revoke_an_old_device_and_try" xml:space="preserve"><value>授权设备已满，请解除旧设备的授权后重试。</value></data>
   <data name="device_limit_reached_revoke_an_old_device_in_account" xml:space="preserve"><value>授权设备已满，请到「账号」解除一台旧设备的授权后重试。</value></data>
+  <data name="devices_join_automatically" xml:space="preserve"><value>新设备首次连接自动加入</value></data>
+  <data name="devices_used" xml:space="preserve"><value>已用 {0} / {1}</value></data>
   <data name="disconnect_action" xml:space="preserve"><value>断开连接</value></data>
   <data name="disconnect_before_changing_location" xml:space="preserve"><value>请先断开连接，再更换位置。</value></data>
   <data name="disconnect_before_changing_routing" xml:space="preserve"><value>请先断开连接再切换分流方式。</value></data>
@@ -66,17 +73,22 @@
   <data name="disconnect_the_vpn_before_signing_out" xml:space="preserve"><value>请先断开 VPN，再退出登录。</value></data>
   <data name="disconnected" xml:space="preserve"><value>已断开</value></data>
   <data name="disconnecting" xml:space="preserve"><value>正在断开…</value></data>
+  <data name="download_amount" xml:space="preserve"><value>↓ 下载 {0}</value></data>
   <data name="email" xml:space="preserve"><value>邮箱</value></data>
   <data name="enter_a_valid_https_server_address" xml:space="preserve"><value>请填写有效的 HTTPS 服务地址。</value></data>
   <data name="enter_an_https_server_address_first" xml:space="preserve"><value>请先填写 HTTPS 服务地址。</value></data>
   <data name="enter_email" xml:space="preserve"><value>输入邮箱</value></data>
   <data name="enter_password" xml:space="preserve"><value>输入密码</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>请填写邮箱和密码。</value></data>
+  <data name="finding_best_route" xml:space="preserve"><value>正在选择最佳线路</value></data>
   <data name="got_it" xml:space="preserve"><value>知道了</value></data>
+  <data name="hide_password" xml:space="preserve"><value>隐藏密码</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>邮箱或密码不正确。</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>服务器响应无效，请稍后重试。</value></data>
   <data name="language" xml:space="preserve"><value>语言</value></data>
   <data name="language_system" xml:space="preserve"><value>跟随系统</value></data>
+  <data name="last_30_days" xml:space="preserve"><value>近 30 天</value></data>
+  <data name="last_active" xml:space="preserve"><value>{0} · {1}</value></data>
   <data name="latency_ms" xml:space="preserve"><value>{0} ms</value></data>
   <data name="location" xml:space="preserve"><value>连接位置</value></data>
   <data name="location_unavailable_select_another" xml:space="preserve"><value>节点不可用，请重新选择</value></data>
@@ -108,10 +120,14 @@
   <data name="refresh_devices" xml:space="preserve"><value>刷新设备状态</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>刷新节点</value></data>
   <data name="retest_latency" xml:space="preserve"><value>重新测速</value></data>
+  <data name="retry_action" xml:space="preserve"><value>重试</value></data>
   <data name="revoke_access" xml:space="preserve"><value>解除授权</value></data>
+  <data name="revoke_release_hint" xml:space="preserve"><value>解除后约 5 分钟内释放名额。</value></data>
+  <data name="revoke_short" xml:space="preserve"><value>解除</value></data>
   <data name="revoke_this_device_s_access" xml:space="preserve"><value>解除这台设备的授权？</value></data>
   <data name="revoking_access_the_slot_is_released_in_about_5" xml:space="preserve"><value>解除中，最多约 5 分钟后释放额度。</value></data>
   <data name="revoking_access_the_slot_is_usually_released_within_about" xml:space="preserve"><value>解除中，通常最多约 5 分钟后释放额度。</value></data>
+  <data name="revoking_short" xml:space="preserve"><value>解除中</value></data>
   <data name="revoking_slot_released_when_the_old_connection_expires" xml:space="preserve"><value>解除中 · 等待旧连接到期后释放额度</value></data>
   <data name="routing_global" xml:space="preserve"><value>全局</value></data>
   <data name="routing_global_detail" xml:space="preserve"><value>全部流量经过 TrackNothing</value></data>
@@ -124,10 +140,14 @@
   <data name="server_address" xml:space="preserve"><value>服务地址</value></data>
   <data name="server_address_url" xml:space="preserve"><value>服务地址 https://…</value></data>
   <data name="share_action" xml:space="preserve"><value>分享</value></data>
+  <data name="show_password" xml:space="preserve"><value>显示密码</value></data>
+  <data name="sign_in_action" xml:space="preserve"><value>登录</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>登录并开始</value></data>
+  <data name="sign_in_tagline" xml:space="preserve"><value>登录即可使用，无需任何配置</value></data>
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>登录 TrackNothing，无需导入或配置。</value></data>
   <data name="sign_out" xml:space="preserve"><value>退出登录</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>模拟器开发版 · 连接功能需在已签名的真机版本验证</value></data>
+  <data name="tap_ring_to_connect" xml:space="preserve"><value>轻触圆环，一键连接</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>点击更换节点</value></data>
   <data name="test_after_disconnecting" xml:space="preserve"><value>连接中无法测速，显示的是上次结果。</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>模拟器仅用于界面测试，请使用已签名的真机版本测试 VPN。</value></data>
@@ -145,6 +165,7 @@
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>暂时无法连接，请检查网络后重试。</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>暂时无法连接服务，请检查网络后重试。</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>暂时无法连接服务，请检查网络或联系管理员。</value></data>
+  <data name="up_to_date" xml:space="preserve"><value>已是最新</value></data>
   <data name="update_allow_installs" xml:space="preserve"><value>请允许 TrackNothing 安装更新，然后返回再点一次“立即更新”。</value></data>
   <data name="update_available" xml:space="preserve"><value>新版本 {0} 已发布</value></data>
   <data name="update_available_detail" xml:space="preserve"><value>更新后可获得最新的功能和修复。</value></data>
@@ -153,6 +174,7 @@
   <data name="update_now" xml:space="preserve"><value>立即更新</value></data>
   <data name="update_open_download" xml:space="preserve"><value>前往下载</value></data>
   <data name="update_required_detail" xml:space="preserve"><value>当前版本已停止支持，更新后才能继续连接。</value></data>
+  <data name="upload_amount" xml:space="preserve"><value>↑ 上传 {0}</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 有效期 · </value></data>
   <data name="valid_until_label" xml:space="preserve"><value>有效期至</value></data>
