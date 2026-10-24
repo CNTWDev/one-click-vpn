@@ -91,11 +91,11 @@ jobs:
         run: |
           apk=clients/android/app/build/outputs/apk/prod/release/app-prod-release.apk
           "$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --print-certs "$apk"
-          mv "$apk" "Veilbird-${{ needs.prepare.outputs.version }}-$VEILBIRD_BUILD_NUMBER.apk"
+          mv "$apk" "TrackNothing-${{ needs.prepare.outputs.version }}-$VEILBIRD_BUILD_NUMBER.apk"
       - uses: actions/upload-artifact@v4
         with:
-          name: Veilbird-android-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
-          path: Veilbird-*.apk
+          name: TrackNothing-android-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
+          path: TrackNothing-*.apk
           if-no-files-found: error
       - uses: actions/setup-node@v4
         if: needs.prepare.outputs.publish == 'true'
@@ -107,7 +107,7 @@ jobs:
           node scripts/release-client.mjs --platform android --arch universal --channel beta --publish
           --version "${{ needs.prepare.outputs.version }}" --build "$VEILBIRD_BUILD_NUMBER" --min-os "Android 8.0"
           --notes "${{ github.ref_name }} (${{ github.sha }})"
-          --file "Veilbird-${{ needs.prepare.outputs.version }}-$VEILBIRD_BUILD_NUMBER.apk"
+          --file "TrackNothing-${{ needs.prepare.outputs.version }}-$VEILBIRD_BUILD_NUMBER.apk"
       - run: rm -f "$RUNNER_TEMP/release.jks"
         if: always()
   windows:
@@ -132,8 +132,8 @@ jobs:
         run: ./clients/windows/build.ps1 -Runtime ${{ matrix.runtime }} -Version ${{ needs.prepare.outputs.version }} -Build $env:VEILBIRD_BUILD_NUMBER -Installer
       - uses: actions/upload-artifact@v4
         with:
-          name: Veilbird-windows-${{ matrix.arch }}-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
-          path: clients/windows/artifacts/Veilbird-*-setup.exe
+          name: TrackNothing-windows-${{ matrix.arch }}-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
+          path: clients/windows/artifacts/TrackNothing-*-setup.exe
           if-no-files-found: error
       - shell: pwsh
         if: needs.prepare.outputs.publish == 'true'
@@ -141,4 +141,4 @@ jobs:
           node scripts/release-client.mjs --platform windows --arch ${{ matrix.arch }} --channel beta --publish
           --version "${{ needs.prepare.outputs.version }}" --build "$env:VEILBIRD_BUILD_NUMBER" --min-os "Windows 10"
           --notes "${{ github.ref_name }} (${{ github.sha }})"
-          --file "clients/windows/artifacts/Veilbird-${{ needs.prepare.outputs.version }}-$env:VEILBIRD_BUILD_NUMBER-${{ matrix.runtime }}-setup.exe"
+          --file "clients/windows/artifacts/TrackNothing-${{ needs.prepare.outputs.version }}-$env:VEILBIRD_BUILD_NUMBER-${{ matrix.runtime }}-setup.exe"

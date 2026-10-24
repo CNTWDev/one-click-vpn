@@ -5,7 +5,7 @@ const privateNetworks = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.6
 // geo database stops the whole profile from loading. Fetched through the tunnel, refreshed daily.
 const ruleSets = "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo";
 const ruleSet = (kind, name, behavior) => ({ type: "http", behavior, format: "mrs", url: `${ruleSets}/${kind}/${name}.mrs`,
-  path: `./veilbird-rules/${kind}-${name}.mrs`, interval: 86400, proxy: "Veilbird" });
+  path: `./veilbird-rules/${kind}-${name}.mrs`, interval: 86400, proxy: "TrackNothing" });
 
 /** Fixed YAML keys + JSON flow values: no interpolation of user data into YAML syntax. */
 /**
@@ -27,18 +27,18 @@ export function renderMihomoConfig(proxies, options = {}) {
     proxies,
     "proxy-groups": [
       // Default: lowest measured latency, switching away from a node that stops answering.
-      { name: "Veilbird", type: "select", proxies: ["自动选择", ...names] },
+      { name: "TrackNothing", type: "select", proxies: ["自动选择", ...names] },
       { name: "自动选择", type: "url-test", proxies: names, url: "https://www.gstatic.com/generate_204", interval: 300, tolerance: 50 },
       // The client's own "Global" switch uses this group; without it Mihomo defaults to DIRECT.
-      // It follows the Veilbird choice unless a node is picked here.
-      { name: "GLOBAL", type: "select", proxies: ["Veilbird", "自动选择", ...names] },
+      // It follows the TrackNothing choice unless a node is picked here.
+      { name: "GLOBAL", type: "select", proxies: ["TrackNothing", "自动选择", ...names] },
     ],
     ...(smart ? { "rule-providers": {
       private_domain: ruleSet("geosite", "private", "domain"), cn_domain: ruleSet("geosite", "cn", "domain"), cn_ip: ruleSet("geoip", "cn", "ipcidr"),
     } } : {}),
     rules: smart
-      ? [...privateNetworks.map((cidr) => `IP-CIDR,${cidr},DIRECT,no-resolve`), "RULE-SET,private_domain,DIRECT", "RULE-SET,cn_domain,DIRECT", "RULE-SET,cn_ip,DIRECT", "MATCH,Veilbird"]
-      : [...privateNetworks.map((cidr) => `IP-CIDR,${cidr},DIRECT,no-resolve`), "MATCH,Veilbird"],
+      ? [...privateNetworks.map((cidr) => `IP-CIDR,${cidr},DIRECT,no-resolve`), "RULE-SET,private_domain,DIRECT", "RULE-SET,cn_domain,DIRECT", "RULE-SET,cn_ip,DIRECT", "MATCH,TrackNothing"]
+      : [...privateNetworks.map((cidr) => `IP-CIDR,${cidr},DIRECT,no-resolve`), "MATCH,TrackNothing"],
   };
   return Object.entries(config).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join("\n") + "\n";
 }

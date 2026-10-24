@@ -68,7 +68,7 @@ public partial class MainWindow : Window {
             renewAt=DateTime.UtcNow.AddSeconds(15);
             try {await Acquire();}
             catch(AccessFailure error) when (error.Code is "AUTH_REQUIRED" or "DEVICE_REVOKED" or "MEMBERSHIP_EXPIRED" or "ACCOUNT_UNAVAILABLE" or "MANAGED_ACCESS_REQUIRED" or "CLIENT_UPDATE_REQUIRED") {
-                await api.Report(error.Code,leaseNodeId);Disconnect("connection_authorization_expired_connect_again");MessageBox.Show(error.Message,"Veilbird");return;
+                await api.Report(error.Code,leaseNodeId);Disconnect("connection_authorization_expired_connect_again");MessageBox.Show(error.Message,"TrackNothing");return;
             }
             catch {/* retried in 15 s until the lease runs out */}
             if(!active) return;
@@ -109,12 +109,12 @@ public partial class MainWindow : Window {
     private async void Work(Func<Task> action) {
         if(busy)return;busy=true;ContentPanel.IsEnabled=false;NavigationPanel.IsEnabled=false;BusyBanner.Visibility=Visibility.Visible;
         try {await action();}
-        catch(Exception error) {if(error is AccessFailure {Code:"CLIENT_UPDATE_REQUIRED"})CheckForUpdate();MessageBox.Show(error is AccessFailure?error.Message:L10n.Text("unable_to_reach_the_service_check_your_network_and"),"Veilbird");}
+        catch(Exception error) {if(error is AccessFailure {Code:"CLIENT_UPDATE_REQUIRED"})CheckForUpdate();MessageBox.Show(error is AccessFailure?error.Message:L10n.Text("unable_to_reach_the_service_check_your_network_and"),"TrackNothing");}
         finally {busy=false;ContentPanel.IsEnabled=true;NavigationPanel.IsEnabled=true;BusyBanner.Visibility=Visibility.Collapsed;}
     }
     private void Render() {
-        ContentPanel.Children.Clear();NavigationPanel.Children.Clear();Text("Veilbird",22);
-        Title="Veilbird";BusyLabel.Text=L10n.Text("working");Language=System.Windows.Markup.XmlLanguage.GetLanguage(L10n.Culture.IetfLanguageTag);
+        ContentPanel.Children.Clear();NavigationPanel.Children.Clear();Text("TrackNothing",22);
+        Title="TrackNothing";BusyLabel.Text=L10n.Text("working");Language=System.Windows.Markup.XmlLanguage.GetLanguage(L10n.Culture.IetfLanguageTag);
         Text(L10n.Text("language"),14);
         var languages=new[]{"system","en","zh","ru"};
         var picker=new ComboBox {ItemsSource=new[]{L10n.Text("language_system"),"English","简体中文","Русский"},SelectedIndex=Array.IndexOf(languages,L10n.Preference),MinHeight=44,Margin=new Thickness(0,0,0,12)};
@@ -137,7 +137,7 @@ public partial class MainWindow : Window {
                 main.Background=Brush("#007A64");main.Foreground=Brush("#FFFFFF");main.MinHeight=56;
             }
             Card(L10n.Text("location"),string.IsNullOrEmpty(nodeName)?L10n.Text("automatic_recommended"):nodeName);
-            Button(L10n.Text("change_location"),()=>{if(active)MessageBox.Show(L10n.Text("disconnect_before_changing_location"),"Veilbird");else{page="nodes";Render();}});
+            Button(L10n.Text("change_location"),()=>{if(active)MessageBox.Show(L10n.Text("disconnect_before_changing_location"),"TrackNothing");else{page="nodes";Render();}});
         } else if(page=="nodes") Work(async()=>{
             Text(L10n.Text("where_would_you_like_to_connect"),30);Text(L10n.Text("choose_a_location_then_return_to_connect"));
             var result=await api.Request("nodes");Button(L10n.Text("automatic_recommended"),()=>{nodeId="";nodeName="";page="connect";Render();});
@@ -158,9 +158,9 @@ public partial class MainWindow : Window {
                 if(device!["status"]!.GetValue<string>()=="revoked")continue;
                 Text(device["name"]!.GetValue<string>()+(device["isCurrent"]!.GetValue<bool>()?L10n.Text("this_device"):""));
                 if(device["status"]!.GetValue<string>()=="revoking")Text(L10n.Text("revoking_access_the_slot_is_released_in_about_5"));
-                else Button(L10n.Text("revoke_access"),()=>{if(MessageBox.Show(L10n.Text("this_device_will_lose_access_revoke_authorization"),"Veilbird",MessageBoxButton.YesNo)==MessageBoxResult.Yes)Work(async()=>{await api.Action("revoke",new JsonObject {["enrollmentId"]=device["id"]!.GetValue<string>()});page="connect";Render();});});
+                else Button(L10n.Text("revoke_access"),()=>{if(MessageBox.Show(L10n.Text("this_device_will_lose_access_revoke_authorization"),"TrackNothing",MessageBoxButton.YesNo)==MessageBoxResult.Yes)Work(async()=>{await api.Action("revoke",new JsonObject {["enrollmentId"]=device["id"]!.GetValue<string>()});page="connect";Render();});});
             }
-            Button(L10n.Text("refresh_devices"),()=>Render());Button(L10n.Text("sign_out"),()=>{if(active){MessageBox.Show(L10n.Text("disconnect_the_vpn_before_signing_out"),"Veilbird");return;}Work(async()=>{await api.Logout();Render();});});
+            Button(L10n.Text("refresh_devices"),()=>Render());Button(L10n.Text("sign_out"),()=>{if(active){MessageBox.Show(L10n.Text("disconnect_the_vpn_before_signing_out"),"TrackNothing");return;}Work(async()=>{await api.Logout();Render();});});
         });
     }
     private void Login() {
@@ -170,7 +170,7 @@ public partial class MainWindow : Window {
         Text(L10n.Text("email"));var email=new TextBox {MinHeight=36};ContentPanel.Children.Add(email);
         Text(L10n.Text("password"));var password=new PasswordBox {MinHeight=36};ContentPanel.Children.Add(password);
         AutomationProperties.SetName(origin,L10n.Text("server_address"));AutomationProperties.SetName(email,L10n.Text("email"));AutomationProperties.SetName(password,L10n.Text("password"));
-        var login=Button(L10n.Text("sign_in_and_start"),()=>{if(string.IsNullOrWhiteSpace(email.Text)||password.Password.Length==0){MessageBox.Show(L10n.Text("enter_your_email_and_password"),"Veilbird");return;}Work(async()=>{api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password.Password);password.Clear();page="connect";Render();CheckForUpdate();});});login.Background=Brush("#007A64");login.Foreground=Brush("#FFFFFF");login.IsDefault=true;
+        var login=Button(L10n.Text("sign_in_and_start"),()=>{if(string.IsNullOrWhiteSpace(email.Text)||password.Password.Length==0){MessageBox.Show(L10n.Text("enter_your_email_and_password"),"TrackNothing");return;}Work(async()=>{api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password.Password);password.Clear();page="connect";Render();CheckForUpdate();});});login.Background=Brush("#007A64");login.Foreground=Brush("#FFFFFF");login.IsDefault=true;
     }
     private static string Bytes(JsonNode? value) {double.TryParse(value?.ToString(),out var bytes);return Bytes(bytes);}
     private static string Bytes(double bytes) {string[] units={"B","KB","MB","GB","TB"};var i=0;while(bytes>=1024&&i<units.Length-1){bytes/=1024;i++;}return $"{bytes:0.#} {units[i]}";}

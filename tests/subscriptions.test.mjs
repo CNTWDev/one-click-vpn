@@ -14,20 +14,20 @@ const proxies = [
 ];
 test("subscription format contains selection groups and cannot inject rules", () => {
   const config = parseConfig(renderSubscription(proxies));
-  assert.equal(config.rules.at(-1),"MATCH,Veilbird");
+  assert.equal(config.rules.at(-1),"MATCH,TrackNothing");
   assert.ok(config.rules.includes("RULE-SET,cn_ip,DIRECT"));
   assert.ok(config.rules.includes("RULE-SET,cn_domain,DIRECT"));
   // Small rule sets, fetched through the tunnel; no geo database that can block the whole profile.
   assert.equal(config["geox-url"],undefined);
   assert.equal(config["rule-providers"].cn_domain.format,"mrs");
-  assert.equal(config["rule-providers"].cn_domain.proxy,"Veilbird");
+  assert.equal(config["rule-providers"].cn_domain.proxy,"TrackNothing");
   assert.ok(config.rules.includes("IP-CIDR,192.168.0.0/16,DIRECT,no-resolve"));
   assert.equal(config.rules.filter((rule) => rule.startsWith("MATCH")).length,1);
   assert.equal(config.proxies.length,2);
   assert.equal(config["proxy-groups"][0].type,"select");
   assert.equal(config["proxy-groups"][1].type,"url-test");
   // The client's built-in Global switch must use the tunnel, not Mihomo's DIRECT default.
-  assert.deepEqual(config["proxy-groups"][2].proxies.slice(0,2),["Veilbird","自动选择"]);
+  assert.deepEqual(config["proxy-groups"][2].proxies.slice(0,2),["TrackNothing","自动选择"]);
   assert.equal(config["proxy-groups"][2].name,"GLOBAL");
   assert.equal(config["allow-lan"],false);
   assert.throws(() => renderSubscription([]),/尚未就绪/);
@@ -35,7 +35,7 @@ test("subscription format contains selection groups and cannot inject rules", ()
 test("global mode proxies everything except private networks", () => {
   const config = parseConfig(renderSubscription(proxies, { mode: "global" }));
   assert.equal(config.rules.some((rule) => rule.includes("GEO") || rule.includes("RULE-SET")),false);
-  assert.equal(config.rules.at(-1),"MATCH,Veilbird");
+  assert.equal(config.rules.at(-1),"MATCH,TrackNothing");
   assert.equal(config["rule-providers"],undefined);
   assert.equal(config.dns["nameserver-policy"],undefined);
 });

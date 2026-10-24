@@ -67,7 +67,7 @@ public static class Tunnel {
         if(scm==IntPtr.Zero) throw new Win32Exception();
         try {
             var command=$"\"{Environment.ProcessPath}\" /service \"{ConfigPath}\"";
-            var service=CreateService(scm,ServiceName,"Veilbird",0xF01FF,0x10,3,1,command,null,IntPtr.Zero,"Nsi\0TcpIp\0",null,null);
+            var service=CreateService(scm,ServiceName,"TrackNothing",0xF01FF,0x10,3,1,command,null,IntPtr.Zero,"Nsi\0TcpIp\0",null,null);
             if(service==IntPtr.Zero) throw new Win32Exception();
             try {
                 var sidType=1; // SERVICE_SID_TYPE_UNRESTRICTED: required by the tunnel service.

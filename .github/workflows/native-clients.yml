@@ -42,7 +42,7 @@ jobs:
       - run: gradle -p clients/android :app:assembleDevDebug :app:assembleProdDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Veilbird-android-development-only
+          name: TrackNothing-android-development-only
           path: clients/android/app/build/outputs/apk/dev/debug/*.apk
           if-no-files-found: error
   apple:
@@ -63,7 +63,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent clients/apple/artifacts/Veilbird-macOS/Build/Products/Debug clients/apple/artifacts/Veilbird-macos-unsigned.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: Veilbird-apple-development-only
+          name: TrackNothing-apple-development-only
           path: clients/apple/artifacts/*.zip
           if-no-files-found: error
   windows:
@@ -81,6 +81,6 @@ jobs:
         run: ./clients/windows/build.ps1 -Runtime ${{ matrix.runtime }}
       - uses: actions/upload-artifact@v4
         with:
-          name: Veilbird-${{ matrix.runtime }}-development-only
+          name: TrackNothing-${{ matrix.runtime }}-development-only
           path: clients/windows/artifacts/*.zip
           if-no-files-found: error

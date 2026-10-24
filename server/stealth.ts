@@ -12,7 +12,7 @@ import type { VpnService } from "./control-db";
 import { nativeUserRows } from "./native-users";
 
 /**
- * Censorship-resistant transports for the Veilbird apps ("stealth" service on a node):
+ * Censorship-resistant transports for the TrackNothing apps ("stealth" service on a node):
  * Hysteria2 with Salamander obfuscation (UDP, no QUIC fingerprint) and VLESS REALITY over
  * XHTTP (TCP). Both run in one mihomo process managed by the Agent. Every enrolled app device
  * has one secret (a UUID) that is its VLESS id and its Hysteria2 password on every node.

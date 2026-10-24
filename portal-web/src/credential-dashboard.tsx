@@ -176,7 +176,7 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
 
   const hero = <section className="hero">
     <div>
-      <h1>{!loaded ? loadError ? t("{0}，你好", [user.displayName]) : <Skeleton height={34} width={240} /> : credentials.length ? t("{0}，你好", [user.displayName]) : t("{0}，欢迎使用 Veilbird", [user.displayName])}</h1>
+      <h1>{!loaded ? loadError ? t("{0}，你好", [user.displayName]) : <Skeleton height={34} width={240} /> : credentials.length ? t("{0}，你好", [user.displayName]) : t("{0}，欢迎使用 TrackNothing", [user.displayName])}</h1>
       {loaded && credentials.length > 0 && <p className="hero-stats">{t("{0} 个连接 · {1} 个在线 · 近 30 天 {2}", [credentials.length, onlineCount, formatBytes(usage?.totals.totalBytes)])}</p>}
     </div>
     {loaded && credentials.length > 0 && <button type="button" className={creating ? "secondary" : "primary"} onClick={() => creating ? setCreating("") : openCreator("subscription")}>{creating ? t("收起") : <>{Icon.plus()}{t("新建连接")}</>}</button>}
@@ -279,6 +279,6 @@ const tone = (state: string) => state === "online" ? "success" : ["offline", "ne
     <ClientDownloads />
     {loaded && <details className="disclosure panel"><summary>{t("可用区域地图")}<span>{regions.length}{t("个区域")}</span></summary><RegionMap regions={regions} selectedRegionId={regionId} onSelect={(id) => { setRegionId(id); openCreator("single"); }} /></details>}
     <Modal open={!!qr} title={qr?.title || t("二维码")} onClose={() => setQr(null)}>{qr && <div className="stack center"><QrCode text={qr.text} label={qr.title} /><p className="hint">{qr.hint}</p><div className="dialog-actions"><button type="button" className="primary" onClick={() => { void navigator.clipboard.writeText(qr.text).then(() => notify(t("已复制。"))).catch(() => notify(t("浏览器不允许自动复制。"), "error")); }}>{Icon.copy(16)}{t("复制内容")}</button></div></div>}</Modal>
-    <footer>{t("Veilbird · 配置仅供本人使用，请勿分享或上传第三方转换网站。")}</footer>
+    <footer>{t("TrackNothing · 配置仅供本人使用，请勿分享或上传第三方转换网站。")}</footer>
   </main>;
 }

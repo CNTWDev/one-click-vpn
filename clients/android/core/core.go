@@ -1,4 +1,4 @@
-// Package core embeds mihomo for the Veilbird Android app (built with gomobile bind).
+// Package core embeds mihomo for the TrackNothing Android app (built with gomobile bind).
 //
 // The app owns the VpnService and hands the tun file descriptor to mihomo through the
 // configuration (tun.file-descriptor). The app excludes itself from its own VPN, so the

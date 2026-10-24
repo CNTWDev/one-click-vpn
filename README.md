@@ -1,6 +1,6 @@
-# Veilbird Control Plane
+# TrackNothing Control Plane
 
-Veilbird is a lightweight VPN control plane for a small fleet of Linux Edge Nodes.
+TrackNothing is a lightweight VPN control plane for a small fleet of Linux Edge Nodes.
 It includes a customer Portal, an Admin console, a Controller/API, and an outbound
 Node Agent. The current data plane supports WireGuard and OpenVPN.
 
@@ -288,11 +288,11 @@ sudo grep -E '^(NORTHSTAR_CONTROLLER_URL|NORTHSTAR_NODE_ID)=' \
 
 The Agent reports health, resource usage, VPN service state, and traffic counters.
 WireGuard normally uses UDP `51820`; OpenVPN normally uses UDP `1194`; VLESS
-REALITY uses TCP `443`; the stealth transports for the Veilbird apps (Hysteria2 and
+REALITY uses TCP `443`; the stealth transports for the TrackNothing apps (Hysteria2 and
 VLESS REALITY XHTTP, one mihomo process, Agent 2.12+) use UDP **and** TCP `8443`.
 Open those ports in the Edge Node firewall/security group separately from the Controller.
 
-## Veilbird app transports
+## TrackNothing app transports
 
 The Android app prefers WireGuard (lightest; Apple and Windows use only WireGuard for now). When it is blocked they fall back, without any
 user choice, to Hysteria2 with Salamander obfuscation (UDP, no QUIC fingerprint), then
@@ -396,10 +396,10 @@ sample may be lost on a restart.
 Subscription links serve Clash/Mihomo YAML by default and a base64 `vless://` list
 (`format=v2ray`) for Shadowrocket, v2rayN/v2rayNG and similar clients; the format is also
 picked from the client's User-Agent. Every Clash profile has the same two choices: the
-`Veilbird` group defaults to `自动选择` (lowest latency, measured by the client every 5
+`TrackNothing` group defaults to `自动选择` (lowest latency, measured by the client every 5
 minutes, switching away from nodes that stop answering) or a fixed node, and the client's
-own Global switch also goes through Veilbird. Routing defaults to `mode=smart` (private
-networks and mainland China direct, everything else through Veilbird) using three small
+own Global switch also goes through TrackNothing. Routing defaults to `mode=smart` (private
+networks and mainland China direct, everything else through TrackNothing) using three small
 rule sets (~0.6 MB, MetaCubeX `meta-rules-dat` via jsdelivr) that the client downloads
 through the tunnel and refreshes daily; if they cannot be downloaded the profile still
 works and simply proxies that traffic. `mode=global` sends everything except private
@@ -485,7 +485,7 @@ reboots and counter resets are handled automatically.
 ### Client releases and Agent 2.10
 
 Deploy the Controller (migrations add `client_releases`, `client_policies` and client
-version columns), then **升级 Agent** on nodes that use Veilbird native access; 2.10.0 is
+version columns), then **升级 Agent** on nodes that use TrackNothing native access; 2.10.0 is
 the native-lease Agent formerly labelled 2.9.0 on the client branch.
 
 - Console → 客户端 → 客户端发布 registers, publishes, promotes and withdraws native clients.

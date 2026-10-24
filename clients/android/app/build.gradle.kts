@@ -23,7 +23,7 @@ android {
     productFlavors {
         create("prod") {
             dimension = "environment"
-            manifestPlaceholders["appLabel"] = "Veilbird"
+            manifestPlaceholders["appLabel"] = "TrackNothing"
             // Published APKs are prod builds; they update themselves from the stable channel.
             buildConfigField("boolean", "SELF_UPDATE", "true")
         }
@@ -31,7 +31,7 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            manifestPlaceholders["appLabel"] = "Veilbird Dev"
+            manifestPlaceholders["appLabel"] = "TrackNothing Dev"
             buildConfigField("boolean", "SELF_UPDATE", "false")
         }
     }

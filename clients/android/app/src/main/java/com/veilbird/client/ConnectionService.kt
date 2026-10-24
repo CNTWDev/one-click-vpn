@@ -120,7 +120,7 @@ class ConnectionService : VpnService() {
         transports = Transports.order(proxies.map { it.getString("name") }, blocked)
         Journal.add("node: ${ConnectionStateStore.node}, transports ${transports.joinToString(" > ")}" + if (blocked.isNotEmpty()) " (blocked here before: ${blocked.joinToString()})" else "")
         Core.stop()
-        val tun = Builder().setSession("Veilbird").setMtu(1500)
+        val tun = Builder().setSession("TrackNothing").setMtu(1500)
             .addAddress("198.18.0.1", 30).addAddress("fdfe:dcba:9876::1", 126)
             .addRoute("0.0.0.0", 0).addRoute("::", 0).addDnsServer("198.18.0.2")
             .addDisallowedApplication(packageName)
@@ -215,7 +215,7 @@ class ConnectionService : VpnService() {
     private fun notification(text: String): Notification {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val stop = PendingIntent.getService(this, 1, Intent(this, ConnectionService::class.java).setAction("disconnect"), PendingIntent.FLAG_IMMUTABLE)
-        return Notification.Builder(this, "vpn").setContentTitle("Veilbird").setContentText(text).setSmallIcon(android.R.drawable.ic_lock_lock).setContentIntent(open).setOngoing(true).addAction(Notification.Action.Builder(null, L10n.text(R.string.disconnect_status), stop).build()).build()
+        return Notification.Builder(this, "vpn").setContentTitle("TrackNothing").setContentText(text).setSmallIcon(android.R.drawable.ic_lock_lock).setContentIntent(open).setOngoing(true).addAction(Notification.Action.Builder(null, L10n.text(R.string.disconnect_status), stop).build()).build()
     }
     private fun stopConnection(message: Int) {
         if (stopping) return

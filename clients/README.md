@@ -1,4 +1,4 @@
-# Veilbird 原生客户端工作区
+# TrackNothing 原生客户端工作区
 
 状态：**开发验证阶段，不是正式可分发版本**。Android / Apple 已接入登录、账号设备管理、自动/指定节点和 WireGuard 引擎；Android APK、Mac 和 iOS 模拟器构建已验证，真机联网尚未验收。Windows 已接入登录、节点列表、授权设备管理和 WireGuard 隧道服务（官方 embeddable tunnel service），尚待真机验收。CI 不自动发布开发产物。
 
@@ -29,7 +29,7 @@ Portal、Console 和三类原生客户端支持中文、英文、俄语，默认
 
 - Android：JDK 17+、Android SDK 35、Gradle 8.14.5；`cd clients/android && ./gradlew :app:assembleDebug`。完整 wrapper 已加入并固定发行包 SHA-256。`VEILBIRD_API_ORIGIN` 在构建时内置服务地址；未设置的开发包需要填写 HTTPS 地址。APK 位于 `app/build/outputs/apk/debug/app-debug.apk`，仅用于测试。
 - Apple：完整 Xcode、XcodeGen、Go 1.24.4；执行 `bash clients/apple/scripts/build.sh ios` 或 `macos`。iOS 使用模拟器 ad-hoc 签名；macOS 包含 arm64/x64，未签名。WireGuardKit 固定上游提交，构建脚本应用 tools-version 与 SDK 头文件兼容补丁；Go bridge 在独立临时目录构建以支持项目路径含空格。这些开发产物不能用于真机 VPN 验收或正式分发。
-- Windows：Windows + .NET 10 SDK；`pwsh clients/windows/build.ps1 -Runtime win-x64`，ARM64 使用 `win-arm64`。先由 `build-tunnel.ps1` 按固定版本构建 wireguard-windows 的 tunnel.dll 并取得签名的 wireguard.dll，再生成自包含 ZIP；加 `-Version -Build -Installer` 生成安装程序 `Veilbird-<版本>-<构建号>-<runtime>-setup.exe`（未做代码签名，首次运行 SmartScreen 会提示）。
+- Windows：Windows + .NET 10 SDK；`pwsh clients/windows/build.ps1 -Runtime win-x64`，ARM64 使用 `win-arm64`。先由 `build-tunnel.ps1` 按固定版本构建 wireguard-windows 的 tunnel.dll 并取得签名的 wireguard.dll，再生成自包含 ZIP；加 `-Version -Build -Installer` 生成安装程序 `TrackNothing-<版本>-<构建号>-<runtime>-setup.exe`（未做代码签名，首次运行 SmartScreen 会提示）。
 - GitHub Actions：手动运行 `Native client development builds`。三平台独立构建，只上传开发 artifacts，不创建公开 Release。
 
 ## 用户下载与正式发布
@@ -71,7 +71,7 @@ Android 构建：`prod` / `dev` 两个 flavor；发布签名只从环境变量�
 1. 备份后运行 `npm run db:migrate`，增加 native 会话、签名挑战、授权设备与租约表。
 2. 所有正常账号都能用客户端登录连接（订阅照常可用），每个账号的客户端设备数默认 `VEILBIRD_NATIVE_DEVICE_LIMIT=3`；`VEILBIRD_NATIVE_ACCESS_ENABLED=0` 可整体关闭客户端。
 3. 升级测试节点 Agent 至 2.10.0，确认 `northstar-native-expiry.timer` 正常，心跳报告 `nativeLeaseEnforcement:1`；旧 Agent 不参与原生节点选择。保持服务器时间同步。
-4. 后台账号「访问详情 → 客户端授权设备与会员额度」可单独设置设备上限和有效期；选「仅 Veilbird」会停用该账号的订阅和第三方配置（只对未曾导出配置的账号开放，旧账号尚无安全迁移流程）。
+4. 后台账号「访问详情 → 客户端授权设备与会员额度」可单独设置设备上限和有效期；选「仅 TrackNothing」会停用该账号的订阅和第三方配置（只对未曾导出配置的账号开放，旧账号尚无安全迁移流程）。
 5. 真机测试首次系统权限、实际出口 IP、IPv4/IPv6/DNS 防泄漏、锁屏后台续租、网络切换、断网恢复、撤销/停用/到期、Agent 停止与重启、跨端并发额度及安装升级卸载。普通终端重装会被视为新身份；当前实现不提供抗 root/管理员复制私钥的硬件证明。
 
 当前租约 300 秒、客户端约 90 秒续租；通过设备签名及权益校验的连接/续租把会话滑动延长 `VEILBIRD_NATIVE_SESSION_DAYS` 天（默认 30），闲置超过该天数才需重新登录；Agent 2.10 起续租只通过任务轮询下发截止时间，不再触发整节点重配。撤销后等待旧租约截止加 20 秒才释放名额，不能承诺“即时全网下线”。节点先安装内核 UTC 截止时间规则，再启用 peer；即使 Agent/watchdog 卡住，内核仍阻断过期流量。独立 watchdog 负责清理 live peer 和持久化配置，重启先恢复防火墙再拉起隧道。只有已经使用原生租约的节点启用这组规则，legacy-only 节点不改变防火墙。修改节点规则、回拨系统时间等不在保证边界内；必须完成 Linux 真机故障注入后才能制定 SLA。启用原生访问的节点不要回退旧 Agent：旧版本新增的 peer 会被保留的默认拒绝规则阻断。

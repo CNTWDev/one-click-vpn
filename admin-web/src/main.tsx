@@ -1,4 +1,4 @@
-import { BrandMark } from "../../shared/brand";
+import { BrandMark, BrandWordmark } from "../../shared/brand";
 import { ConsoleLanguage, ConsoleLanguagePicker, t, useConsoleLanguage } from "./i18n";
 /* eslint-disable react-hooks/set-state-in-effect */
 import { type FormEvent, lazy, Suspense, useCallback, useEffect, useState } from "react";
@@ -38,7 +38,7 @@ applyTheme();
 
 function Brand() {
   useConsoleLanguage();
-  return <div className="brand"><span className="mark"><BrandMark size={26} /></span><span>VEIL<em>BIRD</em> <small>CONSOLE</small></span></div>;
+  return <div className="brand"><span className="mark"><BrandMark size={26} /></span><span className="brand-text"><span><BrandWordmark /></span><small>CONSOLE</small></span></div>;
 }
 
 function Login({ onUser }: { onUser: (user: AdminUser) => void }) {

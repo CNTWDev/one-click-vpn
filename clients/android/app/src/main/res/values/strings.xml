@@ -10,7 +10,7 @@
   <string name="allow_the_system_vpn_permission_to_connect">Allow the system VPN permission to connect.</string>
   <string name="allow_vpn_access_on_your_first_connection">Allow VPN access on your first connection</string>
   <string name="announcement">Announcement</string>
-  <string name="ask_your_administrator_to_enable_veilbird_client_access">Ask your administrator to enable Veilbird client access.</string>
+  <string name="ask_your_administrator_to_enable_veilbird_client_access">Ask your administrator to enable TrackNothing client access.</string>
   <string name="authorized_devices">Authorized devices</string>
   <string name="authorizing_and_connecting">Authorizing and connecting…</string>
   <string name="auto_detail">Picked by latency, stability and load</string>
@@ -22,12 +22,12 @@
   <string name="change_location">Change location  ›</string>
   <string name="choose_a_location_then_connect_from_the_home_screen">Choose a location, then connect from the home screen.</string>
   <string name="choose_a_location_then_return_to_connect">Choose a location, then return to Connect.</string>
-  <string name="choose_a_location_veilbird_takes_care_of_the_rest">Choose a location. Veilbird takes care of the rest.</string>
+  <string name="choose_a_location_veilbird_takes_care_of_the_rest">Choose a location. TrackNothing takes care of the rest.</string>
   <string name="choose_location_then_connect_hint">Choose a location, then connect from the home screen.</string>
   <string name="clear_action">Clear</string>
   <string name="client_access_is_not_enabled_on_the_server">Client access is not enabled on the server.</string>
   <string name="client_access_is_not_enabled_on_the_server_contact">Client access is not enabled on the server. Contact your administrator.</string>
-  <string name="client_update_required">This version is no longer supported. Download the latest Veilbird to sign in or connect.</string>
+  <string name="client_update_required">This version is no longer supported. Download the latest TrackNothing to sign in or connect.</string>
   <string name="confirming_connection_status">Confirming connection…</string>
   <string name="connect_action">Connect</string>
   <string name="connect_automatically_or_choose_your_own_location">Connect automatically or choose your own location.</string>
@@ -49,7 +49,7 @@
   <string name="current_page">, current page</string>
   <string name="development_build_the_windows_tunnel_service_is_not_integrated">Development build: the Windows tunnel service is not integrated. You can sign in, view locations and manage devices, but cannot connect to a VPN.</string>
   <string name="development_server_address">Development server address</string>
-  <string name="development_title">Veilbird — Development</string>
+  <string name="development_title">TrackNothing — Development</string>
   <string name="device">Device</string>
   <string name="device_limit_reached_account_hint">Device limit reached. Revoke an old device in Account and try again.</string>
   <string name="device_limit_reached_revoke_an_old_device_and_try">Device limit reached. Revoke an old device and try again.</string>
@@ -84,7 +84,7 @@
   <string name="measuring_latency">Testing…</string>
   <string name="membership_expired_hint">Your access has expired. Contact your administrator to renew it.</string>
   <string name="my_account">My account</string>
-  <string name="my_veilbird">My Veilbird</string>
+  <string name="my_veilbird">My TrackNothing</string>
   <string name="new_devices_are_added_on_their_first_connection_when">New devices are added on their first connection when a slot is available.</string>
   <string name="no_authorized_devices_yet_they_appear_after_their_first">No authorized devices yet. They appear after their first connection.</string>
   <string name="no_expiry">No expiry</string>
@@ -109,9 +109,9 @@
   <string name="revoking_access_the_slot_is_usually_released_within_about">Revoking access. The slot is usually released within about 5 minutes.</string>
   <string name="revoking_slot_released_when_the_old_connection_expires">Revoking · Slot released when the old connection expires</string>
   <string name="routing_global">Global</string>
-  <string name="routing_global_detail">All traffic goes through Veilbird</string>
+  <string name="routing_global_detail">All traffic goes through TrackNothing</string>
   <string name="routing_smart">Smart</string>
-  <string name="routing_smart_detail">Sites in mainland China go direct, the rest through Veilbird</string>
+  <string name="routing_smart_detail">Sites in mainland China go direct, the rest through TrackNothing</string>
   <string name="search_locations_or_regions">Search locations or regions</string>
   <string name="secure_storage_is_unavailable_unlock_your_device_and_try">Secure storage is unavailable. Unlock your device and try again.</string>
   <string name="select_an_available_location_for_you">Fastest location, switches if one fails</string>
@@ -119,7 +119,7 @@
   <string name="server_address_url">Server address https://…</string>
   <string name="share_action">Share</string>
   <string name="sign_in_and_start">Sign in and start</string>
-  <string name="sign_in_to_veilbird_no_imports_or_configuration_needed">Sign in to Veilbird. No imports or configuration needed.</string>
+  <string name="sign_in_to_veilbird_no_imports_or_configuration_needed">Sign in to TrackNothing. No imports or configuration needed.</string>
   <string name="sign_out">Sign out</string>
   <string name="simulator_build_verify_vpn_connections_on_a_signed_physical">Simulator build · Verify VPN connections on a signed physical-device build</string>
   <string name="tap_to_change">Tap to change location</string>
@@ -138,7 +138,7 @@
   <string name="unable_to_connect_check_your_network_and_try_again">Unable to connect. Check your network and try again.</string>
   <string name="unable_to_reach_the_service_check_your_network_and">Unable to reach the service. Check your network and try again.</string>
   <string name="unable_to_reach_the_service_check_your_network_or">Unable to reach the service. Check your network or contact your administrator.</string>
-  <string name="update_allow_installs">Allow Veilbird to install updates, then come back and tap Update now again.</string>
+  <string name="update_allow_installs">Allow TrackNothing to install updates, then come back and tap Update now again.</string>
   <string name="update_available">Version %1$s is available</string>
   <string name="update_available_detail">Update to get the latest features and fixes.</string>
   <string name="update_downloading">Downloading and verifying the update…</string>

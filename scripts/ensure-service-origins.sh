@@ -59,7 +59,7 @@ if [ -z "$portal_domain" ] || [ -z "$admin_domain" ] || [ -z "$api_domain" ]; th
   default_api="api.$base_domain"
 
   echo ""
-  echo "Veilbird service-domain migration"
+  echo "TrackNothing service-domain migration"
   echo "The current .env still uses the legacy single-domain layout: ${current_app:-unset}"
   printf "Portal domain [%s]: " "$default_portal"
   read -r portal_domain

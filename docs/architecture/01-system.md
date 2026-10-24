@@ -10,7 +10,7 @@ flowchart TB
     Android["Android Client"]
   end
 
-  subgraph Control["Veilbird Control Plane"]
+  subgraph Control["TrackNothing Control Plane"]
     Portal["Customer Web"]
     Admin["Admin Web"]
     API["Controller API"]
@@ -21,7 +21,7 @@ flowchart TB
   end
 
   subgraph Edge["Cloud Edge Nodes"]
-    Agent["Veilbird Agent"]
+    Agent["TrackNothing Agent"]
     WG["WireGuard Adapter"]
     OVPN["OpenVPN Adapter"]
     IKE["IKEv2 Adapter"]
@@ -73,7 +73,7 @@ flowchart TB
 
 - 承载一个或多个 VPN 数据面；
 - 本地保存节点私钥；
-- 运行 Veilbird Agent；
+- 运行 TrackNothing Agent；
 - 应用签名/授权后的配置；
 - 上报心跳、握手和流量统计；
 - 在本地执行有限的 allow-listed 操作。

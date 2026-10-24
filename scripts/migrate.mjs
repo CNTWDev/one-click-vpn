@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 CREATE INDEX IF NOT EXISTS audit_created_idx ON audit_logs(created_at);
 CREATE TABLE IF NOT EXISTS controller_settings (
-  id TEXT PRIMARY KEY, display_name TEXT NOT NULL DEFAULT 'Veilbird Controller',
+  id TEXT PRIMARY KEY, display_name TEXT NOT NULL DEFAULT 'TrackNothing Controller',
   location_label TEXT NOT NULL DEFAULT '', latitude DOUBLE PRECISION, longitude DOUBLE PRECISION,
   location_source TEXT NOT NULL DEFAULT 'unset', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
@@ -430,7 +430,7 @@ try {
     DECLARE managed BOOLEAN;
     BEGIN
       SELECT u.native_only INTO managed FROM users u JOIN devices d ON d.user_id=u.id WHERE d.id=NEW.device_id FOR UPDATE OF u;
-      IF managed THEN RAISE EXCEPTION 'Please connect using the Veilbird app'; END IF;
+      IF managed THEN RAISE EXCEPTION 'Please connect using the TrackNothing app'; END IF;
       RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
@@ -443,6 +443,10 @@ try {
   // First desired revision that contained this profile; subscriptions wait only for that, not for later revisions.
   await pool.query("ALTER TABLE connection_profiles ADD COLUMN IF NOT EXISTS included_revision INTEGER");
   await pool.query("UPDATE vpn_services SET subnet='10.70.0.0/20' WHERE protocol='wireguard' AND subnet='10.70.0.0/24'");
+  // Product renamed Veilbird -> TrackNothing; only untouched defaults follow, names an operator typed stay.
+  await pool.query("ALTER TABLE controller_settings ALTER COLUMN display_name SET DEFAULT 'TrackNothing Controller'");
+  await pool.query("UPDATE controller_settings SET display_name='TrackNothing Controller' WHERE display_name='Veilbird Controller'");
+  await pool.query("UPDATE mail_settings SET from_name='TrackNothing' WHERE from_name='Veilbird'");
   const timestamp = new Date().toISOString();
   const regions = [
     ["tokyo-jp", "Tokyo", "Japan", "JP"],
@@ -475,7 +479,7 @@ try {
       [randomUUID(), email, process.env.VEILBIRD_ADMIN_NAME?.trim() || "Owner", hashPassword(password), timestamp],
     );
   }
-  console.log("Veilbird PostgreSQL database ready");
+  console.log("TrackNothing PostgreSQL database ready");
 } finally {
   await pool.end();
 }

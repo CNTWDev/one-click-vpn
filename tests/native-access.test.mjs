@@ -48,7 +48,7 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     assert.equal(result.proxies.some(p=>p.name==="hysteria2"),false,"no stealth service on this node");
     const internalDevice=(await pool.query("SELECT device_id FROM native_leases WHERE id=$1",[result.leaseId])).rows[0].device_id;
     await assert.rejects(pool.query(`INSERT INTO connection_profiles(id,device_id,node_id,protocol,transport,revision,endpoint_json,issued_at,expires_at,updated_at)
-      VALUES($1,$2,$3,'wireguard','udp',1,'{}',$4,$4,$4)`,[`${user}_bypass`,internalDevice,node,stamp]),/Veilbird app/);
+      VALUES($1,$2,$3,'wireguard','udp',1,'{}',$4,$4,$4)`,[`${user}_bypass`,internalDevice,node,stamp]),/TrackNothing app/);
     assert.equal(Number((await pool.query("SELECT COUNT(*) FROM native_enrollments WHERE user_id=$1",[user])).rows[0].count),1);
     assert.equal((await call("connect",payload,a.token)).status,403,"proof cannot replay");
     assert.equal((await call(`status/${result.leaseId}`,undefined,loser.token)).status,403);

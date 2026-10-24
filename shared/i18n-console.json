@@ -107,9 +107,9 @@
     "Manage regions →",
     "Управление регионами →"
   ],
-  "Veilbird 全球 VPN 节点分布图": [
-    "Veilbird global VPN node map",
-    "Карта узлов VPN Veilbird"
+  "TrackNothing 全球 VPN 节点分布图": [
+    "TrackNothing global VPN node map",
+    "Карта узлов VPN TrackNothing"
   ],
   "{0}，{1} 个节点，{2} 个在线": [
     "{0}, {1} nodes, {2} online",
@@ -615,13 +615,13 @@
     "Saved. Revocation requires synchronization; offline nodes may take about 5 minutes. Slots remain occupied until then.",
     "Сохранено. Отзыв требует синхронизации; недоступным узлам может потребоваться около 5 минут. До этого места остаются занятыми."
   ],
-  "Veilbird 授权设备": [
-    "Veilbird authorized devices",
-    "Авторизованные устройства Veilbird"
+  "TrackNothing 授权设备": [
+    "TrackNothing authorized devices",
+    "Авторизованные устройства TrackNothing"
   ],
-  "所有账号都能用 Veilbird 客户端登录连接，客户端设备数受下面的上限限制。选择「仅 Veilbird」会同时停用该账号的订阅和第三方配置。": [
-    "Every account can sign in and connect with the Veilbird app; app devices count toward the limit below. “Veilbird only” also turns off this account’s subscriptions and third-party configurations.",
-    "Любой аккаунт может входить и подключаться в приложении Veilbird; устройства приложения учитываются в лимите ниже. «Только Veilbird» также отключает подписки и сторонние конфигурации аккаунта."
+  "所有账号都能用 TrackNothing 客户端登录连接，客户端设备数受下面的上限限制。选择「仅 TrackNothing」会同时停用该账号的订阅和第三方配置。": [
+    "Every account can sign in and connect with the TrackNothing app; app devices count toward the limit below. “TrackNothing only” also turns off this account’s subscriptions and third-party configurations.",
+    "Любой аккаунт может входить и подключаться в приложении TrackNothing; устройства приложения учитываются в лимите ниже. «Только TrackNothing» также отключает подписки и сторонние конфигурации аккаунта."
   ],
   "访问方式": [
     "Access mode",
@@ -631,9 +631,9 @@
     "Client and subscriptions",
     "Клиент и подписки"
   ],
-  "仅 Veilbird · 严格授权设备": [
-    "Veilbird only · authorized devices",
-    "Только Veilbird · авторизованные устройства"
+  "仅 TrackNothing · 严格授权设备": [
+    "TrackNothing only · authorized devices",
+    "Только TrackNothing · авторизованные устройства"
   ],
   "设备上限": [
     "Device limit",
@@ -1087,9 +1087,9 @@
     "No manual fingerprint generation or entry",
     "Не нужно создавать или вводить отпечаток вручную"
   ],
-  "添加时，Controller 会通过 SSH 自动读取并固定主机公钥，同时在服务器上读取或生成持久的 Veilbird 节点 ID。发现重复节点、复用的 SSH host key 或重复 IP/端口时会停止部署。": [
-    "When adding a server, Controller retrieves and pins its SSH public key, then reads or creates a persistent Veilbird node ID. Deployment stops if it detects duplicate nodes, reused SSH host keys or duplicate IP/port pairs.",
-    "При добавлении Controller получает и закрепляет открытый ключ SSH, затем читает или создаёт постоянный ID узла Veilbird. Развёртывание останавливается при обнаружении дубликатов узлов, ключей SSH или пар IP/порт."
+  "添加时，Controller 会通过 SSH 自动读取并固定主机公钥，同时在服务器上读取或生成持久的 TrackNothing 节点 ID。发现重复节点、复用的 SSH host key 或重复 IP/端口时会停止部署。": [
+    "When adding a server, Controller retrieves and pins its SSH public key, then reads or creates a persistent TrackNothing node ID. Deployment stops if it detects duplicate nodes, reused SSH host keys or duplicate IP/port pairs.",
+    "При добавлении Controller получает и закрепляет открытый ключ SSH, затем читает или создаёт постоянный ID узла TrackNothing. Развёртывание останавливается при обнаружении дубликатов узлов, ключей SSH или пар IP/порт."
   ],
   "首次连接采用 TOFU；后续部署和修复必须匹配已固定的主机指纹与节点 ID。": [
     "The first connection uses TOFU. Later deployments and repairs must match the pinned host fingerprint and node ID.",
@@ -2299,9 +2299,9 @@
     "Client releases",
     "Выпуски клиентов"
   ],
-  "登记、发布和撤回 Veilbird 客户端；门户下载、固定下载链接和客户端更新检查都读取这里。": [
-    "Register, publish and withdraw Veilbird clients. Portal downloads, permanent download links and client update checks all read from here.",
-    "Регистрация, публикация и отзыв клиентов Veilbird. Загрузки на портале, постоянные ссылки и проверка обновлений используют эти данные."
+  "登记、发布和撤回 TrackNothing 客户端；门户下载、固定下载链接和客户端更新检查都读取这里。": [
+    "Register, publish and withdraw TrackNothing clients. Portal downloads, permanent download links and client update checks all read from here.",
+    "Регистрация, публикация и отзыв клиентов TrackNothing. Загрузки на портале, постоянные ссылки и проверка обновлений используют эти данные."
   ],
   "安装包存储：S3 兼容对象存储（{0}）": [
     "Installer storage: S3-compatible object storage ({0}).",

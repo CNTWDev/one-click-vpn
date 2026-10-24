@@ -44,7 +44,7 @@ struct VeilbirdApp: App {
         do {
             signedIn=try SecureStorage.read("token") != nil
             #if !targetEnvironment(simulator)
-            manager=try await NETunnelProviderManager.loadAllFromPreferences().first { $0.localizedDescription == "Veilbird" }
+            manager=try await NETunnelProviderManager.loadAllFromPreferences().first { $0.localizedDescription == "TrackNothing" }
             #endif
             if signedIn {try await load()}
         } catch {message=error.localizedDescription}
@@ -72,9 +72,9 @@ struct VeilbirdApp: App {
         let manager=self.manager ?? NETunnelProviderManager()
         let proto=NETunnelProviderProtocol()
         proto.providerBundleIdentifier=(Bundle.main.bundleIdentifier ?? "")+".tunnel"
-        proto.serverAddress="Veilbird"
+        proto.serverAddress="TrackNothing"
         proto.providerConfiguration=["origin":api.origin,"nodeId":selected]
-        manager.protocolConfiguration=proto;manager.localizedDescription="Veilbird";manager.isEnabled=true
+        manager.protocolConfiguration=proto;manager.localizedDescription="TrackNothing";manager.isEnabled=true
         try await manager.saveToPreferences();try await manager.loadFromPreferences();self.manager=manager
         try manager.connection.startVPNTunnel()
         #endif
@@ -107,7 +107,7 @@ struct ClientView:View {
         VStack(spacing:0) {
             ScrollView {
                 VStack(alignment:.leading,spacing:24) {
-                    HStack {Label("Veilbird",systemImage:"bird").font(.headline).tracking(2);Spacer();Text(L10n.text("connect_freely")).font(.caption).foregroundStyle(VeilbirdStyle.muted)}
+                    HStack {Label("TrackNothing",systemImage:"slash.circle").font(.headline).tracking(2);Spacer();Text(L10n.text("connect_freely")).font(.caption).foregroundStyle(VeilbirdStyle.muted)}
                     Picker(L10n.text("language"), selection: $language) {
                         Text(L10n.text("language_system")).tag("system")
                         Text("English").tag("en")
