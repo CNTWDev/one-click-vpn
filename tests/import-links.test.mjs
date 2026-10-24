@@ -6,7 +6,7 @@ const link = subscriptionLink("A".repeat(43), { format: "v2ray", mode: "global" 
 
 test("Hiddify deep link round-trips the subscription URL the way Hiddify parses it", () => {
   // Mirrors hiddify-app LinkParser.deep: a `url` query parameter wins and is decoded.
-  const uri = new URL(importUrls.hiddify(link));
+  const uri = new URL(importUrls.hiddify(link, "TrackNothing"));
   assert.equal(uri.protocol, "hiddify:");
   assert.equal(uri.host, "import");
   assert.equal(uri.searchParams.get("url"), link);
@@ -14,7 +14,7 @@ test("Hiddify deep link round-trips the subscription URL the way Hiddify parses 
 });
 
 test("Clash deep link round-trips the subscription URL", () => {
-  const uri = new URL(importUrls.clash(link));
+  const uri = new URL(importUrls.clash(link, "TrackNothing"));
   assert.equal(uri.host, "install-config");
   assert.equal(uri.searchParams.get("url"), link);
 });

@@ -37,12 +37,13 @@ export function subscriptionLink(token: string, options: { format?: Subscription
   return `${origin}/api/subscription?${query.toString()}`;
 }
 const base64Url = (value: string) => btoa(String.fromCharCode(...new TextEncoder().encode(value))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+/** `name` is the profile name the client shows: the site's name. */
 export const importUrls = {
-  clash: (link: string) => `clash://install-config?url=${encodeURIComponent(link)}&name=TrackNothing`,
+  clash: (link: string, name: string) => `clash://install-config?url=${encodeURIComponent(link)}&name=${encodeURIComponent(name)}`,
   // Hiddify reads the raw (still percent-encoded) path of hiddify://import/<url>, so an encoded URL there fails
   // to import; its query form decodes `url` properly and keeps the token's own query string intact.
-  hiddify: (link: string) => `hiddify://import?url=${encodeURIComponent(link)}&name=TrackNothing`,
-  shadowrocket: (link: string) => `shadowrocket://add/sub://${base64Url(link)}?remark=TrackNothing`,
+  hiddify: (link: string, name: string) => `hiddify://import?url=${encodeURIComponent(link)}&name=${encodeURIComponent(name)}`,
+  shadowrocket: (link: string, name: string) => `shadowrocket://add/sub://${base64Url(link)}?remark=${encodeURIComponent(name)}`,
 };
 
 export type Platform = "ios" | "android" | "mac" | "windows" | "linux";

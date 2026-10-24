@@ -31,6 +31,9 @@ const views = [
   { name: "services-reality", hash: "services?tab=reality" },
   { name: "regions", hash: "regions" },
   { name: "controller", hash: "controller" },
+  { name: "sites", hash: "sites" },
+  { name: "sites-checked", hash: "sites", open: async (page, l) => { await page.getByRole("button", { name: tr(l, "检查域名") }).nth(1).click(); await page.locator(".site-check").first().waitFor(); }, modal: false },
+  { name: "sites-edit", hash: "sites", open: (page, l) => page.getByRole("button", { name: tr(l, "编辑"), exact: true }).nth(1).click(), modal: false },
   { name: "logs", hash: "logs" },
   { name: "releases", hash: "releases" },
 ];
@@ -64,7 +67,7 @@ test("Console layout: no overflow, spill or overlap on any page, locale or width
           await page.reload(); // drop any dialog left open by the previous view
           await page.locator(".content h1, .subscription-heading h2").first().waitFor();
           if (view.open) await view.open(page, locale);
-          if (view.open || view.hash.includes("focus=")) await page.locator(".modal").first().waitFor();
+          if ((view.open && view.modal !== false) || view.hash.includes("focus=")) await page.locator(".modal").first().waitFor();
           await page.waitForTimeout(300);
           for (const issue of await page.evaluate(`(${auditLayout})()`)) failures.push(`${locale} ${width}px ${view.name}: [${issue.kind}] ${issue.detail}`);
           if (shots) await page.screenshot({ path: path.join(shots, `${locale}-${width}-${view.name}.png`), fullPage: true });

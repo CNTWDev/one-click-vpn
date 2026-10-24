@@ -18,12 +18,13 @@ async function passwordHash(userId: string): Promise<{ hash: string; status: str
   return (await dbQuery<{ hash: string; status: string; role: string }>("SELECT password_hash AS hash, status, role FROM users WHERE id = $1", [userId]))[0];
 }
 
-export async function createResetLink(userId: string, ttlSeconds: number): Promise<{ url: string; expiresAt: string } | null> {
+/** `portalOrigin` is the Portal of the site the request came from, so the link opens the brand the user knows. */
+export async function createResetLink(userId: string, ttlSeconds: number, portalOrigin = publicOrigin()): Promise<{ url: string; expiresAt: string } | null> {
   const user = await passwordHash(userId);
   if (!user) return null;
   const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
   const token = `${userId}.${expires}.${signature(userId, expires, user.hash)}`;
-  return { url: `${publicOrigin()}/#reset=${token}`, expiresAt: new Date(expires * 1000).toISOString() };
+  return { url: `${portalOrigin}/#reset=${token}`, expiresAt: new Date(expires * 1000).toISOString() };
 }
 
 /** Sets the new password and signs the account out everywhere. Returns the user id, or null for a bad link. */

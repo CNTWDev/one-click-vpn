@@ -2846,5 +2846,185 @@
   "下一页": [
     "Next",
     "Далее"
+  ],
+  "站点": [
+    "Sites",
+    "Сайты"
+  ],
+  "同一套账号和节点，按访问域名显示不同的名称和 Logo。": [
+    "One set of accounts and nodes, shown under a different name and logo per domain.",
+    "Одни и те же аккаунты и узлы под разными названиями и логотипами для каждого домена."
+  ],
+  "站点列表": [
+    "Sites",
+    "Сайты"
+  ],
+  "还没有站点。部署时配置的域名会在下次更新后自动成为默认站点。": [
+    "No sites yet. The domains set at deployment become the default site after the next update.",
+    "Сайтов пока нет. Домены из развёртывания станут сайтом по умолчанию после следующего обновления."
+  ],
+  "默认": [
+    "Default",
+    "По умолчанию"
+  ],
+  "用户访问": [
+    "Portal",
+    "Портал"
+  ],
+  "订阅 / API": [
+    "Subscription / API",
+    "Подписка / API"
+  ],
+  "管理后台": [
+    "Console",
+    "Консоль"
+  ],
+  "已连通": [
+    "Reachable",
+    "Доступен"
+  ],
+  "指向了其他站点：{0}": [
+    "Points to another site: {0}",
+    "Ведёт на другой сайт: {0}"
+  ],
+  "无法访问：{0}": [
+    "Unreachable: {0}",
+    "Недоступен: {0}"
+  ],
+  "检查中…": [
+    "Checking…",
+    "Проверка…"
+  ],
+  "检查域名": [
+    "Check domains",
+    "Проверить домены"
+  ],
+  "设为默认": [
+    "Make default",
+    "Сделать основным"
+  ],
+  "删除站点": [
+    "Delete site",
+    "Удалить сайт"
+  ],
+  "在宝塔添加站点": [
+    "Add the site in BaoTa",
+    "Добавьте сайт в BaoTa"
+  ],
+  "在 DNS 把这几个域名解析到本服务器。": [
+    "Point these domains to this server in DNS.",
+    "Направьте эти домены на этот сервер в DNS."
+  ],
+  "宝塔 → 网站 → 添加站点，每个域名建一个。": [
+    "BaoTa → Website → Add site, one per domain.",
+    "BaoTa → Сайты → Добавить сайт, по одному на домен."
+  ],
+  "每个网站的反向代理目标：": [
+    "Reverse proxy target for each:",
+    "Цель обратного прокси для каждого:"
+  ],
+  "反向代理的“发送域名”填 {0}，系统靠它识别站点。": [
+    "Set the proxy's “Send domain” to {0}; this is how the site is recognized.",
+    "В прокси укажите «Отправляемый домен» {0} — по нему определяется сайт."
+  ],
+  "SSL → Let's Encrypt 申请证书，然后点“检查域名”。": [
+    "SSL → Let's Encrypt for a certificate, then click “Check domains”.",
+    "SSL → Let's Encrypt для сертификата, затем нажмите «Проверить домены»."
+  ],
+  "编辑站点": [
+    "Edit site",
+    "Изменить сайт"
+  ],
+  "新建站点": [
+    "New site",
+    "Новый сайт"
+  ],
+  "站点名称": [
+    "Site name",
+    "Название сайта"
+  ],
+  "用户访问域名": [
+    "Portal domain",
+    "Домен портала"
+  ],
+  "订阅 / API 域名": [
+    "Subscription / API domain",
+    "Домен подписки / API"
+  ],
+  "订阅链接使用这个域名。": [
+    "Subscription links use this domain.",
+    "Ссылки подписки используют этот домен."
+  ],
+  "管理后台域名": [
+    "Console domain",
+    "Домен консоли"
+  ],
+  "邮件发件人名称": [
+    "Email sender name",
+    "Имя отправителя писем"
+  ],
+  "留空则用邮件设置里的名称": [
+    "Empty uses the mail settings name",
+    "Пусто — имя из настроек почты"
+  ],
+  "Logo": [
+    "Logo",
+    "Логотип"
+  ],
+  "自定义 SVG": [
+    "Custom SVG",
+    "Свой SVG"
+  ],
+  "默认图标": [
+    "Default icon",
+    "Значок по умолчанию"
+  ],
+  "上传 SVG": [
+    "Upload SVG",
+    "Загрузить SVG"
+  ],
+  "移除": [
+    "Remove",
+    "Убрать"
+  ],
+  "保存站点": [
+    "Save site",
+    "Сохранить сайт"
+  ],
+  "Logo 需小于 48 KB。": [
+    "The logo must be under 48 KB.",
+    "Логотип должен быть меньше 48 КБ."
+  ],
+  "请选择 SVG 格式的 Logo。": [
+    "Choose an SVG logo.",
+    "Выберите логотип в формате SVG."
+  ],
+  "站点已更新。": [
+    "Site updated.",
+    "Сайт обновлён."
+  ],
+  "站点已创建。按左侧说明在宝塔添加这几个域名。": [
+    "Site created. Add its domains in BaoTa as described on the left.",
+    "Сайт создан. Добавьте его домены в BaoTa, как описано слева."
+  ],
+  "设为默认站点": [
+    "Make default site",
+    "Сделать сайтом по умолчанию"
+  ],
+  "未绑定的域名和客户端 App 将显示 {0}。": [
+    "Unbound domains and the client apps will show {0}.",
+    "Непривязанные домены и приложения будут показывать {0}."
+  ],
+  "默认站点已更改。": [
+    "Default site changed.",
+    "Сайт по умолчанию изменён."
+  ],
+  "删除后，{0} 的域名将显示默认站点。账号和节点不受影响。": [
+    "After deletion, {0}'s domains show the default site. Accounts and nodes are not affected.",
+    "После удаления домены {0} покажут сайт по умолчанию. Аккаунты и узлы не затрагиваются."
+  ],
+  "站点已删除。": [
+    "Site deleted.",
+    "Сайт удалён."
   ]
 }

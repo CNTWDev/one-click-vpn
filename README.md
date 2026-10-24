@@ -94,6 +94,27 @@ Nginx sends all `app.example.com` traffic to Portal and all `console.example.com
 traffic to Admin. Their `/api` requests stay on the Docker network. The separate
 `api.example.com` host is only for native clients and remote Edge Agents.
 
+## Sites (several brands on one deployment)
+
+Console → **站点** lists the brands this deployment serves. Every site shares the same
+accounts, nodes and Agent; only the name, logo and hostnames differ. A site has three
+hostnames: the user Portal, the subscription/API domain and (optionally) its own Console.
+The Controller picks the site from the requested hostname (`Host` / `X-Forwarded-Host`):
+the Portal and Console show that site's name and logo, subscription links use its API
+domain and name the Clash group after it, and password-reset emails link to its Portal.
+Unknown hostnames get the default site. The first site is created automatically from
+`VEILBIRD_PORTAL_DOMAIN`, `VEILBIRD_ADMIN_DOMAIN` and `VEILBIRD_API_DOMAIN`.
+
+The Agent keeps using `VEILBIRD_AGENT_ORIGIN` (the deployment's own API domain), so adding,
+renaming or deleting sites never touches the nodes. The native apps are built for the
+default site; other sites offer subscriptions and hide the app downloads.
+
+To add a site: create it in Console, point its DNS records at this server, then add one
+reverse-proxy website per hostname in Nginx / BaoTa: Portal → `http://127.0.0.1:3100`,
+API → `http://127.0.0.1:3000`, Console → `http://127.0.0.1:3200`, forwarding the original
+host (`proxy_set_header Host $host`, BaoTa "发送域名" `$host`), and issue a Let's Encrypt
+certificate. **检查域名** on the site confirms each hostname reaches this site over HTTPS.
+
 ## Services and ports
 
 | Service | Port | Purpose |

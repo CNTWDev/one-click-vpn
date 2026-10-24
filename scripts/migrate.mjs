@@ -99,6 +99,12 @@ CREATE TABLE IF NOT EXISTS controller_settings (
   location_label TEXT NOT NULL DEFAULT '', latitude DOUBLE PRECISION, longitude DOUBLE PRECISION,
   location_source TEXT NOT NULL DEFAULT 'unset', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sites (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, portal_domain TEXT NOT NULL, console_domain TEXT NOT NULL DEFAULT '',
+  api_domain TEXT NOT NULL, logo_svg TEXT NOT NULL DEFAULT '', mail_from_name TEXT NOT NULL DEFAULT '',
+  is_default BOOLEAN NOT NULL DEFAULT FALSE, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS sites_one_default_idx ON sites (is_default) WHERE is_default;
 CREATE TABLE IF NOT EXISTS mail_settings (
   id TEXT PRIMARY KEY CHECK (id = 'primary'), provider TEXT NOT NULL, host TEXT NOT NULL, port INTEGER NOT NULL,
   username TEXT NOT NULL, from_name TEXT NOT NULL DEFAULT '', password_ciphertext TEXT NOT NULL,
@@ -447,6 +453,15 @@ try {
   await pool.query("ALTER TABLE controller_settings ALTER COLUMN display_name SET DEFAULT 'TrackNothing Controller'");
   await pool.query("UPDATE controller_settings SET display_name='TrackNothing Controller' WHERE display_name='Veilbird Controller'");
   await pool.query("UPDATE mail_settings SET from_name='TrackNothing' WHERE from_name='Veilbird'");
+  // The first site is the deployment's own three hostnames; more sites are added in Console → 站点.
+  const host = (value) => { try { return value ? new URL(value).hostname : ""; } catch { return ""; } };
+  const portalDomain = process.env.VEILBIRD_PORTAL_DOMAIN?.trim() || host(process.env.VEILBIRD_PUBLIC_ORIGIN?.trim());
+  const apiDomain = process.env.VEILBIRD_API_DOMAIN?.trim() || host(process.env.VEILBIRD_API_ORIGIN?.trim());
+  if (portalDomain && apiDomain) {
+    await pool.query(`INSERT INTO sites (id, name, portal_domain, console_domain, api_domain, is_default, created_at, updated_at)
+      SELECT 'default', 'TrackNothing', $1, $2, $3, TRUE, $4, $4 WHERE NOT EXISTS (SELECT 1 FROM sites)`,
+    [portalDomain.toLowerCase(), (process.env.VEILBIRD_ADMIN_DOMAIN?.trim() || "").toLowerCase(), apiDomain.toLowerCase(), new Date().toISOString()]);
+  }
   const timestamp = new Date().toISOString();
   const regions = [
     ["tokyo-jp", "Tokyo", "Japan", "JP"],
