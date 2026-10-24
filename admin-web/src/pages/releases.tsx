@@ -46,9 +46,9 @@ const extensions = ".apk,.aab,.zip,.dmg,.pkg,.msix,.msixbundle,.exe,.msi";
 const defaultArch: Record<Platform, string> = { android: "universal", ios: "universal", macos: "universal", windows: "x64" };
 const minOsHint: Record<Platform, string> = { android: "Android 8.0", ios: "iOS 16", macos: "macOS 13", windows: "Windows 10" };
 
-/** CI names installers Veilbird-<version>-<build>[-win-<arch>].apk|.zip; picking one fills the form. */
+/** CI names installers Veilbird-<version>-<build>.apk and Veilbird-<version>-<build>-win-<arch>-setup.exe; picking one fills the form. */
 function parseInstallerName(name: string): { platform: Platform; arch: string; version: string; build: string } | null {
-  const match = name.match(/^Veilbird-(\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?)-(\d+)(?:-win-(x64|arm64))?\.(apk|zip)$/i);
+  const match = name.match(/^Veilbird-(\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?)-(\d+)(?:-win-(x64|arm64)(?:-setup)?)?\.(apk|zip|exe)$/i);
   if (!match || (match[4].toLowerCase() === "apk") === !!match[3]) return null;
   return match[3] ? { platform: "windows", arch: match[3], version: match[1], build: match[2] } : { platform: "android", arch: "universal", version: match[1], build: match[2] };
 }

@@ -17,6 +17,8 @@ public sealed class AccessFailure(string code) : Exception(code) {
         "CLIENT_ACCESS_NOT_ENABLED" => L10n.Text("client_access_is_not_enabled_on_the_server"),
         "MANAGED_ACCESS_REQUIRED" => L10n.Text("ask_your_administrator_to_enable_veilbird_client_access"),
         "CLIENT_UPDATE_REQUIRED" => L10n.Text("client_update_required"),
+        "NODE_UNAVAILABLE" => L10n.Text("this_location_is_unavailable_try_another"),
+        "ACCESS_EXPIRED" => L10n.Text("connection_authorization_expired_connect_again"),
         _ => L10n.Text("unable_to_reach_the_service_check_your_network_or")
     };
 }
@@ -87,6 +89,12 @@ public sealed class NativeApi : IDisposable {
         var bytes=Convert.FromBase64String(encoded.PadRight((encoded.Length+3)/4*4,'='));
         var signature=identity.SignData(bytes,HashAlgorithmName.SHA256,DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
         return await Request(action,new JsonObject {["challengeId"]=challenge["id"]!.GetValue<string>(),["signature"]=B64(signature),["request"]=input.DeepClone()});
+    }
+    /// Connection failure codes for the Console's diagnostics (no keys, addresses or traffic); best effort.
+    public async Task Report(string code,string nodeId="") {
+        var item=new JsonObject {["code"]=code,["at"]=DateTimeOffset.UtcNow.ToString("O")};
+        if(nodeId.Length>0) item["nodeId"]=nodeId;
+        try {await Request("diagnostics",new JsonObject {["events"]=new JsonArray(item)});} catch {/* diagnostics never block connecting */}
     }
     public async Task Logout() {try {await Request("logout",new JsonObject());}finally {Save("token",null);}}
     public void Dispose() {identity.Dispose();client.Dispose();}

@@ -11,17 +11,12 @@ name: Client release
 #   VEILBIRD_ANDROID_KEY_ALIAS, VEILBIRD_ANDROID_KEY_PASSWORD (scripts/android-keystore.sh makes them).
 # Auto-publish (optional): variable VEILBIRD_RELEASE_API (Controller origin) + secret VEILBIRD_RELEASE_TOKEN.
 # Variable VEILBIRD_API_ORIGIN: service origin baked into the apps.
-# Windows (opt-in): input or variable VEILBIRD_RELEASE_WINDOWS='true'.
+# Windows: an Inno Setup installer per architecture (x64, arm64), always built.
 # iPhone / Mac need an Apple Developer account first; see clients/RELEASING.md.
 on:
   push:
     tags: ['client-v*']
   workflow_dispatch:
-    inputs:
-      windows:
-        description: Also build Windows
-        type: boolean
-        default: false
 permissions:
   contents: read
 concurrency:
@@ -111,7 +106,6 @@ jobs:
         if: always()
   windows:
     needs: prepare
-    if: inputs.windows || vars.VEILBIRD_RELEASE_WINDOWS == 'true'
     runs-on: windows-latest
     strategy:
       matrix:
@@ -129,11 +123,11 @@ jobs:
         with:
           node-version: '22'
       - shell: pwsh
-        run: ./clients/windows/build.ps1 -Runtime ${{ matrix.runtime }} -Version ${{ needs.prepare.outputs.version }} -Build $env:VEILBIRD_BUILD_NUMBER
+        run: ./clients/windows/build.ps1 -Runtime ${{ matrix.runtime }} -Version ${{ needs.prepare.outputs.version }} -Build $env:VEILBIRD_BUILD_NUMBER -Installer
       - uses: actions/upload-artifact@v4
         with:
           name: Veilbird-windows-${{ matrix.arch }}-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
-          path: clients/windows/artifacts/Veilbird-*.zip
+          path: clients/windows/artifacts/Veilbird-*-setup.exe
           if-no-files-found: error
       - shell: pwsh
         if: needs.prepare.outputs.publish == 'true'
@@ -141,4 +135,4 @@ jobs:
           node scripts/release-client.mjs --platform windows --arch ${{ matrix.arch }} --channel beta --publish
           --version "${{ needs.prepare.outputs.version }}" --build "$env:VEILBIRD_BUILD_NUMBER" --min-os "Windows 10"
           --notes "${{ github.ref_name }} (${{ github.sha }})"
-          --file "clients/windows/artifacts/Veilbird-${{ needs.prepare.outputs.version }}-$env:VEILBIRD_BUILD_NUMBER-${{ matrix.runtime }}.zip"
+          --file "clients/windows/artifacts/Veilbird-${{ needs.prepare.outputs.version }}-$env:VEILBIRD_BUILD_NUMBER-${{ matrix.runtime }}-setup.exe"

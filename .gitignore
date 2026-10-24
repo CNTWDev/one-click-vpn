@@ -54,6 +54,7 @@ tsconfig.tsbuildinfo
 # Native client build output and local signing material
 /clients/**/.build/
 /clients/**/.dependencies/
+/clients/**/.deps/
 /clients/**/.gradle/
 /clients/**/build/
 /clients/**/bin/
