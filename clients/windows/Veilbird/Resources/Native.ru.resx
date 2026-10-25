@@ -194,14 +194,34 @@
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>Сервис недоступен. Проверьте сеть и повторите.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>Сервис недоступен. Проверьте сеть или обратитесь к администратору.</value></data>
   <data name="up_to_date" xml:space="preserve"><value>Актуальная версия</value></data>
+  <data name="update_action" xml:space="preserve"><value>Обновить</value></data>
   <data name="update_allow_installs" xml:space="preserve"><value>Разрешите TrackNothing устанавливать обновления, затем вернитесь и снова нажмите «Обновить».</value></data>
   <data name="update_available" xml:space="preserve"><value>Доступна версия {0}</value></data>
   <data name="update_available_detail" xml:space="preserve"><value>Обновите приложение, чтобы получить новые функции и исправления.</value></data>
+  <data name="update_banner_title" xml:space="preserve"><value>Версия {0}</value></data>
   <data name="update_downloading" xml:space="preserve"><value>Загрузка и проверка обновления…</value></data>
+  <data name="update_downloading_title" xml:space="preserve"><value>Загрузка {0}</value></data>
+  <data name="update_downloading_value" xml:space="preserve"><value>Загрузка {0}</value></data>
   <data name="update_failed" xml:space="preserve"><value>Не удалось загрузить или проверить обновление. Повторите попытку позже.</value></data>
+  <data name="update_failed_digest" xml:space="preserve"><value>Файл не прошёл проверку и удалён. Повторите позже.</value></data>
+  <data name="update_failed_network" xml:space="preserve"><value>Соединение прервалось. Повторная попытка продолжит загрузку.</value></data>
+  <data name="update_failed_package" xml:space="preserve"><value>Пакет не соответствует приложению и не был установлен.</value></data>
+  <data name="update_failed_storage" xml:space="preserve"><value>Недостаточно места. Освободите место и повторите.</value></data>
+  <data name="update_failed_title" xml:space="preserve"><value>Не удалось загрузить {0}</value></data>
+  <data name="update_install" xml:space="preserve"><value>Установить</value></data>
+  <data name="update_later" xml:space="preserve"><value>Напомнить позже</value></data>
+  <data name="update_minutes" xml:space="preserve"><value>{0} мин</value></data>
   <data name="update_now" xml:space="preserve"><value>Обновить</value></data>
   <data name="update_open_download" xml:space="preserve"><value>Скачать</value></data>
+  <data name="update_open_installer" xml:space="preserve"><value>Открыть установщик</value></data>
+  <data name="update_ready_detail" xml:space="preserve"><value>Во время установки соединение прервётся, затем восстановится.</value></data>
+  <data name="update_ready_detail_idle" xml:space="preserve"><value>Нажмите «Установить» — это займёт несколько секунд.</value></data>
+  <data name="update_ready_title" xml:space="preserve"><value>Версия {0} загружена</value></data>
   <data name="update_required_detail" xml:space="preserve"><value>Эта версия больше не поддерживается. Обновите приложение, чтобы продолжить подключаться.</value></data>
+  <data name="update_required_title" xml:space="preserve"><value>Нужна версия {0}</value></data>
+  <data name="update_retry" xml:space="preserve"><value>Повторить</value></data>
+  <data name="update_seconds" xml:space="preserve"><value>{0} с</value></data>
+  <data name="update_time_left" xml:space="preserve"><value>около {0}</value></data>
   <data name="upload_amount" xml:space="preserve"><value>↑ Отдача {0}</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 Действует до · </value></data>

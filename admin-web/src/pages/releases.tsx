@@ -12,12 +12,13 @@ type Release = {
   id: string; platform: Platform; arch: string; channel: "stable" | "beta"; version: string; build: number;
   status: "draft" | "published" | "withdrawn"; distribution: string; url: string; sha256?: string; sizeBytes?: number;
   minOs: string; notes: string; publishedAt: string | null; createdAt: string; createdBy: string | null; rolloutPercent: number;
+  mirror: "ready" | "pending" | "retrying" | "failed" | null; mirrorError: string | null;
 };
 type Overview = {
   releases: Release[]; policies: Array<{ platform: Platform; minBuild: number; announcement: string; downloadPath: string }>;
   adoption: Array<{ platform: string; version: string | null; build: number | null; devices: number }>;
   diagnostics: Array<{ platform: string; build: number | null; code: string; events: number; users: number; lastAt: string | null }>;
-  storage: { mode: "local" | "s3"; publicBaseUrl?: string; maxBytes?: number; chunkBytes?: number }; ciTokenConfigured: boolean;
+  storage: { mode: "local" | "s3"; publicBaseUrl?: string; maxBytes?: number; chunkBytes?: number; mirror?: string | null }; ciTokenConfigured: boolean;
 };
 const platformNames: Record<Platform, string> = { android: "Android", ios: "iPhone / iPad", macos: "macOS", windows: "Windows" };
 const errors: Record<string, string> = {
@@ -55,11 +56,12 @@ type ImportItem = {
 };
 const importExtensions = ".zip,.apk,.exe,.dmg";
 
-/** CI names installers TrackNothing-<version>-<build>.apk and TrackNothing-<version>-<build>-win-<arch>-setup.exe; picking one fills the form (older Veilbird-* files still match). */
+/** CI names installers TrackNothing-<version>-<build>[-arm64].apk and TrackNothing-<version>-<build>-win-<arch>-setup.exe; picking one fills the form (older Veilbird-* files still match). */
 function parseInstallerName(name: string): Installer | null {
-  const match = name.match(/^(?:TrackNothing|Veilbird)-(\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?)-(\d+)(?:-win-(x64|arm64)(?:-setup)?|-(macos))?\.(apk|zip|exe|dmg)$/i);
+  const match = name.match(/^(?:TrackNothing|Veilbird)-(\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?)-(\d+)(?:-win-(x64|arm64)(?:-setup)?|-(macos)|-(arm64))?\.(apk|zip|exe|dmg)$/i);
   if (!match) return null;
-  const [, version, build, windows, macos, extension] = match, kind = extension.toLowerCase();
+  const [, version, build, windows, macos, android, extension] = match, kind = extension.toLowerCase();
+  if (android) return kind === "apk" ? { platform: "android", arch: "arm64", version, build } : null;
   if (macos || kind === "dmg") return macos && kind === "dmg" ? { platform: "macos", arch: "universal", version, build } : null;
   if ((kind === "apk") === !!windows) return null;
   return windows ? { platform: "windows", arch: windows, version, build } : { platform: "android", arch: "universal", version, build };
@@ -290,8 +292,10 @@ export function ReleasesPage() {
     {data && <>
       <InlineNotice notice={{ tone: "info", message: [
         data.storage.mode === "s3" ? t("安装包存储：S3 兼容对象存储（{0}）", [data.storage.publicBaseUrl || ""]) : t("安装包存储：Controller 数据卷"),
+        data.storage.mirror === "invalid" ? t("下载加速（CDN）配置有误，请检查 VEILBIRD_RELEASE_MIRROR_*。")
+          : data.storage.mirror ? t("下载加速：CDN（{0}），客户端优先从这里下载，失败时改从 Controller 下载。", [data.storage.mirror]) : "",
         data.ciTokenConfigured ? t("发布令牌已配置：CI 或本地脚本可以上传、登记草稿并发布到测试版。") : t("发布令牌未配置：只能在这里手动登记版本。"),
-      ].join(" ") }} />
+      ].filter(Boolean).join(" ") }} />
       <section className="panel flush"><div className="panel-head padded"><h2>{t("下载链接与最低版本")}</h2></div>
         <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("平台")}</th><th>{t("固定下载链接")}</th><th>{t("当前正式版")}</th><th>{t("最低构建号")}</th><th>{t("客户端公告")}</th></tr></thead><tbody>{data.policies.map((policy) => {
           const stable = data.releases.filter((item) => item.platform === policy.platform && item.channel === "stable" && item.status === "published").sort((a, b) => b.build - a.build)[0];
@@ -361,7 +365,8 @@ export function ReleasesPage() {
             {release.status === "draft" && <small style={{ display: "block", marginTop: 6, whiteSpace: "nowrap" }}>{release.channel === "stable" ? t("发布后为正式版") : t("发布后为测试版")}</small>}</td>
           <td>{release.status !== "withdrawn" && <div className="row-actions"><input type="number" min={1} max={100} style={{ width: 80 }} aria-label={t("灰度比例 (%)")} title={t("灰度比例 (%)")} value={rollouts[release.id] ?? "100"} onChange={(event) => setRollouts({ ...rollouts, [release.id]: event.target.value })} /><small>%</small>
               <button className="button ghost small" disabled={busy || String(release.rolloutPercent) === (rollouts[release.id] ?? "100")} onClick={() => void saveRollout(release)}>{t("保存")}</button></div>}</td>
-          <td><a href={release.url} target="_blank" rel="noopener noreferrer">{release.distribution === "direct" ? formatBytes(release.sizeBytes) : release.distribution}</a>{release.sha256 && <small><br /><code title={release.sha256}>{release.sha256.slice(0, 12)}…</code></small>}</td>
+          <td><a href={release.url} target="_blank" rel="noopener noreferrer">{release.distribution === "direct" ? formatBytes(release.sizeBytes) : release.distribution}</a>{release.sha256 && <small><br /><code title={release.sha256}>{release.sha256.slice(0, 12)}…</code></small>}
+            {release.mirror && <small title={release.mirrorError || undefined}><br />{release.mirror === "ready" ? t("CDN 已同步") : release.mirror === "failed" ? t("CDN 同步失败") : t("CDN 同步中")}</small>}</td>
           <td>{formatTime(release.createdAt)}{release.publishedAt && release.status === "published" && Date.parse(release.publishedAt) - Date.parse(release.createdAt) > 60_000 && <small>{t("发布于 {0}", [formatTime(release.publishedAt)])}</small>}</td>
           <td className="align-right cell-actions"><div className="row-actions">
             {release.status !== "published" && <button className="button ghost small" disabled={busy} onClick={() => void act(release, "publish")}>{t("发布")}</button>}
