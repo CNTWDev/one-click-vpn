@@ -22,6 +22,8 @@ import subprocess
 import sys
 import tempfile
 import time
+import ast
+import queue
 import ssl
 import platform
 import threading
@@ -68,6 +70,15 @@ last_network_sample = None
 wan_interface_cache = (0.0, None)
 last_errors = {}
 native_watchdog_ready = False
+# The Controller renews app leases every few minutes. While it cannot be reached (an outage, an upgrade, a
+# blocked domain) the node keeps the leases it already has for up to this long, so connected apps stay
+# connected; revocations cannot be sent during an outage anyway. An explicit refusal (HTTP 401/403) ends it.
+NATIVE_OFFLINE_GRACE = int(os.environ.get("NORTHSTAR_NATIVE_OFFLINE_GRACE") or 43200)
+CONTROLLER_CONTACT = STATE_DIR / "controller-contact"
+controller_contact = 0.0
+controller_rejected = False
+# Long-polled task pulls: the Controller holds a pull with nothing to do for up to this many seconds.
+TASK_WAIT = 25
 
 
 @contextmanager
@@ -210,6 +221,40 @@ def refresh_native_peers(peers):
                 run_fixed(["wg", "set", "northstar", "peer", key, "allowed-ips", wanted[key][1], "persistent-keepalive", "25"])
 
 
+def extend_native_leases_offline(now=None):
+    """While the Controller is unreachable, keep each still-valid app lease a few minutes ahead of expiry.
+
+    Leases are extended only up to NATIVE_OFFLINE_GRACE after the last successful contact; peers that are
+    already expired or removed stay gone. The kernel guard and the expiry watchdog read the same deadlines.
+    """
+    now = time.time() if now is None else now
+    contact = last_controller_contact()
+    if controller_rejected or not contact or now - contact < 90 or not WIREGUARD_CONFIG.exists():
+        return False
+    limit = int(contact + NATIVE_OFFLINE_GRACE)
+    with wireguard_lock():
+        if not WIREGUARD_CONFIG.exists():
+            return False
+        text = WIREGUARD_CONFIG.read_text()
+        changed = False
+
+        def extend(match):
+            nonlocal changed
+            deadline = int(match[1])
+            target = min(int(now) + 300, limit)
+            if deadline <= now or deadline - now > 150 or target <= deadline:
+                return match[0]
+            changed = True
+            return f"# NorthstarExpiresAt={target}"
+
+        updated = re.sub(r"(?m)^# NorthstarExpiresAt=(\d+)$", extend, text)
+        if not changed:
+            return False
+        atomic_write(WIREGUARD_CONFIG, updated)
+        restore_native_kernel_guard()
+    return True
+
+
 def install_native_watchdog():
     global native_watchdog_ready
     if Path(__file__).resolve() != Path("/opt/northstar-agent/agent.py"):
@@ -275,7 +320,30 @@ def log_failure(operation, error):
             pass
 
 
-def request_json(path, payload):
+def note_controller_contact(now=None):
+    global controller_contact, controller_rejected
+    now = now or time.time()
+    controller_rejected = False
+    if now - controller_contact >= 60:
+        try:
+            atomic_write(CONTROLLER_CONTACT, f"{int(now)}\n")
+        except OSError:
+            pass
+    controller_contact = now
+
+
+def last_controller_contact():
+    """Survives Agent restarts, so a restart during an outage does not extend the grace period."""
+    if controller_contact:
+        return controller_contact
+    try:
+        return float(CONTROLLER_CONTACT.read_text().strip())
+    except (OSError, ValueError):
+        return 0.0
+
+
+def request_json(path, payload, timeout=15):
+    global controller_rejected
     request_payload = dict(payload)
     request_payload.pop("token", None)
     request = urllib.request.Request(
@@ -285,10 +353,14 @@ def request_json(path, payload):
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=15) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             raw = response.read()
-            return json.loads(raw.decode() or "{}")
+            result = json.loads(raw.decode() or "{}")
+        note_controller_contact()
+        return result
     except urllib.error.HTTPError as error:
+        if error.code in (401, 403):
+            controller_rejected = True
         try:
             body = json.loads(error.read().decode() or "{}")
             detail = body.get("error") if isinstance(body, dict) else ""
@@ -1391,6 +1463,10 @@ def capabilities():
         },
         "connectivity": connectivity_snapshot(),
         "upgradePending": upgrade_pending(),
+        # 2.17: tasks are long-polled, upgrades arrive over this channel (no SSH), leases survive an outage.
+        "longPoll": 1,
+        "selfUpgrade": 1,
+        "offlineGrace": NATIVE_OFFLINE_GRACE,
         "realityProbe": reality_probe,
         "controllerOrigin": CONTROLLER,
     }
@@ -1720,16 +1796,75 @@ def confirm_staged_upgrade():
     return True
 
 
+def node_identity():
+    """The host's persistent identity (written by the installer); lets a node added by install command bind it."""
+    try:
+        value = Path("/var/lib/northstar/node-id").read_text().split("\n", 1)[0].strip()
+    except OSError:
+        return ""
+    return value if re.fullmatch(r"nsn_[0-9a-f-]{36}", value) else ""
+
+
+ROLLBACK_SCRIPT = """set -eu
+exec 9>/opt/northstar-agent/upgrade.lock
+flock -x 9
+if test -f /opt/northstar-agent/upgrade.pending; then
+  cp -p /opt/northstar-agent/agent.py.rollback /opt/northstar-agent/agent.py
+  rm -f /opt/northstar-agent/upgrade.pending /opt/northstar-agent/upgrade.confirmed
+  systemctl restart northstar-agent
+  echo 'Unverified Agent upgrade rolled back'
+fi
+"""
+
+
+def self_upgrade(upgrade):
+    """An upgrade from the Console without SSH: the same staged upgrade as server/agent-upgrade.ts.
+
+    The source comes over this Agent's authenticated channel and must match the announced SHA-256. A timer
+    restores the previous source after 90 s unless the new one confirms itself with a successful heartbeat.
+    """
+    version, digest = upgrade.get("version"), upgrade.get("sha256")
+    if not isinstance(version, str) or not re.fullmatch(r"agent \d+\.\d+\.\d+", version):
+        raise ValueError("invalid upgrade version")
+    if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise ValueError("invalid upgrade digest")
+    if upgrade_pending() or not (AGENT_DIR / "config.env").exists():
+        return False
+    source = request_json("/api/v1/agent/source", {"nodeId": NODE_ID, "token": TOKEN}).get("source")
+    if not isinstance(source, str) or hashlib.sha256(source.encode()).hexdigest() != digest:
+        raise RuntimeError("Agent source does not match the announced SHA-256")
+    ast.parse(source)
+    with open(AGENT_DIR / "upgrade.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        shutil.copy2(AGENT_DIR / "agent.py", AGENT_DIR / "agent.py.rollback")
+        atomic_write(AGENT_DIR / "upgrade-rollback.sh", ROLLBACK_SCRIPT, 0o700)
+        (AGENT_DIR / "upgrade.confirmed").unlink(missing_ok=True)
+        (AGENT_DIR / "upgrade.pending").touch()
+        run_optional(["systemctl", "stop", "northstar-agent-upgrade-rollback.timer", "northstar-agent-upgrade-rollback.service"])
+        run_optional(["systemctl", "reset-failed", "northstar-agent-upgrade-rollback.service"])
+        armed = run_optional(["systemd-run", "--unit=northstar-agent-upgrade-rollback", "--on-active=90s", "--timer-property=AccuracySec=1s",
+                              "/bin/sh", str(AGENT_DIR / "upgrade-rollback.sh")])
+        if armed.returncode != 0:
+            (AGENT_DIR / "upgrade.pending").unlink(missing_ok=True)
+            raise RuntimeError("could not arm the Agent rollback timer: " + armed.stderr.strip()[-300:])
+        atomic_write(AGENT_DIR / "agent.py", source, 0o700)
+    print(f"northstar-agent upgrading itself to {version}", file=sys.stderr, flush=True)
+    # --no-block: this process is the one being restarted.
+    run_optional(["systemctl", "--no-block", "restart", "northstar-agent"])
+    return True
+
+
 def heartbeat():
     response = request_json("/api/v1/agent/heartbeat", {
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.16.0",
+        "version": "agent 2.17.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
         "usageSnapshots": wireguard_usage_snapshots() + openvpn_usage_snapshots() + vless_usage_snapshots() + stealth_usage_snapshots(),
+        "nodeIdentity": node_identity(),
     })
     try:
         confirm_staged_upgrade()
@@ -1763,7 +1898,7 @@ def adopt_controller_origin(target):
     CONTROLLER = target
     try:
         request_json("/api/v1/agent/heartbeat", {"nodeId": NODE_ID, "token": TOKEN, "hostname": socket.gethostname(),
-                                                 "version": "agent 2.16.0", "capabilities": capabilities()})
+                                                 "version": "agent 2.17.0", "capabilities": capabilities()})
         lines = CONFIG_ENV.read_text().splitlines()
         lines = [f"NORTHSTAR_CONTROLLER_URL={target}" if line.startswith("NORTHSTAR_CONTROLLER_URL=") else line for line in lines]
         if f"NORTHSTAR_CONTROLLER_URL={target}" not in lines:
@@ -1826,8 +1961,45 @@ def run_port_check(check, wait=time.sleep):
     return {"id": check.get("id"), "results": results, "error": "" if installed or not rules else "could not add counting rules"}
 
 
-def poll_tasks():
-    response = request_json("/api/v1/agent/tasks/pull", {"nodeId": NODE_ID, "token": TOKEN, "limit": 10, "nativePeers": True, "portCheck": True})
+task_responses = queue.Queue(maxsize=1)
+task_handled = threading.Event()
+
+
+def pull_tasks():
+    return request_json("/api/v1/agent/tasks/pull", {"nodeId": NODE_ID, "token": TOKEN, "limit": 10, "nativePeers": True, "portCheck": True,
+                                                     "selfUpgrade": True, "wait": TASK_WAIT}, timeout=TASK_WAIT + 20)
+
+
+def task_poller():
+    """Long-polls the task queue in the background; the main loop applies each response, one at a time.
+
+    A Controller that predates long polling answers at once, so a quick empty answer waits 5 s before the next pull.
+    """
+    failures = 0
+    while True:
+        started = time.time()
+        try:
+            response = pull_tasks()
+            failures = 0
+        except Exception as error:
+            log_failure("task poll", error)
+            failures += 1
+            time.sleep(request_retry_delay(error, failures))
+            continue
+        task_handled.clear()
+        task_responses.put(response)
+        task_handled.wait()
+        if time.time() - started < 2 and not response.get("tasks") and not response.get("portCheck"):
+            time.sleep(5)
+
+
+def handle_task_response(response):
+    upgrade = response.get("upgrade")
+    if isinstance(upgrade, dict):
+        try:
+            self_upgrade(upgrade)
+        except Exception as error:
+            log_failure("Agent self-upgrade", command_failure_detail(error))
     check = response.get("portCheck")
     if isinstance(check, dict):
         try:
@@ -1899,7 +2071,8 @@ def main():
     except Exception as error:
         log_failure("OpenVPN restore", command_failure_detail(error))
     last_heartbeat_attempt = 0
-    last_task_poll = 0
+    last_offline_check = 0
+    threading.Thread(target=task_poller, name="task-poller", daemon=True).start()
     last_reality_refresh = 0
     last_reality_probe = 0
     last_stealth_poll = 0
@@ -1939,15 +2112,24 @@ def main():
                 refresh_stealth_target()
             except Exception as error:
                 log_failure("stealth target refresh", error)
-        if now >= request_backoff_until and now - last_task_poll >= 5:
-            last_task_poll = now
+        try:
+            response = task_responses.get_nowait()
+        except queue.Empty:
+            response = None
+        if response is not None:
             try:
-                poll_tasks()
-                consecutive_request_failures = 0
+                handle_task_response(response)
             except Exception as error:
-                log_failure("task poll", error)
-                consecutive_request_failures += 1
-                request_backoff_until = now + request_retry_delay(error, consecutive_request_failures)
+                log_failure("task handling", error)
+            finally:
+                task_handled.set()
+        if now - last_offline_check >= 20:
+            last_offline_check = now
+            try:
+                if extend_native_leases_offline(now):
+                    log_failure("Controller contact", f"unreachable since {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(last_controller_contact()))} UTC; app leases kept alive")
+            except Exception as error:
+                log_failure("offline lease grace", command_failure_detail(error))
         time.sleep(1)
 
 

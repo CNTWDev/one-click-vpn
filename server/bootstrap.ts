@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { currentAgentOrigin } from "./agent-domain";
 import { decryptSecret, hashToken } from "./crypto";
-import { addAudit, addNodeAction, appendNodeActionEvent, bindNodeIdentity, countRunningNodeActions, findNode, finishNodeAction, startNodeAction, updateNode, updateNodeActionProgress } from "./db";
+import { addAudit, addNodeAction, appendNodeActionEvent, bindNodeIdentity, clearNodeCredential, countRunningNodeActions, findNode, finishNodeAction, startNodeAction, updateNode, updateNodeActionProgress } from "./db";
 import { ensureDefaultNodeProtocols, rebuildDesiredState } from "./control-plane";
 import { ensureStandardVpnServices, reconcileEnabledVpnServices } from "./vpn-services";
 import { writeOperationalLog } from "./operational-logs";
@@ -12,6 +12,8 @@ import { discoverRemoteNode, executeRemoteCommand } from "./remote-ssh";
 import { dbExec } from "./db";
 import { listVpnServices, updateVpnServiceState } from "./control-db";
 import { agentUpgradeCommand, agentRollbackCommand, agentUpgradeFinalizeCommand } from "./agent-upgrade";
+import { requestSelfUpgrade, supportsSelfUpgrade } from "./agent-self-upgrade";
+import { findControlNode } from "./control-db";
 
 const maximumConcurrentRemoteActions = 3;
 const remoteActionQueue: Array<() => Promise<void>> = [];
@@ -52,7 +54,7 @@ function hasFreshAgentHeartbeat(node: Awaited<ReturnType<typeof findNode>>, maxi
   return Number.isFinite(heartbeatAt) && Date.now() - heartbeatAt <= maximumAgeMilliseconds;
 }
 
-async function waitForAgentHeartbeat(nodeId: string, notBefore: number, timeoutMilliseconds: number = 25_000, expectedVersion?: string): Promise<boolean> {
+export async function waitForAgentHeartbeat(nodeId: string, notBefore: number, timeoutMilliseconds: number = 25_000, expectedVersion?: string): Promise<boolean> {
   const deadline = Date.now() + timeoutMilliseconds;
   while (Date.now() < deadline) {
     const node = await findNode(nodeId);
@@ -62,6 +64,13 @@ async function waitForAgentHeartbeat(nodeId: string, notBefore: number, timeoutM
   }
   return false;
 }
+
+/** Nodes added by install command, or whose SSH credential was cleared, have none: SSH actions need it entered again. */
+export function hasSshCredential(node: { credential_type: string; credential_ciphertext: string }): boolean {
+  return node.credential_type !== "none" && Boolean(node.credential_ciphertext);
+}
+
+const NO_SSH = "这个节点没有保存 SSH 凭据。在节点详情里复制安装命令到服务器上运行即可重装；也可以在编辑节点里重新填写 SSH 凭据。";
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
@@ -109,9 +118,9 @@ class ActionOutputRecorder {
   }
 }
 
-export async function queueNodeBootstrap(nodeId: string, actorUserId?: string): Promise<string> {
+export async function queueNodeBootstrap(nodeId: string, actorUserId?: string, options: { forgetCredential?: boolean } = {}): Promise<string> {
   const actionId = await addNodeAction(nodeId, "bootstrap");
-  enqueueRemoteAction(actionId, await captureTrace(), () => bootstrapNode(nodeId, actorUserId, actionId));
+  enqueueRemoteAction(actionId, await captureTrace(), () => bootstrapNode(nodeId, actorUserId, actionId, options));
   return actionId;
 }
 
@@ -129,35 +138,21 @@ export async function queueNodeAction(nodeId: string, action: "restart-agent" | 
   return actionId;
 }
 
-export async function bootstrapNode(nodeId: string, actorUserId?: string, queuedActionId?: string): Promise<void> {
-  let node = await findNode(nodeId);
-  if (!node) return;
-  const actionId = queuedActionId || await addNodeAction(nodeId, "bootstrap", "running");
-  await startNodeAction(actionId);
-  await updateNode(nodeId, { status: "provisioning", version: "bootstrap running", last_seen: "connecting" });
-  let recorder: ActionOutputRecorder | undefined;
-
-  try {
-    const secret = decryptSecret({
-      ciphertext: node.credential_ciphertext,
-      iv: node.credential_iv,
-      tag: node.credential_tag,
-    });
-    await updateNodeActionProgress(actionId, { phase: "identity", progress: 8, message: "Discovering and verifying the persistent node identity" });
-    const discovery = await discoverRemoteNode(node, secret);
-    node = await bindNodeIdentity(
-      nodeId,
-      discovery.nodeIdentity,
-      discovery.fingerprint,
-      node.host_fingerprint_source === "operator" ? "operator" : "ssh_tofu",
-    );
-    const agentToken = randomBytes(32).toString("base64url");
-    const source = Buffer.from(agentSource(), "utf8").toString("base64");
-    const agentOrigin = await currentAgentOrigin();
-    const controllerOrigin = shellQuote(agentOrigin);
-    const command = `set -eu
-progress() { printf 'NORTHSTAR_PROGRESS|%s|%s|%s\\n' "$1" "$2" "$3"; }
-progress connection 15 'SSH session established; checking node prerequisites'
+/**
+ * Packages, the Agent files and its service unit. The SSH install and the install command (node-join.ts) run
+ * the same script; the service is started separately once the Controller has registered the Agent's token.
+ */
+export function agentInstallScript(input: { nodeId: string; agentToken: string; agentOrigin: string; progress: "markers" | "text"; firstStep: string }): string {
+  const { nodeId, agentToken, agentOrigin, firstStep } = input;
+  const source = Buffer.from(agentSource(), "utf8").toString("base64");
+  const controllerOrigin = shellQuote(agentOrigin);
+  // Markers become the action's progress bar in Console; a person running the install command reads plain lines.
+  const progressFunction = input.progress === "markers"
+    ? "progress() { printf 'NORTHSTAR_PROGRESS|%s|%s|%s\\n' \"$1\" \"$2\" \"$3\"; }"
+    : "progress() { printf '[%3s%%] %s\\n' \"$2\" \"$3\"; }";
+  return `set -eu
+${progressFunction}
+progress connection 15 ${shellQuote(firstStep)}
 install_wireguard_tools() {
   if command -v wg >/dev/null 2>&1 && command -v wg-quick >/dev/null 2>&1; then
     return 0
@@ -301,7 +296,7 @@ if command -v wg >/dev/null 2>&1; then
 fi
 cat > /opt/northstar-agent/config.env <<'NORTHSTAR_CONFIG'
 NORTHSTAR_CONTROLLER_URL=${agentOrigin}
-NORTHSTAR_NODE_ID=${node.id}
+NORTHSTAR_NODE_ID=${nodeId}
 NORTHSTAR_AGENT_TOKEN=${agentToken}
 NORTHSTAR_AGENT_STATE_DIR=/opt/northstar-agent/state
 NORTHSTAR_CONFIG
@@ -328,6 +323,44 @@ WantedBy=multi-user.target
 NORTHSTAR_SERVICE
 progress agent-staged 88 'Agent files are staged; registering its new identity with the Controller'
 `;
+}
+
+/** After the first heartbeat of a new Agent (SSH install or install command): protocols, services and their first sync. */
+export async function finishAgentInstall(nodeId: string, actionId: string): Promise<void> {
+  await ensureDefaultNodeProtocols(nodeId);
+  await ensureStandardVpnServices(nodeId);
+  await reconcileEnabledVpnServices(nodeId);
+  const pendingServices = (await listVpnServices(nodeId)).filter((service) => service.enabled && service.status !== "healthy");
+  if (pendingServices.length) await appendNodeActionEvent(actionId, { level: "warning", phase: "vpn-services", message: `Agent 部署完成；协议仍在同步或等待配置：${pendingServices.map((service) => `${service.protocol}: ${service.last_error || service.status}`).join("；")}。请查看 VPN 服务状态，勿将 Agent 成功视为全部协议已就绪。` });
+}
+
+export async function bootstrapNode(nodeId: string, actorUserId?: string, queuedActionId?: string, options: { forgetCredential?: boolean } = {}): Promise<void> {
+  let node = await findNode(nodeId);
+  if (!node) return;
+  const actionId = queuedActionId || await addNodeAction(nodeId, "bootstrap", "running");
+  await startNodeAction(actionId);
+  await updateNode(nodeId, { status: "provisioning", version: "bootstrap running", last_seen: "connecting" });
+  let recorder: ActionOutputRecorder | undefined;
+
+  try {
+    if (!hasSshCredential(node)) throw new Error(NO_SSH);
+    const secret = decryptSecret({
+      ciphertext: node.credential_ciphertext,
+      iv: node.credential_iv,
+      tag: node.credential_tag,
+    });
+    await updateNodeActionProgress(actionId, { phase: "identity", progress: 8, message: "Discovering and verifying the persistent node identity" });
+    const discovery = await discoverRemoteNode(node, secret);
+    node = await bindNodeIdentity(
+      nodeId,
+      discovery.nodeIdentity,
+      discovery.fingerprint,
+      node.host_fingerprint_source === "operator" ? "operator" : "ssh_tofu",
+    );
+    const agentToken = randomBytes(32).toString("base64url");
+    const agentOrigin = await currentAgentOrigin();
+    const command = agentInstallScript({ nodeId: node.id, agentToken, agentOrigin, progress: "markers", firstStep: "SSH session established; checking node prerequisites" });
+
     const outputRecorder = new ActionOutputRecorder(actionId, nodeId);
     recorder = outputRecorder;
     const result = await executeRemoteCommand(node, secret, command, (chunk) => outputRecorder.write(chunk));
@@ -374,11 +407,12 @@ printf 'NORTHSTAR_PROGRESS|heartbeat|96|Agent is active; waiting for its first C
       await addAudit({ actorUserId, action: "node.bootstrap.heartbeat_failed", targetType: "node", targetId: nodeId });
       return;
     }
-    await ensureDefaultNodeProtocols(nodeId);
-    await ensureStandardVpnServices(nodeId);
-    await reconcileEnabledVpnServices(nodeId);
-    const pendingServices = (await listVpnServices(nodeId)).filter((service) => service.enabled && service.status !== "healthy");
-    if (pendingServices.length) await appendNodeActionEvent(actionId, { level: "warning", phase: "vpn-services", message: `Agent 部署完成；协议仍在同步或等待配置：${pendingServices.map((service) => `${service.protocol}: ${service.last_error || service.status}`).join("；")}。请查看 VPN 服务状态，勿将 Agent 成功视为全部协议已就绪。` });
+    await finishAgentInstall(nodeId, actionId);
+    // Agents 2.17+ upgrade themselves, so a fresh install does not need the credential afterwards.
+    if (options.forgetCredential) {
+      await clearNodeCredential(nodeId);
+      await appendNodeActionEvent(actionId, { phase: "credential", message: "SSH credential cleared after install; upgrades go through the Agent." });
+    }
     await finishNodeAction(actionId, "succeeded", combinedOutput.slice(-12000));
     await addAudit({ actorUserId, action: "node.bootstrap.succeeded", targetType: "node", targetId: nodeId });
   } catch (error) {
@@ -391,6 +425,31 @@ printf 'NORTHSTAR_PROGRESS|heartbeat|96|Agent is active; waiting for its first C
   }
 }
 
+/** Source changes can alter runtime configuration even when desired data is unchanged. */
+async function rebuildAfterUpgrade(nodeId: string, actionId: string): Promise<void> {
+  for (const service of await listVpnServices(nodeId)) {
+    if (!service.enabled) continue;
+    try { await rebuildDesiredState(nodeId, service.protocol, { force: true }); }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await updateVpnServiceState(nodeId, service.protocol, { status: "attention", lastError: message });
+      await appendNodeActionEvent(actionId, { level: "warning", phase: "vpn-services", message: `Agent 已升级，${service.protocol} 等待修复：${message}` });
+    }
+  }
+}
+
+/** Agent 2.17+: the Agent fetches and stages the release itself (agent-self-upgrade.ts) and confirms it with a heartbeat. */
+async function selfUpgradeNode(nodeId: string, actionId: string): Promise<void> {
+  const started = Date.now();
+  const { version } = requestSelfUpgrade(nodeId);
+  await updateNodeActionProgress(actionId, { phase: "upgrade", progress: 30, message: `Agent is downloading ${version} over its own connection` });
+  if (!(await waitForAgentHeartbeat(nodeId, started, 150_000, version))) {
+    throw new Error(`没有在 150 秒内收到 ${version} 的心跳`);
+  }
+  await updateNodeActionProgress(actionId, { phase: "verify", progress: 85, message: "New Agent version is online; refreshing node configuration" });
+  await rebuildAfterUpgrade(nodeId, actionId);
+}
+
 export async function runNodeAction(nodeId: string, action: "restart-agent" | "status-agent" | "upgrade-agent", actorUserId?: string, queuedActionId?: string): Promise<string> {
   const node = await findNode(nodeId);
   if (!node) throw new Error("Node not found");
@@ -399,7 +458,18 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
   await startNodeAction(actionId);
   let recorder: ActionOutputRecorder | undefined;
   let upgradeConfirmed = false;
+  let upgradePath: "" | "agent" | "ssh" = "";
   try {
+    if (action === "upgrade-agent" && supportsSelfUpgrade((await findControlNode(nodeId))?.capabilities) && hasFreshAgentHeartbeat(node)) {
+      upgradePath = "agent";
+      await selfUpgradeNode(nodeId, actionId);
+      upgradeConfirmed = true;
+      await finishNodeAction(actionId, "succeeded", "Agent upgraded itself over its own connection; no SSH was used.");
+      await addAudit({ actorUserId, action: `node.${action}.succeeded`, targetType: "node", targetId: nodeId, metadata: { via: "agent" } });
+      return "";
+    }
+    if (!hasSshCredential(node)) throw new Error(action === "upgrade-agent" ? `Agent ${node.version || ""} 还不能自己升级（需要 2.17 以上且在线）。${NO_SSH}` : NO_SSH);
+    if (action === "upgrade-agent") upgradePath = "ssh";
     const secret = decryptSecret({ ciphertext: node.credential_ciphertext, iv: node.credential_iv, tag: node.credential_tag });
     const command = action === "upgrade-agent" ? agentUpgradeCommand(agentSource()) : action === "restart-agent"
       ? "printf 'NORTHSTAR_PROGRESS|restart|30|Requesting a managed Agent restart\\n'; systemctl restart northstar-agent; printf 'NORTHSTAR_PROGRESS|verify|75|Checking service status after restart\\n'; systemctl --no-pager --full status northstar-agent; printf 'NORTHSTAR_PROGRESS|complete|100|Agent restart completed\\n'"
@@ -424,16 +494,7 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
       if (action === "upgrade-agent") {
         await executeRemoteCommand(node, secret, agentUpgradeFinalizeCommand(), (chunk) => outputRecorder.write(chunk));
         upgradeConfirmed = true;
-        // Source changes can alter runtime configuration even when desired data is unchanged.
-        for (const service of await listVpnServices(nodeId)) {
-          if (!service.enabled) continue;
-          try { await rebuildDesiredState(nodeId, service.protocol, { force: true }); }
-          catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            await updateVpnServiceState(nodeId, service.protocol, { status: "attention", lastError: message });
-            await appendNodeActionEvent(actionId, { level: "warning", phase: "vpn-services", message: `Agent 已升级，${service.protocol} 等待修复：${message}` });
-          }
-        }
+        await rebuildAfterUpgrade(nodeId, actionId);
       }
     } else {
       const inspectedNode = await findNode(nodeId);
@@ -449,7 +510,9 @@ export async function runNodeAction(nodeId: string, action: "restart-agent" | "s
     return output;
   } catch (error) {
     let message = error instanceof Error ? error.message : String(error);
-    if (action === "upgrade-agent" && !upgradeConfirmed) {
+    if (upgradePath === "agent" && !upgradeConfirmed) {
+      message += "；节点本地回滚定时器会在 90 秒内恢复旧版本。";
+    } else if (upgradePath === "ssh" && !upgradeConfirmed) {
       try {
         const secret = decryptSecret({ ciphertext: node.credential_ciphertext, iv: node.credential_iv, tag: node.credential_tag });
         await executeRemoteCommand(node, secret, agentRollbackCommand());

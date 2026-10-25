@@ -9,6 +9,7 @@ import { markNodeReconciled, nodeReconcileDue } from "../../../../../server/reco
 import { recordTrafficSnapshots, type UsageSnapshot } from "../../../../../server/traffic";
 import { collectUserBundles } from "../../../../../server/reality";
 import { currentAgentOrigin } from "../../../../../server/agent-domain";
+import { adoptNodeIdentity } from "../../../../../server/db";
 
 export const runtime = "nodejs";
 
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
       metrics: body.metrics,
       activeUsers: activeSessionCount(usageSnapshots),
     });
+    if (!node.node_identity && typeof body.nodeIdentity === "string") await adoptNodeIdentity(nodeId, body.nodeIdentity);
     const protocols = Array.isArray(capabilities.protocols) ? capabilities.protocols.filter((value): value is Protocol => typeof value === "string" && supportedProtocols.has(value as Protocol)) : [];
     if (!protocols.length) {
       if (!(await listNodeProtocols(nodeId)).length) await ensureDefaultNodeProtocols(nodeId);
@@ -75,7 +77,7 @@ export async function POST(request: Request) {
     if (due !== null) markNodeReconciled(nodeId, due);
     await collectUserBundles(nodeId);
     // Agents 2.13+ move to this origin on their own once a heartbeat there succeeds.
-    return NextResponse.json({ ok: true, nextPollSeconds: 5, controllerOrigin: await currentAgentOrigin() });
+    return NextResponse.json({ ok: true, controllerOrigin: await currentAgentOrigin() });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Invalid heartbeat");
   }
