@@ -507,6 +507,8 @@ export async function deleteNode(id: string): Promise<boolean> {
   return (await dbExec("DELETE FROM nodes WHERE id = $1", [id])) === 1;
 }
 
+const transientAuditAction = /^agent\.reconcile\.|(^|\.)login\.failed$|node-pending$|\.skipped$/;
+
 export async function addAudit(input: {
   actorUserId?: string | null;
   action: string;
@@ -514,11 +516,15 @@ export async function addAudit(input: {
   targetId?: string;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
-  await dbExec(`INSERT INTO audit_logs (id, actor_user_id, action, target_type, target_id, metadata_json, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)`, [
-    randomUUID(), input.actorUserId || null, input.action, input.targetType || null,
-    input.targetId || null, JSON.stringify(input.metadata || {}), now(),
-  ]);
+  // Machine-driven and attack-driven events (every Agent task result, failed sign-ins, nodes skipped on each
+  // subscription refresh) go to the operational log only; audit_logs keeps the long-lived trail of decisions.
+  if (!transientAuditAction.test(input.action)) {
+    await dbExec(`INSERT INTO audit_logs (id, actor_user_id, action, target_type, target_id, metadata_json, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)`, [
+      randomUUID(), input.actorUserId || null, input.action, input.targetType || null,
+      input.targetId || null, JSON.stringify(input.metadata || {}), now(),
+    ]);
+  }
   void mirrorAuditToLog(input);
 }
 

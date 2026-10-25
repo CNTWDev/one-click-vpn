@@ -417,6 +417,24 @@ export async function listControlNodes(): Promise<Array<DbNode & {
   return rows.map((row) => ({ ...row, capabilities: parseJson(row.agent_capabilities_json, {}) }));
 }
 
+/** One node with its parsed Agent capabilities, without reading the whole fleet. */
+export async function findControlNode(nodeId: string): Promise<(DbNode & {
+  provider: string;
+  region: string;
+  public_endpoint: string | null;
+  server_public_key: string | null;
+  capabilities: Record<string, unknown>;
+}) | undefined> {
+  const row = (await dbQuery<DbNode & {
+    provider: string;
+    region: string;
+    public_endpoint: string | null;
+    server_public_key: string | null;
+    agent_capabilities_json: string;
+  }>("SELECT * FROM nodes WHERE id = $1", [nodeId]))[0];
+  return row && { ...row, capabilities: parseJson(row.agent_capabilities_json, {}) };
+}
+
 export async function updateNodeControlMetadata(nodeId: string, input: {
   provider?: string;
   region?: string;
@@ -464,6 +482,37 @@ export async function upsertNodeProtocol(input: {
     input.minClientVersion || null, input.configSchemaVersion || 1, input.status || "enabled", timestamp,
   ]);
   return (await listNodeProtocols(input.nodeId)).find((item) => item.protocol === input.protocol)!;
+}
+
+type NodeProtocolInput = {
+  protocol: Protocol;
+  transports: string[];
+  platforms: string[];
+  routing: string[];
+  ipv6: boolean;
+  minClientVersion?: string | null;
+  configSchemaVersion?: number;
+  status?: string;
+};
+
+/** Every heartbeat reports the same capabilities, so rows are only written when something differs. */
+export async function syncNodeProtocols(nodeId: string, rows: NodeProtocolInput[]): Promise<void> {
+  if (!rows.length) return;
+  await dbExec(`INSERT INTO node_protocols
+    (node_id, protocol, transports_json, platforms_json, routing_json, ipv6, min_client_version, config_schema_version, status, updated_at)
+    SELECT $1, p.*, $9 FROM unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::int[], $7::text[], $8::int[], $10::text[]) AS p
+    ON CONFLICT(node_id, protocol) DO UPDATE SET
+      transports_json = excluded.transports_json, platforms_json = excluded.platforms_json,
+      routing_json = excluded.routing_json, ipv6 = excluded.ipv6, min_client_version = excluded.min_client_version,
+      config_schema_version = excluded.config_schema_version, status = excluded.status, updated_at = excluded.updated_at
+    WHERE (node_protocols.transports_json, node_protocols.platforms_json, node_protocols.routing_json, node_protocols.ipv6,
+      node_protocols.min_client_version, node_protocols.config_schema_version, node_protocols.status)
+      IS DISTINCT FROM (excluded.transports_json, excluded.platforms_json, excluded.routing_json, excluded.ipv6,
+      excluded.min_client_version, excluded.config_schema_version, excluded.status)`, [
+    nodeId, rows.map((row) => row.protocol), rows.map((row) => JSON.stringify(row.transports)), rows.map((row) => JSON.stringify(row.platforms)),
+    rows.map((row) => JSON.stringify(row.routing)), rows.map((row) => row.ipv6 ? 1 : 0), rows.map((row) => row.minClientVersion || null),
+    rows.map((row) => row.configSchemaVersion || 1), now(), rows.map((row) => row.status || "enabled"),
+  ]);
 }
 
 export async function listNodeProtocols(nodeId?: string): Promise<NodeProtocol[]> {
@@ -567,11 +616,16 @@ export async function allocateIpLease(nodeId: string, protocol: Protocol, device
   throw new Error("No VPN addresses available for this node and protocol");
 }
 
+// Due profiles are marked expired once a minute (server/jobs.ts); reads treat them as expired right away.
+const effectiveProfileStatus = (nowParam: string) => `CASE WHEN connection_profiles.status IN ('issued', 'active')
+  AND connection_profiles.expires_at <= ${nowParam} THEN 'expired' ELSE connection_profiles.status END`;
+
 function profileFromRow(row: Record<string, unknown>): ConnectionProfile {
+  const due = (row.status === "issued" || row.status === "active") && String(row.expires_at) <= now();
   return {
     id: String(row.id), device_id: String(row.device_id), credential_id: row.credential_id ? String(row.credential_id) : null,
     node_id: String(row.node_id), protocol: row.protocol as Protocol,
-    transport: String(row.transport), revision: Number(row.revision), status: row.status as ProfileStatus,
+    transport: String(row.transport), revision: Number(row.revision), status: (due ? "expired" : row.status) as ProfileStatus,
     endpoint: parseJson(String(row.endpoint_json), { host: "", port: 0 }), client_address: row.client_address ? String(row.client_address) : null,
     dns: parseJson(String(row.dns_json), []), allowed_ips: parseJson(String(row.allowed_ips_json), []),
     protocol_payload: parseJson(String(row.protocol_payload_json), {}), issued_at: String(row.issued_at),
@@ -605,18 +659,18 @@ export async function createConnectionProfile(input: {
   return (await findConnectionProfile(id))!;
 }
 
+/** Persists the expiry that reads already apply; returns how many profiles just expired. */
 export async function expireDueConnectionProfiles(): Promise<number> {
   return dbExec(`UPDATE connection_profiles SET status = 'expired', updated_at = $1
     WHERE status IN ('issued', 'active') AND expires_at <= $2`, [now(), now()]);
 }
 
 export async function listConnectionProfiles(filters: { deviceId?: string; credentialId?: string; status?: ProfileStatus; userId?: string } = {}): Promise<ConnectionProfile[]> {
-  await expireDueConnectionProfiles();
   const clauses: string[] = [];
   const values: string[] = [];
   if (filters.deviceId) { clauses.push(`connection_profiles.device_id = $${values.length + 1}`); values.push(filters.deviceId); }
   if (filters.credentialId) { clauses.push(`connection_profiles.credential_id = $${values.length + 1}`); values.push(filters.credentialId); }
-  if (filters.status) { clauses.push(`connection_profiles.status = $${values.length + 1}`); values.push(filters.status); }
+  if (filters.status) { clauses.push(`${effectiveProfileStatus(`$${values.length + 1}`)} = $${values.length + 2}`); values.push(now(), filters.status); }
   if (filters.userId) { clauses.push(`devices.user_id = $${values.length + 1}`); values.push(filters.userId); }
   const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "";
   return (await dbQuery<Record<string, unknown>>(`SELECT connection_profiles.* FROM connection_profiles
@@ -625,7 +679,6 @@ export async function listConnectionProfiles(filters: { deviceId?: string; crede
 }
 
 export async function findConnectionProfile(id: string): Promise<ConnectionProfile | undefined> {
-  await expireDueConnectionProfiles();
   const rows = await dbQuery<Record<string, unknown>>("SELECT * FROM connection_profiles WHERE id = $1", [id]);
   return rows[0] ? profileFromRow(rows[0]) : undefined;
 }
@@ -682,11 +735,8 @@ export async function enqueueReconcileTask(input: { nodeId: string; protocol: Pr
   return id;
 }
 
+/** Agents poll every few seconds; stale and failed tasks return to the queue in server/jobs.ts, not here. */
 export async function pullReconcileTasks(nodeId: string, limit = 10): Promise<ReconcileTask[]> {
-  const stale = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-  await dbExec("UPDATE reconcile_tasks SET status = 'pending', started_at = NULL WHERE node_id = $1 AND status = 'running' AND started_at < $2", [nodeId, stale]);
-  const retryAfter = new Date(Date.now() - 30 * 1000).toISOString();
-  await dbExec("UPDATE reconcile_tasks SET status = 'pending', started_at = NULL WHERE node_id = $1 AND status = 'failed' AND attempts < 5 AND finished_at < $2", [nodeId, retryAfter]);
   const rows = await dbQuery<Record<string, unknown>>("SELECT * FROM reconcile_tasks WHERE node_id = $1 AND status = 'pending' ORDER BY created_at LIMIT $2", [nodeId, Math.min(Math.max(limit, 1), 20)]);
   const tasks: ReconcileTask[] = [];
   for (const row of rows) {
@@ -727,13 +777,12 @@ export async function finishReconcileTask(input: {
 }
 
 export async function listActivePeers(nodeId: string, protocol: Protocol): Promise<Array<{ publicKey: string; allowedIps: string[]; persistentKeepaliveSeconds: number; expiresAt?: number }>> {
-  await expireDueConnectionProfiles();
   const rows = await dbQuery<{ public_key: string; address: string }>(`SELECT d.public_key, l.address
     FROM devices d JOIN ip_leases l ON l.device_id = d.id
     JOIN connection_profiles p ON p.device_id = d.id AND p.node_id = l.node_id AND p.protocol = l.protocol
     JOIN users u ON u.id = d.user_id
     LEFT JOIN access_credentials c ON c.id = p.credential_id
-    WHERE l.node_id = $1 AND l.protocol = $2 AND l.status = 'active' AND d.status = 'active' AND p.status = 'active'
+    WHERE l.node_id = $1 AND l.protocol = $2 AND l.status = 'active' AND d.status = 'active' AND p.status = 'active' AND p.expires_at > $3
       AND ${accessSql()} AND NOT u.native_only AND (c.id IS NULL OR (c.status = 'active' AND NOT c.user_disabled
         AND NOT c.admin_disabled AND c.deleted_at IS NULL AND (c.expires_at IS NULL OR c.expires_at > $3)))
     GROUP BY d.id, l.address, d.public_key`, [nodeId, protocol, now()]);

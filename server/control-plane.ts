@@ -3,7 +3,8 @@ import { realitySettings, realityUsersSecret, realityClientSecretId } from "./re
 import { ensureRealityService } from "./service-prerequisites";
 import { stealthDesiredState } from "./stealth";
 import { withReconcileLock } from "./reconcile-lock";
-import { addAudit } from "./db";
+import { markAccessChanged } from "./reconcile-schedule";
+import { addAudit, dbQuery } from "./db";
 import { renderMihomoWireGuard } from "./protocols/mihomo";
 import { WIREGUARD_CLIENT_MTU, nativeWireGuardAllowedIps } from "./protocols/wireguard";
 import { assertCredentialUsable } from "./credential-access";
@@ -20,6 +21,7 @@ import {
   findVpnService,
   listActivePeers,
   listConnectionProfiles,
+  findControlNode,
   listControlNodes,
   listCredentialIdsForDevice,
   listNodeProtocols,
@@ -84,7 +86,7 @@ export function publicProfile(profile: ConnectionProfile, region?: { code: strin
 }
 
 async function findNode(nodeId: string) {
-  return (await listControlNodes()).find((node) => node.id === nodeId);
+  return findControlNode(nodeId);
 }
 
 export async function ensureDefaultNodeProtocols(nodeId: string): Promise<void> {
@@ -142,7 +144,11 @@ async function buildDesiredStateLocked(nodeId: string, protocol: Protocol, optio
     ? { ...desiredPayload, peers: (desiredPayload.peers as Array<Record<string, unknown>>).map((peer) => ({ ...peer, expiresAt: undefined })) }
     : undefined;
   const desired = await upsertDesiredConfig({ nodeId, protocol, payload: desiredPayload, hashPayload });
-  if (options.force || !previous || previous.config_hash !== desired.config_hash) {
+  const changed = !previous || previous.config_hash !== desired.config_hash;
+  // Access rarely changes on one node alone (app devices appear in every node's VLESS and stealth users),
+  // so a new revision anywhere lets every node re-check on its next heartbeat.
+  if (changed) markAccessChanged();
+  if (options.force || changed) {
     await enqueueReconcileTask({
       nodeId,
       protocol,
@@ -157,14 +163,11 @@ async function buildDesiredStateLocked(nodeId: string, protocol: Protocol, optio
 export async function selectVpnServices(input: { protocol: Protocol; regionId?: string }) {
   const services = (await listVpnServices()).filter((service) => service.protocol === input.protocol && service.enabled && service.status === "healthy");
   const nodes = await listControlNodes();
-  const activeProfiles = await listConnectionProfiles({ status: "active" });
-  const profileCounts = new Map<string, number>();
-  for (const profile of activeProfiles) profileCounts.set(profile.node_id, (profileCounts.get(profile.node_id) || 0) + 1);
-  const advertised = new Map<string, boolean>();
-  await Promise.all(nodes.map(async (node) => {
-    const capability = (await listNodeProtocols(node.id)).find((item) => item.protocol === input.protocol);
-    advertised.set(node.id, capability?.status === "enabled");
-  }));
+  // Counted in SQL: loading every active profile row just to count them grew with the user base.
+  const profileCounts = new Map((await dbQuery<{ node_id: string; count: number }>(
+    "SELECT node_id, COUNT(*)::int AS count FROM connection_profiles WHERE status = 'active' AND expires_at > $1 GROUP BY node_id", [new Date().toISOString()],
+  )).map((row) => [row.node_id, row.count]));
+  const advertised = new Map((await listNodeProtocols()).filter((item) => item.protocol === input.protocol).map((item) => [item.node_id, item.status === "enabled"]));
   return nodes.filter((node) => {
     if (!services.some((service) => service.node_id === node.id)) return false;
     if (!advertised.get(node.id)) return false;
