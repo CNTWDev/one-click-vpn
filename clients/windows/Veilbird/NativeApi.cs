@@ -41,7 +41,12 @@ public sealed class NativeApi : IDisposable {
         if(key is null) Save("identity",identity.ExportPkcs8PrivateKey());
         else identity.ImportPkcs8PrivateKey(key,out _);
     }
-    public string Origin {get;set;}="";
+    /// The service address release builds carry (VEILBIRD_API_ORIGIN, see Veilbird.csproj): users never type one.
+    /// Development builds are empty and ask for it on the sign-in page.
+    public static readonly string BuiltInOrigin=(System.Reflection.CustomAttributeExtensions.GetCustomAttributes<System.Reflection.AssemblyMetadataAttribute>(typeof(NativeApi).Assembly)
+        .FirstOrDefault(a=>a.Key=="VeilbirdApiOrigin")?.Value??"").Trim().TrimEnd('/');
+    private string origin="";
+    public string Origin {get=>BuiltInOrigin.Length>0?BuiltInOrigin:origin;set=>origin=value;}
     private string Entered=>Origin.Trim().TrimEnd('/');
     /// Every origin of this server, best first: the one that answered last, the others the server listed, and the
     /// address the user entered. Another address entered means another server: only that address until it answers.

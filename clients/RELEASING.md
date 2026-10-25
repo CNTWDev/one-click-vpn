@@ -17,7 +17,7 @@ Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次�
 2. **把这 4 个值填到 GitHub**：仓库 → Settings → Secrets and variables → Actions → New repository secret，名称照抄：
    `VEILBIRD_ANDROID_KEYSTORE_BASE64`、`VEILBIRD_ANDROID_KEYSTORE_PASSWORD`、`VEILBIRD_ANDROID_KEY_ALIAS`、`VEILBIRD_ANDROID_KEY_PASSWORD`。
 
-3. 同一页面的 Variables 标签新建 `VEILBIRD_API_ORIGIN`，值是你的 API 地址（例如 `https://api.example.com`）。打包时写进 App，用户安装后不用手填服务器地址。
+3. 同一页面的 Variables 标签新建 `VEILBIRD_API_ORIGIN`，值是你的 API 地址（例如 `https://api.example.com`）。打包时写进安卓、Windows 和 Mac/iPhone 的 App，用户安装后只要登录，不用填服务器地址，下次打开自动登录。没设这个变量的开发版才会在登录页显示「服务器地址」输入框。
 
 4. 所有正常账号都能直接登录客户端并连接，订阅照常可用；设备数上限来自账号的套餐（后台「套餐」，新用户默认 1 台），客户端、订阅和节点配置合计计数；改某个账号的上限就在「访问详情」里给它更换套餐。如果服务器 `.env` 里有 `VEILBIRD_NATIVE_ACCESS_ENABLED=0`，改成 `1` 或删掉这一行，再运行 `sudo ./one-click-update.sh`。
 

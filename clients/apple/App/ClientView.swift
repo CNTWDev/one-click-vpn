@@ -230,7 +230,7 @@ struct ClientView:View {
                 Wordmark(size:mac ? 24:30).padding(.top,mac ? 16:22).accessibilityAddTraits(.isHeader)
                 Text(L10n.text("sign_in_tagline")).font(.system(size:mac ? 13:15)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).padding(.top,6)
                 VStack(alignment:.leading,spacing:8) {
-                    if (Bundle.main.object(forInfoDictionaryKey:"VeilbirdAPIOrigin") as? String ?? "").isEmpty {
+                    if ClientModel.builtInOrigin.isEmpty {
                         caption(L10n.text("development_server_address"));TextField("https://…",text:$model.origin).literalInput().veilbirdField().padding(.bottom,6)
                     }
                     caption(L10n.text("email"));TextField("name@example.com",text:$email).literalInput().veilbirdField().padding(.bottom,6)

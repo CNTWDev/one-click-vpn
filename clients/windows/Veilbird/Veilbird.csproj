@@ -24,5 +24,8 @@
   <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\.deps\$(RuntimeIdentifier)\veilbird-core.exe')">
     <None Include="..\.deps\$(RuntimeIdentifier)\veilbird-core.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Link="veilbird-core.exe" />
   </ItemGroup>
+  <!-- Release builds bake the service address in (environment variable VEILBIRD_API_ORIGIN, the GitHub variable of the
+       same name), so users only sign in; without it (development builds) the sign-in page asks for one. -->
+  <ItemGroup><AssemblyMetadata Include="VeilbirdApiOrigin" Value="$(VEILBIRD_API_ORIGIN)" /></ItemGroup>
   <ItemGroup><PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" /></ItemGroup>
 </Project>

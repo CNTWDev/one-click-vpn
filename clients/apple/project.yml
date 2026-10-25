@@ -13,10 +13,12 @@ settings:
     # Bundle identifier prefix: development builds keep this placeholder; release builds pass the registered one
     # (GitHub variable VEILBIRD_APPLE_BUNDLE_ID, see clients/RELEASING.md).
     VEILBIRD_BUNDLE_ID: com.veilbird.client.dev
-    INFOPLIST_KEY_VeilbirdKeychainGroup: $(AppIdentifierPrefix)$(VEILBIRD_BUNDLE_ID).shared
+    # Read at run time from Info.plist (Config/App-Info.plist for the apps, the info properties of the tunnels).
+    VEILBIRD_KEYCHAIN_GROUP: $(AppIdentifierPrefix)$(VEILBIRD_BUNDLE_ID).shared
     # Shared by the app and its tunnel: the diagnostic log, routing choice and blocked-transport memory.
-    INFOPLIST_KEY_VeilbirdAppGroup: group.$(VEILBIRD_BUNDLE_ID)
-    INFOPLIST_KEY_VeilbirdAPIOrigin: $(VEILBIRD_API_ORIGIN)
+    VEILBIRD_APP_GROUP: group.$(VEILBIRD_BUNDLE_ID)
+    # VEILBIRD_API_ORIGIN (not set here, so the environment or the xcodebuild command line can pass it): the service
+    # address release builds carry, so users only sign in; development builds leave it empty and ask for one.
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     GENERATE_INFOPLIST_FILE: YES
@@ -32,6 +34,7 @@ targets:
         PRODUCT_NAME: Veilbird
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_CFBundleDisplayName: TrackNothing
+        INFOPLIST_FILE: Config/App-Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
     dependencies:
@@ -53,11 +56,12 @@ targets:
         PRODUCT_NAME: Veilbird
         INFOPLIST_KEY_CFBundleDisplayName: TrackNothing
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_FILE: Config/App-Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Direct download (Developer ID): hardened runtime for notarization; the tunnel is a system extension, which
         # runs as root, so it shares no keychain or app group container with the app (TunnelControl hands it what it needs).
         ENABLE_HARDENED_RUNTIME: YES
-        INFOPLIST_KEY_VeilbirdAppGroup: $(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)
+        VEILBIRD_APP_GROUP: $(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)
         PROVISIONING_PROFILE_SPECIFIER: $(VEILBIRD_MACOS_APP_PROFILE)
     dependencies:
       - package: VeilbirdCore
@@ -93,6 +97,8 @@ targets:
         NSExtension:
           NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
+        VeilbirdKeychainGroup: $(VEILBIRD_KEYCHAIN_GROUP)
+        VeilbirdAppGroup: $(VEILBIRD_APP_GROUP)
     entitlements:
       path: Signing/iOSTunnel.entitlements
       properties:
@@ -120,13 +126,15 @@ targets:
         PRODUCT_NAME: $(PRODUCT_BUNDLE_IDENTIFIER)
         PRODUCT_MODULE_NAME: VeilbirdTunnel
         ENABLE_HARDENED_RUNTIME: YES
-        INFOPLIST_KEY_VeilbirdKeychainGroup: ""
-        INFOPLIST_KEY_VeilbirdAppGroup: $(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)
+        VEILBIRD_KEYCHAIN_GROUP: ""
+        VEILBIRD_APP_GROUP: $(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)
         PROVISIONING_PROFILE_SPECIFIER: $(VEILBIRD_MACOS_TUNNEL_PROFILE)
     info:
       path: Signing/macOSTunnel.plist
       properties:
         NSSystemExtensionUsageDescription: TrackNothing uses this extension to create its VPN connection.
+        VeilbirdKeychainGroup: $(VEILBIRD_KEYCHAIN_GROUP)
+        VeilbirdAppGroup: $(VEILBIRD_APP_GROUP)
         NetworkExtension:
           # Must start with one of the extension's app groups.
           NEMachServiceName: $(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID).tunnel
