@@ -32,18 +32,25 @@ function artifactServer(files) {
   execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1",
     "-keyout", path.join(dir, "key.pem"), "-out", path.join(dir, "cert.pem")], { stdio: "ignore" });
   const server = createServer({ key: readFileSync(path.join(dir, "key.pem")), cert: readFileSync(path.join(dir, "cert.pem")) }, (request, response) => {
+    if (request.method === "PUT") {
+      // Stands in for the download mirror's bucket (path-style S3 PUT); the public URL reads the same path.
+      const chunks = [];
+      request.on("data", (chunk) => chunks.push(chunk)).on("end", () => { files[request.url.split("?")[0]] = Buffer.concat(chunks); response.writeHead(200).end(); });
+      return;
+    }
+    if (request.method === "DELETE") { delete files[request.url.split("?")[0]]; response.writeHead(204).end(); return; }
     const body = files[request.url];
-    response.writeHead(body ? 200 : 404).end(body || "missing");
+    response.writeHead(body ? 200 : 404, body ? { "Content-Length": String(body.length) } : {}).end(body || "missing");
   });
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve({ server, ca: path.join(dir, "cert.pem"), origin: `https://127.0.0.1:${server.address().port}` })));
 }
 
 test("client releases: CI drafts, verified artifacts, promotion, permanent links and minimum builds", { skip: !database, timeout: 120000 }, async () => {
-  const installer = Buffer.from("northstar-msix-v2"), cdn = await artifactServer({ "/v2.msix": installer, "/v3.msix": Buffer.from("northstar-msix-v3"), "/v4.msix": Buffer.from("northstar-msix-v4") });
+  const installer = Buffer.from("northstar-msix-v2"), cdnFiles = { "/v2.msix": installer, "/v3.msix": Buffer.from("northstar-msix-v3"), "/v4.msix": Buffer.from("northstar-msix-v4") }, cdn = await artifactServer(cdnFiles);
   const admin = { email: `release_${Date.now()}@example.com`, password: "release-admin-password-1" };
   const env = { VEILBIRD_DATABASE_URL: database, VEILBIRD_MASTER_KEY: Buffer.alloc(32, 7).toString("base64"), VEILBIRD_RELEASE_TOKEN: token,
     VEILBIRD_ADMIN_EMAIL: admin.email, VEILBIRD_ADMIN_PASSWORD: admin.password, VEILBIRD_NATIVE_ACCESS_ENABLED: "1", NODE_EXTRA_CA_CERTS: cdn.ca,
-    VEILBIRD_CLIENT_RELEASES_JSON: "[]", VEILBIRD_PUBLIC_ORIGIN: "https://app.example.com", VEILBIRD_RELEASE_LOCAL_DIR: mkdtempSync(path.join(tmpdir(), "veilbird-local-")) };
+    VEILBIRD_CLIENT_RELEASES_JSON: "[]", VEILBIRD_PUBLIC_ORIGIN: "https://app.example.com", VEILBIRD_API_ORIGIN: "https://api.example.com", VEILBIRD_RELEASE_LOCAL_DIR: mkdtempSync(path.join(tmpdir(), "veilbird-local-")) };
   execFileSync(process.execPath, ["scripts/migrate.mjs"], { env: { ...process.env, ...env }, stdio: "pipe" });
   const pool = new pg.Pool({ connectionString: database });
   await pool.query("DELETE FROM client_releases WHERE platform IN ('windows','android')");
@@ -70,11 +77,20 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
       const stored = await (await chunk(6000, true, apk.subarray(6000))).json();
       assert.deepEqual([stored.complete, stored.sizeBytes, stored.sha256], [true, apk.length, createHash("sha256").update(apk).digest("hex")]);
       const local = await (await ci("/api/v1/admin/client-releases", { ...meta, channel: "beta", minOs: "Android 8.0", storageKey: stored.storageKey, notes: "首个版本", publish: true })).json();
-      assert.equal(local.url, `https://app.example.com/api/v1/client-releases/files/clients/android/universal/1.0.0%2B10/Veilbird-1.0.0.apk`);
+      // Straight to the Controller on the API domain, not through the Portal.
+      assert.equal(local.url, `https://api.example.com/api/v1/client-releases/files/clients/android/universal/1.0.0%2B10/TrackNothing-1.0.0.apk`);
       assert.deepEqual([local.status, local.sha256, local.sizeBytes], ["published", stored.sha256, apk.length]);
       const served = await fetch(`${base}${new URL(local.url).pathname}`);
       assert.equal(served.status, 200);
+      assert.equal(served.headers.get("accept-ranges"), "bytes");
       assert.deepEqual(Buffer.from(await served.arrayBuffer()), apk);
+      // A broken download resumes with Range.
+      const rest = await fetch(`${base}${new URL(local.url).pathname}`, { headers: { Range: "bytes=10000-" } });
+      assert.deepEqual([rest.status, rest.headers.get("content-range"), rest.headers.get("content-length")], [206, `bytes 10000-${apk.length - 1}/${apk.length}`, String(apk.length - 10000)]);
+      assert.deepEqual(Buffer.from(await rest.arrayBuffer()), apk.subarray(10000));
+      assert.equal((await fetch(`${base}${new URL(local.url).pathname}`, { headers: { Range: `bytes=${apk.length}-` } })).status, 416);
+      const localCheck = await (await fetch(`${base}/api/v1/client-releases/latest?platform=android&arch=universal&build=1&channel=beta`)).json();
+      assert.deepEqual(localCheck.downloads, { urls: [], path: new URL(local.url).pathname }, "no mirror: the apps use the path on every API origin");
       const second = crypto.randomUUID(), meta2 = { ...meta, version: "1.1.0", build: 11, fileName: "TrackNothing-1.1.0.apk" };
       const stored2 = await (await fetch(`${base}/api/v1/admin/client-releases/files?${new URLSearchParams({ ...meta2, upload: second, offset: "0", final: "1" })}`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: apk })).json();
       const draft2 = await (await ci("/api/v1/admin/client-releases", { ...meta2, channel: "beta", minOs: "Android 8.0", storageKey: stored2.storageKey })).json();
@@ -161,6 +177,42 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
       assert.equal(overview.policies.find((p) => p.platform === "windows").minBuild, 200);
       assert.equal(overview.ciTokenConfigured, true);
       assert.equal((await fetch(`${base}/api/v1/admin/client-releases`, { headers: { Authorization: `Bearer ${token}` } })).status, 403, "the release token cannot read the admin overview");
+    });
+
+    // Download mirror (OSS/R2 + CDN): each uploaded build is copied there and offered first; the Controller stays the fallback.
+    await withServer({ ...env, VEILBIRD_RELEASE_MIRROR_ENDPOINT: cdn.origin, VEILBIRD_RELEASE_MIRROR_BUCKET: "bucket", VEILBIRD_RELEASE_MIRROR_ADDRESSING: "path",
+      VEILBIRD_RELEASE_MIRROR_ACCESS_KEY_ID: "key", VEILBIRD_RELEASE_MIRROR_SECRET_ACCESS_KEY: "secret", VEILBIRD_RELEASE_MIRROR_PUBLIC_BASE_URL: `${cdn.origin}/bucket` }, 3397, async (base) => {
+      const apk = Buffer.from("veilbird-apk-v3".repeat(1000)), meta = { platform: "android", arch: "arm64", version: "1.2.0", build: 12, fileName: "TrackNothing-1.2.0-arm64.apk" };
+      const stored = await (await fetch(`${base}/api/v1/admin/client-releases/files?${new URLSearchParams({ ...meta, upload: crypto.randomUUID(), offset: "0", final: "1" })}`,
+        { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: apk })).json();
+      const createdResponse = await fetch(`${base}/api/v1/admin/client-releases`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...meta, channel: "beta", minOs: "Android 8.0", storageKey: stored.storageKey, publish: true }) });
+      assert.equal(createdResponse.status, 200);
+      const created = await createdResponse.json();
+      const mirrored = `${cdn.origin}/bucket/clients/android/arm64/1.2.0%2B12/TrackNothing-1.2.0-arm64.apk`;
+      let check;
+      for (let attempt = 0; attempt < 50; attempt++) {
+        check = await (await fetch(`${base}/api/v1/client-releases/latest?platform=android&arch=arm64&build=1&channel=beta`)).json();
+        if (check.downloads?.urls.length) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      assert.deepEqual(check.downloads, { urls: [mirrored], path: "/api/v1/client-releases/files/clients/android/arm64/1.2.0%2B12/TrackNothing-1.2.0-arm64.apk" });
+      check = await (await fetch(`${base}/api/v1/client-releases/latest?platform=android&arch=arm64&build=1&channel=beta`)).json();
+      assert.equal(check.latest.url, mirrored, "older apps that only read url download from the mirror too");
+
+      // Deleting a package removes the record, the Controller's copy and the mirror's copy; published builds are withdrawn first.
+      const login = await fetch(`${base}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(admin) });
+      const cookie = login.headers.get("set-cookie").split(";")[0];
+      const act = (headers, action) => fetch(`${base}/api/v1/admin/client-releases/${created.id}`, { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      const objectPath = new URL(mirrored).pathname;
+      assert.ok(cdnFiles[objectPath], "the mirror holds the copy");
+      assert.equal((await act({ Authorization: `Bearer ${token}` }, "delete")).status, 403, "the release token cannot delete");
+      assert.equal((await act({ Cookie: cookie }, "delete")).status, 409, "a published build is withdrawn first");
+      assert.equal((await act({ Cookie: cookie }, "withdraw")).status, 200);
+      assert.equal((await act({ Cookie: cookie }, "delete")).status, 200);
+      assert.equal(cdnFiles[objectPath], undefined, "the mirror's copy is deleted");
+      assert.equal((await fetch(base + check.downloads.path)).status, 404, "the Controller's copy is deleted");
+      assert.equal((await pool.query("SELECT id FROM client_releases WHERE id=$1", [created.id])).rowCount, 0);
     });
 
     await withServer({ ...env, VEILBIRD_CLIENT_RELEASES_JSON: '{"privateSigningKey":"SECRET"}' }, 3396, async (base) => {

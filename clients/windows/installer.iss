@@ -56,6 +56,8 @@ Name: "{autodesktop}\TrackNothing"; Filename: "{app}\Veilbird.exe"
 
 [Run]
 Filename: "{app}\Veilbird.exe"; Description: "TrackNothing"; Flags: nowait postinstall skipifsilent shellexec
+; In-app updates run this installer silently (/VERYSILENT): start the new version when it is done.
+Filename: "{app}\Veilbird.exe"; Flags: nowait shellexec; Check: WizardSilent
 
 [UninstallRun]
 ; Stops the core (and with it the tunnel), and a tunnel service left by versions before the built-in core.

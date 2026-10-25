@@ -10,7 +10,8 @@ namespace Veilbird;
 /// TrackNothing tun adapter (wintun, needs the administrator rights the app runs with) and carries all traffic.
 /// Commands go over stdin/stdout one line at a time, so the configuration with keys never touches the disk and
 /// no local control port exists. The core exits when its stdin closes, including when this app dies.
-/// Commands are answered in order, except fetch (API calls), which answers "fetch:id ..." whenever it is done.
+/// Commands are answered in order, except fetch (API calls) and download (updates), which answer "fetch:id ..."
+/// and "download:id ..." whenever they are done.
 /// </summary>
 public sealed class Core : IDisposable {
     // gate keeps one ordinary command waiting for its answer at a time; writing guards the pipe and the process.
@@ -37,9 +38,10 @@ public sealed class Core : IDisposable {
     private void Read(Process core,BlockingCollection<string> lines) {
         try {
             while(core.StandardOutput.ReadLine() is { } line) {
-                if(line.StartsWith("fetch:",StringComparison.Ordinal)) {
+                var prefix=line.StartsWith("fetch:",StringComparison.Ordinal)?6:line.StartsWith("download:",StringComparison.Ordinal)?9:0;
+                if(prefix>0) {
                     var space=line.IndexOf(' ');
-                    if(space>6&&fetches.TryRemove(line[6..space],out var waiting)) waiting.TrySetResult(line[(space+1)..]);
+                    if(space>prefix&&fetches.TryRemove(line[prefix..space],out var waiting)) waiting.TrySetResult(line[(space+1)..]);
                 } else lines.Add(line);
             }
         } catch(IOException) {/* exited */}
@@ -64,6 +66,21 @@ public sealed class Core : IDisposable {
         }
         return await answer.Task.WaitAsync(TimeSpan.FromSeconds(60));
     }
+    /// An update installer (core.Download: mirror first, then every API origin, resuming); status JSON when it ends.
+    public async Task<string> Download(string request) {
+        var id=Guid.NewGuid().ToString("N")[..12];
+        var answer=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        fetches[id]=answer;
+        lock(writing) {
+            var core=Running();
+            core.StandardInput.WriteLine($"download {id} {Convert.ToBase64String(Encoding.UTF8.GetBytes(request))}");core.StandardInput.Flush();
+        }
+        return await answer.Task;
+    }
+    /// The running download's status JSON (received, size, seconds left).
+    public string Progress()=>Call("progress");
+    /// Stops the download; its partial file stays and resumes next time.
+    public void CancelDownload() {try {Call("cancel");} catch(IOException) {/* gone */}}
     /// Kill switch: while on, Windows lets traffic out only through the tunnel (WFP rules held by the core).
     public void KillSwitch(bool on) {
         var reply=Call("killswitch "+(on?"on":"off"));

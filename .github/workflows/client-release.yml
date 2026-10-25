@@ -92,9 +92,14 @@ jobs:
       - run: gradle -p clients/android :app:assembleProdRelease
       - name: Verify signature
         run: |
-          apk=clients/android/app/build/outputs/apk/prod/release/app-prod-release.apk
-          "$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --print-certs "$apk"
-          mv "$apk" "TrackNothing-${{ needs.prepare.outputs.version }}-$VEILBIRD_BUILD_NUMBER.apk"
+          # Same build number, two architectures: arm64 for nearly every phone, universal for the rest.
+          out=clients/android/app/build/outputs/apk/prod/release name="TrackNothing-${{ needs.prepare.outputs.version }}-$VEILBIRD_BUILD_NUMBER"
+          for apk in "$out/app-prod-arm64-v8a-release.apk" "$out/app-prod-universal-release.apk"; do
+            "$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --print-certs "$apk"
+          done
+          mv "$out/app-prod-arm64-v8a-release.apk" "$name-arm64.apk"
+          mv "$out/app-prod-universal-release.apk" "$name.apk"
+          ls -l TrackNothing-*.apk
       - uses: actions/upload-artifact@v4
         with:
           name: TrackNothing-android-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
@@ -106,11 +111,14 @@ jobs:
           node-version: '22'
       - name: Publish to beta
         if: needs.prepare.outputs.publish == 'true'
-        run: >-
-          node scripts/release-client.mjs --platform android --arch universal --channel beta --publish
-          --version "${{ needs.prepare.outputs.version }}" --build "$VEILBIRD_BUILD_NUMBER" --min-os "Android 8.0"
-          --notes "${{ github.ref_name }} (${{ github.sha }})"
-          --file "TrackNothing-${{ needs.prepare.outputs.version }}-$VEILBIRD_BUILD_NUMBER.apk"
+        run: |
+          name="TrackNothing-${{ needs.prepare.outputs.version }}-$VEILBIRD_BUILD_NUMBER"
+          for arch in arm64 universal; do
+            file="$name.apk"; [[ $arch == arm64 ]] && file="$name-arm64.apk"
+            node scripts/release-client.mjs --platform android --arch "$arch" --channel beta --publish \
+              --version "${{ needs.prepare.outputs.version }}" --build "$VEILBIRD_BUILD_NUMBER" --min-os "Android 8.0" \
+              --notes "${{ github.ref_name }} (${{ github.sha }})" --file "$file"
+          done
       - run: rm -f "$RUNNER_TEMP/release.jks"
         if: always()
   windows:

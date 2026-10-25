@@ -57,8 +57,16 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions { jvmTarget = "17" }
-    // WireGuard runs inside the embedded core (libs/veilbird-core.aar); the library's own engine is not shipped.
-    packaging { jniLibs { excludes += "**/libwg-go.so" } }
+    // Two downloads: arm64 (nearly every phone) and a universal APK for the rest. Each holds the embedded
+    // core once per ABI, so a phone downloads one copy instead of two.
+    splits { abi { isEnable = true; reset(); include("arm64-v8a"); isUniversalApk = true } }
+    packaging {
+        // WireGuard runs inside the embedded core (libs/veilbird-core.aar); the library's own engine is not shipped.
+        jniLibs.excludes += "**/libwg-go.so"
+        // Native libraries compressed inside the APK: a much smaller download (the core is most of the app),
+        // unpacked once at install time. Uncompressed is the default and only pays off for store-split installs.
+        jniLibs.useLegacyPackaging = true
+    }
 }
 dependencies {
     // Built by clients/core/build-android.sh (gomobile bind of mihomo); CI builds it before Gradle.

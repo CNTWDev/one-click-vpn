@@ -194,14 +194,34 @@
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>Unable to reach the service. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>Unable to reach the service. Check your network or contact your administrator.</value></data>
   <data name="up_to_date" xml:space="preserve"><value>Up to date</value></data>
+  <data name="update_action" xml:space="preserve"><value>Update</value></data>
   <data name="update_allow_installs" xml:space="preserve"><value>Allow TrackNothing to install updates, then come back and tap Update now again.</value></data>
   <data name="update_available" xml:space="preserve"><value>Version {0} is available</value></data>
   <data name="update_available_detail" xml:space="preserve"><value>Update to get the latest features and fixes.</value></data>
+  <data name="update_banner_title" xml:space="preserve"><value>Version {0}</value></data>
   <data name="update_downloading" xml:space="preserve"><value>Downloading and verifying the update…</value></data>
+  <data name="update_downloading_title" xml:space="preserve"><value>Downloading {0}</value></data>
+  <data name="update_downloading_value" xml:space="preserve"><value>Downloading {0}</value></data>
   <data name="update_failed" xml:space="preserve"><value>The update could not be downloaded or verified. Try again later.</value></data>
+  <data name="update_failed_digest" xml:space="preserve"><value>The file failed verification and was deleted. Try again later.</value></data>
+  <data name="update_failed_network" xml:space="preserve"><value>The connection dropped. Trying again continues where it stopped.</value></data>
+  <data name="update_failed_package" xml:space="preserve"><value>The package does not match this app, so it was not installed.</value></data>
+  <data name="update_failed_storage" xml:space="preserve"><value>Not enough storage. Free some space and try again.</value></data>
+  <data name="update_failed_title" xml:space="preserve"><value>{0} did not finish downloading</value></data>
+  <data name="update_install" xml:space="preserve"><value>Install</value></data>
+  <data name="update_later" xml:space="preserve"><value>Remind me later</value></data>
+  <data name="update_minutes" xml:space="preserve"><value>{0} min</value></data>
   <data name="update_now" xml:space="preserve"><value>Update now</value></data>
   <data name="update_open_download" xml:space="preserve"><value>Download</value></data>
+  <data name="update_open_installer" xml:space="preserve"><value>Open installer</value></data>
+  <data name="update_ready_detail" xml:space="preserve"><value>Installing disconnects briefly; the app reconnects afterwards.</value></data>
+  <data name="update_ready_detail_idle" xml:space="preserve"><value>Tap Install; it takes a few seconds.</value></data>
+  <data name="update_ready_title" xml:space="preserve"><value>{0} is ready</value></data>
   <data name="update_required_detail" xml:space="preserve"><value>This version is no longer supported. Update to keep connecting.</value></data>
+  <data name="update_required_title" xml:space="preserve"><value>Update to {0} required</value></data>
+  <data name="update_retry" xml:space="preserve"><value>Try again</value></data>
+  <data name="update_seconds" xml:space="preserve"><value>{0} s</value></data>
+  <data name="update_time_left" xml:space="preserve"><value>about {0}</value></data>
   <data name="upload_amount" xml:space="preserve"><value>↑ Up {0}</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 Valid until · </value></data>

@@ -11,6 +11,9 @@
 //	keypair                       -> <private> <public> (WireGuard, base64)
 //	fetch <id> <base64 request>   -> fetch:<id> <response JSON>, possibly after later commands' replies
 //	                                 (API call over every known origin, see core.Fetch)
+//	download <id> <base64 request> -> download:<id> <status JSON> when finished (update installer, see core.Download)
+//	progress                      -> status JSON of the running download
+//	cancel                        -> ok (the partial file stays and resumes next time)
 //	killswitch on|off             -> ok | error <message> (block traffic outside the tun)
 package main
 
@@ -81,6 +84,24 @@ func main() {
 				}
 				reply("fetch:" + id + " " + core.Fetch(home, string(request)))
 			}()
+		case "download":
+			if len(fields) != 3 {
+				continue
+			}
+			id, encoded := fields[1], fields[2]
+			go func() {
+				request, err := base64.StdEncoding.DecodeString(encoded)
+				if err != nil {
+					reply("download:" + id + ` {"state":"failed","error":"invalid","seconds":-1}`)
+					return
+				}
+				reply("download:" + id + " " + core.Download(home, string(request)))
+			}()
+		case "progress":
+			reply(core.DownloadProgress())
+		case "cancel":
+			core.CancelDownload()
+			reply("ok")
 		case "killswitch":
 			if len(fields) != 2 || (fields[1] != "on" && fields[1] != "off") {
 				reply("error usage")

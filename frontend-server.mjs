@@ -31,6 +31,8 @@ function proxyApi(request, response, pathname) {
 
   const transport = target.protocol === "https:" ? requestHttps : requestHttp;
   const upstream = transport(target, { method: request.method, headers }, (upstreamResponse) => {
+    // The timeout covers waiting for an answer; a long download may pause while a slow client catches up.
+    upstream.setTimeout(0);
     const responseHeaders = {};
     for (const [name, value] of Object.entries(upstreamResponse.headers)) {
       if (!hopByHopHeaders.has(name.toLowerCase()) && value !== undefined) responseHeaders[name] = value;

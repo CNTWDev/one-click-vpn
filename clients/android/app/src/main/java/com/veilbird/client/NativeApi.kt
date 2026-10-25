@@ -28,7 +28,8 @@ class ApiFailure(val code: String) : Exception(code)
  */
 class NativeApi(context: Context) {
     private val prefs = context.getSharedPreferences("veilbird", Context.MODE_PRIVATE)
-    private val home = File(context.filesDir, "core").apply { mkdirs() }.path
+    /** The core's data directory (cached API addresses). */
+    val home: String = File(context.filesDir, "core").apply { mkdirs() }.path
     private val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
     private val alias = "veilbird-device-v1"
     var origin: String
@@ -68,7 +69,7 @@ class NativeApi(context: Context) {
      * Every origin of this server, best first: the one that answered last, the others the server listed, and the
      * address the app was given. Another address means another server: only that one until it answers.
      */
-    private fun origins(): List<String> {
+    fun origins(): List<String> {
         val saved = prefs.getString("origins", "")!!.split('\n').filter { it.isNotEmpty() }
         return if (origin in saved) saved else listOf(origin)
     }
@@ -170,5 +171,6 @@ fun friendlyResource(error: Throwable): Int = when ((error as? ApiFailure)?.code
     "INVALID_EMAIL" -> R.string.enter_a_valid_email
     "CLIENT_UPDATE_REQUIRED" -> R.string.client_update_required
     "UPDATE_FAILED" -> R.string.update_failed
+    "UPDATE_PACKAGE" -> R.string.update_failed_package
     else -> R.string.unable_to_reach_the_service_check_your_network_and
 }

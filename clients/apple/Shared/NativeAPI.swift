@@ -73,7 +73,7 @@ final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     }
     func urlSession(_ session:URLSession,task:URLSessionTask,willPerformHTTPRedirection response:HTTPURLResponse,newRequest request:URLRequest,completionHandler:@escaping(URLRequest?)->Void) {completionHandler(nil)}
     /// Every origin of this server, best first. Another address means another server: only that one until it answers.
-    private func origins() -> [String] {
+    func origins() -> [String] {
         let saved=UserDefaults.standard.stringArray(forKey:"apiOrigins") ?? []
         return saved.contains(origin) ? saved:[origin]
     }

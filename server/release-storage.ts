@@ -1,6 +1,7 @@
 import { createHash, createHmac } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
 import { link, mkdir, rm, stat } from "node:fs/promises";
+import { request as requestHttps } from "node:https";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable, Transform } from "node:stream";
@@ -49,7 +50,7 @@ const hmac = (key: Buffer | string, value: string) => createHmac("sha256", key).
 
 /** AWS Signature Version 4 query-string presigning (path-style). */
 export function presignS3Url(input: {
-  method: "GET" | "PUT"; endpoint: string; bucket: string; key: string; region: string;
+  method: "GET" | "PUT" | "DELETE"; endpoint: string; bucket: string; key: string; region: string;
   accessKeyId: string; secretAccessKey: string; expiresSeconds: number; now?: Date; virtualHost?: boolean;
 }): string {
   const now = input.now || new Date();
@@ -147,4 +148,68 @@ export async function inspectLocalArtifact(storage: Extract<ReleaseStorage, { mo
 /** Public URL of a locally stored installer, served by the Controller through the Portal's /api proxy. */
 export function localArtifactUrl(origin: string, key: string): string {
   return `${origin.replace(/\/+$/, "")}/api/v1/client-releases/files/${key.split("/").map(encode).join("/")}`;
+}
+
+/**
+ * Optional download mirror for locally stored installers: an S3-compatible bucket behind a CDN (Aliyun OSS + CDN,
+ * Cloudflare R2, ...). The Controller copies each uploaded build there and the apps try the CDN first; the
+ * Controller's own copy stays the fallback, and the apps check the published SHA-256 whichever one served it.
+ */
+export type ReleaseMirror = { endpoint: string; bucket: string; region: string; accessKeyId: string; secretAccessKey: string; publicBaseUrl: string; virtualHost: boolean };
+
+export function releaseMirror(env: Record<string, string | undefined> = process.env): ReleaseMirror | null {
+  const value = (name: string) => env[`VEILBIRD_RELEASE_MIRROR_${name}`]?.trim() || "";
+  if (!value("ENDPOINT")) return null;
+  for (const name of ["BUCKET", "ACCESS_KEY_ID", "SECRET_ACCESS_KEY", "PUBLIC_BASE_URL"]) {
+    if (!value(name)) throw new Error(`VEILBIRD_RELEASE_MIRROR_${name} is required for the download mirror`);
+  }
+  const endpoint = new URL(value("ENDPOINT")), publicBaseUrl = new URL(value("PUBLIC_BASE_URL"));
+  if (endpoint.protocol !== "https:" || publicBaseUrl.protocol !== "https:") throw new Error("Mirror URLs must use HTTPS");
+  // Aliyun OSS accepts only virtual-hosted requests (bucket.endpoint); MinIO and most others accept both.
+  const style = value("ADDRESSING") || (endpoint.hostname.endsWith(".aliyuncs.com") ? "virtual" : "path");
+  if (style !== "virtual" && style !== "path") throw new Error("VEILBIRD_RELEASE_MIRROR_ADDRESSING must be virtual or path");
+  return { endpoint: endpoint.origin, bucket: value("BUCKET"), region: value("REGION") || "auto", accessKeyId: value("ACCESS_KEY_ID"),
+    secretAccessKey: value("SECRET_ACCESS_KEY"), publicBaseUrl: publicBaseUrl.href.replace(/\/+$/, ""), virtualHost: style === "virtual" };
+}
+
+/**
+ * Deletes one object from an S3-compatible bucket (the release bucket or the download mirror).
+ * A missing object counts as deleted, so a retry after a partial failure succeeds.
+ */
+export async function deleteStoredObject(target: { endpoint: string; bucket: string; region: string; accessKeyId: string; secretAccessKey: string; virtualHost?: boolean },
+  key: string, fetcher: typeof fetch = fetch): Promise<void> {
+  const url = presignS3Url({ method: "DELETE", endpoint: target.endpoint, bucket: target.bucket, key, region: target.region,
+    accessKeyId: target.accessKeyId, secretAccessKey: target.secretAccessKey, expiresSeconds: 600, virtualHost: target.virtualHost });
+  const response = await fetcher(url, { method: "DELETE", redirect: "error", signal: AbortSignal.timeout(30_000) });
+  if (!response.ok && response.status !== 404) {
+    const code = (await response.text().catch(() => "")).match(/<Code>([^<]+)<\/Code>/)?.[1];
+    throw new Error(`Delete failed (HTTP ${response.status}${code ? `, ${code}` : ""})`);
+  }
+}
+
+export const mirrorUrl = (mirror: ReleaseMirror, key: string) => `${mirror.publicBaseUrl}/${key.split("/").map(encode).join("/")}`;
+
+/** Copies one stored installer to the mirror bucket and checks the public URL serves its full size. Returns that URL. */
+export async function copyToMirror(mirror: ReleaseMirror, key: string, file: string, size: number): Promise<string> {
+  const target = new URL(presignS3Url({ method: "PUT", endpoint: mirror.endpoint, bucket: mirror.bucket, key, region: mirror.region,
+    accessKeyId: mirror.accessKeyId, secretAccessKey: mirror.secretAccessKey, expiresSeconds: 3600, virtualHost: mirror.virtualHost }));
+  // node:https with a Content-Length: object stores refuse chunked uploads to presigned URLs.
+  await new Promise<void>((resolve, reject) => {
+    const put = requestHttps(target, { method: "PUT", timeout: 120_000, headers: { "Content-Length": String(size), "Content-Type": "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${key.split("/").pop()}"` } }, (response) => {
+      let text = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk: string) => { if (text.length < 2000) text += chunk; });
+      response.on("end", () => (response.statusCode || 0) >= 200 && (response.statusCode || 0) < 300 ? resolve()
+        : reject(new Error(`Mirror upload failed (HTTP ${response.statusCode}${text.match(/<Code>([^<]+)<\/Code>/)?.[1] ? `, ${text.match(/<Code>([^<]+)<\/Code>/)![1]}` : ""})`)));
+    });
+    put.on("timeout", () => put.destroy(new Error("Mirror upload timed out")));
+    put.on("error", reject);
+    createReadStream(file).on("error", reject).pipe(put);
+  });
+  const url = mirrorUrl(mirror, key);
+  const head = await fetch(url, { method: "HEAD", redirect: "error", signal: AbortSignal.timeout(30_000), headers: { "Cache-Control": "no-cache" } });
+  if (!head.ok) throw new Error(`Mirror download URL answered HTTP ${head.status}`);
+  if (Number(head.headers.get("content-length")) !== size) throw new Error("Mirror download URL serves a different size");
+  return url;
 }

@@ -659,6 +659,106 @@
     "en": "Download",
     "ru": "Скачать"
   },
+  "update_banner_title": {
+    "zh": "新版本 {0}",
+    "en": "Version {0}",
+    "ru": "Версия {0}"
+  },
+  "update_required_title": {
+    "zh": "需要升级到 {0}",
+    "en": "Update to {0} required",
+    "ru": "Нужна версия {0}"
+  },
+  "update_action": {
+    "zh": "升级",
+    "en": "Update",
+    "ru": "Обновить"
+  },
+  "update_later": {
+    "zh": "稍后提醒",
+    "en": "Remind me later",
+    "ru": "Напомнить позже"
+  },
+  "update_downloading_title": {
+    "zh": "正在下载 {0}",
+    "en": "Downloading {0}",
+    "ru": "Загрузка {0}"
+  },
+  "update_time_left": {
+    "zh": "约 {0}",
+    "en": "about {0}",
+    "ru": "около {0}"
+  },
+  "update_seconds": {
+    "zh": "{0} 秒",
+    "en": "{0} s",
+    "ru": "{0} с"
+  },
+  "update_minutes": {
+    "zh": "{0} 分钟",
+    "en": "{0} min",
+    "ru": "{0} мин"
+  },
+  "update_ready_title": {
+    "zh": "{0} 已下载",
+    "en": "{0} is ready",
+    "ru": "Версия {0} загружена"
+  },
+  "update_ready_detail": {
+    "zh": "安装时会断开连接，装好后自动重连。",
+    "en": "Installing disconnects briefly; the app reconnects afterwards.",
+    "ru": "Во время установки соединение прервётся, затем восстановится."
+  },
+  "update_ready_detail_idle": {
+    "zh": "点击安装，几秒即可完成。",
+    "en": "Tap Install; it takes a few seconds.",
+    "ru": "Нажмите «Установить» — это займёт несколько секунд."
+  },
+  "update_install": {
+    "zh": "安装",
+    "en": "Install",
+    "ru": "Установить"
+  },
+  "update_open_installer": {
+    "zh": "打开安装包",
+    "en": "Open installer",
+    "ru": "Открыть установщик"
+  },
+  "update_failed_title": {
+    "zh": "没能下载完 {0}",
+    "en": "{0} did not finish downloading",
+    "ru": "Не удалось загрузить {0}"
+  },
+  "update_failed_network": {
+    "zh": "网络中断了，再试会接着下载。",
+    "en": "The connection dropped. Trying again continues where it stopped.",
+    "ru": "Соединение прервалось. Повторная попытка продолжит загрузку."
+  },
+  "update_failed_digest": {
+    "zh": "安装包校验没通过，已删除，请稍后再试。",
+    "en": "The file failed verification and was deleted. Try again later.",
+    "ru": "Файл не прошёл проверку и удалён. Повторите позже."
+  },
+  "update_failed_storage": {
+    "zh": "存储空间不足，清理后再试。",
+    "en": "Not enough storage. Free some space and try again.",
+    "ru": "Недостаточно места. Освободите место и повторите."
+  },
+  "update_failed_package": {
+    "zh": "安装包与当前应用不符，已停止安装。",
+    "en": "The package does not match this app, so it was not installed.",
+    "ru": "Пакет не соответствует приложению и не был установлен."
+  },
+  "update_retry": {
+    "zh": "重试",
+    "en": "Try again",
+    "ru": "Повторить"
+  },
+  "update_downloading_value": {
+    "zh": "下载中 {0}",
+    "en": "Downloading {0}",
+    "ru": "Загрузка {0}"
+  },
   "announcement": {
     "zh": "公告",
     "en": "Announcement",

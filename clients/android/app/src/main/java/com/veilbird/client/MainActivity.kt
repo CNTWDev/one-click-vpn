@@ -52,6 +52,13 @@ class MainActivity : Activity() {
     private lateinit var updater: Updater
     private var update: UpdateInfo? = null
     private var announcement = ""
+    // The update banner and the account page's update row follow one state: available, downloading, ready, failed.
+    private var downloading = false
+    private var download: DownloadState? = null
+    private var downloadError = ""
+    private var banner: LinearLayout? = null
+    private var updateRowValue: TextView? = null
+    private var launched = false
     private lateinit var content: LinearLayout
     private val executor = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
@@ -78,20 +85,36 @@ class MainActivity : Activity() {
     private val refresh = object : Runnable {
         override fun run() { showState(); if (visible) handler.postDelayed(this, 1000) }
     }
+    private val downloadTick = object : Runnable {
+        override fun run() { if (!downloading) return; download = updater.progress(); showUpdate(); handler.postDelayed(this, 300) }
+    }
+    /** Not while a connection is being set up: the check would compete with it for the network. */
+    private val updateCheck = object : Runnable {
+        override fun run() {
+            if (ConnectionStateStore.active && ConnectionStateStore.since == 0L) { handler.postDelayed(this, 10_000); return }
+            checkForUpdate()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState); api = NativeApi(this); updater = Updater(this, api)
         val settings = getSharedPreferences("preferences", MODE_PRIVATE)
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", "")!!; selectedCode = settings.getString("nodeCode", "")!!
         @Suppress("DEPRECATION") window.apply { statusBarColor = Palette.ground; navigationBarColor = Palette.ground; decorView.systemUiVisibility = 0 }
-        render(); checkForUpdate()
+        render()
         executor.execute { Crash.send(this, api) }
         // The Quick Settings tile could not start the VPN from the background: connect now that the app is open.
         if (intent?.getBooleanExtra("connect", false) == true && api.secret("token") != null && !ConnectionStateStore.active) toggleConnection()
     }
-    override fun onResume() { super.onResume(); visible = true; handler.post(refresh) }
+    override fun onResume() {
+        super.onResume(); visible = true; handler.post(refresh)
+        // At launch a few seconds after the first frame, then whenever the app returns after six hours or more.
+        val due = !launched || System.currentTimeMillis() - updater.checkedAt > 6 * 3_600_000L
+        launched = true
+        if (due && !downloading) { handler.removeCallbacks(updateCheck); handler.postDelayed(updateCheck, 3000) }
+    }
     override fun onPause() { visible = false; handler.removeCallbacks(refresh); super.onPause() }
-    override fun onDestroy() { executor.shutdown(); super.onDestroy() }
+    override fun onDestroy() { handler.removeCallbacks(updateCheck); handler.removeCallbacks(downloadTick); executor.shutdown(); super.onDestroy() }
     @Deprecated("Back handling for API 26+")
     override fun onBackPressed() {
         when (page) {
@@ -201,6 +224,7 @@ class MainActivity : Activity() {
 
     // ---- Pages
     private fun render() {
+        banner = null; updateRowValue = null
         ring = null; stateTitle = null; stateDot = null; stateDetail = null; stateTimer = null; stream = null; nodeTitle = null; nodeDetail = null; nodeBadge = null
         val side = maxOf(20.dp, (resources.displayMetrics.widthPixels - 560.dp) / 2)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 4.dp, side, 20.dp) }
@@ -224,6 +248,7 @@ class MainActivity : Activity() {
             "logs" -> logs()
             else -> account()
         }
+        showUpdate()
         if (page in listOf("connect", "nodes", "account")) root.addView(tabBar())
         handler.removeCallbacks(refresh); if (visible) handler.post(refresh)
     }
@@ -235,7 +260,11 @@ class MainActivity : Activity() {
             val selected = tab == page; val color = if (selected) Palette.accent else Palette.secondary
             tabs.addView(LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; background = pressable(Color.TRANSPARENT, 12)
-                addView(icon(res, color, 22))
+                // A small dot on the account tab while an update waits (the banner can be dismissed, the dot stays).
+                addView(FrameLayout(this@MainActivity).apply {
+                    addView(icon(res, color, 22), FrameLayout.LayoutParams(22.dp, 22.dp, Gravity.CENTER))
+                    if (tab == "account" && update != null) addView(View(this@MainActivity).apply { setBackgroundColor(Palette.accent) }, FrameLayout.LayoutParams(6.dp, 6.dp, Gravity.TOP or Gravity.END))
+                }, LinearLayout.LayoutParams(30.dp, 22.dp))
                 addView(text(L10n.text(title), 11f, color, 500).apply { maxLines = 1 }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
                 contentDescription = L10n.text(title) + if (selected) L10n.text(R.string.current_page) else ""
                 setOnClickListener { if (!busy && !selected) { page = tab; render() } }
@@ -245,15 +274,8 @@ class MainActivity : Activity() {
     }
     /** Update and announcement notes: one compact card each, only when there is something to say. */
     private fun notices() {
-        update?.let { available ->
-            add(row(60).apply {
-                background = rounded(Palette.surface, 16)
-                addView(titles(L10n.text(R.string.update_available, available.version), L10n.text(if (available.mandatory) R.string.update_required_detail else R.string.update_available_detail)))
-                addView(text(L10n.text(R.string.update_now), 14f, Palette.accent, 600).apply {
-                    setPadding(12.dp, 10.dp, 4.dp, 10.dp); background = pressable(Color.TRANSPARENT, 10); setOnClickListener { if (!busy) installUpdate(available) }
-                }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
-            }, top = 4, bottom = 8)
-        }
+        banner = add(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }) as LinearLayout
+        showUpdate()
         if (announcement.isNotBlank()) add(text(announcement, 14f, Palette.secondary).apply { background = rounded(Palette.surface, 16); setPadding(16.dp, 14.dp, 16.dp, 14.dp) }, top = 4, bottom = 8)
     }
 
@@ -425,7 +447,7 @@ class MainActivity : Activity() {
         add(primaryButton(L10n.text(R.string.sign_in_action)) {
             val origin = server?.text?.toString(); val address = email.text.toString().trim(); val secret = password.text.toString()
             if (address.isBlank() || secret.isEmpty()) { alert(L10n.text(R.string.enter_your_email_and_password)); return@primaryButton }
-            work({ if (origin != null) api.origin = origin; api.login(address, secret) }) { password.setText(""); page = "connect"; render(); checkForUpdate() }
+            work({ if (origin != null) api.origin = origin; api.login(address, secret) }) { password.setText(""); page = "connect"; render(); handler.postDelayed(updateCheck, 1500) }
         }, height = 52.dp, top = 12)
     }
     /** Both "forgot password" and "change password" email the Portal's reset link; the new password is set there. */
@@ -580,7 +602,6 @@ class MainActivity : Activity() {
                 }, LinearLayout.LayoutParams(0, -2, 1f))
             }, top = 4)
             usageCard(data)
-            val updateValue = update?.let { L10n.text(R.string.update_available, it.version) } ?: L10n.text(R.string.up_to_date)
             add(group(listOf(
                 settingRow(L10n.text(R.string.authorized_devices), "${L10n.number(data.optInt("used"))} / ${deviceLimit(data)}") { page = "devices"; render() },
                 settingRow(L10n.text(R.string.change_password), "") { resetPassword(email, L10n.text(R.string.reset_change_detail, email), L10n.text(R.string.reset_link_sent_to, email)) },
@@ -591,7 +612,8 @@ class MainActivity : Activity() {
                         .setPositiveButton(L10n.text(R.string.open_vpn_settings)) { _, _ -> try { startActivity(Intent(android.provider.Settings.ACTION_VPN_SETTINGS)) } catch (_: Exception) { } }
                         .setNegativeButton(L10n.text(R.string.cancel), null).show()
                 },
-                settingRow(L10n.text(R.string.check_for_updates), updateValue) { update?.let { installUpdate(it) } ?: checkForUpdate(announce = true) },
+                settingRow(L10n.text(R.string.check_for_updates), "") { update?.let { if (!downloading) startDownload(it) } ?: checkForUpdate(announce = true) }
+                    .also { updateRowValue = it.getChildAt(1) as TextView },
             )), top = 20)
             add(text(L10n.text(R.string.sign_out), 15f, Palette.danger).apply {
                 gravity = Gravity.CENTER; background = pressable(Palette.surface, 16)
@@ -776,14 +798,125 @@ class MainActivity : Activity() {
                 if (isDestroyed) return@runOnUiThread
                 if (found == null) { if (announce) Toast.makeText(this, L10n.text(R.string.unable_to_reach_the_service_check_your_network_and), Toast.LENGTH_SHORT).show(); return@runOnUiThread }
                 if (announce && found.update == null) Toast.makeText(this, L10n.text(R.string.up_to_date), Toast.LENGTH_SHORT).show()
-                if (found.update?.build != update?.build || found.announcement != announcement) { update = found.update; announcement = found.announcement; if (!busy) render() }
+                if (found.update?.build != update?.build || found.announcement != announcement) {
+                    if (downloading && found.update?.build != update?.build) updater.cancel()
+                    update = found.update; announcement = found.announcement; downloadError = ""; if (!busy) render()
+                }
+            }
+        }.start()
+    }
+
+    private enum class UpdatePhase { NONE, AVAILABLE, DOWNLOADING, READY, FAILED }
+    private fun updatePhase(available: UpdateInfo) = when {
+        downloading -> UpdatePhase.DOWNLOADING
+        updater.downloaded(available) != null -> UpdatePhase.READY
+        downloadError.isNotEmpty() -> UpdatePhase.FAILED
+        else -> UpdatePhase.AVAILABLE
+    }
+    /** "12.4 MB / 29.6 MB · about 20 s"; the time appears once the core's rate has settled. */
+    private fun downloadMeta(state: DownloadState?, available: UpdateInfo): String {
+        val received = state?.received ?: 0L; val size = state?.size?.takeIf { it > 0 } ?: available.sizeBytes
+        val seconds = state?.seconds ?: -1
+        val left = when { seconds < 0 -> ""; seconds < 60 -> L10n.text(R.string.update_seconds, L10n.number(seconds.toInt())); else -> L10n.text(R.string.update_minutes, L10n.number(((seconds + 59) / 60).toInt())) }
+        return "${bytes(received)} / ${bytes(size)}" + if (left.isEmpty()) "" else " · " + L10n.text(R.string.update_time_left, left)
+    }
+    private fun percent(state: DownloadState?, available: UpdateInfo) =
+        ((state?.received ?: 0L) * 100 / (state?.size?.takeIf { it > 0 } ?: available.sizeBytes).coerceAtLeast(1)).toInt().coerceIn(0, 100)
+
+    /** Fills the home banner and the account row from the update state; called on every progress tick. */
+    private fun showUpdate() {
+        val available = update
+        updateRowValue?.text = when (available?.let { updatePhase(it) }) {
+            null, UpdatePhase.NONE -> L10n.text(R.string.up_to_date)
+            UpdatePhase.DOWNLOADING -> L10n.text(R.string.update_downloading_value, "${percent(download, available!!)}%")
+            UpdatePhase.READY -> L10n.text(R.string.update_install)
+            else -> L10n.text(R.string.update_banner_title, available!!.version)
+        }
+        val holder = banner ?: return
+        val phase = available?.let { updatePhase(it) } ?: UpdatePhase.NONE
+        if (available == null || (phase == UpdatePhase.AVAILABLE && updater.dismissed(available))) { holder.removeAllViews(); holder.visibility = View.GONE; return }
+        holder.visibility = View.VISIBLE
+        if (phase == UpdatePhase.DOWNLOADING && holder.tag == "downloading" && holder.childCount == 1) { fillProgress(holder.getChildAt(0) as LinearLayout, available); return }
+        holder.removeAllViews(); holder.tag = if (phase == UpdatePhase.DOWNLOADING) "downloading" else ""
+        val card: LinearLayout = when (phase) {
+            UpdatePhase.DOWNLOADING -> progressCard(available)
+            UpdatePhase.READY -> bannerRow(L10n.text(R.string.update_ready_title, available.version),
+                L10n.text(if (ConnectionStateStore.active) R.string.update_ready_detail else R.string.update_ready_detail_idle),
+                bannerButton(L10n.text(R.string.update_install), filled = true) { installUpdate(available) })
+            UpdatePhase.FAILED -> bannerRow(L10n.text(R.string.update_failed_title, available.version),
+                L10n.text(when (downloadError) { "digest" -> R.string.update_failed_digest; "storage" -> R.string.update_failed_storage; "package" -> R.string.update_failed_package; else -> R.string.update_failed_network }),
+                bannerButton(L10n.text(R.string.update_retry)) { startDownload(available) })
+            else -> bannerRow(L10n.text(if (available.mandatory) R.string.update_required_title else R.string.update_banner_title, available.version),
+                if (available.mandatory) L10n.text(R.string.update_required_detail) else available.notes.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: L10n.text(R.string.update_available_detail),
+                bannerButton(L10n.text(R.string.update_action)) { startDownload(available) },
+                if (available.mandatory) null else text("×", 20f, Palette.faint).apply {
+                    gravity = Gravity.CENTER; background = pressable(Color.TRANSPARENT, 10); contentDescription = L10n.text(R.string.update_later)
+                    layoutParams = LinearLayout.LayoutParams(40.dp, 44.dp); setOnClickListener { updater.dismiss(available); showUpdate() }
+                })
+        }
+        holder.addView(card, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4.dp; bottomMargin = 8.dp })
+    }
+    private fun bannerButton(title: String, filled: Boolean = false, onClick: () -> Unit) = text(title, 14f, if (filled) Palette.onAccent else Palette.accent, 600).apply {
+        gravity = Gravity.CENTER; setPadding(if (filled) 16.dp else 12.dp, 0, if (filled) 16.dp else 12.dp, 0)
+        background = if (filled) RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.onAccent, 40)), rounded(Palette.accent, 10), null) else pressable(Color.TRANSPARENT, 10)
+        layoutParams = LinearLayout.LayoutParams(-2, if (filled) 40.dp else 44.dp).apply { marginStart = 8.dp }
+        setOnClickListener { if (!busy) onClick() }
+    }
+    private fun bannerRow(title: String, detail: String, action: View, trailing: View? = null) = row(60).apply {
+        background = rounded(Palette.surface, 16); setPadding(16.dp, 8.dp, if (trailing != null) 4.dp else 8.dp, 8.dp)
+        addView(titles(title, detail).apply { (getChildAt(1) as TextView).maxLines = 2 })
+        addView(action); trailing?.let { addView(it) }
+    }
+    /** Title, size and time left, a big percentage, and a bar of square blocks (the brand's pixel accent). */
+    private fun progressCard(available: UpdateInfo) = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL; background = rounded(Palette.surface, 16); setPadding(16.dp, 12.dp, 8.dp, 14.dp)
+        val top = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        top.addView(titles(L10n.text(if (available.mandatory) R.string.update_required_title else R.string.update_downloading_title, available.version), " "))
+        top.addView(text("", 22f, Palette.accent).apply { typeface = Pixel.font(this@MainActivity) }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
+        if (!available.mandatory) top.addView(text(L10n.text(R.string.cancel), 13f, Palette.secondary).apply {
+            gravity = Gravity.CENTER; setPadding(10.dp, 0, 10.dp, 0); background = pressable(Color.TRANSPARENT, 10)
+            setOnClickListener { updater.cancel() }
+        }, LinearLayout.LayoutParams(-2, 44.dp))
+        addView(top)
+        val blocks = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
+        repeat(30) { i -> blocks.addView(View(this@MainActivity), LinearLayout.LayoutParams(0, 6.dp, 1f).apply { if (i > 0) marginStart = 3.dp }) }
+        addView(blocks, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 10.dp; marginEnd = 8.dp })
+        fillProgress(this, available)
+    }
+    private fun fillProgress(card: LinearLayout, available: UpdateInfo) {
+        val top = card.getChildAt(0) as LinearLayout; val names = top.getChildAt(0) as LinearLayout
+        val value = percent(download, available)
+        (names.getChildAt(1) as TextView).apply { text = downloadMeta(download, available); visibility = View.VISIBLE }
+        (top.getChildAt(1) as TextView).text = "$value%"
+        val blocks = card.getChildAt(1) as LinearLayout
+        for (i in 0 until blocks.childCount) blocks.getChildAt(i).setBackgroundColor(if (i < value * blocks.childCount / 100) Palette.accent else Palette.raised)
+        card.contentDescription = L10n.text(R.string.update_downloading_title, available.version) + ", $value%"
+    }
+
+    /** One tap: the download runs in the core (CDN first, then the server, resuming), then the system installer. */
+    private fun startDownload(available: UpdateInfo) {
+        if (downloading) return
+        if (updater.downloaded(available) != null) { installUpdate(available); return }
+        if (!updater.canInstall()) { alert(L10n.text(R.string.update_allow_installs)); startActivity(updater.installPermissionIntent()); return }
+        downloading = true; downloadError = ""; download = null
+        showUpdate(); handler.post(downloadTick)
+        Thread {
+            val result = try { updater.download(available) } catch (e: Exception) { DownloadState("failed", 0, 0, -1, "", "network", e.javaClass.simpleName) }
+            runOnUiThread {
+                downloading = false; handler.removeCallbacks(downloadTick); download = result
+                if (result.state == "failed") downloadError = result.error.ifEmpty { "network" }
+                if (isDestroyed) return@runOnUiThread
+                showUpdate()
+                // Straight to the installer when nobody would lose a connection; otherwise the banner offers Install.
+                if (result.state == "done" && visible && !ConnectionStateStore.active) installUpdate(available)
             }
         }.start()
     }
     private fun installUpdate(available: UpdateInfo) {
         if (!updater.canInstall()) { alert(L10n.text(R.string.update_allow_installs)); startActivity(updater.installPermissionIntent()); return }
-        Toast.makeText(this, L10n.text(R.string.update_downloading), Toast.LENGTH_SHORT).show()
-        work({ updater.downloadAndInstall(available) }) {}
+        if (updater.downloaded(available) == null) { startDownload(available); return }
+        // A package for another app is deleted by install(); the banner then offers the download again.
+        work({ updater.install(available, reconnect = ConnectionStateStore.active) }) {}
     }
     private fun alert(message: String) { AlertDialog.Builder(this).setTitle("TrackNothing").setMessage(message).setPositiveButton(L10n.text(R.string.got_it), null).show() }
     private fun startConnection() { startForegroundService(Intent(this, ConnectionService::class.java).putExtra("nodeId", selectedId)) }

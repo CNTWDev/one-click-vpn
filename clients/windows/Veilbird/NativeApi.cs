@@ -95,7 +95,7 @@ public sealed class NativeApi : IDisposable {
         return json;
     }
     /// Public release catalog: the operator's announcement, and a newer build for this install if one is published.
-    public async Task<(string Announcement,(string Version,bool Mandatory,Uri Download)? Update)?> LatestRelease() {
+    public async Task<(string Announcement,ReleaseUpdate? Update)?> LatestRelease() {
         if(!ValidOrigin(Entered+"/")) return null;
         var origin=new Uri(Entered+"/");
         var installation=Read("installation") is { } saved?Encoding.UTF8.GetString(saved):Guid.NewGuid().ToString();Save("installation",Encoding.UTF8.GetBytes(installation));
@@ -105,9 +105,22 @@ public sealed class NativeApi : IDisposable {
         var json=JsonNode.Parse(body) as JsonObject;
         if(json is null) return null;
         var announcement=json["announcement"]?.GetValue<string>() is { } text?text[..Math.Min(text.Length,500)]:"";
-        if(json["updateAvailable"]?.GetValue<bool>()!=true||json["latest"]?["version"]?.GetValue<string>() is not { } version) return (announcement,null);
-        // The permanent link always resolves to the current stable installer.
-        return (announcement,(version,json["mandatory"]?.GetValue<bool>()==true,new Uri(origin,json["downloadPath"]?.GetValue<string>()??"/download/windows")));
+        if(json["updateAvailable"]?.GetValue<bool>()!=true||json["latest"] is not JsonObject latest||latest["version"]?.GetValue<string>() is not { } version) return (announcement,null);
+        // The permanent link always resolves to the current stable installer (the browser fallback).
+        var page=new Uri(origin,json["downloadPath"]?.GetValue<string>()??"/download/windows");
+        var downloads=json["downloads"] as JsonObject;
+        string[] urls=downloads?["urls"] is JsonArray list?list.Select(u=>u?.GetValue<string>()??"").Where(u=>u.StartsWith("https://",StringComparison.Ordinal)).ToArray()
+            :latest["url"]?.GetValue<string>() is { } url?[url]:[];
+        return (announcement,new ReleaseUpdate(version,latest["build"]?.GetValue<int>()??0,json["mandatory"]?.GetValue<bool>()==true,page,
+            latest["distribution"]?.GetValue<string>()=="direct"?latest["sha256"]?.GetValue<string>()??"":"",latest["sizeBytes"]?.GetValue<long>()??0,
+            latest["notes"]?.GetValue<string>() is { } notes?notes[..Math.Min(notes.Length,400)]:"",urls,downloads?["path"]?.GetValue<string>()??""));
+    }
+    /// Downloads an installer through the core (mirror URLs first, then the path on every API origin, resuming)
+    /// into file, checked against the published SHA-256. Returns the core's final status.
+    public async Task<JsonObject> DownloadUpdate(ReleaseUpdate update,string file) {
+        var request=new JsonObject {["urls"]=new JsonArray(update.Urls.Select(u=>(JsonNode)u).ToArray()),["origins"]=new JsonArray(Origins().Select(o=>(JsonNode)o).ToArray()),
+            ["path"]=update.Path,["file"]=file,["sha256"]=update.Sha256,["size"]=update.Size};
+        return JsonNode.Parse(await core.Download(request.ToJsonString())) as JsonObject ?? new JsonObject {["state"]="failed",["error"]="network"};
     }
     /// windows/0.1.0+1 (the fourth assembly version field is the build number; CI sets it per release).
     private static readonly string ClientAgent=typeof(NativeApi).Assembly.GetName().Version is { } v?$"windows/{v.Major}.{v.Minor}.{Math.Max(0,v.Build)}+{Math.Max(1,v.Revision)}":"windows/0.0.0+1";
@@ -138,4 +151,9 @@ public sealed class NativeApi : IDisposable {
     }
     public async Task Logout() {try {await Request("logout",new JsonObject());}finally {Save("token",null);}}
     public void Dispose()=>identity.Dispose();
+}
+
+/// A newer build. Without a digest (an older server) the app can only open the download page.
+public sealed record ReleaseUpdate(string Version,int Build,bool Mandatory,Uri Download,string Sha256,long Size,string Notes,string[] Urls,string Path) {
+    public bool InApp=>Sha256.Length==64&&Size>0&&(Urls.Length>0||Path.StartsWith('/'));
 }
