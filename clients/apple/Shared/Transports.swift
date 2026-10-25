@@ -11,9 +11,6 @@ enum Transports {
     static let group="TrackNothing"
     static let testURL="https://www.gstatic.com/generate_204"
     private static let memoryDays:TimeInterval=7
-    private static let privateNetworks=["10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","100.64.0.0/10","127.0.0.0/8","169.254.0.0/16"]
-    // Same small rule sets as the subscription profiles (server/mihomo-config.mjs), fetched through the tunnel.
-    private static let ruleSets="https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo"
 
     /// A short one-way label for the network outside the tunnel: interface kind and gateways. Nothing that names the network is stored.
     static func networkKey(_ path:NWPath?) -> String {
@@ -60,26 +57,10 @@ enum Transports {
                 "public-key":key,"allowed-ips":["0.0.0.0/0"],"udp":true,"mtu":1280,"remote-dns-resolve":true,"dns":wg["dns"] as? [String] ?? []]
     }
     /// The whole mihomo configuration for one node (JSON is valid YAML). The provider owns the tun and passes its descriptor.
-    static func config(proxies:[[String:Any]],order:[String],fd:Int32,smart:Bool) throws -> String {
-        var dns:[String:Any]=["enable":true,"ipv6":false,"enhanced-mode":"fake-ip","fake-ip-range":"198.18.0.1/16",
-            "fake-ip-filter":["+.lan","+.local","+.apple.com","time.*.com","+.ntp.org.cn"],"respect-rules":true,
-            "default-nameserver":["223.5.5.5","119.29.29.29"],"nameserver":["https://1.1.1.1/dns-query","https://8.8.8.8/dns-query"],
-            "proxy-server-nameserver":["https://doh.pub/dns-query","223.5.5.5"]]
-        if smart {dns["nameserver-policy"]=["rule-set:private_domain,cn_domain":["https://doh.pub/dns-query","https://dns.alidns.com/dns-query"]]}
-        var rules=privateNetworks.map {"IP-CIDR,\($0),DIRECT,no-resolve"}
-        if smart {rules+=["RULE-SET,private_domain,DIRECT","RULE-SET,cn_domain,DIRECT","RULE-SET,cn_ip,DIRECT"]}
-        rules.append("MATCH,\(group)")
-        func ruleSet(_ kind:String,_ name:String,_ behavior:String) -> [String:Any] {
-            ["type":"http","behavior":behavior,"format":"mrs","url":"\(ruleSets)/\(kind)/\(name).mrs","path":"./rules/\(kind)-\(name).mrs","interval":86400,"proxy":group]
-        }
-        var config:[String:Any]=["mode":"rule","log-level":"silent","ipv6":false,"find-process-mode":"off","unified-delay":true,"tcp-concurrent":true,"geo-auto-update":false,
-            "profile":["store-selected":false,"store-fake-ip":false],"dns":dns,
-            "tun":["enable":true,"stack":"gvisor","file-descriptor":Int(fd),"auto-route":false,"auto-detect-interface":false,"dns-hijack":["any:53"],"mtu":1500],
-            "proxies":proxies,
-            "proxy-groups":[["name":group,"type":"fallback","proxies":order,"url":testURL,"interval":300,"lazy":false]],
-            "rules":rules]
-        if smart {config["rule-providers"]=["private_domain":ruleSet("geosite","private","domain"),"cn_domain":ruleSet("geosite","cn","domain"),"cn_ip":ruleSet("geoip","cn","ipcidr")]}
-        return String(decoding:try JSONSerialization.data(withJSONObject:config),as:UTF8.self)
+    /// What the core needs to build the configuration (clients/core/config.go): the same on every app.
+    static func options(proxies:[[String:Any]],order:[String],fd:Int32,smart:Bool) throws -> String {
+        let options:[String:Any]=["platform":"apple","fd":Int(fd),"smart":smart,"proxies":proxies,"order":order]
+        return String(decoding:try JSONSerialization.data(withJSONObject:options),as:UTF8.self)
     }
     /// "name=delay,..." from the core; -1 means no answer.
     static func parseProbe(_ result:String) -> [String:Int] {

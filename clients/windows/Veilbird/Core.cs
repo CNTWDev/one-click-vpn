@@ -33,9 +33,9 @@ public sealed class Core : IDisposable {
             return core.StandardOutput.ReadLine() ?? throw new IOException("core exited");
         }
     }
-    /// Applies a full configuration; the tun comes up with it.
-    public void Start(string configuration) {
-        var reply=Call("start "+Convert.ToBase64String(Encoding.UTF8.GetBytes(configuration)));
+    /// Builds and applies the configuration from Transports.Options; the tun comes up with it.
+    public void Run(string options) {
+        var reply=Call("run "+Convert.ToBase64String(Encoding.UTF8.GetBytes(options)));
         if(reply!="ok") throw new IOException(reply);
     }
     /// Tests the named transports at once through url; -1 means no answer.

@@ -36,6 +36,9 @@ jobs:
         with:
           go-version-file: clients/core/go.mod
           cache-dependency-path: clients/core/go.sum
+      # The shared mihomo configuration every app runs (clients/core/config.go) must parse for each platform.
+      - run: go test ./...
+        working-directory: clients/core
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
       # The embedded core (mihomo) as an AAR; Gradle links it from app/libs.
       - run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash clients/core/build-android.sh
