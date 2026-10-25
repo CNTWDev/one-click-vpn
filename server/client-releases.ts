@@ -7,7 +7,7 @@ import {
 import { addAudit, dbExec, dbQuery } from "./db";
 import { requestAdmin } from "./request-auth";
 import { apiOrigin } from "./config";
-import { appendLocalArtifact, copyToMirror, deleteStoredObject, inspectArtifact, inspectLocalArtifact, localArtifactPath, localArtifactUrl, maxInstallerBytes, presignReleaseUpload, releaseMirror, releaseObjectKey, releaseStorage, uploadChunkBytes } from "./release-storage";
+import { appendLocalArtifact, copyToMirror, deleteStoredObject, StoreError, testMirror, inspectArtifact, inspectLocalArtifact, localArtifactPath, localArtifactUrl, maxInstallerBytes, presignReleaseUpload, releaseMirror, releaseObjectKey, releaseStorage, uploadChunkBytes } from "./release-storage";
 import { writeOperationalLog } from "./operational-logs";
 
 export class ReleaseError extends Error {
@@ -62,7 +62,7 @@ function adminRelease(row: ReleaseRow) {
   return { ...toRelease(row), id: row.id, notes: row.notes, storageKey: row.storage_key, verifiedAt: iso(row.verified_at),
     publishedAt: iso(row.published_at), createdAt: iso(row.created_at), updatedAt: iso(row.updated_at), createdBy: row.created_by,
     rolloutPercent: Number(row.rollout_percent ?? 100),
-    mirror: row.mirror_url ? "ready" : mirrorConfigured() && row.storage_key && releaseStorage().mode === "local"
+    mirror: row.mirror_url ? "ready" : mirrorConfigured() && row.storage_key && releaseStorage().mode === "local" && row.status !== "withdrawn"
       ? (row.mirror_error ? (Number(row.mirror_attempts) >= mirrorAttempts ? "failed" : "retrying") : "pending") : null,
     mirrorError: row.mirror_error || null };
 }
@@ -112,7 +112,12 @@ async function downloadSources(release: ClientRelease): Promise<{ urls: string[]
 
 const mirrorAttempts = 5;
 const mirrorConfigured = () => { try { return !!releaseMirror(); } catch { return false; } };
-let mirroring = false;
+let mirroring = false, lastConfigError = "";
+/** One Loki line per mirror event, with the provider's answer (status, error code, request id); never a key or secret. */
+const mirrorLog = (action: string, level: "info" | "warning", fields: Record<string, unknown>) =>
+  writeOperationalLog({ component: "controller", level, message: action, action, fields }).catch(() => undefined);
+const answerFields = (answer: StoreError["answer"] | undefined) => answer ? { stage: answer.stage, host: answer.host, status: answer.status, code: answer.code,
+  providerMessage: answer.message, requestId: answer.requestId, ms: answer.ms } : {};
 /**
  * Copies locally stored builds to the download mirror (when configured), newest first, one at a time.
  * Runs after each upload and from the minute jobs, so a failed copy is retried a few times and a restart loses nothing.
@@ -120,7 +125,12 @@ let mirroring = false;
 export async function syncReleaseMirrors(): Promise<void> {
   const storage = releaseStorage();
   let mirror;
-  try { mirror = releaseMirror(); } catch (error) { console.error("Release mirror", (error as Error).message); return; }
+  try { mirror = releaseMirror(); lastConfigError = ""; } catch (error) {
+    // Logged when it starts or changes, not every minute.
+    const message = (error as Error).message;
+    if (message !== lastConfigError) { lastConfigError = message; console.error("Release mirror", message); await mirrorLog("client_release.mirror_config_invalid", "warning", { error: message }); }
+    return;
+  }
   if (!mirror || storage.mode !== "local" || mirroring) return;
   mirroring = true;
   try {
@@ -129,24 +139,32 @@ export async function syncReleaseMirrors(): Promise<void> {
         AND mirror_attempts<$1 AND distribution='direct' AND size_bytes IS NOT NULL ORDER BY created_at DESC LIMIT 1`, [mirrorAttempts]))[0];
       if (!row) return;
       await dbExec("UPDATE client_releases SET mirror_attempts=mirror_attempts+1 WHERE id=$1", [row.id]);
+      const release = { release: row.id, platform: row.platform, arch: row.arch, build: row.build, key: row.storage_key, bytes: Number(row.size_bytes), attempt: Number(row.mirror_attempts) + 1 };
       try {
-        const url = await copyToMirror(mirror, row.storage_key!, localArtifactPath(storage, row.storage_key!), Number(row.size_bytes));
+        const { url, upload, cdn } = await copyToMirror(mirror, row.storage_key!, localArtifactPath(storage, row.storage_key!), Number(row.size_bytes));
         // Deleted while it was copying: take the copy back off the CDN.
         if (!(await dbExec("UPDATE client_releases SET mirror_url=$2,mirror_error='',updated_at=now() WHERE id=$1", [row.id, url]))) {
           await deleteStoredObject(mirror, row.storage_key!).catch(() => undefined);
           continue;
         }
-        await writeOperationalLog({ component: "controller", level: "info", message: "client_release.mirrored", action: "client_release.mirrored",
-          fields: { release: row.id, platform: row.platform, build: row.build } }).catch(() => undefined);
+        await mirrorLog("client_release.mirrored", "info", { ...release, url, uploadMs: upload.ms, uploadRequestId: upload.requestId, cdnStatus: cdn.status, cdnMs: cdn.ms });
       } catch (error) {
         const message = ((error as Error).message || "Mirror copy failed").slice(0, 300);
         await dbExec("UPDATE client_releases SET mirror_error=$2 WHERE id=$1", [row.id, message]);
-        await writeOperationalLog({ component: "controller", level: "warning", message: "client_release.mirror_failed", action: "client_release.mirror_failed",
-          fields: { release: row.id, platform: row.platform, build: row.build, error: message } }).catch(() => undefined);
+        await mirrorLog("client_release.mirror_failed", "warning", { ...release, error: message, ...answerFields((error as StoreError).answer) });
         return;
       }
     }
   } finally { mirroring = false; }
+}
+
+/** Console 「测试 OSS/CDN」: a throwaway object through every step a real copy takes; the result is logged too. */
+export async function mirrorTest(actor: ReleaseActor) {
+  requireAdmin(actor);
+  const result = await testMirror();
+  await mirrorLog("client_release.mirror_test", result.ok ? "info" : "warning", { ok: result.ok, failedStep: result.steps.find((step) => !step.ok)?.name,
+    steps: result.steps.map((step) => ({ name: step.name, ok: step.ok, detail: step.detail, ...answerFields(step.answer) })) });
+  return result;
 }
 
 export function downloadPath(platform: ClientPlatform, arch?: ClientArch) {
@@ -298,6 +316,11 @@ export async function transitionRelease(actor: ReleaseActor, id: string, action:
     // Files go first, so a failed delete keeps the record and can simply be retried.
     if (release.storageKey) await deleteReleaseFiles(release.storageKey);
     changed = await dbExec("DELETE FROM client_releases WHERE id=$1 AND status IN ('draft','withdrawn')", [id]);
+  } else if (action === "retry_mirror") {
+    requireAdmin(actor);
+    // Starts the copy again from attempt 1, e.g. after fixing the mirror configuration or the bucket permissions.
+    changed = await dbExec("UPDATE client_releases SET mirror_attempts=0,mirror_error='' WHERE id=$1 AND mirror_url IS NULL AND storage_key IS NOT NULL AND status<>'withdrawn'", [id]);
+    if (changed) void syncReleaseMirrors();
   } else throw new ReleaseError("INVALID_ACTION");
   if (!changed) throw new ReleaseError("INVALID_RELEASE_STATE", 409);
   if (action === "withdraw" || action === "rollout") {
@@ -319,10 +342,11 @@ async function deleteReleaseFiles(key: string) {
   try {
     let mirror: ReturnType<typeof releaseMirror> = null;
     try { mirror = releaseMirror(); } catch { /* A broken mirror configuration never blocks deleting. */ }
-    if (mirror) await deleteStoredObject(mirror, key);
+    if (mirror) await mirrorLog("client_release.mirror_deleted", "info", { key, ...answerFields(await deleteStoredObject(mirror, key)) });
     if (storage.mode === "s3") await deleteStoredObject(storage, key);
   } catch (error) {
     console.error("Release delete", (error as Error).message);
+    await mirrorLog("client_release.delete_failed", "warning", { key, error: (error as Error).message, ...answerFields((error as StoreError).answer) });
     throw new ReleaseError("RELEASE_FILE_DELETE_FAILED", 502);
   }
   if (storage.mode === "local") await rm(localArtifactPath(storage, key), { force: true }).catch(() => undefined);
@@ -366,7 +390,7 @@ export async function releaseOverview() {
     adoption: adoption.map((row) => ({ platform: row.platform, version: row.client_version, build: row.client_build, devices: row.devices })),
     diagnostics: diagnostics.map((row) => ({ platform: row.platform, build: row.client_build, code: row.code, events: row.events, users: row.users, lastAt: iso(row.last_at) })),
     storage: storage.mode === "s3" ? { mode: storage.mode, publicBaseUrl: storage.publicBaseUrl } : { mode: storage.mode, maxBytes: maxInstallerBytes, chunkBytes: uploadChunkBytes,
-      mirror: (() => { try { return releaseMirror()?.publicBaseUrl ?? null; } catch { return "invalid"; } })() },
+      ...(() => { try { return { mirror: releaseMirror()?.publicBaseUrl ?? null }; } catch (error) { return { mirror: "invalid", mirrorError: (error as Error).message }; } })() },
     ciTokenConfigured: (process.env.VEILBIRD_RELEASE_TOKEN?.trim().length || 0) >= 32,
   };
 }

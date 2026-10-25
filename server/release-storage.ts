@@ -163,8 +163,14 @@ export function releaseMirror(env: Record<string, string | undefined> = process.
   for (const name of ["BUCKET", "ACCESS_KEY_ID", "SECRET_ACCESS_KEY", "PUBLIC_BASE_URL"]) {
     if (!value(name)) throw new Error(`VEILBIRD_RELEASE_MIRROR_${name} is required for the download mirror`);
   }
-  const endpoint = new URL(value("ENDPOINT")), publicBaseUrl = new URL(value("PUBLIC_BASE_URL"));
-  if (endpoint.protocol !== "https:" || publicBaseUrl.protocol !== "https:") throw new Error("Mirror URLs must use HTTPS");
+  // The message names the variable: the Console shows it to the operator (never a value, so no secret leaks).
+  const https = (name: string) => {
+    let url: URL | null = null;
+    try { url = new URL(value(name)); } catch { /* reported below */ }
+    if (url?.protocol !== "https:") throw new Error(`VEILBIRD_RELEASE_MIRROR_${name} must be a full https:// URL`);
+    return url;
+  };
+  const endpoint = https("ENDPOINT"), publicBaseUrl = https("PUBLIC_BASE_URL");
   // Aliyun OSS accepts only virtual-hosted requests (bucket.endpoint); MinIO and most others accept both.
   const style = value("ADDRESSING") || (endpoint.hostname.endsWith(".aliyuncs.com") ? "virtual" : "path");
   if (style !== "virtual" && style !== "path") throw new Error("VEILBIRD_RELEASE_MIRROR_ADDRESSING must be virtual or path");
@@ -172,44 +178,144 @@ export function releaseMirror(env: Record<string, string | undefined> = process.
     secretAccessKey: value("SECRET_ACCESS_KEY"), publicBaseUrl: publicBaseUrl.href.replace(/\/+$/, ""), virtualHost: style === "virtual" };
 }
 
+type BucketTarget = { endpoint: string; bucket: string; region: string; accessKeyId: string; secretAccessKey: string; virtualHost?: boolean };
+
+/**
+ * What an object store or CDN answered, kept so a failure can be looked up later (the request id is what the
+ * provider's support asks for). Never holds a signature, key or secret.
+ */
+export type StoreAnswer = { stage: string; host: string; status?: number; code?: string; message?: string; requestId?: string; ms: number };
+
+/** A failed object store or CDN request; `answer` goes to the operational logs and the Console. */
+export class StoreError extends Error {
+  answer: StoreAnswer;
+  constructor(message: string, answer: StoreAnswer) { super(message); this.answer = answer; }
+}
+
+const requestIdOf = (headers: Headers | Record<string, string | string[] | undefined>) => {
+  const get = (name: string) => headers instanceof Headers ? headers.get(name) : [headers[name]].flat()[0];
+  // Aliyun OSS, AWS S3 / MinIO / R2, Aliyun CDN, Cloudflare.
+  return get("x-oss-request-id") || get("x-amz-request-id") || get("eagleid") || get("cf-ray") || undefined;
+};
+const xmlField = (text: string, name: string) => text.match(new RegExp(`<${name}>([^<]{1,300})</${name}>`))?.[1];
+/** The useful part of a network error: ENOTFOUND, ECONNREFUSED, CERT_HAS_EXPIRED, a timeout ... */
+export const networkReason = (error: unknown) => {
+  const cause = (error as { cause?: { code?: string; message?: string } })?.cause;
+  return String(cause?.code || cause?.message || (error as Error)?.message || error).slice(0, 200);
+};
+const failure = (stage: string, what: string, answer: Omit<StoreAnswer, "stage">) =>
+  new StoreError(`${what} failed (${[answer.status ? `HTTP ${answer.status}` : "", answer.code, answer.message, answer.requestId ? `request ${answer.requestId}` : ""].filter(Boolean).join(", ")})`, { stage, ...answer });
+
+/** One signed request to an S3-compatible bucket over node:https (presigned URLs need a Content-Length, not chunks). */
+function bucketRequest(target: BucketTarget, stage: string, method: "GET" | "PUT" | "DELETE", key: string,
+  body?: { size: number; open: () => NodeJS.ReadableStream; headers?: Record<string, string> }): Promise<{ status: number; text: string; answer: StoreAnswer }> {
+  const url = new URL(presignS3Url({ method, endpoint: target.endpoint, bucket: target.bucket, key, region: target.region,
+    accessKeyId: target.accessKeyId, secretAccessKey: target.secretAccessKey, expiresSeconds: 3600, virtualHost: target.virtualHost }));
+  const started = Date.now();
+  return new Promise((resolve, reject) => {
+    const request = requestHttps(url, { method, timeout: 120_000, headers: body ? { "Content-Length": String(body.size), "Content-Type": "application/octet-stream", ...body.headers } : {} }, (response) => {
+      let text = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk: string) => { if (text.length < 4000) text += chunk; });
+      response.on("error", (error) => reject(new StoreError(`${stage}: ${networkReason(error)}`, { stage, host: url.host, message: networkReason(error), ms: Date.now() - started })));
+      response.on("end", () => {
+        const status = response.statusCode || 0;
+        resolve({ status, text, answer: { stage, host: url.host, status, code: xmlField(text, "Code"), message: xmlField(text, "Message"),
+          requestId: requestIdOf(response.headers) || xmlField(text, "RequestId"), ms: Date.now() - started } });
+      });
+    });
+    request.on("timeout", () => request.destroy(new Error("timed out after 120 s without data")));
+    request.on("error", (error) => reject(new StoreError(`${stage}: ${networkReason(error)}`, { stage, host: url.host, message: networkReason(error), ms: Date.now() - started })));
+    if (body) body.open().on("error", (error) => request.destroy(error)).pipe(request);
+    else request.end();
+  });
+}
+
 /**
  * Deletes one object from an S3-compatible bucket (the release bucket or the download mirror).
  * A missing object counts as deleted, so a retry after a partial failure succeeds.
  */
-export async function deleteStoredObject(target: { endpoint: string; bucket: string; region: string; accessKeyId: string; secretAccessKey: string; virtualHost?: boolean },
-  key: string, fetcher: typeof fetch = fetch): Promise<void> {
-  const url = presignS3Url({ method: "DELETE", endpoint: target.endpoint, bucket: target.bucket, key, region: target.region,
-    accessKeyId: target.accessKeyId, secretAccessKey: target.secretAccessKey, expiresSeconds: 600, virtualHost: target.virtualHost });
-  const response = await fetcher(url, { method: "DELETE", redirect: "error", signal: AbortSignal.timeout(30_000) });
-  if (!response.ok && response.status !== 404) {
-    const code = (await response.text().catch(() => "")).match(/<Code>([^<]+)<\/Code>/)?.[1];
-    throw new Error(`Delete failed (HTTP ${response.status}${code ? `, ${code}` : ""})`);
-  }
+export async function deleteStoredObject(target: BucketTarget, key: string): Promise<StoreAnswer> {
+  const { status, answer } = await bucketRequest(target, "delete", "DELETE", key);
+  if ((status < 200 || status >= 300) && status !== 404) throw failure("delete", "Delete", answer);
+  return answer;
 }
 
 export const mirrorUrl = (mirror: ReleaseMirror, key: string) => `${mirror.publicBaseUrl}/${key.split("/").map(encode).join("/")}`;
 
-/** Copies one stored installer to the mirror bucket and checks the public URL serves its full size. Returns that URL. */
-export async function copyToMirror(mirror: ReleaseMirror, key: string, file: string, size: number): Promise<string> {
-  const target = new URL(presignS3Url({ method: "PUT", endpoint: mirror.endpoint, bucket: mirror.bucket, key, region: mirror.region,
-    accessKeyId: mirror.accessKeyId, secretAccessKey: mirror.secretAccessKey, expiresSeconds: 3600, virtualHost: mirror.virtualHost }));
-  // node:https with a Content-Length: object stores refuse chunked uploads to presigned URLs.
-  await new Promise<void>((resolve, reject) => {
-    const put = requestHttps(target, { method: "PUT", timeout: 120_000, headers: { "Content-Length": String(size), "Content-Type": "application/octet-stream",
-      "Content-Disposition": `attachment; filename="${key.split("/").pop()}"` } }, (response) => {
-      let text = "";
-      response.setEncoding("utf8");
-      response.on("data", (chunk: string) => { if (text.length < 2000) text += chunk; });
-      response.on("end", () => (response.statusCode || 0) >= 200 && (response.statusCode || 0) < 300 ? resolve()
-        : reject(new Error(`Mirror upload failed (HTTP ${response.statusCode}${text.match(/<Code>([^<]+)<\/Code>/)?.[1] ? `, ${text.match(/<Code>([^<]+)<\/Code>/)![1]}` : ""})`)));
-    });
-    put.on("timeout", () => put.destroy(new Error("Mirror upload timed out")));
-    put.on("error", reject);
-    createReadStream(file).on("error", reject).pipe(put);
-  });
+/** Reads the public (CDN) URL: HEAD for the size, or a Range GET. Times out after 30 s. */
+async function cdnRequest(stage: string, url: string, init: RequestInit = {}) {
+  const started = Date.now(), host = new URL(url).host;
+  try {
+    const response = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(30_000), ...init, headers: { "Cache-Control": "no-cache", ...init.headers } });
+    const body = init.method === "HEAD" ? new Uint8Array() : new Uint8Array(await response.arrayBuffer());
+    const text = response.ok ? "" : new TextDecoder().decode(body.subarray(0, 4000));
+    return { response, body, answer: { stage, host, status: response.status, code: xmlField(text, "Code"), message: xmlField(text, "Message"),
+      requestId: requestIdOf(response.headers) || xmlField(text, "RequestId"), ms: Date.now() - started } as StoreAnswer };
+  } catch (error) {
+    throw new StoreError(`${stage}: ${networkReason(error)}`, { stage, host, message: networkReason(error), ms: Date.now() - started });
+  }
+}
+
+/** Copies one stored installer to the mirror bucket and checks the public URL serves its full size. */
+export async function copyToMirror(mirror: ReleaseMirror, key: string, file: string, size: number): Promise<{ url: string; upload: StoreAnswer; cdn: StoreAnswer }> {
+  const { status, answer: upload } = await bucketRequest(mirror, "upload", "PUT", key,
+    { size, open: () => createReadStream(file), headers: { "Content-Disposition": `attachment; filename="${key.split("/").pop()}"` } });
+  if (status < 200 || status >= 300) throw failure("upload", "Mirror upload", upload);
   const url = mirrorUrl(mirror, key);
-  const head = await fetch(url, { method: "HEAD", redirect: "error", signal: AbortSignal.timeout(30_000), headers: { "Cache-Control": "no-cache" } });
-  if (!head.ok) throw new Error(`Mirror download URL answered HTTP ${head.status}`);
-  if (Number(head.headers.get("content-length")) !== size) throw new Error("Mirror download URL serves a different size");
-  return url;
+  const { response, answer: cdn } = await cdnRequest("cdn", url, { method: "HEAD" });
+  if (!response.ok) throw failure("cdn", "CDN download URL", cdn);
+  if (Number(response.headers.get("content-length")) !== size) throw new StoreError(`CDN download URL serves ${response.headers.get("content-length")} bytes, expected ${size}`, cdn);
+  return { url, upload, cdn };
+}
+
+export type MirrorTestStep = { name: "config" | "upload" | "bucket_read" | "cdn_head" | "cdn_range" | "delete"; ok: boolean; detail: string; answer?: StoreAnswer; hint?: "range_ignored" };
+
+/**
+ * Console "test": the same requests a real copy makes, on a small throwaway object, one step at a time:
+ * the configuration, a signed upload, a signed read back from the bucket, the CDN URL (size, then a Range read,
+ * which the apps need to resume) and the delete. Each step reports the HTTP status, provider error code and request id.
+ */
+export async function testMirror(env: Record<string, string | undefined> = process.env): Promise<{ ok: boolean; steps: MirrorTestStep[] }> {
+  const steps: MirrorTestStep[] = [];
+  const done = () => ({ ok: steps.every((step) => step.ok), steps });
+  let mirror: ReleaseMirror | null;
+  try { mirror = releaseMirror(env); } catch (error) { steps.push({ name: "config", ok: false, detail: (error as Error).message }); return done(); }
+  if (!mirror) { steps.push({ name: "config", ok: false, detail: "VEILBIRD_RELEASE_MIRROR_ENDPOINT is not set" }); return done(); }
+  steps.push({ name: "config", ok: true, detail: `${mirror.endpoint} · bucket ${mirror.bucket} · region ${mirror.region} · ${mirror.virtualHost ? "virtual-hosted" : "path-style"} · CDN ${mirror.publicBaseUrl}` });
+  const key = `clients/.healthcheck/${new Date().toISOString().replace(/[:.]/g, "-")}-${createHash("sha256").update(String(Math.random())).digest("hex").slice(0, 8)}.txt`;
+  const body = Buffer.from("TrackNothing download mirror test\n".repeat(128));
+  const run = async (name: MirrorTestStep["name"], work: () => Promise<Omit<MirrorTestStep, "name">>) => {
+    try { const result = await work(); steps.push({ name, ...result }); return result.ok; }
+    catch (error) { steps.push({ name, ok: false, detail: (error as Error).message, answer: (error as StoreError).answer }); return false; }
+  };
+  const describe = (answer: StoreAnswer) => [answer.status ? `HTTP ${answer.status}` : "", answer.code, answer.message].filter(Boolean).join(" · ");
+  const uploaded = await run("upload", async () => {
+    const { status, answer } = await bucketRequest(mirror, "upload", "PUT", key, { size: body.length, open: () => Readable.from([body]) });
+    return { ok: status >= 200 && status < 300, detail: `${describe(answer)} · ${body.length} bytes to ${key}`, answer };
+  });
+  if (uploaded) {
+    await run("bucket_read", async () => {
+      const { status, text, answer } = await bucketRequest(mirror, "bucket_read", "GET", key);
+      return { ok: status === 200 && text === body.toString("utf8"), detail: status === 200 && text !== body.toString("utf8") ? "the bucket returned different content" : describe(answer), answer };
+    });
+    const url = mirrorUrl(mirror, key);
+    const reachable = await run("cdn_head", async () => {
+      const { response, answer } = await cdnRequest("cdn_head", url, { method: "HEAD" });
+      const length = Number(response.headers.get("content-length"));
+      const cache = response.headers.get("x-cache") || response.headers.get("via") || "";
+      return { ok: response.ok && length === body.length,
+        detail: response.ok && length !== body.length ? `${url} serves ${length} bytes, expected ${body.length}` : `${describe(answer)} · ${url}${cache ? ` · ${cache.slice(0, 80)}` : ""}`, answer };
+    });
+    if (reachable) {
+      await run("cdn_range", async () => {
+        const { response, body: part, answer } = await cdnRequest("cdn_range", url, { headers: { Range: "bytes=100-199" } });
+        const ok = response.status === 206 && Buffer.from(part).equals(body.subarray(100, 200));
+        if (response.status === 200) return { ok: false, hint: "range_ignored", detail: "the CDN ignored Range (HTTP 200): turn on Range origin fetch, or downloads cannot resume", answer };
+        return { ok, detail: ok ? `${describe(answer)} · ${response.headers.get("content-range") || ""}` : describe(answer), answer };
+      });
+    }
+    await run("delete", async () => { const answer = await deleteStoredObject(mirror, key); return { ok: true, detail: describe(answer), answer }; });
+  }
+  return done();
 }

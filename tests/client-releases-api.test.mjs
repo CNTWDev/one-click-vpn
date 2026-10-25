@@ -39,8 +39,14 @@ function artifactServer(files) {
       return;
     }
     if (request.method === "DELETE") { delete files[request.url.split("?")[0]]; response.writeHead(204).end(); return; }
-    const body = files[request.url];
-    response.writeHead(body ? 200 : 404, body ? { "Content-Length": String(body.length) } : {}).end(body || "missing");
+    // Signed bucket reads carry a query string; the public (CDN) URL does not.
+    const body = files[request.url.split("?")[0]], range = request.headers.range?.match(/^bytes=(\d+)-(\d+)$/);
+    if (body && range) {
+      const part = body.subarray(Number(range[1]), Number(range[2]) + 1);
+      response.writeHead(206, { "Content-Length": String(part.length), "Content-Range": `bytes ${range[1]}-${range[2]}/${body.length}` }).end(request.method === "HEAD" ? undefined : part);
+      return;
+    }
+    response.writeHead(body ? 200 : 404, body ? { "Content-Length": String(body.length), "x-oss-request-id": "test-request" } : {}).end(request.method === "HEAD" ? undefined : body || "<Error><Code>NoSuchKey</Code></Error>");
   });
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve({ server, ca: path.join(dir, "cert.pem"), origin: `https://127.0.0.1:${server.address().port}` })));
 }
@@ -204,6 +210,12 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
       const login = await fetch(`${base}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(admin) });
       const cookie = login.headers.get("set-cookie").split(";")[0];
       const act = (headers, action) => fetch(`${base}/api/v1/admin/client-releases/${created.id}`, { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      // 「测试 OSS/CDN」 walks every step on a throwaway object and removes it again.
+      const mirrorCheck = await (await fetch(`${base}/api/v1/admin/client-releases/mirror-test`, { method: "POST", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: "{}" })).json();
+      assert.deepEqual(mirrorCheck.steps.map((step) => [step.name, step.ok]), [["config", true], ["upload", true], ["bucket_read", true], ["cdn_head", true], ["cdn_range", true], ["delete", true]], JSON.stringify(mirrorCheck));
+      assert.equal(mirrorCheck.steps[3].answer.requestId, "test-request");
+      assert.ok(!Object.keys(cdnFiles).some((name) => name.includes(".healthcheck")), "the test object is deleted");
+      assert.equal((await fetch(`${base}/api/v1/admin/client-releases/mirror-test`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: "{}" })).status, 403);
       const objectPath = new URL(mirrored).pathname;
       assert.ok(cdnFiles[objectPath], "the mirror holds the copy");
       assert.equal((await act({ Authorization: `Bearer ${token}` }, "delete")).status, 403, "the release token cannot delete");

@@ -5,7 +5,7 @@ import { useConfirm } from "../confirm-dialog";
 import { Icon } from "../icons";
 import { useToast } from "../toast";
 import { extractEntry, zipEntries } from "../zip";
-import { Empty, formatBytes, formatTime, InlineNotice, type Notice, PageHeader, Pill } from "./shared";
+import { Empty, formatBytes, formatTime, InlineNotice, type Notice, PageHeader, Pill, StateDot } from "./shared";
 
 type Platform = "android" | "ios" | "macos" | "windows";
 type Release = {
@@ -18,7 +18,7 @@ type Overview = {
   releases: Release[]; policies: Array<{ platform: Platform; minBuild: number; announcement: string; downloadPath: string }>;
   adoption: Array<{ platform: string; version: string | null; build: number | null; devices: number }>;
   diagnostics: Array<{ platform: string; build: number | null; code: string; events: number; users: number; lastAt: string | null }>;
-  storage: { mode: "local" | "s3"; publicBaseUrl?: string; maxBytes?: number; chunkBytes?: number; mirror?: string | null }; ciTokenConfigured: boolean;
+  storage: { mode: "local" | "s3"; publicBaseUrl?: string; maxBytes?: number; chunkBytes?: number; mirror?: string | null; mirrorError?: string }; ciTokenConfigured: boolean;
 };
 const platformNames: Record<Platform, string> = { android: "Android", ios: "iPhone / iPad", macos: "macOS", windows: "Windows" };
 const errors: Record<string, string> = {
@@ -46,6 +46,8 @@ const errors: Record<string, string> = {
   WITHDRAW_BEFORE_DELETE: "已发布的版本需要先撤回，再删除。",
   RELEASE_FILE_DELETE_FAILED: "删除存储里的安装包失败，记录已保留，请检查 OSS 密钥是否有删除权限后重试。",
 };
+type MirrorStep = { name: "config" | "upload" | "bucket_read" | "cdn_head" | "cdn_range" | "delete"; ok: boolean; detail: string; answer?: { ms: number; requestId?: string }; hint?: string };
+const mirrorStepNames: Record<MirrorStep["name"], string> = { config: "读取配置", upload: "上传到 OSS", bucket_read: "从 OSS 读回", cdn_head: "通过 CDN 访问", cdn_range: "CDN 断点续传（Range）", delete: "删除测试文件" };
 const extensions = ".apk,.aab,.zip,.dmg,.pkg,.msix,.msixbundle,.exe,.msi";
 const defaultArch: Record<Platform, string> = { android: "universal", ios: "universal", macos: "universal", windows: "x64" };
 const minOsHint: Record<Platform, string> = { android: "Android 8.0", ios: "iOS 16", macos: "macOS 13", windows: "Windows 10" };
@@ -128,6 +130,7 @@ export function ReleasesPage() {
   const [importNotes, setImportNotes] = useState("");
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
+  const [mirrorTest, setMirrorTest] = useState<{ ok: boolean; steps: MirrorStep[] } | "running" | null>(null);
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -150,9 +153,14 @@ export function ReleasesPage() {
     try { await work(); toast(success); await refresh(); }
     catch (error) { setNotice({ tone: "error", message: errorText(error) }); setBusy(false); }
   }
-  async function act(release: Release, action: "publish" | "promote" | "withdraw" | "delete") {
+  async function testMirror() {
+    setMirrorTest("running");
+    try { setMirrorTest(await api<{ ok: boolean; steps: MirrorStep[] }>("/api/v1/admin/client-releases/mirror-test", { method: "POST", body: "{}" })); }
+    catch (error) { setMirrorTest(null); setNotice({ tone: "error", message: errorText(error) }); }
+  }
+  async function act(release: Release, action: "publish" | "promote" | "withdraw" | "delete" | "retry_mirror") {
     const label = `${platformNames[release.platform]} ${release.version} (${release.build})`;
-    if ((action !== "publish" || release.channel === "stable") && !(await confirm(action === "publish"
+    if (action !== "retry_mirror" && (action !== "publish" || release.channel === "stable") && !(await confirm(action === "publish"
       ? { title: t("发布正式版"), message: t("{0} 将成为正式版，固定下载链接和客户端更新检查会立即指向它。", [label]), confirmLabel: t("发布") }
       : action === "promote"
       ? { title: t("晋升为正式版"), message: t("{0} 将成为正式版，固定下载链接和客户端更新检查会立即指向它。", [label]), confirmLabel: t("晋升正式版") }
@@ -294,10 +302,16 @@ export function ReleasesPage() {
     {data && <>
       <InlineNotice notice={{ tone: "info", message: [
         data.storage.mode === "s3" ? t("安装包存储：S3 兼容对象存储（{0}）", [data.storage.publicBaseUrl || ""]) : t("安装包存储：Controller 数据卷"),
-        data.storage.mirror === "invalid" ? t("下载加速（CDN）配置有误，请检查 VEILBIRD_RELEASE_MIRROR_*。")
-          : data.storage.mirror ? t("下载加速：CDN（{0}），客户端优先从这里下载，失败时改从 Controller 下载。", [data.storage.mirror]) : "",
         data.ciTokenConfigured ? t("发布令牌已配置：CI 或本地脚本可以上传、登记草稿并发布到测试版。") : t("发布令牌未配置：只能在这里手动登记版本。"),
       ].filter(Boolean).join(" ") }} />
+      {data.storage.mirror && <section className="panel result-panel"><div className="panel-head"><h2>{t("下载加速（CDN）")}</h2>
+          <button className="button ghost small" disabled={mirrorTest === "running"} onClick={() => void testMirror()}>{mirrorTest === "running" ? t("测试中…") : t("测试 OSS/CDN")}</button></div>
+        <p className="form-note">{data.storage.mirror === "invalid" ? t("配置有误：{0}", [data.storage.mirrorError || "VEILBIRD_RELEASE_MIRROR_*"]) : t("{0}，客户端优先从这里下载，失败时改从 Controller 下载。", [data.storage.mirror])}</p>
+        {mirrorTest && mirrorTest !== "running" && <><div className="compact-list">{mirrorTest.steps.map((step) => <div key={step.name}><StateDot tone={step.ok ? "success" : "danger"} />
+          <span><b>{t(mirrorStepNames[step.name])}</b><small>{step.hint === "range_ignored" ? t("CDN 没有按 Range 返回（HTTP 200）：请在 CDN 控制台打开「Range 回源」，否则客户端无法断点续传。") : step.detail}{step.answer?.requestId ? ` · Request ID ${step.answer.requestId}` : ""}</small></span>
+          {step.answer && <small>{step.answer.ms} ms</small>}</div>)}</div>
+          <p className="form-note">{mirrorTest.ok ? t("全部通过。") : t("每次测试和同步的详细过程都记录在运行日志里，可搜索 client_release.mirror。")}</p></>}
+      </section>}
       <section className="panel flush"><div className="panel-head padded"><h2>{t("下载链接与最低版本")}</h2></div>
         <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("平台")}</th><th>{t("固定下载链接")}</th><th>{t("当前正式版")}</th><th>{t("最低构建号")}</th><th>{t("客户端公告")}</th></tr></thead><tbody>{data.policies.map((policy) => {
           const stable = data.releases.filter((item) => item.platform === policy.platform && item.channel === "stable" && item.status === "published").sort((a, b) => b.build - a.build)[0];
@@ -374,6 +388,7 @@ export function ReleasesPage() {
             {release.status !== "published" && <button className="button ghost small" disabled={busy} onClick={() => void act(release, "publish")}>{t("发布")}</button>}
             {release.channel === "beta" && release.status !== "withdrawn" && !release.version.includes("-") && release.distribution !== "testflight" && <button className="button primary small" disabled={busy} onClick={() => void act(release, "promote")}>{t("晋升正式版")}</button>}
             {release.status === "published" && <button className="button danger small" disabled={busy} onClick={() => void act(release, "withdraw")}>{t("撤回")}</button>}
+            {release.mirror === "failed" && <button className="button ghost small" disabled={busy} title={release.mirrorError || undefined} onClick={() => void act(release, "retry_mirror")}>{t("重试同步")}</button>}
             {release.status !== "published" && <button className="button danger small" disabled={busy} onClick={() => void act(release, "delete")}>{t("删除")}</button>}
           </div></td></tr>)}</tbody></table></div>
           : <Empty>{platformFilter === "all" ? t("还没有任何版本。在上方上传安装包，或用 npm run release:client 发布。") : t("这个平台还没有版本。")}</Empty>}
