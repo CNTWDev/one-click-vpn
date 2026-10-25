@@ -24,7 +24,7 @@ test("Console locales: all routes, persisted choice, forms and mobile layout", {
       const user = { id: "owner", displayName: "Owner", email: "owner@example.com", role: "admin", status: "active", createdAt: "2026-10-01T00:00:00Z" };
       if (url.pathname === "/api/auth/me") { status = signedIn ? 200 : 401; body = signedIn ? { user } : { error: "Authentication required" }; }
       else if (url.pathname === "/api/auth/login") { signedIn = true; body = { user }; }
-      else if (url.pathname === "/api/v1/admin/users") body = { users: [user] };
+      else if (url.pathname === "/api/v1/admin/users") body = { counts: { pending: 0, active: 1, rejected: 0, suspended: 0 }, users: url.searchParams.get("status") === "pending" ? [] : [user] };
       else if (url.pathname === "/api/nodes") body = { nodes: [] };
       else if (url.pathname === "/api/regions") { if (method === "POST") region = route.request().postDataJSON(); body = { regions: [] }; }
       else if (url.pathname === "/api/controller") body = { settings: { display_name: "NORTHSTAR", location_label: "", latitude: null, longitude: null, location_source: "unset" }, status: "healthy", publicOrigin: "https://example.com", publicHost: "example.com", publicIp: "192.0.2.1", build: "test", runtime: { uptimeSeconds: 5000, nodeVersion: "22", rssBytes: 1048576, heapUsedBytes: 524288, load1: 0.25, observedAt: new Date().toISOString() } };

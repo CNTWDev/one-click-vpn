@@ -216,6 +216,13 @@ export async function createPendingUser(input: { email: string; displayName: str
   return (await findUserById(id))!;
 }
 
+/** How many accounts are in each status; cheap enough for the Console's navigation badge. */
+export async function countUsersByStatus(): Promise<Record<DbUser["status"], number>> {
+  const counts = { pending: 0, active: 0, rejected: 0, suspended: 0 } as Record<DbUser["status"], number>;
+  for (const row of await dbQuery<{ status: DbUser["status"]; count: string }>("SELECT status, COUNT(*)::text AS count FROM users GROUP BY status")) counts[row.status] = Number(row.count);
+  return counts;
+}
+
 export async function listUsers(status?: DbUser["status"]): Promise<DbUser[]> {
   const rows = status
     ? await dbQuery<DbUser>("SELECT id, email, display_name, role, status, approved_at, approved_by, rejection_reason, created_at, updated_at FROM users WHERE status = $1 ORDER BY created_at DESC", [status])

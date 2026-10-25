@@ -59,7 +59,8 @@ test("Console layout: no overflow, spill or overlap on any page, locale or width
       await installWideFont(context);
       const api = consoleApi();
       await context.route("**/api/**", async (route) => {
-        const [status, body] = api(new URL(route.request().url()).pathname, route.request().method());
+        const url = new URL(route.request().url());
+        const [status, body] = api(url.pathname, route.request().method(), url.searchParams);
         await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
       });
       const page = await context.newPage();

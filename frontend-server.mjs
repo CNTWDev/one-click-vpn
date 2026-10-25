@@ -74,6 +74,14 @@ createServer((request, response) => {
     file = join(root, "index.html");
   }
   if (!existsSync(file)) { response.writeHead(404); response.end("Not found"); return; }
-  response.writeHead(200, { "Content-Type": types[extname(file)] || "application/octet-stream", "Cache-Control": extname(file) === ".html" ? "no-cache" : "public, max-age=31536000, immutable" });
-  createReadStream(file).pipe(response);
+  // Text assets have .br/.gz siblings from scripts/compress-frontend-assets.mjs.
+  const accepted = String(request.headers["accept-encoding"] || "");
+  const encoding = ["br", "gzip"].find((name) => accepted.includes(name) && existsSync(`${file}.${name === "br" ? "br" : "gz"}`));
+  response.writeHead(200, {
+    "Content-Type": types[extname(file)] || "application/octet-stream",
+    "Cache-Control": extname(file) === ".html" ? "no-cache" : "public, max-age=31536000, immutable",
+    Vary: "Accept-Encoding",
+    ...(encoding ? { "Content-Encoding": encoding } : {}),
+  });
+  createReadStream(encoding ? `${file}.${encoding === "br" ? "br" : "gz"}` : file).pipe(response);
 }).listen(port, "0.0.0.0", () => console.log(`TrackNothing frontend listening on ${port}; API proxy ${apiUpstream || "disabled"}`));

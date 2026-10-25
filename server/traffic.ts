@@ -379,7 +379,8 @@ function certificateFingerprint(pem: string): string {
   try { return new X509Certificate(pem).fingerprint256; } catch { return ""; }
 }
 
-export async function adminUserAccessSummaries() {
+/** Per-account usage for the Console's user list; pass ids to summarize only the accounts being shown. */
+export async function adminUserAccessSummaries(userIds?: string[]) {
   const { from, to } = range({});
   const rows = await dbQuery<{
     user_id: string; device_count: string; active_device_count: string; credential_count: string; active_credential_count: string; profile_count: string; active_profile_count: string;
@@ -399,7 +400,7 @@ export async function adminUserAccessSummaries() {
       (SELECT COALESCE(SUM(t.upload_bytes), 0)::text FROM traffic_daily t WHERE t.user_id = u.id AND t.day BETWEEN $1 AND $2) AS upload_bytes,
       (SELECT COALESCE(SUM(t.download_bytes), 0)::text FROM traffic_daily t WHERE t.user_id = u.id AND t.day BETWEEN $1 AND $2) AS download_bytes,
       (SELECT MAX(c.last_handshake_at) FROM traffic_counters c INNER JOIN devices d ON d.id = c.device_id WHERE d.user_id = u.id) AS last_activity_at
-    FROM users u`, [from, to, now()]);
+    FROM users u${userIds ? " WHERE u.id = ANY($4)" : ""}`, userIds ? [from, to, now(), userIds] : [from, to, now()]);
   return new Map(rows.map((row) => [row.user_id, {
     deviceCount: Number(row.device_count || 0), activeDeviceCount: Number(row.active_device_count || 0),
     credentialCount: Number(row.credential_count || 0), activeCredentialCount: Number(row.active_credential_count || 0),

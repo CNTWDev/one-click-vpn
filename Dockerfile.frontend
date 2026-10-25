@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY public/favicon.svg ./public/favicon.svg
-COPY scripts/check-frontend-assets.mjs ./scripts/check-frontend-assets.mjs
+COPY scripts/check-frontend-assets.mjs scripts/compress-frontend-assets.mjs ./scripts/
 COPY shared ./shared
 
 FROM dependencies AS portal-build
