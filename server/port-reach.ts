@@ -3,18 +3,19 @@ import { dbExec, dbQuery } from "./db";
 
 /**
  * Whether a node's ports can be reached from outside, past cloud security groups and network ACLs
- * (which the Agent cannot see). TCP is tested from the control plane; UDP cannot be tested without
- * speaking each protocol, so it comes from what the apps observed when they connected.
+ * (which the Agent cannot see). TCP is tested from the control plane; UDP by the manual port check
+ * (port-check.ts), or seen open once an app got an answer. An app that got none proves nothing: its
+ * own network or carrier may block UDP, so failures never mark a port closed.
  */
-export type CloudFirewall = "reachable" | "unreachable" | "suspected" | "unverified";
+export type CloudFirewall = "reachable" | "unreachable" | "unverified";
 
 const tcpCache = new Map<string, { at: number; open: boolean }>();
 const TCP_TTL = 5 * 60_000;
 
 /** A plain TCP connect from the control plane, cached for 5 minutes per address. */
-export async function tcpReachable(host: string, port: number, timeoutMs = 3000): Promise<boolean> {
+export async function tcpReachable(host: string, port: number, { timeoutMs = 3000, fresh = false } = {}): Promise<boolean> {
   const key = `${host}:${port}`, cached = tcpCache.get(key);
-  if (cached && Date.now() - cached.at < TCP_TTL) return cached.open;
+  if (!fresh && cached && Date.now() - cached.at < TCP_TTL) return cached.open;
   const open = await new Promise<boolean>((resolve) => {
     const socket = connect({ host, port, timeout: timeoutMs });
     const done = (result: boolean) => { socket.destroy(); resolve(result); };
@@ -55,13 +56,24 @@ export async function recordTransportProbe(nodeId: string, network: unknown, det
 }
 
 /**
- * UDP status per app transport on a node: open once any app got an answer in the last 7 days;
- * suspected when apps on two or more different networks got none and none ever did.
+ * UDP evidence for a node: app transports that got an answer in the last 7 days, and the latest
+ * manual port check per "udp/<port>" (network "controller").
  */
-export async function udpReach(nodeId: string): Promise<Record<string, CloudFirewall>> {
-  const rows = await dbQuery<{ transport: string; ok: number; failed: number }>(`SELECT transport,
-      COUNT(*) FILTER (WHERE ok_at > now() - interval '7 days')::int AS ok,
-      COUNT(*) FILTER (WHERE failed_at > now() - interval '7 days' AND (ok_at IS NULL OR ok_at < failed_at))::int AS failed
-    FROM node_transport_reach WHERE node_id = $1 GROUP BY transport`, [nodeId]);
-  return Object.fromEntries(rows.map((row) => [row.transport, row.ok > 0 ? "reachable" : row.failed >= 2 ? "suspected" : "unverified"]));
+export async function udpReach(nodeId: string) {
+  const rows = await dbQuery<{ transport: string; network: string; ok_at: string | null; failed_at: string | null }>(`SELECT transport, network, ok_at, failed_at
+    FROM node_transport_reach WHERE node_id = $1 AND (ok_at > now() - interval '7 days' OR (network = 'controller' AND failed_at > now() - interval '7 days'))`, [nodeId]);
+  const apps: Record<string, number> = {}, checks: Record<string, { open: boolean; at: number }> = {};
+  for (const row of rows) {
+    if (row.network === "controller") {
+      checks[row.transport] = row.ok_at ? { open: true, at: Date.parse(row.ok_at) } : { open: false, at: Date.parse(row.failed_at || "") };
+    } else if (row.ok_at) apps[row.transport] = Math.max(apps[row.transport] || 0, Date.parse(row.ok_at));
+  }
+  return { apps, checks };
+}
+
+/** A UDP port's status: the manual check, unless an app got an answer after it said closed. */
+export function udpStatus(reach: Awaited<ReturnType<typeof udpReach>>, app: string | undefined, port: number): { cloudFirewall: CloudFirewall; checkedAt: string | null } {
+  const check = reach.checks[`udp/${port}`], appOk = app ? reach.apps[app] : undefined;
+  if (check && (check.open || !appOk || appOk < check.at)) return { cloudFirewall: check.open ? "reachable" : "unreachable", checkedAt: new Date(check.at).toISOString() };
+  return { cloudFirewall: appOk ? "reachable" : "unverified", checkedAt: null };
 }

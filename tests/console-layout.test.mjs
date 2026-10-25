@@ -29,6 +29,7 @@ const views = [
   { name: "subscriptions", hash: "subscriptions" },
   { name: "nodes", hash: "nodes" },
   { name: "nodes-detail", hash: "nodes?focus=n4" },
+  { name: "nodes-port-check", hash: "nodes?focus=n4", open: async (page, l) => { await page.locator(".modal").first().waitFor(); await page.getByRole("button", { name: tr(l, "检测端口") }).click(); await page.getByText(tr(l, "TCP 已重新检测；UDP 检测需要先升级 Agent 到 2.16。")).waitFor(); } },
   { name: "nodes-add", hash: "nodes", open: (page) => page.locator(".page-actions .button.primary").click() },
   { name: "services", hash: "services" },
   { name: "services-policy", hash: "services?tab=policy" },

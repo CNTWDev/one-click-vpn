@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+import { api } from "../api";
 import { consoleLanguage, t } from "../i18n";
 import { protocolName, statusLabel } from "../status";
 import type { NodeDiagnostics, NodeRecord } from "../types";
@@ -26,10 +28,47 @@ function phaseLabel(value?: string): string {
   return value.replaceAll("-", " ").replaceAll("_", " ");
 }
 
+type PortCheckView = { id: string; status: "waiting" | "counting" | "done" | "failed"; error: string };
+
+/**
+ * 检测端口: the Controller re-tests TCP ports and sends UDP packets the node's Agent counts. The
+ * diagnostics refresh every few seconds and pick up the results; this only shows the progress.
+ */
+function PortCheckButton({ nodeId }: { nodeId: string }) {
+  const [state, setState] = useState<"idle" | "checking" | "done" | "failed" | "agent-outdated">("idle");
+  const live = useRef(true);
+  useEffect(() => () => { live.current = false; }, []);
+  async function run() {
+    setState("checking");
+    try {
+      const started = await api<{ check: PortCheckView | null; udp: string }>(`/api/nodes/${nodeId}/port-check`, { method: "POST" });
+      if (started.udp === "agent-outdated") return setState("agent-outdated");
+      for (let tries = 0; started.check && tries < 40 && live.current; tries += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+        const { check } = await api<{ check: PortCheckView | null }>(`/api/nodes/${nodeId}/port-check`);
+        if (check?.status === "failed") return setState("failed");
+        if (!check || check.status === "done") break;
+      }
+      setState("done");
+    } catch { setState("failed"); }
+  }
+  const hint = { idle: t("从 Controller 经公网向各端口发包，Agent 确认是否收到。"), checking: t("正在检测，约 15 秒…"), done: t("检测完成，结果几秒内更新。"),
+    failed: t("检测失败：Agent 没有回应，稍后重试。"), "agent-outdated": t("TCP 已重新检测；UDP 检测需要先升级 Agent 到 2.16。") }[state];
+  return (
+    <div className="diagnostic-section-head">
+      <div>
+        <h3>{t("VPN 协议运行状态")}</h3>
+        <p>{hint}</p>
+      </div>
+      <button className="button ghost small" disabled={state === "checking"} onClick={() => void run()}>{state === "checking" ? t("检测中…") : t("检测端口")}</button>
+    </div>
+  );
+}
+
 /**
  * What the Console knows about one node: the current task, identity and resources, the deployment log,
- * protocol health, configuration sync and the raw output of every operation. Read-only; actions stay on
- * the node page.
+ * protocol health, configuration sync and the raw output of every operation. Read-only apart from the port
+ * check; other actions stay on the node page.
  */
 export function NodeDiagnosticsView({ node, diagnostics, outdated }: { node: NodeRecord; diagnostics: NodeDiagnostics; outdated: boolean }) {
   return (
@@ -133,7 +172,7 @@ export function NodeDiagnosticsView({ node, diagnostics, outdated }: { node: Nod
         )}
       </section>
       <section>
-        <h3>{t("VPN 协议运行状态")}</h3>
+        <PortCheckButton nodeId={node.id} />
         {diagnostics.connectivity?.protocols.length ? (
           <div className="protocol-grid">
             {diagnostics.connectivity.protocols.map((protocol) => (
@@ -150,6 +189,7 @@ export function NodeDiagnosticsView({ node, diagnostics, outdated }: { node: Nod
                   <small key={`${port.transport}/${port.port}`}>
                     {port.transport.toUpperCase()} {port.port} · {t("主机防火墙：{0}", [statusLabel(port.hostFirewall)])} ·{" "}
                     {t("云防火墙：{0}", [statusLabel(port.cloudFirewall)])}
+                    {port.checkedAt && <> · <Time value={port.checkedAt} prefix={t("检测于 ")} /></>}
                   </small>
                 ))}
                 {protocol.lastError && <p>{protocol.lastError}</p>}

@@ -1,5 +1,5 @@
 import { getNodeReconcileStatus, findControlNode, listVpnServices, type Protocol, type VpnService } from "./control-db";
-import { appTransports, tcpReachable, udpReach, type CloudFirewall } from "./port-reach";
+import { appTransports, tcpReachable, udpReach, udpStatus, type CloudFirewall } from "./port-reach";
 
 export type ConnectivityState = "healthy" | "attention" | "provisioning" | "unavailable" | "not_configured" | "unknown";
 
@@ -75,10 +75,9 @@ export async function getNodeConnectivity(nodeId: string) {
     const port = Number(item.port);
     const ports = await Promise.all(transports.map(async (transport) => {
       const app = Object.entries(appTransports).find(([, value]) => value.protocol === item.protocol && value.transport === transport)?.[0];
-      const cloudFirewall: CloudFirewall = !item.configured || !item.listening ? "unverified"
-        : transport === "tcp" ? (await tcpReachable(host, port) ? "reachable" : "unreachable")
-        : (app && udp[app]) || "unverified";
-      return { transport, port, hostFirewall: hostFirewall(transport, port), cloudFirewall };
+      if (transport === "udp") return { transport, port, hostFirewall: hostFirewall(transport, port), ...udpStatus(udp, app, port) };
+      const cloudFirewall: CloudFirewall = !item.configured || !item.listening ? "unverified" : await tcpReachable(host, port) ? "reachable" : "unreachable";
+      return { transport, port, hostFirewall: hostFirewall(transport, port), cloudFirewall, checkedAt: null };
     }));
     // Kept for older Console builds: the first port's status.
     return { ...item, ports, hostFirewall: ports[0].hostFirewall, cloudFirewall: ports[0].cloudFirewall };
@@ -97,6 +96,6 @@ export async function getNodeConnectivity(nodeId: string) {
     lastAuthenticatedHeartbeat: heartbeatAt,
     firewall: { manager: typeof firewall.manager === "string" ? firewall.manager : "unknown", inputPolicy: typeof firewall.inputPolicy === "string" ? firewall.inputPolicy : "unknown" },
     protocols: withPorts,
-    note: "Cloud firewall: TCP ports are tested from the control plane every 5 minutes; UDP ports from what the apps observed in the last 7 days (suspected = no answer from two or more networks, never an answer).",
+    note: "Cloud firewall: TCP ports are tested from the control plane every 5 minutes; UDP ports by Check ports (the control plane sends packets, the Agent counts them), or open once an app got an answer.",
   };
 }
