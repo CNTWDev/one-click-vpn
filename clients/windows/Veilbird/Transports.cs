@@ -19,9 +19,6 @@ public static class Transports {
     public const string Group="TrackNothing";
     public const string TestUrl="https://www.gstatic.com/generate_204";
     private static readonly TimeSpan Memory=TimeSpan.FromDays(7);
-    private static readonly string[] PrivateNetworks={"10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","100.64.0.0/10","127.0.0.0/8","169.254.0.0/16"};
-    // Same small rule sets as the subscription profiles (server/mihomo-config.mjs), fetched through the tunnel.
-    private const string RuleSets="https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo";
     private static readonly string MemoryPath=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Veilbird","transports.json");
 
     /// A short one-way label for the network outside the tunnel: a hash of the active adapter's kind, gateways,
@@ -76,37 +73,12 @@ public static class Transports {
             ["allowed-ips"]=new JsonArray("0.0.0.0/0"),["udp"]=true,["mtu"]=1280,["remote-dns-resolve"]=true,["dns"]=wg["dns"]!.DeepClone(),
         };
     }
-    private static JsonArray Strings(params string[] values)=>new(values.Select(v=>(JsonNode?)JsonValue.Create(v)).ToArray());
-    private static JsonObject RuleSet(string kind,string name,string behavior)=>new() {
-        ["type"]="http",["behavior"]=behavior,["format"]="mrs",["url"]=$"{RuleSets}/{kind}/{name}.mrs",["path"]=$"./rules/{kind}-{name}.mrs",["interval"]=86400,["proxy"]=Group,
-    };
-    /// The whole mihomo configuration for one node (JSON is valid YAML).
-    public static string Config(IEnumerable<JsonObject> proxies,IEnumerable<string> order,bool smart) {
-        var dns=new JsonObject {
-            ["enable"]=true,["ipv6"]=false,["enhanced-mode"]="fake-ip",["fake-ip-range"]="198.18.0.1/16",
-            ["fake-ip-filter"]=Strings("+.lan","+.local","+.msftconnecttest.com","+.msftncsi.com","time.*.com","+.ntp.org.cn"),
-            ["respect-rules"]=true,["default-nameserver"]=Strings("223.5.5.5","119.29.29.29"),
-            ["nameserver"]=Strings("https://1.1.1.1/dns-query","https://8.8.8.8/dns-query"),["proxy-server-nameserver"]=Strings("https://doh.pub/dns-query","223.5.5.5"),
-        };
-        if(smart) dns["nameserver-policy"]=new JsonObject {["rule-set:private_domain,cn_domain"]=Strings("https://doh.pub/dns-query","https://dns.alidns.com/dns-query")};
-        // The app's own requests (API, latency tests) and the core's stay outside the tunnel, as on the phones.
-        var rules=new List<string> {"PROCESS-NAME,Veilbird.exe,DIRECT"};
-        rules.AddRange(PrivateNetworks.Select(cidr=>$"IP-CIDR,{cidr},DIRECT,no-resolve"));
-        if(smart) rules.AddRange(new[]{"RULE-SET,private_domain,DIRECT","RULE-SET,cn_domain,DIRECT","RULE-SET,cn_ip,DIRECT"});
-        rules.Add("MATCH,"+Group);
-        var config=new JsonObject {
-            ["mode"]="rule",["log-level"]="silent",["ipv6"]=true,["find-process-mode"]="strict",["unified-delay"]=true,["tcp-concurrent"]=true,["geo-auto-update"]=false,
-            ["profile"]=new JsonObject {["store-selected"]=false,["store-fake-ip"]=false},
-            ["dns"]=dns,
-            // strict-route keeps DNS and other traffic from leaking around the adapter.
-            ["tun"]=new JsonObject {["enable"]=true,["device"]="TrackNothing",["stack"]="mixed",["auto-route"]=true,["strict-route"]=true,["auto-detect-interface"]=true,["dns-hijack"]=Strings("any:53"),["mtu"]=1500},
-            ["proxies"]=new JsonArray(proxies.Select(p=>(JsonNode?)p.DeepClone()).ToArray()),
-            ["proxy-groups"]=new JsonArray(new JsonObject {["name"]=Group,["type"]="fallback",["proxies"]=Strings(order.ToArray()),["url"]=TestUrl,["interval"]=300,["lazy"]=false}),
-            ["rules"]=Strings(rules.ToArray()),
-        };
-        if(smart) config["rule-providers"]=new JsonObject {["private_domain"]=RuleSet("geosite","private","domain"),["cn_domain"]=RuleSet("geosite","cn","domain"),["cn_ip"]=RuleSet("geoip","cn","ipcidr")};
-        return config.ToJsonString();
-    }
+    /// What the core needs to build the configuration (clients/core/config.go): the same on every app.
+    public static string Options(IEnumerable<JsonObject> proxies,IEnumerable<string> order,bool smart)=>new JsonObject {
+        ["platform"]="windows",["smart"]=smart,
+        ["proxies"]=new JsonArray(proxies.Select(p=>(JsonNode?)p.DeepClone()).ToArray()),
+        ["order"]=new JsonArray(order.Select(n=>(JsonNode?)JsonValue.Create(n)).ToArray()),
+    }.ToJsonString();
     /// "name=delay,..." from the core; -1 means no answer.
     public static Dictionary<string,long> ParseProbe(string result)=>result.Split(',',StringSplitOptions.RemoveEmptyEntries).Where(p=>p.Contains('='))
         .ToDictionary(p=>p[..p.IndexOf('=')],p=>long.TryParse(p[(p.IndexOf('=')+1)..],out var ms)?ms:-1);

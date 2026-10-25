@@ -2,7 +2,7 @@ import { setBanListener } from "./rate-limit";
 import { currentTrace } from "./trace";
 
 /**
- * Operational logs live only in the bundled single-node Loki (MinIO-backed, 14-day retention in
+ * Operational logs live only in the bundled single-node Loki (on its own volume, 14-day retention in
  * deploy/loki/loki.yml), never in Postgres, so they cannot grow the control-plane database.
  */
 export type OperationalLogInput = {

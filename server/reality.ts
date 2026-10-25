@@ -76,8 +76,6 @@ async function decryptUsers(rows: Awaited<ReturnType<typeof realityUserRows>>) {
 /** Telemetry identities currently granted on a node (no secrets are decrypted). */
 export async function realityUserIdentities(nodeId: string) { return new Set((await realityUserRows(nodeId)).map((row) => row.email)); }
 
-export async function realityUsers(nodeId: string) { return decryptUsers(await realityUserRows(nodeId)); }
-
 export async function realityClientSecretId(credentialId: string) {
   const row = (await dbQuery<{ private_key_secret_id: string }>(`SELECT private_key_secret_id FROM subscriptions WHERE credential_id=$1
     UNION ALL SELECT id FROM secret_materials WHERE kind='vless_client:' || $1 AND owner_node_id IS NULL LIMIT 1`, [credentialId]))[0];
@@ -90,24 +88,31 @@ export async function realityUsersSecret(nodeId: string) {
   const sourceFingerprint = hashToken(JSON.stringify(rows));
   const previous = await findSecretMaterialByKind("vless_users_bundle", nodeId);
   if (previous?.source_fingerprint === sourceFingerprint) {
-    await cleanRealityBundles(nodeId, previous.id);
+    await collectUserBundles(nodeId);
     return previous.id;
   }
   const value = JSON.stringify(await decryptUsers(rows));
   const material = previous?.fingerprint === hashToken(value) ? previous : await createSecretMaterial({ kind: "vless_users_bundle", ownerNodeId: nodeId, value });
   await dbExec("UPDATE secret_materials SET source_fingerprint=$1 WHERE id=$2", [sourceFingerprint, material.id]);
-  await cleanRealityBundles(nodeId, material.id);
+  await collectUserBundles(nodeId);
   return material.id;
 }
-async function cleanRealityBundles(nodeId: string, keepId: string) {
-  // Runs on every heartbeat: an indexed existence probe first, the jsonb scans only when there is something to collect.
-  const cutoff = new Date(Date.now()-86400000).toISOString();
-  if (!(await dbQuery("SELECT 1 FROM secret_materials WHERE kind='vless_users_bundle' AND owner_node_id=$1 AND id<>$2 AND created_at<$3 LIMIT 1", [nodeId, keepId, cutoff])).length) return;
-  // Keep queued and in-flight revisions readable; completed bundles have a one-day grace period.
-  await dbExec(`DELETE FROM secret_materials s WHERE s.kind='vless_users_bundle' AND s.owner_node_id=$1
-    AND s.id<>$2 AND s.created_at<$3
+const USER_BUNDLE_KINDS = ["vless_users_bundle", "stealth_users_bundle"];
+
+/**
+ * Encrypted user lists of a node that no desired state or queued task refers to any more are garbage a day
+ * after they were replaced. Cheap enough for every heartbeat: one indexed probe, the jsonb scans only when
+ * there is something to collect. The newest bundle of each kind is always kept.
+ */
+export async function collectUserBundles(nodeId: string): Promise<void> {
+  const cutoff = new Date(Date.now() - 86400000).toISOString();
+  const stale = `s.kind = ANY($2::text[]) AND s.owner_node_id = $1 AND s.created_at < $3
+    AND s.id <> (SELECT x.id FROM secret_materials x WHERE x.kind = s.kind AND x.owner_node_id = $1 ORDER BY x.created_at DESC LIMIT 1)`;
+  if (!(await dbQuery(`SELECT 1 FROM secret_materials s WHERE ${stale} LIMIT 1`, [nodeId, USER_BUNDLE_KINDS, cutoff])).length) return;
+  // Keep queued and in-flight revisions readable.
+  await dbExec(`DELETE FROM secret_materials s WHERE ${stale}
     AND NOT EXISTS (SELECT 1 FROM desired_configs d WHERE d.node_id=$1 AND d.payload_json::jsonb->>'usersSecretId'=s.id)
     AND NOT EXISTS (SELECT 1 FROM reconcile_tasks t WHERE t.node_id=$1
       AND (t.status IN ('pending','running') OR (t.status='failed' AND t.attempts<5))
-      AND t.payload_json::jsonb->>'usersSecretId'=s.id)`, [nodeId, keepId, new Date(Date.now()-86400000).toISOString()]);
+      AND t.payload_json::jsonb->>'usersSecretId'=s.id)`, [nodeId, USER_BUNDLE_KINDS, cutoff]);
 }

@@ -3,7 +3,7 @@
 // configuration with keys is written to disk and no local control port is opened. The core
 // stops and exits when stdin closes, which also happens if the parent dies.
 //
-//	start <base64 config>         -> ok | error <message>
+//	run <base64 options JSON>     -> ok | error <message> (see core.Options)
 //	probe <names> <url> <ms>      -> name=delay,...
 //	now <group>                   -> proxy name
 //	rate                          -> up down (bytes per second)
@@ -43,14 +43,14 @@ func main() {
 			continue
 		}
 		switch fields[0] {
-		case "start":
+		case "run":
 			if len(fields) != 2 {
 				reply("error usage")
 				continue
 			}
-			configuration, err := base64.StdEncoding.DecodeString(fields[1])
+			options, err := base64.StdEncoding.DecodeString(fields[1])
 			if err == nil {
-				err = core.Start(home, string(configuration))
+				err = core.Run(home, string(options))
 			}
 			if err != nil {
 				reply("error " + err.Error())

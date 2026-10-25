@@ -116,11 +116,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         Journal.add("node: \(nodeName), transports \(transports.joined(separator:" > "))"+(blocked.isEmpty ? "":" (blocked here before: \(blocked.sorted().joined(separator:", ")))"))
         guard let fd=tunnelDescriptor() else {throw AccessFailure.code("TUNNEL_ERROR")}
         CoreStop()
-        let configuration=try Transports.config(proxies:proxies,order:transports,fd:fd,smart:smart)
+        let options=try Transports.options(proxies:proxies,order:transports,fd:fd,smart:smart)
         var failure:NSError?
         // Disconnect pressed while connecting cancels this task: stop before and after the core starts.
         try Task.checkCancellation()
-        _ = CoreStart(home,configuration,&failure)
+        _ = CoreRun(home,options,&failure)
         if Task.isCancelled {CoreStop();throw CancellationError()}
         if failure != nil {throw AccessFailure.code("TUNNEL_ERROR")}
         if !(await probe(initial:true)) {

@@ -233,3 +233,6 @@ export type OperationalLogLine = {
   actor?: { id: string; email?: string; role?: string }; target?: { type?: string; id?: string };
   ip?: string; request?: string; details?: Record<string, unknown>;
 };
+
+/** Accounts per status, sent with every user list. */
+export type UserCounts = Record<AdminUser["status"], number>;

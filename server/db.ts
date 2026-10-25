@@ -216,6 +216,13 @@ export async function createPendingUser(input: { email: string; displayName: str
   return (await findUserById(id))!;
 }
 
+/** How many accounts are in each status; cheap enough for the Console's navigation badge. */
+export async function countUsersByStatus(): Promise<Record<DbUser["status"], number>> {
+  const counts = { pending: 0, active: 0, rejected: 0, suspended: 0 } as Record<DbUser["status"], number>;
+  for (const row of await dbQuery<{ status: DbUser["status"]; count: string }>("SELECT status, COUNT(*)::text AS count FROM users GROUP BY status")) counts[row.status] = Number(row.count);
+  return counts;
+}
+
 export async function listUsers(status?: DbUser["status"]): Promise<DbUser[]> {
   const rows = status
     ? await dbQuery<DbUser>("SELECT id, email, display_name, role, status, approved_at, approved_by, rejection_reason, created_at, updated_at FROM users WHERE status = $1 ORDER BY created_at DESC", [status])
@@ -507,6 +514,8 @@ export async function deleteNode(id: string): Promise<boolean> {
   return (await dbExec("DELETE FROM nodes WHERE id = $1", [id])) === 1;
 }
 
+const transientAuditAction = /^agent\.reconcile\.|(^|\.)login\.failed$|node-pending$|\.skipped$/;
+
 export async function addAudit(input: {
   actorUserId?: string | null;
   action: string;
@@ -514,11 +523,15 @@ export async function addAudit(input: {
   targetId?: string;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
-  await dbExec(`INSERT INTO audit_logs (id, actor_user_id, action, target_type, target_id, metadata_json, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)`, [
-    randomUUID(), input.actorUserId || null, input.action, input.targetType || null,
-    input.targetId || null, JSON.stringify(input.metadata || {}), now(),
-  ]);
+  // Machine-driven and attack-driven events (every Agent task result, failed sign-ins, nodes skipped on each
+  // subscription refresh) go to the operational log only; audit_logs keeps the long-lived trail of decisions.
+  if (!transientAuditAction.test(input.action)) {
+    await dbExec(`INSERT INTO audit_logs (id, actor_user_id, action, target_type, target_id, metadata_json, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)`, [
+      randomUUID(), input.actorUserId || null, input.action, input.targetType || null,
+      input.targetId || null, JSON.stringify(input.metadata || {}), now(),
+    ]);
+  }
   void mirrorAuditToLog(input);
 }
 

@@ -21,9 +21,6 @@ object Transports {
     const val GROUP = "TrackNothing"
     const val TEST_URL = "https://www.gstatic.com/generate_204"
     private const val MEMORY_DAYS = 7L
-    private val privateNetworks = listOf("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16")
-    // Same small rule sets as the subscription profiles (server/mihomo-config.mjs), fetched through the tunnel.
-    private const val RULE_SETS = "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo"
 
     /**
      * A short, one-way label for the network the device uses outside the VPN: the carrier code on
@@ -89,38 +86,9 @@ object Transports {
             .put("remote-dns-resolve", true).put("dns", wg.getJSONArray("dns"))
     }
 
-    /** The whole mihomo configuration for one node; JSON is valid YAML. */
-    fun config(proxies: List<JSONObject>, order: List<String>, fd: Int, smart: Boolean): String {
-        fun array(vararg values: String) = JSONArray().apply { values.forEach { put(it) } }
-        val dns = JSONObject().put("enable", true).put("ipv6", false).put("enhanced-mode", "fake-ip").put("fake-ip-range", "198.18.0.1/16")
-            .put("fake-ip-filter", array("+.lan", "+.local", "localhost.ptlogin2.qq.com", "+.msftconnecttest.com", "+.msftncsi.com", "time.*.com", "+.ntp.org.cn"))
-            .put("respect-rules", true)
-            .put("default-nameserver", array("223.5.5.5", "119.29.29.29"))
-            .put("nameserver", array("https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query"))
-            .put("proxy-server-nameserver", array("https://doh.pub/dns-query", "223.5.5.5"))
-        if (smart) dns.put("nameserver-policy", JSONObject().put("rule-set:private_domain,cn_domain", array("https://doh.pub/dns-query", "https://dns.alidns.com/dns-query")))
-        val rules = JSONArray()
-        privateNetworks.forEach { rules.put("IP-CIDR,$it,DIRECT,no-resolve") }
-        if (smart) listOf("RULE-SET,private_domain,DIRECT", "RULE-SET,cn_domain,DIRECT", "RULE-SET,cn_ip,DIRECT").forEach { rules.put(it) }
-        rules.put("MATCH,$GROUP")
-        fun ruleSet(kind: String, name: String, behavior: String) = JSONObject().put("type", "http").put("behavior", behavior).put("format", "mrs")
-            .put("url", "$RULE_SETS/$kind/$name.mrs").put("path", "./rules/$kind-$name.mrs").put("interval", 86400).put("proxy", GROUP)
-        val config = JSONObject()
-            .put("mode", "rule").put("log-level", "silent").put("ipv6", false).put("find-process-mode", "off")
-            .put("unified-delay", true).put("tcp-concurrent", true).put("geo-auto-update", false)
-            .put("profile", JSONObject().put("store-selected", false).put("store-fake-ip", false))
-            .put("dns", dns)
-            // The app owns the tun (VpnService) and excludes itself from it, so mihomo neither routes nor binds.
-            .put("tun", JSONObject().put("enable", true).put("stack", "gvisor").put("file-descriptor", fd).put("auto-route", false)
-                .put("auto-detect-interface", false).put("dns-hijack", array("any:53")).put("mtu", 1500))
-            .put("proxies", JSONArray(proxies))
-            .put("proxy-groups", JSONArray().put(JSONObject().put("name", GROUP).put("type", "fallback").put("proxies", JSONArray(order))
-                .put("url", TEST_URL).put("interval", 300).put("lazy", false)))
-            .put("rules", rules)
-        if (smart) config.put("rule-providers", JSONObject().put("private_domain", ruleSet("geosite", "private", "domain"))
-            .put("cn_domain", ruleSet("geosite", "cn", "domain")).put("cn_ip", ruleSet("geoip", "cn", "ipcidr")))
-        return config.toString()
-    }
+    /** What the core needs to build the configuration (clients/core/config.go): the same on every app. */
+    fun options(proxies: List<JSONObject>, order: List<String>, fd: Int, smart: Boolean): String =
+        JSONObject().put("platform", "android").put("fd", fd).put("smart", smart).put("proxies", JSONArray(proxies)).put("order", JSONArray(order)).toString()
 
     /** "name=delay,..." from Core.probe; -1 means no answer. */
     fun parseProbe(result: String): Map<String, Long> = result.split(',').filter { '=' in it }

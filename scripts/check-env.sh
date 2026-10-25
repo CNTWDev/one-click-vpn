@@ -34,7 +34,6 @@ required_value VEILBIRD_ADMIN_PASSWORD
 required_value VEILBIRD_MASTER_KEY
 required_value VEILBIRD_PUBLIC_ORIGIN
 required_value VEILBIRD_DB_PASSWORD
-required_value VEILBIRD_LOG_STORAGE_PASSWORD
 
 domain=$(env_value APP_DOMAIN)
 origin=$(env_value VEILBIRD_PUBLIC_ORIGIN)
@@ -52,7 +51,6 @@ email=$(env_value VEILBIRD_ADMIN_EMAIL)
 password=$(env_value VEILBIRD_ADMIN_PASSWORD)
 master_key=$(env_value VEILBIRD_MASTER_KEY)
 database_password=$(env_value VEILBIRD_DB_PASSWORD)
-log_storage_password=$(env_value VEILBIRD_LOG_STORAGE_PASSWORD)
 
 if ! printf '%s' "$domain" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'; then
   echo "APP_DOMAIN must be a DNS hostname without a scheme or path." >&2
@@ -99,11 +97,6 @@ fi
 
 if [ "${#database_password}" -lt 24 ]; then
   echo "VEILBIRD_DB_PASSWORD must be at least 24 characters." >&2
-  exit 1
-fi
-
-if [ "${#log_storage_password}" -lt 24 ]; then
-  echo "VEILBIRD_LOG_STORAGE_PASSWORD must be at least 24 characters." >&2
   exit 1
 fi
 

@@ -11,7 +11,7 @@ test("Sites: deployment domains seed the default site; each hostname gets its ow
     VEILBIRD_ADMIN_EMAIL: "owner@example.com", VEILBIRD_ADMIN_PASSWORD: "test-password-123", VEILBIRD_PUBLIC_ORIGIN: "https://app.example.com",
     VEILBIRD_PORTAL_DOMAIN: "app.example.com", VEILBIRD_ADMIN_DOMAIN: "console.example.com", VEILBIRD_API_DOMAIN: "api.example.com", VEILBIRD_AGENT_ORIGIN: "https://agent.example.com" };
   const pool = new pg.Pool({ connectionString: databaseUrl });
-  await pool.query("DROP TABLE IF EXISTS sites");
+  await pool.query("DELETE FROM sites").catch(() => undefined);
   await promisify(execFile)(process.execPath, ["scripts/migrate.mjs"], { env });
   await promisify(execFile)(process.execPath, ["scripts/migrate.mjs"], { env }); // idempotent: still one default site
   const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", "3196"], { env, stdio: "ignore" });

@@ -3,6 +3,7 @@ import { X509Certificate } from "node:crypto";
 import { credentialSyncStatus } from "./credential-access";
 import { EXPIRY_WARNING_DAYS } from "./credential-validity";
 import { chargeTraffic } from "./entitlements";
+import { markAccessChanged } from "./reconcile-schedule";
 import { writeOperationalLog } from "./operational-logs";
 
 export type UsageSnapshot = {
@@ -37,7 +38,15 @@ function dayOf(value: string): string {
 }
 
 type Owner = { device_id: string; credential_id: string | null; user_id: string };
-type PreviousCounter = { counter_epoch: string; observed_rx_bytes: string; observed_tx_bytes: string; observed_at: string; last_traffic_at: string | null };
+type PreviousCounter = {
+  counter_epoch: string; observed_rx_bytes: string; observed_tx_bytes: string; observed_at: string; last_traffic_at: string | null;
+  last_handshake_at: string | null; connected: number; device_id: string | null; credential_id: string | null;
+};
+
+// An idle counter row is rewritten at most this often, so "last reported" stays meaningful without a write per heartbeat.
+const IDLE_REFRESH_MS = 5 * 60_000;
+// Last-seen times on credentials and devices only need minute precision.
+const LAST_SEEN_REFRESH_MS = 2 * 60_000;
 
 const MAX_SNAPSHOTS = 10000;
 
@@ -56,7 +65,8 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
 
   // Load previous counters and owners in three queries instead of several per snapshot.
   const previousRows = await dbQuery<PreviousCounter & { protocol: string; identity_key: string; session_key: string }>(
-    `SELECT protocol, identity_key, session_key, counter_epoch, observed_rx_bytes, observed_tx_bytes, observed_at, last_traffic_at
+    `SELECT protocol, identity_key, session_key, counter_epoch, observed_rx_bytes, observed_tx_bytes, observed_at, last_traffic_at,
+       last_handshake_at, connected, device_id, credential_id
      FROM traffic_counters WHERE node_id = $1`, [nodeId],
   );
   const previousByKey = new Map<string, PreviousCounter>(previousRows.map((row) => [counterKey(row.protocol, row.identity_key, row.session_key), row]));
@@ -93,61 +103,98 @@ export async function recordTrafficSnapshots(nodeId: string, snapshots: UsageSna
   const seenDevices = new Set<string>();
   // Every counted byte also comes off the account's grants (entitlements.ts).
   const bytesByUser = new Map<string, number>();
+  const counters: Array<[string, string, string, string | null, string | null, string, string, string | null, string | null, number, string]> = [];
+  const daily = new Map<string, { userId: string; deviceId: string; credentialId: string | null; protocol: string; upload: number; download: number }>();
+  const openvpnSessions: Array<[string, string]> = [];
+  const observedTime = new Date(observedAt).getTime();
+  for (const { snapshot, identityKey, sessionKey } of valid) {
+    const rxBytes = validBytes(snapshot.rxBytes);
+    const txBytes = validBytes(snapshot.txBytes);
+    const epoch = (snapshot.counterEpoch || "").trim().slice(0, 128);
+    const key = counterKey(snapshot.protocol, identityKey, sessionKey);
+    const previous = previousByKey.get(key);
+    if (previous && new Date(previous.observed_at).getTime() >= observedTime) continue;
+    const sameCounter = previous && previous.counter_epoch === epoch;
+    const uploadDelta = sameCounter ? Math.max(0, rxBytes - Number(previous.observed_rx_bytes)) : rxBytes;
+    const downloadDelta = sameCounter ? Math.max(0, txBytes - Number(previous.observed_tx_bytes)) : txBytes;
+    const owner = snapshot.protocol !== "openvpn" ? wireguardOwners.get(identityKey) : openvpnOwners.get(`CN=${identityKey}`);
+    const hasTraffic = uploadDelta > 0 || downloadDelta > 0;
+    const lastHandshakeAt = validHandshake(snapshot.lastHandshakeAt);
+    const handshakeTime = lastHandshakeAt ? new Date(lastHandshakeAt).getTime() : 0;
+    const connected = snapshot.protocol === "openvpn" || (Number.isFinite(handshakeTime) && handshakeTime >= Date.now() - 180_000);
+    const lastTrafficAt = hasTraffic ? observedAt : previous?.last_traffic_at || null;
+    if (snapshot.protocol === "openvpn") openvpnSessions.push([identityKey, sessionKey]);
+    // Most peers are idle most of the time; their row stays as it is until something moves or it gets old.
+    const idle = previous && sameCounter && !hasTraffic && snapshot.protocol !== "openvpn"
+      && (previous.last_handshake_at || null) === lastHandshakeAt && Number(previous.connected) === (connected ? 1 : 0)
+      && (previous.device_id || null) === (owner?.device_id || null) && (previous.credential_id || null) === (owner?.credential_id || null)
+      && observedTime - new Date(previous.observed_at).getTime() < IDLE_REFRESH_MS;
+    if (!idle) {
+      counters.push([snapshot.protocol, identityKey, sessionKey, owner?.device_id || null, owner?.credential_id || null,
+        String(rxBytes), String(txBytes), lastHandshakeAt, lastTrafficAt, connected ? 1 : 0, epoch]);
+    }
+    // Guard against duplicate snapshots for the same key within one heartbeat.
+    previousByKey.set(key, {
+      counter_epoch: epoch, observed_rx_bytes: String(rxBytes), observed_tx_bytes: String(txBytes), observed_at: observedAt, last_traffic_at: lastTrafficAt,
+      last_handshake_at: lastHandshakeAt, connected: connected ? 1 : 0, device_id: owner?.device_id || null, credential_id: owner?.credential_id || null,
+    });
+    if (owner && (connected || hasTraffic)) {
+      if (owner.credential_id) seenCredentials.add(owner.credential_id);
+      seenDevices.add(owner.device_id);
+    }
+    if (!owner || !hasTraffic) continue;
+    bytesByUser.set(owner.user_id, (bytesByUser.get(owner.user_id) || 0) + uploadDelta + downloadDelta);
+    // traffic_daily is keyed per device, node and protocol; several sessions of one device add up first.
+    const dailyKey = `${owner.device_id}\u0000${snapshot.protocol}`;
+    const row = daily.get(dailyKey) || { userId: owner.user_id, deviceId: owner.device_id, credentialId: owner.credential_id, protocol: snapshot.protocol, upload: 0, download: 0 };
+    row.upload += uploadDelta; row.download += downloadDelta; row.credentialId = owner.credential_id;
+    daily.set(dailyKey, row);
+  }
+  const column = <T,>(index: number) => counters.map((row) => row[index] as T);
+  const lastSeenBefore = new Date(observedTime - LAST_SEEN_REFRESH_MS).toISOString();
   await withTransaction(async (exec) => {
-    await exec("UPDATE traffic_counters SET connected = 0 WHERE node_id = $1 AND protocol = 'openvpn'", [nodeId]);
-    for (const { snapshot, identityKey, sessionKey } of valid) {
-      const rxBytes = validBytes(snapshot.rxBytes);
-      const txBytes = validBytes(snapshot.txBytes);
-      const epoch = (snapshot.counterEpoch || "").trim().slice(0, 128);
-      const key = counterKey(snapshot.protocol, identityKey, sessionKey);
-      const previous = previousByKey.get(key);
-      if (previous && new Date(previous.observed_at).getTime() >= new Date(observedAt).getTime()) continue;
-      const sameCounter = previous && previous.counter_epoch === epoch;
-      const uploadDelta = sameCounter ? Math.max(0, rxBytes - Number(previous.observed_rx_bytes)) : rxBytes;
-      const downloadDelta = sameCounter ? Math.max(0, txBytes - Number(previous.observed_tx_bytes)) : txBytes;
-      const owner = snapshot.protocol !== "openvpn" ? wireguardOwners.get(identityKey) : openvpnOwners.get(`CN=${identityKey}`);
-      const hasTraffic = uploadDelta > 0 || downloadDelta > 0;
-      const lastHandshakeAt = validHandshake(snapshot.lastHandshakeAt);
-      const handshakeTime = lastHandshakeAt ? new Date(lastHandshakeAt).getTime() : 0;
-      const connected = snapshot.protocol === "openvpn" || (Number.isFinite(handshakeTime) && handshakeTime >= Date.now() - 180_000);
-      const lastTrafficAt = hasTraffic ? observedAt : previous?.last_traffic_at || null;
+    await exec(`UPDATE traffic_counters SET connected = 0 WHERE node_id = $1 AND protocol = 'openvpn' AND connected = 1
+      AND (identity_key, session_key) NOT IN (SELECT * FROM unnest($2::text[], $3::text[]))`,
+    [nodeId, openvpnSessions.map((item) => item[0]), openvpnSessions.map((item) => item[1])]);
+    if (counters.length) {
       await exec(`INSERT INTO traffic_counters
         (node_id, protocol, identity_key, session_key, device_id, credential_id, observed_rx_bytes, observed_tx_bytes, last_handshake_at, last_traffic_at, connected, counter_epoch, observed_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        SELECT $1, c.*, $13 FROM unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::bigint[], $8::bigint[], $9::text[], $10::text[], $11::int[], $12::text[]) AS c
         ON CONFLICT(node_id, protocol, identity_key, session_key) DO UPDATE SET
           device_id = excluded.device_id, credential_id = excluded.credential_id, observed_rx_bytes = excluded.observed_rx_bytes,
           observed_tx_bytes = excluded.observed_tx_bytes, last_handshake_at = excluded.last_handshake_at,
           last_traffic_at = excluded.last_traffic_at, connected = excluded.connected,
           counter_epoch = excluded.counter_epoch, observed_at = excluded.observed_at`, [
-        nodeId, snapshot.protocol, identityKey, sessionKey, owner?.device_id || null, owner?.credential_id || null,
-        String(rxBytes), String(txBytes), lastHandshakeAt, lastTrafficAt, connected ? 1 : 0, epoch, observedAt,
+        nodeId, column(0), column(1), column(2), column(3), column(4), column(5), column(6), column(7), column(8), column(9), column(10), observedAt,
       ]);
-      // Guard against duplicate snapshots for the same key within one heartbeat.
-      previousByKey.set(key, { counter_epoch: epoch, observed_rx_bytes: String(rxBytes), observed_tx_bytes: String(txBytes), observed_at: observedAt, last_traffic_at: lastTrafficAt });
-      if (owner && (connected || hasTraffic)) {
-        if (owner.credential_id) seenCredentials.add(owner.credential_id);
-        seenDevices.add(owner.device_id);
-      }
-      if (!owner || !hasTraffic) continue;
-      bytesByUser.set(owner.user_id, (bytesByUser.get(owner.user_id) || 0) + uploadDelta + downloadDelta);
+    }
+    if (daily.size) {
+      const rows = [...daily.values()];
       await exec(`INSERT INTO traffic_daily
         (day, user_id, device_id, credential_id, node_id, protocol, upload_bytes, download_bytes, first_seen_at, last_seen_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+        SELECT $1, d.user_id, d.device_id, d.credential_id, $2, d.protocol, d.upload, d.download, $9, $9
+        FROM unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::bigint[], $8::bigint[]) AS d(user_id, device_id, credential_id, protocol, upload, download)
         ON CONFLICT(day, device_id, node_id, protocol) DO UPDATE SET
           credential_id = excluded.credential_id,
           upload_bytes = traffic_daily.upload_bytes + excluded.upload_bytes,
           download_bytes = traffic_daily.download_bytes + excluded.download_bytes,
           last_seen_at = excluded.last_seen_at`, [
-        dayOf(observedAt), owner.user_id, owner.device_id, owner.credential_id, nodeId, snapshot.protocol, String(uploadDelta), String(downloadDelta), observedAt,
+        dayOf(observedAt), nodeId, rows.map((row) => row.userId), rows.map((row) => row.deviceId), rows.map((row) => row.credentialId),
+        rows.map((row) => row.protocol), rows.map((row) => String(row.upload)), rows.map((row) => String(row.download)), observedAt,
       ]);
     }
     if (seenCredentials.size) {
-      await exec("UPDATE access_credentials SET last_seen_at = $1, updated_at = GREATEST(updated_at, $1) WHERE id = ANY($2::text[])", [observedAt, [...seenCredentials]]);
+      await exec(`UPDATE access_credentials SET last_seen_at = $1, updated_at = GREATEST(updated_at, $1)
+        WHERE id = ANY($2::text[]) AND (last_seen_at IS NULL OR last_seen_at < $3)`, [observedAt, [...seenCredentials], lastSeenBefore]);
     }
-    if (seenDevices.size) await exec("UPDATE devices SET last_seen_at = $1 WHERE id = ANY($2::text[])", [observedAt, [...seenDevices]]);
+    if (seenDevices.size) {
+      await exec("UPDATE devices SET last_seen_at = $1 WHERE id = ANY($2::text[]) AND (last_seen_at IS NULL OR last_seen_at < $3)", [observedAt, [...seenDevices], lastSeenBefore]);
+    }
   });
-  // Accounts that just ran out leave every node on its next heartbeat (this node's comes right after).
-  for (const userId of await chargeTraffic(bytesByUser)) {
+  // Accounts that just ran out leave every node on its next heartbeat.
+  const ended = await chargeTraffic(bytesByUser);
+  if (ended.length) markAccessChanged();
+  for (const userId of ended) {
     await writeOperationalLog({ component: "controller", level: "info", message: "account.quota_exhausted", action: "account.quota_exhausted", target: { type: "user", id: userId } }).catch(() => undefined);
   }
 }
@@ -332,7 +379,8 @@ function certificateFingerprint(pem: string): string {
   try { return new X509Certificate(pem).fingerprint256; } catch { return ""; }
 }
 
-export async function adminUserAccessSummaries() {
+/** Per-account usage for the Console's user list; pass ids to summarize only the accounts being shown. */
+export async function adminUserAccessSummaries(userIds?: string[]) {
   const { from, to } = range({});
   const rows = await dbQuery<{
     user_id: string; device_count: string; active_device_count: string; credential_count: string; active_credential_count: string; profile_count: string; active_profile_count: string;
@@ -352,7 +400,7 @@ export async function adminUserAccessSummaries() {
       (SELECT COALESCE(SUM(t.upload_bytes), 0)::text FROM traffic_daily t WHERE t.user_id = u.id AND t.day BETWEEN $1 AND $2) AS upload_bytes,
       (SELECT COALESCE(SUM(t.download_bytes), 0)::text FROM traffic_daily t WHERE t.user_id = u.id AND t.day BETWEEN $1 AND $2) AS download_bytes,
       (SELECT MAX(c.last_handshake_at) FROM traffic_counters c INNER JOIN devices d ON d.id = c.device_id WHERE d.user_id = u.id) AS last_activity_at
-    FROM users u`, [from, to, now()]);
+    FROM users u${userIds ? " WHERE u.id = ANY($4)" : ""}`, userIds ? [from, to, now(), userIds] : [from, to, now()]);
   return new Map(rows.map((row) => [row.user_id, {
     deviceCount: Number(row.device_count || 0), activeDeviceCount: Number(row.active_device_count || 0),
     credentialCount: Number(row.credential_count || 0), activeCredentialCount: Number(row.active_credential_count || 0),

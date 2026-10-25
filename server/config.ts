@@ -1,9 +1,3 @@
-function required(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`Missing required environment variable: ${name}`);
-  return value;
-}
-
 export function sessionTtlSeconds(): number {
   const value = Number(process.env.VEILBIRD_SESSION_TTL_SECONDS || 60 * 60 * 12);
   return Number.isFinite(value) && value > 300 ? value : 60 * 60 * 12;
@@ -59,7 +53,3 @@ export function agentOrigin(): string {
   return value || apiOrigin();
 }
 
-export function requireProductionSecret(name: string): string {
-  if (!isProduction()) return process.env[name] || "development-only";
-  return required(name);
-}

@@ -36,3 +36,39 @@ func TestYAMLUnchanged(t *testing.T) {
 		t.Fatalf("normalize changed YAML: %q", got)
 	}
 }
+
+func TestBuildParsesOnEveryPlatform(t *testing.T) {
+	proxies := []map[string]any{
+		{"name": "wireguard", "type": "wireguard", "server": "1.2.3.4", "port": 51820, "ip": "10.8.0.2",
+			"private-key": "yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=", "public-key": "HIgo9xNzJMWLKASShiTqIybxZ0U3wGLiUeJ1PKf8ykw=",
+			"allowed-ips": []string{"0.0.0.0/0"}, "udp": true, "mtu": 1280, "remote-dns-resolve": true, "dns": []string{"1.1.1.1"}},
+	}
+	for _, platform := range []string{"android", "apple", "windows"} {
+		for _, smart := range []bool{false, true} {
+			text, err := Build(Options{Platform: platform, FD: 42, Smart: smart, Proxies: proxies, Order: []string{"wireguard"}})
+			if err != nil {
+				t.Fatal(platform, err)
+			}
+			cfg, err := config.Parse(normalize([]byte(text)))
+			if err != nil {
+				t.Fatal(platform, smart, err)
+			}
+			if platform == "windows" {
+				if cfg.General.Tun.FileDescriptor != 0 || !cfg.General.Tun.AutoRoute || cfg.Rules[0].Payload() != "Veilbird.exe" {
+					t.Fatalf("windows tun or process rule wrong: %+v", cfg.General.Tun)
+				}
+			} else if cfg.General.Tun.FileDescriptor != 42 || cfg.General.Tun.AutoRoute {
+				t.Fatalf("%s tun = %+v", platform, cfg.General.Tun)
+			}
+			if got := len(cfg.RuleProviders); (got > 0) != smart {
+				t.Fatalf("%s smart=%v rule providers = %d", platform, smart, got)
+			}
+			if last := cfg.Rules[len(cfg.Rules)-1]; last.Adapter() != group {
+				t.Fatalf("last rule goes to %s", last.Adapter())
+			}
+		}
+	}
+	if _, err := Build(Options{Platform: "linux", Proxies: proxies, Order: []string{"wireguard"}}); err == nil {
+		t.Fatal("unknown platform accepted")
+	}
+}

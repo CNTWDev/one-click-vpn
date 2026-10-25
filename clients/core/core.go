@@ -1,6 +1,7 @@
-// Package core embeds mihomo for the TrackNothing Android app (built with gomobile bind).
+// Package core embeds mihomo for the TrackNothing apps: gomobile bind for Android and Apple, and
+// cmd/veilbird-core for Windows. Run builds the shared configuration (config.go) and applies it.
 //
-// The app owns the VpnService and hands the tun file descriptor to mihomo through the
+// On the phones the app owns the tun and hands its file descriptor to mihomo through the
 // configuration (tun.file-descriptor). The app excludes itself from its own VPN, so the
 // connections mihomo opens to nodes leave through the underlying network.
 package core
@@ -45,8 +46,8 @@ func init() {
 // idle replaces a running configuration on Stop: no tun, no listeners, no proxies.
 const idle = "mode: direct\nlog-level: silent\nipv6: false\n"
 
-// Start applies a mihomo configuration (YAML or JSON) with home as its data directory.
-func Start(home string, configuration string) error {
+// start applies a mihomo configuration (YAML or JSON) with home as its data directory.
+func start(home string, configuration string) error {
 	lock.Lock()
 	defer lock.Unlock()
 	if err := os.MkdirAll(home, 0o700); err != nil {

@@ -4,26 +4,24 @@ server:
   http_listen_port: 3100
 
 common:
-  path_prefix: /loki
+  # Not /loki itself: earlier versions left an index there that points at the retired MinIO store.
+  path_prefix: /loki/fs
   replication_factor: 1
   ring:
     kvstore:
       store: inmemory
+  # A single node keeps chunks and index on its own volume; an object store added a service and a
+  # password to run for nothing at this size.
   storage:
-    s3:
-      # Loki 3.x (AWS SDK v2) rejects a bare host:port and exits at startup; keep the scheme.
-      endpoint: http://minio:9000
-      bucketnames: northstar-logs
-      access_key_id: northstar
-      secret_access_key: ${VEILBIRD_LOG_STORAGE_PASSWORD}
-      s3forcepathstyle: true
-      insecure: true
+    filesystem:
+      chunks_directory: /loki/fs/chunks
+      rules_directory: /loki/fs/rules
 
 schema_config:
   configs:
     - from: 2024-01-01
       store: tsdb
-      object_store: s3
+      object_store: filesystem
       schema: v13
       index:
         prefix: index_
@@ -32,14 +30,14 @@ schema_config:
 ingester:
   wal:
     enabled: true
-    dir: /loki/wal
+    dir: /loki/fs/wal
 
 compactor:
-  working_directory: /loki/compactor
+  working_directory: /loki/fs/compactor
   compaction_interval: 5m
   retention_enabled: true
   retention_delete_delay: 5m
-  delete_request_store: s3
+  delete_request_store: filesystem
 
 limits_config:
   retention_period: 336h

@@ -42,7 +42,7 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(agent, /add\[add\.index\("-C"\)\] = operation/);
   assert.doesNotMatch(agent, /add\[1\] = operation/);
   assert.match(agent, /\/etc\/wireguard\/northstar\.conf/);
-  assert.match(agent, /agent 2\.11\.0/);
+  assert.match(agent, /"version": "agent 2\.\d+\.\d+"/);
   assert.match(agent, /status-version 3/);
   assert.match(agent, /def openvpn_usage_snapshots/);
   assert.match(agent, /wireguard_usage_snapshots\(\) \+ openvpn_usage_snapshots\(\)/);
@@ -53,7 +53,7 @@ test("VPN service lifecycle is represented in schema and Agent tasks", () => {
   assert.match(openVpnPki, /safeCommonName\(`northstar-\$\{credentialId\}`\)/);
   assert.doesNotMatch(openVpnPki, /commonName: `northstar-device-\$\{deviceName\}`/);
   assert.match(readFileSync(path.join(root, "server/control-plane.ts"), "utf8"), /displayName: device\?\.display_name \|\| null/);
-  assert.match(traffic, /snapshot\.protocol === "wireguard"/);
+  assert.match(traffic, /snapshot\.protocol !== "openvpn"/);
   assert.match(traffic, /certificate_issuances c/);
   assert.match(traffic, /export async function usageByCredentials/);
 });
@@ -883,7 +883,11 @@ test("credential controls preserve independent user/admin locks and recoverable 
     const wgCredential = (await pool.query("SELECT * FROM access_credentials WHERE id=$1", [id])).rows[0];
     assert.equal(wgProfile.expiresAt, wgCredential.expires_at);
     assert.equal(new Date(wgCredential.expires_at) - new Date(wgCredential.created_at), 365 * 86_400_000);
-    const migrate = () => execFileAsync(process.execPath, [fileURLToPath(new URL("../scripts/migrate.mjs", import.meta.url))], { cwd: root, env: { ...process.env, VEILBIRD_DATABASE_URL: databaseUrl } });
+    // The legacy profile correction lives in the baseline, which runs once per database; forget it to replay it here.
+    const migrate = async () => {
+      await pool.query("DELETE FROM schema_migrations WHERE id='001-baseline'");
+      return execFileAsync(process.execPath, [fileURLToPath(new URL("../scripts/migrate.mjs", import.meta.url))], { cwd: root, env: { ...process.env, VEILBIRD_DATABASE_URL: databaseUrl } });
+    };
     await pool.query("UPDATE connection_profiles SET expires_at=$2 WHERE id=$1", [wgProfile.id, new Date(new Date(wgProfile.issuedAt).getTime() + 86_400_000).toISOString()]);
     await migrate();
     await migrate();

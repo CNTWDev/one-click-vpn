@@ -7,14 +7,18 @@ import { PRODUCT_NAME } from "../../shared/brand-name";
 import { PortalLanguage, PortalLanguagePicker } from "./language";
 import "./language.css";
 import { errorText } from "../../shared/i18n-errors";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { api } from "./api";
-import { CredentialDashboard } from "./credential-dashboard";
-import { Home } from "./home";
 import { DataStream } from "./pixel";
 import "./styles.css";
 import "./region-map.css";
+
+// Signed-in pages load on demand, so the sign-in screen does not wait for them (or for the QR code library).
+const loadHome = () => import("./home");
+const loadDashboard = () => import("./credential-dashboard");
+const Home = lazy(() => loadHome().then((module) => ({ default: module.Home })));
+const CredentialDashboard = lazy(() => loadDashboard().then((module) => ({ default: module.CredentialDashboard })));
 
 type User = {
   id: string;
@@ -179,7 +183,11 @@ export default function App() {
     const timer = window.setTimeout(() => {
       // The site (name, logo) loads alongside the session so the first screen already shows the right brand.
       void Promise.all([
-        api<{ user: User }>("/api/v1/auth/me").then((result) => setUser(result.user)).catch(() => undefined),
+        api<{ user: User }>("/api/v1/auth/me").then((result) => {
+          // Fetch the signed-in page while the site settings are still loading.
+          if (result.user?.status === "active") void (readManual() ? loadDashboard() : loadHome()).catch(() => undefined);
+          setUser(result.user);
+        }).catch(() => undefined),
         loadSite().then((site) => applySiteToDocument(site)),
       ]).finally(() => setLoading(false));
     }, 0);
@@ -192,15 +200,17 @@ export default function App() {
     setMode("login");
   }
 
+  const connecting = <main className="center-page" aria-busy="true"><Brand /><span className="loader" aria-label={t("正在连接…")} /></main>;
   if (resetToken) return <><PortalLanguagePicker floating /><ResetPassword token={resetToken} onDone={finishReset} /></>;
   if (user?.status === "active" && !loading) {
-    // The apps are built for the default site only; other sites keep subscriptions as their home.
-    if (site?.isDefault === false) return <CredentialDashboard user={user} onLogout={() => void logout()} />;
     // #manual keeps the browser's Back button working between the two pages.
     const go = (next: boolean) => { if (next) window.location.hash = "manual"; else window.history.replaceState(null, "", window.location.pathname + window.location.search); setManual(next); window.scrollTo(0, 0); };
-    return manual ? <CredentialDashboard user={user} onLogout={() => void logout()} onBack={() => go(false)} /> : <Home user={user} onLogout={() => void logout()} onManual={() => go(true)} />;
+    // The apps are built for the default site only; other sites keep subscriptions as their home.
+    const page = site?.isDefault === false ? <CredentialDashboard user={user} onLogout={() => void logout()} />
+      : manual ? <CredentialDashboard user={user} onLogout={() => void logout()} onBack={() => go(false)} /> : <Home user={user} onLogout={() => void logout()} onManual={() => go(true)} />;
+    return <Suspense fallback={connecting}>{page}</Suspense>;
   }
-  return <><PortalLanguagePicker floating />{loading ? <main className="center-page" aria-busy="true"><Brand /><span className="loader" aria-label={t("正在连接…")} /></main>
+  return <><PortalLanguagePicker floating />{loading ? connecting
     : !user ? <Auth mode={mode} onMode={setMode} onUser={setUser} notice={notice} /> : <Pending user={user} onLogout={() => void logout()} />}</>;
 }
 
