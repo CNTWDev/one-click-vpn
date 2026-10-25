@@ -39,7 +39,7 @@ final class UpdateDownloader:NSObject,URLSessionDownloadDelegate,@unchecked Send
         super.init()
         let configuration=URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest=20
-        configuration.requestCachePolicy=.reloadIgnoringLocalCacheData
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         session=URLSession(configuration:configuration,delegate:self,delegateQueue:nil)
     }
 
