@@ -776,4 +776,19 @@ details[open] > summary .chev { transform: rotate(180deg); }
 .upload-progress { position: relative; height: 34px; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
 .upload-progress i { position: absolute; inset: 0 auto 0 0; background: var(--accent-soft); border-right: 2px solid var(--accent); transition: width .2s; }
 .upload-progress span { position: relative; display: flex; align-items: center; height: 100%; padding: 0 12px; color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+.release-import { display: grid; gap: 16px; }
+.release-drop { position: relative; display: grid; justify-items: center; gap: 6px; padding: 28px 20px; color: var(--text-2); text-align: center; background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: var(--radius); cursor: pointer; }
+.release-drop:hover, .release-drop.active { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+.release-drop input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.release-drop b { color: var(--text); font-size: 14px; font-weight: 600; }
+.release-drop small { max-width: 560px; font-size: 13px; line-height: 1.5; }
+.release-import-list { display: grid; grid-template-columns: minmax(0, 1fr) max-content max-content; margin: 0; padding: 0; list-style: none; border: 1px solid var(--border); border-radius: var(--radius); }
+.release-import-list li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; gap: 6px 24px; padding: 12px 16px; font-size: 14px; }
+.release-import-list li + li { border-top: 1px solid var(--border); }
+.release-import-list b, .release-import-list small { display: block; }
+.release-import-list small { margin-top: 2px; color: var(--text-2); font-size: 13px; }
+.release-import-list .import-name { font-weight: 600; overflow-wrap: anywhere; }
+.release-import-list .import-error { color: var(--danger); overflow-wrap: anywhere; }
+.release-import-list .import-progress { color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 720px) { .release-import-list { grid-template-columns: minmax(0, 1fr); } .release-import-list li { grid-template-columns: minmax(0, 1fr); justify-items: start; } }
 @media (max-width: 720px) { .release-upload .form-grid { grid-template-columns: minmax(0, 1fr); } .release-upload .span-2 { grid-column: auto; } }

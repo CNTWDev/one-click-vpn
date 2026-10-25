@@ -3482,5 +3482,89 @@
   "确认更换": [
     "Change plan",
     "Сменить тариф"
+  ],
+  "无法读取压缩包：{0}": [
+    "Cannot read the archive: {0}",
+    "Не удалось прочитать архив: {0}"
+  ],
+  "{0} 个安装包将直接成为正式版，固定下载链接和客户端更新检查会立即指向它们。": [
+    "{0} installers will become the stable release right away; the fixed download links and in-app update checks will point to them immediately.",
+    "Установщиков: {0}. Они сразу станут стабильной версией: постоянные ссылки и проверка обновлений в приложениях сразу переключатся на них."
+  ],
+  "已导入并发布 {0} 个安装包": [
+    "Imported and published {0} installers",
+    "Импортировано и опубликовано установщиков: {0}"
+  ],
+  "已导入 {0} 个安装包，已保存为草稿": [
+    "Imported {0} installers as drafts",
+    "Импортировано установщиков: {0}, сохранены как черновики"
+  ],
+  "待导入": [
+    "Ready",
+    "Готов"
+  ],
+  "已导入": [
+    "Imported",
+    "Импортирован"
+  ],
+  "已存在，跳过": [
+    "Exists, skipped",
+    "Уже есть, пропущен"
+  ],
+  "无法识别": [
+    "Not recognised",
+    "Не распознан"
+  ],
+  "导入 GitHub 构建包": [
+    "Import GitHub builds",
+    "Импорт сборок GitHub"
+  ],
+  "把 GitHub 下载的压缩包拖到这里，或点击选择": [
+    "Drop the archives downloaded from GitHub here, or click to choose",
+    "Перетащите сюда архивы, скачанные с GitHub, или нажмите, чтобы выбрать"
+  ],
+  "可一次放入多个 .zip，也可以直接放 .apk、.exe、.dmg。自动识别平台、架构、版本号和构建号，只上传压缩包里的安装包。": [
+    "Add several .zip files at once, or .apk, .exe and .dmg files directly. Platform, architecture, version and build are detected automatically; only the installers inside the archives are uploaded.",
+    "Можно добавить сразу несколько .zip или напрямую .apk, .exe и .dmg. Платформа, архитектура, версия и сборка определяются автоматически; загружаются только установщики из архивов."
+  ],
+  "识别结果": [
+    "Detected",
+    "Распознано"
+  ],
+  "导入后": [
+    "After import",
+    "После импорта"
+  ],
+  "保存为草稿": [
+    "Save as draft",
+    "Сохранить черновик"
+  ],
+  "立即发布": [
+    "Publish now",
+    "Опубликовать сразу"
+  ],
+  "清空列表": [
+    "Clear list",
+    "Очистить список"
+  ],
+  "导入 {0} 个安装包": [
+    "Import {0} installers",
+    "Импортировать ({0})"
+  ],
+  "导入": [
+    "Import",
+    "Импортировать"
+  ],
+  "上传时间": [
+    "Uploaded",
+    "Загружено"
+  ],
+  "发布于 {0}": [
+    "Published {0}",
+    "Опубликовано {0}"
+  ],
+  "正在校验…": [
+    "Verifying…",
+    "Проверка…"
   ]
 }

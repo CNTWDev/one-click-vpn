@@ -28,11 +28,11 @@ Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次�
 ## 每次发版
 
 1. 改 `clients/version.json` 的版本号，提交后推送标签 `client-v<版本号>`；或在 GitHub → Actions →「Client release」→ Run workflow。
-2. 运行结束后，在该次运行页面底部 **Artifacts** 下载（GitHub 会再套一层 zip，先解压）：
+2. 运行结束后，在该次运行页面底部 **Artifacts** 下载各平台的 zip（不用解压）：
    - `TrackNothing-android-…` → `TrackNothing-<版本>-<构建号>.apk`
    - `TrackNothing-windows-x64-…` → `TrackNothing-<版本>-<构建号>-win-x64-setup.exe`（arm64 同理，给 ARM 笔记本用）
    - `TrackNothing-macos-…` → `TrackNothing-<版本>-<构建号>-macos.dmg`（配好 Apple 签名后才有）
-3. 控制台 → 客户端 → 客户端发布 →「上传安装包」，选择解压出来的 `.apk`、`-setup.exe` 或 `.dmg`。平台、架构、版本号、构建号会按文件名自动填好，点「上传并保存草稿」。
+3. 控制台 → 客户端 → 客户端发布 →「导入 GitHub 构建包」，把下载的 zip 一次全部拖进去（也可以拖 `.apk`、`.exe`、`.dmg`）。页面在浏览器里解压，按文件名识别平台、架构、版本号、构建号，只上传里面的安装包；浏览器算的 SHA-256 会和服务器收到的文件再核对一遍。选好渠道和「导入后：保存为草稿 / 立即发布」，点「导入」。已存在的构建会标记并跳过。文件名不规范时，用「上传安装包」手动填写。
 4. 版本历史里点「发布」（测试版），自己装一遍确认没问题，再点「晋升正式版」。门户下载区和固定链接 `/download/android`、`/download/windows`、`/download/macos` 立即指向它，已安装的客户端下次启动会提示更新。
 5. 需要强制所有人升级时，在「下载链接与最低版本」设置最低构建号。
 
