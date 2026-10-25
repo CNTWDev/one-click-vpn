@@ -265,7 +265,7 @@ export async function setMinimumBuild(actor: ReleaseActor, body: Record<string, 
 export async function releaseOverview() {
   const storage = releaseStorage();
   const [rows, policies, adoption, diagnostics] = await Promise.all([
-    dbQuery<ReleaseRow>("SELECT * FROM client_releases ORDER BY platform, build DESC, arch LIMIT 500"),
+    dbQuery<ReleaseRow>("SELECT * FROM client_releases ORDER BY created_at DESC, build DESC LIMIT 500"),
     dbQuery<{ platform: ClientPlatform; min_build: number; announcement: string; updated_at: Date }>("SELECT platform,min_build,announcement,updated_at FROM client_policies"),
     dbQuery<{ platform: string; client_version: string | null; client_build: number | null; devices: number }>(`SELECT platform,client_version,client_build,COUNT(*)::int AS devices
       FROM native_enrollments WHERE status='active' GROUP BY platform,client_version,client_build ORDER BY platform,client_build DESC NULLS LAST`),

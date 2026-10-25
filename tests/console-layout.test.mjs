@@ -41,6 +41,13 @@ const views = [
   { name: "sites-edit", hash: "sites", open: (page, l) => page.getByRole("button", { name: tr(l, "编辑"), exact: true }).nth(1).click(), modal: false },
   { name: "logs", hash: "logs" },
   { name: "releases", hash: "releases" },
+  // Batch import with recognised, already-existing and unknown files (no dialog to wait for).
+  { name: "releases-import", hash: "releases", modal: false, open: async (page) => { await page.locator(".release-drop input").setInputFiles([
+    { name: "TrackNothing-1.2.0-13.apk", mimeType: "application/vnd.android.package-archive", buffer: Buffer.alloc(2048, 1) },
+    { name: "TrackNothing-1.2.0-13-win-arm64-setup.exe", mimeType: "application/octet-stream", buffer: Buffer.alloc(4096, 1) },
+    { name: "TrackNothing-1.1.3-11.apk", mimeType: "application/vnd.android.package-archive", buffer: Buffer.alloc(1024, 1) },
+    { name: "screenshot-from-a-very-long-folder-name-that-is-not-an-installer.png", mimeType: "image/png", buffer: Buffer.alloc(512, 1) },
+  ]); await page.locator(".release-import-list").waitFor(); } },
 ];
 
 test("Console layout: no overflow, spill or overlap on any page, locale or width", { skip: !process.env.VEILBIRD_TEST_PLAYWRIGHT, timeout: 600000 }, async () => {

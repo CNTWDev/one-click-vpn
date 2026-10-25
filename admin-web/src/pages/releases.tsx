@@ -1,9 +1,10 @@
 import { t, useConsoleLanguage } from "../i18n";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type DragEvent, type FormEvent, useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { useConfirm } from "../confirm-dialog";
 import { Icon } from "../icons";
 import { useToast } from "../toast";
+import { extractEntry, zipEntries } from "../zip";
 import { Empty, formatBytes, formatTime, InlineNotice, type Notice, PageHeader, Pill } from "./shared";
 
 type Platform = "android" | "ios" | "macos" | "windows";
@@ -46,8 +47,16 @@ const extensions = ".apk,.aab,.zip,.dmg,.pkg,.msix,.msixbundle,.exe,.msi";
 const defaultArch: Record<Platform, string> = { android: "universal", ios: "universal", macos: "universal", windows: "x64" };
 const minOsHint: Record<Platform, string> = { android: "Android 8.0", ios: "iOS 16", macos: "macOS 13", windows: "Windows 10" };
 
+type Installer = { platform: Platform; arch: string; version: string; build: string };
+/** One installer found in what was dropped: a file itself, or an entry of a GitHub artifact ZIP. */
+type ImportItem = {
+  key: string; name: string; size: number; meta: Installer | null; read: () => Promise<File>;
+  state: "ready" | "uploading" | "done" | "exists" | "failed" | "unknown"; progress?: number; error?: string;
+};
+const importExtensions = ".zip,.apk,.exe,.dmg";
+
 /** CI names installers TrackNothing-<version>-<build>.apk and TrackNothing-<version>-<build>-win-<arch>-setup.exe; picking one fills the form (older Veilbird-* files still match). */
-function parseInstallerName(name: string): { platform: Platform; arch: string; version: string; build: string } | null {
+function parseInstallerName(name: string): Installer | null {
   const match = name.match(/^(?:TrackNothing|Veilbird)-(\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?)-(\d+)(?:-win-(x64|arm64)(?:-setup)?|-(macos))?\.(apk|zip|exe|dmg)$/i);
   if (!match) return null;
   const [, version, build, windows, macos, extension] = match, kind = extension.toLowerCase();
@@ -72,6 +81,31 @@ function putWithProgress(url: string, body: Blob, onProgress: (sent: number) => 
   });
 }
 const errorText = (error: unknown) => { const code = (error as Error).message.split(":")[0]; return errors[code] ? t(errors[code]) : (error as Error).message; };
+const sha256Hex = async (data: ArrayBuffer) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", data))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+const releaseKey = (meta: Installer) => `${meta.platform}:${meta.arch}:${meta.build}`;
+
+/**
+ * Lists the installers in dropped files. A GitHub artifact ZIP is opened in the browser and only the installers
+ * inside are uploaded, so users download the APK / EXE / DMG itself. A ZIP without recognisable installers that is
+ * itself named like an installer (older portable Windows builds) is kept as the installer.
+ */
+async function collectInstallers(files: File[]): Promise<ImportItem[]> {
+  const items: ImportItem[] = [];
+  for (const file of files) {
+    const direct = { key: `${file.name}:${file.size}:${file.lastModified}`, name: file.name, size: file.size, meta: parseInstallerName(file.name), read: async () => file };
+    if (!/\.zip$/i.test(file.name)) { items.push({ ...direct, state: direct.meta ? "ready" : "unknown" }); continue; }
+    try {
+      const entries = (await zipEntries(file)).map((entry) => ({ entry, name: entry.name.split("/").pop() || entry.name }))
+        .filter(({ name }) => !/\.zip$/i.test(name) && parseInstallerName(name));
+      if (!entries.length) { items.push({ ...direct, state: direct.meta ? "ready" : "unknown" }); continue; }
+      for (const { entry, name } of entries) items.push({ key: `${direct.key}/${entry.name}`, name, size: entry.size, meta: parseInstallerName(name), state: "ready",
+        read: async () => new File([await extractEntry(file, entry)], name) });
+    } catch (error) {
+      items.push(direct.meta ? { ...direct, state: "ready" } : { ...direct, state: "failed", error: t("无法读取压缩包：{0}", [(error as Error).message]) });
+    }
+  }
+  return items;
+}
 
 export function ReleasesPage() {
   useConsoleLanguage();
@@ -83,7 +117,12 @@ export function ReleasesPage() {
   const [rollouts, setRollouts] = useState<Record<string, string>>({});
   const [platformFilter, setPlatformFilter] = useState<"all" | Platform>("all");
   const [formPlatform, setFormPlatform] = useState<Platform>("android");
-  const [source, setSource] = useState<"upload" | "url">("upload");
+  const [source, setSource] = useState<"import" | "upload" | "url">("import");
+  const [imports, setImports] = useState<ImportItem[]>([]);
+  const [importChannel, setImportChannel] = useState<"beta" | "stable">("beta");
+  const [importPublish, setImportPublish] = useState(false);
+  const [importNotes, setImportNotes] = useState("");
+  const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const confirm = useConfirm();
   const toast = useToast();
@@ -143,13 +182,13 @@ export function ReleasesPage() {
     });
   }
   /** Sends the installer to the configured storage and returns its storage key. */
-  async function uploadInstaller(file: File, meta: Record<string, string | number>) {
+  async function uploadInstaller(file: File, meta: Record<string, string | number>, onProgress: (share: number) => void = setProgress) {
     const sizeError = data?.storage.maxBytes && file.size > data.storage.maxBytes;
     if (sizeError) throw new Error("ARTIFACT_TOO_LARGE");
     const fields = { ...meta, fileName: file.name };
     if (data?.storage.mode === "s3") {
       const target = await api<{ storageKey: string; uploadUrl: string }>("/api/v1/admin/client-releases/uploads", { method: "POST", body: JSON.stringify(fields) });
-      await putWithProgress(target.uploadUrl, file, (sent) => setProgress(sent / file.size), false);
+      await putWithProgress(target.uploadUrl, file, (sent) => onProgress(sent / file.size), false);
       return target.storageKey;
     }
     // Local storage: ordered chunks, each below the default Nginx request limit.
@@ -161,10 +200,57 @@ export function ReleasesPage() {
       const response = await fetch(`/api/v1/admin/client-releases/files?${query}`, { method: "PUT", credentials: "include", cache: "no-store", headers: { "Content-Type": "application/octet-stream" }, body: file.slice(offset, offset + chunk) });
       if (!response.ok) throw await readError(response);
       storageKey = ((await response.json()) as { storageKey: string }).storageKey;
-      setProgress(Math.min(1, (offset + chunk) / Math.max(file.size, 1)));
+      onProgress(Math.min(1, (offset + chunk) / Math.max(file.size, 1)));
       if (final) break;
     }
     return storageKey;
+  }
+  async function addImports(files: File[]) {
+    if (!files.length) return;
+    const found = await collectInstallers(files);
+    // A build already in the history is marked and skipped; a build dropped twice is listed once.
+    const existing = new Set((data?.releases || []).map((release) => `${release.platform}:${release.arch}:${release.build}`));
+    setImports((current) => {
+      const next = current.filter((item) => !found.some((added) => added.key === item.key));
+      const listed = new Set(next.flatMap((item) => item.meta ? [releaseKey(item.meta)] : []));
+      for (const item of found) {
+        const key = item.meta && releaseKey(item.meta);
+        if (key && listed.has(key)) continue;
+        if (key) listed.add(key);
+        next.push(key && item.state === "ready" && existing.has(key) ? { ...item, state: "exists" } : item);
+      }
+      return next;
+    });
+  }
+  function dropImports(event: DragEvent<HTMLElement>) {
+    event.preventDefault(); setDragging(false);
+    void addImports([...event.dataTransfer.files]);
+  }
+  const patchImport = (key: string, patch: Partial<ImportItem>) => setImports((current) => current.map((item) => item.key === key ? { ...item, ...patch } : item));
+  /** Uploads every recognised installer in turn; the Controller re-hashes what it stored and rejects a digest that differs. */
+  async function runImports() {
+    const queue = imports.filter((item) => item.meta && (item.state === "ready" || item.state === "failed"));
+    if (!queue.length) return;
+    if (importPublish && importChannel === "stable" && !(await confirm({ title: t("发布正式版"), message: t("{0} 个安装包将直接成为正式版，固定下载链接和客户端更新检查会立即指向它们。", [queue.length]), confirmLabel: t("发布") }))) return;
+    setBusy(true); setNotice(null);
+    let imported = 0;
+    for (const item of queue) {
+      const meta = item.meta!;
+      patchImport(item.key, { state: "uploading", progress: 0, error: undefined });
+      try {
+        const file = await item.read(), sha256 = await sha256Hex(await file.arrayBuffer());
+        const fields = { platform: meta.platform, arch: meta.arch, version: meta.version, build: Number(meta.build) };
+        const storageKey = await uploadInstaller(file, fields, (share) => patchImport(item.key, { progress: share }));
+        await api("/api/v1/admin/client-releases", { method: "POST", body: JSON.stringify({ ...fields, channel: importChannel, minOs: minOsHint[meta.platform], notes: importNotes.trim(),
+          distribution: "direct", storageKey, sha256, sizeBytes: file.size, publish: importPublish }) });
+        patchImport(item.key, { state: "done" }); imported++;
+      } catch (error) {
+        const code = (error as Error).message.split(":")[0];
+        patchImport(item.key, code === "RELEASE_BUILD_EXISTS" ? { state: "exists" } : { state: "failed", error: errorText(error) });
+      }
+    }
+    if (imported) toast(importPublish ? t("已导入并发布 {0} 个安装包", [imported]) : t("已导入 {0} 个安装包，已保存为草稿", [imported]));
+    await refresh();
   }
   async function register(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -186,7 +272,15 @@ export function ReleasesPage() {
       } finally { setProgress(null); }
     }, source === "upload" ? t("安装包已上传并校验，已保存为草稿") : t("草稿已登记，安装包已校验"));
   }
-  const visibleReleases = (data?.releases || []).filter((item) => platformFilter === "all" || item.platform === platformFilter);
+  // Newest upload first, whatever the platform or build number.
+  const visibleReleases = (data?.releases || []).filter((item) => platformFilter === "all" || item.platform === platformFilter)
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.build - a.build);
+  const pendingImports = imports.filter((item) => item.meta && (item.state === "ready" || item.state === "failed")).length;
+  const importState = (item: ImportItem) => item.state === "uploading"
+    ? <span className="import-progress">{(item.progress ?? 0) < 1 ? t("正在上传 {0}%", [Math.round((item.progress ?? 0) * 100)]) : t("正在校验…")}</span>
+    : item.state === "failed" ? <><Pill value="failed" label={t("失败")} tone="danger" />{item.error && <small className="import-error">{item.error}</small>}</>
+    : <Pill value={item.state} label={{ ready: t("待导入"), done: t("已导入"), exists: t("已存在，跳过"), unknown: t("无法识别") }[item.state]}
+      tone={item.state === "done" ? "success" : item.state === "ready" ? "progress" : "neutral"} />;
   const copy = (path: string) => { void navigator.clipboard?.writeText(new URL(path, window.location.origin).href); toast(t("已复制")); };
 
   return <>
@@ -211,10 +305,32 @@ export function ReleasesPage() {
       <section className="panel release-upload"><div className="panel-head"><h2>{t("上传新版本")}</h2></div>
         <p className="form-note">{data.storage.mode === "s3" ? t("安装包直接上传到对象存储（{0}）。上传后 Controller 会下载一次，记录真实的 SHA-256 和大小，并保存为草稿。", [data.storage.publicBaseUrl || ""]) : t("安装包保存在 Controller 的数据卷里，门户通过固定链接提供下载。上传后自动记录 SHA-256 和大小，并保存为草稿。")}{" "}{t("每个版本都会保留，用户可以在门户查看和下载历史版本；撤回的版本不再显示。")}</p>
         <div className="tabs" role="tablist" aria-label={t("安装包来源")}>
+          <button type="button" role="tab" aria-selected={source === "import"} className={source === "import" ? "active" : ""} onClick={() => setSource("import")}>{t("导入 GitHub 构建包")}</button>
           <button type="button" role="tab" aria-selected={source === "upload"} className={source === "upload" ? "active" : ""} onClick={() => setSource("upload")}>{t("上传安装包")}</button>
           <button type="button" role="tab" aria-selected={source === "url"} className={source === "url" ? "active" : ""} onClick={() => setSource("url")}>{t("填写下载地址")}</button>
         </div>
-        <form className="form-grid" onSubmit={(event) => void register(event)}>
+        {source === "import" ? <div className="release-import">
+          <label className={`release-drop${dragging ? " active" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={dropImports}>
+            <input type="file" multiple accept={importExtensions} onChange={(event) => { void addImports([...(event.currentTarget.files || [])]); event.currentTarget.value = ""; }} />
+            <Icon name="download" size={20} />
+            <b>{t("把 GitHub 下载的压缩包拖到这里，或点击选择")}</b>
+            <small>{t("可一次放入多个 .zip，也可以直接放 .apk、.exe、.dmg。自动识别平台、架构、版本号和构建号，只上传压缩包里的安装包。")}</small>
+          </label>
+          {imports.length > 0 && <ul className="release-import-list" aria-label={t("安装包")}>{imports.map((item) => <li key={item.key}>
+            <div><b className="import-name">{item.name}</b><small>{formatBytes(item.size)}</small></div>
+            <div>{item.meta ? <>{platformNames[item.meta.platform]} · {item.meta.arch}<small>{item.meta.version} · {t("构建 {0}", [item.meta.build])}</small></> : <small>—</small>}</div>
+            <div className="import-state">{importState(item)}</div></li>)}</ul>}
+          <div className="form-grid">
+            <label>{t("渠道")}<select value={importChannel} onChange={(event) => setImportChannel(event.target.value as "beta" | "stable")}><option value="beta">{t("测试版")}</option><option value="stable">{t("正式版")}</option></select></label>
+            <label>{t("导入后")}<select value={importPublish ? "publish" : "draft"} onChange={(event) => setImportPublish(event.target.value === "publish")}><option value="draft">{t("保存为草稿")}</option><option value="publish">{t("立即发布")}</option></select></label>
+            <label className="span-2">{t("更新说明")}<textarea maxLength={4000} rows={3} value={importNotes} onChange={(event) => setImportNotes(event.target.value)} placeholder={t("用户会在门户的下载区看到这段说明。")} /></label>
+            <div className="span-2 form-actions">
+              {imports.length > 0 && <button type="button" className="button ghost" disabled={busy} onClick={() => setImports([])}>{t("清空列表")}</button>}
+              <button type="button" className="button primary" disabled={busy || !pendingImports} onClick={() => void runImports()}>{pendingImports ? t("导入 {0} 个安装包", [pendingImports]) : t("导入")}</button>
+            </div>
+          </div>
+        </div>
+        : <form className="form-grid" onSubmit={(event) => void register(event)}>
           <label>{t("平台")}<select name="platform" value={formPlatform} onChange={(event) => setFormPlatform(event.target.value as Platform)}>{Object.entries(platformNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label>{t("架构")}<select name="arch" key={formPlatform} defaultValue={defaultArch[formPlatform]}><option value="universal">universal</option><option value="arm64">arm64</option><option value="x64">x64</option></select></label>
           <label>{t("版本号")}<input name="version" required placeholder="1.2.0" pattern="\d+\.\d+\.\d+(-[A-Za-z0-9.-]+)?" /></label>
@@ -231,11 +347,11 @@ export function ReleasesPage() {
           <label className="span-2">{t("更新说明")}<textarea name="notes" maxLength={4000} rows={3} placeholder={t("用户会在门户的下载区看到这段说明。")} /></label>
           {progress !== null && <div className="span-2 upload-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}><i style={{ width: `${Math.round(progress * 100)}%` }} /><span>{progress < 1 ? t("正在上传 {0}%", [Math.round(progress * 100)]) : t("正在校验…")}</span></div>}
           <div className="span-2 form-actions"><button className="button primary" disabled={busy}>{source === "upload" ? t("上传并保存草稿") : t("登记草稿")}</button></div>
-        </form>
+        </form>}
       </section>
       <section className="panel flush"><div className="panel-head padded"><h2>{t("版本历史")}</h2></div>
         <div className="table-toolbar"><div className="chips" role="group" aria-label={t("平台")}>{(["all", ...Object.keys(platformNames)] as Array<"all" | Platform>).map((value) => <button key={value} type="button" className={platformFilter === value ? "active" : ""} aria-pressed={platformFilter === value} onClick={() => setPlatformFilter(value)}>{value === "all" ? t("全部") : platformNames[value]}<em>{data.releases.filter((item) => value === "all" || item.platform === value).length}</em></button>)}</div></div>
-        {visibleReleases.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("版本")}</th><th>{t("平台")}</th><th>{t("状态")}</th><th>{t("灰度")}</th><th>{t("安装包")}</th><th>{t("发布时间")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visibleReleases.map((release) => <tr key={release.id}>
+        {visibleReleases.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>{t("版本")}</th><th>{t("平台")}</th><th>{t("状态")}</th><th>{t("灰度")}</th><th>{t("安装包")}</th><th>{t("上传时间")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visibleReleases.map((release) => <tr key={release.id}>
           <td><b>{release.version}</b><small>{t("构建 {0}", [release.build])}</small>{release.notes && <small>{release.notes}</small>}</td>
           <td>{platformNames[release.platform]} · {release.arch}<small><br />{release.minOs}</small></td>
           {/* One state per row: users only see published builds, so a draft shows where it will go instead of a channel badge. */}
@@ -246,7 +362,7 @@ export function ReleasesPage() {
           <td>{release.status !== "withdrawn" && <div className="row-actions"><input type="number" min={1} max={100} style={{ width: 80 }} aria-label={t("灰度比例 (%)")} title={t("灰度比例 (%)")} value={rollouts[release.id] ?? "100"} onChange={(event) => setRollouts({ ...rollouts, [release.id]: event.target.value })} /><small>%</small>
               <button className="button ghost small" disabled={busy || String(release.rolloutPercent) === (rollouts[release.id] ?? "100")} onClick={() => void saveRollout(release)}>{t("保存")}</button></div>}</td>
           <td><a href={release.url} target="_blank" rel="noopener noreferrer">{release.distribution === "direct" ? formatBytes(release.sizeBytes) : release.distribution}</a>{release.sha256 && <small><br /><code title={release.sha256}>{release.sha256.slice(0, 12)}…</code></small>}</td>
-          <td>{release.publishedAt ? formatTime(release.publishedAt) : "—"}</td>
+          <td>{formatTime(release.createdAt)}{release.publishedAt && release.status === "published" && Date.parse(release.publishedAt) - Date.parse(release.createdAt) > 60_000 && <small>{t("发布于 {0}", [formatTime(release.publishedAt)])}</small>}</td>
           <td className="align-right cell-actions"><div className="row-actions">
             {release.status !== "published" && <button className="button ghost small" disabled={busy} onClick={() => void act(release, "publish")}>{t("发布")}</button>}
             {release.channel === "beta" && release.status !== "withdrawn" && !release.version.includes("-") && release.distribution !== "testflight" && <button className="button primary small" disabled={busy} onClick={() => void act(release, "promote")}>{t("晋升正式版")}</button>}
