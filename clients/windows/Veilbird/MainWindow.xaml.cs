@@ -664,6 +664,8 @@ public partial class MainWindow : Window {
         }
         if(rows.Count>0) Add(Card(rows));
         else Add(Caption(L10n.Text("no_authorized_devices_yet_they_appear_after_their_first")));
+        var configs=Number(account["configs"]);
+        if(configs>0) Add(Caption(L10n.Text("devices_configs_note",configs.ToString("N0",L10n.Culture))),10,0);
         Add(Caption(L10n.Text("revoke_release_hint")),10,0);
         _=RefreshPage("devices");
     }

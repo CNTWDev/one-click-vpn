@@ -543,6 +543,14 @@ const migrations = [
       SELECT user_id, id, created_at::timestamptz FROM access_credentials
       WHERE deleted_at IS NULL AND status <> 'revoked' AND (expires_at IS NULL OR expires_at::timestamptz > now())`);
   }],
+  ["005-legacy-plan", async (db) => {
+    // Accounts from before plans get a real plan (no end, no traffic or device limit), so every account shows one.
+    await db.query(`INSERT INTO access_plans (id, name, duration_days, quota_bytes, device_limit, is_welcome, enabled, sort_order)
+      VALUES ('legacy', '老用户', NULL, NULL, NULL, FALSE, TRUE, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM access_plans)) ON CONFLICT (id) DO NOTHING`);
+    await db.query("UPDATE access_grants SET plan_id = 'legacy', plan_name = (SELECT name FROM access_plans WHERE id = 'legacy') WHERE source = 'migration' AND plan_id IS NULL");
+    // The per-account device limit is gone: an account's plan alone sets it.
+    await db.query("UPDATE users SET native_device_limit = NULL WHERE native_device_limit IS NOT NULL");
+  }],
 ];
 
 const client = await pool.connect();
@@ -606,7 +614,7 @@ async function seed(pool) {
       [randomUUID(), email, process.env.VEILBIRD_ADMIN_NAME?.trim() || "Owner", hashPassword(password), timestamp],
     );
     // A new owner is permanent and unlimited.
-    if (owner.rowCount) await pool.query(`INSERT INTO access_grants (id, user_id, source, plan_name, starts_at, note)
-      VALUES ($1, $2, 'migration', '', now(), 'Owner')`, [`grant_${randomUUID()}`, owner.rows[0].id]);
+    if (owner.rowCount) await pool.query(`INSERT INTO access_grants (id, user_id, source, plan_id, plan_name, starts_at, note)
+      SELECT $1, $2, 'migration', p.id, COALESCE(p.name, ''), now(), 'Owner' FROM (SELECT 1) one LEFT JOIN access_plans p ON p.id = 'legacy'`, [`grant_${randomUUID()}`, owner.rows[0].id]);
   }
 }

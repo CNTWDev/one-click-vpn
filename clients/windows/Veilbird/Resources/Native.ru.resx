@@ -64,6 +64,7 @@
   <data name="device_limit_reached_account_hint" xml:space="preserve"><value>Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите.</value></data>
   <data name="device_limit_reached_revoke_an_old_device_and_try" xml:space="preserve"><value>Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите.</value></data>
   <data name="device_limit_reached_revoke_an_old_device_in_account" xml:space="preserve"><value>Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите.</value></data>
+  <data name="devices_configs_note" xml:space="preserve"><value>Ещё подписок или конфигураций, занимающих места: {0}. Ненужные можно удалить на веб-портале.</value></data>
   <data name="devices_join_automatically" xml:space="preserve"><value>Новые устройства добавляются сами</value></data>
   <data name="devices_unlimited" xml:space="preserve"><value>Без лимита</value></data>
   <data name="devices_used" xml:space="preserve"><value>Занято {0} из {1}</value></data>

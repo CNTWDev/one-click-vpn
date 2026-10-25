@@ -203,6 +203,7 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
           </li>)}</ul>
             : <p className="hint home-empty">{t("还没有设备登录。安装客户端并登录后会显示在这里。")}</p>}
         {devices.length > 0 && <p className="hint">{t("设备丢了？在这里让它退出登录。")}</p>}
+        {account && account.deviceCount > devices.length && <p className="hint">{t("另有 {0} 个订阅或节点配置也算在设备数里，可以在「使用其他客户端」里删除不用的。", [account.deviceCount - devices.length])}</p>}
       </section>
     </div>
 

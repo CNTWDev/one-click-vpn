@@ -34,8 +34,8 @@ const stateLabels = (): Record<AccessGrant["state"], string> => ({ active: t("�
 const stateTones: Record<AccessGrant["state"], "success" | "progress" | "neutral" | "danger"> = { active: "success", upcoming: "progress", expired: "neutral", exhausted: "danger", revoked: "neutral" };
 
 type View = { access: AccountAccess; devices: { limit: number | null; used: number }; grants: AccessGrant[] };
-type Form = { plan: string; period: "forever" | "days" | "date"; days: string; date: string; traffic: "unlimited" | "gb"; gb: string; devices: string; gift: boolean; note: string };
-const emptyForm: Form = { plan: "", period: "days", days: "30", date: "", traffic: "unlimited", gb: "", devices: "", gift: false, note: "" };
+type Form = { mode: "switch" | "add"; plan: string; period: "forever" | "days" | "date"; days: string; date: string; traffic: "unlimited" | "gb"; gb: string; devices: string; gift: boolean; note: string };
+const emptyForm: Form = { mode: "add", plan: "", period: "days", days: "30", date: "", traffic: "unlimited", gb: "", devices: "", gift: false, note: "" };
 
 /** Console → 账号管理 → 访问详情: what the account may use and every grant that gave it. */
 export function AccessPanel({ userId, onChanged }: { userId: string; onChanged?: () => void }) {
@@ -59,6 +59,7 @@ export function AccessPanel({ userId, onChanged }: { userId: string; onChanged?:
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!form) return;
+    if (form.mode === "switch") { await send({ action: "switch", planId: form.plan, note: form.note }, t("套餐已更换，节点会在半分钟内同步。")); return; }
     const custom = form.plan === "custom";
     await send(custom ? {
       action: "grant", gift: form.gift, note: form.note,
@@ -76,9 +77,15 @@ export function AccessPanel({ userId, onChanged }: { userId: string; onChanged?:
   const access = view?.access;
   const enabledPlans = plans.filter((plan) => plan.enabled);
   const sources = sourceLabels(), states = stateLabels();
+  // The plan the account is on: the plans of the grants in force now (normally one).
+  const current = [...new Set((view?.grants || []).filter((grant) => grant.state === "active").map((grant) => grant.planName || t("自定义权益")))];
+  const switching = form?.mode === "switch";
   return <section className="access-panel" aria-labelledby={`access-${userId}`}>
-    <div className="access-panel-head"><h3 id={`access-${userId}`}>{t("账号权益")}</h3>
-      {!form && <button className="button primary small" disabled={!view} onClick={() => setForm({ ...emptyForm, plan: enabledPlans.find((plan) => !plan.isWelcome)?.id || "custom" })}>{t("增加权益")}</button>}</div>
+    <div className="access-panel-head"><div><h3 id={`access-${userId}`}>{t("账号权益")}</h3>
+      {view && <small>{current.length ? t("当前套餐：{0}", [current.join(" + ")]) : t("当前没有套餐")}</small>}</div>
+      {!form && <div className="row-actions">
+        <button className="button ghost small" disabled={!view} onClick={() => setForm({ ...emptyForm, plan: enabledPlans.find((plan) => !plan.isWelcome)?.id || "custom" })}>{t("增加权益")}</button>
+        <button className="button primary small" disabled={!view || !enabledPlans.length} onClick={() => setForm({ ...emptyForm, mode: "switch", plan: enabledPlans.find((plan) => !current.includes(plan.name))?.id || enabledPlans[0]?.id || "" })}>{t("更换套餐")}</button></div>}</div>
     <InlineNotice notice={notice} />
     {access && <div className="access-facts">
       <article className={`tone-${summary.tone === "neutral" ? "plain" : summary.tone}`}><small>{t("有效期")}</small><b>{access.state === "active" ? access.until ? formatDate(access.until) : t("长期有效") : summary.title}</b>
@@ -90,9 +97,9 @@ export function AccessPanel({ userId, onChanged }: { userId: string; onChanged?:
         <span>{view.devices.limit !== null && view.devices.used > view.devices.limit ? t("超出上限，只有最早的 {0} 个可用", [view.devices.limit]) : t("已用 {0} · 含订阅和节点配置", [view.devices.used])}</span></article>}
     </div>}
     {form && <form className="grant-form" onSubmit={(event) => void submit(event)}>
-      <label className="span-2">{t("内容")}<select value={form.plan} onChange={(event) => setForm({ ...form, plan: event.target.value })}>
+      <label className="span-2">{switching ? t("新套餐") : t("内容")}<select value={form.plan} onChange={(event) => setForm({ ...form, plan: event.target.value })}>
         {enabledPlans.map((plan) => <option key={plan.id} value={plan.id}>{`${plan.name} · ${planTerms(plan)}`}</option>)}
-        <option value="custom">{t("自定义…")}</option></select></label>
+        {!switching && <option value="custom">{t("自定义…")}</option>}</select></label>
       {form.plan === "custom" && <>
         <label>{t("有效期")}<span className="field-pair"><select value={form.period} onChange={(event) => setForm({ ...form, period: event.target.value as Form["period"] })}><option value="days">{t("按天数")}</option><option value="date">{t("到指定日期")}</option><option value="forever">{t("长期有效")}</option></select>
           {form.period === "days" && <input type="number" min={1} max={3650} required aria-label={t("天数")} value={form.days} onChange={(event) => setForm({ ...form, days: event.target.value })} />}
@@ -101,10 +108,10 @@ export function AccessPanel({ userId, onChanged }: { userId: string; onChanged?:
           {form.traffic === "gb" && <input type="number" min={0.1} step={0.1} required aria-label={t("流量（GB）")} placeholder="GB" value={form.gb} onChange={(event) => setForm({ ...form, gb: event.target.value })} />}</span></label>
         <label>{t("设备上限")}<input type="number" min={1} max={100} placeholder={t("不限")} value={form.devices} onChange={(event) => setForm({ ...form, devices: event.target.value })} /></label>
       </>}
-      <label className={form.plan === "custom" ? "" : "span-2"}>{t("备注")}<input maxLength={200} placeholder={t("可留空")} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label>
-      <label className="grant-check span-2"><input type="checkbox" checked={form.gift} onChange={(event) => setForm({ ...form, gift: event.target.checked })} />{t("记为福利赠送")}</label>
-      <p className="grant-hint span-2">{t("有天数的权益接在当前有效期之后开始，其余立即生效。流量按全部节点合计扣减。")}</p>
-      <div className="form-actions span-2"><button type="button" className="button ghost" onClick={() => setForm(null)}>{t("取消")}</button><button className="button primary" disabled={busy}>{busy ? t("保存中…") : t("确认增加")}</button></div>
+      <label className={form.plan === "custom" && !switching ? "" : "span-2"}>{t("备注")}<input maxLength={200} placeholder={t("可留空")} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label>
+      {!switching && <label className="grant-check span-2"><input type="checkbox" checked={form.gift} onChange={(event) => setForm({ ...form, gift: event.target.checked })} />{t("记为福利赠送")}</label>}
+      <p className="grant-hint span-2">{switching ? t("现在和待生效的权益会立即停止，新套餐马上生效，流量重新计算。") : t("有天数的权益接在当前有效期之后开始，其余立即生效。流量按全部节点合计扣减。")}</p>
+      <div className="form-actions span-2"><button type="button" className="button ghost" onClick={() => setForm(null)}>{t("取消")}</button><button className="button primary" disabled={busy || !form.plan}>{busy ? t("保存中…") : switching ? t("确认更换") : t("确认增加")}</button></div>
     </form>}
     {view && <div className="grant-list">{view.grants.map((grant) => <div key={grant.id} className={grant.state === "revoked" || grant.state === "expired" ? "past" : ""}>
       <span className="grow"><b>{grant.planName || (grant.source === "migration" ? t("升级前已有的账号") : t("自定义权益"))}</b>

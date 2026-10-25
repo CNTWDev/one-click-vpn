@@ -8,6 +8,7 @@ export const sharedCatalog: Record<string, readonly [en: string, ru: string]> = 
   "设备": ["Devices", "Устройства"],
   "超出上限，只有最早的 {0} 个可用": ["Over the limit: only the first {0} work", "Сверх лимита: работают только первые {0}"],
   "不限": ["Unlimited", "Без лимита"],
+  "另有 {0} 个订阅或节点配置也算在设备数里，可以在「使用其他客户端」里删除不用的。": ["{0} more subscriptions or server configs also count as devices. Delete unused ones under “Use another app”.", "Ещё подписок или конфигураций, которые считаются устройствами: {0}. Ненужные можно удалить в разделе «Другие приложения»."],
   "显示密码": ["Show password", "Показать пароль"],
   "隐藏密码": ["Hide password", "Скрыть пароль"],
   "清除节点日志": ["Clear server logs", "Очистить журналы сервера"],

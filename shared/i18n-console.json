@@ -615,9 +615,9 @@
     "TrackNothing authorized devices",
     "Авторизованные устройства TrackNothing"
   ],
-  "所有账号都能用 TrackNothing 客户端登录连接，客户端设备数受下面的上限限制。选择「仅 TrackNothing」会同时停用该账号的订阅和第三方配置。": [
-    "Every account can sign in and connect with the TrackNothing app; app devices count toward the limit below. “TrackNothing only” also turns off this account’s subscriptions and third-party configurations.",
-    "Любой аккаунт может входить и подключаться в приложении TrackNothing; устройства приложения учитываются в лимите ниже. «Только TrackNothing» также отключает подписки и сторонние конфигурации аккаунта."
+  "所有账号都能用 TrackNothing 客户端登录连接，设备上限由账号套餐决定。选择「仅 TrackNothing」会同时停用该账号的订阅和第三方配置。": [
+    "Every account can sign in and connect with the TrackNothing app; the account’s plan sets its device limit. “TrackNothing only” also turns off this account’s subscriptions and third-party configurations.",
+    "Любой аккаунт может входить и подключаться в приложении TrackNothing; лимит устройств задаёт тариф аккаунта. «Только TrackNothing» также отключает подписки и сторонние конфигурации аккаунта."
   ],
   "访问方式": [
     "Access mode",
@@ -3295,10 +3295,6 @@
     "Plan or system default ({0})",
     "Тариф или по умолчанию ({0})"
   ],
-  "留空则跟随套餐或系统默认。": [
-    "Leave the limit empty to use the plan or system default.",
-    "Оставьте лимит пустым, чтобы использовать тариф или значение по умолчанию."
-  ],
   "套餐已更新。": [
     "Plan updated.",
     "Тариф обновлён."
@@ -3403,17 +3399,9 @@
     "{0} in use · subscriptions and configs included",
     "Занято: {0} · включая подписки и конфигурации"
   ],
-  "跟随账号权益（{0}）": [
-    "From account access ({0})",
-    "По доступу аккаунта ({0})"
-  ],
   "设备数（含订阅和节点配置）：{0} / {1}": [
     "Devices (subscriptions and configs included): {0} / {1}",
     "Устройства (включая подписки и конфигурации): {0} / {1}"
-  ],
-  "留空则跟随账号权益。": [
-    "Leave empty to follow the account's access.",
-    "Оставьте пустым, чтобы использовать доступ аккаунта."
   ],
   "天数、流量和设备上限留空都表示不限。设备数包括客户端、订阅和节点配置。": [
     "Leave days, traffic or devices empty for no limit. Devices include apps, subscriptions and node configs.",
@@ -3466,5 +3454,33 @@
   "检测于 ": [
     "checked ",
     "проверено "
+  ],
+  "套餐已更换，节点会在半分钟内同步。": [
+    "Plan changed. Servers sync within half a minute.",
+    "Тариф изменён. Серверы синхронизируются в течение полминуты."
+  ],
+  "当前套餐：{0}": [
+    "Plan: {0}",
+    "Тариф: {0}"
+  ],
+  "当前没有套餐": [
+    "No plan",
+    "Нет тарифа"
+  ],
+  "更换套餐": [
+    "Change plan",
+    "Сменить тариф"
+  ],
+  "新套餐": [
+    "New plan",
+    "Новый тариф"
+  ],
+  "现在和待生效的权益会立即停止，新套餐马上生效，流量重新计算。": [
+    "Current and upcoming access stops now; the new plan starts right away with fresh traffic.",
+    "Текущий и будущий доступ сразу прекращается; новый тариф начинает действовать сразу, трафик считается заново."
+  ],
+  "确认更换": [
+    "Change plan",
+    "Сменить тариф"
   ]
 }
