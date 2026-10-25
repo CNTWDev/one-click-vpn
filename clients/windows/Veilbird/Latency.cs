@@ -47,12 +47,10 @@ public static class Latency {
     /// that result (with the current load), so connecting right after the location list does not probe again.
     public static async Task<List<(JsonNode Node,Quality Quality)>> Rank(JsonArray nodes,int attempts=5,TimeSpan? reuse=null) {
         var list=nodes.Where(n=>n is not null).Select(n=>n!).ToList();
-        bool Known(JsonNode node,out Quality quality) {
-            quality=null!;
-            return reuse is { } age&&node["id"]?.GetValue<string>() is { } id&&MeasuredAt.TryGetValue(id,out var at)&&DateTime.UtcNow-at<age&&Recent.TryGetValue(id,out quality!);
-        }
+        Quality? Known(JsonNode node)=>reuse is { } age&&node["id"]?.GetValue<string>() is { } id&&MeasuredAt.TryGetValue(id,out var at)&&DateTime.UtcNow-at<age
+            &&Recent.TryGetValue(id,out var quality)?quality:null;
         var measured=await Task.WhenAll(list.Select(async node=>{
-            if(Known(node,out var known)) return known with {Load=Load(node),Users=Users(node)};
+            if(Known(node) is { } known) return known with {Load=Load(node),Users=Users(node)};
             var fresh=await Measure(node,attempts);
             if(node["id"]?.GetValue<string>() is { } id) MeasuredAt[id]=DateTime.UtcNow;
             return fresh;

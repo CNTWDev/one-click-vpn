@@ -100,9 +100,9 @@ public sealed class NativeApi : IDisposable {
         var origin=new Uri(Entered+"/");
         var installation=Read("installation") is { } saved?Encoding.UTF8.GetString(saved):Guid.NewGuid().ToString();Save("installation",Encoding.UTF8.GetBytes(installation));
         var build=ClientAgent[(ClientAgent.IndexOf('+')+1)..];
-        var (status,text)=await Send("GET",$"/api/v1/client-releases/latest?platform=windows&arch={(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture==System.Runtime.InteropServices.Architecture.Arm64?"arm64":"x64")}&build={build}&installation={installation}",null,new());
+        var (status,body)=await Send("GET",$"/api/v1/client-releases/latest?platform=windows&arch={(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture==System.Runtime.InteropServices.Architecture.Arm64?"arm64":"x64")}&build={build}&installation={installation}",null,new());
         if(status is <200 or >=300) return null;
-        var json=JsonNode.Parse(text) as JsonObject;
+        var json=JsonNode.Parse(body) as JsonObject;
         if(json is null) return null;
         var announcement=json["announcement"]?.GetValue<string>() is { } text?text[..Math.Min(text.Length,500)]:"";
         if(json["updateAvailable"]?.GetValue<bool>()!=true||json["latest"]?["version"]?.GetValue<string>() is not { } version) return (announcement,null);
