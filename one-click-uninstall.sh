@@ -18,7 +18,7 @@ usage() {
 Usage: sudo ./one-click-uninstall.sh [--check] [--yes] [--no-backup]
 
 Permanently removes this TrackNothing installation's containers, local images,
-PostgreSQL/MinIO/Loki volumes, .env, environment backups, and local DB backups.
+PostgreSQL/Loki volumes, .env, environment backups, and local DB backups.
 
 The source tree, host Nginx configuration, TLS certificates, and DNS are kept.
 By default a recovery package is written beside the project directory first.
@@ -81,8 +81,8 @@ echo "TrackNothing destructive uninstall"
 echo "Project: $APP_DIR"
 echo ""
 echo "This will permanently remove:"
-echo "  - TrackNothing Controller, Portal, Admin, PostgreSQL, MinIO, and Loki containers"
-echo "  - this Compose project's PostgreSQL, MinIO, and Loki volumes"
+echo "  - TrackNothing Controller, Portal, Admin, PostgreSQL, and Loki containers"
+echo "  - this Compose project's PostgreSQL and Loki volumes"
 echo "  - locally built TrackNothing images"
 echo "  - $APP_DIR/.env and .env.backup*"
 echo "  - $APP_DIR/backups"

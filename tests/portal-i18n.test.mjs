@@ -3,10 +3,10 @@ import fs from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
 import { rolldown } from "rolldown";
-const catalogBundle = await rolldown({ input: "shared/i18n-catalog.ts" });
+const catalogBundle = await rolldown({ input: "shared/i18n-shared.ts" });
 const { output: catalogOutput } = await catalogBundle.generate({ format: "esm" });
 await catalogBundle.close();
-const { catalog } = await import(`data:text/javascript;base64,${Buffer.from(catalogOutput[0].code).toString("base64")}`);
+const { sharedCatalog: catalog } = await import(`data:text/javascript;base64,${Buffer.from(catalogOutput[0].code).toString("base64")}`);
 
 const bundle = await rolldown({ input: "shared/i18n-core.ts" });
 const { output } = await bundle.generate({ format: "esm" });

@@ -1,4 +1,10 @@
-import { catalog } from "./i18n-catalog";
+import { sharedCatalog } from "./i18n-shared";
+
+const catalog: Record<string, readonly [en: string, ru: string]> = { ...sharedCatalog };
+/** Adds an app's own text (the Console registers i18n-console.json); shared entries keep precedence. */
+export function addCatalog(entries: Record<string, readonly string[]>): void {
+  for (const [source, [en, ru]] of Object.entries(entries)) if (!(source in catalog)) catalog[source] = [en, ru];
+}
 
 export type Locale = "zh" | "en" | "ru";
 export type LanguagePreference = Locale | "system";
