@@ -9,6 +9,7 @@
   <data name="account_device_quota" xml:space="preserve"><value>Authorized devices   {0} / {1}</value></data>
   <data name="account_valid_until" xml:space="preserve"><value>Valid until · {0}</value></data>
   <data name="all_locations" xml:space="preserve"><value>All locations</value></data>
+  <data name="allow_system_extension" xml:space="preserve"><value>Allow the TrackNothing system extension in System Settings → Privacy &amp; Security. It connects once allowed.</value></data>
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>Allow the system to add a VPN on first connection. Manage authorized devices in Account.</value></data>
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>Allow the system VPN permission to connect.</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>Allow VPN access on your first connection</value></data>
@@ -104,6 +105,7 @@
   <data name="logs_title" xml:space="preserve"><value>Diagnostic log</value></data>
   <data name="measuring_latency" xml:space="preserve"><value>Testing…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>Your access has expired. Contact your administrator to renew it.</value></data>
+  <data name="move_to_applications_first" xml:space="preserve"><value>Move TrackNothing to the Applications folder first, then open it from there.</value></data>
   <data name="my_account" xml:space="preserve"><value>My account</value></data>
   <data name="my_veilbird" xml:space="preserve"><value>My TrackNothing</value></data>
   <data name="new_devices_are_added_on_their_first_connection_when" xml:space="preserve"><value>New devices are added on their first connection when a slot is available.</value></data>
@@ -166,6 +168,7 @@
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Sign in to TrackNothing. No imports or configuration needed.</value></data>
   <data name="sign_out" xml:space="preserve"><value>Sign out</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Simulator build · Verify VPN connections on a signed physical-device build</value></data>
+  <data name="system_extension_failed" xml:space="preserve"><value>Couldn't enable the VPN component. Reinstall TrackNothing and try again.</value></data>
   <data name="tap_ring_to_connect" xml:space="preserve"><value>Tap the ring to connect</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>Tap to change location</value></data>
   <data name="test_after_disconnecting" xml:space="preserve"><value>Latency is tested while disconnected. Showing the last results.</value></data>

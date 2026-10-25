@@ -608,7 +608,9 @@ struct ClientView:View {
         }.padding(.leading,16).padding(.trailing,8).frame(minHeight:mac ? 52:64)
     }
     private var logsView:some View {
-        let log=Journal.read()
+        // Both logs' lines start with an ISO 8601 time (20 characters): sorting on it merges them in order.
+        let lines=(Journal.read()+"\n"+model.tunnelLog).split(separator:"\n").enumerated()
+        let log=lines.sorted {($0.element.prefix(20),$0.offset)<($1.element.prefix(20),$1.offset)}.map {$0.element}.joined(separator:"\n")
         return ScrollView {
             VStack(alignment:.leading,spacing:12) {
                 subPageHeader(L10n.text("logs_title")) {tab=2}
@@ -623,14 +625,14 @@ struct ClientView:View {
                         model.message=L10n.text("copied")
                     } label:{logAction(L10n.text("copy_action"))}.buttonStyle(.plain).disabled(log.isEmpty)
                     ShareLink(item:log) {logAction(L10n.text("share_action"))}.buttonStyle(.plain).disabled(log.isEmpty)
-                    Button {Journal.clear();tab=2;tab=3} label:{logAction(L10n.text("clear_action"),color:VeilbirdStyle.danger)}.buttonStyle(.plain)
+                    Button {Journal.clear();model.clearTunnelLog();tab=2;tab=3} label:{logAction(L10n.text("clear_action"),color:VeilbirdStyle.danger)}.buttonStyle(.plain)
                 }
                 // Newest first: the last attempt is what someone opening the log is looking for.
                 Text(log.isEmpty ? L10n.text("logs_empty"):log.split(separator:"\n").reversed().joined(separator:"\n"))
                     .font(.system(size:11,design:.monospaced)).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading).padding(12)
                     .background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
             }.padding(.horizontal,16).padding(.bottom,20)
-        }
+        }.onAppear {model.loadTunnelLog()}
     }
     private func logAction(_ title:String,color:Color=VeilbirdStyle.text)->some View {
         Text(title).font(.system(size:VeilbirdStyle.detail+1,weight:.medium)).foregroundStyle(color).frame(maxWidth:.infinity).frame(height:mac ? 32:44)

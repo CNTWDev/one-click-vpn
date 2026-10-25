@@ -16,6 +16,7 @@ enum AccessFailure: LocalizedError {
                 "KEYCHAIN_SIGNATURE_REQUIRED":L10n.text("this_development_build_lacks_signing_entitlements_configure_your_developer"),
                 "SIMULATOR_UNSUPPORTED":L10n.text("the_simulator_is_for_ui_testing_only_test_the"),
                 "CONNECT_FROM_APP_FIRST":L10n.text("connect_from_app_first"),
+                "MOVE_TO_APPLICATIONS":L10n.text("move_to_applications_first"), "SYSTEM_EXTENSION_FAILED":L10n.text("system_extension_failed"),
                 "SERVER_REQUIRED":L10n.text("enter_a_valid_https_server_address"),
                 "ACCOUNT_UNAVAILABLE":L10n.text("your_account_is_not_active"), "ACCESS_EXPIRED":L10n.text("connection_authorization_expired_connect_again"),
                 "RATE_LIMITED":L10n.text("too_many_attempts_try_again_later"), "PASSWORD_RESET_UNAVAILABLE":L10n.text("password_reset_unavailable"), "INVALID_EMAIL":L10n.text("enter_a_valid_email"), "CLIENT_UPDATE_REQUIRED":L10n.text("client_update_required"), "INVALID_RESPONSE":L10n.text("invalid_server_response_try_again_later")] [code] ?? L10n.text("unable_to_connect_check_your_network_and_try_again")
@@ -23,6 +24,9 @@ enum AccessFailure: LocalizedError {
 }
 
 enum SecureStorage {
+    /// The Mac tunnel is a system extension running as root, outside the user's keychain: the app hands it the
+    /// session token and device key when it starts the tunnel (TunnelControl.secrets), and they stay in its memory.
+    static var handed:[String:Data]?
     static func query(_ name: String) -> [String:Any] {
         var q:[String:Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:"veilbird-native-v1",kSecAttrAccount as String:name]
         #if !targetEnvironment(simulator)
@@ -31,6 +35,7 @@ enum SecureStorage {
         return q
     }
     static func read(_ name: String) throws -> Data? {
+        if let handed {return handed[name]}
         var q=query(name); q[kSecReturnData as String]=true; q[kSecMatchLimit as String]=kSecMatchLimitOne
         var result:CFTypeRef?
         let status=SecItemCopyMatching(q as CFDictionary,&result)
@@ -40,6 +45,7 @@ enum SecureStorage {
         return result as? Data
     }
     static func write(_ name:String,_ value:Data?) throws {
+        if handed != nil {handed?[name]=value;return}
         let q=query(name)
         guard let value else { let status=SecItemDelete(q as CFDictionary); guard status == errSecSuccess || status == errSecItemNotFound else {throw AccessFailure.code("KEYCHAIN_UNAVAILABLE")}; return }
         let status=SecItemUpdate(q as CFDictionary,[kSecValueData as String:value] as CFDictionary)

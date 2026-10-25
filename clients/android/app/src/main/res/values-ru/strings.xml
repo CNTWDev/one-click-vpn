@@ -7,6 +7,7 @@
   <string name="account_device_quota">Устройства   %1$s / %2$s</string>
   <string name="account_valid_until">Действует до · %1$s</string>
   <string name="all_locations">Все локации</string>
+  <string name="allow_system_extension">Разрешите системное расширение TrackNothing в «Системные настройки → Конфиденциальность и безопасность». После этого подключение продолжится.</string>
   <string name="allow_the_system_to_add_a_vpn_on_first">При первом подключении разрешите добавление VPN. Управляйте устройствами в аккаунте.</string>
   <string name="allow_the_system_vpn_permission_to_connect">Для подключения разрешите использование VPN.</string>
   <string name="allow_vpn_access_on_your_first_connection">При первом подключении разрешите VPN</string>
@@ -102,6 +103,7 @@
   <string name="logs_title">Журнал диагностики</string>
   <string name="measuring_latency">Проверка…</string>
   <string name="membership_expired_hint">Срок доступа истёк. Обратитесь к администратору для продления.</string>
+  <string name="move_to_applications_first">Сначала перенесите TrackNothing в папку «Программы» и откройте его оттуда.</string>
   <string name="my_account">Мой аккаунт</string>
   <string name="my_veilbird">Мой TrackNothing</string>
   <string name="new_devices_are_added_on_their_first_connection_when">Новые устройства добавляются при первом подключении, если есть свободное место.</string>
@@ -164,6 +166,7 @@
   <string name="sign_in_to_veilbird_no_imports_or_configuration_needed">Войдите в TrackNothing. Импорт и настройка не нужны.</string>
   <string name="sign_out">Выйти</string>
   <string name="simulator_build_verify_vpn_connections_on_a_signed_physical">Версия для симулятора · Проверяйте VPN на подписанной сборке для устройства</string>
+  <string name="system_extension_failed">Не удалось включить VPN-компонент. Переустановите TrackNothing и попробуйте снова.</string>
   <string name="tap_ring_to_connect">Нажмите на кольцо, чтобы подключиться</string>
   <string name="tap_to_change">Нажмите, чтобы сменить</string>
   <string name="test_after_disconnecting">Задержка проверяется без подключения. Показаны последние результаты.</string>

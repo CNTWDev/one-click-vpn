@@ -139,6 +139,29 @@
         }
       }
     },
+    "allow_system_extension": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow the TrackNothing system extension in System Settings → Privacy & Security. It connects once allowed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在“系统设置 → 隐私与安全性”中允许 TrackNothing 的系统扩展，允许后会自动连接。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Разрешите системное расширение TrackNothing в «Системные настройки → Конфиденциальность и безопасность». После этого подключение продолжится."
+          }
+        }
+      }
+    },
     "allow_the_system_to_add_a_vpn_on_first": {
       "extractionState": "manual",
       "localizations": {
@@ -2324,6 +2347,29 @@
         }
       }
     },
+    "move_to_applications_first": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move TrackNothing to the Applications folder first, then open it from there."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先把 TrackNothing 拖到“应用程序”文件夹，再从那里打开。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сначала перенесите TrackNothing в папку «Программы» и откройте его оттуда."
+          }
+        }
+      }
+    },
     "my_account": {
       "extractionState": "manual",
       "localizations": {
@@ -3746,6 +3792,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Версия для симулятора · Проверяйте VPN на подписанной сборке для устройства"
+          }
+        }
+      }
+    },
+    "system_extension_failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't enable the VPN component. Reinstall TrackNothing and try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法启用 VPN 组件，请重新安装 TrackNothing 后再试。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось включить VPN-компонент. Переустановите TrackNothing и попробуйте снова."
           }
         }
       }

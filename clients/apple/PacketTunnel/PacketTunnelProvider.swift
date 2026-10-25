@@ -40,6 +40,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         lifecycle=Task {
             do {
                 guard let configuration=(protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration,let origin=configuration["origin"] as? String else {throw AccessFailure.code("SERVER_REQUIRED")}
+                #if os(macOS)
+                // Handed over by the app (see SecureStorage.handed); a start from System Settings has none.
+                guard let token=options?["token"] as? Data,let identity=options?["identity"] as? Data else {throw AccessFailure.code("CONNECT_FROM_APP_FIRST")}
+                SecureStorage.handed=["token":token,"identity":identity]
+                #endif
                 api=try NativeAPI(origin:origin);nodeId=configuration["nodeId"] as? String ?? "";smart=(configuration["routing"] as? String ?? "smart") != "global"
                 try await Task.sleep(nanoseconds:200_000_000) // let the path monitor report the current network
                 network=Transports.networkKey(monitor.currentPath)
@@ -225,8 +230,14 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     }
     // Renew immediately after sleep instead of waiting out a stale refresh timer.
     override func wake() {woke=true}
-    /// The app polls this for its status line: status key, node, connected-since and current speed.
+    /// The app polls this for its status line: status key, node, connected-since and current speed. On the Mac the
+    /// tunnel's own log lives in root's container, so the app's log page asks for it ("journal") here.
     override func handleAppMessage(_ messageData:Data,completionHandler:((Data?)->Void)?) {
+        switch String(decoding:messageData,as:UTF8.self) {
+        case "journal":completionHandler?(Data(Journal.read().utf8));return
+        case "journal-clear":Journal.clear();completionHandler?(nil);return
+        default:break
+        }
         stateLock.lock();let state=snapshot;stateLock.unlock()
         completionHandler?(try? JSONSerialization.data(withJSONObject:state))
     }

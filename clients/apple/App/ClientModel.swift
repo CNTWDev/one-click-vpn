@@ -95,10 +95,31 @@ import ServiceManagement
         throw AccessFailure.code("SIMULATOR_UNSUPPORTED")
         #else
         if connected {attempt=nil;manager?.connection.stopVPNTunnel();return}
-        failed=false;attempt=Date()
+        failed=false
+        #if os(macOS)
+        SystemExtension.shared.onApprovalNeeded={[weak self] in self?.message=L10n.text("allow_system_extension")}
+        try await SystemExtension.shared.activate()
+        message=""
+        #endif
+        attempt=Date()
         Journal.add("connect: requested from the app")
         manager=try await TunnelControl.start(origin:try api().origin,nodeId:selected,routing:routing)
         #endif
+    }
+    /// The Mac tunnel's own log lines (they live in root's container); read while the tunnel is running.
+    @Published var tunnelLog=""
+    func loadTunnelLog() {
+        #if os(macOS)
+        guard let session=manager?.connection as? NETunnelProviderSession else {return}
+        try? session.sendProviderMessage(Data("journal".utf8)) {data in
+            let text=data.map {String(decoding:$0,as:UTF8.self)} ?? ""
+            Task {@MainActor in if !text.isEmpty {self.tunnelLog=text}}
+        }
+        #endif
+    }
+    func clearTunnelLog() {
+        tunnelLog=""
+        try? (manager?.connection as? NETunnelProviderSession)?.sendProviderMessage(Data("journal-clear".utf8)) {_ in}
     }
     func refreshStatus() {
         switch manager?.connection.status {

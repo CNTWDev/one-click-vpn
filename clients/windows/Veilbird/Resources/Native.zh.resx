@@ -9,6 +9,7 @@
   <data name="account_device_quota" xml:space="preserve"><value>授权设备   {0} / {1}</value></data>
   <data name="account_valid_until" xml:space="preserve"><value>有效期 · {0}</value></data>
   <data name="all_locations" xml:space="preserve"><value>全部节点</value></data>
+  <data name="allow_system_extension" xml:space="preserve"><value>请在“系统设置 → 隐私与安全性”中允许 TrackNothing 的系统扩展，允许后会自动连接。</value></data>
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>首次连接时，请允许系统添加 VPN。授权设备可在「我的」中管理。</value></data>
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>允许系统 VPN 权限后才能连接。</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>首次连接需要允许系统 VPN 权限</value></data>
@@ -104,6 +105,7 @@
   <data name="logs_title" xml:space="preserve"><value>诊断日志</value></data>
   <data name="measuring_latency" xml:space="preserve"><value>测速中…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>账号已到期，请联系管理员续期。</value></data>
+  <data name="move_to_applications_first" xml:space="preserve"><value>请先把 TrackNothing 拖到“应用程序”文件夹，再从那里打开。</value></data>
   <data name="my_account" xml:space="preserve"><value>我的账号</value></data>
   <data name="my_veilbird" xml:space="preserve"><value>我的 TrackNothing</value></data>
   <data name="new_devices_are_added_on_their_first_connection_when" xml:space="preserve"><value>未满额度时，新设备首次连接会自动加入。</value></data>
@@ -166,6 +168,7 @@
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>登录 TrackNothing，无需导入或配置。</value></data>
   <data name="sign_out" xml:space="preserve"><value>退出登录</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>模拟器开发版 · 连接功能需在已签名的真机版本验证</value></data>
+  <data name="system_extension_failed" xml:space="preserve"><value>无法启用 VPN 组件，请重新安装 TrackNothing 后再试。</value></data>
   <data name="tap_ring_to_connect" xml:space="preserve"><value>轻触圆环，一键连接</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>点击更换节点</value></data>
   <data name="test_after_disconnecting" xml:space="preserve"><value>连接中无法测速，显示的是上次结果。</value></data>

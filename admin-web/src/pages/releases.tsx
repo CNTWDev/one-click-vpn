@@ -48,9 +48,12 @@ const minOsHint: Record<Platform, string> = { android: "Android 8.0", ios: "iOS 
 
 /** CI names installers TrackNothing-<version>-<build>.apk and TrackNothing-<version>-<build>-win-<arch>-setup.exe; picking one fills the form (older Veilbird-* files still match). */
 function parseInstallerName(name: string): { platform: Platform; arch: string; version: string; build: string } | null {
-  const match = name.match(/^(?:TrackNothing|Veilbird)-(\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?)-(\d+)(?:-win-(x64|arm64)(?:-setup)?)?\.(apk|zip|exe)$/i);
-  if (!match || (match[4].toLowerCase() === "apk") === !!match[3]) return null;
-  return match[3] ? { platform: "windows", arch: match[3], version: match[1], build: match[2] } : { platform: "android", arch: "universal", version: match[1], build: match[2] };
+  const match = name.match(/^(?:TrackNothing|Veilbird)-(\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?)-(\d+)(?:-win-(x64|arm64)(?:-setup)?|-(macos))?\.(apk|zip|exe|dmg)$/i);
+  if (!match) return null;
+  const [, version, build, windows, macos, extension] = match, kind = extension.toLowerCase();
+  if (macos || kind === "dmg") return macos && kind === "dmg" ? { platform: "macos", arch: "universal", version, build } : null;
+  if ((kind === "apk") === !!windows) return null;
+  return windows ? { platform: "windows", arch: windows, version, build } : { platform: "android", arch: "universal", version, build };
 }
 
 async function readError(response: Response) {

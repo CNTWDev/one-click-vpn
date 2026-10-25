@@ -17,7 +17,7 @@ struct ConnectIntent:AppIntent {
     func perform() async throws -> some IntentResult {
         guard let manager=try await TunnelControl.saved() else {throw AccessFailure.code("CONNECT_FROM_APP_FIRST")}
         Journal.add("connect: requested from Shortcuts")
-        try manager.connection.startVPNTunnel()
+        try manager.connection.startVPNTunnel(options:try TunnelControl.secrets())
         return .result()
     }
 }

@@ -1033,5 +1033,20 @@
     "zh": "请输入有效的邮箱地址。",
     "en": "Enter a valid email address.",
     "ru": "Введите корректный email."
+  },
+  "allow_system_extension": {
+    "zh": "请在“系统设置 → 隐私与安全性”中允许 TrackNothing 的系统扩展，允许后会自动连接。",
+    "en": "Allow the TrackNothing system extension in System Settings → Privacy & Security. It connects once allowed.",
+    "ru": "Разрешите системное расширение TrackNothing в «Системные настройки → Конфиденциальность и безопасность». После этого подключение продолжится."
+  },
+  "move_to_applications_first": {
+    "zh": "请先把 TrackNothing 拖到“应用程序”文件夹，再从那里打开。",
+    "en": "Move TrackNothing to the Applications folder first, then open it from there.",
+    "ru": "Сначала перенесите TrackNothing в папку «Программы» и откройте его оттуда."
+  },
+  "system_extension_failed": {
+    "zh": "无法启用 VPN 组件，请重新安装 TrackNothing 后再试。",
+    "en": "Couldn't enable the VPN component. Reinstall TrackNothing and try again.",
+    "ru": "Не удалось включить VPN-компонент. Переустановите TrackNothing и попробуйте снова."
   }
 }

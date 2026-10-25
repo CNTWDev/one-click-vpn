@@ -12,7 +12,10 @@ name: Client release
 # Auto-publish (optional): variable VEILBIRD_RELEASE_API (Controller origin) + secret VEILBIRD_RELEASE_TOKEN.
 # Variable VEILBIRD_API_ORIGIN: service origin baked into the apps.
 # Windows: an Inno Setup installer per architecture (x64, arm64), always built.
-# iPhone / Mac need an Apple Developer account first; see clients/RELEASING.md.
+# Mac: a signed, notarized DMG (Developer ID), built once these are set, skipped with a notice otherwise:
+#   variables VEILBIRD_APPLE_TEAM_ID, VEILBIRD_APPLE_BUNDLE_ID; secrets VEILBIRD_APPLE_API_KEY_ID,
+#   VEILBIRD_APPLE_API_ISSUER_ID, VEILBIRD_APPLE_API_KEY_P8, VEILBIRD_MACOS_DEVELOPER_ID_P12 (base64),
+#   VEILBIRD_MACOS_DEVELOPER_ID_P12_PASSWORD. iPhone (TestFlight) comes later; see clients/RELEASING.md.
 on:
   push:
     tags: ['client-v*']
@@ -147,3 +150,89 @@ jobs:
           --version "${{ needs.prepare.outputs.version }}" --build "$env:VEILBIRD_BUILD_NUMBER" --min-os "Windows 10"
           --notes "${{ github.ref_name }} (${{ github.sha }})"
           --file "clients/windows/artifacts/TrackNothing-${{ needs.prepare.outputs.version }}-$env:VEILBIRD_BUILD_NUMBER-${{ matrix.runtime }}-setup.exe"
+  macos:
+    needs: prepare
+    runs-on: macos-15
+    env:
+      VEILBIRD_API_ORIGIN: ${{ vars.VEILBIRD_API_ORIGIN }}
+      VEILBIRD_APPLE_TEAM_ID: ${{ vars.VEILBIRD_APPLE_TEAM_ID }}
+      VEILBIRD_APPLE_BUNDLE_ID: ${{ vars.VEILBIRD_APPLE_BUNDLE_ID }}
+      VEILBIRD_APPLE_API_KEY_ID: ${{ secrets.VEILBIRD_APPLE_API_KEY_ID }}
+      VEILBIRD_APPLE_API_ISSUER_ID: ${{ secrets.VEILBIRD_APPLE_API_ISSUER_ID }}
+      VEILBIRD_VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - id: ready
+        env:
+          P8: ${{ secrets.VEILBIRD_APPLE_API_KEY_P8 }}
+          P12: ${{ secrets.VEILBIRD_MACOS_DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.VEILBIRD_MACOS_DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          missing=""
+          for name in VEILBIRD_APPLE_TEAM_ID VEILBIRD_APPLE_BUNDLE_ID VEILBIRD_APPLE_API_KEY_ID VEILBIRD_APPLE_API_ISSUER_ID P8 P12 P12_PASSWORD; do
+            [[ -n "${!name}" ]] || missing="$missing $name"
+          done
+          if [[ -n "$missing" ]]; then
+            echo "::notice::Mac DMG skipped: Apple signing is not configured (missing:$missing). See clients/RELEASING.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else echo "ready=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.ready == 'true'
+      - uses: actions/setup-go@v5
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          go-version-file: clients/core/go.mod
+          cache-dependency-path: clients/core/go.sum
+      - uses: actions/setup-node@v4
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          node-version: '22'
+      - run: brew install xcodegen
+        if: steps.ready.outputs.ready == 'true'
+      - name: Import signing certificate and API key
+        if: steps.ready.outputs.ready == 'true'
+        env:
+          P8: ${{ secrets.VEILBIRD_APPLE_API_KEY_P8 }}
+          P12: ${{ secrets.VEILBIRD_MACOS_DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.VEILBIRD_MACOS_DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db" password=$(openssl rand -hex 16)
+          echo "$P12" | base64 -d > "$RUNNER_TEMP/developer-id.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          # The Developer ID intermediate, in case the runner image lacks it.
+          curl -fsSL https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer -o "$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$keychain" -T /usr/bin/codesign || true
+          security import "$RUNNER_TEMP/developer-id.p12" -k "$keychain" -P "$P12_PASSWORD" -f pkcs12 -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/developer-id.p12"
+          printf '%s\n' "$P8" > "$RUNNER_TEMP/AuthKey.p8"
+          echo "VEILBIRD_APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+      - name: Install provisioning profiles
+        if: steps.ready.outputs.ready == 'true'
+        run: >-
+          node scripts/apple-profiles.mjs --type MAC_APP_DIRECT
+          --bundle "$VEILBIRD_APPLE_BUNDLE_ID.macos=VEILBIRD_MACOS_APP_PROFILE"
+          --bundle "$VEILBIRD_APPLE_BUNDLE_ID.macos.tunnel=VEILBIRD_MACOS_TUNNEL_PROFILE" >> "$GITHUB_ENV"
+      - name: Build, sign and notarize
+        if: steps.ready.outputs.ready == 'true'
+        run: bash clients/apple/scripts/release-macos.sh
+      - uses: actions/upload-artifact@v4
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          name: TrackNothing-macos-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
+          path: clients/apple/artifacts/release/TrackNothing-*-macos.dmg
+          if-no-files-found: error
+      - name: Publish to beta
+        if: steps.ready.outputs.ready == 'true' && needs.prepare.outputs.publish == 'true'
+        run: >-
+          node scripts/release-client.mjs --platform macos --arch universal --channel beta --publish
+          --version "${{ needs.prepare.outputs.version }}" --build "$VEILBIRD_BUILD_NUMBER" --min-os "macOS 13"
+          --notes "${{ github.ref_name }} (${{ github.sha }})"
+          --file "clients/apple/artifacts/release/TrackNothing-${{ needs.prepare.outputs.version }}-$VEILBIRD_BUILD_NUMBER-macos.dmg"
+      - name: Remove signing material
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/developer-id.p12"

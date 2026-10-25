@@ -1,8 +1,8 @@
-# 客户端打包与分发（Android / Windows）
+# 客户端打包与分发（Android / Windows / Mac）
 
 目标闭环：GitHub Actions 打包 → 安装包放到控制台「客户端发布」→ 门户登录后下载 → 客户端用同一账号登录、选节点、连接 → 以后有新版本时客户端提示下载。
 
-Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次。iPhone / Mac 需要 Apple 开发者账号，见文末，暂不在闭环内。
+Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次。Mac 版在配好 Apple 开发者账号后自动打出签名、公证过的 DMG，见「Mac（DMG 直接下载）」。iPhone 暂不在闭环内，见文末。
 
 ## 一次性准备（只有你能做）
 
@@ -31,8 +31,9 @@ Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次�
 2. 运行结束后，在该次运行页面底部 **Artifacts** 下载（GitHub 会再套一层 zip，先解压）：
    - `TrackNothing-android-…` → `TrackNothing-<版本>-<构建号>.apk`
    - `TrackNothing-windows-x64-…` → `TrackNothing-<版本>-<构建号>-win-x64-setup.exe`（arm64 同理，给 ARM 笔记本用）
-3. 控制台 → 客户端 → 客户端发布 →「上传安装包」，选择解压出来的 `.apk` 或 `-setup.exe`。平台、架构、版本号、构建号会按文件名自动填好，点「上传并保存草稿」。
-4. 版本历史里点「发布」（测试版），自己装一遍确认没问题，再点「晋升正式版」。门户下载区和固定链接 `/download/android`、`/download/windows` 立即指向它，已安装的客户端下次启动会提示更新。
+   - `TrackNothing-macos-…` → `TrackNothing-<版本>-<构建号>-macos.dmg`（配好 Apple 签名后才有）
+3. 控制台 → 客户端 → 客户端发布 →「上传安装包」，选择解压出来的 `.apk`、`-setup.exe` 或 `.dmg`。平台、架构、版本号、构建号会按文件名自动填好，点「上传并保存草稿」。
+4. 版本历史里点「发布」（测试版），自己装一遍确认没问题，再点「晋升正式版」。门户下载区和固定链接 `/download/android`、`/download/windows`、`/download/macos` 立即指向它，已安装的客户端下次启动会提示更新。
 5. 需要强制所有人升级时，在「下载链接与最低版本」设置最低构建号。
 
 ## 可选：让 CI 自动上传（省掉第 2、3 步）
@@ -45,6 +46,42 @@ Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次�
 - Windows：启动时检查，显示新版本卡片，点击下载新安装程序，运行后覆盖安装。
 - 灰度：测试版可以设置比例，只有落在比例内的安装会收到提示。
 
-## iPhone / Mac（有 Apple 开发者账号后再做）
+## Mac（DMG 直接下载）
 
-Apple 不允许绕过签名安装 VPN 类应用。需要：Apple Developer Program（VPN 应用公开上架要求**组织账号**，需要邓白氏编码）；在 App Store Connect 创建 App；生成 App Store Connect API Key。届时 CI 用 API Key 自动签名并上传 TestFlight，控制台登记 TestFlight / App Store 链接，客户端已有的更新提示会打开对应链接。
+走 Developer ID：用你自己的证书签名，交给 Apple 自动公证（几分钟，不是人工审核），DMG 放在控制台的发布存储里下载，不经过 App Store。没配好下面这些时，CI 会跳过 Mac 并在运行页面提示缺什么，Android / Windows 照常打包。
+
+### 一次性准备（在 [developer.apple.com](https://developer.apple.com/account) 和 [App Store Connect](https://appstoreconnect.apple.com)）
+
+1. 加入 Apple Developer Program（个人账号即可，99 美元/年），在 Membership 页面记下 **Team ID**（10 位）。
+2. Certificates → 新建 **Developer ID Application**（需要账号持有人操作）。按页面提示用「钥匙串访问」生成 CSR，下载 `.cer` 双击装入钥匙串，然后在钥匙串里右键这张证书 →「导出」为 `.p12`，设一个密码。
+3. Identifiers → 新建两个 App ID（Bundle ID 前缀以 `com.veilbird.client` 为例）：
+   - `com.veilbird.client.macos`：勾选 **Network Extensions** 和 **System Extension**
+   - `com.veilbird.client.macos.tunnel`：勾选 **Network Extensions**
+   Mac 用的 App Group 是「Team ID + 前缀」形式，不用单独注册。描述文件也不用手动建：CI 会用下面的 API Key 自动创建并下载。
+4. App Store Connect → 用户和访问 → 集成 → App Store Connect API → 生成密钥，角色选 **管理**（Admin，CI 要用它自动创建描述文件）。下载 `.p8`（只能下载一次，离线备份），记下 Key ID 和页面上方的 Issuer ID。
+
+### 填到 GitHub（仓库 → Settings → Secrets and variables → Actions）
+
+| 名称 | 类型 | 值 |
+| --- | --- | --- |
+| `VEILBIRD_APPLE_TEAM_ID` | Variable | Team ID |
+| `VEILBIRD_APPLE_BUNDLE_ID` | Variable | Bundle ID 前缀，如 `com.veilbird.client` |
+| `VEILBIRD_APPLE_API_KEY_ID` | Secret | API Key 的 Key ID |
+| `VEILBIRD_APPLE_API_ISSUER_ID` | Secret | Issuer ID |
+| `VEILBIRD_APPLE_API_KEY_P8` | Secret | `.p8` 文件全文（文本编辑器打开后整段复制） |
+| `VEILBIRD_MACOS_DEVELOPER_ID_P12` | Secret | `.p12` 的 base64：`base64 -i developer-id.p12 \| pbcopy` |
+| `VEILBIRD_MACOS_DEVELOPER_ID_P12_PASSWORD` | Secret | 导出 `.p12` 时设的密码 |
+
+之后每次运行「Client release」都会多出 `TrackNothing-macos-…`。CI 做的事：导入证书 → `scripts/apple-profiles.mjs` 取描述文件 → `clients/apple/scripts/release-macos.sh` 打包签名、生成 DMG、公证并钉订票据。本机有 Xcode 时也可以手动跑这个脚本（需要的环境变量写在脚本开头）。
+
+### 用户第一次安装
+
+1. 打开 DMG，把 TrackNothing 拖进「应用程序」（系统扩展只能从这里加载，直接在 DMG 里打开会提示先移动）。
+2. 第一次点连接时，macOS 提示「系统扩展已被阻止」：打开「系统设置 → 隐私与安全性」，点「允许」，App 会自动继续连接；再同意添加 VPN 配置。以后和普通 App 一样。
+3. 升级：下载新 DMG 覆盖「应用程序」里的旧版，下次连接时新版系统扩展自动替换旧的。
+
+注意：Mac 的隧道以 root 运行，读不到用户钥匙串，所以只能从 App（窗口、菜单栏或快捷指令）里连接；在「系统设置 → VPN」里直接打开会提示先在 App 里连接。
+
+## iPhone（之后再做）
+
+iPhone 没有直接下载的方式。个人账号可以用 TestFlight（内部测试最多 100 人；公开链接最多 10000 人，首个版本要过 Beta 审核）；公开上架 App Store 要求**组织账号**（需要邓白氏编码），且中国大陆区不上架 VPN 应用。届时 CI 用同一个 API Key 签名并上传 TestFlight，另需 `Apple Distribution` 证书（`VEILBIRD_IOS_DISTRIBUTION_P12` 和密码），控制台登记 TestFlight 链接，客户端已有的更新提示会打开它。

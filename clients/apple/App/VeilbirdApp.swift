@@ -41,7 +41,17 @@ enum TunnelControl {
         proto.providerConfiguration=["origin":origin,"nodeId":nodeId,"routing":routing]
         manager.protocolConfiguration=proto;manager.localizedDescription="TrackNothing";manager.isEnabled=true
         try await manager.saveToPreferences();try await manager.loadFromPreferences()
-        try manager.connection.startVPNTunnel()
+        try manager.connection.startVPNTunnel(options:try secrets())
         return manager
+    }
+    /// What the Mac tunnel (a root system extension without the user's keychain) needs to sign in; nil on iOS,
+    /// where the tunnel reads the shared keychain itself.
+    static func secrets() throws -> [String:NSObject]? {
+        #if os(macOS)
+        guard let token=try SecureStorage.read("token") else {throw AccessFailure.code("AUTH_REQUIRED")}
+        return ["token":token as NSData,"identity":try NativeAPI.identity().rawRepresentation as NSData]
+        #else
+        return nil
+        #endif
     }
 }
