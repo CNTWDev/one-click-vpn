@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { latestClientReleases, parseClientReleases } from "../shared/client-releases.ts";
 
 const release = { platform: "android", arch: "universal", channel: "stable", version: "1.0.0", build: 1, status: "published", distribution: "direct", url: "https://downloads.example.com/client.apk", sha256: "a".repeat(64), sizeBytes: 123, minOs: "Android 8", publishedAt: "2026-01-01T00:00:00Z" };
@@ -29,14 +29,12 @@ test("Apple store URLs must be official and TestFlight cannot masquerade as stab
   assert.equal(parse({ ...ios, channel: "beta", distribution: "testflight", url: "https://testflight.apple.com/join/test" })[0].channel, "beta");
 });
 test("native builds do not publish artifacts or fake a connected tunnel", async () => {
+  // The tunnels report "connected" only after a transport answered through the core; until then they confirm.
   const apple = await readFile("clients/apple/PacketTunnel/PacketTunnelProvider.swift", "utf8");
-  assert.match(apple, /last_handshake_time_sec/);
-  const android = await readFile("clients/android/app/src/main/java/com/veilbird/client/MainActivity.kt", "utf8");
-  assert.match(android, /GoBackend.VpnService.prepare/);
-  const windows = await readFile("clients/windows/Veilbird/MainWindow.xaml.cs", "utf8");
-  assert.match(windows, /Button\(L10n.Text\("connection_unavailable"\),\(\)=>\{\},false\)/);
-  const messages = JSON.parse(await readFile("clients/locales/messages.json", "utf8"));
-  assert.match(messages.connection_unavailable.en, /unavailable/i);
+  assert.match(apple, /\["status":"connection_confirming"\]/);
+  assert.match(apple, /failures==0 \? "connection_connected":"connection_confirming"/);
+  const android = (await Promise.all((await readdir("clients/android/app/src/main/java/com/veilbird/client")).map((name) => readFile(`clients/android/app/src/main/java/com/veilbird/client/${name}`, "utf8")))).join("\n");
+  assert.match(android, /VpnService\.prepare\(this\)/);
   const workflow = await readFile(".github/workflows/native-clients.yml", "utf8");
   assert.match(workflow, /workflow_dispatch/);
   assert.doesNotMatch(workflow, /contents: write|gh release|signingPassword/);

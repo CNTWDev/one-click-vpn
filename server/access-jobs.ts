@@ -6,15 +6,16 @@ import { PRODUCT_NAME } from "../shared/brand-name";
 import { writeOperationalLog } from "./operational-logs";
 
 /**
- * Once a minute: refresh accounts whose period just ended or whose next grant just started (nodes
- * drop or re-admit them on their next heartbeat), and mail the reminders once per period.
+ * Refreshes accounts whose period just ended or whose next grant just started, and mails the reminders
+ * once per period. Runs once a minute from server/jobs.ts; returns how many accounts were refreshed.
  */
-export async function runAccessJobs(): Promise<void> {
+export async function runAccessJobs(): Promise<number> {
   const due = await dbQuery<{ id: string }>(`SELECT id FROM users WHERE access_ok AND access_until<=now()
     UNION SELECT DISTINCT user_id FROM access_grants WHERE status='active'
       AND ((starts_at<=now() AND starts_at>now()-interval '10 minutes') OR (ends_at<=now() AND ends_at>now()-interval '10 minutes'))`);
   for (const { id } of due) await refreshAccess(id).catch(() => undefined);
   if (await mailConfigured()) await sendReminders();
+  return due.length;
 }
 
 const SOON_DAYS = 7;
@@ -67,14 +68,4 @@ async function sendReminders() {
         target: { type: "user", id: user.id }, fields: { notice, error: error instanceof Error ? error.message : String(error) } }).catch(() => undefined);
     }
   }
-}
-
-let started = false;
-/** Starts the minute loop once per server process. */
-export function startAccessJobs(): void {
-  if (started) return;
-  started = true;
-  const tick = () => { void runAccessJobs().catch((error) => console.error("Account access jobs failed", error)); };
-  setTimeout(tick, 15_000).unref();
-  setInterval(tick, 60_000).unref();
 }

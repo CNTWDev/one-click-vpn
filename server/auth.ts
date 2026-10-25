@@ -52,12 +52,6 @@ export async function requestActor(): Promise<{ id: string; email: string; role:
   return null;
 }
 
-export async function requireUser(): Promise<DbUser> {
-  const user = await currentUser();
-  if (!user) throw new Response("Unauthorized", { status: 401 });
-  return user;
-}
-
 export async function createLoginSession(userId: string, kind: SessionKind): Promise<{ id: string; expires: Date }> {
   const id = randomBytes(32).toString("base64url");
   const expires = new Date(Date.now() + sessionTtlSeconds() * 1000);

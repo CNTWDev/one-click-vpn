@@ -1,4 +1,4 @@
-import { getNodeReconcileStatus, listControlNodes, listVpnServices, type Protocol, type VpnService } from "./control-db";
+import { getNodeReconcileStatus, findControlNode, listVpnServices, type Protocol, type VpnService } from "./control-db";
 
 export type ConnectivityState = "healthy" | "attention" | "provisioning" | "unavailable" | "not_configured" | "unknown";
 
@@ -45,7 +45,7 @@ function protocolAssessment(protocol: Protocol, raw: unknown, service: VpnServic
 }
 
 export async function getNodeConnectivity(nodeId: string) {
-  const node = (await listControlNodes()).find((item) => item.id === nodeId);
+  const node = await findControlNode(nodeId);
   if (!node) return undefined;
   const capabilities = record(node.capabilities);
   const snapshot = record(capabilities.connectivity);

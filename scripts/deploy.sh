@@ -115,42 +115,19 @@ wait_for_healthy() {
 }
 
 wait_for_healthy db
-echo "PostgreSQL is healthy. Preparing internal operational-log storage..."
-compose up -d minio
-# Re-run the one-shot bucket setup on every deploy: an exit code from an earlier run says nothing
-# about whether the bucket still exists, and Loki crash-loops without it.
-compose up -d --force-recreate minio-init
+echo "PostgreSQL is healthy."
 
-minio_init_id=$(compose ps --all --quiet minio-init)
-if [ -z "$minio_init_id" ]; then
-  echo "MinIO initialization container was not created." >&2
-  compose ps --all >&2
-  compose logs --tail=160 minio minio-init >&2 || true
-  exit 1
+# Operational logs used to sit in a bundled MinIO; Loki now keeps them on its own volume (under /loki/fs,
+# so the old MinIO-era index is never read). Stop the old containers; their data volume is left in place.
+old_log_store=$(docker ps -aq --filter "label=com.docker.compose.project.working_dir=$APP_DIR" --filter "label=com.docker.compose.service=minio"
+  docker ps -aq --filter "label=com.docker.compose.project.working_dir=$APP_DIR" --filter "label=com.docker.compose.service=minio-init")
+if [ -n "$old_log_store" ]; then
+  minio_volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}' $old_log_store | grep . | head -n 1 || true)
+  docker stop $old_log_store >/dev/null || true
+  docker container rm $old_log_store >/dev/null || true
+  echo "Operational logs now use Loki's own storage; runtime logs start fresh from this deploy."
+  [ -z "$minio_volume" ] || echo "The old log volume is no longer used. To free its space: docker volume rm $minio_volume"
 fi
-
-minio_initialized=""
-i=0
-while [ "$i" -lt 65 ]; do
-  minio_init_status=$(docker inspect --format '{{.State.Status}}:{{.State.ExitCode}}' "$minio_init_id" 2>/dev/null || true)
-  if [ "$minio_init_status" = "exited:0" ]; then
-    minio_initialized="yes"
-    break
-  fi
-  case "$minio_init_status" in
-    exited:*|dead:*) break ;;
-  esac
-  i=$((i + 1))
-  sleep 2
-done
-
-if [ -z "$minio_initialized" ]; then
-  echo "MinIO bucket initialization did not complete successfully." >&2
-  compose ps --all >&2
-  compose logs --tail=160 minio minio-init >&2 || true
-  exit 1
-fi
-
 compose up -d loki
 
 if [ "$service" = "all" ]; then
@@ -261,7 +238,7 @@ if [ -n "$loki_ready" ]; then
   echo "Log service (Loki) is ready."
 else
   echo "Warning: the log service (Loki) is not ready; Console Runtime logs stay empty until it is." >&2
-  compose ps --all loki minio minio-init >&2 || true
+  compose ps --all loki >&2 || true
   echo "Recent Loki output:" >&2
   if [ -n "$loki_crashed" ]; then
     compose logs --no-color --since "$check_started" loki 2>/dev/null | grep "error running loki" | tail -n 1 >&2 || true

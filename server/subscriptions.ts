@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { x25519 } from "@noble/curves/ed25519.js";
-import { Pool } from "pg";
-import { addAudit, dbExec, dbQuery, getDb } from "./db";
+import { addAudit, dbExec, dbQuery } from "./db";
+import { withKeyedLock } from "./reconcile-lock";
 import { hashToken } from "./crypto";
 import { createAccessCredential, findDesiredConfig, listConnectionProfiles } from "./control-db";
 import { activateProfile, issueConnectionProfile, selectVpnServices } from "./control-plane";
@@ -12,7 +12,6 @@ import { realityUserIdentities } from "./reality";
 import { accountAccess } from "./entitlements";
 
 type Subscription = { id: string; credential_id: string; token_hash: string; token_secret_id: string | null; private_key_secret_id: string | null; created_at: string; updated_at: string; last_fetched_at: string | null };
-let lockPool: Pool | undefined;
 export async function listSubscriptions(userId?: string) {
   return dbQuery<Subscription & { user_id: string; display_name: string; protocol: string; status: string; user_disabled: boolean; admin_disabled: boolean; expires_at: string; email: string }>(
     `SELECT s.id,s.credential_id,s.created_at,s.updated_at,s.last_fetched_at,c.user_id,c.display_name,c.protocol,c.status,
@@ -27,38 +26,9 @@ export async function listSubscriptions(userId?: string) {
       JOIN users u ON u.id=c.user_id WHERE c.deleted_at IS NULL ${userId ? "AND c.user_id=$1" : ""} ORDER BY s.created_at DESC`, userId ? [userId,new Date().toISOString()] : [new Date().toISOString()]);
 }
 
-// A session advisory lock serializes provisioning across controller workers without nesting existing DB transactions.
-// Same-process callers queue in memory first, so two devices refreshing one subscription wait instead of failing.
-const lockQueues = new Map<string, Promise<unknown>>();
-async function locked<T>(key: string, work: () => Promise<T>): Promise<T> {
-  const previous = lockQueues.get(key) || Promise.resolve();
-  const pending = previous.catch(() => undefined).then(() => lockAndRun(key, work));
-  lockQueues.set(key, pending);
-  try { return await pending; }
-  finally { if (lockQueues.get(key) === pending) lockQueues.delete(key); }
-}
-async function lockAndRun<T>(key: string, work: () => Promise<T>): Promise<T> {
-  // Dedicated bounded pool, separate from the reconcile lock pool that work() itself may need.
-  if (!lockPool) {
-    getDb(); // Validate the configured database before creating another pool.
-    lockPool = new Pool({ connectionString: process.env.VEILBIRD_DATABASE_URL, max: Number(process.env.VEILBIRD_SUBSCRIPTION_LOCK_POOL_MAX || 10), connectionTimeoutMillis: 15000, idleTimeoutMillis: 10000 });
-    lockPool.on("error", () => console.error("Subscription lock connection failed"));
-  }
-  const client = await lockPool.connect().catch(() => { throw new Error("订阅服务繁忙，请稍后重试"); });
-  let held = false;
-  try {
-    try {
-      await client.query("SET lock_timeout='15s'");
-      await client.query("SELECT pg_advisory_lock(hashtext($1))", [key]);
-      held = true;
-    } catch { throw new Error("订阅正在更新，请稍后重试"); }
-    return await work();
-  } finally {
-    let discard = false;
-    try { if (held) await client.query("SELECT pg_advisory_unlock(hashtext($1))", [key]); }
-    catch { discard = true; }
-    finally { client.release(discard || !held); }
-  }
+/** Concurrent refreshes of one link wait for each other instead of provisioning twice. */
+function locked<T>(key: string, work: () => Promise<T>): Promise<T> {
+  return withKeyedLock(key, work);
 }
 
 export async function createSubscription(userId: string, name: string, protocol: "wireguard" | "vless") {

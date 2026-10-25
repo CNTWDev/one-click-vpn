@@ -134,7 +134,7 @@ class ConnectionService : VpnService() {
             .apply { if (android.os.Build.VERSION.SDK_INT >= 29) setMetered(false) }
             .establish() ?: throw ApiFailure("VPN_PERMISSION_REQUIRED")
         // mihomo owns the descriptor from here and closes it on stop.
-        Core.start(home, Transports.config(proxies, transports, tun.detachFd(), routing() == "smart"))
+        Core.run(home, Transports.options(proxies, transports, tun.detachFd(), routing() == "smart"))
         if (stopping) { Core.stop(); throw ApiFailure("CANCELLED") }
         if (!probe(initial = true)) {
             // WireGuard waits for the node to add this device; give it the rest of the readiness window.

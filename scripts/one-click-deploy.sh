@@ -116,8 +116,6 @@ else
   [ -n "$master_key" ] || master_key=$(openssl rand -base64 32 | tr -d '\n')
   db_password=$(existing_value VEILBIRD_DB_PASSWORD)
   [ -n "$db_password" ] || db_password=$(openssl rand -hex 24)
-  log_storage_password=$(existing_value VEILBIRD_LOG_STORAGE_PASSWORD)
-  [ -n "$log_storage_password" ] || log_storage_password=$(openssl rand -hex 24)
   umask 077
   {
     echo "NODE_ENV=production"
@@ -132,7 +130,6 @@ else
     echo "VEILBIRD_API_ORIGIN=https://$api_domain"
     echo "VEILBIRD_AGENT_ORIGIN=https://$api_domain"
     echo "VEILBIRD_DB_PASSWORD=$db_password"
-    echo "VEILBIRD_LOG_STORAGE_PASSWORD=$log_storage_password"
     echo "VEILBIRD_ADMIN_NAME=Owner"
     echo "VEILBIRD_SESSION_TTL_SECONDS=43200"
     echo "VEILBIRD_ALLOW_TOFU_HOST_KEYS=false"

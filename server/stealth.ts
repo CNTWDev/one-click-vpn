@@ -6,7 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { dbExec, dbQuery, withTransaction } from "./db";
 import { hashToken } from "./crypto";
-import { realitySettings } from "./reality";
+import { collectUserBundles, realitySettings } from "./reality";
 import { createSecretMaterial, findSecretMaterialByKind, readSecretMaterial } from "./secret-materials";
 import type { VpnService } from "./control-db";
 import { nativeUserRows } from "./native-users";
@@ -92,11 +92,7 @@ export async function stealthUsersSecret(nodeId: string) {
   const value = JSON.stringify(users);
   const material = previous?.fingerprint === hashToken(value) ? previous : await createSecretMaterial({ kind: "stealth_users_bundle", ownerNodeId: nodeId, value });
   await dbExec("UPDATE secret_materials SET source_fingerprint=$1 WHERE id=$2", [sourceFingerprint, material.id]);
-  // Bundles no desired state or pending task refers to any more are garbage after a day.
-  await dbExec(`DELETE FROM secret_materials s WHERE s.kind='stealth_users_bundle' AND s.owner_node_id=$1 AND s.id<>$2 AND s.created_at<$3
-    AND NOT EXISTS (SELECT 1 FROM desired_configs d WHERE d.node_id=$1 AND d.payload_json::jsonb->>'usersSecretId'=s.id)
-    AND NOT EXISTS (SELECT 1 FROM reconcile_tasks t WHERE t.node_id=$1 AND t.status IN ('pending','running') AND t.payload_json::jsonb->>'usersSecretId'=s.id)`,
-  [nodeId, material.id, new Date(Date.now() - 86400000).toISOString()]);
+  await collectUserBundles(nodeId);
   return material.id;
 }
 

@@ -95,7 +95,7 @@ public sealed class Connection(NativeApi api,Core core) {
         Journal.Add($"node: {NodeName}, transports {string.Join(" > ",transports)}"+(blocked.Count>0?$" (blocked here before: {string.Join(", ",blocked)})":""));
         // Disconnect pressed while connecting cancels the attempt here, before the tunnel stays up.
         if(!Active) throw new OperationCanceledException();
-        await Task.Run(()=>core.Start(Transports.Config(proxies,transports,smart)));
+        await Task.Run(()=>core.Run(Transports.Options(proxies,transports,smart)));
         if(!Active) throw new OperationCanceledException();
         if(!await Probe(initial:true)) {
             // WireGuard waits for the node to add this PC; give it the rest of the readiness window.

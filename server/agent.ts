@@ -1,8 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
-import { findNode, updateNode } from "./db";
+import { dbExec, findNode } from "./db";
 import { hashToken } from "./crypto";
 import { recordAuthFailure } from "./rate-limit";
-import { updateNodeControlMetadata } from "./control-db";
 import { recordNodeNetworkCounters, type NodeNetworkRate } from "./node-traffic";
 
 function metricNumber(value: unknown, max = Number.MAX_SAFE_INTEGER): number {
@@ -55,6 +54,7 @@ export async function authenticateAgent(nodeId: string, token: string, request?:
   return node;
 }
 
+/** One UPDATE per heartbeat: status, metrics, Agent metadata and the online-user count together. */
 export async function recordAgentHeartbeat(input: {
   nodeId: string;
   version?: string;
@@ -67,22 +67,21 @@ export async function recordAgentHeartbeat(input: {
 }): Promise<void> {
   // Rate comes from the stored public-interface sample, so it is overwritten each heartbeat and adds no rows.
   const wanRate = input.metrics === undefined ? null : await recordNodeNetworkCounters(input.nodeId, input.metrics);
-  const normalizedMetrics = input.metrics === undefined ? undefined : normalizeMetrics(input.metrics, wanRate);
-  await updateNode(input.nodeId, {
-    status: "online",
-    last_seen: "now",
-    last_heartbeat_at: new Date().toISOString(),
-    latency: "connected",
-    ...(input.activeUsers !== undefined ? { users: Math.max(0, Math.floor(input.activeUsers)) } : {}),
-    version: input.version || "unknown",
-    ...(normalizedMetrics ? { metrics_json: normalizedMetrics } : {}),
-  });
-  await updateNodeControlMetadata(input.nodeId, {
-    publicEndpoint: input.publicEndpoint,
-    ...(input.serverPublicKey ? { serverPublicKey: input.serverPublicKey } : {}),
-    capabilities: {
-      hostname: input.hostname || "",
-      ...(input.capabilities || {}),
-    },
-  });
+  const normalizedMetrics = input.metrics === undefined ? null : normalizeMetrics(input.metrics, wanRate);
+  const timestamp = new Date().toISOString();
+  // VLESS users have no session list on the node; count the identities that moved traffic in the last 90 s.
+  await dbExec(`UPDATE nodes n SET status = 'online', last_seen = 'now', last_heartbeat_at = $2,
+      latency = 'connected', version = $3, metrics_json = COALESCE($4, n.metrics_json),
+      public_endpoint = COALESCE($5, n.public_endpoint), server_public_key = COALESCE($6, n.server_public_key),
+      agent_capabilities_json = $7, updated_at = $2,
+      users = $8 + (SELECT COUNT(DISTINCT tc.identity_key) FROM traffic_counters tc
+        JOIN access_credentials c ON c.id = tc.credential_id JOIN users u ON u.id = c.user_id
+        WHERE tc.node_id = $1 AND tc.protocol = 'vless' AND tc.last_traffic_at > $9 AND c.status = 'active'
+          AND NOT c.user_disabled AND NOT c.admin_disabled AND c.deleted_at IS NULL AND u.status = 'active')
+    WHERE n.id = $1`, [
+    input.nodeId, timestamp, input.version || "unknown", normalizedMetrics,
+    input.publicEndpoint ?? null, input.serverPublicKey || null,
+    JSON.stringify({ hostname: input.hostname || "", ...(input.capabilities || {}) }),
+    Math.max(0, Math.floor(input.activeUsers || 0)), new Date(Date.now() - 90_000).toISOString(),
+  ]);
 }

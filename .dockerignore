@@ -4,7 +4,6 @@ data
 backups
 .git
 .env
-.wrangler
 dist
 *.log
 # Native SDK caches, generated projects and signing material never enter server images.

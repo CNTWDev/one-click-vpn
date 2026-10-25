@@ -573,6 +573,5 @@ Deploy the Controller (migrations run automatically), then **升级 Agent** on e
   the results in its heartbeat. Pinned target addresses are kept while they still
   handshake, even when CDN DNS answers rotate, so Xray is not restarted needlessly.
 - Subscriptions include a node as soon as the Agent applied a revision containing that
-  user, so unrelated access changes no longer hide nodes for a few seconds. The
-  subscription lock pool is configurable (`VEILBIRD_SUBSCRIPTION_LOCK_POOL_MAX`, default
-  10) and concurrent refreshes of one link wait instead of failing.
+  user, so unrelated access changes no longer hide nodes for a few seconds. Concurrent
+  refreshes of one link wait instead of failing.

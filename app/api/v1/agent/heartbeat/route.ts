@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { cleanText, jsonError, readJson } from "../../../../../server/http";
 import { agentTokenFromRequest, authenticateAgent, recordAgentHeartbeat } from "../../../../../server/agent";
 import { ensureDefaultNodeProtocols } from "../../../../../server/control-plane";
-import { listNodeProtocols, upsertNodeProtocol, type Platform, type Protocol } from "../../../../../server/control-db";
+import { listNodeProtocols, syncNodeProtocols, type Platform, type Protocol } from "../../../../../server/control-db";
 import { getProtocolAdapter, listProtocolAdapters } from "../../../../../server/protocols/registry";
 import { reconcileEnabledVpnServices } from "../../../../../server/vpn-services";
+import { markNodeReconciled, nodeReconcileDue } from "../../../../../server/reconcile-schedule";
 import { recordTrafficSnapshots, type UsageSnapshot } from "../../../../../server/traffic";
-import { dbExec } from "../../../../../server/db";
+import { collectUserBundles } from "../../../../../server/reality";
 import { currentAgentOrigin } from "../../../../../server/agent-domain";
 
 export const runtime = "nodejs";
@@ -39,6 +40,8 @@ export async function POST(request: Request) {
       ? body.capabilities as Record<string, unknown>
       : {};
     const usageSnapshots = Array.isArray(body.usageSnapshots) ? body.usageSnapshots.filter((value): value is UsageSnapshot => Boolean(value && typeof value === "object" && !Array.isArray(value))) : [];
+    // Traffic first: the online-user count in the node row reads the counters just written.
+    await recordTrafficSnapshots(nodeId, usageSnapshots);
     await recordAgentHeartbeat({
       nodeId,
       version: cleanText(body.version, 64),
@@ -49,47 +52,28 @@ export async function POST(request: Request) {
       metrics: body.metrics,
       activeUsers: activeSessionCount(usageSnapshots),
     });
-    await recordTrafficSnapshots(nodeId, usageSnapshots);
-    await dbExec(`UPDATE nodes SET users=$2+(SELECT COUNT(DISTINCT tc.identity_key) FROM traffic_counters tc
-      JOIN access_credentials c ON c.id=tc.credential_id JOIN users u ON u.id=c.user_id
-      WHERE tc.node_id=$1 AND tc.protocol='vless' AND tc.last_traffic_at>$3 AND c.status='active'
-      AND NOT c.user_disabled AND NOT c.admin_disabled AND c.deleted_at IS NULL AND u.status='active') WHERE id=$1`,
-      [nodeId,activeSessionCount(usageSnapshots),new Date(Date.now()-90_000).toISOString()]);
     const protocols = Array.isArray(capabilities.protocols) ? capabilities.protocols.filter((value): value is Protocol => typeof value === "string" && supportedProtocols.has(value as Protocol)) : [];
     if (!protocols.length) {
-      const knownProtocols = await listNodeProtocols(nodeId);
-      if (!knownProtocols.length) await ensureDefaultNodeProtocols(nodeId);
-      for (const current of await listNodeProtocols(nodeId)) {
-        await upsertNodeProtocol({
-          nodeId,
-          protocol: current.protocol,
-          transports: current.transports,
-          platforms: current.platforms,
-          routing: current.routing,
-          ipv6: current.ipv6,
-          minClientVersion: current.min_client_version,
-          configSchemaVersion: current.config_schema_version,
-          status: "unavailable",
-        });
-      }
+      if (!(await listNodeProtocols(nodeId)).length) await ensureDefaultNodeProtocols(nodeId);
+      await syncNodeProtocols(nodeId, (await listNodeProtocols(nodeId)).map((current) => ({
+        protocol: current.protocol, transports: current.transports, platforms: current.platforms, routing: current.routing, ipv6: current.ipv6,
+        minClientVersion: current.min_client_version, configSchemaVersion: current.config_schema_version, status: "unavailable",
+      })));
     } else {
-      for (const protocol of supportedProtocols) {
+      await syncNodeProtocols(nodeId, [...supportedProtocols].map((protocol) => {
         const adapter = getProtocolAdapter(protocol);
-        const available = protocols.includes(protocol);
-        await upsertNodeProtocol({
-          nodeId,
-          protocol,
-          transports: adapter.capability.transports,
-          platforms: supportedPlatforms,
-          routing: adapter.capability.routing,
-          ipv6: adapter.capability.ipv6,
-          minClientVersion: adapter.capability.minClientVersion,
-          configSchemaVersion: adapter.capability.configSchemaVersion,
-          status: available ? adapter.capability.status : "unavailable",
-        });
-      }
+        return {
+          protocol, transports: adapter.capability.transports, platforms: supportedPlatforms, routing: adapter.capability.routing,
+          ipv6: adapter.capability.ipv6, minClientVersion: adapter.capability.minClientVersion,
+          configSchemaVersion: adapter.capability.configSchemaVersion, status: protocols.includes(protocol) ? adapter.capability.status : "unavailable",
+        };
+      }));
     }
-    await reconcileEnabledVpnServices(nodeId);
+    // Healthy services are rebuilt only when access may have changed since this node's last rebuild.
+    const due = nodeReconcileDue(nodeId);
+    await reconcileEnabledVpnServices(nodeId, { healthy: due !== null });
+    if (due !== null) markNodeReconciled(nodeId, due);
+    await collectUserBundles(nodeId);
     // Agents 2.13+ move to this origin on their own once a heartbeat there succeeds.
     return NextResponse.json({ ok: true, nextPollSeconds: 5, controllerOrigin: await currentAgentOrigin() });
   } catch (error) {

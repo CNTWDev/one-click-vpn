@@ -453,8 +453,11 @@ CREATE TABLE IF NOT EXISTS node_traffic_monthly (
 );
 `;
 
-try {
-  await pool.query("SELECT 1");
+/**
+ * Everything up to the October 2026 schema, written to be re-runnable. Deployments that predate
+ * schema_migrations run it once more and record it; from then on only newer migrations run.
+ */
+async function baseline(pool) {
   // Grants arrive with this release; accounts that exist before it keep working: permanent and unlimited.
   const firstEntitlements = !(await pool.query("SELECT to_regclass('access_grants') AS t")).rows[0].t;
   await pool.query(schema);
@@ -481,6 +484,73 @@ try {
   await pool.query("UPDATE mail_settings SET from_name='TrackNothing' WHERE from_name='Veilbird'");
   // Agent domain set in Console → 站点; empty means VEILBIRD_AGENT_ORIGIN from .env.
   await pool.query("ALTER TABLE controller_settings ADD COLUMN IF NOT EXISTS agent_domain TEXT NOT NULL DEFAULT ''");
+  const timestamp = new Date().toISOString();
+  await pool.query(`UPDATE nodes SET region_id = regions.id
+    FROM regions WHERE nodes.region_id IS NULL AND nodes.place = regions.name || ' · ' || regions.country`);
+  await pool.query(`INSERT INTO vpn_services
+    (node_id, protocol, enabled, transport, listen_port, subnet, dns_json, status, created_at, updated_at)
+    SELECT id, 'wireguard', 1, 'udp', 51820, '10.70.0.0/20', '["1.1.1.1"]', 'pending', $1, $1 FROM nodes
+    ON CONFLICT (node_id, protocol) DO NOTHING`, [timestamp]);
+  await pool.query(`INSERT INTO vpn_services
+    (node_id, protocol, enabled, transport, listen_port, subnet, dns_json, status, created_at, updated_at)
+    SELECT id, 'openvpn', 1, 'udp', 1194, '10.71.0.0/24', '["1.1.1.1"]', 'pending', $1, $1 FROM nodes
+    ON CONFLICT (node_id, protocol) DO NOTHING`, [timestamp]);
+  if (firstEntitlements) {
+    await pool.query(`INSERT INTO access_grants (id, user_id, source, plan_name, starts_at, note)
+      SELECT 'grant_' || md5(random()::text || id), id, 'migration', '', now(), 'Existing account' FROM users`);
+    await pool.query("UPDATE users SET access_ok = TRUE, access_until = NULL, access_device_limit = NULL");
+    // Starter plans, created once; operators rename, change or switch them off in Console → 套餐.
+    await pool.query(`INSERT INTO access_plans (id, name, duration_days, quota_bytes, is_welcome, sort_order) VALUES
+      ('welcome', '新用户赠送', NULL, 10737418240, TRUE, 0), ('day', '1 天体验', 1, NULL, FALSE, 1),
+      ('week', '周卡', 7, NULL, FALSE, 2), ('month', '月卡', 30, NULL, FALSE, 3), ('year', '年卡', 365, NULL, FALSE, 4)
+      ON CONFLICT (id) DO NOTHING`);
+  }
+}
+
+/** One-time changes after the baseline, applied in order inside a transaction each. Never edit a released one. */
+const migrations = [
+  ["001-baseline", baseline],
+  ["002-maintenance-indexes", async (db) => db.query(`
+    -- Profiles that can still expire: the minute job marks them expired, reads filter on expires_at.
+    CREATE INDEX IF NOT EXISTS profiles_live_expiry_idx ON connection_profiles(expires_at) WHERE status IN ('issued', 'active');
+    -- Retries, stale-task recovery and the daily cleanup look tasks up by state and age.
+    CREATE INDEX IF NOT EXISTS reconcile_tasks_status_idx ON reconcile_tasks(status, finished_at);
+    CREATE INDEX IF NOT EXISTS access_credentials_expiry_idx ON access_credentials(expires_at) WHERE status = 'active';
+    CREATE INDEX IF NOT EXISTS traffic_counters_observed_idx ON traffic_counters(observed_at);
+    CREATE INDEX IF NOT EXISTS audit_created_idx ON audit_logs(created_at);
+  `)],
+];
+
+const client = await pool.connect();
+try {
+  // Two controller containers starting together must not migrate at the same time.
+  await client.query("SELECT pg_advisory_lock(hashtext('veilbird:migrate'))");
+  await client.query("CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())");
+  const applied = new Set((await client.query("SELECT id FROM schema_migrations")).rows.map((row) => row.id));
+  for (const [id, run] of migrations) {
+    if (applied.has(id)) continue;
+    if (id === "001-baseline") await run(client);
+    else {
+      await client.query("BEGIN");
+      try { await run(client); } catch (error) { await client.query("ROLLBACK"); throw error; }
+      await client.query("INSERT INTO schema_migrations (id) VALUES ($1)", [id]);
+      await client.query("COMMIT");
+      console.log(`Applied migration ${id}`);
+      continue;
+    }
+    await client.query("INSERT INTO schema_migrations (id) VALUES ($1)", [id]);
+    console.log(`Applied migration ${id}`);
+  }
+  // Settings that follow .env on every start: the first site, the starter regions and the owner account.
+  await seed(client);
+  console.log("TrackNothing PostgreSQL database ready");
+} finally {
+  await client.query("SELECT pg_advisory_unlock(hashtext('veilbird:migrate'))").catch(() => undefined);
+  client.release();
+  await pool.end();
+}
+
+async function seed(pool) {
   // The first site is the deployment's own three hostnames; more sites are added in Console → 站点.
   const host = (value) => { try { return value ? new URL(value).hostname : ""; } catch { return ""; } };
   const portalDomain = process.env.VEILBIRD_PORTAL_DOMAIN?.trim() || host(process.env.VEILBIRD_PUBLIC_ORIGIN?.trim());
@@ -503,16 +573,6 @@ try {
       [id, name, country, code, timestamp],
     );
   }
-  await pool.query(`UPDATE nodes SET region_id = regions.id
-    FROM regions WHERE nodes.region_id IS NULL AND nodes.place = regions.name || ' · ' || regions.country`);
-  await pool.query(`INSERT INTO vpn_services
-    (node_id, protocol, enabled, transport, listen_port, subnet, dns_json, status, created_at, updated_at)
-    SELECT id, 'wireguard', 1, 'udp', 51820, '10.70.0.0/20', '["1.1.1.1"]', 'pending', $1, $1 FROM nodes
-    ON CONFLICT (node_id, protocol) DO NOTHING`, [timestamp]);
-  await pool.query(`INSERT INTO vpn_services
-    (node_id, protocol, enabled, transport, listen_port, subnet, dns_json, status, created_at, updated_at)
-    SELECT id, 'openvpn', 1, 'udp', 1194, '10.71.0.0/24', '["1.1.1.1"]', 'pending', $1, $1 FROM nodes
-    ON CONFLICT (node_id, protocol) DO NOTHING`, [timestamp]);
   const email = process.env.VEILBIRD_ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.VEILBIRD_ADMIN_PASSWORD;
   if (email && password) {
@@ -521,21 +581,8 @@ try {
        VALUES ($1, $2, $3, $4, 'owner', 'active', $5, $5, $5) ON CONFLICT (email) DO NOTHING RETURNING id`,
       [randomUUID(), email, process.env.VEILBIRD_ADMIN_NAME?.trim() || "Owner", hashPassword(password), timestamp],
     );
-    // A new owner is permanent and unlimited (on a fresh install the block below covers it).
-    if (owner.rowCount && !firstEntitlements) await pool.query(`INSERT INTO access_grants (id, user_id, source, plan_name, starts_at, note)
+    // A new owner is permanent and unlimited.
+    if (owner.rowCount) await pool.query(`INSERT INTO access_grants (id, user_id, source, plan_name, starts_at, note)
       VALUES ($1, $2, 'migration', '', now(), 'Owner')`, [`grant_${randomUUID()}`, owner.rows[0].id]);
   }
-  if (firstEntitlements) {
-    await pool.query(`INSERT INTO access_grants (id, user_id, source, plan_name, starts_at, note)
-      SELECT 'grant_' || md5(random()::text || id), id, 'migration', '', now(), 'Existing account' FROM users`);
-    await pool.query("UPDATE users SET access_ok = TRUE, access_until = NULL, access_device_limit = NULL");
-    // Starter plans, created once; operators rename, change or switch them off in Console → 套餐.
-    await pool.query(`INSERT INTO access_plans (id, name, duration_days, quota_bytes, is_welcome, sort_order) VALUES
-      ('welcome', '新用户赠送', NULL, 10737418240, TRUE, 0), ('day', '1 天体验', 1, NULL, FALSE, 1),
-      ('week', '周卡', 7, NULL, FALSE, 2), ('month', '月卡', 30, NULL, FALSE, 3), ('year', '年卡', 365, NULL, FALSE, 4)
-      ON CONFLICT (id) DO NOTHING`);
-  }
-  console.log("TrackNothing PostgreSQL database ready");
-} finally {
-  await pool.end();
 }
