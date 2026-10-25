@@ -1,6 +1,9 @@
 import Foundation
 import CryptoKit
 import Security
+#if canImport(TunnelCore)
+import TunnelCore
+#endif
 
 enum AccessFailure: LocalizedError {
     case code(String)
@@ -56,6 +59,10 @@ enum SecureStorage {
     }
 }
 
+/// The TrackNothing API over every origin of the server: the address the app was given, the other API domains the
+/// server lists (every site plus backup domains) and, in the tunnel, the core's address cache and DNS over HTTPS
+/// (CoreFetch), so a blocked domain or poisoned DNS does not lock the app out. The app itself (no core linked)
+/// tries the origins in turn, the one that answered last first.
 final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     let origin:String
     /// Set by the packet tunnel for one connection attempt: the server's runtime log lines for it carry the same id.
@@ -65,30 +72,72 @@ final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         self.origin=origin.hasSuffix("/") ? String(origin.dropLast()) : origin
     }
     func urlSession(_ session:URLSession,task:URLSessionTask,willPerformHTTPRedirection response:HTTPURLResponse,newRequest request:URLRequest,completionHandler:@escaping(URLRequest?)->Void) {completionHandler(nil)}
+    /// Every origin of this server, best first. Another address means another server: only that one until it answers.
+    private func origins() -> [String] {
+        let saved=UserDefaults.standard.stringArray(forKey:"apiOrigins") ?? []
+        return saved.contains(origin) ? saved:[origin]
+    }
+    private func remember(answered:String?,offered:[String]?) {
+        var list=origins()
+        if let offered {list=Array(offered.filter {$0.hasPrefix("https://")}.prefix(12))+[origin]}
+        if let answered,!answered.isEmpty {list.removeAll {$0==answered};list.insert(answered,at:0)}
+        var seen=Set<String>()
+        UserDefaults.standard.set(Array(list.filter {seen.insert($0).inserted}.prefix(14)),forKey:"apiOrigins")
+    }
+    /// One call over the origins; status and body of the first that answered.
+    private func send(_ method:String,_ path:String,body:Data?,headers:[String:String]) async throws -> (Int,Data) {
+        let tried=origins()
+        var all=headers;all["Accept"]="application/json"
+        if body != nil {all["Content-Type"]="application/json"}
+        #if canImport(TunnelCore)
+        var request:[String:Any]=["origins":tried,"method":method,"path":path,"headers":all,"timeoutMs":15000]
+        if let body {request["body"]=String(decoding:body,as:UTF8.self)}
+        let input=String(decoding:try JSONSerialization.data(withJSONObject:request),as:UTF8.self)
+        let home=Shared.folder.appendingPathComponent("core").path
+        let output=await Task.detached {CoreFetch(home,input)}.value
+        guard let reply=try JSONSerialization.jsonObject(with:Data(output.utf8)) as? [String:Any] else {throw AccessFailure.code("SERVICE_UNAVAILABLE")}
+        if let error=reply["error"] as? String,!error.isEmpty {Journal.add("api: unreachable (\(Journal.scrub(error)))");throw AccessFailure.code("SERVICE_UNAVAILABLE")}
+        if let answered=reply["origin"] as? String,!answered.isEmpty,answered != tried.first {Journal.add("api: answered by another address");remember(answered:answered,offered:nil)}
+        let text=reply["body"] as? String ?? ""
+        guard text.utf8.count<=262144 else {throw AccessFailure.code("INVALID_RESPONSE")}
+        return (reply["status"] as? Int ?? 0,Data(text.utf8))
+        #else
+        var lastError:Error=AccessFailure.code("SERVICE_UNAVAILABLE")
+        for (index,candidate) in tried.enumerated() {
+            guard let url=URL(string:candidate+path) else {continue}
+            var request=URLRequest(url:url);request.timeoutInterval=tried.count==1 ? 15:(index==0 ? 8:6)
+            request.httpMethod=method;request.httpBody=body
+            for (name,value) in all {request.setValue(value,forHTTPHeaderField:name)}
+            let session=URLSession(configuration:.ephemeral,delegate:self,delegateQueue:nil)
+            defer {session.invalidateAndCancel()}
+            do {
+                let (data,response)=try await session.data(for:request)
+                guard let response=response as? HTTPURLResponse,data.count<=262144 else {throw AccessFailure.code("INVALID_RESPONSE")}
+                if index>0 {remember(answered:candidate,offered:nil)}
+                return (response.statusCode,data)
+            } catch let error as URLError where error.code != .cancelled {lastError=error}
+        }
+        throw lastError
+        #endif
+    }
     func request(_ path:String,_ body:[String:Any]?=nil) async throws -> [String:Any] {
-        var request=URLRequest(url:URL(string:"\(origin)/api/v2/native/\(path)")!);request.timeoutInterval=15
-        request.setValue("application/json",forHTTPHeaderField:"Accept")
-        request.setValue(Self.clientAgent,forHTTPHeaderField:"X-Veilbird-Client")
-        if let attempt {request.setValue(attempt,forHTTPHeaderField:"X-Request-Id")}
-        if path != "login",let token=try SecureStorage.read("token").flatMap({String(data:$0,encoding:.utf8)}) {request.setValue("Bearer \(token)",forHTTPHeaderField:"Authorization")}
-        if let body {request.httpMethod="POST";request.setValue("application/json",forHTTPHeaderField:"Content-Type");request.httpBody=try JSONSerialization.data(withJSONObject:body)}
-        let session=URLSession(configuration:.ephemeral,delegate:self,delegateQueue:nil)
-        defer { session.invalidateAndCancel() }
-        let (data,response)=try await session.data(for:request)
-        guard data.count<=262144,let json=try JSONSerialization.jsonObject(with:data) as? [String:Any],let response=response as? HTTPURLResponse else {throw AccessFailure.code("INVALID_RESPONSE")}
-        guard (200..<300).contains(response.statusCode) else {throw AccessFailure.code(json["code"] as? String ?? "SERVICE_UNAVAILABLE")}
+        var headers=["X-Veilbird-Client":Self.clientAgent]
+        if let attempt {headers["X-Request-Id"]=attempt}
+        if path != "login",let token=try SecureStorage.read("token").flatMap({String(data:$0,encoding:.utf8)}) {headers["Authorization"]="Bearer \(token)"}
+        let (status,data)=try await send(body == nil ? "GET":"POST","/api/v2/native/\(path)",body:try body.map {try JSONSerialization.data(withJSONObject:$0)},headers:headers)
+        guard let json=try? JSONSerialization.jsonObject(with:data) as? [String:Any] else {throw AccessFailure.code("INVALID_RESPONSE")}
+        guard (200..<300).contains(status) else {throw AccessFailure.code(json["code"] as? String ?? "SERVICE_UNAVAILABLE")}
+        if let offered=json["apiOrigins"] as? [String] {remember(answered:nil,offered:offered)}
         return json
     }
     /// Public release catalog: whether a newer build (or a required one) exists for this install.
     func latestRelease(installation:String) async throws -> [String:Any] {
         let info=Bundle.main.infoDictionary ?? [:],build=Int(info["CFBundleVersion"] as? String ?? "") ?? 0
-        var components=URLComponents(string:"\(origin)/api/v1/client-releases/latest")!
+        var components=URLComponents()
+        components.path="/api/v1/client-releases/latest"
         components.queryItems=[URLQueryItem(name:"platform",value:Self.clientAgent.components(separatedBy:"/")[0]),URLQueryItem(name:"build",value:String(build)),URLQueryItem(name:"installation",value:installation)]
-        var request=URLRequest(url:components.url!);request.timeoutInterval=15;request.setValue("application/json",forHTTPHeaderField:"Accept")
-        let session=URLSession(configuration:.ephemeral,delegate:self,delegateQueue:nil)
-        defer { session.invalidateAndCancel() }
-        let (data,response)=try await session.data(for:request)
-        guard (response as? HTTPURLResponse)?.statusCode==200,data.count<=65536,let json=try JSONSerialization.jsonObject(with:data) as? [String:Any] else {throw AccessFailure.code("SERVICE_UNAVAILABLE")}
+        let (status,data)=try await send("GET",components.string ?? "/api/v1/client-releases/latest",body:nil,headers:[:])
+        guard status==200,data.count<=65536,let json=try JSONSerialization.jsonObject(with:data) as? [String:Any] else {throw AccessFailure.code("SERVICE_UNAVAILABLE")}
         return json
     }
     /// `ios/1.2.3+45`: lets the server require an upgrade (CLIENT_UPDATE_REQUIRED) and track version adoption.

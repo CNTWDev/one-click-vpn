@@ -4,6 +4,7 @@ import { currentUser } from "../../../server/auth";
 import { encryptSecret } from "../../../server/crypto";
 import { cleanText, isValidIp, isValidPort, jsonError, readJson } from "../../../server/http";
 import { queueNodeBootstrap } from "../../../server/bootstrap";
+import { createJoinCommand } from "../../../server/node-join";
 import { initializeVpnServices, type DeploymentTemplate } from "../../../server/vpn-services";
 import { STANDARD_POLICY_VERSION } from "../../../server/deployment-policy";
 import { currentMonthTrafficByNode } from "../../../server/node-traffic";
@@ -37,6 +38,20 @@ export async function POST(request: Request) {
     if (!["standard", "wireguard", "openvpn", "agent-only"].includes(deploymentTemplate)) return jsonError("Invalid deployment template");
     if (!name) return jsonError("Node name is required");
     if (!isValidIp(ip)) return jsonError("Public IP must be a valid IPv4 address, for example 203.0.113.10");
+    const policy = { deployment_policy: (deploymentTemplate === "standard" ? "standard" : deploymentTemplate === "agent-only" ? "agent-only" : "custom") as "standard" | "agent-only" | "custom", policy_version: deploymentTemplate === "standard" ? STANDARD_POLICY_VERSION : 0 };
+    if (body.method === "command") {
+      // No SSH: the node installs itself with a one-time command (server/node-join.ts).
+      if (!region) return jsonError("A valid region is required");
+      const node = await insertNode({
+        name, place, region_id: region.id, ip, ssh_user: "root", ssh_port: 22, ssh_privilege_mode: "root",
+        status: "provisioning", latency: "checking", users: 0, traffic: "—", version: "waiting for install command", last_seen: "just added",
+        credential_type: "none", credential_ciphertext: "", credential_iv: "", credential_tag: "",
+        host_fingerprint: null, host_fingerprint_source: null, node_identity: null, identity_verified_at: null, agent_token_hash: null, ...policy,
+      });
+      await addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { method: "command" } });
+      await initializeVpnServices(node.id, deploymentTemplate);
+      return NextResponse.json({ node: publicNode(node), install: await createJoinCommand(node.id) }, { status: 201 });
+    }
     if (!rawSecret) return jsonError("SSH password or private key is required");
     if (!region) return jsonError("A valid region is required");
     const secret = validateSshCredential(credentialType, rawSecret);
@@ -73,12 +88,12 @@ export async function POST(request: Request) {
       node_identity: discovery.nodeIdentity,
       identity_verified_at: new Date().toISOString(),
       agent_token_hash: null,
-      deployment_policy: deploymentTemplate === "standard" ? "standard" : deploymentTemplate === "agent-only" ? "agent-only" : "custom",
-      policy_version: deploymentTemplate === "standard" ? STANDARD_POLICY_VERSION : 0,
+      ...policy,
     });
     await addAudit({ actorUserId: user.id, action: "node.created", targetType: "node", targetId: node.id, metadata: { credentialType, sshPrivilegeMode, nodeIdentity: discovery.nodeIdentity, hostFingerprint: discovery.fingerprint, fingerprintSource: hostFingerprint ? "operator" : "ssh_tofu" } });
     await initializeVpnServices(node.id, deploymentTemplate);
-    const actionId = await queueNodeBootstrap(node.id, user.id);
+    // On by default: once the Agent runs it upgrades itself, so the password or key is not needed any more.
+    const actionId = await queueNodeBootstrap(node.id, user.id, { forgetCredential: body.forgetCredential !== false });
     return NextResponse.json({ node: publicNode(node), actionId }, { status: 201 });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to create node", error instanceof NodeIdentityConflictError ? 409 : 400);

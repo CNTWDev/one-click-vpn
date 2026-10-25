@@ -4,6 +4,7 @@ import { lookup } from "node:dns/promises";
 import { findControlNode } from "./control-db";
 import { dbExec } from "./db";
 import { writeOperationalLog } from "./operational-logs";
+import { wakeAgent } from "./agent-wake";
 
 /**
  * Manual "检测端口" from the Console: the Controller sends marker UDP packets to a node over the
@@ -60,6 +61,7 @@ export async function startPortCheck(nodeId: string, ports: PortCheckPort[]): Pr
   };
   store.set(nodeId, check);
   if (!udp.length) return finish(check, []);
+  wakeAgent(nodeId);
   const { address, family } = await lookup(host);
   const socket = createSocket(family === 6 ? "udp6" : "udp4");
   socket.on("error", () => undefined);

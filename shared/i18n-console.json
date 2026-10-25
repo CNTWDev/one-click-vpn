@@ -3566,5 +3566,149 @@
   "正在校验…": [
     "Verifying…",
     "Проверка…"
+  ],
+  "告警收件人已保存。": [
+    "Alert recipients saved.",
+    "Получатели оповещений сохранены."
+  ],
+  "告警": [
+    "Alerts",
+    "Оповещения"
+  ],
+  "节点离线 3 分钟、服务异常 10 分钟、磁盘超过 85%、Agent 落后一天时发邮件，恢复时再发一封。": [
+    "Emails when a node is offline for 3 minutes, a service is failing for 10 minutes, a disk is over 85%, or an Agent is a day behind, and again on recovery.",
+    "Письмо, если узел недоступен 3 минуты, служба сбоит 10 минут, диск заполнен более чем на 85% или Agent отстаёт на сутки, и ещё одно при восстановлении."
+  ],
+  "先在上方“邮件发送”配置发信，告警才能发出。": [
+    "Set up Mail delivery above first, or alerts cannot be sent.",
+    "Сначала настройте отправку почты выше, иначе оповещения не уйдут."
+  ],
+  "等待发送": [
+    "not sent yet",
+    "ещё не отправлено"
+  ],
+  "当前没有告警": [
+    "No alerts right now",
+    "Сейчас оповещений нет"
+  ],
+  "收件人": [
+    "Recipients",
+    "Получатели"
+  ],
+  "备用 API 域名已保存。App 下次请求时拿到新列表。": [
+    "Backup API domains saved. Apps get the new list with their next request.",
+    "Резервные домены API сохранены. Приложения получат новый список при следующем запросе."
+  ],
+  "App 备用入口": [
+    "Backup entry points for apps",
+    "Резервные адреса для приложений"
+  ],
+  "App 连不上自己的 API 域名时，会依次尝试所有站点的 API 域名和下面的备用域名，并记住能用的地址。": [
+    "When an app cannot reach its own API domain, it tries the API domains of all sites and the backup domains below, and remembers what works.",
+    "Если приложение не может достучаться до своего домена API, оно пробует домены API всех сайтов и резервные домены ниже и запоминает рабочий."
+  ],
+  "App 会尝试": [
+    "Apps try",
+    "Приложения пробуют"
+  ],
+  "备用 API 域名": [
+    "Backup API domains",
+    "Резервные домены API"
+  ],
+  "每行一个，最多 8 个。先在宝塔把域名反向代理到 {0} 并申请证书，保存时会逐个检查。": [
+    "One per line, up to 8. First proxy each domain to {0} in BaoTa and issue a certificate; each is checked on save.",
+    "По одному в строке, до 8. Сначала настройте в BaoTa обратный прокси на {0} и сертификат; при сохранении каждый проверяется."
+  ],
+  "清除 SSH 凭据": [
+    "Clear SSH credential",
+    "Удалить SSH-доступ"
+  ],
+  "删除 Controller 保存的 {0} 的 SSH 密码或私钥。之后升级由 Agent 自己完成；重装或修复改用安装命令。": [
+    "Deletes the SSH password or key the Controller keeps for {0}. Upgrades are then done by the Agent itself; reinstall or repair uses the install command.",
+    "Удаляет пароль или ключ SSH для {0}, хранящийся в Controller. Обновления затем выполняет сам Agent; переустановка и восстановление — через команду установки."
+  ],
+  "SSH 凭据已清除。": [
+    "SSH credential cleared.",
+    "SSH-доступ удалён."
+  ],
+  "将 {0} 从 {1} 升级至 {2}。Agent 自己下载并校验新版本（旧版 Agent 通过 SSH 更新），90 秒内未上报会自动回滚，保留身份和 VPN 配置。": [
+    "Upgrade {0} from {1} to {2}. The Agent downloads and verifies the new version itself (older Agents are updated over SSH) and rolls back if it does not report within 90 seconds. Identity and VPN configuration are kept.",
+    "Обновить {0} с {1} до {2}. Agent сам загрузит и проверит новую версию (старые версии обновляются по SSH) и откатится, если не отчитается за 90 секунд. Идентичность и настройки VPN сохраняются."
+  ],
+  "用安装命令": [
+    "via install command",
+    "через команду установки"
+  ],
+  "安装命令": [
+    "Install command",
+    "Команда установки"
+  ],
+  "在节点上运行，1 小时内有效": [
+    "run on the node, valid for 1 hour",
+    "запустить на узле, действует 1 час"
+  ],
+  "在服务器上以 root 运行一行命令即可接入，Controller 不保存任何 SSH 凭据。": [
+    "Run one command as root on the server to join it. The Controller stores no SSH credential.",
+    "Чтобы подключить сервер, выполните одну команду от root. Controller не хранит SSH-доступ."
+  ],
+  "生成安装命令": [
+    "Create install command",
+    "Создать команду установки"
+  ],
+  "接入方式": [
+    "Setup method",
+    "Способ подключения"
+  ],
+  "安装命令（推荐）": [
+    "Install command (recommended)",
+    "Команда установки (рекомендуется)"
+  ],
+  "SSH 部署": [
+    "Deploy over SSH",
+    "Развернуть по SSH"
+  ],
+  "部署成功后删除 SSH 凭据（推荐，之后由 Agent 自己升级）": [
+    "Delete the SSH credential after a successful deploy (recommended; the Agent upgrades itself afterwards)",
+    "Удалить SSH-доступ после успешного развёртывания (рекомендуется; дальше Agent обновляется сам)"
+  ],
+  "{0} · 安装命令": [
+    "{0} · Install command",
+    "{0} · Команда установки"
+  ],
+  "用 root 在节点上运行（非 root 账号把 | sh 换成 | sudo sh）。命令只能用一次，{0}前有效。": [
+    "Run it on the node as root (for other accounts replace | sh with | sudo sh). It works once, until {0}.",
+    "Выполните на узле от root (для других учётных записей замените | sh на | sudo sh). Команда одноразовая и действует до {0}."
+  ],
+  "已复制安装命令。": [
+    "Install command copied.",
+    "Команда установки скопирована."
+  ],
+  "无法复制，请手动选择命令。": [
+    "Could not copy. Select the command manually.",
+    "Не удалось скопировать. Выделите команду вручную."
+  ],
+  "复制命令": [
+    "Copy command",
+    "Копировать команду"
+  ],
+  "运行后节点自动安装 Agent 并出现在列表中，部署进度可在节点详情查看。需要能访问本 Controller 的 HTTPS 域名，不需要开放 SSH。": [
+    "The node then installs the Agent and appears in the list; follow progress in its details. It needs to reach this Controller's HTTPS domain; no SSH port has to be open.",
+    "Узел установит Agent и появится в списке; ход установки — в его карточке. Нужен доступ к HTTPS-домену этого Controller, открывать SSH не нужно."
+  ],
+  "节点离线：{0}": [
+    "Node offline: {0}",
+    "Узел недоступен: {0}"
+  ],
+  "协议同步失败：{0}": [
+    "Service failing: {0}",
+    "Сбой службы: {0}"
+  ],
+  "Agent 不是最新版：{0}": [
+    "Agent not up to date: {0}",
+    "Agent устарел: {0}"
+  ],
+  "控制面磁盘已用 {0}": [
+    "Controller disk {0} full",
+    "Диск Controller заполнен на {0}"
   ]
 }

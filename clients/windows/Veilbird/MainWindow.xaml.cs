@@ -22,8 +22,8 @@ namespace Veilbird;
 /// carries the quick actions. Closing the window keeps TrackNothing running in the tray; Quit exits.
 /// </summary>
 public partial class MainWindow : Window {
-    private readonly NativeApi api=new();
     private readonly Core core=new();
+    private readonly NativeApi api;
     private readonly Connection connection;
     private readonly Forms.NotifyIcon tray=new();
     private string page="connect",nodeId=Settings.Get("nodeId"),nodeName=Settings.Get("nodeName");
@@ -53,6 +53,7 @@ public partial class MainWindow : Window {
     private static bool Smart=>Settings.Get("routing","smart")=="smart";
 
     public MainWindow() {
+        api=new NativeApi(core);
         L10n.Initialize();InitializeComponent();api.Origin=api.SavedOrigin;
         TitleLogo.Content=Look.Mark(16,Look.Accent);
         connection=new Connection(api,core);
@@ -63,7 +64,7 @@ public partial class MainWindow : Window {
         SourceInitialized+=(_,_)=>DarkFrame();
         SetupTray();
         Closing+=OnClosing;
-        Render();CheckForUpdate(false);
+        Render();CheckForUpdate(false);_=Crash.Send(api);
     }
 
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
@@ -423,7 +424,7 @@ public partial class MainWindow : Window {
             :Elapsed() is { } time?compact?L10n.Text("connection_stats",time,Mbps(connection.RxRate),Mbps(connection.TxRate)):L10n.Text("connection_rates",Mbps(connection.RxRate),Mbps(connection.TxRate)):"",
         RingState.Connecting=>L10n.Text("finding_best_route"),
         RingState.Failed=>failure,
-        _=>L10n.Text(update?.Mandatory==true?"update_required_detail":"tap_ring_to_connect"),
+        _=>L10n.Text(update?.Mandatory==true?"update_required_detail":connection.Blocking?"kill_switch_blocking":"tap_ring_to_connect"),
     };
     /// The location the next (or current) connection uses, as title, detail and tile code (null: automatic).
     private (string Title,string Detail,string? Code) Location() {
@@ -566,11 +567,19 @@ public partial class MainWindow : Window {
         AutomationProperties.SetName(startup,L10n.Text("open_at_login"));
         startup.Click+=(_,_)=>{var on=startup.IsChecked==true;if(!LoginTask.Set(on)) {startup.IsChecked=!on;Notify(L10n.Text("unable_to_reach_the_service_check_your_network_and"));}};
         var startupRow=new Border {Height=44,Padding=new Thickness(14,0,14,0),Child=Columns(new FrameworkElement(),Single(L10n.Text("open_at_login"),14),startup)};
+        // Kill switch: Windows Filtering Platform rules held by the core, applied with the next tunnel.
+        var guard=new ToggleButton {Style=(Style)FindResource("Switch"),IsChecked=Connection.KillSwitchOn,VerticalAlignment=VerticalAlignment.Center};
+        AutomationProperties.SetName(guard,L10n.Text("kill_switch"));
+        guard.Click+=(_,_)=>{
+            var on=guard.IsChecked==true;Settings.Set("killSwitch",on?"on":"off");
+            Work(async()=>{if(connection.Active) await Task.Run(()=>core.KillSwitch(on));else await connection.KillSwitchChanged();});
+        };
+        var guardRow=new Border {Height=44,Padding=new Thickness(14,0,14,0),Child=Columns(new FrameworkElement(),Single(L10n.Text("kill_switch"),14),guard)};
         var updates=SettingRow(L10n.Text("check_for_updates"),update is { } available?L10n.Text("update_available",available.Version):L10n.Text("up_to_date"),_=>{
             if(update is { } found) Process.Start(new ProcessStartInfo(found.Download.AbsoluteUri) {UseShellExecute=true});
             else CheckForUpdate(true);
         });
-        Add(Card(new FrameworkElement[]{devices,password,language,startupRow,updates},14));
+        Add(Card(new FrameworkElement[]{devices,password,language,startupRow,guardRow,updates},14));
 
         var signOut=new Button {Content=L10n.Text("sign_out"),Height=40,Background=Look.Surface,Foreground=Look.Danger,HorizontalContentAlignment=HorizontalAlignment.Center};
         signOut.Click+=(_,_)=>{

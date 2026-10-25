@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { currentMonthTrafficByNode } from "../../../../server/node-traffic";
-import { addAudit, countRunningNodeActions, NodeBusyError, deleteNode, findNode, findRegion, listNodeActionEvents, listNodeActions, NodeIdentityConflictError, publicNode, updateNodeConfig } from "../../../../server/db";
+import { addAudit, clearNodeCredential, countRunningNodeActions, NodeBusyError, deleteNode, findNode, findRegion, listNodeActionEvents, listNodeActions, NodeIdentityConflictError, publicNode, updateNodeConfig } from "../../../../server/db";
 import { currentUser } from "../../../../server/auth";
 import { cleanText, isValidIp, isValidPort, jsonError, readJson } from "../../../../server/http";
 import { queueNodeBootstrap } from "../../../../server/bootstrap";
+import { createJoinCommand } from "../../../../server/node-join";
 import { getNodeReconcileStatus } from "../../../../server/control-db";
 import { getNodeConnectivity } from "../../../../server/connectivity";
 import { encryptSecret } from "../../../../server/crypto";
@@ -29,7 +30,17 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!node) return jsonError("Node not found", 404);
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
   const action = typeof body.action === "string" ? body.action : "";
-  if (action !== "bootstrap") return jsonError("Only bootstrap is available from this endpoint");
+  if (action === "install-command") {
+    // Also how a node without a stored credential is reinstalled or repaired.
+    await addAudit({ actorUserId: user.id, action: "node.install_command.created", targetType: "node", targetId: id });
+    return NextResponse.json({ install: await createJoinCommand(id) });
+  }
+  if (action === "clear-credential") {
+    await clearNodeCredential(id);
+    await addAudit({ actorUserId: user.id, action: "node.credential.cleared", targetType: "node", targetId: id });
+    return NextResponse.json({ node: publicNode((await findNode(id))!) });
+  }
+  if (action !== "bootstrap") return jsonError("Unsupported node action");
   if (await countRunningNodeActions(id) > 0) return jsonError(new NodeBusyError().message, 409);
   let actionId: string;
   try {

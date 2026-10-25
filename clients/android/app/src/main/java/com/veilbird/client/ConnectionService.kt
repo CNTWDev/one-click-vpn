@@ -44,6 +44,7 @@ class ConnectionService : VpnService() {
     private var leaseReady = false
     private var deadline = 0L
     private var renewAt = 0L
+    private var renewedAt = 0L
     @Volatile private var stopping = false
     private var network = ""
     private var transports = listOf<String>()
@@ -94,7 +95,8 @@ class ConnectionService : VpnService() {
     }
     /** Measured before the tunnel exists; if the list cannot be loaded the server picks the least-loaded node. */
     private fun chooseFastest() {
-        val ranked = try { Latency.rank(api.request("nodes").getJSONArray("nodes"), attempts = 3) } catch (_: Exception) { emptyList() }
+        // Measurements from the last minute (the location list) are reused, so connecting does not probe again.
+        val ranked = try { Latency.rank(api.request("nodes").getJSONArray("nodes"), attempts = 3, reuseMs = 60000) } catch (_: Exception) { emptyList() }
         ranked.take(3).forEach { (node, quality) -> Journal.add("probe: ${node.optString("name")} ${quality.latency?.let { "${it} ms" } ?: "no answer"}, jitter ${quality.jitter} ms, loss ${quality.loss}%") }
         nodeId = ranked.firstOrNull()?.first?.getString("id") ?: ""
         fallbacks.clear(); fallbacks.addAll(ranked.drop(1).take(2).map { it.first.getString("id") })
@@ -169,8 +171,8 @@ class ConnectionService : VpnService() {
     }
     private fun status(): Boolean = try { api.request("status/$leaseId").getBoolean("ready") } catch (_: Exception) { false }
     /**
-     * A lease for this device on nodeId. A first connection with other transports waits briefly for
-     * WireGuard to be ready; without them it waits up to 15 s. Renewals only check readiness.
+     * A lease for this device on nodeId. A first connection with other transports does not wait for WireGuard
+     * (they carry traffic until it is ready; tick switches then); without them it waits up to 15 s.
      */
     private fun acquire(initial: Boolean = false): JSONObject {
         val input = JSONObject().put("publicKey", keyPair.publicKey.toBase64())
@@ -179,12 +181,12 @@ class ConnectionService : VpnService() {
         nodeId = lease.getString("nodeId"); ConnectionStateStore.nodeId = nodeId
         val remaining = (Instant.parse(lease.getString("expiresAt")).toEpochMilli() - System.currentTimeMillis()).coerceAtMost(300000)
         if (remaining <= 0) throw ApiFailure("ACCESS_EXPIRED")
-        deadline = SystemClock.elapsedRealtime() + remaining; renewAt = SystemClock.elapsedRealtime() + 90000
+        deadline = SystemClock.elapsedRealtime() + remaining; renewAt = SystemClock.elapsedRealtime() + 90000; renewedAt = SystemClock.elapsedRealtime()
         ConnectionStateStore.node = lease.getString("nodeName")
         leaseId = lease.getString("leaseId"); leaseReady = lease.optBoolean("ready")
         if (!initial) { if (!leaseReady) leaseReady = status(); return lease }
         val spare = (lease.optJSONArray("proxies")?.length() ?: 0) > 0
-        for (attempt in 0 until if (spare) 3 else 15) {
+        for (attempt in 0 until if (spare) 0 else 15) {
             if (leaseReady) break
             if (SystemClock.elapsedRealtime() >= deadline) throw ApiFailure("ACCESS_EXPIRED")
             Thread.sleep(1000); leaseReady = status()
@@ -197,13 +199,15 @@ class ConnectionService : VpnService() {
         if (stopping) return
         try {
             val now = SystemClock.elapsedRealtime()
-            // After Doze the lease may already have lapsed: one renewal attempt before closing the tunnel.
-            if (now >= renewAt || now >= deadline) {
+            // A refusal (account, device, quota) closes the tunnel. When the server cannot be reached the tunnel
+            // stays while it still carries traffic, up to OFFLINE_GRACE after the last renewal; probes decide.
+            if (now >= renewAt) {
+                val retry = now + if (now - renewedAt < 300000) 15000 else 60000
                 try { acquire() } catch (e: ApiFailure) {
                     if (e.code in listOf("AUTH_REQUIRED", "DEVICE_REVOKED", "DEVICE_LIMIT_REACHED", "MEMBERSHIP_EXPIRED", "QUOTA_EXHAUSTED", "ACCOUNT_UNAVAILABLE", "MANAGED_ACCESS_REQUIRED", "CLIENT_UPDATE_REQUIRED")) { fail(e); return }
-                    Journal.add("lease: renewal failed (${e.code}), retrying"); renewAt = now + 15000
-                } catch (_: Exception) { renewAt = now + 15000 }
-                if (SystemClock.elapsedRealtime() >= deadline) { Journal.add("lease: expired"); api.report("LEASE_RENEWAL_FAILED", nodeId); stopConnection(R.string.connection_authorization_expired_connect_again); return }
+                    Journal.add("lease: renewal failed (${e.code}), retrying"); renewAt = retry
+                } catch (_: Exception) { renewAt = retry }
+                if (SystemClock.elapsedRealtime() - renewedAt >= OFFLINE_GRACE) { Journal.add("lease: expired"); api.report("LEASE_RENEWAL_FAILED", nodeId); stopConnection(R.string.connection_authorization_expired_connect_again); return }
             } else if (!leaseReady) {
                 // WireGuard became usable: test it now so traffic moves to the lightest transport without waiting for the next round.
                 if (status()) { leaseReady = true; Journal.add("lease: WireGuard ready"); probe(report = true) }
@@ -244,6 +248,10 @@ class ConnectionService : VpnService() {
         ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L
         try { api.action("disconnect", JSONObject()) } catch (_: Exception) { }
         stopForeground(STOP_FOREGROUND_REMOVE); stopSelf()
+    }
+    companion object {
+        /** Keep a working tunnel this long when the server cannot be reached to renew the lease; the node keeps the lease as long. */
+        private const val OFFLINE_GRACE = 12 * 3600 * 1000L
     }
     override fun onDestroy() {
         worker.shutdownNow()

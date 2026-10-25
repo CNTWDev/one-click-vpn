@@ -191,6 +191,8 @@ export function publicNode(node: DbNode): Record<string, unknown> {
   const stale = node.status === "online" && heartbeatAt && Date.now() - new Date(heartbeatAt).getTime() > 90_000;
   return {
     ...Object.fromEntries(Object.entries(node).filter(([key]) => !hidden.has(key))),
+    // False for nodes added by install command or whose credential was cleared: SSH actions need it again.
+    has_ssh_credential: node.credential_type !== "none" && Boolean(node.credential_ciphertext),
     metrics: parseMetrics(node.metrics_json),
     metricsCollectedAt: parseMetrics(node.metrics_json)?.collectedAt || null,
     ...(stale ? { status: "attention", latency: "no heartbeat", last_seen: "heartbeat expired" } : {}),
@@ -453,6 +455,18 @@ export async function updateNode(id: string, values: Record<string, string | num
     await dbExec(`UPDATE nodes SET ${assignments}, updated_at = $${entries.length + 1} WHERE id = $${entries.length + 2}`, valuesWithTimestamp);
   }
   return findNode(id);
+}
+
+/** Forgets the stored SSH password or key; the Agent keeps working and upgrades itself (2.17+). */
+export async function clearNodeCredential(id: string): Promise<void> {
+  await dbExec("UPDATE nodes SET credential_type = 'none', credential_ciphertext = '', credential_iv = '', credential_tag = '', updated_at = $2 WHERE id = $1", [id, now()]);
+}
+
+/** A node seen first through its Agent (install command) records the identity the Agent reports, once. */
+export async function adoptNodeIdentity(id: string, identity: string): Promise<void> {
+  if (!/^nsn_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(identity)) return;
+  await dbExec(`UPDATE nodes SET node_identity = $2, identity_verified_at = $3 WHERE id = $1 AND node_identity IS NULL
+    AND NOT EXISTS (SELECT 1 FROM nodes other WHERE other.node_identity = $2)`, [id, identity, now()]).catch(() => undefined);
 }
 
 export async function updateNodeConfig(id: string, values: {

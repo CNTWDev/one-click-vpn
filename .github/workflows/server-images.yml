@@ -1,0 +1,83 @@
+name: Server images
+# Builds the Controller, Portal, Console and REALITY target images once per master commit, so servers pull
+# them (scripts/deploy.sh with VEILBIRD_IMAGE_PREFIX) instead of building on the production host. Tags are
+# the first 12 characters of the commit; deploying an older tag is a rollback.
+#
+# Registries: GHCR always (ghcr.io/<owner>/tracknothing-<service>). With the repository variable
+# VEILBIRD_ACR_PREFIX (e.g. registry.cn-hangzhou.aliyuncs.com/tracknothing/tracknothing) and the secrets
+# VEILBIRD_ACR_USERNAME / VEILBIRD_ACR_PASSWORD, the same images also go to Aliyun ACR, which servers in
+# mainland China pull from much faster.
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths-ignore: ['clients/**', '**/*.md', '.github/workflows/native-clients.yml', '.github/workflows/client-release.yml']
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: server-images-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: veilbird
+            file: Dockerfile
+            target: ''
+          - service: portal-web
+            file: Dockerfile.frontend
+            target: portal-runtime
+            port: '3100'
+          - service: admin-web
+            file: Dockerfile.frontend
+            target: admin-runtime
+            port: '3200'
+          - service: reality-target
+            file: deploy/reality-target/Dockerfile
+            target: ''
+    steps:
+      - uses: actions/checkout@v4
+      - id: names
+        env:
+          OWNER: ${{ github.repository_owner }}
+          ACR: ${{ vars.VEILBIRD_ACR_PREFIX }}
+          ACR_USER: ${{ secrets.VEILBIRD_ACR_USERNAME }}
+        run: |
+          tag=${GITHUB_SHA::12}
+          ghcr="ghcr.io/$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')/tracknothing-${{ matrix.service }}"
+          tags="$ghcr:$tag,$ghcr:latest"
+          if [ -n "$ACR" ] && [ -n "$ACR_USER" ]; then
+            tags="$tags,$ACR-${{ matrix.service }}:$tag,$ACR-${{ matrix.service }}:latest"
+            echo "acr_registry=${ACR%%/*}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+          echo "rev=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - if: steps.names.outputs.acr_registry != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ steps.names.outputs.acr_registry }}
+          username: ${{ secrets.VEILBIRD_ACR_USERNAME }}
+          password: ${{ secrets.VEILBIRD_ACR_PASSWORD }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          platforms: ${{ vars.VEILBIRD_IMAGE_PLATFORMS || 'linux/amd64' }}
+          build-args: |
+            VEILBIRD_BUILD_REV=${{ steps.names.outputs.rev }}
+            PORT=${{ matrix.port }}
+          push: true
+          tags: ${{ steps.names.outputs.tags }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}

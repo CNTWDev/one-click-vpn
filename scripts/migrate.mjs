@@ -551,6 +551,20 @@ const migrations = [
     // The per-account device limit is gone: an account's plan alone sets it.
     await db.query("UPDATE users SET native_device_limit = NULL WHERE native_device_limit IS NOT NULL");
   }],
+  ["006-join-alerts-origins", async (db) => db.query(`
+    -- One-time install commands (server/node-join.ts): only the hash is kept, a token works once within an hour.
+    CREATE TABLE IF NOT EXISTS node_join_tokens (
+      token_hash TEXT PRIMARY KEY, node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    -- Alert rules (server/alerts.ts) that are firing, so a restart neither repeats nor forgets an alert.
+    CREATE TABLE IF NOT EXISTS alert_states (
+      key TEXT PRIMARY KEY, firing_since TIMESTAMPTZ NOT NULL, notified_at TIMESTAMPTZ, detail TEXT NOT NULL DEFAULT ''
+    );
+    ALTER TABLE controller_settings ADD COLUMN IF NOT EXISTS alert_emails TEXT NOT NULL DEFAULT '';
+    -- Extra API domains the apps try when the site domains are blocked (server/api-origins.ts).
+    ALTER TABLE controller_settings ADD COLUMN IF NOT EXISTS backup_api_domains TEXT NOT NULL DEFAULT '';
+  `)],
 ];
 
 const client = await pool.connect();

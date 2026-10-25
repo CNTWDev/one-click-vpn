@@ -92,6 +92,10 @@
   <data name="hide_password" xml:space="preserve"><value>Скрыть пароль</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Неверная почта или пароль.</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>Некорректный ответ сервера. Повторите позже.</value></data>
+  <data name="kill_switch" xml:space="preserve"><value>Блокировка без VPN</value></data>
+  <data name="kill_switch_android_detail" xml:space="preserve"><value>В настройках Android включите «Постоянная VPN» и «Блокировать соединения без VPN»</value></data>
+  <data name="kill_switch_apple_detail" xml:space="preserve"><value>Весь трафик идёт через VPN, без неё сеть закрыта. Действует со следующего подключения</value></data>
+  <data name="kill_switch_blocking" xml:space="preserve"><value>Отключено · интернет заблокирован без VPN</value></data>
   <data name="language" xml:space="preserve"><value>Язык</value></data>
   <data name="language_system" xml:space="preserve"><value>Как в системе</value></data>
   <data name="last_30_days" xml:space="preserve"><value>За 30 дней</value></data>
@@ -121,6 +125,7 @@
   <data name="open_app" xml:space="preserve"><value>Открыть TrackNothing</value></data>
   <data name="open_at_login" xml:space="preserve"><value>Запускать при входе</value></data>
   <data name="open_main_window" xml:space="preserve"><value>Открыть окно</value></data>
+  <data name="open_vpn_settings" xml:space="preserve"><value>Открыть настройки VPN</value></data>
   <data name="password" xml:space="preserve"><value>Пароль</value></data>
   <data name="password_reset_unavailable" xml:space="preserve"><value>Сброс пароля по email сейчас недоступен. Обратитесь к администратору.</value></data>
   <data name="quality_fair" xml:space="preserve"><value>Средне</value></data>

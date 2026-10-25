@@ -41,7 +41,7 @@ const nodes = [
   node("n1", "13.245.35.167@Cape Town", "r1", "13.245.35.167", "root", 10022, { metrics: metrics(2, 17, 3) }),
   node("n2", "190.92.202.34@Singapore", "r2", "190.92.202.34", "root", 22, { metrics: metrics(3, 16, 18, 117.6e6, 112.9e6), monthlyTraffic: monthly(1843.2, 1907.5) }),
   node("n3", "3.139.105.5(US)", "r3", "3.139.105.5", "ubuntu", 22, { metrics: metrics(2, 48, 3, 90, 40), monthlyTraffic: monthly(0.004, 0.006) }),
-  node("n4", "Johor-bytedance", "r4", "101.47.28.201", "root", 22, { metrics: metrics(100, 94, 71) }),
+  node("n4", "Johor-bytedance", "r4", "101.47.28.201", "root", 22, { metrics: metrics(100, 94, 71), has_ssh_credential: true }),
   node("n5", "sao-paulo-edge-gateway-primary-with-a-very-long-hostname", "r5", "2001:db8:85a3::8a2e:370:7334", "administrator", 65022, { status: "offline", last_seen: "2 days ago", metrics: null, monthlyTraffic: null, deployment_policy: "custom", policy_version: 1, version: "agent 2.9.4" }),
 ];
 
@@ -117,13 +117,20 @@ export function consoleApi({ signedIn = true } = {}) {
     if (/^\/api\/v1\/admin\/users\/[^/]+\/access$/.test(pathname)) return [200, accountAccess];
     if (pathname === "/api/v1/admin/plans") return [200, { plans }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/native-access$/.test(pathname)) return [200, { enabled: true, devices: [], credentials: [] }];
-    if (pathname === "/api/nodes") return [200, { nodes }];
+    if (pathname === "/api/nodes" && method !== "POST") return [200, { nodes }];
     if (pathname === "/api/nodes/agent-release") return [200, { version: "2.10.0", revision: "test" }];
     if (/^\/api\/nodes\/[^/]+\/port-check$/.test(pathname)) return [200, { check: null, udp: "agent-outdated" }];
     if (/^\/api\/nodes\/[^/]+$/.test(pathname) && method === "GET") return [200, { node: nodes.find((n) => pathname.endsWith(n.id)), actions, actionEvents, reconcile: { observed: [{ protocol: "vless", appliedRevision: 14, status: "applied", lastError: "", updatedAt: now }], tasks: [{ id: "task_1", protocol: "vless", taskType: "apply", desiredRevision: 15, status: "failed", attempts: 3, lastError: "xray: failed to bind 0.0.0.0:443", createdAt: ago(20), startedAt: ago(19), finishedAt: ago(18) }] }, connectivity }];
     if (pathname === "/api/regions") return [200, { regions }];
     if (pathname === "/api/v1/site") return [200, { id: "default", name: "TrackNothing", logoSvg: "", isDefault: true, portalOrigin: "https://app.example.com", consoleOrigin: "https://console.example.com", apiOrigin: "https://api.example.com" }];
     if (pathname === "/api/v1/admin/sites") return [200, { sites }];
+    if (pathname === "/api/v1/admin/api-origins") return [200, { backupDomains: ["api-backup.very-long-infrastructure-domain.example.net", "api.tracknothing-mirror.org"],
+      origins: ["https://api.tracknothing.com", "https://subscriptions.very-long-brand-name.example.net", "https://api-backup.very-long-infrastructure-domain.example.net", "https://api.tracknothing-mirror.org"] }];
+    if (pathname === "/api/v1/admin/alerts") return [200, { recipients: "ops@example.com, aleksandra.konstantinopolskaya@very-long-company-domain.example", mailConfigured: true, firing: [
+      { key: "node-offline:n5", kind: "node-offline", subject: "Frankfurt-Edge-04@Germany (very long node name)", detail: "", since: ago(720), notified: true },
+      { key: "service:n2:vless", kind: "service", subject: "Singapore-02 vless", detail: "xray: failed to bind 0.0.0.0:443", since: ago(120), notified: false },
+    ] }];
+    if (pathname === "/api/nodes" && method === "POST") return [201, { node: nodes[0], install: { command: `curl -fsSL https://agent.very-long-infrastructure-domain.example.net/api/v1/agent/join/${"Ab3-".repeat(8)} | sh`, expiresAt: "2026-10-25T12:00:00Z" } }];
     if (pathname === "/api/v1/admin/agent-domain") return [200, { domain: "", origin: "https://agent.very-long-infrastructure-domain.example.net", source: "environment", environmentOrigin: "https://agent.very-long-infrastructure-domain.example.net",
       nodes: nodes.map((node, index) => ({ id: node.id, name: node.name, status: index === 4 ? "offline" : "online", version: "agent 2.13.0", controllerOrigin: index < 2 ? "https://agent.very-long-infrastructure-domain.example.net" : index === 2 ? "" : "https://api.example.com" })) }];
     if (/^\/api\/v1\/admin\/sites\/[^/]+\/check$/.test(pathname)) return [200, { checks: [

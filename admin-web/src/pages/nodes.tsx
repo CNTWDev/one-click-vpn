@@ -21,12 +21,15 @@ function compareVersions(left: string, right: string): number {
 type NodeForm = {
   name: string; ip: string; regionId: string; sshUser: string; sshPort: string; secret: string;
   credentialType: "password" | "private_key"; sshPrivilegeMode: "root" | "sudo"; deploymentTemplate: string;
+  /** New nodes: install with a one-time command on the server, or deploy over SSH from here. */
+  method: "command" | "ssh"; forgetCredential: boolean;
 };
+type Install = { nodeName: string; command: string; expiresAt: string };
 type NodeAction = "status-agent" | "restart-agent" | "upgrade-agent" | "bootstrap" | "delete";
 
 /** Public-interface rate from the latest heartbeat; hidden once the heartbeat goes stale. */
 
-const blankNodeForm: NodeForm = { name: "", ip: "", regionId: "", sshUser: "root", sshPort: "22", secret: "", credentialType: "password", sshPrivilegeMode: "root", deploymentTemplate: "standard" };
+const blankNodeForm: NodeForm = { name: "", ip: "", regionId: "", sshUser: "root", sshPort: "22", secret: "", credentialType: "password", sshPrivilegeMode: "root", deploymentTemplate: "standard", method: "command", forgetCredential: true };
 const statusRank = { danger: 0, warning: 1, progress: 2, neutral: 3, success: 4 };
 
 
@@ -50,6 +53,7 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
   const [testedFingerprint, setTestedFingerprint] = useState("");
   const [targetVersion, setTargetVersion] = useState("");
   const [batchResults, setBatchResults] = useState<Array<{ nodeId: string; status: string; reason?: string }>>([]);
+  const [install, setInstall] = useState<Install | null>(null);
   const confirm = useConfirm();
   const toast = useToast();
   const { query } = useRoute();
@@ -91,18 +95,20 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
 
   function openEdit(node: NodeRecord) {
     const sshUser = node.ssh_user || "root";
-    const next: NodeForm = { name: node.name, ip: node.ip, regionId: node.region_id || "", sshUser, sshPort: String(node.ssh_port || 22), secret: "", credentialType: node.credential_type || "password", sshPrivilegeMode: node.ssh_privilege_mode === "sudo" || (node.ssh_privilege_mode === "auto" && sshUser !== "root") ? "sudo" : "root", deploymentTemplate: node.deployment_policy || "standard" };
+    const next: NodeForm = { name: node.name, ip: node.ip, regionId: node.region_id || "", sshUser, sshPort: String(node.ssh_port || 22), secret: "", credentialType: node.credential_type === "private_key" ? "private_key" : "password", sshPrivilegeMode: node.ssh_privilege_mode === "sudo" || (node.ssh_privilege_mode === "auto" && sshUser !== "root") ? "sudo" : "root", deploymentTemplate: node.deployment_policy || "standard", method: "ssh", forgetCredential: false };
     setEditing(node); setForm(next); setInitialForm(next); setTestedFingerprint(""); setFormNotice(null); setShowForm(true);
   }
 
   async function saveNode(event: FormEvent) {
     event.preventDefault(); setBusy("save-node"); setFormNotice(null);
     try {
-      await api(editing ? `/api/nodes/${editing.id}` : "/api/nodes", {
+      const result = await api<{ install?: { command: string; expiresAt: string } }>(editing ? `/api/nodes/${editing.id}` : "/api/nodes", {
         method: editing ? "PATCH" : "POST",
         body: JSON.stringify({ ...form, sshPort: Number(form.sshPort) }),
       });
-      setShowForm(false); toast(editing ? t("节点配置已保存。") : t("节点已创建，安全部署任务已加入队列。"));
+      setShowForm(false);
+      if (result.install) setInstall({ nodeName: form.name, ...result.install });
+      else toast(editing ? t("节点配置已保存。") : t("节点已创建，安全部署任务已加入队列。"));
       await onRefresh();
     } catch (error) { setFormNotice({ tone: "error", message: (error as Error).message }); }
     finally { setBusy(""); }
@@ -172,9 +178,31 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
     return () => window.clearInterval(timer);
   }, [diagnosticNodeId]);
 
+  async function showInstallCommand(node: NodeRecord) {
+    setBusy(`${node.id}:install`); setNotice(null);
+    try {
+      const result = await api<{ install: { command: string; expiresAt: string } }>(`/api/nodes/${node.id}`, { method: "POST", body: JSON.stringify({ action: "install-command" }) });
+      setInstall({ nodeName: node.name, ...result.install });
+    } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
+    finally { setBusy(""); }
+  }
+
+  async function clearCredential(node: NodeRecord) {
+    if (!await confirm({ title: t("清除 SSH 凭据"), message: t("删除 Controller 保存的 {0} 的 SSH 密码或私钥。之后升级由 Agent 自己完成；重装或修复改用安装命令。", [node.name]), confirmLabel: t("清除") })) return;
+    setBusy(`${node.id}:clear`); setNotice(null);
+    try {
+      await api(`/api/nodes/${node.id}`, { method: "POST", body: JSON.stringify({ action: "clear-credential" }) });
+      toast(t("SSH 凭据已清除。")); await onRefresh();
+      if (diagnosticRequestRef.current === node.id) await loadDiagnostics(node);
+    } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
+    finally { setBusy(""); }
+  }
+
   async function operate(node: NodeRecord, action: NodeAction) {
+    // Without a stored credential the node repairs itself from the install command.
+    if (action === "bootstrap" && node.has_ssh_credential === false) { await showInstallCommand(node); return; }
     const descriptions = {
-      "upgrade-agent": t("将 {0} 从 {1} 升级至 {2}。通过 SSH 更新程序并重启 Agent，保留身份和 VPN 配置。", [node.name, node.version || t("未知版本"), targetVersion]),
+      "upgrade-agent": t("将 {0} 从 {1} 升级至 {2}。Agent 自己下载并校验新版本（旧版 Agent 通过 SSH 更新），90 秒内未上报会自动回滚，保留身份和 VPN 配置。", [node.name, node.version || t("未知版本"), targetVersion]),
       "restart-agent": t("确定重启 {0} 的 Agent 吗？短时间内会中断状态上报。", [node.name]),
       bootstrap: t("确定重新安装/修复 {0} 吗？这会重新部署 Agent，并为标准模板节点自动补齐缺少的协议（含 VLESS）。保留已有密钥和单节点配置；自定义模板不会被覆盖。", [node.name]),
       delete: t("将从 Controller 移除节点 {0}（{1}）。此操作不可撤销，且不会自动销毁云服务器。", [node.name, node.ip]),
@@ -252,7 +280,9 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
       { label: t("升级 Agent"), hint: needsUpgrade(node) ? `${node.version} → ${targetVersion}` : t("已是目标版本"), disabled: Boolean(busy) || !targetVersion, onSelect: () => void operate(node, "upgrade-agent") },
       { label: t("检查 Agent"), hint: t("只读，不重启服务"), disabled: Boolean(busy), onSelect: () => void operate(node, "status-agent") },
       { label: t("重启 Agent"), disabled: Boolean(busy), onSelect: () => void operate(node, "restart-agent") },
-      { label: t("重新安装 / 修复"), disabled: Boolean(busy), onSelect: () => void operate(node, "bootstrap") },
+      { label: t("重新安装 / 修复"), hint: node.has_ssh_credential === false ? t("用安装命令") : undefined, disabled: Boolean(busy), onSelect: () => void operate(node, "bootstrap") },
+      { label: t("安装命令"), hint: t("在节点上运行，1 小时内有效"), disabled: Boolean(busy), onSelect: () => void showInstallCommand(node) },
+      ...(node.has_ssh_credential ? [{ label: t("清除 SSH 凭据"), disabled: Boolean(busy), onSelect: () => void clearCredential(node) }] : []),
       "divider",
       { label: t("删除节点"), danger: true, disabled: Boolean(busy), onSelect: () => void operate(node, "delete") },
     ]} />;
@@ -277,6 +307,7 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
 
   const allSelected = visible.length > 0 && visible.every((node) => selected.has(node.id));
   const formDirty = showForm && JSON.stringify(form) !== JSON.stringify(initialForm);
+  const byCommand = !editing && form.method === "command";
   return <>
     <PageHeader title={t("节点运维")} description={<>{t("部署、修复和诊断 Agent。Controller 当前提供 Agent")} <b className="mono">{targetVersion || "…"}</b>{t("，升级保留身份和 VPN 配置。")}</>} actions={<><button className="button ghost" onClick={() => void onRefresh()}><Icon name="refresh" size={16} />{t("刷新")}</button><button className="button primary" onClick={openCreate} disabled={!regions.length}><Icon name="plus" size={16} />{t("添加节点")}</button></>} />
     {!regions.length && <InlineNotice notice={{ tone: "info", message: t("添加节点前，请先在“区域管理”中创建至少一个区域。") }} />}
@@ -304,25 +335,37 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
       {!visible.length && (loading && !nodes.length ? <div className="skeleton-block" role="status" aria-label={t("正在加载节点")}><i /><i /><i /></div> : nodes.length ? <Empty action={<button className="button ghost" onClick={() => { setSearch(""); setFilter("all"); }}>{t("清除筛选")}</button>}>{t("没有符合条件的节点。")}</Empty> : <Empty action={regions.length ? <button className="button primary" onClick={openCreate}>{t("添加第一台节点")}</button> : <a className="button primary" href="#/regions">{t("先创建区域")}</a>}>{t("尚未部署节点。")}</Empty>)}
     </section>
 
-    {showForm && <Modal title={editing ? t("编辑 {0}", [editing.name]) : t("添加节点")} description={editing ? t("留空凭据表示保持当前 SSH 凭据。") : t("节点会先验证 SSH 主机，再加入安全部署队列。")} onClose={() => setShowForm(false)} dirty={formDirty}
-      footer={<><InlineNotice notice={formNotice} /><div className="form-actions"><button type="button" className="button ghost" disabled={Boolean(busy) || !form.ip || !form.sshUser || (!editing && !form.secret)} onClick={() => void testSshConnection()}>{busy === "test-ssh" ? t("测试中…") : t("测试 SSH 连接")}</button><span className="grow" /><button type="button" className="button ghost" disabled={busy === "save-node"} onClick={() => setShowForm(false)}>{t("取消")}</button><button type="submit" form="node-form" className="button primary" disabled={Boolean(busy)}>{busy === "save-node" ? t("保存中…") : editing ? t("保存配置") : t("添加并部署")}</button></div></>}>
+    {showForm && <Modal title={editing ? t("编辑 {0}", [editing.name]) : t("添加节点")} description={editing ? t("留空凭据表示保持当前 SSH 凭据。") : byCommand ? t("在服务器上以 root 运行一行命令即可接入，Controller 不保存任何 SSH 凭据。") : t("节点会先验证 SSH 主机，再加入安全部署队列。")} onClose={() => setShowForm(false)} dirty={formDirty}
+      footer={<><InlineNotice notice={formNotice} /><div className="form-actions">{!byCommand && <button type="button" className="button ghost" disabled={Boolean(busy) || !form.ip || !form.sshUser || (!editing && !form.secret)} onClick={() => void testSshConnection()}>{busy === "test-ssh" ? t("测试中…") : t("测试 SSH 连接")}</button>}<span className="grow" /><button type="button" className="button ghost" disabled={busy === "save-node"} onClick={() => setShowForm(false)}>{t("取消")}</button><button type="submit" form="node-form" className="button primary" disabled={Boolean(busy)}>{busy === "save-node" ? t("保存中…") : editing ? t("保存配置") : byCommand ? t("生成安装命令") : t("添加并部署")}</button></div></>}>
       <form id="node-form" className="form-grid" onSubmit={saveNode}>
+        {!editing && <div className="tabs span-2" role="radiogroup" aria-label={t("接入方式")}>{([["command", t("安装命令（推荐）")], ["ssh", t("SSH 部署")]] as const).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={form.method === value} className={form.method === value ? "active" : ""} onClick={() => setForm({ ...form, method: value })}>{label}</button>)}</div>}
         <label className="span-2">{t("节点名称")}<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Tokyo Edge" /></label>
         <label>{t("公网 IPv4")}<input required value={form.ip} onChange={(event) => { setForm({ ...form, ip: event.target.value }); setTestedFingerprint(""); }} placeholder="203.0.113.10" /></label>
         <label>{t("区域")}<select required value={form.regionId} onChange={(event) => setForm({ ...form, regionId: event.target.value })}><option value="">{t("选择区域")}</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} · {region.country}</option>)}</select></label>
+        {!byCommand && <>
         <label>{t("SSH 用户")}<input required value={form.sshUser} onChange={(event) => { setForm({ ...form, sshUser: event.target.value }); setTestedFingerprint(""); }} /></label>
         <label>{t("SSH 端口")}<input required type="number" min="1" max="65535" value={form.sshPort} onChange={(event) => { setForm({ ...form, sshPort: event.target.value }); setTestedFingerprint(""); }} /></label>
         <label>{t("凭据类型")}<select value={form.credentialType} onChange={(event) => { setForm({ ...form, credentialType: event.target.value as NodeForm["credentialType"], secret: "" }); setTestedFingerprint(""); }}><option value="password">{t("SSH 密码")}</option><option value="private_key">{t("SSH 私钥")}</option></select></label>
         <label>{t("远程权限")}<select value={form.sshPrivilegeMode} onChange={(event) => { setForm({ ...form, sshPrivilegeMode: event.target.value as NodeForm["sshPrivilegeMode"] }); setTestedFingerprint(""); }}><option value="root">{t("直接使用 root")}</option><option value="sudo">{t("非 root + 免密 sudo")}</option></select><small>{form.sshPrivilegeMode === "sudo" ? t("适合 ubuntu、ec2-user、debian 等云主机账号。") : t("SSH 登录账号必须具有 uid 0。")}</small></label>
+        </>}
         {!editing && <label className="span-2">{t("部署模板")}<select value={form.deploymentTemplate} onChange={(event) => setForm({ ...form, deploymentTemplate: event.target.value })}><option value="standard">{t("标准：全部可用协议（推荐）")}</option><option value="wireguard">{t("仅 WireGuard")}</option><option value="openvpn">{t("仅 OpenVPN")}</option><option value="agent-only">{t("仅 Agent")}</option></select><small>{t("标准模板自动部署 WireGuard、OpenVPN、VLESS 和抗封锁通道。REALITY 目标只需在平台配置一次；未配置时其他协议仍可正常部署。")}</small></label>}
+        {!byCommand && <>
         <label className="span-2 credential-input">{editing ? t("新凭据（可留空）") : t("SSH 凭据")}{form.credentialType === "private_key" && <span className="credential-file"><input type="file" accept=".pem,.key,text/plain" onChange={(event) => void loadPrivateKey(event.target.files?.[0])} /><em>{t("选择 .pem / .key 文件")}</em></span>}<textarea required={!editing} rows={form.credentialType === "private_key" ? 7 : 2} value={form.secret} onChange={(event) => { setForm({ ...form, secret: event.target.value }); setTestedFingerprint(""); }} autoComplete="new-password" placeholder={form.credentialType === "private_key" ? t("粘贴 OpenSSH、RSA、EC 或 PKCS#8 私钥") : t("输入 SSH 密码")} /><small>{form.credentialType === "private_key" ? t("私钥会在 Controller 使用主密钥加密；暂不支持带口令的私钥。") : t("密码会加密保存，仅用于节点安装和应急修复。")}</small></label>
         <div className="fingerprint-field span-2"><div className="fingerprint-label"><label>{t("服务器身份自动识别")}</label></div><aside className="fingerprint-guide"><b>{t("无需手工生成或填写指纹")}</b><p>{t("添加时，Controller 会通过 SSH 自动读取并固定主机公钥，同时在服务器上读取或生成持久的 TrackNothing 节点 ID。发现重复节点、复用的 SSH host key 或重复 IP/端口时会停止部署。")}</p><small>{t("首次连接采用 TOFU；后续部署和修复必须匹配已固定的主机指纹与节点 ID。")}</small></aside>{testedFingerprint && <div className="ssh-test-result"><b>{t("本次连接读取到的 SSH 指纹")}</b><code>{testedFingerprint}</code><small>{t("保存节点时会重新连接、登记节点 ID，并执行去重检查。")}</small></div>}</div>
+        {!editing && <label className="check-line span-2"><input type="checkbox" checked={form.forgetCredential} onChange={(event) => setForm({ ...form, forgetCredential: event.target.checked })} />{t("部署成功后删除 SSH 凭据（推荐，之后由 Agent 自己升级）")}</label>}
+        </>}
       </form>
+    </Modal>}
+
+    {install && <Modal title={t("{0} · 安装命令", [install.nodeName])} description={t("用 root 在节点上运行（非 root 账号把 | sh 换成 | sudo sh）。命令只能用一次，{0}前有效。", [formatTime(install.expiresAt)])} onClose={() => setInstall(null)}
+      footer={<div className="form-actions"><span className="grow" /><button type="button" className="button ghost" onClick={() => setInstall(null)}>{t("关闭")}</button><button type="button" className="button primary" onClick={() => void navigator.clipboard.writeText(install.command).then(() => toast(t("已复制安装命令。")), () => toast(t("无法复制，请手动选择命令。"), "info"))}><Icon name="copy" size={16} />{t("复制命令")}</button></div>}>
+      <pre className="install-command"><code>{install.command}</code></pre>
+      <p className="form-note">{t("运行后节点自动安装 Agent 并出现在列表中，部署进度可在节点详情查看。需要能访问本 Controller 的 HTTPS 域名，不需要开放 SSH。")}</p>
     </Modal>}
 
     {diagnosticNode && <Modal wide title={t("{0} · 节点详情", [diagnosticNode.name])} description={`${diagnosticNode.ip} · ${diagnosticNode.place} · ${diagnosticNode.version || "—"}`} onClose={closeDetail}>
       <InlineNotice notice={notice} />
-      <div className="diagnostic-toolbar"><span><i className="live-mark" />{t("每 5 秒自动刷新")}</span><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "status-agent")}>{t("检查 Agent")}</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "bootstrap")}>{t("重新安装 / 修复")}</button>{needsUpgrade(diagnosticNode) && <button className="button primary small" disabled={Boolean(busy) || !targetVersion} onClick={() => void operate(diagnosticNode, "upgrade-agent")}>{t("升级 Agent 至 {0}", [targetVersion])}</button>}</div>
+      <div className="diagnostic-toolbar"><span><i className="live-mark" />{t("每 5 秒自动刷新")}</span><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "status-agent")}>{t("检查 Agent")}</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "bootstrap")}>{t("重新安装 / 修复")}</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void showInstallCommand(diagnosticNode)}>{t("安装命令")}</button>{diagnosticNode.has_ssh_credential && <button className="button ghost small" disabled={Boolean(busy)} onClick={() => void clearCredential(diagnosticNode)}>{t("清除 SSH 凭据")}</button>}{needsUpgrade(diagnosticNode) && <button className="button primary small" disabled={Boolean(busy) || !targetVersion} onClick={() => void operate(diagnosticNode, "upgrade-agent")}>{t("升级 Agent 至 {0}", [targetVersion])}</button>}</div>
       {diagnosticsBusy && !diagnostics ? <div className="skeleton-block" role="status" aria-label={t("正在读取诊断信息")}><i /><i /><i /></div> : diagnostics && <NodeDiagnosticsView node={diagnosticNode} diagnostics={diagnostics} outdated={needsUpgrade(diagnosticNode)} />}
     </Modal>}
   </>;

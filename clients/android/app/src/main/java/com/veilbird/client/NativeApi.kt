@@ -6,7 +6,6 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import org.json.JSONObject
 import java.net.URI
-import java.io.ByteArrayOutputStream
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.Signature
@@ -16,11 +15,20 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
-import javax.net.ssl.HttpsURLConnection
+import com.veilbird.core.Core
+import org.json.JSONArray
+import java.io.File
 
 class ApiFailure(val code: String) : Exception(code)
+
+/**
+ * The TrackNothing API. Calls go through the core (Core.fetch): the address the app was given, the other API
+ * domains the server lists (every site plus backup domains), addresses that worked before and DNS over HTTPS,
+ * so a blocked domain or poisoned DNS does not lock the app out.
+ */
 class NativeApi(context: Context) {
     private val prefs = context.getSharedPreferences("veilbird", Context.MODE_PRIVATE)
+    private val home = File(context.filesDir, "core").apply { mkdirs() }.path
     private val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
     private val alias = "veilbird-device-v1"
     var origin: String
@@ -55,42 +63,60 @@ class NativeApi(context: Context) {
     }
     /** Set by the VPN service for the length of one connection attempt. */
     @Volatile var attempt: String? = null
-    fun request(path: String, body: JSONObject? = null): JSONObject {
+
+    /**
+     * Every origin of this server, best first: the one that answered last, the others the server listed, and the
+     * address the app was given. Another address means another server: only that one until it answers.
+     */
+    private fun origins(): List<String> {
+        val saved = prefs.getString("origins", "")!!.split('\n').filter { it.isNotEmpty() }
+        return if (origin in saved) saved else listOf(origin)
+    }
+    @Synchronized private fun remember(answered: String?, offered: JSONArray?) {
+        var list = origins()
+        if (offered != null) list = (0 until offered.length()).map { offered.optString(it) }.filter { it.startsWith("https://") }.take(12) + origin
+        if (!answered.isNullOrEmpty()) list = listOf(answered) + (list - answered)
+        prefs.edit().putString("origins", list.distinct().take(14).joinToString("\n")).apply()
+    }
+    /** One call through the core: status and body of the first origin that answered. */
+    private fun send(method: String, path: String, body: JSONObject?, headers: Map<String, String>, timeoutMs: Int = 15000): Pair<Int, String> {
         if (origin.isEmpty()) throw ApiFailure("SERVER_REQUIRED")
-        val connection = URI("${origin}/api/v2/native/$path").toURL().openConnection() as HttpsURLConnection
-        connection.connectTimeout = 10000; connection.readTimeout = 10000; connection.instanceFollowRedirects = false
-        connection.setRequestProperty("Accept", "application/json")
+        val tried = origins()
+        val all = JSONObject().put("Accept", "application/json")
+        headers.forEach { (name, value) -> all.put(name, value) }
+        val request = JSONObject().put("origins", JSONArray(tried)).put("method", method).put("path", path).put("timeoutMs", timeoutMs).put("headers", all)
+        if (body != null) { all.put("Content-Type", "application/json"); request.put("body", body.toString()) }
+        val reply = try { JSONObject(Core.fetch(home, request.toString())) } catch (_: Exception) { throw ApiFailure("SERVICE_UNAVAILABLE") }
+        reply.optString("error").takeIf { it.isNotEmpty() }?.let { Journal.add("api: unreachable (${Journal.scrub(it)})"); throw ApiFailure("SERVICE_UNAVAILABLE") }
+        val answered = reply.optString("origin")
+        if (answered.isNotEmpty() && answered != tried.first()) { Journal.add("api: answered by another address"); remember(answered, null) }
+        return reply.optInt("status") to reply.optString("body")
+    }
+    fun request(path: String, body: JSONObject? = null): JSONObject {
         // Lets the server require an upgrade (CLIENT_UPDATE_REQUIRED) and track version adoption.
-        connection.setRequestProperty("X-Veilbird-Client", "android/${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}")
-        if (path != "login") secret("token")?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
+        val headers = mutableMapOf("X-Veilbird-Client" to "android/${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}")
+        if (path != "login") secret("token")?.let { headers["Authorization"] = "Bearer $it" }
         // One id per connection attempt: the server's runtime log lines for it carry the same id.
-        attempt?.let { connection.setRequestProperty("X-Request-Id", it) }
-        try {
-            if (body != null) {
-                connection.requestMethod = "POST"; connection.doOutput = true
-                connection.setRequestProperty("Content-Type", "application/json")
-                connection.outputStream.use { it.write(body.toString().toByteArray()) }
-            }
-            val code = connection.responseCode
-            val bytes = (if (code in 200..299) connection.inputStream else connection.errorStream)?.use { stream ->
-                val buffer = ByteArray(8192)
-                val output = ByteArrayOutputStream()
-                while (true) { val count = stream.read(buffer); if (count < 0) break; output.write(buffer, 0, count); if (output.size() > 262144) throw ApiFailure("INVALID_RESPONSE") }
-                output.toByteArray()
-            } ?: byteArrayOf()
-            if (bytes.size > 262144) throw ApiFailure("INVALID_RESPONSE")
-            val data = try { JSONObject(String(bytes, Charsets.UTF_8)) } catch (_: Exception) { throw ApiFailure("SERVICE_UNAVAILABLE") }
-            if (code !in 200..299) throw ApiFailure(data.optString("code", "SERVICE_UNAVAILABLE"))
-            return data
-        } finally { connection.disconnect() }
+        attempt?.let { headers["X-Request-Id"] = it }
+        val (code, text) = send(if (body == null) "GET" else "POST", "/api/v2/native/$path", body, headers)
+        val data = try { JSONObject(text) } catch (_: Exception) { throw ApiFailure("SERVICE_UNAVAILABLE") }
+        if (code !in 200..299) throw ApiFailure(data.optString("code", "SERVICE_UNAVAILABLE"))
+        data.optJSONArray("apiOrigins")?.let { remember(null, it) }
+        return data
+    }
+    /** A public GET (release catalog) over the same origins. */
+    fun get(pathAndQuery: String): JSONObject {
+        val (code, text) = send("GET", pathAndQuery, null, emptyMap())
+        if (code != 200) throw ApiFailure("SERVICE_UNAVAILABLE")
+        return try { JSONObject(text) } catch (_: Exception) { throw ApiFailure("INVALID_RESPONSE") }
     }
     /**
      * Queues a connection failure code and a scrubbed error text (no keys, addresses or traffic)
      * and sends the queue when the service is reachable; the network is often what just failed.
      */
-    @Synchronized fun report(code: String, nodeId: String = "", detail: String = "", network: String = "") {
+    @Synchronized fun report(code: String, nodeId: String = "", detail: String = "", network: String = "", at: String? = null) {
         val queue = try { org.json.JSONArray(prefs.getString("diagnostics", "[]")) } catch (_: Exception) { org.json.JSONArray() }
-        if (code.isNotEmpty()) queue.put(JSONObject().put("code", code).put("at", java.time.Instant.now().toString()).apply {
+        if (code.isNotEmpty()) queue.put(JSONObject().put("code", code).put("at", at ?: java.time.Instant.now().toString()).apply {
             if (nodeId.isNotEmpty()) put("nodeId", nodeId)
             if (detail.isNotEmpty()) put("detail", detail)
             if (network.isNotEmpty()) put("network", network)

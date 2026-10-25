@@ -85,6 +85,7 @@ class MainActivity : Activity() {
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", "")!!; selectedCode = settings.getString("nodeCode", "")!!
         @Suppress("DEPRECATION") window.apply { statusBarColor = Palette.ground; navigationBarColor = Palette.ground; decorView.systemUiVisibility = 0 }
         render(); checkForUpdate()
+        executor.execute { Crash.send(this, api) }
         // The Quick Settings tile could not start the VPN from the background: connect now that the app is open.
         if (intent?.getBooleanExtra("connect", false) == true && api.secret("token") != null && !ConnectionStateStore.active) toggleConnection()
     }
@@ -584,6 +585,12 @@ class MainActivity : Activity() {
                 settingRow(L10n.text(R.string.authorized_devices), "${L10n.number(data.optInt("used"))} / ${deviceLimit(data)}") { page = "devices"; render() },
                 settingRow(L10n.text(R.string.change_password), "") { resetPassword(email, L10n.text(R.string.reset_change_detail, email), L10n.text(R.string.reset_link_sent_to, email)) },
                 settingRow(L10n.text(R.string.language), currentLanguage().second) { chooseLanguage() },
+                // Android's own kill switch: Always-on VPN with "Block connections without VPN" in system settings.
+                settingRow(L10n.text(R.string.kill_switch), "") {
+                    AlertDialog.Builder(this@MainActivity).setTitle(L10n.text(R.string.kill_switch)).setMessage(L10n.text(R.string.kill_switch_android_detail))
+                        .setPositiveButton(L10n.text(R.string.open_vpn_settings)) { _, _ -> try { startActivity(Intent(android.provider.Settings.ACTION_VPN_SETTINGS)) } catch (_: Exception) { } }
+                        .setNegativeButton(L10n.text(R.string.cancel), null).show()
+                },
                 settingRow(L10n.text(R.string.check_for_updates), updateValue) { update?.let { installUpdate(it) } ?: checkForUpdate(announce = true) },
             )), top = 20)
             add(text(L10n.text(R.string.sign_out), 15f, Palette.danger).apply {

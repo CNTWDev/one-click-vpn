@@ -4,6 +4,7 @@ import { dbExec, dbQuery, findUserById, withTransaction, type DbNode, type DbUse
 import { hashToken } from "./crypto";
 import { defaultCredentialExpiry } from "./credential-validity";
 import { accessSql, assertDeviceSlot, withinDeviceLimitSql } from "./entitlements";
+import { wakeAgent } from "./agent-wake";
 
 export type Platform = "web" | "macos" | "ios" | "android" | "windows" | "linux";
 export type Protocol = "wireguard" | "openvpn" | "ikev2" | "vless" | "stealth";
@@ -734,10 +735,11 @@ export async function enqueueReconcileTask(input: { nodeId: string; protocol: Pr
   const id = `task_${randomUUID()}`;
   await dbExec(`INSERT INTO reconcile_tasks (id, node_id, protocol, task_type, desired_revision, payload_json, status, created_at)
     VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)`, [id, input.nodeId, input.protocol, input.taskType, input.desiredRevision, JSON.stringify(input.payload), now()]);
+  wakeAgent(input.nodeId);
   return id;
 }
 
-/** Agents poll every few seconds; stale and failed tasks return to the queue in server/jobs.ts, not here. */
+/** Agents long-poll for these (agent-wake.ts); stale and failed tasks return to the queue in server/jobs.ts, not here. */
 export async function pullReconcileTasks(nodeId: string, limit = 10): Promise<ReconcileTask[]> {
   const rows = await dbQuery<Record<string, unknown>>("SELECT * FROM reconcile_tasks WHERE node_id = $1 AND status = 'pending' ORDER BY created_at LIMIT $2", [nodeId, Math.min(Math.max(limit, 1), 20)]);
   const tasks: ReconcileTask[] = [];

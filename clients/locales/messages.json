@@ -1048,5 +1048,30 @@
     "zh": "无法启用 VPN 组件，请重新安装 TrackNothing 后再试。",
     "en": "Couldn't enable the VPN component. Reinstall TrackNothing and try again.",
     "ru": "Не удалось включить VPN-компонент. Переустановите TrackNothing и попробуйте снова."
+  },
+  "kill_switch": {
+    "en": "Kill switch",
+    "zh": "断网保护",
+    "ru": "Блокировка без VPN"
+  },
+  "kill_switch_blocking": {
+    "en": "Disconnected · the kill switch is blocking the internet",
+    "zh": "连接已断开，断网保护正在阻止上网",
+    "ru": "Отключено · интернет заблокирован без VPN"
+  },
+  "kill_switch_android_detail": {
+    "en": "In Android settings, turn on Always-on VPN and Block connections without VPN",
+    "zh": "在系统设置里打开「始终开启的 VPN」和「屏蔽未使用 VPN 的连接」",
+    "ru": "В настройках Android включите «Постоянная VPN» и «Блокировать соединения без VPN»"
+  },
+  "kill_switch_apple_detail": {
+    "en": "All traffic goes through the VPN; without it, nothing goes out. Applies from the next connection",
+    "zh": "所有流量只走 VPN，VPN 断开时不联网。下次连接时生效",
+    "ru": "Весь трафик идёт через VPN, без неё сеть закрыта. Действует со следующего подключения"
+  },
+  "open_vpn_settings": {
+    "en": "Open VPN settings",
+    "zh": "打开 VPN 设置",
+    "ru": "Открыть настройки VPN"
   }
 }

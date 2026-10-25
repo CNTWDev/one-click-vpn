@@ -90,6 +90,10 @@
   <string name="hide_password">Скрыть пароль</string>
   <string name="incorrect_email_or_password">Неверная почта или пароль.</string>
   <string name="invalid_server_response_try_again_later">Некорректный ответ сервера. Повторите позже.</string>
+  <string name="kill_switch">Блокировка без VPN</string>
+  <string name="kill_switch_android_detail">В настройках Android включите «Постоянная VPN» и «Блокировать соединения без VPN»</string>
+  <string name="kill_switch_apple_detail">Весь трафик идёт через VPN, без неё сеть закрыта. Действует со следующего подключения</string>
+  <string name="kill_switch_blocking">Отключено · интернет заблокирован без VPN</string>
   <string name="language">Язык</string>
   <string name="language_system">Как в системе</string>
   <string name="last_30_days">За 30 дней</string>
@@ -119,6 +123,7 @@
   <string name="open_app">Открыть TrackNothing</string>
   <string name="open_at_login">Запускать при входе</string>
   <string name="open_main_window">Открыть окно</string>
+  <string name="open_vpn_settings">Открыть настройки VPN</string>
   <string name="password">Пароль</string>
   <string name="password_reset_unavailable">Сброс пароля по email сейчас недоступен. Обратитесь к администратору.</string>
   <string name="quality_fair">Средне</string>

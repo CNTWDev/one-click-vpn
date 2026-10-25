@@ -231,6 +231,24 @@ healthy deploy the untagged images left by the previous build and build cache ol
 than 7 days are removed (`VEILBIRD_DOCKER_PRUNE=no` skips this). Copy important
 dumps off the server; they are not a substitute for off-site backups.
 
+### Server images from CI
+
+By default each update builds the images on the server. CI can build them instead
+(`.github/workflows/server-images.yml`, one set per master commit, tagged with the first
+12 characters of the commit), so the server only pulls:
+
+1. Set `VEILBIRD_IMAGE_PREFIX` in `.env`, e.g. `ghcr.io/cntwdev/tracknothing`. GHCR packages
+   are private by default: run `docker login ghcr.io` once on the server with a token that
+   has `read:packages`, or make the packages public. For servers in mainland China, also push
+   to Aliyun ACR: set the repository variable `VEILBIRD_ACR_PREFIX` (e.g.
+   `registry.cn-hangzhou.aliyuncs.com/<namespace>/tracknothing`) and the secrets
+   `VEILBIRD_ACR_USERNAME` / `VEILBIRD_ACR_PASSWORD`, and use that prefix here.
+2. Update as usual. Deploy pulls the images for the checked-out commit; if CI has not
+   finished yet or the registry cannot be reached, it builds locally as before.
+3. Roll back by running an earlier commit's images:
+   `sudo ./scripts/deploy.sh --service all --tag <commit>` (database migrations only add,
+   so an older Controller keeps working on the newer schema).
+
 When upgrading a legacy single-domain installation, deployment opens a one-time
 domain migration prompt and rewrites only the seven Portal/Admin/API origin keys.
 It backs up `.env` first; passwords and application secrets are preserved.
@@ -316,7 +334,29 @@ Setting a new password signs the account out of the Portal and native clients.
 
 ## Edge Node bootstrap
 
-In Admin, create a node with its public address and SSH credential, then choose
+**Install command (recommended).** In Console → 节点运维 → 添加节点, choose
+**安装命令**, enter the name, public IP, region and template, and run the command it
+shows on the server as root:
+
+```bash
+curl -fsSL https://<agent domain>/api/v1/agent/join/<one-time token> | sh
+```
+
+The token works once and expires after 1 hour; only its hash is stored. The script
+creates `/var/lib/northstar/node-id`, installs the Agent with this node's token and
+starts it; the node then appears online and the standard services are deployed. No SSH
+credential is stored and no inbound SSH is needed. Node details → **安装命令** creates a
+new one for reinstalling or repairing such a node.
+
+**Agent self-upgrade.** Agent 2.17+ upgrades itself: **升级 Agent** hands it the new
+version over its HTTPS long-poll, it downloads the source, checks the SHA-256, keeps the
+old file and confirms on its first heartbeat; without that heartbeat within 90 seconds a
+timer restores the old version. Older Agents are upgraded over SSH once. **清除 SSH 凭据**
+(node menu) deletes the stored password or key; nodes deployed over SSH can also delete it
+automatically after a successful deploy (on by default). The Controller can still
+change what nodes run, so protect the Console and the server like the nodes themselves.
+
+**SSH deployment.** In Admin, create a node with its public address and SSH credential, then choose
 a deployment template. Before creating the database record, the Controller logs
 in, reads and pins the negotiated SSH host key, and reads or atomically creates
 `/var/lib/northstar/node-id`. The Controller rejects duplicate node identities,
@@ -502,6 +542,31 @@ therefore keep the Portal/Admin dependency and build layers cached.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) and
 [docs/architecture](docs/architecture/README.md) for detailed design notes.
+
+### Agent 2.17: outage tolerance, alerts and app entry points
+
+- **Controller outage.** App leases are renewed every 90 s and last 5 minutes. When the Agent
+  cannot reach the Controller (not when it is refused) it extends valid app WireGuard
+  leases itself, up to 12 h after the last contact (`NORTHSTAR_NATIVE_OFFLINE_GRACE` in the
+  Agent's `config.env`, seconds); the apps keep a working tunnel for as long. Revocations,
+  expiry and quota still apply as soon as the Controller is back.
+- **Tasks on demand.** Agents long-poll for tasks (held up to 25 s and answered as soon as
+  there is work) instead of asking every 5 s.
+- **Alerts.** Console → Controller → **告警**: recipients for email (sent through the mail
+  settings above it) when a node has no heartbeat for 3 minutes, a service is failing for
+  10 minutes, a disk is above 85% or an Agent is a day behind; recovery is mailed too.
+- **App entry points.** The apps try their own API domain, then the API domains of every
+  site and the backup domains in Console → 站点 → **App 备用入口**. Per domain they dial
+  addresses that worked before first, then system DNS, then DNS over HTTPS; certificates
+  are always checked against the domain. Backup domains need the same Nginx reverse proxy
+  to `http://127.0.0.1:3000` and a certificate.
+- **Apps.** Kill switch (Windows: firewall rules held by the core; Apple: "include all
+  networks"; Android: the system's always-on VPN with blocking), crash reports (APP_CRASH
+  in 客户端发布 / 运行日志), automatic location also weighs node load and users, and
+  connecting no longer waits for WireGuard when other transports are offered.
+
+Rollout: `sudo ./one-click-update.sh` (migration 006) → **升级 Agent** on each node to 2.17
+(this one time over SSH; later upgrades need no SSH) → new app builds.
 
 ### Agent 2.8 reliability and routing update
 

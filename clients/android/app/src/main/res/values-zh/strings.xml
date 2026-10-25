@@ -90,6 +90,10 @@
   <string name="hide_password">隐藏密码</string>
   <string name="incorrect_email_or_password">邮箱或密码不正确。</string>
   <string name="invalid_server_response_try_again_later">服务器响应无效，请稍后重试。</string>
+  <string name="kill_switch">断网保护</string>
+  <string name="kill_switch_android_detail">在系统设置里打开「始终开启的 VPN」和「屏蔽未使用 VPN 的连接」</string>
+  <string name="kill_switch_apple_detail">所有流量只走 VPN，VPN 断开时不联网。下次连接时生效</string>
+  <string name="kill_switch_blocking">连接已断开，断网保护正在阻止上网</string>
   <string name="language">语言</string>
   <string name="language_system">跟随系统</string>
   <string name="last_30_days">近 30 天</string>
@@ -119,6 +123,7 @@
   <string name="open_app">打开 TrackNothing</string>
   <string name="open_at_login">登录时启动</string>
   <string name="open_main_window">打开主窗口</string>
+  <string name="open_vpn_settings">打开 VPN 设置</string>
   <string name="password">密码</string>
   <string name="password_reset_unavailable">暂时无法通过邮件重置密码，请联系管理员。</string>
   <string name="quality_fair">良</string>

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.Json.Nodes;
 
 namespace Veilbird;
@@ -17,12 +18,19 @@ public sealed class Connection(NativeApi api,Core core) {
     public DateTime? Since {get;private set;}
     public long RxRate {get;private set;}
     public long TxRate {get;private set;}
+    /// The connection dropped with the kill switch on: traffic stays blocked until the user connects again or
+    /// turns the kill switch off.
+    public bool Blocking {get;private set;}
+    public static bool KillSwitchOn=>Settings.Get("killSwitch","off")=="on";
+    /// Keep a working tunnel this long when the server cannot be reached to renew the lease (it is down or
+    /// blocked); the node keeps the lease alive on its side for as long (Agent offline grace).
+    private static readonly TimeSpan OfflineGrace=TimeSpan.FromHours(12);
     private CancellationTokenSource? loop;
     private readonly List<string> fallbacks=new();
     private (string Public,string Private) keys;
     private string leaseId="",network="",carrying="";
     private bool leaseReady;
-    private DateTime deadline,renewAt,lastProbe,lastNetworkCheck;
+    private DateTime deadline,renewAt,renewedAt,lastProbe,lastNetworkCheck;
     private List<string> transports=new();
     private int failures;
     private static readonly string[] Fatal={"AUTH_REQUIRED","DEVICE_REVOKED","DEVICE_LIMIT_REACHED","MEMBERSHIP_EXPIRED","QUOTA_EXHAUSTED","ACCOUNT_UNAVAILABLE","MANAGED_ACCESS_REQUIRED","CLIENT_UPDATE_REQUIRED"};
@@ -40,8 +48,10 @@ public sealed class Connection(NativeApi api,Core core) {
         await current;
     }
     private async Task Attempt(string nodeId,bool smart) {
-        Active=true;Since=null;RxRate=TxRate=0;NodeId=nodeId;failures=0;Set("authorizing_and_connecting");
+        var wasBlocking=Blocking;
+        Active=true;Blocking=false;Since=null;RxRate=TxRate=0;NodeId=nodeId;failures=0;Set("authorizing_and_connecting");
         try {
+            await Task.Run(()=>core.KillSwitch(KillSwitchOn));
             keys=await Task.Run(core.NewKeypair);
             network=await Task.Run(Transports.NetworkKey);lastNetworkCheck=DateTime.UtcNow;
             api.Attempt=Guid.NewGuid().ToString("N")[..16];
@@ -57,7 +67,10 @@ public sealed class Connection(NativeApi api,Core core) {
             var detail=error is AccessFailure?"":$"{error.GetType().Name}: {Journal.Scrub(error.Message)}";
             Journal.Add($"connect: failed {code}"+(detail.Length>0?$" ({detail})":""));
             await api.Report(code,NodeId,detail);
-            await Task.Run(core.Stop);Active=false;Set("not_connected");
+            await Task.Run(core.Stop);Active=false;
+            // A reconnect after a drop keeps blocking; a first attempt that failed does not.
+            if(wasBlocking&&KillSwitchOn) {Blocking=true;Set("kill_switch_blocking");}
+            else {await LiftKillSwitch();Set("not_connected");}
             throw error as AccessFailure ?? new AccessFailure("CONNECT_FAILED");
         }
         // Disconnect pressed while connecting: the core may have started after Disconnect stopped it.
@@ -68,7 +81,8 @@ public sealed class Connection(NativeApi api,Core core) {
     }
     private async Task ChooseFastest() {
         try {
-            var ranked=await Latency.Rank((await api.Request("nodes"))["nodes"]!.AsArray(),attempts:3);
+            // Measurements from the last minute (the location list) are reused, so connecting does not probe again.
+            var ranked=await Latency.Rank((await api.Request("nodes"))["nodes"]!.AsArray(),attempts:3,reuse:TimeSpan.FromMinutes(1));
             foreach(var (node,quality) in ranked.Take(3)) Journal.Add($"probe: {node["name"]} {(quality.Latency is { } ms?$"{ms} ms":"no answer")}, jitter {quality.Jitter} ms, loss {quality.Loss}%");
             NodeId=ranked.FirstOrDefault().Node?["id"]?.GetValue<string>()??"";
             fallbacks.Clear();fallbacks.AddRange(ranked.Skip(1).Take(2).Select(r=>r.Node["id"]!.GetValue<string>()));
@@ -95,7 +109,10 @@ public sealed class Connection(NativeApi api,Core core) {
         Journal.Add($"node: {NodeName}, transports {string.Join(" > ",transports)}"+(blocked.Count>0?$" (blocked here before: {string.Join(", ",blocked)})":""));
         // Disconnect pressed while connecting cancels the attempt here, before the tunnel stays up.
         if(!Active) throw new OperationCanceledException();
-        await Task.Run(()=>core.Run(Transports.Options(proxies,transports,smart)));
+        if(await Task.Run(()=>core.Run(Transports.Options(proxies,transports,smart))) is { } killSwitchError) {
+            Journal.Add($"killswitch: not applied ({Journal.Scrub(killSwitchError)})");
+            _=api.Report("KILL_SWITCH_FAILED",NodeId,Journal.Scrub(killSwitchError));
+        }
         if(!Active) throw new OperationCanceledException();
         if(!await Probe(initial:true)) {
             // WireGuard waits for the node to add this PC; give it the rest of the readiness window.
@@ -136,12 +153,13 @@ public sealed class Connection(NativeApi api,Core core) {
         NodeId=lease["nodeId"]!.GetValue<string>();NodeName=lease["nodeName"]?.GetValue<string>()??"";
         var remaining=DateTimeOffset.Parse(lease["expiresAt"]!.GetValue<string>(),System.Globalization.CultureInfo.InvariantCulture)-DateTimeOffset.UtcNow;
         if(remaining<=TimeSpan.Zero) throw new AccessFailure("ACCESS_EXPIRED");
-        deadline=DateTime.UtcNow+(remaining<TimeSpan.FromMinutes(5)?remaining:TimeSpan.FromMinutes(5));renewAt=DateTime.UtcNow.AddSeconds(90);
+        deadline=DateTime.UtcNow+(remaining<TimeSpan.FromMinutes(5)?remaining:TimeSpan.FromMinutes(5));renewAt=DateTime.UtcNow.AddSeconds(90);renewedAt=DateTime.UtcNow;
         leaseId=lease["leaseId"]!.GetValue<string>();leaseReady=lease["ready"]?.GetValue<bool>()==true;
         Changed?.Invoke();
         if(!initial) {if(!leaseReady) leaseReady=await Status();return lease;}
+        // With other transports there is no wait: they carry traffic until WireGuard is ready (Tick switches then).
         var spare=lease["proxies"] is JsonArray { Count: >0 };
-        for(var attempt=0;attempt<(spare?3:15)&&!leaseReady;attempt++) {
+        for(var attempt=0;attempt<(spare?0:15)&&!leaseReady;attempt++) {
             if(DateTime.UtcNow>=deadline) throw new AccessFailure("ACCESS_EXPIRED");
             await Task.Delay(1000);leaseReady=await Status();
         }
@@ -153,12 +171,16 @@ public sealed class Connection(NativeApi api,Core core) {
         if(!Active) return;
         try {
             var now=DateTime.UtcNow;
-            // After sleep the lease may already have lapsed: one renewal attempt before closing the tunnel.
-            if(now>=renewAt||now>=deadline) {
+            // A refusal (account, device, quota) closes the tunnel. When the server cannot be reached the tunnel
+            // stays while it still carries traffic, up to OfflineGrace after the last renewal; probes decide.
+            if(now>=renewAt) {
                 try {await Acquire();}
                 catch(AccessFailure error) when (Fatal.Contains(error.Code)) {await Fail(error.Code,"connection_authorization_expired_connect_again");return;}
-                catch(Exception error) {Journal.Add($"lease: renewal failed ({(error as AccessFailure)?.Code??"network"}), retrying");renewAt=now.AddSeconds(15);}
-                if(DateTime.UtcNow>=deadline) {Journal.Add("lease: expired");await Fail("LEASE_RENEWAL_FAILED","connection_authorization_expired_connect_again");return;}
+                catch(Exception error) {
+                    Journal.Add($"lease: renewal failed ({(error as AccessFailure)?.Code??"network"}), retrying");
+                    renewAt=now.AddSeconds(now-renewedAt<TimeSpan.FromMinutes(5)?15:60);
+                }
+                if(DateTime.UtcNow-renewedAt>=OfflineGrace) {Journal.Add("lease: expired");await Fail("LEASE_RENEWAL_FAILED","connection_authorization_expired_connect_again");return;}
             } else if(!leaseReady&&await Status()) {
                 // WireGuard became usable: test it now so traffic moves to the lightest transport right away.
                 leaseReady=true;Journal.Add("lease: WireGuard ready");await Probe(report:true);
@@ -185,16 +207,30 @@ public sealed class Connection(NativeApi api,Core core) {
             TxRate=up;RxRate=down;Changed?.Invoke();
         } catch(Exception error) {
             var detail=$"{error.GetType().Name}: {Journal.Scrub(error.Message)}";
-            Journal.Add($"tunnel: error {detail}");await api.Report("TUNNEL_ERROR",NodeId,detail);await Disconnect("connection_interrupted_try_again");
+            Journal.Add($"tunnel: error {detail}");await api.Report("TUNNEL_ERROR",NodeId,detail);await Disconnect("connection_interrupted_try_again",unexpected:true);
         }
     }
-    private async Task Fail(string code,string status) {await api.Report(code,NodeId);await Disconnect(status);}
-    /// Closes the tunnel and releases the device slot (best effort, at most 5 s).
-    public async Task Disconnect(string status="disconnected") {
-        if(!Active) return;
+    private async Task Fail(string code,string status) {await api.Report(code,NodeId);await Disconnect(status,unexpected:true);}
+    private async Task LiftKillSwitch() {
+        try {await Task.Run(()=>core.KillSwitch(false));} catch(IOException) {/* the core is gone, and its rules with it */}
+    }
+    /// Turning the kill switch off while it blocks lets traffic out again.
+    public async Task KillSwitchChanged() {
+        if(KillSwitchOn||!Blocking) return;
+        Blocking=false;await LiftKillSwitch();Set("not_connected");
+    }
+    /// Closes the tunnel and releases the device slot (best effort, at most 5 s). A drop the user did not ask
+    /// for keeps the kill switch blocking.
+    public async Task Disconnect(string status="disconnected",bool unexpected=false) {
+        if(!Active) {
+            if(Blocking&&!unexpected) {Blocking=false;await LiftKillSwitch();Set(status);}
+            return;
+        }
         Active=false;loop?.Cancel();Since=null;RxRate=TxRate=0;carrying="";
         Journal.Add("disconnect: "+status);
         await Task.Run(core.Stop);
+        if(unexpected&&KillSwitchOn) {Blocking=true;status="kill_switch_blocking";Journal.Add("killswitch: blocking until connected again");}
+        else await LiftKillSwitch();
         Set(status);
         try {await api.Action("disconnect",new JsonObject()).WaitAsync(TimeSpan.FromSeconds(5));} catch {/* the lease also expires on its own */}
     }

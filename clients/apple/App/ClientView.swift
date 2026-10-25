@@ -491,6 +491,13 @@ struct ClientView:View {
                     Hairline()
                     languageChooser(settingRow(L10n.text("language"),currentLanguage.name) {choosingLanguage=true})
                     Hairline()
+                    Toggle(isOn:$model.killSwitch) {
+                        VStack(alignment:.leading,spacing:2) {
+                            Text(L10n.text("kill_switch")).font(.system(size:VeilbirdStyle.body))
+                            Text(L10n.text("kill_switch_apple_detail")).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).fixedSize(horizontal:false,vertical:true)
+                        }
+                    }.toggleStyle(.switch).controlSize(mac ? .small:.regular).tint(VeilbirdStyle.accent).padding(.horizontal,16).padding(.vertical,8).frame(minHeight:mac ? 40:50)
+                    Hairline()
                     #if os(iOS)
                     settingRow(L10n.text("shortcuts"),L10n.text("shortcuts_detail")) {if let url=URL(string:"shortcuts://") {openURL(url)}}
                     #else

@@ -45,7 +45,8 @@ export async function recordDiagnostics(session: { user_id: string; platform: st
     const at = typeof event?.at === "string" ? Date.parse(event.at) : NaN;
     if (!event || typeof event.code !== "string" || !diagnosticCode.test(event.code) || !Number.isFinite(at) || at < now - 7 * 86400000 || at > now + 300000) return [];
     return [{ code: event.code, at: new Date(at).toISOString(), nodeId: typeof event.nodeId === "string" && diagnosticNode.test(event.nodeId) ? event.nodeId : null,
-      detail: scrubDetail(event.detail), attempt: typeof event.attempt === "string" && diagnosticAttempt.test(event.attempt) ? event.attempt : null, network: event.network }];
+      // A crash carries a short stack (Class/Method frames), so it may be longer.
+      detail: scrubDetail(event.detail, event.code === "APP_CRASH" ? 600 : 200), attempt: typeof event.attempt === "string" && diagnosticAttempt.test(event.attempt) ? event.attempt : null, network: event.network }];
   });
   // A probe summary is reachability data, not a failure: it updates the node's port status only.
   for (const event of events.filter((item) => item.code === "TRANSPORT_PROBE" && item.nodeId)) await recordTransportProbe(event.nodeId!, event.network, event.detail);
@@ -55,7 +56,7 @@ export async function recordDiagnostics(session: { user_id: string; platform: st
   for (const event of accepted) {
     await dbExec("INSERT INTO native_diagnostics (id,user_id,platform,client_version,client_build,code,node_id,occurred_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
       [`diag_${randomUUID()}`, session.user_id, session.platform, agent?.version ?? null, agent?.build ?? null, event.code, event.nodeId, event.at]);
-    void writeOperationalLog({ component: "client", level: "warning", nodeId: event.nodeId, actor: { id: session.user_id },
+    void writeOperationalLog({ component: "client", level: event.code === "APP_CRASH" ? "error" : "warning", nodeId: event.nodeId, actor: { id: session.user_id },
       message: `App ${session.platform} ${agent ? `${agent.version}+${agent.build}` : ""}: ${event.code}${event.detail ? ` (${event.detail})` : ""}`.replace(/ {2,}/g, " "),
       fields: { code: event.code, occurredAt: event.at, attempt: event.attempt ?? undefined } });
   }

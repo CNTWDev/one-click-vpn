@@ -90,6 +90,10 @@
   <string name="hide_password">Hide password</string>
   <string name="incorrect_email_or_password">Incorrect email or password.</string>
   <string name="invalid_server_response_try_again_later">Invalid server response. Try again later.</string>
+  <string name="kill_switch">Kill switch</string>
+  <string name="kill_switch_android_detail">In Android settings, turn on Always-on VPN and Block connections without VPN</string>
+  <string name="kill_switch_apple_detail">All traffic goes through the VPN; without it, nothing goes out. Applies from the next connection</string>
+  <string name="kill_switch_blocking">Disconnected · the kill switch is blocking the internet</string>
   <string name="language">Language</string>
   <string name="language_system">Follow system</string>
   <string name="last_30_days">Last 30 days</string>
@@ -119,6 +123,7 @@
   <string name="open_app">Open TrackNothing</string>
   <string name="open_at_login">Open at login</string>
   <string name="open_main_window">Open main window</string>
+  <string name="open_vpn_settings">Open VPN settings</string>
   <string name="password">Password</string>
   <string name="password_reset_unavailable">Password reset by email isn\'t available right now. Contact your administrator.</string>
   <string name="quality_fair">Fair</string>

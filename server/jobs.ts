@@ -3,6 +3,7 @@ import { runAccessJobs } from "./access-jobs";
 import { expireDueConnectionProfiles } from "./control-db";
 import { markAccessChanged } from "./reconcile-schedule";
 import { writeOperationalLog } from "./operational-logs";
+import { runAlerts } from "./alerts";
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
@@ -26,6 +27,7 @@ export async function runMinuteJobs(): Promise<void> {
   lastBoundaryCheck = until;
   if (refreshed || expired || boundary) markAccessChanged();
   await retryReconcileTasks();
+  await runAlerts().catch((error) => console.error("Alerts failed", error instanceof Error ? error.message : error));
 }
 
 /** Tasks an Agent took but never reported return to the queue; failed ones retry up to five times. */
@@ -55,6 +57,7 @@ export async function runDailyJobs(): Promise<Record<string, number>> {
     nodeActions: await dbExec(`DELETE FROM node_actions a WHERE a.status NOT IN ('queued', 'running') AND a.created_at < $1
       AND a.id NOT IN (SELECT x.id FROM node_actions x WHERE x.node_id = a.node_id ORDER BY x.created_at DESC LIMIT 20)`, [ago(30 * DAY)]),
     auditLogs: await dbExec("DELETE FROM audit_logs WHERE created_at < $1", [ago(180 * DAY)]),
+    joinTokens: await dbExec("DELETE FROM node_join_tokens WHERE expires_at < $1", [ago(DAY)]),
     deviceSessions: await dbExec("DELETE FROM device_sessions WHERE refresh_expires_at < $1 OR revoked_at < $1", [ago(DAY)]),
   };
   if (Object.values(removed).some(Boolean)) {
