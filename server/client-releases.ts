@@ -6,8 +6,9 @@ import {
 } from "../shared/client-releases";
 import { addAudit, dbExec, dbQuery } from "./db";
 import { requestAdmin } from "./request-auth";
-import { publicOrigin } from "./config";
-import { appendLocalArtifact, inspectArtifact, inspectLocalArtifact, localArtifactPath, localArtifactUrl, maxInstallerBytes, presignReleaseUpload, releaseObjectKey, releaseStorage, uploadChunkBytes } from "./release-storage";
+import { apiOrigin } from "./config";
+import { appendLocalArtifact, copyToMirror, inspectArtifact, inspectLocalArtifact, localArtifactPath, localArtifactUrl, maxInstallerBytes, presignReleaseUpload, releaseMirror, releaseObjectKey, releaseStorage, uploadChunkBytes } from "./release-storage";
+import { writeOperationalLog } from "./operational-logs";
 
 export class ReleaseError extends Error {
   constructor(public code: string, public status = 400) { super(code); }
@@ -33,20 +34,37 @@ type ReleaseRow = {
   status: ClientRelease["status"]; distribution: ClientRelease["distribution"]; url: string; sha256: string | null; size_bytes: string | null;
   min_os: string; notes: string; storage_key: string | null; verified_at: Date | null; published_at: Date | null;
   created_by: string | null; created_at: Date; updated_at: Date; rollout_percent: number;
+  mirror_url: string | null; mirror_error: string; mirror_attempts: number;
 };
 const iso = (value: Date | null) => value ? new Date(value).toISOString() : null;
+
+/** Path of a locally stored installer on any API origin (all of them reach this Controller). */
+const localFilePath = (key: string) => new URL(localArtifactUrl("https://localhost", key)).pathname;
+
+/**
+ * Where users download a build: the CDN mirror once the copy is there, otherwise the Controller's own copy on
+ * the API domain (straight to the Controller, not through the Portal). Older rows recorded the Portal domain.
+ */
+function downloadUrl(row: ReleaseRow) {
+  if (row.mirror_url) return row.mirror_url;
+  const origin = apiOrigin();
+  return row.storage_key && releaseStorage().mode === "local" && origin.startsWith("https://") ? localArtifactUrl(origin, row.storage_key) : row.url;
+}
 
 function toRelease(row: ReleaseRow): ClientRelease {
   return validateClientRelease({
     platform: row.platform, arch: row.arch, channel: row.channel, version: row.version, build: row.build, status: row.status,
-    distribution: row.distribution, url: row.url, minOs: row.min_os, publishedAt: iso(row.published_at) || iso(row.created_at), notes: row.notes,
+    distribution: row.distribution, url: downloadUrl(row), minOs: row.min_os, publishedAt: iso(row.published_at) || iso(row.created_at), notes: row.notes,
     ...(row.sha256 ? { sha256: row.sha256, sizeBytes: Number(row.size_bytes) } : {}),
   });
 }
 function adminRelease(row: ReleaseRow) {
   return { ...toRelease(row), id: row.id, notes: row.notes, storageKey: row.storage_key, verifiedAt: iso(row.verified_at),
     publishedAt: iso(row.published_at), createdAt: iso(row.created_at), updatedAt: iso(row.updated_at), createdBy: row.created_by,
-    rolloutPercent: Number(row.rollout_percent ?? 100) };
+    rolloutPercent: Number(row.rollout_percent ?? 100),
+    mirror: row.mirror_url ? "ready" : mirrorConfigured() && row.storage_key && releaseStorage().mode === "local"
+      ? (row.mirror_error ? (Number(row.mirror_attempts) >= mirrorAttempts ? "failed" : "retrying") : "pending") : null,
+    mirrorError: row.mirror_error || null };
 }
 
 /**
@@ -77,7 +95,54 @@ export async function minimumBuild(platform: ClientPlatform): Promise<number> {
 
 export async function updateCheck(input: { platform: ClientPlatform; arch?: ClientArch; channel: ClientChannel; build: number | null; installation?: string }) {
   const latest = releaseFor(await publicReleases(input.installation), input.platform, input.arch, input.channel);
-  return { ...updateDecision(latest, await minimumBuild(input.platform), input.build), announcement: await clientAnnouncement(input.platform) };
+  return { ...updateDecision(latest, await minimumBuild(input.platform), input.build), announcement: await clientAnnouncement(input.platform),
+    ...(latest?.distribution === "direct" ? { downloads: await downloadSources(latest) } : {}) };
+}
+
+/**
+ * Every place the apps can fetch a direct build from, for the core's resumable download (clients/core/download.go):
+ * full URLs tried first (the CDN mirror, or external storage), then `path` on each API origin the app knows.
+ */
+async function downloadSources(release: ClientRelease): Promise<{ urls: string[]; path: string | null }> {
+  const row = (await dbQuery<ReleaseRow>("SELECT * FROM client_releases WHERE platform=$1 AND arch=$2 AND build=$3", [release.platform, release.arch, release.build]))[0];
+  if (!row) return { urls: [release.url], path: null };
+  const local = !!row.storage_key && releaseStorage().mode === "local";
+  return { urls: row.mirror_url ? [row.mirror_url] : local ? [] : [release.url], path: local ? localFilePath(row.storage_key!) : null };
+}
+
+const mirrorAttempts = 5;
+const mirrorConfigured = () => { try { return !!releaseMirror(); } catch { return false; } };
+let mirroring = false;
+/**
+ * Copies locally stored builds to the download mirror (when configured), newest first, one at a time.
+ * Runs after each upload and from the minute jobs, so a failed copy is retried a few times and a restart loses nothing.
+ */
+export async function syncReleaseMirrors(): Promise<void> {
+  const storage = releaseStorage();
+  let mirror;
+  try { mirror = releaseMirror(); } catch (error) { console.error("Release mirror", (error as Error).message); return; }
+  if (!mirror || storage.mode !== "local" || mirroring) return;
+  mirroring = true;
+  try {
+    for (;;) {
+      const row = (await dbQuery<ReleaseRow>(`SELECT * FROM client_releases WHERE storage_key IS NOT NULL AND mirror_url IS NULL AND status<>'withdrawn'
+        AND mirror_attempts<$1 AND distribution='direct' AND size_bytes IS NOT NULL ORDER BY created_at DESC LIMIT 1`, [mirrorAttempts]))[0];
+      if (!row) return;
+      await dbExec("UPDATE client_releases SET mirror_attempts=mirror_attempts+1 WHERE id=$1", [row.id]);
+      try {
+        const url = await copyToMirror(mirror, row.storage_key!, localArtifactPath(storage, row.storage_key!), Number(row.size_bytes));
+        await dbExec("UPDATE client_releases SET mirror_url=$2,mirror_error='',updated_at=now() WHERE id=$1", [row.id, url]);
+        await writeOperationalLog({ component: "controller", level: "info", message: "client_release.mirrored", action: "client_release.mirrored",
+          fields: { release: row.id, platform: row.platform, build: row.build } }).catch(() => undefined);
+      } catch (error) {
+        const message = ((error as Error).message || "Mirror copy failed").slice(0, 300);
+        await dbExec("UPDATE client_releases SET mirror_error=$2 WHERE id=$1", [row.id, message]);
+        await writeOperationalLog({ component: "controller", level: "warning", message: "client_release.mirror_failed", action: "client_release.mirror_failed",
+          fields: { release: row.id, platform: row.platform, build: row.build, error: message } }).catch(() => undefined);
+        return;
+      }
+    }
+  } finally { mirroring = false; }
 }
 
 export function downloadPath(platform: ClientPlatform, arch?: ClientArch) {
@@ -161,7 +226,7 @@ export async function createRelease(actor: ReleaseActor, body: Record<string, un
   if (!url && storageKey && storage.mode === "s3") url = `${storage.publicBaseUrl}/${storageKey.split("/").map(encodeURIComponent).join("/")}`;
   if (local) {
     if (body.distribution !== undefined && body.distribution !== "direct") throw new ReleaseError("INVALID_DISTRIBUTION");
-    url = localArtifactUrl(publicOrigin(), storageKey!);
+    url = localArtifactUrl(apiOrigin(), storageKey!);
   }
   const draft: Record<string, unknown> = {
     platform, arch: body.arch ?? (platform === "windows" ? "x64" : "universal"), channel: body.channel ?? "beta", version: body.version,
@@ -193,6 +258,7 @@ export async function createRelease(actor: ReleaseActor, body: Record<string, un
   }
   await addAudit({ actorUserId: actorId(actor), action: "client_release.create", targetType: "client_release", targetId: id,
     metadata: { actor: actorLabel(actor), platform: release.platform, arch: release.arch, version: release.version, build: release.build } });
+  if (storageKey) void syncReleaseMirrors().catch(() => undefined);
   if (body.publish === true) return transitionRelease(actor, id, "publish");
   return findRelease(id);
 }
@@ -279,7 +345,8 @@ export async function releaseOverview() {
       return { platform, minBuild: policy?.min_build || 0, announcement: policy?.announcement || "", downloadPath: downloadPath(platform) }; }),
     adoption: adoption.map((row) => ({ platform: row.platform, version: row.client_version, build: row.client_build, devices: row.devices })),
     diagnostics: diagnostics.map((row) => ({ platform: row.platform, build: row.client_build, code: row.code, events: row.events, users: row.users, lastAt: iso(row.last_at) })),
-    storage: storage.mode === "s3" ? { mode: storage.mode, publicBaseUrl: storage.publicBaseUrl } : { mode: storage.mode, maxBytes: maxInstallerBytes, chunkBytes: uploadChunkBytes },
+    storage: storage.mode === "s3" ? { mode: storage.mode, publicBaseUrl: storage.publicBaseUrl } : { mode: storage.mode, maxBytes: maxInstallerBytes, chunkBytes: uploadChunkBytes,
+      mirror: (() => { try { return releaseMirror()?.publicBaseUrl ?? null; } catch { return "invalid"; } })() },
     ciTokenConfigured: (process.env.VEILBIRD_RELEASE_TOKEN?.trim().length || 0) >= 32,
   };
 }

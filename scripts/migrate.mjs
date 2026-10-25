@@ -565,6 +565,12 @@ const migrations = [
     -- Extra API domains the apps try when the site domains are blocked (server/api-origins.ts).
     ALTER TABLE controller_settings ADD COLUMN IF NOT EXISTS backup_api_domains TEXT NOT NULL DEFAULT '';
   `)],
+  ["007-release-mirror", async (db) => db.query(`
+    -- Copy of a locally stored installer on the download mirror (OSS/R2 + CDN), see syncReleaseMirrors.
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS mirror_url TEXT;
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS mirror_error TEXT NOT NULL DEFAULT '';
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS mirror_attempts INTEGER NOT NULL DEFAULT 0;
+  `)],
 ];
 
 const client = await pool.connect();

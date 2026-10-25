@@ -4,6 +4,7 @@ import { expireDueConnectionProfiles } from "./control-db";
 import { markAccessChanged } from "./reconcile-schedule";
 import { writeOperationalLog } from "./operational-logs";
 import { runAlerts } from "./alerts";
+import { syncReleaseMirrors } from "./client-releases";
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
@@ -28,6 +29,8 @@ export async function runMinuteJobs(): Promise<void> {
   if (refreshed || expired || boundary) markAccessChanged();
   await retryReconcileTasks();
   await runAlerts().catch((error) => console.error("Alerts failed", error instanceof Error ? error.message : error));
+  // Not awaited: copying an installer to the download mirror can take longer than a minute.
+  void syncReleaseMirrors().catch((error) => console.error("Release mirror failed", error instanceof Error ? error.message : error));
 }
 
 /** Tasks an Agent took but never reported return to the queue; failed ones retry up to five times. */
