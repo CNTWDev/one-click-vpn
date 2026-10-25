@@ -29,7 +29,7 @@ Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次�
 
 1. 改 `clients/version.json` 的版本号，提交后推送标签 `client-v<版本号>`；或在 GitHub → Actions →「Client release」→ Run workflow。
 2. 运行结束后，在该次运行页面底部 **Artifacts** 下载各平台的 zip（不用解压）：
-   - `TrackNothing-android-…` → `TrackNothing-<版本>-<构建号>.apk`
+   - `TrackNothing-android-…` → `TrackNothing-<版本>-<构建号>-arm64.apk`（几乎所有手机）和 `TrackNothing-<版本>-<构建号>.apk`（通用包，给少数 32 位手机和网页下载），两个都导入
    - `TrackNothing-windows-x64-…` → `TrackNothing-<版本>-<构建号>-win-x64-setup.exe`（arm64 同理，给 ARM 笔记本用）
    - `TrackNothing-macos-…` → `TrackNothing-<版本>-<构建号>-macos.dmg`（配好 Apple 签名后才有）
 3. 控制台 → 客户端 → 客户端发布 →「导入 GitHub 构建包」，把下载的 zip 一次全部拖进去（也可以拖 `.apk`、`.exe`、`.dmg`）。页面在浏览器里解压，按文件名识别平台、架构、版本号、构建号，只上传里面的安装包；浏览器算的 SHA-256 会和服务器收到的文件再核对一遍。选好渠道和「导入后：保存为草稿 / 立即发布」，点「导入」。已存在的构建会标记并跳过。文件名不规范时，用「上传安装包」手动填写。
@@ -40,10 +40,31 @@ Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次�
 
 在服务器 `.env` 设置 `VEILBIRD_RELEASE_TOKEN`（`openssl rand -hex 32` 生成），运行 `sudo ./one-click-update.sh`。然后在 GitHub 新建 Secret `VEILBIRD_RELEASE_TOKEN`（同一个值）和 Variable `VEILBIRD_RELEASE_API`（Controller 地址）。之后 CI 会自己把安装包传到控制台并发布为测试版，你只需在控制台点「晋升正式版」。默认的本地存储和 S3 都支持。
 
+## 可选：下载加速（阿里云 OSS + CDN、Cloudflare R2 等）
+
+安装包仍然先存到服务器上；配置后，后台会把每个上传的构建自动复制到对象存储（约 1 分钟内）。客户端和网页下载都优先走 CDN，CDN 不通时改从服务器下载，并且接着已下载的部分继续。版本历史里会显示「CDN 已同步 / 同步中 / 同步失败」（鼠标移上去可以看到失败原因）。
+
+在服务器 `.env` 加上下面几行，然后运行 `sudo ./one-click-update.sh`：
+
+```
+VEILBIRD_RELEASE_MIRROR_ENDPOINT=https://oss-ap-northeast-1.aliyuncs.com   # bucket 所在地域的外网 Endpoint，不带 bucket 名
+VEILBIRD_RELEASE_MIRROR_REGION=ap-northeast-1                              # 地域 ID；签名报错时改成 oss-ap-northeast-1
+VEILBIRD_RELEASE_MIRROR_BUCKET=<bucket 名>
+VEILBIRD_RELEASE_MIRROR_ACCESS_KEY_ID=<RAM 用户 AccessKey ID>
+VEILBIRD_RELEASE_MIRROR_SECRET_ACCESS_KEY=<RAM 用户 AccessKey Secret>
+VEILBIRD_RELEASE_MIRROR_PUBLIC_BASE_URL=https://<CDN 加速域名>
+```
+
+阿里云侧：CDN 源站选这个 bucket，配 HTTPS 证书；bucket 私有时打开「阿里云 OSS 私有 Bucket 回源」；打开「Range 回源」（断点续传）；RAM 用户只给这个 bucket 的 `oss:PutObject`。
+
 ## 客户端更新
 
-- Android：启动时检查，下载后校验 SHA-256 和签名，交给系统安装器，用户点一次「安装」。必须升级时隐藏连接按钮。
-- Windows：启动时检查，显示新版本卡片，点击下载新安装程序，运行后覆盖安装。
+- 检查时机：启动后约 3 秒；之后在前台或托盘里每隔 6 小时；正在建立连接时推迟。我的 →「检查更新」随时手动检查。
+- 提示：首页一条提示条（可点 × 推迟 3 天，「我的」标签上的小点保留）；必须升级时不能关闭，也不能连接。
+- 下载：在应用里进行，提示条显示百分比、已下载/总大小和剩余时间；CDN 优先，失败换服务器，断点续传，最后校验 SHA-256。
+- Android：下载完交给系统安装器（只接受同一签名）；连接中时先显示「安装」，装好后自动重连。
+- Windows：下载完静默运行安装程序，覆盖安装后自动启动新版本；连接中时装好后自动重连。
+- Mac：下载并校验 DMG 后打开它，把新版本拖到「应用程序」里覆盖。iPhone 走 TestFlight / App Store。
 - 灰度：测试版可以设置比例，只有落在比例内的安装会收到提示。
 
 ## Mac（DMG 直接下载）
