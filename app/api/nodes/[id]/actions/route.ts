@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "../../../../../server/auth";
-import { countRunningNodeActions, findNode, NodeBusyError } from "../../../../../server/db";
+import { addAudit, countRunningNodeActions, findNode, NodeBusyError, setNodePaused } from "../../../../../server/db";
 import { jsonError } from "../../../../../server/http";
 import { queueNodeAction } from "../../../../../server/bootstrap";
 
@@ -11,6 +11,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!user) return jsonError("Authentication required", 401);
   const { id } = await context.params;
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+  // Pause / resume is a flag on the controller only: immediate, nothing is sent to the node.
+  if (body.action === "pause" || body.action === "resume") {
+    const paused = body.action === "pause";
+    if (!(await setNodePaused(id, paused))) return jsonError("Node not found", 404);
+    await addAudit({ actorUserId: user.id, action: paused ? "node.paused" : "node.resumed", targetType: "node", targetId: id });
+    return NextResponse.json({ ok: true, paused });
+  }
   const action = body.action === "restart-agent" || body.action === "status-agent" || body.action === "upgrade-agent" ? body.action : null;
   if (!action) return jsonError("Unsupported node action");
   try {

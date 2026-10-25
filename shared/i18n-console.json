@@ -3718,5 +3718,41 @@
   "删除存储里的安装包失败，记录已保留，请检查 OSS 密钥是否有删除权限后重试。": [
     "Could not delete the installer from storage. The record was kept; check that the OSS key may delete objects, then retry.",
     "Не удалось удалить установщик из хранилища. Запись сохранена; проверьте, что ключ OSS может удалять объекты, и повторите."
+  ],
+  "已暂停": [
+    "Paused",
+    "Приостановлен"
+  ],
+  "暂停服务": [
+    "Pause service",
+    "Приостановить"
+  ],
+  "恢复服务": [
+    "Resume service",
+    "Возобновить"
+  ],
+  "重新在 App 和订阅中显示": [
+    "Show again in apps and subscriptions",
+    "Снова показывать в приложениях и подписках"
+  ],
+  "App 和订阅中隐藏": [
+    "Hide from apps and subscriptions",
+    "Скрыть из приложений и подписок"
+  ],
+  "App 和订阅里将不再显示 {0}，也不会再有新连接。节点照常运行，正在连接的用户和已下载的配置不受影响，可随时恢复。": [
+    "{0} will no longer appear in apps or subscriptions and will take no new connections. The server keeps running; users connected now and downloaded configs are not affected. You can resume it at any time.",
+    "{0} больше не будет отображаться в приложениях и подписках и не будет принимать новые подключения. Сервер продолжит работать; текущие подключения и скачанные конфигурации не затрагиваются. Возобновить можно в любой момент."
+  ],
+  "{0} 已暂停服务。": [
+    "{0} is paused.",
+    "{0} приостановлен."
+  ],
+  "{0} 已恢复服务。": [
+    "{0} is back in service.",
+    "{0} снова доступен."
+  ],
+  "已暂停服务：App 和订阅里不显示此节点，已下载的配置照常可用。": [
+    "Paused: this server is hidden from apps and subscriptions. Downloaded configs keep working.",
+    "Приостановлен: сервер скрыт из приложений и подписок. Скачанные конфигурации продолжают работать."
   ]
 }

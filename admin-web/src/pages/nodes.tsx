@@ -25,7 +25,7 @@ type NodeForm = {
   method: "command" | "ssh"; forgetCredential: boolean;
 };
 type Install = { nodeName: string; command: string; expiresAt: string };
-type NodeAction = "status-agent" | "restart-agent" | "upgrade-agent" | "bootstrap" | "delete";
+type NodeAction = "status-agent" | "restart-agent" | "upgrade-agent" | "bootstrap" | "delete" | "pause" | "resume";
 
 /** Public-interface rate from the latest heartbeat; hidden once the heartbeat goes stale. */
 
@@ -70,8 +70,9 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
   const matchers: Record<string, (node: NodeRecord) => boolean> = {
     all: () => true, online: (node) => node.status === "online", attention: (node) => node.status !== "online",
     offline: (node) => node.status === "offline", provisioning: (node) => node.status === "provisioning", upgrade: needsUpgrade,
+    paused: (node) => Boolean(node.paused_at),
   };
-  const chips = [["all", t("全部")], ["online", t("在线")], ["attention", t("需关注")], ["offline", t("离线")], ["provisioning", t("部署中")], ["upgrade", t("需升级")]]
+  const chips = [["all", t("全部")], ["online", t("在线")], ["attention", t("需关注")], ["offline", t("离线")], ["provisioning", t("部署中")], ["upgrade", t("需升级")], ["paused", t("已暂停")]]
     .map(([value, label]) => ({ value, label, count: nodes.filter(matchers[value]).length }))
     .filter((chip) => chip.value === "all" || chip.value === filter || chip.count > 0);
   const regionName = useMemo(() => new Map(regions.map((region) => [region.id, region.name])), [regions]);
@@ -206,10 +207,11 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
       "restart-agent": t("确定重启 {0} 的 Agent 吗？短时间内会中断状态上报。", [node.name]),
       bootstrap: t("确定重新安装/修复 {0} 吗？这会重新部署 Agent，并为标准模板节点自动补齐缺少的协议（含 VLESS）。保留已有密钥和单节点配置；自定义模板不会被覆盖。", [node.name]),
       delete: t("将从 Controller 移除节点 {0}（{1}）。此操作不可撤销，且不会自动销毁云服务器。", [node.name, node.ip]),
-      "status-agent": "",
+      pause: t("App 和订阅里将不再显示 {0}，也不会再有新连接。节点照常运行，正在连接的用户和已下载的配置不受影响，可随时恢复。", [node.name]),
+      "status-agent": "", resume: "",
     };
-    const titles = { "upgrade-agent": t("升级 Agent"), "restart-agent": t("重启 Agent"), bootstrap: t("重新安装 / 修复"), delete: t("删除节点"), "status-agent": "" };
-    if (action !== "status-agent" && !await confirm({
+    const titles = { "upgrade-agent": t("升级 Agent"), "restart-agent": t("重启 Agent"), bootstrap: t("重新安装 / 修复"), delete: t("删除节点"), pause: t("暂停服务"), "status-agent": "", resume: "" };
+    if (action !== "status-agent" && action !== "resume" && !await confirm({
       title: titles[action],
       message: descriptions[action],
       confirmLabel: titles[action],
@@ -221,7 +223,8 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
       if (action === "delete") await api(`/api/nodes/${node.id}`, { method: "DELETE" });
       else if (action === "bootstrap") await api(`/api/nodes/${node.id}`, { method: "POST", body: JSON.stringify({ action }) });
       else await api(`/api/nodes/${node.id}/actions`, { method: "POST", body: JSON.stringify({ action }) });
-      toast(action === "delete" ? t("节点 {0} 已删除。", [node.name]) : t("操作已加入队列，可在节点详情中跟踪进度。"));
+      toast(action === "delete" ? t("节点 {0} 已删除。", [node.name]) : action === "pause" ? t("{0} 已暂停服务。", [node.name])
+        : action === "resume" ? t("{0} 已恢复服务。", [node.name]) : t("操作已加入队列，可在节点详情中跟踪进度。"));
       if (action === "delete") {
         setSelected((current) => { const next = new Set(current); next.delete(node.id); return next; });
         if (diagnosticRequestRef.current === node.id) closeDetail();
@@ -284,6 +287,9 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
       { label: t("安装命令"), hint: t("在节点上运行，1 小时内有效"), disabled: Boolean(busy), onSelect: () => void showInstallCommand(node) },
       ...(node.has_ssh_credential ? [{ label: t("清除 SSH 凭据"), disabled: Boolean(busy), onSelect: () => void clearCredential(node) }] : []),
       "divider",
+      node.paused_at
+        ? { label: t("恢复服务"), hint: t("重新在 App 和订阅中显示"), disabled: Boolean(busy), onSelect: () => void operate(node, "resume") }
+        : { label: t("暂停服务"), hint: t("App 和订阅中隐藏"), disabled: Boolean(busy), onSelect: () => void operate(node, "pause") },
       { label: t("删除节点"), danger: true, disabled: Boolean(busy), onSelect: () => void operate(node, "delete") },
     ]} />;
   }
@@ -325,7 +331,7 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
       <div className="table-wrap"><table className="data-table cards node-table"><thead><tr><th className="check"><input type="checkbox" aria-label={t("选择全部节点")} checked={allSelected} onChange={(event) => setSelected(event.target.checked ? new Set(visible.map((node) => node.id)) : new Set())} /></th><th>{t("节点")}</th><th>{t("状态")}</th><th>Agent</th><th>{t("负载")}</th><th>{t("流量")}</th><th>{t("策略")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visible.map((node) => <tr key={node.id} className={selected.has(node.id) ? "selected" : ""}>
         <td className="check"><input type="checkbox" aria-label={t("选择 {0}", [node.name])} checked={selected.has(node.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(node.id); else next.delete(node.id); return next; })} /></td>
         <td className="cell-main"><button className="node-detail-trigger" onClick={() => openDetail(node)}><StateDot value={node.status} /><span><b>{breakAfterAt(node.name)}</b><small>{node.ip} · {node.place}</small></span></button></td>
-        <td className="cell-status"><Pill value={node.status} /><small>{node.latency} · {node.last_seen}</small></td>
+        <td className="cell-status">{node.paused_at && node.status === "online" ? <><Pill value="paused" /><small>{statusLabel(node.status)} · {node.latency}</small></> : <><Pill value={node.status} /><small>{node.latency} · {node.last_seen}</small></>}</td>
         <td className="m-hide"><b className="mono">{node.version || "—"}</b>{needsUpgrade(node) ? <button className="upgrade-chip" disabled={Boolean(busy)} onClick={() => void operate(node, "upgrade-agent")} title={t("点击升级 Agent")}>{t("升级到 {0}", [targetVersion])}</button> : <small>{node.ssh_user || "root"}@{node.ssh_port || 22}</small>}</td>
         <td className="m-hide">{node.metrics ? <div className="meters"><Meter label="CPU" value={node.metrics.cpuPercent} /><Meter label={t("内存")} value={node.metrics.memory.percent} /><Meter label={t("磁盘")} value={node.metrics.disk.percent} /></div> : <span className="muted">{t("暂无指标")}</span>}</td>
         <td className="m-hide nowrap" title={trafficTitle(node)}>{trafficCell(node)}</td>
@@ -365,6 +371,7 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
 
     {diagnosticNode && <Modal wide title={t("{0} · 节点详情", [diagnosticNode.name])} description={`${diagnosticNode.ip} · ${diagnosticNode.place} · ${diagnosticNode.version || "—"}`} onClose={closeDetail}>
       <InlineNotice notice={notice} />
+      {diagnosticNode.paused_at && <InlineNotice notice={{ tone: "info", message: t("已暂停服务：App 和订阅里不显示此节点，已下载的配置照常可用。") }} />}
       <div className="diagnostic-toolbar"><span><i className="live-mark" />{t("每 5 秒自动刷新")}</span><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "status-agent")}>{t("检查 Agent")}</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void operate(diagnosticNode, "bootstrap")}>{t("重新安装 / 修复")}</button><button className="button ghost small" disabled={Boolean(busy)} onClick={() => void showInstallCommand(diagnosticNode)}>{t("安装命令")}</button>{diagnosticNode.has_ssh_credential && <button className="button ghost small" disabled={Boolean(busy)} onClick={() => void clearCredential(diagnosticNode)}>{t("清除 SSH 凭据")}</button>}{needsUpgrade(diagnosticNode) && <button className="button primary small" disabled={Boolean(busy) || !targetVersion} onClick={() => void operate(diagnosticNode, "upgrade-agent")}>{t("升级 Agent 至 {0}", [targetVersion])}</button>}</div>
       {diagnosticsBusy && !diagnostics ? <div className="skeleton-block" role="status" aria-label={t("正在读取诊断信息")}><i /><i /><i /></div> : diagnostics && <NodeDiagnosticsView node={diagnosticNode} diagnostics={diagnostics} outdated={needsUpgrade(diagnosticNode)} />}
     </Modal>}

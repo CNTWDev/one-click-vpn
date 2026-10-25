@@ -17,7 +17,7 @@ const dictionary: Record<string, [label: string, tone: Tone]> = {
   "account-disabled": ["账号已停用", W], "user-disabled": ["用户已停用", W], not_configured: ["未配置", N], unknown: ["未知", N],
   managed: ["已托管", S], permissive: ["全部放行", W], unverified: ["未验证", N],
   reachable: ["已放行", S], unreachable: ["未放行", D], listening: ["监听中", S], cancelled: ["已取消", N],
-  info: ["信息", P], warning: ["警告", W],
+  info: ["信息", P], warning: ["警告", W], paused: ["已暂停", N],
 };
 
 export function statusLabel(value?: string | null): string {

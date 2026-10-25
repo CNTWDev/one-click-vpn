@@ -128,6 +128,8 @@ export type NodeRecord = {
   identity_verified_at?: string | null;
   deployment_policy?: string;
   policy_version?: number;
+  /** Set while paused: apps, subscriptions and new configs no longer offer the node. */
+  paused_at?: string | null;
   metrics?: NodeMetrics | null;
   monthlyTraffic?: NodeMonthlyTraffic | null;
 };
