@@ -7,6 +7,7 @@
   <string name="account_device_quota">Authorized devices   %1$s / %2$s</string>
   <string name="account_valid_until">Valid until · %1$s</string>
   <string name="all_locations">All locations</string>
+  <string name="allow_system_extension">Allow the TrackNothing system extension in System Settings → Privacy &amp; Security. It connects once allowed.</string>
   <string name="allow_the_system_to_add_a_vpn_on_first">Allow the system to add a VPN on first connection. Manage authorized devices in Account.</string>
   <string name="allow_the_system_vpn_permission_to_connect">Allow the system VPN permission to connect.</string>
   <string name="allow_vpn_access_on_your_first_connection">Allow VPN access on your first connection</string>
@@ -101,6 +102,7 @@
   <string name="logs_title">Diagnostic log</string>
   <string name="measuring_latency">Testing…</string>
   <string name="membership_expired_hint">Your access has expired. Contact your administrator to renew it.</string>
+  <string name="move_to_applications_first">Move TrackNothing to the Applications folder first, then open it from there.</string>
   <string name="my_account">My account</string>
   <string name="my_veilbird">My TrackNothing</string>
   <string name="new_devices_are_added_on_their_first_connection_when">New devices are added on their first connection when a slot is available.</string>
@@ -163,6 +165,7 @@
   <string name="sign_in_to_veilbird_no_imports_or_configuration_needed">Sign in to TrackNothing. No imports or configuration needed.</string>
   <string name="sign_out">Sign out</string>
   <string name="simulator_build_verify_vpn_connections_on_a_signed_physical">Simulator build · Verify VPN connections on a signed physical-device build</string>
+  <string name="system_extension_failed">Couldn\'t enable the VPN component. Reinstall TrackNothing and try again.</string>
   <string name="tap_ring_to_connect">Tap the ring to connect</string>
   <string name="tap_to_change">Tap to change location</string>
   <string name="test_after_disconnecting">Latency is tested while disconnected. Showing the last results.</string>

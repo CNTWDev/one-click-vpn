@@ -10,15 +10,17 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    INFOPLIST_KEY_VeilbirdKeychainGroup: $(AppIdentifierPrefix)com.veilbird.client.dev.shared
+    # Bundle identifier prefix: development builds keep this placeholder; release builds pass the registered one
+    # (GitHub variable VEILBIRD_APPLE_BUNDLE_ID, see clients/RELEASING.md).
+    VEILBIRD_BUNDLE_ID: com.veilbird.client.dev
+    INFOPLIST_KEY_VeilbirdKeychainGroup: $(AppIdentifierPrefix)$(VEILBIRD_BUNDLE_ID).shared
     # Shared by the app and its tunnel: the diagnostic log, routing choice and blocked-transport memory.
-    INFOPLIST_KEY_VeilbirdAppGroup: group.com.veilbird.client.dev
+    INFOPLIST_KEY_VeilbirdAppGroup: group.$(VEILBIRD_BUNDLE_ID)
     INFOPLIST_KEY_VeilbirdAPIOrigin: $(VEILBIRD_API_ORIGIN)
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     GENERATE_INFOPLIST_FILE: YES
     CODE_SIGN_STYLE: Automatic
-    # Development identifiers: replace with verified identifiers before distribution.
 targets:
   Veilbird-iOS:
     type: application
@@ -26,7 +28,7 @@ targets:
     sources: [App, Shared]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.veilbird.client.dev.ios
+        PRODUCT_BUNDLE_IDENTIFIER: $(VEILBIRD_BUNDLE_ID).ios
         PRODUCT_NAME: Veilbird
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_CFBundleDisplayName: TrackNothing
@@ -39,18 +41,24 @@ targets:
       path: Signing/iOS.entitlements
       properties:
         com.apple.developer.networking.networkextension: [packet-tunnel-provider]
-        keychain-access-groups: [$(AppIdentifierPrefix)com.veilbird.client.dev.shared]
-        com.apple.security.application-groups: [group.com.veilbird.client.dev]
+        keychain-access-groups: [$(AppIdentifierPrefix)$(VEILBIRD_BUNDLE_ID).shared]
+        com.apple.security.application-groups: [group.$(VEILBIRD_BUNDLE_ID)]
   Veilbird-macOS:
     type: application
     platform: macOS
     sources: [App, Shared]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.veilbird.client.dev.macos
+        PRODUCT_BUNDLE_IDENTIFIER: $(VEILBIRD_BUNDLE_ID).macos
         PRODUCT_NAME: Veilbird
         INFOPLIST_KEY_CFBundleDisplayName: TrackNothing
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Direct download (Developer ID): hardened runtime for notarization; the tunnel is a system extension, which
+        # runs as root, so it shares no keychain or app group container with the app (TunnelControl hands it what it needs).
+        ENABLE_HARDENED_RUNTIME: YES
+        INFOPLIST_KEY_VeilbirdAppGroup: $(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)
+        PROVISIONING_PROFILE_SPECIFIER: $(VEILBIRD_MACOS_APP_PROFILE)
     dependencies:
       - package: VeilbirdCore
       - target: VeilbirdTunnel-macOS
@@ -59,9 +67,10 @@ targets:
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
-        com.apple.developer.networking.networkextension: [packet-tunnel-provider]
-        keychain-access-groups: [$(AppIdentifierPrefix)com.veilbird.client.dev.shared]
-        com.apple.security.application-groups: [group.com.veilbird.client.dev]
+        com.apple.developer.networking.networkextension: [packet-tunnel-provider-systemextension]
+        com.apple.developer.system-extension.install: true
+        keychain-access-groups: [$(AppIdentifierPrefix)$(VEILBIRD_BUNDLE_ID).shared]
+        com.apple.security.application-groups: [$(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)]
   VeilbirdTunnel-iOS:
     type: app-extension
     platform: iOS
@@ -75,7 +84,7 @@ targets:
       - sdk: Security.framework
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.veilbird.client.dev.ios.tunnel
+        PRODUCT_BUNDLE_IDENTIFIER: $(VEILBIRD_BUNDLE_ID).ios.tunnel
         TARGETED_DEVICE_FAMILY: "1,2"
         APPLICATION_EXTENSION_API_ONLY: YES
     info:
@@ -88,12 +97,15 @@ targets:
       path: Signing/iOSTunnel.entitlements
       properties:
         com.apple.developer.networking.networkextension: [packet-tunnel-provider]
-        keychain-access-groups: [$(AppIdentifierPrefix)com.veilbird.client.dev.shared]
-        com.apple.security.application-groups: [group.com.veilbird.client.dev]
+        keychain-access-groups: [$(AppIdentifierPrefix)$(VEILBIRD_BUNDLE_ID).shared]
+        com.apple.security.application-groups: [group.$(VEILBIRD_BUNDLE_ID)]
   VeilbirdTunnel-macOS:
-    type: app-extension
+    # A system extension, not an app extension: Apple accepts Network Extension app extensions only from the Mac
+    # App Store, while a Developer ID (direct download) build needs this form. macOS asks once in System Settings →
+    # Privacy & Security before it loads (SystemExtension.swift).
+    type: system-extension
     platform: macOS
-    sources: [PacketTunnel, Shared]
+    sources: [PacketTunnel, PacketTunnelMac, Shared]
     dependencies:
       # The shared mihomo core (clients/core/build-apple.sh); same transports and routing as Android and Windows.
       - framework: .deps/TunnelCore.xcframework
@@ -103,22 +115,30 @@ targets:
       - sdk: Security.framework
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.veilbird.client.dev.macos.tunnel
-        APPLICATION_EXTENSION_API_ONLY: YES
+        PRODUCT_BUNDLE_IDENTIFIER: $(VEILBIRD_BUNDLE_ID).macos.tunnel
+        # macOS requires the bundle to be named <bundle identifier>.systemextension.
+        PRODUCT_NAME: $(PRODUCT_BUNDLE_IDENTIFIER)
+        PRODUCT_MODULE_NAME: VeilbirdTunnel
+        ENABLE_HARDENED_RUNTIME: YES
+        INFOPLIST_KEY_VeilbirdKeychainGroup: ""
+        INFOPLIST_KEY_VeilbirdAppGroup: $(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)
+        PROVISIONING_PROFILE_SPECIFIER: $(VEILBIRD_MACOS_TUNNEL_PROFILE)
     info:
       path: Signing/macOSTunnel.plist
       properties:
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
-          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
+        NSSystemExtensionUsageDescription: TrackNothing uses this extension to create its VPN connection.
+        NetworkExtension:
+          # Must start with one of the extension's app groups.
+          NEMachServiceName: $(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID).tunnel
+          NEProviderClasses:
+            com.apple.networkextension.packet-tunnel: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
     entitlements:
       path: Signing/macOSTunnel.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
-        com.apple.developer.networking.networkextension: [packet-tunnel-provider]
-        keychain-access-groups: [$(AppIdentifierPrefix)com.veilbird.client.dev.shared]
-        com.apple.security.application-groups: [group.com.veilbird.client.dev]
+        com.apple.developer.networking.networkextension: [packet-tunnel-provider-systemextension]
+        com.apple.security.application-groups: [$(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)]
 schemes:
   Veilbird-iOS:
     build:

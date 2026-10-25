@@ -9,6 +9,7 @@
   <data name="account_device_quota" xml:space="preserve"><value>Устройства   {0} / {1}</value></data>
   <data name="account_valid_until" xml:space="preserve"><value>Действует до · {0}</value></data>
   <data name="all_locations" xml:space="preserve"><value>Все локации</value></data>
+  <data name="allow_system_extension" xml:space="preserve"><value>Разрешите системное расширение TrackNothing в «Системные настройки → Конфиденциальность и безопасность». После этого подключение продолжится.</value></data>
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>При первом подключении разрешите добавление VPN. Управляйте устройствами в аккаунте.</value></data>
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>Для подключения разрешите использование VPN.</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>При первом подключении разрешите VPN</value></data>
@@ -103,6 +104,7 @@
   <data name="logs_title" xml:space="preserve"><value>Журнал диагностики</value></data>
   <data name="measuring_latency" xml:space="preserve"><value>Проверка…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>Срок доступа истёк. Обратитесь к администратору для продления.</value></data>
+  <data name="move_to_applications_first" xml:space="preserve"><value>Сначала перенесите TrackNothing в папку «Программы» и откройте его оттуда.</value></data>
   <data name="my_account" xml:space="preserve"><value>Мой аккаунт</value></data>
   <data name="my_veilbird" xml:space="preserve"><value>Мой TrackNothing</value></data>
   <data name="new_devices_are_added_on_their_first_connection_when" xml:space="preserve"><value>Новые устройства добавляются при первом подключении, если есть свободное место.</value></data>
@@ -165,6 +167,7 @@
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Войдите в TrackNothing. Импорт и настройка не нужны.</value></data>
   <data name="sign_out" xml:space="preserve"><value>Выйти</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Версия для симулятора · Проверяйте VPN на подписанной сборке для устройства</value></data>
+  <data name="system_extension_failed" xml:space="preserve"><value>Не удалось включить VPN-компонент. Переустановите TrackNothing и попробуйте снова.</value></data>
   <data name="tap_ring_to_connect" xml:space="preserve"><value>Нажмите на кольцо, чтобы подключиться</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>Нажмите, чтобы сменить</value></data>
   <data name="test_after_disconnecting" xml:space="preserve"><value>Задержка проверяется без подключения. Показаны последние результаты.</value></data>

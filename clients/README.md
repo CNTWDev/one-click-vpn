@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `core/` | 全平台 | Go + mihomo 共用内核：Android AAR、Apple `TunnelCore.xcframework`（gomobile），Windows `veilbird-core.exe`（子进程，标准输入输出通信，App 退出即停止） |
 | `android/` | Android | Kotlin 原生 UI、VpnService + 内嵌内核、前台连接服务、快捷开关磁贴、Android Keystore 身份签名与加密会话 |
-| `apple/` | iPhone、iPad、Mac | SwiftUI 共享界面和 Swift Package；独立 iOS/macOS App 与 Packet Tunnel Extension（内核在扩展里运行）；Mac 为固定大小小窗口 + 菜单栏图标 |
+| `apple/` | iPhone、iPad、Mac | SwiftUI 共享界面和 Swift Package；独立 iOS/macOS App；iOS 隧道是 Packet Tunnel 扩展，Mac 隧道是系统扩展（Developer ID 直接下载只能用这种形式，以 root 运行，登录凭据由 App 启动隧道时交给它），内核在隧道里运行；Mac 为固定大小小窗口 + 菜单栏图标 |
 | `windows/` | Windows x64/ARM64 | .NET 10 WPF 固定大小小窗口 + 托盘图标、DPAPI 用户级密钥保护；内核自建 wintun 虚拟网卡和路由，App 以管理员身份启动；关闭窗口留在托盘；Inno Setup 安装到 Program Files |
 | `contracts/` | 全平台 | 设备身份、连接授权和发布清单约定；不将订阅或证书数量当作设备数 |
 
