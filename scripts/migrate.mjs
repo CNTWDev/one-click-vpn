@@ -418,6 +418,12 @@ CREATE TABLE IF NOT EXISTS native_diagnostics (
   code TEXT NOT NULL, node_id TEXT, occurred_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS native_diagnostics_recent ON native_diagnostics(created_at DESC);
+-- Which app transports answered on a node, per network (a one-way hash from the app): tells a closed
+-- UDP port in a cloud security group from a network that blocks UDP. Rows older than 7 days are dropped.
+CREATE TABLE IF NOT EXISTS node_transport_reach (
+  node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, transport TEXT NOT NULL, network TEXT NOT NULL,
+  ok_at TIMESTAMPTZ, failed_at TIMESTAMPTZ, PRIMARY KEY (node_id, transport, network)
+);
 CREATE TABLE IF NOT EXISTS node_network_counters (
   node_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, interface TEXT NOT NULL, counter_epoch TEXT NOT NULL,
   rx_bytes BIGINT NOT NULL, tx_bytes BIGINT NOT NULL, observed_at TIMESTAMPTZ NOT NULL

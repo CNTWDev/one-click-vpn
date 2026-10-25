@@ -88,11 +88,12 @@ class NativeApi(context: Context) {
      * Queues a connection failure code and a scrubbed error text (no keys, addresses or traffic)
      * and sends the queue when the service is reachable; the network is often what just failed.
      */
-    @Synchronized fun report(code: String, nodeId: String = "", detail: String = "") {
+    @Synchronized fun report(code: String, nodeId: String = "", detail: String = "", network: String = "") {
         val queue = try { org.json.JSONArray(prefs.getString("diagnostics", "[]")) } catch (_: Exception) { org.json.JSONArray() }
         if (code.isNotEmpty()) queue.put(JSONObject().put("code", code).put("at", java.time.Instant.now().toString()).apply {
             if (nodeId.isNotEmpty()) put("nodeId", nodeId)
             if (detail.isNotEmpty()) put("detail", detail)
+            if (network.isNotEmpty()) put("network", network)
             attempt?.let { put("attempt", it) }
         })
         while (queue.length() > 20) queue.remove(0)
