@@ -32,6 +32,12 @@ xcodebuild archive -project Veilbird.xcodeproj -scheme Veilbird-macOS -configura
   MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build" VEILBIRD_API_ORIGIN="${VEILBIRD_API_ORIGIN:-}" \
   OTHER_CODE_SIGN_FLAGS=--timestamp
 
+# The service address users never type: it must be in the app (Config/App-Info.plist).
+plist="$out/TrackNothing.xcarchive/Products/Applications/Veilbird.app/Contents/Info.plist"
+[[ "$(plutil -extract VeilbirdAPIOrigin raw -o - "$plist" 2>/dev/null)" == "${VEILBIRD_API_ORIGIN:-}" ]] \
+  || { echo "VeilbirdAPIOrigin in $plist does not match VEILBIRD_API_ORIGIN" >&2; exit 1; }
+[[ -n "${VEILBIRD_API_ORIGIN:-}" ]] || echo 'warning: VEILBIRD_API_ORIGIN is not set; this build asks users for a server address.' >&2
+
 cat > "$out/export.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

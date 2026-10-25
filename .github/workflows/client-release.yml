@@ -124,6 +124,8 @@ jobs:
   windows:
     needs: prepare
     runs-on: windows-latest
+    env:
+      VEILBIRD_API_ORIGIN: ${{ vars.VEILBIRD_API_ORIGIN }}
     strategy:
       matrix:
         include:

@@ -817,7 +817,8 @@ public partial class MainWindow : Window {
         var word=Look.Wordmark(26);word.HorizontalAlignment=HorizontalAlignment.Center;Add(word,18,0);
         Add(new TextBlock {Text=L10n.Text("sign_in_tagline"),FontSize=13,Foreground=Look.Secondary,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center},6,24);
         if(Notices() is { } notes) Add(notes,0,8);
-        Add(Caption(L10n.Text("server_address")),0,6);var origin=Add(new TextBox {Text=api.Origin},0,12);
+        TextBox? origin=null;
+        if(NativeApi.BuiltInOrigin.Length==0) {Add(Caption(L10n.Text("server_address")),0,6);origin=Add(new TextBox {Text=api.Origin},0,12);AutomationProperties.SetName(origin,L10n.Text("server_address"));}
         Add(Caption(L10n.Text("email")),0,6);var email=Add(new TextBox(),0,12);
         Add(Caption(L10n.Text("password")),0,6);
         var hidden=new PasswordBox {Padding=new Thickness(10,0,40,0)};var shown=new TextBox {Padding=new Thickness(10,0,40,0),Visibility=Visibility.Collapsed};
@@ -830,19 +831,19 @@ public partial class MainWindow : Window {
         eye.Click+=(_,_)=>{if(showPassword) hidden.Password=shown.Text;else shown.Text=hidden.Password;showPassword=!showPassword;Reveal();};
         Reveal();
         var field=new Grid();field.Children.Add(hidden);field.Children.Add(shown);field.Children.Add(eye);Add(field);
-        AutomationProperties.SetName(origin,L10n.Text("server_address"));AutomationProperties.SetName(email,L10n.Text("email"));AutomationProperties.SetName(hidden,L10n.Text("password"));AutomationProperties.SetName(shown,L10n.Text("password"));
+        AutomationProperties.SetName(email,L10n.Text("email"));AutomationProperties.SetName(hidden,L10n.Text("password"));AutomationProperties.SetName(shown,L10n.Text("password"));
         var forgot=Add(new Button {Style=(Style)FindResource("Bare"),Content=new Border {Padding=new Thickness(8,0,2,0),Child=Single(L10n.Text("forgot_password"),12,Look.Secondary)},HorizontalAlignment=HorizontalAlignment.Right,Height=30},4,0);
         forgot.Click+=(_,_)=>{
             var address=email.Text.Trim();
             if(address.Length==0) {Notify(L10n.Text("reset_enter_email_first"));email.Focus();return;}
-            ResetPassword(address,L10n.Text("reset_confirm_detail",address),L10n.Text("reset_link_sent"),()=>api.Origin=origin.Text.Trim());
+            ResetPassword(address,L10n.Text("reset_confirm_detail",address),L10n.Text("reset_link_sent"),()=>{if(origin is not null) api.Origin=origin.Text.Trim();});
         };
         var login=Add(Primary(L10n.Text("sign_in_action")),8,0);
         login.IsDefault=true;
         login.Click+=(_,_)=>{
             var password=showPassword?shown.Text:hidden.Password;
             if(string.IsNullOrWhiteSpace(email.Text)||password.Length==0) {Notify(L10n.Text("enter_your_email_and_password"));return;}
-            Work(async()=>{api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password);hidden.Clear();shown.Clear();page="connect";Render();CheckForUpdate(false);});
+            Work(async()=>{if(origin is not null) api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password);hidden.Clear();shown.Clear();page="connect";Render();CheckForUpdate(false);});
         };
     }
     /// Both "forgot password" and "change password" email the Portal's reset link; the new password is set there.

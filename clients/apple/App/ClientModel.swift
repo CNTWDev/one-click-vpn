@@ -41,7 +41,10 @@ import ServiceManagement
     @Published var failed=false
     @Published var failure=""
     private var attempt:Date?
-    @Published var origin=UserDefaults.standard.string(forKey:"origin") ?? (Bundle.main.object(forInfoDictionaryKey:"VeilbirdAPIOrigin") as? String ?? "")
+    /// The service address release builds carry (VEILBIRD_API_ORIGIN): users never type one. Development builds are
+    /// empty and ask for it on the sign-in page.
+    static let builtInOrigin=(Bundle.main.object(forInfoDictionaryKey:"VeilbirdAPIOrigin") as? String ?? "").trimmingCharacters(in:.whitespaces)
+    @Published var origin=builtInOrigin.isEmpty ? UserDefaults.standard.string(forKey:"origin") ?? "":builtInOrigin
     private var ticker:AnyCancellable?
     // Status is polled here, not in the window: on the Mac the menu bar keeps working after the window is closed.
     init() {
