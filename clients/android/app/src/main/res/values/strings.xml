@@ -58,10 +58,11 @@
   <string name="development_server_address">Development server address</string>
   <string name="development_title">TrackNothing — Development</string>
   <string name="device">Device</string>
-  <string name="device_limit_reached_account_hint">Device limit reached. Revoke an old device in Account and try again.</string>
-  <string name="device_limit_reached_revoke_an_old_device_and_try">Device limit reached. Revoke an old device and try again.</string>
-  <string name="device_limit_reached_revoke_an_old_device_in_account">Device limit reached. Revoke an old device in Account and try again.</string>
+  <string name="device_limit_reached_account_hint">Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again.</string>
+  <string name="device_limit_reached_revoke_an_old_device_and_try">Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again.</string>
+  <string name="device_limit_reached_revoke_an_old_device_in_account">Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again.</string>
   <string name="devices_join_automatically">New devices join on first connect</string>
+  <string name="devices_unlimited">Unlimited</string>
   <string name="devices_used">%1$s of %2$s used</string>
   <string name="disconnect_action">Disconnect</string>
   <string name="disconnect_before_changing_location">Disconnect before changing location.</string>

@@ -7,6 +7,11 @@ import { addAudit, dbQuery, getDb } from "./db";
  * and has traffic left. Admin grants, gifts, the welcome gift and (later) paid orders are all grants;
  * nothing else decides access. users.access_ok / access_until / access_device_limit cache the result
  * so every enforcement point checks one row with {@link accessSql}.
+ *
+ * Each grant has three dimensions, and empty means unlimited in all of them: the period (permanent),
+ * the traffic quota and the device limit. With several grants in force the account gets the largest
+ * device limit. Devices are app sign-ins, subscriptions and node configs together (the account_slots
+ * view); past the limit, only the first ones the account added keep working ({@link withinDeviceLimitSql}).
  */
 
 export type GrantSource = "admin" | "gift" | "welcome" | "order" | "migration";
@@ -32,6 +37,36 @@ export function accessSql(alias = "u"): string {
   return `(${alias}.status='active' AND ${alias}.access_ok AND (${alias}.access_until IS NULL OR ${alias}.access_until>now()))`;
 }
 
+/** The account's device limit over a users row: its own override (Console), else its grants. NULL = unlimited. */
+export function deviceLimitSql(alias = "u"): string {
+  return `COALESCE(${alias}.native_device_limit,${alias}.access_device_limit)`;
+}
+
+/** Whether a device of the account (by its account_slots created_at and id) is among the first `limit` it added. */
+export function withinDeviceLimitSql(alias: string, createdAt: string, id: string): string {
+  return `(${deviceLimitSql(alias)} IS NULL OR (SELECT count(*) FROM account_slots s WHERE s.user_id=${alias}.id AND (s.created_at,s.id)<(${createdAt},${id}))<${deviceLimitSql(alias)})`;
+}
+
+const slotsSql = `SELECT ${deviceLimitSql("users")} AS "limit",(SELECT count(*) FROM account_slots s WHERE s.user_id=users.id)::int AS used FROM users WHERE id=$1`;
+const slotCount = (row?: { limit: number | null; used: number }) => ({ limit: row?.limit ?? null, used: Number(row?.used || 0) });
+
+/** Devices in use (app sign-ins, subscriptions, node configs) and the limit (null = unlimited). */
+export async function deviceSlots(userId: string) {
+  return slotCount((await dbQuery<{ limit: number | null; used: number }>(slotsSql, [userId]))[0]);
+}
+
+/** Before adding a device: throws when the account is at its limit. Pass the transaction's client to count under its lock. */
+export async function assertDeviceSlot(userId: string, client?: PoolClient) {
+  const slots = slotCount(client ? (await client.query<{ limit: number | null; used: number }>(slotsSql, [userId])).rows[0]
+    : (await dbQuery<{ limit: number | null; used: number }>(slotsSql, [userId]))[0]);
+  if (slots.limit !== null && slots.used >= slots.limit) throw new DeviceLimitError(slots.limit, slots.used);
+  return slots;
+}
+
+export class DeviceLimitError extends Error {
+  constructor(public limit: number, public used: number) { super("设备数已达上限，请先删除不用的设备、订阅或配置"); }
+}
+
 const num = (value: string | number | null) => value === null ? null : Number(value);
 const exhausted = (grant: Grant) => grant.quota_bytes !== null && Number(grant.used_bytes) >= Number(grant.quota_bytes);
 const live = (grant: Grant, at: number) => grant.status === "active" && !exhausted(grant) && (grant.ends_at === null || grant.ends_at.getTime() > at);
@@ -50,8 +85,9 @@ export function evaluate(grants: Grant[], at = Date.now()) {
     cursor = Math.max(...covering.map((grant) => grant.ends_at!.getTime()));
     until = cursor;
   }
-  const limits = current.map((grant) => grant.device_limit).filter((value): value is number => value !== null);
-  return { ok: current.length > 0, until: current.length ? until : null, deviceLimit: limits.length ? Math.max(...limits) : null, current };
+  const limits = current.map((grant) => grant.device_limit);
+  const deviceLimit = !limits.length || limits.includes(null) ? null : Math.max(...limits as number[]);
+  return { ok: current.length > 0, until: current.length ? until : null, deviceLimit, current };
 }
 
 /** What people see: state, end date and the traffic of the grants in force now. */

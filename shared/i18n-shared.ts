@@ -5,6 +5,9 @@ import { onboardingCatalog } from "./i18n-onboarding";
  */
 export const sharedCatalog: Record<string, readonly [en: string, ru: string]> = {
   ...onboardingCatalog,
+  "设备": ["Devices", "Устройства"],
+  "超出上限，只有最早的 {0} 个可用": ["Over the limit: only the first {0} work", "Сверх лимита: работают только первые {0}"],
+  "不限": ["Unlimited", "Без лимита"],
   "显示密码": ["Show password", "Показать пароль"],
   "隐藏密码": ["Hide password", "Скрыть пароль"],
   "清除节点日志": ["Clear server logs", "Очистить журналы сервера"],

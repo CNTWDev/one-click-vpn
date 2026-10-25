@@ -98,6 +98,19 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     assert.equal(again.status,200);loser.token=again.data.accessToken;
     const back=await call("connect",await proof(loser,"connect",{...input,publicKey:randomBytes(32).toString("base64")}),loser.token);
     assert.equal(back.status,200,JSON.stringify(back.data));
+    // A subscription or node config takes a device too. One added before the app leaves the app past the limit of 1.
+    const early="2000-01-02T00:00:00.000Z";
+    await pool.query("INSERT INTO devices(id,user_id,display_name,platform,app_version,public_key,status,created_at,updated_at) VALUES($1,$2,'Config','web','credential-1.0.0',$3,'active',$4,$4)",[`${user}_cfgdev`,user,randomBytes(32).toString("base64"),early]);
+    await pool.query("INSERT INTO access_credentials(id,user_id,device_id,display_name,protocol,identity_key,status,created_at,updated_at) VALUES($1,$2,$3,'Config','vless',$4,'active',$5,$5)",[`${user}_cfg`,user,`${user}_cfgdev`,randomBytes(16).toString("hex"),early]);
+    const counted=(await call("account",undefined,loser.token)).data;
+    assert.deepEqual([counted.used,counted.configs,counted.limit],[2,1,1]);
+    assert.equal((await call("connect",await proof(loser,"connect",{...input,publicKey:randomBytes(32).toString("base64")}),loser.token)).data.code,"DEVICE_LIMIT_REACHED","past a lowered limit only the first devices connect");
+    await pool.query("UPDATE users SET native_device_limit=NULL WHERE id=$1",[user]);
+    assert.equal((await call("account",undefined,loser.token)).data.limit,null,"no override and no limiting grant: unlimited");
+    const lifted=await call("connect",await proof(loser,"connect",{...input,publicKey:randomBytes(32).toString("base64")}),loser.token);
+    assert.equal(lifted.status,200,JSON.stringify(lifted.data));
+    await pool.query("DELETE FROM access_credentials WHERE id=$1",[`${user}_cfg`]);
+    await pool.query("UPDATE users SET native_device_limit=1 WHERE id=$1",[user]);
     await pool.query("UPDATE users SET access_until=$2 WHERE id=$1",[user,new Date(Date.now()-1000).toISOString()]);
     assert.equal((await call("connect",await proof(loser,"connect",input),loser.token)).data.code,"MEMBERSHIP_EXPIRED");
     // A grant whose traffic is used up: a different code, so the apps can say why.

@@ -291,6 +291,7 @@ public partial class MainWindow : Window {
         return grid;
     }
     private static string Mbps(long bytesPerSecond)=>(bytesPerSecond*8/1_000_000.0).ToString("0.0",L10n.Culture);
+    private static string DeviceLimit(JsonNode account)=>account["limit"] is null?L10n.Text("devices_unlimited"):Number(account["limit"]).ToString("N0",L10n.Culture);
     private static long Number(JsonNode? value)=>long.TryParse(value?.ToString(),out var number)?number:0;
     private static string Bytes(long value) {double bytes=value;string[] units={"B","KB","MB","GB","TB"};var i=0;while(bytes>=1024&&i<units.Length-1){bytes/=1024;i++;}return bytes.ToString(i==0?"0":"0.#",L10n.Culture)+" "+units[i];}
     private static string? Ms(Quality? quality)=>quality?.Latency is { } ms?L10n.Text("latency_ms",ms.ToString("N0",L10n.Culture)):null;
@@ -558,7 +559,7 @@ public partial class MainWindow : Window {
         identity.Margin=new Thickness(4,0,4,0);Add(identity,4,16);
         if(account["traffic"] is { } traffic) Add(UsageCard(traffic),0,16);
 
-        var devices=SettingRow(L10n.Text("authorized_devices"),$"{Number(account["used"]).ToString("N0",L10n.Culture)} / {Number(account["limit"]).ToString("N0",L10n.Culture)}",_=>{page="devices";Render();});
+        var devices=SettingRow(L10n.Text("authorized_devices"),$"{Number(account["used"]).ToString("N0",L10n.Culture)} / {DeviceLimit(account)}",_=>{page="devices";Render();});
         var language=SettingRow(L10n.Text("language"),LanguageName(L10n.Preference),ChooseLanguage);
         var startup=new ToggleButton {Style=(Style)FindResource("Switch"),IsChecked=LoginTask.Enabled,VerticalAlignment=VerticalAlignment.Center};
         AutomationProperties.SetName(startup,L10n.Text("open_at_login"));
@@ -634,7 +635,7 @@ public partial class MainWindow : Window {
         var summary=new DockPanel {Margin=new Thickness(4,0,4,0)};
         var hint=new TextBlock {Text=L10n.Text("devices_join_automatically"),FontSize=11,Foreground=Look.Secondary,TextAlignment=TextAlignment.Right,MaxWidth=180,Margin=new Thickness(12,0,0,0)};
         DockPanel.SetDock(hint,Dock.Right);summary.Children.Add(hint);
-        summary.Children.Add(Single(L10n.Text("devices_used",Number(account["used"]).ToString("N0",L10n.Culture),Number(account["limit"]).ToString("N0",L10n.Culture)),12,Look.Secondary));
+        summary.Children.Add(Single(L10n.Text("devices_used",Number(account["used"]).ToString("N0",L10n.Culture),DeviceLimit(account)),12,Look.Secondary));
         Add(summary,0,10);
         var rows=new List<FrameworkElement>();
         foreach(var device in account["devices"]?.AsArray()??new JsonArray()) {

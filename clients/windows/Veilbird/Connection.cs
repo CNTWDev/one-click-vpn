@@ -25,7 +25,7 @@ public sealed class Connection(NativeApi api,Core core) {
     private DateTime deadline,renewAt,lastProbe,lastNetworkCheck;
     private List<string> transports=new();
     private int failures;
-    private static readonly string[] Fatal={"AUTH_REQUIRED","DEVICE_REVOKED","MEMBERSHIP_EXPIRED","QUOTA_EXHAUSTED","ACCOUNT_UNAVAILABLE","MANAGED_ACCESS_REQUIRED","CLIENT_UPDATE_REQUIRED"};
+    private static readonly string[] Fatal={"AUTH_REQUIRED","DEVICE_REVOKED","DEVICE_LIMIT_REACHED","MEMBERSHIP_EXPIRED","QUOTA_EXHAUSTED","ACCOUNT_UNAVAILABLE","MANAGED_ACCESS_REQUIRED","CLIENT_UPDATE_REQUIRED"};
 
     private void Set(string status) {StatusKey=status;Changed?.Invoke();}
 

@@ -260,9 +260,9 @@
     "ru": "Для подключения разрешите использование VPN."
   },
   "device_limit_reached_revoke_an_old_device_in_account": {
-    "zh": "授权设备已满，请到「账号」解除一台旧设备的授权后重试。",
-    "en": "Device limit reached. Revoke an old device in Account and try again.",
-    "ru": "Достигнут лимит устройств. Отзовите старое устройство в аккаунте и повторите."
+    "zh": "设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。",
+    "en": "Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again.",
+    "ru": "Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
   },
   "access_for_this_device_has_been_revoked_contact_your": {
     "zh": "这台设备的授权已解除，请联系管理员。",
@@ -480,9 +480,9 @@
     "ru": "Отключите VPN перед выходом."
   },
   "device_limit_reached_account_hint": {
-    "zh": "授权设备已满，请在「账号」解除旧设备的授权后重试。",
-    "en": "Device limit reached. Revoke an old device in Account and try again.",
-    "ru": "Достигнут лимит устройств. Отзовите старое устройство в аккаунте и повторите."
+    "zh": "设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。",
+    "en": "Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again.",
+    "ru": "Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
   },
   "this_location_is_unavailable_try_another": {
     "zh": "节点暂时不可用，请换一个节点重试。",
@@ -585,9 +585,9 @@
     "ru": "Устройство потеряет доступ. Отозвать авторизацию?"
   },
   "device_limit_reached_revoke_an_old_device_and_try": {
-    "zh": "授权设备已满，请解除旧设备的授权后重试。",
-    "en": "Device limit reached. Revoke an old device and try again.",
-    "ru": "Достигнут лимит устройств. Отзовите старое устройство и повторите."
+    "zh": "设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。",
+    "en": "Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again.",
+    "ru": "Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
   },
   "unable_to_reach_the_service_check_your_network_or": {
     "zh": "暂时无法连接服务，请检查网络或联系管理员。",
@@ -968,5 +968,10 @@
     "zh": "流量已用完，请联系管理员增加流量。",
     "en": "Your traffic is used up. Contact your administrator to add more.",
     "ru": "Трафик закончился. Обратитесь к администратору, чтобы добавить трафик."
+  },
+  "devices_unlimited": {
+    "zh": "不限",
+    "en": "Unlimited",
+    "ru": "Без лимита"
   }
 }

@@ -26,14 +26,14 @@ const daysLeft = (until: string) => Math.max(0, Math.ceil((Date.parse(until) - D
 
 export function planTerms(plan: Pick<AccessPlan, "durationDays" | "quotaBytes" | "deviceLimit">): string {
   return [plan.durationDays ? t("{0} 天", [plan.durationDays]) : t("长期有效"), plan.quotaBytes ? formatBytes(plan.quotaBytes) : t("不限流量"),
-    ...(plan.deviceLimit ? [t("{0} 台设备", [plan.deviceLimit])] : [])].join(" · ");
+    plan.deviceLimit ? t("{0} 台设备", [plan.deviceLimit]) : t("不限设备")].join(" · ");
 }
 
 const sourceLabels = (): Record<AccessGrant["source"], string> => ({ admin: t("后台开通"), gift: t("福利赠送"), welcome: t("新用户赠送"), order: t("订阅订单"), migration: t("原有账号") });
 const stateLabels = (): Record<AccessGrant["state"], string> => ({ active: t("生效中"), upcoming: t("待生效"), expired: t("已到期"), exhausted: t("已用完"), revoked: t("已撤销") });
 const stateTones: Record<AccessGrant["state"], "success" | "progress" | "neutral" | "danger"> = { active: "success", upcoming: "progress", expired: "neutral", exhausted: "danger", revoked: "neutral" };
 
-type View = { access: AccountAccess; grants: AccessGrant[] };
+type View = { access: AccountAccess; devices: { limit: number | null; used: number }; grants: AccessGrant[] };
 type Form = { plan: string; period: "forever" | "days" | "date"; days: string; date: string; traffic: "unlimited" | "gb"; gb: string; devices: string; gift: boolean; note: string };
 const emptyForm: Form = { plan: "", period: "days", days: "30", date: "", traffic: "unlimited", gb: "", devices: "", gift: false, note: "" };
 
@@ -85,7 +85,9 @@ export function AccessPanel({ userId, onChanged }: { userId: string; onChanged?:
         <span>{access.state === "active" ? access.until ? t("剩 {0} 天", [daysLeft(access.until)]) : t("没有到期日") : access.state === "expired" ? summary.detail : t("增加权益后恢复")}</span></article>
       <article><small>{t("流量")}</small><b>{access.quotaBytes === null ? t("不限") : formatBytes(access.remainingBytes || 0)}</b>
         {access.quotaBytes !== null ? <><span>{t("已用 {0} / {1}", [formatBytes(access.usedBytes), formatBytes(access.quotaBytes)])}</span><i className={`quota-bar${(access.remainingBytes || 0) <= access.quotaBytes * 0.1 ? " low" : ""}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (access.usedBytes / access.quotaBytes) * 100)}%` }} /></i></> : <span>{t("全部节点合计")}</span>}</article>
-      <article><small>{t("设备上限")}</small><b>{access.deviceLimit ?? "—"}</b><span>{access.deviceLimit ? t("来自套餐") : t("系统默认或单独设置")}</span></article>
+      {view && <article className={view.devices.limit !== null && view.devices.used > view.devices.limit ? "tone-warning" : ""}><small>{t("设备")}</small>
+        <b>{view.devices.limit === null ? t("不限") : t("{0} / {1} 台", [view.devices.used, view.devices.limit])}</b>
+        <span>{view.devices.limit !== null && view.devices.used > view.devices.limit ? t("超出上限，只有最早的 {0} 个可用", [view.devices.limit]) : t("已用 {0} · 含订阅和节点配置", [view.devices.used])}</span></article>}
     </div>}
     {form && <form className="grant-form" onSubmit={(event) => void submit(event)}>
       <label className="span-2">{t("内容")}<select value={form.plan} onChange={(event) => setForm({ ...form, plan: event.target.value })}>
@@ -97,7 +99,7 @@ export function AccessPanel({ userId, onChanged }: { userId: string; onChanged?:
           {form.period === "date" && <input type="date" required aria-label={t("到期日期")} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />}</span></label>
         <label>{t("流量")}<span className="field-pair"><select value={form.traffic} onChange={(event) => setForm({ ...form, traffic: event.target.value as Form["traffic"] })}><option value="unlimited">{t("不限流量")}</option><option value="gb">{t("限定流量")}</option></select>
           {form.traffic === "gb" && <input type="number" min={0.1} step={0.1} required aria-label={t("流量（GB）")} placeholder="GB" value={form.gb} onChange={(event) => setForm({ ...form, gb: event.target.value })} />}</span></label>
-        <label>{t("设备上限")}<input type="number" min={1} max={100} placeholder={t("不变")} value={form.devices} onChange={(event) => setForm({ ...form, devices: event.target.value })} /></label>
+        <label>{t("设备上限")}<input type="number" min={1} max={100} placeholder={t("不限")} value={form.devices} onChange={(event) => setForm({ ...form, devices: event.target.value })} /></label>
       </>}
       <label className={form.plan === "custom" ? "" : "span-2"}>{t("备注")}<input maxLength={200} placeholder={t("可留空")} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label>
       <label className="grant-check span-2"><input type="checkbox" checked={form.gift} onChange={(event) => setForm({ ...form, gift: event.target.checked })} />{t("记为福利赠送")}</label>

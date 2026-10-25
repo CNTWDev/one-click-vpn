@@ -16,7 +16,8 @@ import "./home.css";
 type User = { email: string; displayName: string };
 type Device = { id: string; name: string; platform: string; lastSeenAt: string; connected: boolean; region: string | null };
 type Access = { state: "active" | "expired" | "exhausted" | "none"; until: string | null; quotaBytes: number | null; usedBytes: number; remainingBytes: number | null };
-type Account = { expiresAt: string | null; access: Access; deviceLimit: number; devices: Device[] };
+/** deviceLimit null = unlimited; deviceCount includes subscriptions and node configs, which take a device too. */
+type Account = { expiresAt: string | null; access: Access; deviceLimit: number | null; deviceCount: number; devices: Device[] };
 
 const SOON_DAYS = 7;
 /** Whole days left until an end date, or null when the access has no end. */
@@ -145,6 +146,7 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
   const access = account?.access, quota = access?.quotaBytes ?? null, left = daysLeft(account?.expiresAt ?? null);
   const paused = access && access.state !== "active";
   const ending = access?.state === "active" && left !== null && left <= SOON_DAYS;
+  const over = !!account && account.deviceLimit !== null && account.deviceCount > account.deviceLimit;
   const low = access?.state === "active" && quota !== null && (access.remainingBytes || 0) <= quota * 0.1;
   return <main className="dashboard home">
     {dialog}{toasts}
@@ -162,7 +164,8 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
       : <div><small>{t("近 30 天流量")}</small>
         {usage ? <span className="home-traffic"><strong className="pixel-figure">{figure(usage.totals.totalBytes)[0]}<span className="unit">{figure(usage.totals.totalBytes)[1]}</span></strong><UsageBlocks values={lastDays(usage)} /></span> : <Skeleton height={30} width="40%" />}
         {usage && <span className="home-stat-note mono">↓ {formatBytes(usage.totals.downloadBytes || 0)} · ↑ {formatBytes(usage.totals.uploadBytes || 0)}</span>}</div>}
-      <div><small>{t("已登录设备")}</small>{account ? <strong className="pixel-figure">{devices.length}<span className="unit">/ {account.deviceLimit}</span></strong> : <Skeleton height={30} width="40%" />}
+      <div><small>{t("设备")}</small>{account ? <strong className={`pixel-figure${over ? " warning-text" : ""}`}>{account.deviceCount}<span className="unit">/ {account.deviceLimit ?? t("不限")}</span></strong> : <Skeleton height={30} width="40%" />}
+        {over && account.deviceLimit !== null && <span className="home-stat-note warning-text">{t("超出上限，只有最早的 {0} 个可用", [account.deviceLimit])}</span>}
         {account && <a className="home-stat-note" href="#devices-title">{t("我的设备")}</a>}</div>
     </section>
     {accountError && <InlineError message={accountError} onRetry={() => void loadAccount()} />}

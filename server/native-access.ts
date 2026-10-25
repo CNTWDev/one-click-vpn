@@ -7,19 +7,18 @@ import { canonical, digest, identity, NativeError, verifyNativeProof } from "./n
 import { rebuildDesiredState, selectVpnServices } from "./control-plane";
 import { ipv4Address, ipv4Pool } from "./ipv4-pool";
 import { ensureNativeSecret, nativeProxies } from "./stealth";
-import { accessSql, accountAccess } from "./entitlements";
+import { accessSql, accountAccess, assertDeviceSlot, DeviceLimitError, deviceSlots, withinDeviceLimitSql } from "./entitlements";
 import { writeOperationalLog } from "./operational-logs";
 
 export type Session = { id: string; user_id: string; identity_jwk: string; identity_thumbprint: string; device_name: string; platform: string };
-type Entitlement = { status: string; native_only: boolean; device_limit: number; allowed: boolean; exhausted: boolean; access_until: Date | null };
-/** The account row as connect needs it: the one access rule and the device limit (own override, then plan, then default). */
-const entitlementSql = (lock = "") => `SELECT status,native_only,COALESCE(native_device_limit,access_device_limit,${defaultLimit()}) AS device_limit,${accessSql("users")} AS allowed,access_until,
+type Entitlement = { status: string; native_only: boolean; allowed: boolean; exhausted: boolean; access_until: Date | null };
+/** The account row as connect needs it: the one access rule, and whether a used-up quota is why it fails. */
+const entitlementSql = (lock = "") => `SELECT status,native_only,${accessSql("users")} AS allowed,access_until,
   EXISTS (SELECT 1 FROM access_grants g WHERE g.user_id=users.id AND g.status='active' AND g.quota_bytes IS NOT NULL AND g.used_bytes>=g.quota_bytes AND g.starts_at<=now() AND (g.ends_at IS NULL OR g.ends_at>now())) AS exhausted
   FROM users WHERE id=$1${lock}`;
 const ttl = 300;
 // Sliding: every signed connect/renewal extends it, so active devices never re-enter passwords.
 export const sessionDays = () => { const n = Number(process.env.VEILBIRD_NATIVE_SESSION_DAYS || 30); return Number.isInteger(n) && n >= 1 && n <= 90 ? n : 30; };
-export const defaultLimit = () => { const n = Number(process.env.VEILBIRD_NATIVE_DEVICE_LIMIT || 3); return Number.isInteger(n) && n >= 1 && n <= 100 ? n : 3; };
 export async function transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await getDb().connect();
   try { await client.query("BEGIN"); const result = await work(client); await client.query("COMMIT"); return result; }
@@ -55,7 +54,8 @@ export async function nativeSession(request: Request): Promise<Session> {
 }
 export async function nativeAccount(session: Session) {
   await dbExec("UPDATE native_enrollments SET status='revoked' WHERE user_id=$1 AND status='revoking' AND release_after<=now()",[session.user_id]);
-  const user = (await dbQuery<{email:string;display_name:string;native_only:boolean;native_device_limit:number|null;access_device_limit:number|null}>("SELECT email,display_name,native_only,native_device_limit,access_device_limit FROM users WHERE id=$1",[session.user_id]))[0];
+  const user = (await dbQuery<{email:string;display_name:string;native_only:boolean;native_device_limit:number|null}>("SELECT email,display_name,native_only,native_device_limit FROM users WHERE id=$1",[session.user_id]))[0];
+  const slots = await deviceSlots(session.user_id);
   const access = await accountAccess(session.user_id);
   const devices = await dbQuery(`SELECT id,device_name AS name,platform,status,created_at AS "createdAt",last_seen_at AS "lastSeenAt",release_after AS "releaseAfter",
     identity_thumbprint=$2 AS "isCurrent" FROM native_enrollments WHERE user_id=$1 ORDER BY created_at`,[session.user_id,session.identity_thumbprint]);
@@ -64,7 +64,8 @@ export async function nativeAccount(session: Session) {
   // Per-day totals for the small usage chart in the apps; days without traffic are absent.
   traffic.days=await dbQuery("SELECT day::text AS day,(SUM(upload_bytes)+SUM(download_bytes))::text AS bytes FROM traffic_daily WHERE user_id=$1 AND day >= $2 GROUP BY day ORDER BY day",[session.user_id,since]);
   // expiresAt stays for apps that predate `access`: the end of the current period, null when it has none.
-  return { name:user.display_name,email:user.email,managed:user.native_only,limit:user.native_device_limit??user.access_device_limit??defaultLimit(),limitSource:user.native_device_limit!==null?"override":user.access_device_limit!==null?"plan":"default",used:devices.filter(d=>d.status!=="revoked").length,
+  return { name:user.display_name,email:user.email,managed:user.native_only,// limit null = unlimited; used counts subscriptions and node configs too, configs is how many of them.
+    limit:slots.limit,limitSource:user.native_device_limit!==null?"override":"plan",used:slots.used,configs:slots.used-devices.filter(d=>d.status!=="revoked").length,
     expiresAt:access.state==="active"?access.until:access.endedAt,access,devices,traffic };
 }
 async function candidates() {
@@ -126,11 +127,12 @@ export async function nativeConnect(session:Session,body:Record<string,unknown>)
     let enrollment=(await client.query("SELECT id,status FROM native_enrollments WHERE user_id=$1 AND identity_thumbprint=$2",[session.user_id,session.identity_thumbprint])).rows[0];
     if(enrollment && enrollment.status!=="active") throw new NativeError("DEVICE_REVOKED",403);
     if(!enrollment) {
-      const used=Number((await client.query("SELECT COUNT(*) AS count FROM native_enrollments WHERE user_id=$1 AND status<>'revoked'",[session.user_id])).rows[0].count),limit=user.device_limit;
-      if(used>=limit) throw new NativeError("DEVICE_LIMIT_REACHED",409,{limit,used});
+      await assertDeviceSlot(session.user_id,client).catch(error=>{throw error instanceof DeviceLimitError?new NativeError("DEVICE_LIMIT_REACHED",409,{limit:error.limit,used:error.used}):error;});
       enrollment={id:`enr_${randomUUID()}`,status:"active"};
       await client.query("INSERT INTO native_enrollments (id,user_id,identity_thumbprint,device_name,platform) VALUES ($1,$2,$3,$4,$5)",[enrollment.id,session.user_id,session.identity_thumbprint,session.device_name,session.platform]);
     }
+    // Past a lowered limit only the devices added first keep connecting.
+    if(!(await client.query(`SELECT ${withinDeviceLimitSql("u","e.created_at","e.id")} AS ok FROM native_enrollments e JOIN users u ON u.id=e.user_id WHERE e.id=$1`,[enrollment.id])).rows[0]?.ok) throw new NativeError("DEVICE_LIMIT_REACHED",409);
     await client.query("UPDATE native_enrollments SET last_seen_at=now() WHERE id=$1",[enrollment.id]);
     // Serializes native allocations per node; the existing allocator uses unique address conflicts to retry.
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`native-pool:${node.id}`]);
@@ -192,7 +194,7 @@ async function fallbackProxies(node:{id:string;ip:string;public_endpoint:string|
   catch(error) { return {proxies:[],reason:`fallback failed: ${error instanceof Error?error.message:String(error)}`}; }
 }
 export async function nativeStatus(session:Session,leaseId:string) {
-  const row=(await dbQuery(`SELECT l.node_id,l.expires_at,l.required_revision,e.status,${accessSql()} AS allowed FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id JOIN users u ON u.id=e.user_id WHERE l.id=$1 AND e.user_id=$2 AND e.identity_thumbprint=$3`,[leaseId,session.user_id,session.identity_thumbprint]))[0];
+  const row=(await dbQuery(`SELECT l.node_id,l.expires_at,l.required_revision,e.status,${accessSql()} AND ${withinDeviceLimitSql("u","e.created_at","e.id")} AS allowed FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id JOIN users u ON u.id=e.user_id WHERE l.id=$1 AND e.user_id=$2 AND e.identity_thumbprint=$3`,[leaseId,session.user_id,session.identity_thumbprint]))[0];
   if(!row || row.status!=="active" || !row.allowed || new Date(row.expires_at).getTime()<=Date.now()) throw new NativeError("ACCESS_EXPIRED",403);
   const observed=(await dbQuery(`SELECT d.revision,o.applied_revision,o.status FROM desired_configs d LEFT JOIN observed_configs o ON o.node_id=d.node_id AND o.protocol=d.protocol WHERE d.node_id=$1 AND d.protocol='wireguard'`,[row.node_id]))[0];
   return {ready:row.required_revision!=null && !!observed && observed.applied_revision>=row.required_revision && ["applied","succeeded"].includes(observed.status),expiresAt:row.expires_at};

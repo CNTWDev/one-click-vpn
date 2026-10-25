@@ -319,6 +319,7 @@ class MainActivity : Activity() {
             runOnUiThread { accountData = data; if (!isDestroyed && traffic.isAttachedToWindow) show(data) }
         }.start()
     }
+    private fun deviceLimit(data: JSONObject) = if (data.isNull("limit")) L10n.text(R.string.devices_unlimited) else L10n.number(data.optInt("limit"))
     private fun totalTraffic(data: JSONObject) = data.optJSONObject("traffic")?.let { (it.optString("uploadBytes", "0").toLongOrNull() ?: 0) + (it.optString("downloadBytes", "0").toLongOrNull() ?: 0) }
     private fun failed() = !ConnectionStateStore.active && ConnectionStateStore.messageId !in listOf(R.string.not_connected, R.string.disconnected)
     private fun showState() {
@@ -563,7 +564,7 @@ class MainActivity : Activity() {
             usageCard(data)
             val updateValue = update?.let { L10n.text(R.string.update_available, it.version) } ?: L10n.text(R.string.up_to_date)
             add(group(listOf(
-                settingRow(L10n.text(R.string.authorized_devices), "${L10n.number(data.optInt("used"))} / ${L10n.number(data.optInt("limit"))}") { page = "devices"; render() },
+                settingRow(L10n.text(R.string.authorized_devices), "${L10n.number(data.optInt("used"))} / ${deviceLimit(data)}") { page = "devices"; render() },
                 settingRow(L10n.text(R.string.language), currentLanguage().second) { chooseLanguage() },
                 settingRow(L10n.text(R.string.check_for_updates), updateValue) { update?.let { installUpdate(it) } ?: checkForUpdate(announce = true) },
             )), top = 20)
@@ -625,7 +626,7 @@ class MainActivity : Activity() {
         withAccount { data ->
             add(LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM; setPadding(4.dp, 0, 4.dp, 0)
-                addView(text(L10n.text(R.string.devices_used, L10n.number(data.optInt("used")), L10n.number(data.optInt("limit"))), 13f, Palette.secondary), LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 12.dp })
+                addView(text(L10n.text(R.string.devices_used, L10n.number(data.optInt("used")), deviceLimit(data)), 13f, Palette.secondary), LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 12.dp })
                 addView(text(L10n.text(R.string.devices_join_automatically), 12f, Palette.secondary).apply { gravity = Gravity.END }, LinearLayout.LayoutParams(0, -2, 1f))
             }, top = 8, bottom = 10)
             val devices = data.getJSONArray("devices")

@@ -50,7 +50,7 @@ export function portalApi({ signedIn = true, empty = false, site = null } = {}) 
     if (pathname === "/api/v1/profiles") return [200, method === "POST" ? { profile: profiles[0] } : { profiles: empty ? [] : profiles }];
     if (pathname === "/api/v1/account") return [200, { ...(empty
       ? { expiresAt: "2026-10-20T00:00:00Z", access: { state: "expired", until: null, endedAt: "2026-10-20T00:00:00Z", quotaBytes: null, usedBytes: 0, remainingBytes: null } }
-      : { expiresAt: soon, access: { state: "active", until: soon, endedAt: null, quotaBytes: 100 * GB, usedBytes: 93.4 * GB, remainingBytes: 6.6 * GB } }), deviceLimit: 3, devices: empty ? [] : [
+      : { expiresAt: soon, access: { state: "active", until: soon, endedAt: null, quotaBytes: 100 * GB, usedBytes: 93.4 * GB, remainingBytes: 6.6 * GB } }), deviceLimit: empty ? null : 3, deviceCount: empty ? 0 : 4, devices: empty ? [] : [
       { id: "enr_1", name: "Aleksandra's ThinkPad X1 Carbon Gen 12 (office)", platform: "windows", lastSeenAt: now, connected: true, region: "São Paulo Metropolitan Area" },
       { id: "enr_2", name: "Pixel 8", platform: "android", lastSeenAt: ago(130), connected: false, region: null },
     ] }];

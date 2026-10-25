@@ -1,5 +1,5 @@
 import { addAudit, dbQuery } from "./db";
-import { defaultLimit, nativeAccount, transaction } from "./native-access";
+import { nativeAccount, transaction } from "./native-access";
 import { NativeError } from "./native-proof";
 import { reconcileUserAccess } from "./credential-access";
 
@@ -26,9 +26,8 @@ export async function updateNativeAccess(userId: string, actor: string, body: Re
       const user=(await c.query("SELECT native_only FROM users WHERE id=$1 FOR UPDATE",[userId])).rows[0];
       // Do not promise strict isolation while previously exported credentials can still exist on offline nodes.
       if (body.managed && !user.native_only && (await c.query("SELECT p.id FROM connection_profiles p JOIN devices d ON d.id=p.device_id WHERE d.user_id=$1 LIMIT 1",[userId])).rowCount) throw new NativeError("LEGACY_ACCESS_MIGRATION_REQUIRED",409);
+      // A lower limit needs no clean-up first: past it, only the devices added first keep connecting.
       const used=Number((await c.query("SELECT COUNT(*) AS count FROM native_enrollments WHERE user_id=$1 AND status<>'revoked'",[userId])).rows[0].count);
-      const planLimit=(await c.query("SELECT access_device_limit FROM users WHERE id=$1",[userId])).rows[0]?.access_device_limit;
-      if (used > (limit === null ? planLimit ?? defaultLimit() : Number(limit))) throw new NativeError("REVOKE_DEVICES_FIRST",409,{used});
       if (!body.managed && used) throw new NativeError("REVOKE_DEVICES_FIRST",409,{used});
       await c.query("UPDATE users SET native_only=$2,native_device_limit=$3 WHERE id=$1",[userId,body.managed,limit]);
     });
