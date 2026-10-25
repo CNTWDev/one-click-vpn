@@ -107,7 +107,7 @@ public sealed class Connection(NativeApi api,Core core) {
         Journal.Add($"connect: ready in {(int)(DateTime.UtcNow-started).TotalMilliseconds} ms via {carrying}");
     }
     /// All transports at once; true when at least one answers. Failures are remembered only when another transport worked.
-    private async Task<bool> Probe(bool initial=false) {
+    private async Task<bool> Probe(bool initial=false,bool? report=null) {
         var results=await Task.Run(()=>core.Probe(transports,5000));
         lastProbe=DateTime.UtcNow;
         var working=results.Where(r=>r.Value>=0).Select(r=>r.Key).ToList();
@@ -115,6 +115,11 @@ public sealed class Connection(NativeApi api,Core core) {
         var failed=results.Where(r=>r.Value<0&&(r.Key!="wireguard"||leaseReady)).Select(r=>r.Key).ToList();
         if(initial||failed.Count>0) Journal.Add("probe: "+string.Join(", ",transports.Select(name=>results.TryGetValue(name,out var ms)&&ms>=0?$"{name} {ms} ms":$"{name} no answer")));
         if(working.Count>0) Transports.Remember(network,failed,working);
+        // Tells the server which of this node's ports answer from here (Console: 云防火墙); off the connect path.
+        if((report??initial)&&working.Count>0) {
+            var summary=string.Join(",",working.Select(name=>$"{name}=ok").Concat(failed.Select(name=>$"{name}=fail")));
+            _=api.Report("TRANSPORT_PROBE",NodeId,summary,network);
+        }
         await UpdateCarrying();
         return working.Count>0;
     }
@@ -156,7 +161,7 @@ public sealed class Connection(NativeApi api,Core core) {
                 if(DateTime.UtcNow>=deadline) {Journal.Add("lease: expired");await Fail("LEASE_RENEWAL_FAILED","connection_authorization_expired_connect_again");return;}
             } else if(!leaseReady&&await Status()) {
                 // WireGuard became usable: test it now so traffic moves to the lightest transport right away.
-                leaseReady=true;Journal.Add("lease: WireGuard ready");await Probe();
+                leaseReady=true;Journal.Add("lease: WireGuard ready");await Probe(report:true);
             }
             if(now-lastNetworkCheck>TimeSpan.FromSeconds(30)) {
                 lastNetworkCheck=now;

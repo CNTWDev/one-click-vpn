@@ -3426,5 +3426,17 @@
   "设备数已超出账号上限，请删除不用的设备、订阅或配置，或联系管理员": [
     "This account is over its device limit. Remove a device, subscription or config you no longer use, or contact your administrator.",
     "Аккаунт превысил лимит устройств. Удалите ненужное устройство, подписку или конфигурацию или обратитесь к администратору."
+  ],
+  "已放行": [
+    "Open",
+    "Открыт"
+  ],
+  "未放行": [
+    "Blocked",
+    "Закрыт"
+  ],
+  "疑似未放行": [
+    "Likely blocked",
+    "Вероятно закрыт"
   ]
 }

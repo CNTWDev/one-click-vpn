@@ -146,9 +146,12 @@ export function NodeDiagnosticsView({ node, diagnostics, outdated }: { node: Nod
                   {protocol.transport}:{protocol.port} · {protocol.listening ? t("正在监听") : t("未监听")} ·{" "}
                   {t("运行时：{0}", [protocol.runtimeActive ? t("运行中") : t("未运行")])}
                 </small>
-                <small>
-                  {t("主机防火墙：{0}", [statusLabel(protocol.hostFirewall)])} · {t("云防火墙：{0}", [statusLabel(protocol.cloudFirewall)])}
-                </small>
+                {(protocol.ports || [{ transport: protocol.transport, port: protocol.port, hostFirewall: protocol.hostFirewall, cloudFirewall: protocol.cloudFirewall }]).map((port) => (
+                  <small key={`${port.transport}/${port.port}`}>
+                    {port.transport.toUpperCase()} {port.port} · {t("主机防火墙：{0}", [statusLabel(port.hostFirewall)])} ·{" "}
+                    {t("云防火墙：{0}", [statusLabel(port.cloudFirewall)])}
+                  </small>
+                ))}
                 {protocol.lastError && <p>{protocol.lastError}</p>}
               </article>
             ))}

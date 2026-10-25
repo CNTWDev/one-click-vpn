@@ -96,10 +96,11 @@ public sealed class NativeApi : IDisposable {
         return await Request(action,new JsonObject {["challengeId"]=challenge["id"]!.GetValue<string>(),["signature"]=B64(signature),["request"]=input.DeepClone()});
     }
     /// Connection failure codes and scrubbed error texts for the Console (no keys, addresses or traffic); best effort.
-    public async Task Report(string code,string nodeId="",string detail="") {
+    public async Task Report(string code,string nodeId="",string detail="",string network="") {
         var item=new JsonObject {["code"]=code,["at"]=DateTimeOffset.UtcNow.ToString("O")};
         if(nodeId.Length>0) item["nodeId"]=nodeId;
         if(detail.Length>0) item["detail"]=detail;
+        if(network.Length>0) item["network"]=network;
         if(Attempt is { } attempt) item["attempt"]=attempt;
         try {await Request("diagnostics",new JsonObject {["events"]=new JsonArray(item)});} catch {/* diagnostics never block connecting */}
     }

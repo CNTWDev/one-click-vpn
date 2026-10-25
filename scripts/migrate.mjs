@@ -519,7 +519,15 @@ const migrations = [
     CREATE INDEX IF NOT EXISTS traffic_counters_observed_idx ON traffic_counters(observed_at);
     CREATE INDEX IF NOT EXISTS audit_created_idx ON audit_logs(created_at);
   `)],
-  ["003-device-limits", async (db) => {
+  ["003-node-transport-reach", async (db) => db.query(`
+    -- Which app transports answered on a node, per network (a one-way hash from the app): tells a closed
+    -- UDP port in a cloud security group from a network that blocks UDP. Rows older than 7 days are dropped.
+    CREATE TABLE IF NOT EXISTS node_transport_reach (
+      node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, transport TEXT NOT NULL, network TEXT NOT NULL,
+      ok_at TIMESTAMPTZ, failed_at TIMESTAMPTZ, PRIMARY KEY (node_id, transport, network)
+    );
+  `)],
+  ["004-device-limits", async (db) => {
     // An empty device limit now means unlimited, like an empty period or quota. Everything keeps what empty
     // meant before (the system default), except accounts from before grants (unlimited) and the welcome plan (1 device).
     const n = Number(process.env.VEILBIRD_NATIVE_DEVICE_LIMIT || 3), fallback = Number.isInteger(n) && n >= 1 && n <= 100 ? n : 3;

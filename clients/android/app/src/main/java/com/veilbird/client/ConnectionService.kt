@@ -146,7 +146,7 @@ class ConnectionService : VpnService() {
         Journal.add("connect: ready in ${SystemClock.elapsedRealtime() - started} ms via ${carrying.ifEmpty { "?" }}")
     }
     /** All transports at once; true when at least one answers. Failures are remembered only when another transport worked. */
-    private fun probe(initial: Boolean = false): Boolean {
+    private fun probe(initial: Boolean = false, report: Boolean = initial): Boolean {
         val results = Transports.parseProbe(Core.probe(transports.joinToString(","), Transports.TEST_URL, 5000))
         lastProbe = SystemClock.elapsedRealtime()
         val working = results.filterValues { it >= 0 }.keys
@@ -154,6 +154,12 @@ class ConnectionService : VpnService() {
         val failed = results.filterValues { it < 0 }.keys.filter { it != "wireguard" || leaseReady }
         if (initial || failed.isNotEmpty()) Journal.add("probe: " + transports.joinToString(", ") { name -> results[name]?.takeIf { it >= 0 }?.let { "$name $it ms" } ?: "$name no answer" })
         if (working.isNotEmpty()) Transports.remember(this, network, failed, working)
+        // Tells the server which of this node's ports answer from here (Console: 云防火墙); off the connect path.
+        if (report && working.isNotEmpty()) {
+            val summary = (working.map { "$it=ok" } + failed.map { "$it=fail" }).joinToString(",")
+            val node = nodeId; val key = network
+            Thread { api.report("TRANSPORT_PROBE", node, summary, key) }.start()
+        }
         updateCarrying()
         return working.isNotEmpty()
     }
@@ -200,7 +206,7 @@ class ConnectionService : VpnService() {
                 if (SystemClock.elapsedRealtime() >= deadline) { Journal.add("lease: expired"); api.report("LEASE_RENEWAL_FAILED", nodeId); stopConnection(R.string.connection_authorization_expired_connect_again); return }
             } else if (!leaseReady) {
                 // WireGuard became usable: test it now so traffic moves to the lightest transport without waiting for the next round.
-                if (status()) { leaseReady = true; Journal.add("lease: WireGuard ready"); probe() }
+                if (status()) { leaseReady = true; Journal.add("lease: WireGuard ready"); probe(report = true) }
             }
             if (now - lastNetworkCheck > 30000) {
                 lastNetworkCheck = now
