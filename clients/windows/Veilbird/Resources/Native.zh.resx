@@ -23,6 +23,7 @@
   <data name="back_action" xml:space="preserve"><value>返回</value></data>
   <data name="cancel" xml:space="preserve"><value>取消</value></data>
   <data name="change_location" xml:space="preserve"><value>更换连接位置  ›</value></data>
+  <data name="change_password" xml:space="preserve"><value>修改密码</value></data>
   <data name="check_for_updates" xml:space="preserve"><value>检查更新</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>选好位置后，返回首页一键连接。</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>选择位置后，返回连接首页。</value></data>
@@ -77,12 +78,14 @@
   <data name="disconnecting" xml:space="preserve"><value>正在断开…</value></data>
   <data name="download_amount" xml:space="preserve"><value>↓ 下载 {0}</value></data>
   <data name="email" xml:space="preserve"><value>邮箱</value></data>
+  <data name="enter_a_valid_email" xml:space="preserve"><value>请输入有效的邮箱地址。</value></data>
   <data name="enter_a_valid_https_server_address" xml:space="preserve"><value>请填写有效的 HTTPS 服务地址。</value></data>
   <data name="enter_an_https_server_address_first" xml:space="preserve"><value>请先填写 HTTPS 服务地址。</value></data>
   <data name="enter_email" xml:space="preserve"><value>输入邮箱</value></data>
   <data name="enter_password" xml:space="preserve"><value>输入密码</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>请填写邮箱和密码。</value></data>
   <data name="finding_best_route" xml:space="preserve"><value>正在选择最佳线路 · 轻触取消</value></data>
+  <data name="forgot_password" xml:space="preserve"><value>忘记密码？</value></data>
   <data name="got_it" xml:space="preserve"><value>知道了</value></data>
   <data name="hide_password" xml:space="preserve"><value>隐藏密码</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>邮箱或密码不正确。</value></data>
@@ -116,6 +119,7 @@
   <data name="open_at_login" xml:space="preserve"><value>登录时启动</value></data>
   <data name="open_main_window" xml:space="preserve"><value>打开主窗口</value></data>
   <data name="password" xml:space="preserve"><value>密码</value></data>
+  <data name="password_reset_unavailable" xml:space="preserve"><value>暂时无法通过邮件重置密码，请联系管理员。</value></data>
   <data name="quality_fair" xml:space="preserve"><value>良</value></data>
   <data name="quality_good" xml:space="preserve"><value>优</value></data>
   <data name="quality_poor" xml:space="preserve"><value>差</value></data>
@@ -124,6 +128,12 @@
   <data name="quota_exhausted_hint" xml:space="preserve"><value>流量已用完，请联系管理员增加流量。</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>刷新设备状态</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>刷新节点</value></data>
+  <data name="reset_by_email" xml:space="preserve"><value>通过邮件重置密码</value></data>
+  <data name="reset_change_detail" xml:space="preserve"><value>我们会把修改密码的链接发到 {0}，1 小时内有效。改完后，所有设备都需要用新密码重新登录。</value></data>
+  <data name="reset_confirm_detail" xml:space="preserve"><value>我们会把重置链接发到 {0}，1 小时内有效。</value></data>
+  <data name="reset_enter_email_first" xml:space="preserve"><value>请先填写邮箱，重置链接会发到这个邮箱。</value></data>
+  <data name="reset_link_sent" xml:space="preserve"><value>如果该邮箱已注册，几分钟内会收到重置邮件。</value></data>
+  <data name="reset_link_sent_to" xml:space="preserve"><value>已发送到 {0}，请在邮件里设置新密码。</value></data>
   <data name="retest_latency" xml:space="preserve"><value>重新测速</value></data>
   <data name="retry_action" xml:space="preserve"><value>重试</value></data>
   <data name="revoke_access" xml:space="preserve"><value>解除授权</value></data>
@@ -142,6 +152,7 @@
   <data name="search_locations_or_regions" xml:space="preserve"><value>搜索节点或地区</value></data>
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>无法访问安全存储，请解锁设备后重试。</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>选延迟最低的节点，连不上自动换</value></data>
+  <data name="send_reset_link" xml:space="preserve"><value>发送</value></data>
   <data name="server_address" xml:space="preserve"><value>服务地址</value></data>
   <data name="server_address_url" xml:space="preserve"><value>服务地址 https://…</value></data>
   <data name="share_action" xml:space="preserve"><value>分享</value></data>

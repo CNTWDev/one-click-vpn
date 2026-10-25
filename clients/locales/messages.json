@@ -973,5 +973,60 @@
     "zh": "不限",
     "en": "Unlimited",
     "ru": "Без лимита"
+  },
+  "forgot_password": {
+    "zh": "忘记密码？",
+    "en": "Forgot password?",
+    "ru": "Забыли пароль?"
+  },
+  "change_password": {
+    "zh": "修改密码",
+    "en": "Change password",
+    "ru": "Сменить пароль"
+  },
+  "reset_by_email": {
+    "zh": "通过邮件重置密码",
+    "en": "Reset password by email",
+    "ru": "Сброс пароля по email"
+  },
+  "reset_enter_email_first": {
+    "zh": "请先填写邮箱，重置链接会发到这个邮箱。",
+    "en": "Enter your email first. The reset link is sent there.",
+    "ru": "Сначала введите email: ссылка для сброса придёт на него."
+  },
+  "reset_confirm_detail": {
+    "zh": "我们会把重置链接发到 {0}，1 小时内有效。",
+    "en": "We'll send a reset link to {0}. It works for 1 hour.",
+    "ru": "Мы отправим ссылку для сброса на {0}. Она действует 1 час."
+  },
+  "reset_change_detail": {
+    "zh": "我们会把修改密码的链接发到 {0}，1 小时内有效。改完后，所有设备都需要用新密码重新登录。",
+    "en": "We'll email a link to {0} to set a new password. It works for 1 hour. Afterwards, every device signs in again with the new password.",
+    "ru": "Мы отправим на {0} ссылку для нового пароля. Она действует 1 час. После смены пароля на всех устройствах нужно войти заново."
+  },
+  "send_reset_link": {
+    "zh": "发送",
+    "en": "Send link",
+    "ru": "Отправить"
+  },
+  "reset_link_sent": {
+    "zh": "如果该邮箱已注册，几分钟内会收到重置邮件。",
+    "en": "If that email has an account, a reset email arrives within minutes.",
+    "ru": "Если этот email зарегистрирован, письмо для сброса придёт в течение нескольких минут."
+  },
+  "reset_link_sent_to": {
+    "zh": "已发送到 {0}，请在邮件里设置新密码。",
+    "en": "Sent to {0}. Set your new password from the email.",
+    "ru": "Отправлено на {0}. Задайте новый пароль по ссылке из письма."
+  },
+  "password_reset_unavailable": {
+    "zh": "暂时无法通过邮件重置密码，请联系管理员。",
+    "en": "Password reset by email isn't available right now. Contact your administrator.",
+    "ru": "Сброс пароля по email сейчас недоступен. Обратитесь к администратору."
+  },
+  "enter_a_valid_email": {
+    "zh": "请输入有效的邮箱地址。",
+    "en": "Enter a valid email address.",
+    "ru": "Введите корректный email."
   }
 }

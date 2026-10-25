@@ -1,8 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { dbExec, dbQuery } from "./db";
+import { addAudit, dbExec, dbQuery, findUserByEmail } from "./db";
 import { masterKey, publicOrigin } from "./config";
 import { hashPasswordAsync } from "./password";
 import { revokeApiSessionsForUser } from "./control-db";
+import { mailConfigured, passwordResetMail, sendMail } from "./mail";
+import { writeOperationalLog } from "./operational-logs";
+import { allowPasswordResetRequest } from "./rate-limit";
+import { cleanText } from "./http";
 
 // Reset links are stateless: nothing is stored. The signature covers the current password hash,
 // so a link stops working the moment it (or any other link) is used, and simply expires otherwise.
@@ -47,4 +51,31 @@ export async function resetPassword(token: string, password: string): Promise<st
     revokeApiSessionsForUser(userId),
   ]);
   return userId;
+}
+
+export type ResetRequestResult = "received" | "invalid" | "limited" | "unconfigured";
+
+/**
+ * "Forgot password" for the Portal and the apps: emails a one-hour link. Unknown addresses get the
+ * same answer and the mail goes out in the background, so the reply never reveals whether an email exists.
+ */
+export async function requestPasswordResetEmail(request: Request, rawEmail: unknown, language: unknown): Promise<ResetRequestResult> {
+  if (!(await mailConfigured())) return "unconfigured";
+  const email = cleanText(rawEmail, 320).toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(email)) return "invalid";
+  if (!allowPasswordResetRequest(request, email)) return "limited";
+  const user = await findUserByEmail(email);
+  if (user && (user.status === "active" || user.status === "pending")) {
+    void (async () => {
+      try {
+        const link = await createResetLink(user.id, EMAIL_LINK_TTL_SECONDS);
+        if (!link) return;
+        await sendMail({ to: user.email, ...passwordResetMail(language, link.url) });
+        await addAudit({ actorUserId: user.id, action: "auth.password_reset.requested", targetType: "user", targetId: user.id });
+      } catch (error) {
+        await writeOperationalLog({ component: "controller", level: "error", message: `Password reset email failed: ${error instanceof Error ? error.message : String(error)}` });
+      }
+    })();
+  }
+  return "received";
 }

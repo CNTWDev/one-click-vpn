@@ -21,6 +21,9 @@ public sealed class AccessFailure(string code) : Exception(code) {
         "MEMBERSHIP_EXPIRED" => L10n.Text("membership_expired_hint"),
         "QUOTA_EXHAUSTED" => L10n.Text("quota_exhausted_hint"),
         "ACCESS_EXPIRED" => L10n.Text("connection_authorization_expired_connect_again"),
+        "RATE_LIMITED" => L10n.Text("too_many_attempts_try_again_later"),
+        "PASSWORD_RESET_UNAVAILABLE" => L10n.Text("password_reset_unavailable"),
+        "INVALID_EMAIL" => L10n.Text("enter_a_valid_email"),
         _ => L10n.Text("unable_to_reach_the_service_check_your_network_or")
     };
 }
@@ -88,6 +91,8 @@ public sealed class NativeApi : IDisposable {
             ["identityKey"]=new JsonObject {["kty"]="EC",["crv"]="P-256",["x"]=B64(key.Q.X!),["y"]=B64(key.Q.Y!)} });
         Save("token",Encoding.UTF8.GetBytes(result["accessToken"]!.GetValue<string>()));Save("origin",Encoding.UTF8.GetBytes(Origin));
     }
+    /// Emails the Portal's reset link; the answer is the same whether or not the address has an account.
+    public async Task RequestPasswordReset(string email)=>await Request("password-reset",new JsonObject {["email"]=email,["language"]=L10n.Culture.TwoLetterISOLanguageName});
     public async Task<JsonObject> Action(string action,JsonObject input) {
         var challenge=await Request("challenge",new JsonObject {["action"]=action,["request"]=input.DeepClone()});
         var encoded=challenge["payload"]!.GetValue<string>().Replace('-','+').Replace('_','/');

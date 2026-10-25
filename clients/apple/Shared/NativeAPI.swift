@@ -18,7 +18,7 @@ enum AccessFailure: LocalizedError {
                 "CONNECT_FROM_APP_FIRST":L10n.text("connect_from_app_first"),
                 "SERVER_REQUIRED":L10n.text("enter_a_valid_https_server_address"),
                 "ACCOUNT_UNAVAILABLE":L10n.text("your_account_is_not_active"), "ACCESS_EXPIRED":L10n.text("connection_authorization_expired_connect_again"),
-                "RATE_LIMITED":L10n.text("too_many_attempts_try_again_later"), "CLIENT_UPDATE_REQUIRED":L10n.text("client_update_required"), "INVALID_RESPONSE":L10n.text("invalid_server_response_try_again_later")] [code] ?? L10n.text("unable_to_connect_check_your_network_and_try_again")
+                "RATE_LIMITED":L10n.text("too_many_attempts_try_again_later"), "PASSWORD_RESET_UNAVAILABLE":L10n.text("password_reset_unavailable"), "INVALID_EMAIL":L10n.text("enter_a_valid_email"), "CLIENT_UPDATE_REQUIRED":L10n.text("client_update_required"), "INVALID_RESPONSE":L10n.text("invalid_server_response_try_again_later")] [code] ?? L10n.text("unable_to_connect_check_your_network_and_try_again")
     }
 }
 
@@ -112,6 +112,8 @@ final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         guard let token=result["accessToken"] as? String else {throw AccessFailure.code("INVALID_RESPONSE")}
         try SecureStorage.write("token",Data(token.utf8))
     }
+    /// Emails the Portal's reset link; the answer is the same whether or not the address has an account.
+    func requestPasswordReset(email:String) async throws {_ = try await request("password-reset",["email":email,"language":String(L10n.language.prefix(2))])}
     func action(_ action:String,_ input:[String:Any]) async throws -> [String:Any] {
         let challenge=try await request("challenge",["action":action,"request":input])
         guard let encoded=challenge["payload"] as? String,let id=challenge["id"] as? String else {throw AccessFailure.code("INVALID_RESPONSE")}

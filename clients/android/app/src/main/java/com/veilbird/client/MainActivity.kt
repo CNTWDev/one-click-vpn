@@ -162,7 +162,7 @@ class MainActivity : Activity() {
     private fun settingRow(title: String, value: String, onClick: () -> Unit) = row().apply {
         addView(text(title, 15f).apply { maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
         addView(text(value, 14f, Palette.secondary).apply { maxLines = 1 }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 8.dp })
-        addView(chevron()); contentDescription = "$title: $value"
+        addView(chevron()); contentDescription = if (value.isEmpty()) title else "$title: $value"
         setOnClickListener { if (!busy) onClick() }
     }
     private fun pageTitle(title: String, trailing: View? = null) {
@@ -411,11 +411,28 @@ class MainActivity : Activity() {
                 }
             }, FrameLayout.LayoutParams(44.dp, 44.dp, Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = 3.dp })
         }, height = 50.dp)
+        add(text(L10n.text(R.string.forgot_password), 13f, Palette.secondary).apply {
+            gravity = Gravity.CENTER_VERTICAL; setPadding(10.dp, 0, 4.dp, 0); background = pressable(Color.TRANSPARENT, 10)
+            setOnClickListener {
+                if (busy) return@setOnClickListener
+                val address = email.text.toString().trim()
+                if (address.isEmpty()) { alert(L10n.text(R.string.reset_enter_email_first)); email.requestFocus(); return@setOnClickListener }
+                val origin = server?.text?.toString()
+                resetPassword(address, L10n.text(R.string.reset_confirm_detail, address), L10n.text(R.string.reset_link_sent)) { if (origin != null) api.origin = origin }
+            }
+        }, height = 40.dp, width = -2, top = 4, gravity = Gravity.END)
         add(primaryButton(L10n.text(R.string.sign_in_action)) {
             val origin = server?.text?.toString(); val address = email.text.toString().trim(); val secret = password.text.toString()
             if (address.isBlank() || secret.isEmpty()) { alert(L10n.text(R.string.enter_your_email_and_password)); return@primaryButton }
             work({ if (origin != null) api.origin = origin; api.login(address, secret) }) { password.setText(""); page = "connect"; render(); checkForUpdate() }
-        }, height = 52.dp, top = 28)
+        }, height = 52.dp, top = 12)
+    }
+    /** Both "forgot password" and "change password" email the Portal's reset link; the new password is set there. */
+    private fun resetPassword(email: String, detail: String, sent: String, before: () -> Unit = {}) {
+        AlertDialog.Builder(this).setTitle(L10n.text(R.string.reset_by_email)).setMessage(detail)
+            .setNegativeButton(L10n.text(R.string.cancel), null).setPositiveButton(L10n.text(R.string.send_reset_link)) { _, _ ->
+                work({ before(); api.requestPasswordReset(email) }) { alert(sent) }
+            }.show()
     }
 
     private var measuring = false
@@ -565,6 +582,7 @@ class MainActivity : Activity() {
             val updateValue = update?.let { L10n.text(R.string.update_available, it.version) } ?: L10n.text(R.string.up_to_date)
             add(group(listOf(
                 settingRow(L10n.text(R.string.authorized_devices), "${L10n.number(data.optInt("used"))} / ${deviceLimit(data)}") { page = "devices"; render() },
+                settingRow(L10n.text(R.string.change_password), "") { resetPassword(email, L10n.text(R.string.reset_change_detail, email), L10n.text(R.string.reset_link_sent_to, email)) },
                 settingRow(L10n.text(R.string.language), currentLanguage().second) { chooseLanguage() },
                 settingRow(L10n.text(R.string.check_for_updates), updateValue) { update?.let { installUpdate(it) } ?: checkForUpdate(announce = true) },
             )), top = 20)

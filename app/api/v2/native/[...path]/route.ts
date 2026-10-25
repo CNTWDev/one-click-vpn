@@ -4,6 +4,7 @@ import { NativeError } from "../../../../../server/native-proof";
 import { writeOperationalLog } from "../../../../../server/operational-logs";
 import { clientHeader,recordDiagnostics,recordEnrollmentClient,recordSessionClient,requireSupportedClient } from "../../../../../server/native-clients";
 import { parseClientAgent,type ClientPlatform } from "../../../../../shared/client-releases";
+import { requestPasswordResetEmail } from "../../../../../server/password-reset";
 import { nativeAccount,nativeChallenge,nativeConnect,nativeEnd,nativeLogin,nativeLogout,nativeNodes,nativeSession,nativeStatus } from "../../../../../server/native-access";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -19,6 +20,15 @@ async function handle(request:Request) {
       const login=await nativeLogin(request,body);
       await recordSessionClient(login.accessToken,agent);
       result=login;
+    }
+    else if(request.method==="POST"&&path==="password-reset") {
+      // Needs no session: "forgot password" on the sign-in screen and "change password" on the account page both
+      // email the Portal's one-hour link; the answer is the same whether or not the address has an account.
+      const sent=await requestPasswordResetEmail(request,body.email,body.language);
+      if(sent==="unconfigured") throw new NativeError("PASSWORD_RESET_UNAVAILABLE",503);
+      if(sent==="invalid") throw new NativeError("INVALID_EMAIL",400);
+      if(sent==="limited") throw new NativeError("RATE_LIMITED",429);
+      result={status:"received"};
     }
     else {
       const session=await nativeSession(request);
