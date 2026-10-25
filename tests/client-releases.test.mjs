@@ -113,15 +113,17 @@ test("history lists older published builds per platform, never withdrawn or beta
 });
 
 test("download mirror: off by default, Aliyun OSS uses virtual-hosted addressing, URLs keep keys encoded", async () => {
-  const { releaseMirror, mirrorUrl, presignS3Url } = await import("../server/release-storage.ts");
+  const { releaseMirror, mirrorUrl, presignS3Url, testMirror } = await import("../server/release-storage.ts");
   assert.equal(releaseMirror({}), null);
+  assert.deepEqual((await testMirror({})).steps.map((step) => [step.name, step.ok]), [["config", false]], "the test stops at a missing configuration");
   const oss = { VEILBIRD_RELEASE_MIRROR_ENDPOINT: "https://oss-cn-hangzhou.aliyuncs.com", VEILBIRD_RELEASE_MIRROR_BUCKET: "tn-dl", VEILBIRD_RELEASE_MIRROR_REGION: "oss-cn-hangzhou",
     VEILBIRD_RELEASE_MIRROR_ACCESS_KEY_ID: "id", VEILBIRD_RELEASE_MIRROR_SECRET_ACCESS_KEY: "secret", VEILBIRD_RELEASE_MIRROR_PUBLIC_BASE_URL: "https://dl.example.com/" };
   const mirror = releaseMirror(oss);
   assert.deepEqual([mirror.virtualHost, mirror.publicBaseUrl, mirror.region], [true, "https://dl.example.com", "oss-cn-hangzhou"]);
   assert.equal(releaseMirror({ ...oss, VEILBIRD_RELEASE_MIRROR_ENDPOINT: "https://minio.example.com" }).virtualHost, false);
   assert.throws(() => releaseMirror({ ...oss, VEILBIRD_RELEASE_MIRROR_PUBLIC_BASE_URL: "" }), /PUBLIC_BASE_URL/);
-  assert.throws(() => releaseMirror({ ...oss, VEILBIRD_RELEASE_MIRROR_PUBLIC_BASE_URL: "http://dl.example.com" }), /HTTPS/);
+  assert.throws(() => releaseMirror({ ...oss, VEILBIRD_RELEASE_MIRROR_PUBLIC_BASE_URL: "http://dl.example.com" }), /PUBLIC_BASE_URL must be a full https:\/\/ URL/);
+  assert.throws(() => releaseMirror({ ...oss, VEILBIRD_RELEASE_MIRROR_ENDPOINT: "oss-ap-northeast-1.aliyuncs.com" }), /ENDPOINT must be a full https:\/\/ URL/);
   assert.equal(mirrorUrl(mirror, "clients/android/arm64/1.2.0+12/a.apk"), "https://dl.example.com/clients/android/arm64/1.2.0%2B12/a.apk");
   const put = new URL(presignS3Url({ method: "PUT", endpoint: mirror.endpoint, bucket: mirror.bucket, key: "clients/a.apk", region: mirror.region,
     accessKeyId: "id", secretAccessKey: "secret", expiresSeconds: 3600, virtualHost: mirror.virtualHost }));

@@ -43,6 +43,7 @@ const views = [
   { name: "sites-edit", hash: "sites", open: (page, l) => page.getByRole("button", { name: tr(l, "编辑"), exact: true }).nth(1).click(), modal: false },
   { name: "logs", hash: "logs" },
   { name: "releases", hash: "releases" },
+  { name: "releases-mirror-test", hash: "releases", modal: false, open: async (page) => { await page.locator(".result-panel .panel-head button").click(); await page.locator(".result-panel .compact-list").waitFor(); } },
   // Batch import with recognised, already-existing and unknown files (no dialog to wait for).
   { name: "releases-import", hash: "releases", modal: false, open: async (page) => { await page.locator(".release-drop input").setInputFiles([
     { name: "TrackNothing-1.2.0-13.apk", mimeType: "application/vnd.android.package-archive", buffer: Buffer.alloc(2048, 1) },

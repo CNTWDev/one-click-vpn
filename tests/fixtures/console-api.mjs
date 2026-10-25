@@ -145,11 +145,19 @@ export function consoleApi({ signedIn = true } = {}) {
     if (pathname === "/api/logs") return [200, { logs, available: true, nextCursor: "1792725817388486405", counts: { info: 11804, warning: 427, error: 39 } }];
     if (pathname.endsWith("/subscriptions")) return [200, { subscriptions, nodes: [] }];
     if (pathname === "/api/v1/admin/client-releases") return [200, {
-      releases: [release("rel_6", "android", "stable", "1.2.1", 13, { status: "draft", publishedAt: null }), release("rel_1", "android", "beta", "1.2.0", 12), release("rel_2", "android", "stable", "1.1.3", 11), release("rel_3", "windows", "stable", "1.1.3", 11, { distribution: "external" }), release("rel_4", "macos", "beta", "1.2.0-rc.1", 12, { status: "withdrawn" }), release("rel_5", "ios", "stable", "1.1.3", 11, { distribution: "app_store", url: "https://apps.apple.com/app/id1234567890" })],
+      releases: [release("rel_6", "android", "stable", "1.2.1", 13, { status: "draft", publishedAt: null }), release("rel_1", "android", "beta", "1.2.0", 12, { mirror: "failed", mirrorError: "Mirror upload failed (HTTP 403, AccessDenied, request 671B4F2E9C3D5A0001)" }), release("rel_2", "android", "stable", "1.1.3", 11, { mirror: "ready" }), release("rel_3", "windows", "stable", "1.1.3", 11, { distribution: "external" }), release("rel_4", "macos", "beta", "1.2.0-rc.1", 12, { status: "withdrawn" }), release("rel_5", "ios", "stable", "1.1.3", 11, { distribution: "app_store", url: "https://apps.apple.com/app/id1234567890" })],
       policies: ["android", "ios", "macos", "windows"].map((platform) => ({ platform, minBuild: platform === "android" ? 10 : 0, announcement: platform === "android" ? "Please update to 1.2 for faster reconnects." : "", downloadPath: `/download/${platform}` })),
       adoption: [{ platform: "android", version: "1.2.0", build: 12, devices: 2 }, { platform: "android", version: "1.1.3", build: 11, devices: 14 }, { platform: "windows", version: null, build: null, devices: 1 }],
       diagnostics: [{ platform: "android", build: 12, code: "HANDSHAKE_TIMEOUT", events: 3, users: 2, lastAt: ago(30) }, { platform: "windows", build: 11, code: "TUN_ADAPTER_CREATE_FAILED_ACCESS_DENIED", events: 41, users: 9, lastAt: ago(90) }],
-      storage: { mode: "local" }, ciTokenConfigured: true }];
+      storage: { mode: "local", mirror: "https://dl.very-long-subdomain.example.com" }, ciTokenConfigured: true }];
+    if (pathname === "/api/v1/admin/client-releases/mirror-test") return [200, { ok: false, steps: [
+      { name: "config", ok: true, detail: "https://oss-ap-northeast-1.aliyuncs.com · bucket tracknothing-downloads · region ap-northeast-1 · virtual-hosted · CDN https://dl.very-long-subdomain.example.com" },
+      { name: "upload", ok: true, detail: "HTTP 200 · 4352 bytes to clients/.healthcheck/2026-10-25T16-20-00-000Z-3f9a1c2b.txt", answer: { ms: 182, requestId: "671B4F2E9C3D5A0001" } },
+      { name: "bucket_read", ok: true, detail: "HTTP 200", answer: { ms: 64, requestId: "671B4F2E9C3D5A0002" } },
+      { name: "cdn_head", ok: true, detail: "HTTP 200 · https://dl.very-long-subdomain.example.com/clients/.healthcheck/2026-10-25T16-20-00-000Z-3f9a1c2b.txt · MISS TCP_MISS dirn:-2:-2", answer: { ms: 412, requestId: "2ff6a8a417298790123456789e" } },
+      { name: "cdn_range", ok: false, hint: "range_ignored", detail: "the CDN ignored Range (HTTP 200)", answer: { ms: 95 } },
+      { name: "delete", ok: true, detail: "HTTP 204", answer: { ms: 71, requestId: "671B4F2E9C3D5A0003" } },
+    ] }];
     return [200, {}];
   };
 }
