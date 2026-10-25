@@ -92,6 +92,10 @@
   <data name="hide_password" xml:space="preserve"><value>隐藏密码</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>邮箱或密码不正确。</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>服务器响应无效，请稍后重试。</value></data>
+  <data name="kill_switch" xml:space="preserve"><value>断网保护</value></data>
+  <data name="kill_switch_android_detail" xml:space="preserve"><value>在系统设置里打开「始终开启的 VPN」和「屏蔽未使用 VPN 的连接」</value></data>
+  <data name="kill_switch_apple_detail" xml:space="preserve"><value>所有流量只走 VPN，VPN 断开时不联网。下次连接时生效</value></data>
+  <data name="kill_switch_blocking" xml:space="preserve"><value>连接已断开，断网保护正在阻止上网</value></data>
   <data name="language" xml:space="preserve"><value>语言</value></data>
   <data name="language_system" xml:space="preserve"><value>跟随系统</value></data>
   <data name="last_30_days" xml:space="preserve"><value>近 30 天</value></data>
@@ -121,6 +125,7 @@
   <data name="open_app" xml:space="preserve"><value>打开 TrackNothing</value></data>
   <data name="open_at_login" xml:space="preserve"><value>登录时启动</value></data>
   <data name="open_main_window" xml:space="preserve"><value>打开主窗口</value></data>
+  <data name="open_vpn_settings" xml:space="preserve"><value>打开 VPN 设置</value></data>
   <data name="password" xml:space="preserve"><value>密码</value></data>
   <data name="password_reset_unavailable" xml:space="preserve"><value>暂时无法通过邮件重置密码，请联系管理员。</value></data>
   <data name="quality_fair" xml:space="preserve"><value>良</value></data>

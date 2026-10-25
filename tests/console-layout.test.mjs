@@ -31,6 +31,8 @@ const views = [
   { name: "nodes-detail", hash: "nodes?focus=n4" },
   { name: "nodes-port-check", hash: "nodes?focus=n4", open: async (page, l) => { await page.locator(".modal").first().waitFor(); await page.getByRole("button", { name: tr(l, "检测端口") }).click(); await page.getByText(tr(l, "TCP 已重新检测；UDP 检测需要先升级 Agent 到 2.16。")).waitFor(); } },
   { name: "nodes-add", hash: "nodes", open: (page) => page.locator(".page-actions .button.primary").click() },
+  { name: "nodes-add-ssh", hash: "nodes", open: async (page, l) => { await page.locator(".page-actions .button.primary").click(); await page.getByRole("radio", { name: tr(l, "SSH 部署") }).click(); } },
+  { name: "nodes-install", hash: "nodes", open: async (page, l) => { await page.locator(".page-actions .button.primary").click(); await page.locator("#node-form input").first().fill("Tokyo Edge"); await page.locator("#node-form input").nth(1).fill("203.0.113.10"); await page.getByRole("button", { name: tr(l, "生成安装命令") }).click(); await page.locator(".install-command").waitFor(); } },
   { name: "services", hash: "services" },
   { name: "services-policy", hash: "services?tab=policy" },
   { name: "services-reality", hash: "services?tab=reality" },

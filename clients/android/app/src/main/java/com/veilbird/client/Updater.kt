@@ -34,7 +34,7 @@ class Updater(private val context: Context, private val api: NativeApi) {
     fun check(): ReleaseStatus? {
         if (api.origin.isEmpty()) return null
         val query = "platform=android&arch=universal&build=${BuildConfig.VERSION_CODE}&installation=${URLEncoder.encode(installation, "UTF-8")}"
-        val data = get("${api.origin}/api/v1/client-releases/latest?$query")
+        val data = api.get("/api/v1/client-releases/latest?$query")
         val latest = data.optJSONObject("latest")
         val update = if (BuildConfig.SELF_UPDATE && latest != null && data.optBoolean("updateAvailable") && latest.optString("distribution") == "direct")
             UpdateInfo(latest.getString("version"), latest.getInt("build"), latest.getString("url"), latest.getString("sha256"), latest.getLong("sizeBytes"), data.optBoolean("mandatory"))
@@ -82,19 +82,6 @@ class Updater(private val context: Context, private val api: NativeApi) {
             val callback = PendingIntent.getBroadcast(context, id, Intent(context, UpdateInstallReceiver::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
             session.commit(callback.intentSender)
         }
-    }
-
-    private fun get(url: String): JSONObject {
-        val connection = URI(url).toURL().openConnection() as HttpsURLConnection
-        connection.connectTimeout = 10000; connection.readTimeout = 10000; connection.instanceFollowRedirects = false
-        connection.setRequestProperty("Accept", "application/json")
-        try {
-            if (connection.responseCode != 200) throw ApiFailure("SERVICE_UNAVAILABLE")
-            val text = connection.inputStream.use { stream -> val bytes = ByteArray(65537); var size = 0
-                while (size < bytes.size) { val count = stream.read(bytes, size, bytes.size - size); if (count < 0) break; size += count }
-                if (size > 65536) throw ApiFailure("INVALID_RESPONSE"); String(bytes, 0, size, Charsets.UTF_8) }
-            return JSONObject(text)
-        } finally { connection.disconnect() }
     }
 }
 

@@ -14,7 +14,7 @@ import java.time.format.FormatStyle
 import java.util.Locale
 
 class VeilbirdApplication : Application() {
-    override fun onCreate() { super.onCreate(); L10n.initialize(this); Journal.initialize(this) }
+    override fun onCreate() { super.onCreate(); L10n.initialize(this); Journal.initialize(this); Crash.watch(this) }
 }
 object L10n {
     private lateinit var app: Context

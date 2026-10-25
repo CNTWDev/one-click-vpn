@@ -10,6 +10,7 @@ mode="deploy"
 service="all"
 service_explicit="no"
 no_cache="no"
+image_tag=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     deploy) mode="deploy"; shift ;;
@@ -17,12 +18,14 @@ while [ "$#" -gt 0 ]; do
     ps|status) mode="ps"; shift ;;
     --service) service=${2:-}; service_explicit="yes"; shift 2 ;;
     --no-cache) no_cache="yes"; shift ;;
+    --tag) image_tag=${2:-}; shift 2 ;;
     -h|--help)
-      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|veilbird|portal-web|admin-web] [--no-cache]"
+      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|veilbird|portal-web|admin-web] [--no-cache] [--tag <commit>]"
+      echo "  --tag  run the registry images of an earlier commit (rollback); needs VEILBIRD_IMAGE_PREFIX in .env"
       exit 0
       ;;
     *)
-      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|veilbird|portal-web|admin-web] [--no-cache]" >&2
+      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|veilbird|portal-web|admin-web] [--no-cache] [--tag <commit>]" >&2
       exit 2
       ;;
   esac
@@ -73,6 +76,20 @@ esac
 "$SCRIPT_DIR/check-env.sh"
 
 export VEILBIRD_BUILD_REV=$(git rev-parse --short HEAD)
+# Images: pulled from the registry CI pushes to (.github/workflows/server-images.yml) when VEILBIRD_IMAGE_PREFIX
+# is set in .env, tagged with the commit; built here otherwise, or when the registry does not have this commit
+# yet (CI still running) or cannot be reached.
+image_prefix=$(env_value VEILBIRD_IMAGE_PREFIX)
+if [ -n "$image_tag" ] && [ -z "$image_prefix" ]; then
+  echo "Error: --tag needs VEILBIRD_IMAGE_PREFIX in .env (see README: server images)." >&2
+  exit 2
+fi
+if [ -n "$image_prefix" ] && [ "$no_cache" = "no" ]; then
+  export VEILBIRD_IMAGE_TAG=${image_tag:-$(git rev-parse --short=12 HEAD)}
+  [ -z "$image_tag" ] || VEILBIRD_BUILD_REV=$(printf '%.7s' "$image_tag")
+else
+  export VEILBIRD_IMAGE_TAG=local
+fi
 # A changed Loki config is a bind mount Compose cannot see; its checksum makes "up -d loki" recreate it.
 export VEILBIRD_LOKI_CONFIG_SHA=$(cksum < deploy/loki/loki.yml | cut -d ' ' -f 1)
 echo "Deploying build $VEILBIRD_BUILD_REV (service: $service)"
@@ -143,11 +160,26 @@ else
   fi
 fi
 
-echo "Building: $build_targets"
-if [ "$no_cache" = "yes" ]; then
-  compose build --no-cache $build_targets
-else
-  compose build $build_targets
+pulled="no"
+if [ "$VEILBIRD_IMAGE_TAG" != "local" ]; then
+  echo "Pulling images $image_prefix-*:$VEILBIRD_IMAGE_TAG"
+  if compose pull --quiet $build_targets; then
+    pulled="yes"
+  elif [ -n "$image_tag" ]; then
+    echo "Error: the registry has no images tagged $image_tag." >&2
+    exit 1
+  else
+    echo "The registry has no images for this commit yet (or cannot be reached); building here instead."
+  fi
+fi
+if [ "$pulled" = "no" ]; then
+  export VEILBIRD_IMAGE_TAG=local
+  echo "Building: $build_targets"
+  if [ "$no_cache" = "yes" ]; then
+    compose build --no-cache $build_targets
+  else
+    compose build $build_targets
+  fi
 fi
 
 echo "Starting: $up_targets"

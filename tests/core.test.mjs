@@ -117,7 +117,8 @@ test("node onboarding discovers persistent identity and preserves canonical SSH 
   assert.match(migration, /node_identity TEXT/);
   assert.match(migration, /nodes_node_identity_unique_idx/);
   assert.match(createRoute, /discoverRemoteNode/);
-  assert.ok(createRoute.indexOf("await discoverRemoteNode") < createRoute.indexOf("await insertNode"));
+  // The SSH path discovers the host before it creates the record (the install-command path has no SSH).
+  assert.ok(createRoute.indexOf("await discoverRemoteNode") < createRoute.lastIndexOf("await insertNode"));
   assert.match(bootstrap, /bindNodeIdentity/);
   assert.match(readFileSync(path.join(root, "server/remote-ssh.ts"), "utf8"), /\/var\/lib\/northstar\/node-id/);
   assert.match(admin, /无需手工生成或填写指纹/);

@@ -8,6 +8,7 @@ x-logging: &default-logging
 services:
   # Static-only site. No controller routes, credentials, database or Docker socket.
   reality-target:
+    image: ${VEILBIRD_IMAGE_PREFIX:-tracknothing}-reality-target:${VEILBIRD_IMAGE_TAG:-local}
     build:
       context: .
       dockerfile: deploy/reality-target/Dockerfile
@@ -44,6 +45,9 @@ services:
       retries: 20
 
   veilbird:
+    # Pulled from the registry CI pushes to when VEILBIRD_IMAGE_PREFIX is set; otherwise built here
+    # (scripts/deploy.sh decides). The tag is the commit, so an older tag is a rollback.
+    image: ${VEILBIRD_IMAGE_PREFIX:-tracknothing}-veilbird:${VEILBIRD_IMAGE_TAG:-local}
     build:
       context: .
       args:
@@ -77,6 +81,7 @@ services:
       retries: 5
 
   portal-web:
+    image: ${VEILBIRD_IMAGE_PREFIX:-tracknothing}-portal-web:${VEILBIRD_IMAGE_TAG:-local}
     build:
       context: .
       dockerfile: Dockerfile.frontend
@@ -100,6 +105,7 @@ services:
       retries: 5
 
   admin-web:
+    image: ${VEILBIRD_IMAGE_PREFIX:-tracknothing}-admin-web:${VEILBIRD_IMAGE_TAG:-local}
     build:
       context: .
       dockerfile: Dockerfile.frontend

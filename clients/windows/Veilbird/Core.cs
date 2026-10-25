@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -9,10 +10,14 @@ namespace Veilbird;
 /// TrackNothing tun adapter (wintun, needs the administrator rights the app runs with) and carries all traffic.
 /// Commands go over stdin/stdout one line at a time, so the configuration with keys never touches the disk and
 /// no local control port exists. The core exits when its stdin closes, including when this app dies.
+/// Commands are answered in order, except fetch (API calls), which answers "fetch:id ..." whenever it is done.
 /// </summary>
 public sealed class Core : IDisposable {
-    private readonly object gate=new();
+    // gate keeps one ordinary command waiting for its answer at a time; writing guards the pipe and the process.
+    private readonly object gate=new(),writing=new();
     private Process? process;
+    private BlockingCollection<string> replies=new();
+    private readonly ConcurrentDictionary<string,TaskCompletionSource<string>> fetches=new();
     private readonly string home=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),"Veilbird","core");
 
     private Process Running() {
@@ -23,20 +28,54 @@ public sealed class Core : IDisposable {
             StandardOutputEncoding=Encoding.UTF8,StandardInputEncoding=new UTF8Encoding(false),
         };
         start.ArgumentList.Add("-d");start.ArgumentList.Add(home);
-        process=Process.Start(start) ?? throw new IOException("core did not start");
-        return process;
+        var started=Process.Start(start) ?? throw new IOException("core did not start");
+        var lines=new BlockingCollection<string>();replies=lines;
+        new Thread(()=>Read(started,lines)) {IsBackground=true,Name="core"}.Start();
+        process=started;
+        return started;
+    }
+    private void Read(Process core,BlockingCollection<string> lines) {
+        try {
+            while(core.StandardOutput.ReadLine() is { } line) {
+                if(line.StartsWith("fetch:",StringComparison.Ordinal)) {
+                    var space=line.IndexOf(' ');
+                    if(space>6&&fetches.TryRemove(line[6..space],out var waiting)) waiting.TrySetResult(line[(space+1)..]);
+                } else lines.Add(line);
+            }
+        } catch(IOException) {/* exited */}
+        lines.CompleteAdding();
+        foreach(var id in fetches.Keys) if(fetches.TryRemove(id,out var waiting)) waiting.TrySetException(new IOException("core exited"));
     }
     private string Call(string line) {
         lock(gate) {
-            var core=Running();
-            core.StandardInput.WriteLine(line);core.StandardInput.Flush();
-            return core.StandardOutput.ReadLine() ?? throw new IOException("core exited");
+            BlockingCollection<string> answers;
+            lock(writing) {var core=Running();answers=replies;core.StandardInput.WriteLine(line);core.StandardInput.Flush();}
+            try {return answers.Take();} catch(InvalidOperationException) {throw new IOException("core exited");}
         }
     }
-    /// Builds and applies the configuration from Transports.Options; the tun comes up with it.
-    public void Run(string options) {
-        var reply=Call("run "+Convert.ToBase64String(Encoding.UTF8.GetBytes(options)));
+    /// One API call (core.Fetch: every known origin, cached addresses first, DNS over HTTPS); JSON in and out.
+    public async Task<string> Fetch(string request) {
+        var id=Guid.NewGuid().ToString("N")[..12];
+        var answer=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        fetches[id]=answer;
+        lock(writing) {
+            var core=Running();
+            core.StandardInput.WriteLine($"fetch {id} {Convert.ToBase64String(Encoding.UTF8.GetBytes(request))}");core.StandardInput.Flush();
+        }
+        return await answer.Task.WaitAsync(TimeSpan.FromSeconds(60));
+    }
+    /// Kill switch: while on, Windows lets traffic out only through the tunnel (WFP rules held by the core).
+    public void KillSwitch(bool on) {
+        var reply=Call("killswitch "+(on?"on":"off"));
         if(reply!="ok") throw new IOException(reply);
+    }
+    /// Builds and applies the configuration from Transports.Options; the tun comes up with it. Returns why the
+    /// kill switch could not be applied, or null.
+    public string? Run(string options) {
+        var reply=Call("run "+Convert.ToBase64String(Encoding.UTF8.GetBytes(options)));
+        if(reply.StartsWith("ok killswitch ",StringComparison.Ordinal)) return reply[14..];
+        if(reply!="ok") throw new IOException(reply);
+        return null;
     }
     /// Tests the named transports at once through url; -1 means no answer.
     public Dictionary<string,long> Probe(IEnumerable<string> names,int timeoutMs)=>
@@ -55,7 +94,7 @@ public sealed class Core : IDisposable {
         return (parts[1],parts[0]);
     }
     public void Dispose() {
-        lock(gate) {
+        lock(writing) {
             if(process is not { HasExited: false }) return;
             try {process.StandardInput.Close();if(!process.WaitForExit(5000)) process.Kill();} catch {/* exiting anyway */}
         }

@@ -1,7 +1,4 @@
 using System.IO;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -27,11 +24,17 @@ public sealed class AccessFailure(string code) : Exception(code) {
         _ => L10n.Text("unable_to_reach_the_service_check_your_network_or")
     };
 }
+/// <summary>
+/// The TrackNothing API. Calls go through the core (Core.Fetch), which tries the address the user entered, the
+/// other API domains the server lists (every site plus backup domains), addresses that worked before, and DNS
+/// over HTTPS, so a blocked domain or poisoned DNS does not lock the app out.
+/// </summary>
 public sealed class NativeApi : IDisposable {
-    private readonly HttpClient client=new(new HttpClientHandler {AllowAutoRedirect=false}) {Timeout=TimeSpan.FromSeconds(15)};
+    private readonly Core core;
     private readonly string folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Veilbird");
     private readonly ECDsa identity;
-    public NativeApi() {
+    public NativeApi(Core core) {
+        this.core=core;
         Directory.CreateDirectory(folder);
         identity=ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var key=Read("identity");
@@ -39,6 +42,19 @@ public sealed class NativeApi : IDisposable {
         else identity.ImportPkcs8PrivateKey(key,out _);
     }
     public string Origin {get;set;}="";
+    private string Entered=>Origin.Trim().TrimEnd('/');
+    /// Every origin of this server, best first: the one that answered last, the others the server listed, and the
+    /// address the user entered. Another address entered means another server: only that address until it answers.
+    private List<string> Origins() {
+        var saved=Read("origins") is { } data?Encoding.UTF8.GetString(data).Split('\n',StringSplitOptions.RemoveEmptyEntries).ToList():[];
+        return saved.Contains(Entered)?saved:[Entered];
+    }
+    private void Remember(string? answered,JsonArray? offered) {
+        var list=Origins();
+        if(offered is not null) list=offered.Select(o=>o?.GetValue<string>()??"").Where(o=>o.StartsWith("https://",StringComparison.Ordinal)).Take(12).Append(Entered).ToList();
+        if(answered is { Length: >0 }) {list.Remove(answered);list.Insert(0,answered);}
+        Save("origins",Encoding.UTF8.GetBytes(string.Join('\n',list.Distinct().Take(14))));
+    }
     public bool SignedIn=>Read("token") is not null;
     public string SavedOrigin=>Read("origin") is { } value?Encoding.UTF8.GetString(value):"";
     private byte[]? Read(string name) {
@@ -54,28 +70,39 @@ public sealed class NativeApi : IDisposable {
     }
     /// Set for one connection attempt: the server's runtime log lines for it carry the same id.
     public string? Attempt {get;set;}
+    private static bool ValidOrigin(string value)=>Uri.TryCreate(value,UriKind.Absolute,out var origin)&&origin.Scheme=="https"&&origin.UserInfo==""&&origin.Query==""&&origin.Fragment==""&&origin.AbsolutePath=="/";
+    /// One call through the core; (status, body) of the first origin that answered.
+    private async Task<(int Status,string Body)> Send(string method,string path,JsonObject? body,Dictionary<string,string> headers,int timeoutMs=15000) {
+        if(!ValidOrigin(Entered+"/")) throw new AccessFailure("SERVER_REQUIRED");
+        var origins=Origins();
+        var request=new JsonObject {["origins"]=new JsonArray(origins.Select(o=>(JsonNode)o).ToArray()),["method"]=method,["path"]=path,["timeoutMs"]=timeoutMs};
+        var all=new JsonObject();foreach(var (name,value) in headers) all[name]=value;
+        if(body is not null) {all["Content-Type"]="application/json";request["body"]=body.ToJsonString();}
+        request["headers"]=all;
+        var reply=JsonNode.Parse(await core.Fetch(request.ToJsonString())) as JsonObject ?? throw new AccessFailure("SERVICE_UNAVAILABLE");
+        if(reply["error"]?.GetValue<string>() is { Length: >0 } error) {Journal.Add("api: unreachable ("+Journal.Scrub(error)+")");throw new AccessFailure("SERVICE_UNAVAILABLE");}
+        if(reply["origin"]?.GetValue<string>() is { Length: >0 } answered&&answered!=origins[0]) {Journal.Add("api: answered by another address");Remember(answered,null);}
+        return (reply["status"]?.GetValue<int>()??0,reply["body"]?.GetValue<string>()??"");
+    }
     public async Task<JsonObject> Request(string path,JsonObject? body=null) {
-        if(!Uri.TryCreate(Origin,UriKind.Absolute,out var origin)||origin.Scheme!="https"||origin.UserInfo!=""||origin.Query!=""||origin.Fragment!=""||origin.AbsolutePath!="/") throw new AccessFailure("SERVER_REQUIRED");
-        using var request=new HttpRequestMessage(body is null?HttpMethod.Get:HttpMethod.Post,new Uri(origin,"/api/v2/native/"+path));
-        request.Headers.TryAddWithoutValidation("X-Veilbird-Client",ClientAgent);
-        if(Attempt is { } attempt) request.Headers.TryAddWithoutValidation("X-Request-Id",attempt);
-        if(path!="login" && Read("token") is { } token) request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",Encoding.UTF8.GetString(token));
-        if(body is not null) request.Content=JsonContent.Create(body);
-        using var response=await client.SendAsync(request,HttpCompletionOption.ResponseHeadersRead);
-        await response.Content.LoadIntoBufferAsync(262144);
-        var json=JsonNode.Parse(await response.Content.ReadAsStringAsync()) as JsonObject ?? throw new AccessFailure("INVALID_RESPONSE");
-        if(!response.IsSuccessStatusCode) throw new AccessFailure(json["code"]?.GetValue<string>()??"SERVICE_UNAVAILABLE");
+        var headers=new Dictionary<string,string> {["X-Veilbird-Client"]=ClientAgent};
+        if(Attempt is { } attempt) headers["X-Request-Id"]=attempt;
+        if(path!="login" && Read("token") is { } token) headers["Authorization"]="Bearer "+Encoding.UTF8.GetString(token);
+        var (status,text)=await Send(body is null?"GET":"POST","/api/v2/native/"+path,body,headers);
+        var json=(text.Length>0?JsonNode.Parse(text):null) as JsonObject ?? throw new AccessFailure("INVALID_RESPONSE");
+        if(status is <200 or >=300) throw new AccessFailure(json["code"]?.GetValue<string>()??"SERVICE_UNAVAILABLE");
+        if(json["apiOrigins"] is JsonArray offered) Remember(null,offered);
         return json;
     }
     /// Public release catalog: the operator's announcement, and a newer build for this install if one is published.
     public async Task<(string Announcement,(string Version,bool Mandatory,Uri Download)? Update)?> LatestRelease() {
-        if(!Uri.TryCreate(Origin,UriKind.Absolute,out var origin)||origin.Scheme!="https") return null;
+        if(!ValidOrigin(Entered+"/")) return null;
+        var origin=new Uri(Entered+"/");
         var installation=Read("installation") is { } saved?Encoding.UTF8.GetString(saved):Guid.NewGuid().ToString();Save("installation",Encoding.UTF8.GetBytes(installation));
         var build=ClientAgent[(ClientAgent.IndexOf('+')+1)..];
-        using var response=await client.GetAsync(new Uri(origin,$"/api/v1/client-releases/latest?platform=windows&arch={(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture==System.Runtime.InteropServices.Architecture.Arm64?"arm64":"x64")}&build={build}&installation={installation}"));
-        if(!response.IsSuccessStatusCode) return null;
-        await response.Content.LoadIntoBufferAsync(65536);
-        var json=JsonNode.Parse(await response.Content.ReadAsStringAsync()) as JsonObject;
+        var (status,text)=await Send("GET",$"/api/v1/client-releases/latest?platform=windows&arch={(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture==System.Runtime.InteropServices.Architecture.Arm64?"arm64":"x64")}&build={build}&installation={installation}",null,new());
+        if(status is <200 or >=300) return null;
+        var json=JsonNode.Parse(text) as JsonObject;
         if(json is null) return null;
         var announcement=json["announcement"]?.GetValue<string>() is { } text?text[..Math.Min(text.Length,500)]:"";
         if(json["updateAvailable"]?.GetValue<bool>()!=true||json["latest"]?["version"]?.GetValue<string>() is not { } version) return (announcement,null);
@@ -101,8 +128,8 @@ public sealed class NativeApi : IDisposable {
         return await Request(action,new JsonObject {["challengeId"]=challenge["id"]!.GetValue<string>(),["signature"]=B64(signature),["request"]=input.DeepClone()});
     }
     /// Connection failure codes and scrubbed error texts for the Console (no keys, addresses or traffic); best effort.
-    public async Task Report(string code,string nodeId="",string detail="",string network="") {
-        var item=new JsonObject {["code"]=code,["at"]=DateTimeOffset.UtcNow.ToString("O")};
+    public async Task Report(string code,string nodeId="",string detail="",string network="",string? at=null) {
+        var item=new JsonObject {["code"]=code,["at"]=at??DateTimeOffset.UtcNow.ToString("O")};
         if(nodeId.Length>0) item["nodeId"]=nodeId;
         if(detail.Length>0) item["detail"]=detail;
         if(network.Length>0) item["network"]=network;
@@ -110,5 +137,5 @@ public sealed class NativeApi : IDisposable {
         try {await Request("diagnostics",new JsonObject {["events"]=new JsonArray(item)});} catch {/* diagnostics never block connecting */}
     }
     public async Task Logout() {try {await Request("logout",new JsonObject());}finally {Save("token",null);}}
-    public void Dispose() {identity.Dispose();client.Dispose();}
+    public void Dispose()=>identity.Dispose();
 }

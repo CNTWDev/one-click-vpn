@@ -792,3 +792,12 @@ details[open] > summary .chev { transform: rotate(180deg); }
 .release-import-list .import-progress { color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 @media (max-width: 720px) { .release-import-list { grid-template-columns: minmax(0, 1fr); } .release-import-list li { grid-template-columns: minmax(0, 1fr); justify-items: start; } }
 @media (max-width: 720px) { .release-upload .form-grid { grid-template-columns: minmax(0, 1fr); } .release-upload .span-2 { grid-column: auto; } }
+
+/* Nodes: install command and SSH credential choice */
+.form-grid .tabs { margin-bottom: 4px; }
+.check-line { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.install-command { margin: 0; padding: 14px; overflow-x: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+.alerts-panel .compact-list { margin: 8px 0 12px; }
+.alerts-panel .form-note { margin-bottom: 14px; }
+.install-command + .form-note { margin-top: 14px; }
+.agent-domain .stack-form { margin-top: 16px; }

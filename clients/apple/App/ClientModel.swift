@@ -23,6 +23,8 @@ import ServiceManagement
     @Published var selected=UserDefaults.standard.string(forKey:"selectedNode") ?? "" {didSet {UserDefaults.standard.set(selected,forKey:"selectedNode")}}
     @Published var selectedName=UserDefaults.standard.string(forKey:"selectedNodeName") ?? "" {didSet {UserDefaults.standard.set(selectedName,forKey:"selectedNodeName")}}
     @Published var routing=UserDefaults.standard.string(forKey:"routing") ?? "smart" {didSet {UserDefaults.standard.set(routing,forKey:"routing")}}
+    /// Applied by TunnelControl.start, so from the next connection.
+    @Published var killSwitch=UserDefaults.standard.bool(forKey:"killSwitch") {didSet {UserDefaults.standard.set(killSwitch,forKey:"killSwitch")}}
     @Published var nodes:[[String:Any]]=[]
     @Published var measuring=false
     @Published var account:[String:Any]=[:]
@@ -37,7 +39,7 @@ import ServiceManagement
     @Published var origin=UserDefaults.standard.string(forKey:"origin") ?? (Bundle.main.object(forInfoDictionaryKey:"VeilbirdAPIOrigin") as? String ?? "")
     private var ticker:AnyCancellable?
     // Status is polled here, not in the window: on the Mac the menu bar keeps working after the window is closed.
-    init() {ticker=Timer.publish(every:1,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in self?.refreshStatus()}}}
+    init() {CrashReports.shared.start();ticker=Timer.publish(every:1,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in self?.refreshStatus()}}}
     var connected:Bool {[.connected,.connecting,.reasserting].contains(manager?.connection.status)}
     /// The two-letter country code shown in a location's tile; the name's first letter when the node has none.
     func code(_ id:String,name:String)->String {
@@ -73,7 +75,7 @@ import ServiceManagement
             #if !targetEnvironment(simulator)
             manager=try await TunnelControl.saved()
             #endif
-            if signedIn {try await loadNodes()}
+            if signedIn {try await loadNodes();if let client=try? api() {await CrashReports.shared.send(client)}}
         } catch {message=error.localizedDescription}
         await checkForUpdate()
     }

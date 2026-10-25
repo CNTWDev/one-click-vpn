@@ -5,6 +5,7 @@ import { api } from "../api";
 import { useConfirm } from "../confirm-dialog";
 import { useToast } from "../toast";
 import { AgentDomainPanel } from "./agent-domain";
+import { BackupApiPanel } from "./api-origins";
 import { Empty, InlineNotice, Menu, type Notice, PageHeader, Pill, StateDot } from "./shared";
 
 type Site = { id: string; name: string; portalDomain: string; consoleDomain: string; apiDomain: string; logoSvg: string; mailFromName: string; isDefault: boolean };
@@ -108,6 +109,7 @@ export function SitesPage() {
           })}</div> : null}
         </section>
         <AgentDomainPanel />
+        <BackupApiPanel />
         <section className="panel site-guide"><div className="panel-head"><h2>{t("在宝塔添加站点")}</h2></div>
           <ol>
             <li>{t("在 DNS 把这几个域名解析到本服务器。")}</li>

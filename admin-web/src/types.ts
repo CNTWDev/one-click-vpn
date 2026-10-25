@@ -113,7 +113,9 @@ export type NodeRecord = {
   ssh_user: string;
   ssh_port: number;
   ssh_privilege_mode?: "auto" | "root" | "sudo";
-  credential_type?: "password" | "private_key";
+  credential_type?: "password" | "private_key" | "none";
+  /** False once the SSH password/key is cleared (or the node joined with an install command). */
+  has_ssh_credential?: boolean;
   status: string;
   latency: string;
   users: number;

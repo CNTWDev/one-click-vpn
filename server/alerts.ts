@@ -11,7 +11,8 @@ import { writeOperationalLog } from "./operational-logs";
 // delay, and once more when it is gone; nothing repeats while it lasts. State lives in alert_states, so a
 // Controller restart neither repeats an alert nor forgets one.
 
-type Problem = { key: string; title: string; detail: string; delayMinutes: number };
+// kind + subject let Console show the problem in its own language; title and detail are the (Chinese) email text.
+type Problem = { key: string; kind: "node-offline" | "service" | "agent-outdated" | "disk"; subject: string; title: string; detail: string; delayMinutes: number };
 type Row = { key: string; firing_since: Date; notified_at: Date | null; detail: string };
 
 const startedAt = Date.now();
@@ -34,16 +35,16 @@ async function nodeProblems(): Promise<Problem[]> {
   if (Date.now() - startedAt > 3 * MINUTE) {
     const silent = await dbQuery<{ id: string; name: string; last_heartbeat_at: string }>(`SELECT id, name, last_heartbeat_at FROM nodes
       WHERE agent_token_hash IS NOT NULL AND last_heartbeat_at IS NOT NULL AND last_heartbeat_at::timestamptz < now() - interval '3 minutes'`);
-    for (const node of silent) problems.push({ key: `node-offline:${node.id}`, title: `节点离线：${node.name}`, detail: `最后心跳 ${node.last_heartbeat_at}`, delayMinutes: 0 });
+    for (const node of silent) problems.push({ key: `node-offline:${node.id}`, kind: "node-offline", subject: node.name, title: `节点离线：${node.name}`, detail: `最后心跳 ${node.last_heartbeat_at}`, delayMinutes: 0 });
   }
   const failing = await dbQuery<{ node_id: string; name: string; protocol: string; last_error: string }>(`SELECT s.node_id, n.name, s.protocol, s.last_error
     FROM vpn_services s JOIN nodes n ON n.id = s.node_id WHERE s.enabled = 1 AND s.status = 'attention'`);
-  for (const service of failing) problems.push({ key: `service:${service.node_id}:${service.protocol}`, title: `协议同步失败：${service.name} ${service.protocol}`,
+  for (const service of failing) problems.push({ key: `service:${service.node_id}:${service.protocol}`, kind: "service", subject: `${service.name} ${service.protocol}`, title: `协议同步失败：${service.name} ${service.protocol}`,
     detail: service.last_error.slice(0, 300) || "状态为 attention", delayMinutes: 10 });
   const release = agentRelease().version;
   const behind = await dbQuery<{ name: string; version: string }>(`SELECT name, version FROM nodes
     WHERE agent_token_hash IS NOT NULL AND status = 'online' AND version LIKE 'agent %' AND version <> $1 ORDER BY name`, [release]);
-  if (behind.length) problems.push({ key: "agent-outdated", title: `${behind.length} 个节点的 Agent 不是最新版 ${release}`,
+  if (behind.length) problems.push({ key: "agent-outdated", kind: "agent-outdated", subject: behind.slice(0, 10).map((node) => node.name).join(", "), title: `${behind.length} 个节点的 Agent 不是最新版 ${release}`,
     detail: `${behind.slice(0, 10).map((node) => `${node.name}（${node.version}）`).join("、")}。在 Console 节点页点「升级 Agent」。`, delayMinutes: 24 * 60 });
   return problems;
 }
@@ -54,7 +55,7 @@ async function diskProblem(): Promise<Problem[]> {
     const stats = await statfs("/");
     const used = 1 - Number(stats.bavail) / Number(stats.blocks);
     if (used < 0.85) return [];
-    return [{ key: "disk", title: `控制面磁盘已用 ${Math.round(used * 100)}%`, detail: `剩余 ${(Number(stats.bavail) * Number(stats.bsize) / 2 ** 30).toFixed(1)} GB。可以清理旧备份或 Docker 镜像。`, delayMinutes: 5 }];
+    return [{ key: "disk", kind: "disk", subject: `${Math.round(used * 100)}%`, title: `控制面磁盘已用 ${Math.round(used * 100)}%`, detail: `剩余 ${(Number(stats.bavail) * Number(stats.bsize) / 2 ** 30).toFixed(1)} GB。可以清理旧备份或 Docker 镜像。`, delayMinutes: 5 }];
   } catch { return []; }
 }
 
@@ -105,7 +106,7 @@ export async function runAlerts(): Promise<{ fired: string[]; resolved: string[]
   return { fired: fire.map((problem) => problem.key), resolved: resolved.map((row) => row.key) };
 }
 
-export type AlertStatus = { recipients: string; mailConfigured: boolean; firing: Array<{ key: string; title: string; detail: string; since: string; notified: boolean }> };
+export type AlertStatus = { recipients: string; mailConfigured: boolean; firing: Array<{ key: string; kind: Problem["kind"]; subject: string; title: string; detail: string; since: string; notified: boolean }> };
 
 export async function alertStatus(): Promise<AlertStatus> {
   const problems = new Map((await currentProblems()).map((problem) => [problem.key, problem]));
@@ -113,7 +114,7 @@ export async function alertStatus(): Promise<AlertStatus> {
   return {
     recipients: (await getControllerSettings() as { alert_emails?: string }).alert_emails || "",
     mailConfigured: await mailConfigured(),
-    firing: rows.filter((row) => problems.has(row.key)).map((row) => ({ key: row.key, title: problems.get(row.key)!.title, detail: problems.get(row.key)!.detail,
+    firing: rows.filter((row) => problems.has(row.key)).map((row) => ({ key: row.key, kind: problems.get(row.key)!.kind, subject: problems.get(row.key)!.subject, title: problems.get(row.key)!.title, detail: problems.get(row.key)!.detail,
       since: new Date(row.firing_since).toISOString(), notified: Boolean(row.notified_at) })),
   };
 }

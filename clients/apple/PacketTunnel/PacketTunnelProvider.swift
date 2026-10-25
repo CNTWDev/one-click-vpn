@@ -20,6 +20,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     // Wall-clock times: systemUptime stops while the device sleeps, the server's lease does not.
     private var deadline=Date.distantPast
     private var renewAt=Date.distantPast
+    private var renewedAt=Date.distantPast
+    /// Keep a working tunnel this long when the server cannot be reached to renew the lease (it is down or blocked);
+    /// the node keeps the lease alive on its side for as long (Agent offline grace).
+    private let offlineGrace:TimeInterval=12*3600
     private var leaseId=""
     private var leaseReady=false
     private var transports:[String]=[]
@@ -93,7 +97,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     /// If the list cannot be loaded the server picks the least-loaded node.
     private func chooseFastest() async {
         guard let api,let nodes=try? await api.request("nodes")["nodes"] as? [[String:Any]] else {return}
-        let ranked=await Latency.rank(nodes,attempts:3)
+        let ranked=await Latency.rank(nodes,attempts:3,reuse:60)
         for item in ranked.prefix(3) {Journal.add("probe: \(item.node["name"] as? String ?? "?") \(item.quality.latency.map {"\($0) ms"} ?? "no answer"), jitter \(item.quality.jitter) ms, loss \(item.quality.loss)%")}
         let ids=ranked.compactMap {$0.node["id"] as? String}
         nodeId=ids.first ?? "";fallbacks=Array(ids.dropFirst().prefix(2))
@@ -173,7 +177,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         Journal.add("disconnect: \(code)")
         await report(code);cancelTunnelWithError(AccessFailure.code(shown ?? code))
     }
-    /// A first connection with other transports waits briefly for WireGuard; without them up to 15 s. Renewals only check readiness.
+    /// A first connection with other transports does not wait for WireGuard (they carry traffic until it is ready;
+    /// tick switches then); without them it waits up to 15 s. Renewals only check readiness.
     private func acquire(initial:Bool=false) async throws -> [String:Any] {
         guard let api else {throw AccessFailure.code("AUTH_REQUIRED")}
         var input:[String:Any]=["publicKey":keys.publicKey]
@@ -184,12 +189,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
               let id=lease["leaseId"] as? String,let node=lease["nodeId"] as? String else {throw AccessFailure.code("INVALID_RESPONSE")}
         let remaining=min(300,expiry.timeIntervalSinceNow)
         guard remaining>0 else {throw AccessFailure.code("ACCESS_EXPIRED")}
-        deadline=Date().addingTimeInterval(remaining);renewAt=Date().addingTimeInterval(90)
+        deadline=Date().addingTimeInterval(remaining);renewAt=Date().addingTimeInterval(90);renewedAt=Date()
         nodeId=node;nodeName=lease["nodeName"] as? String ?? "";leaseId=id;leaseReady=lease["ready"] as? Bool == true
         if !initial {if !leaseReady {leaseReady=await status()};return lease}
         let spare = !((lease["proxies"] as? [Any]) ?? []).isEmpty
         var attempt=0
-        while !leaseReady && attempt<(spare ? 3:15) {
+        while !leaseReady && attempt<(spare ? 0:15) {
             try await Task.sleep(nanoseconds:1_000_000_000);leaseReady=await status();attempt+=1
         }
         if !leaseReady && !spare {throw AccessFailure.code("NODE_UNAVAILABLE")}
@@ -198,12 +203,13 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     }
     private func tick() async {
         if woke {woke=false;renewAt=Date.distantPast;lastProbe=Date.distantPast}
-        // After sleep the lease may already have lapsed: one renewal attempt before closing the tunnel.
-        if Date()>=renewAt || Date()>=deadline {
+        // A refusal (account, device, quota) closes the tunnel. When the server cannot be reached the tunnel stays
+        // while it still carries traffic, up to offlineGrace after the last renewal; probes decide.
+        if Date()>=renewAt {
             do {_ = try await acquire()}
             catch AccessFailure.code(let code) where ["AUTH_REQUIRED","DEVICE_REVOKED","DEVICE_LIMIT_REACHED","MEMBERSHIP_EXPIRED","QUOTA_EXHAUSTED","ACCOUNT_UNAVAILABLE","MANAGED_ACCESS_REQUIRED","CLIENT_UPDATE_REQUIRED"].contains(code) {await fail(code);return}
-            catch {Journal.add("lease: renewal failed, retrying");renewAt=Date().addingTimeInterval(15)}
-            if Date()>=deadline {await fail("LEASE_RENEWAL_FAILED","ACCESS_EXPIRED");return}
+            catch {Journal.add("lease: renewal failed, retrying");renewAt=Date().addingTimeInterval(Date().timeIntervalSince(renewedAt)<300 ? 15:60)}
+            if Date().timeIntervalSince(renewedAt)>=offlineGrace {await fail("LEASE_RENEWAL_FAILED","ACCESS_EXPIRED");return}
         } else if !leaseReady,await status() {
             // WireGuard became usable: test it now so traffic moves to the lightest transport right away.
             leaseReady=true;Journal.add("lease: WireGuard ready");_ = await probe(report:true)
