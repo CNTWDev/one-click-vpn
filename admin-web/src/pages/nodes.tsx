@@ -1,7 +1,7 @@
 import { consoleLanguage, t, useConsoleLanguage } from "../i18n";
 /* eslint-disable react-hooks/set-state-in-effect */
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "../api";
+import { api, networkErrorMessage } from "../api";
 import { useConfirm } from "../confirm-dialog";
 import { Icon } from "../icons";
 import { setQuery, useQueryParam, useRoute } from "../router";
@@ -173,6 +173,8 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
         if (diagnosticRequestRef.current !== diagnosticNodeId) return;
         setDiagnostics(result);
         if (result.node) setDiagnosticNode(result.node);
+        // The Controller answers again, so an earlier connection error no longer applies.
+        setNotice((current) => current?.message === networkErrorMessage() ? null : current);
       }).catch(() => undefined);
     }, 5_000);
     return () => window.clearInterval(timer);

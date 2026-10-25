@@ -3710,5 +3710,9 @@
   "控制面磁盘已用 {0}": [
     "Controller disk {0} full",
     "Диск Controller заполнен на {0}"
+  ],
+  "无法连接 Controller（网络中断或服务正在重启），请稍后重试。": [
+    "Can't reach the Controller (network dropped or the service is restarting). Try again shortly.",
+    "Нет связи с Controller (обрыв сети или перезапуск сервиса). Повторите попытку позже."
   ]
 }

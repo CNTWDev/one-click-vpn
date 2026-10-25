@@ -4,7 +4,7 @@ import { ConsoleLanguage, ConsoleLanguagePicker, t, useConsoleLanguage } from ".
 /* eslint-disable react-hooks/set-state-in-effect */
 import { type FormEvent, lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { api, isUnauthorized, setUnauthorizedHandler } from "./api";
+import { api, isUnauthorized, networkErrorMessage, setUnauthorizedHandler } from "./api";
 import { ConfirmProvider } from "./confirm-dialog";
 import { Icon, type IconName } from "./icons";
 import { href, useRoute } from "./router";
@@ -126,7 +126,10 @@ function App() {
     if (!user || page !== "nodes") return;
     const timer = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      void api<{ nodes: NodeRecord[] }>("/api/nodes").then((result) => setNodes(result.nodes || [])).catch(() => undefined);
+      void api<{ nodes: NodeRecord[] }>("/api/nodes").then((result) => {
+        setNodes(result.nodes || []);
+        setError((current) => current === networkErrorMessage() ? "" : current);
+      }).catch(() => undefined);
     }, 15_000);
     return () => window.clearInterval(timer);
   }, [user, page]);
