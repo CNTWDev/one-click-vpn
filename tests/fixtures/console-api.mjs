@@ -99,11 +99,15 @@ const release = (id, platform, channel, version, build, extra = {}) => ({ id, pl
 
 export function consoleApi({ signedIn = true } = {}) {
   let session = signedIn;
-  return (pathname, method) => {
+  return (pathname, method, query = new URLSearchParams()) => {
     if (pathname === "/api/auth/me") return session ? [200, { user }] : [401, { error: "Authentication required" }];
     if (pathname === "/api/auth/login") { session = true; return [200, { user }]; }
     if (pathname === "/api/auth/logout") { session = false; return [200, {}]; }
-    if (pathname === "/api/v1/admin/users") return [200, { users }];
+    if (pathname === "/api/v1/admin/users") {
+      const counts = { pending: 0, active: 0, rejected: 0, suspended: 0 };
+      for (const item of users) counts[item.status] += 1;
+      return [200, { counts, users: users.filter((item) => !query.get("status") || item.status === query.get("status")) }];
+    }
     if (/^\/api\/v1\/admin\/users\/[^/]+\/credentials$/.test(pathname)) return [200, access];
     if (pathname === "/api/v1/admin/mail-settings") return [200, { settings: { provider: "aliyun", host: "smtpdm-ap-southeast-1.aliyun.com", port: 465, username: "no-reply@notifications.very-long-company-domain.example", fromName: "TrackNothing", passwordSet: true, updatedAt: now } }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/password-reset$/.test(pathname)) return [200, { url: `https://app.very-long-subdomain.example.com/#reset=usr_6f1c2d3e-4b5a-6978-8a9b-0c1d2e3f4a5b.1792000000.${"x".repeat(43)}`, expiresAt: "2026-10-24T10:00:00Z" }];

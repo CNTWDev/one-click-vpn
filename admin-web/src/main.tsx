@@ -10,10 +10,9 @@ import { Icon, type IconName } from "./icons";
 import { href, useRoute } from "./router";
 import { applyTheme, type ThemeChoice, useTheme } from "./theme";
 import { ToastProvider } from "./toast";
-import type { AdminUser, ControllerInfo, NodeRecord, Region } from "./types";
+import type { AdminUser, ControllerInfo, NodeRecord, Region, UserCounts } from "./types";
 import "./styles.css";
 import "./credential-usage.css";
-import { SubscriptionPanel } from "../../shared/subscription-panel";
 import { PasswordInput } from "../../shared/password-input";
 
 // Each console page is its own chunk, fetched the first time it is opened.
@@ -27,6 +26,7 @@ const ControllerPage = lazy(() => import("./pages/controller").then((module) => 
 const ReleasesPage = lazy(() => import("./pages/releases").then((module) => ({ default: module.ReleasesPage })));
 const SitesPage = lazy(() => import("./pages/sites").then((module) => ({ default: module.SitesPage })));
 const PlansPage = lazy(() => import("./pages/plans").then((module) => ({ default: module.PlansPage })));
+const SubscriptionPanel = lazy(() => import("../../shared/subscription-panel").then((module) => ({ default: module.SubscriptionPanel })));
 const LogsPage = lazy(() => import("./pages/logs").then((module) => ({ default: module.LogsPage })));
 
 type PageId = "overview" | "topology" | "users" | "plans" | "subscriptions" | "nodes" | "services" | "regions" | "controller" | "sites" | "logs" | "releases";
@@ -80,7 +80,9 @@ function App() {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
-  const [users, setUsers] = useState<AdminUser[]>([]);
+  // Pending accounts and per-status counts only: the navigation badge and the overview need no more.
+  const [pendingUsers, setPendingUsers] = useState<AdminUser[]>([]);
+  const [userCounts, setUserCounts] = useState<UserCounts | null>(null);
   const [nodes, setNodes] = useState<NodeRecord[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
   const [controllerSettings, setControllerSettings] = useState<ControllerInfo["settings"] | null>(null);
@@ -94,18 +96,18 @@ function App() {
     setDataLoading(true); setError("");
     try {
       const [userResult, nodeResult, regionResult, controllerResult] = await Promise.all([
-        api<{ users: AdminUser[] }>("/api/v1/admin/users"),
+        api<{ users: AdminUser[]; counts?: UserCounts }>("/api/v1/admin/users?status=pending"),
         api<{ nodes: NodeRecord[] }>("/api/nodes"),
         api<{ regions: Region[] }>("/api/regions"),
         api<ControllerInfo>("/api/controller"),
       ]);
-      setUsers(userResult.users || []); setNodes(nodeResult.nodes || []); setRegions(regionResult.regions || []); setControllerSettings(controllerResult.settings);
+      setPendingUsers(userResult.users || []); setUserCounts(userResult.counts || null); setNodes(nodeResult.nodes || []); setRegions(regionResult.regions || []); setControllerSettings(controllerResult.settings);
     } catch (reason) { if (!isUnauthorized(reason)) setError((reason as Error).message); }
     finally { setDataLoading(false); }
   }, []);
 
   const clearSession = useCallback(() => {
-    setUser(null); setUsers([]); setNodes([]); setRegions([]); setControllerSettings(null); setMenuOpen(false); setError("");
+    setUser(null); setPendingUsers([]); setUserCounts(null); setNodes([]); setRegions([]); setControllerSettings(null); setMenuOpen(false); setError("");
   }, []);
   useEffect(() => {
     setUnauthorizedHandler(clearSession);
@@ -140,11 +142,11 @@ function App() {
   if (!user) return <Login onUser={setUser} />;
 
   const current = pages.find((item) => item.id === page)!;
-  const pendingUsers = users.filter((account) => account.status === "pending").length;
+  const pendingCount = userCounts?.pending ?? pendingUsers.length;
   return <main className="app-shell">
     <aside className={menuOpen ? "open" : ""}>
       <div className="aside-head"><Brand /><button className="icon-button mobile-only" aria-label={t("关闭菜单")} onClick={() => setMenuOpen(false)}><Icon name="close" /></button></div>
-      <nav aria-label={t("管理控制台导航")}>{navigation.map((section) => <div className="nav-group" key={section.group}><p>{t(section.group)}</p>{section.items.map((item) => <a key={item.id} href={href(item.id)} className={page === item.id ? "active" : ""} aria-current={page === item.id ? "page" : undefined} onClick={() => setMenuOpen(false)}><Icon name={item.icon} /><span>{t(item.label)}</span>{item.id === "users" && pendingUsers > 0 && <em title={t("{0} 个账号待审核", [pendingUsers])}>{pendingUsers}</em>}</a>)}</div>)}</nav>
+      <nav aria-label={t("管理控制台导航")}>{navigation.map((section) => <div className="nav-group" key={section.group}><p>{t(section.group)}</p>{section.items.map((item) => <a key={item.id} href={href(item.id)} className={page === item.id ? "active" : ""} aria-current={page === item.id ? "page" : undefined} onClick={() => setMenuOpen(false)}><Icon name={item.icon} /><span>{t(item.label)}</span>{item.id === "users" && pendingCount > 0 && <em title={t("{0} 个账号待审核", [pendingCount])}>{pendingCount}</em>}</a>)}</div>)}</nav>
       <div className="aside-health"><span className={`live-mark ${error ? "down" : ""}`} /><span><b>Controller API</b><small>{error ? t("连接异常") : dataLoading ? t("同步数据中") : t("已认证 · 运行中")}</small></span></div>
       <div className="aside-user"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><span><b>{user.displayName}</b><small>{user.email}</small></span><button className="icon-button" title={t("退出登录")} aria-label={t("退出登录")} onClick={() => void logout()}><Icon name="logout" size={16} /></button></div>
     </aside>
@@ -154,9 +156,9 @@ function App() {
       <div className="content">
         {error && <div className="inline-notice error" role="alert"><span>{error}</span><button className="text-button" onClick={() => void refreshCore()}>{t("重试")}</button></div>}
         <Suspense fallback={<div className="page-loading" role="status"><i /><i /><i /></div>}>
-          {page === "overview" && <OverviewPage users={users} nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
+          {page === "overview" && <OverviewPage pendingUsers={pendingUsers} activeUsers={userCounts?.active ?? 0} nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
           {page === "topology" && <TopologyPage nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
-          {page === "users" && <UsersPage users={users} onRefresh={refreshCore} />}
+          {page === "users" && <UsersPage onChanged={() => void refreshCore()} />}
           {page === "plans" && <PlansPage />}
           {page === "subscriptions" && <SubscriptionPanel api={api} admin />}
           {page === "nodes" && <NodesPage nodes={nodes} regions={regions} loading={dataLoading} onRefresh={refreshCore} />}

@@ -9,12 +9,11 @@ import { Empty, PageHeader, Pill, StateDot, Time } from "./shared";
 const MAP_KEY = "veilbird-console-overview-map";
 function readMapOpen() { try { return window.localStorage.getItem(MAP_KEY) !== "closed"; } catch { return true; } }
 
-export function OverviewPage({ users, nodes, regions, controllerSettings, onRefresh }: {
-  users: AdminUser[]; nodes: NodeRecord[]; regions: Region[]; controllerSettings?: ControllerInfo["settings"] | null; onRefresh: () => Promise<void>;
+export function OverviewPage({ pendingUsers: pending, activeUsers, nodes, regions, controllerSettings, onRefresh }: {
+  pendingUsers: AdminUser[]; activeUsers: number; nodes: NodeRecord[]; regions: Region[]; controllerSettings?: ControllerInfo["settings"] | null; onRefresh: () => Promise<void>;
 }) {
   useConsoleLanguage();
   const [mapOpen, setMapOpen] = useState(readMapOpen);
-  const pending = users.filter((user) => user.status === "pending");
   const attention = nodes.filter((node) => node.status !== "online");
   const online = nodes.length - attention.length;
   function toggleMap() {
@@ -27,7 +26,7 @@ export function OverviewPage({ users, nodes, regions, controllerSettings, onRefr
       <a href={href("users", { filter: "pending" })} className={pending.length ? "warn" : ""}><small>{t("待审核账号")}</small><b>{pending.length}</b><span>{t("去审核 →")}</span></a>
       <a href={href("nodes", { filter: "online" })}><small>{t("在线节点")}</small><b>{online}<em> / {nodes.length}</em></b><span>{t("查看节点 →")}</span></a>
       <a href={href("nodes", { filter: "attention" })} className={attention.length ? "danger" : ""}><small>{t("需关注节点")}</small><b>{attention.length}</b><span>{t("查看需关注节点 →")}</span></a>
-      <a href={href("users", { filter: "active" })}><small>{t("已启用账号")}</small><b>{users.filter((user) => user.status === "active").length}</b><span>{t("查看账号 →")}</span></a>
+      <a href={href("users", { filter: "active" })}><small>{t("已启用账号")}</small><b>{activeUsers}</b><span>{t("查看账号 →")}</span></a>
     </section>
     <div className="two-column">
       <section className="panel">

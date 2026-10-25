@@ -1,5 +1,6 @@
 import { consoleLanguage, t, useConsoleLanguage } from "../i18n";
-import { useState } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useEffect, useState } from "react";
 import { accessSummary } from "./account-access";
 import { UserAccessDialog } from "./user-access";
 import { api } from "../api";
@@ -10,8 +11,11 @@ import { useToast } from "../toast";
 import type { AdminUser } from "../types";
 import { BatchBar, Empty, formatBytes, includesText, InlineNotice, Menu, type MenuItem, Modal, type Notice, PageHeader, Pill, TableToolbar, Time } from "./shared";
 
-export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh: () => Promise<void> }) {
+/** Accounts: review, status, password reset and the access detail. Loads its own list; onChanged refreshes the navigation badge. */
+export function UsersPage({ onChanged }: { onChanged: () => void }) {
   useConsoleLanguage();
+  const [loaded, setLoaded] = useState<AdminUser[] | null>(null);
+  const users = loaded || [];
   const [filter, setFilter] = useQueryParam("filter", "all");
   const [search, setSearch] = useQueryParam("q");
   const [sort, setSort] = useQueryParam("sort", "created");
@@ -36,6 +40,12 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
   const selectedPending = selectablePending.filter((user) => selected.has(user.id));
   const confirm = useConfirm();
   const toast = useToast();
+  async function refresh() {
+    try { setLoaded((await api<{ users: AdminUser[] }>("/api/v1/admin/users")).users || []); }
+    catch (error) { setLoaded((current) => current || []); setNotice({ tone: "error", message: (error as Error).message }); }
+    onChanged();
+  }
+  useEffect(() => { void refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function update(user: AdminUser, status: "active" | "rejected" | "suspended") {
     let reason = "";
@@ -61,7 +71,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
       await api(`/api/v1/admin/users/${user.id}/status`, { method: "POST", body: JSON.stringify({ status, reason }) });
       toast(status === "active" ? t("{0} 已启用。", [user.email]) : status === "rejected" ? t("已拒绝 {0} 的申请。", [user.email]) : t("{0} 已停用。", [user.email]));
       setSelected((current) => { const next = new Set(current); next.delete(user.id); return next; });
-      await onRefresh();
+      await refresh();
     } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
     finally { setBusy(""); }
   }
@@ -84,7 +94,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
     }
     if (failures.length) setNotice({ tone: "error", message: t("{0} 个账号处理失败：{1}", [failures.length, failures.join("；")]) });
     if (targets.length > failures.length) toast(t("已{0} {1} 个账号申请。", [status === "active" ? t("通过") : t("拒绝"), targets.length - failures.length]));
-    setSelected(new Set()); setBusy(""); await onRefresh();
+    setSelected(new Set()); setBusy(""); await refresh();
   }
 
   // The administrator only hands over a one-time link; the user picks the new password themselves.
@@ -123,7 +133,7 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
   }
 
   return <>
-    <PageHeader title={t("账号管理")} description={t("账号能否连接由权益决定：有效期和流量按全部节点合计。停用账号或撤销凭据会立即终止使用。")} actions={<button className="button ghost" onClick={() => void onRefresh()}><Icon name="refresh" size={16} />{t("刷新")}</button>} />
+    <PageHeader title={t("账号管理")} description={t("账号能否连接由权益决定：有效期和流量按全部节点合计。停用账号或撤销凭据会立即终止使用。")} actions={<button className="button ghost" onClick={() => void refresh()}><Icon name="refresh" size={16} />{t("刷新")}</button>} />
     <InlineNotice notice={notice} />
     {pending.length > 0 && filter !== "pending" && <div className="inline-notice warning"><span><b>{t("{0} 个账号等待审核。", [pending.length])}</b> {t("可勾选后批量通过或拒绝。")}</span><button className="button ghost small" onClick={() => setFilter("pending")}>{t("查看待审核")}</button></div>}
     <section className="panel flush table-panel">
@@ -141,11 +151,11 @@ export function UsersPage({ users, onRefresh }: { users: AdminUser[]; onRefresh:
         <td className="m-hide"><Time value={user.createdAt} /></td>
         <td className="align-right cell-actions">{rowActions(user)}</td>
       </tr>)}</tbody></table></div>
-      {!visible.length && <Empty action={search || filter !== "all" ? <button className="button ghost" onClick={() => { setSearch(""); setFilter("all"); }}>{t("清除筛选")}</button> : undefined}>{users.length ? t("没有符合条件的账号。") : t("还没有账号。")}</Empty>}
+      {!visible.length && (loaded === null ? <div className="skeleton-block" role="status" aria-label={t("正在加载账号")}><i /><i /><i /></div> : <Empty action={search || filter !== "all" ? <button className="button ghost" onClick={() => { setSearch(""); setFilter("all"); }}>{t("清除筛选")}</button> : undefined}>{users.length ? t("没有符合条件的账号。") : t("还没有账号。")}</Empty>)}
     </section>
     {resetLink && <Modal title={t("重置密码链接")} description={t("发给 {0}，对方打开后自己设置新密码。24 小时内有效，只能使用一次。", [resetLink.user.email])} onClose={() => setResetLink(null)} footer={<div className="form-actions"><button className="button primary" onClick={() => void copyResetLink()}>{t("复制链接")}</button></div>}>
       <input readOnly value={resetLink.url} aria-label={t("重置密码链接")} onFocus={(event) => event.currentTarget.select()} />
     </Modal>}
-    {accessUser && <UserAccessDialog user={accessUser} onClose={() => setAccessUser(null)} onChanged={() => void onRefresh()} />}
+    {accessUser && <UserAccessDialog user={accessUser} onClose={() => setAccessUser(null)} onChanged={() => void refresh()} />}
   </>;
 }

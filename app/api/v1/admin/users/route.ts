@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listUsers } from "../../../../../server/db";
+import { countUsersByStatus, listUsers } from "../../../../../server/db";
 import { publicUser } from "../../../../../server/device-auth";
 import { requestAdmin } from "../../../../../server/request-auth";
 import { cleanText, jsonError } from "../../../../../server/http";
@@ -13,8 +13,8 @@ export async function GET(request: Request) {
   if (!admin) return jsonError("Administrator authentication required", 403);
   const status = cleanText(new URL(request.url).searchParams.get("status"), 20) as "pending" | "active" | "rejected" | "suspended" | "";
   const users = await listUsers(status || undefined);
-  const [summaries, access] = await Promise.all([adminUserAccessSummaries(), accessByUser()]);
-  return NextResponse.json({ users: users.map((user) => ({ ...publicUser(user), access: access.get(user.id) || null, accessSummary: summaries.get(user.id) || {
+  const [summaries, access, counts] = await Promise.all([adminUserAccessSummaries(status ? users.map((user) => user.id) : undefined), accessByUser(), countUsersByStatus()]);
+  return NextResponse.json({ counts, users: users.map((user) => ({ ...publicUser(user), access: access.get(user.id) || null, accessSummary: summaries.get(user.id) || {
     deviceCount: 0, activeDeviceCount: 0, credentialCount: 0, activeCredentialCount: 0, profileCount: 0, activeProfileCount: 0,
     certificateCount: 0, activeCertificateCount: 0, uploadBytes: 0, downloadBytes: 0, totalBytes: 0, lastActivityAt: null,
   } })) });
