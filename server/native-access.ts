@@ -9,6 +9,7 @@ import { ipv4Address, ipv4Pool } from "./ipv4-pool";
 import { ensureNativeSecret, nativeProxies } from "./stealth";
 import { accessSql, accountAccess, assertDeviceSlot, DeviceLimitError, deviceSlots, withinDeviceLimitSql } from "./entitlements";
 import { writeOperationalLog } from "./operational-logs";
+import { apiOrigins } from "./api-origins";
 
 export type Session = { id: string; user_id: string; identity_jwk: string; identity_thumbprint: string; device_name: string; platform: string };
 type Entitlement = { status: string; native_only: boolean; allowed: boolean; exhausted: boolean; access_until: Date | null };
@@ -43,7 +44,8 @@ export async function nativeLogin(request: Request, body: Record<string, unknown
   // Signing in again with the password re-admits a device that was signed out earlier; it counts against the limit on connect.
   await dbExec("DELETE FROM native_enrollments WHERE user_id=$1 AND identity_thumbprint=$2 AND (status='revoked' OR (status='revoking' AND release_after<=now()))",[user.id,key.thumbprint]);
   await addAudit({ actorUserId: user.id, action: "native.login", targetType: "native_session", targetId: id });
-  return { accessToken: token, expiresAt: new Date(Date.now()+sessionDays()*86400000).toISOString() };
+  // Every entry the apps may try when their own domain is blocked (api-origins.ts); also sent with the node list.
+  return { accessToken: token, expiresAt: new Date(Date.now()+sessionDays()*86400000).toISOString(), apiOrigins: await apiOrigins() };
 }
 export async function nativeSession(request: Request): Promise<Session> {
   const token = request.headers.get("authorization")?.match(/^Bearer ([A-Za-z0-9_-]{43})$/)?.[1];
@@ -86,10 +88,11 @@ export async function nativeNodes() {
   const tcp=new Map((await selectVpnServices({protocol:"vless"})).map(({node,service})=>[node.id,service.listen_port]));
   // The country code labels each location in the apps (a two-letter badge).
   const regions=new Map((await listRegions()).map((region)=>[region.id,region]));
-  return {nodes:(await candidates()).map(({node})=>{
+  return {apiOrigins:await apiOrigins(),nodes:(await candidates()).map(({node})=>{
     const port=tcp.get(node.id);
     const countryCode=node.region_id?regions.get(node.region_id)?.code?.toUpperCase()||null:null;
-    return {id:node.id,name:node.name,region:node.region,countryCode,protocol:"wireguard",probe:port?{host:node.public_endpoint||node.ip,port}:null,load:nodeLoad(node.metrics_json)};
+    // load (CPU %) and users (online now) let the apps prefer a quieter node when latencies are close.
+    return {id:node.id,name:node.name,region:node.region,countryCode,protocol:"wireguard",probe:port?{host:node.public_endpoint||node.ip,port}:null,load:nodeLoad(node.metrics_json),users:Math.max(0,Number(node.users)||0)};
   })};
 }
 export async function nativeChallenge(session: Session, body: Record<string,unknown>) {
