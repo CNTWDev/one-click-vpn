@@ -41,6 +41,8 @@ struct MenuBarView:View {
                         Text(model.failed ? model.failure:L10n.text("tap_ring_to_connect")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).lineLimit(2)
                     }
                 }.frame(maxWidth:.infinity).padding(.top,20).padding(.bottom,16)
+                // The same update banner as the window, with its download progress.
+                if let update=model.update {UpdateBanner(update:update).padding(.bottom,10)}
                 Button {openMain()} label:{
                     HStack(spacing:12) {
                         if model.connected && !model.connectedNodeId.isEmpty {Badge(code:model.code(model.connectedNodeId,name:model.nodeName),size:30)}

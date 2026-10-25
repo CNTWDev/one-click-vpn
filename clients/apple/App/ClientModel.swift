@@ -29,8 +29,13 @@ import ServiceManagement
     @Published var measuring=false
     @Published var account:[String:Any]=[:]
     @Published var manager:NETunnelProviderManager?
-    /// (version, mandatory, download URL) when the release catalog has a newer build.
-    @Published var update:(version:String,mandatory:Bool,url:URL)?
+    /// A newer build from the release catalog, and the state of its download (Mac DMG; iPhone opens the store).
+    @Published var update:ReleaseUpdate?
+    @Published var downloading=false
+    @Published var downloadProgress:UpdateDownloader.Progress?
+    @Published var downloadError=""
+    private var downloader:UpdateDownloader?
+    private var updateTicker:AnyCancellable?
     @Published var announcement=""
     /// Set when a connection attempt ended without connecting; the ring then offers a retry.
     @Published var failed=false
@@ -39,7 +44,11 @@ import ServiceManagement
     @Published var origin=UserDefaults.standard.string(forKey:"origin") ?? (Bundle.main.object(forInfoDictionaryKey:"VeilbirdAPIOrigin") as? String ?? "")
     private var ticker:AnyCancellable?
     // Status is polled here, not in the window: on the Mac the menu bar keeps working after the window is closed.
-    init() {CrashReports.shared.start();ticker=Timer.publish(every:1,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in self?.refreshStatus()}}}
+    init() {
+        CrashReports.shared.start();ticker=Timer.publish(every:1,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in self?.refreshStatus()}}
+        // The apps stay open for days (menu bar, background): check again once six hours have passed.
+        updateTicker=Timer.publish(every:900,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in await self?.checkIfDue()}}
+    }
     var connected:Bool {[.connected,.connecting,.reasserting].contains(manager?.connection.status)}
     /// The two-letter country code shown in a location's tile; the name's first letter when the node has none.
     func code(_ id:String,name:String)->String {
@@ -77,6 +86,14 @@ import ServiceManagement
             #endif
             if signedIn {try await loadNodes();if let client=try? api() {await CrashReports.shared.send(client)}}
         } catch {message=error.localizedDescription}
+        // A few seconds after the first screen, so the check never holds up connecting.
+        try? await Task.sleep(nanoseconds:3_000_000_000)
+        await checkForUpdate()
+    }
+    /// At launch a few seconds after the first screen, then whenever six hours have passed; not while connecting.
+    func checkIfDue() async {
+        guard Date().timeIntervalSince1970-UserDefaults.standard.double(forKey:"updateCheckedAt")>6*3600,!downloading else {return}
+        if connected && since == nil {return}
         await checkForUpdate()
     }
     func checkForUpdate() async {
@@ -84,13 +101,58 @@ import ServiceManagement
         let installation=defaults.string(forKey:"installation") ?? UUID().uuidString
         defaults.set(installation,forKey:"installation")
         guard let client=try? api(),let data=try? await client.latestRelease(installation:installation) else {return}
+        defaults.set(Date().timeIntervalSince1970,forKey:"updateCheckedAt")
         announcement=String((data["announcement"] as? String ?? "").prefix(500))
         guard data["updateAvailable"] as? Bool == true,
               let latest=data["latest"] as? [String:Any],let version=latest["version"] as? String else {update=nil;return}
-        // App Store builds open the store; direct builds use the permanent download link.
-        let target=latest["distribution"] as? String == "direct" ? URL(string:client.origin+(data["downloadPath"] as? String ?? "")) : URL(string:latest["url"] as? String ?? "")
-        guard let target,target.scheme=="https" else {update=nil;return}
-        update=(version,data["mandatory"] as? Bool == true,target)
+        let direct=latest["distribution"] as? String == "direct"
+        // App Store builds open the store; direct builds download in the app, or open the permanent link.
+        let page=direct ? URL(string:client.origin+(data["downloadPath"] as? String ?? "")) : URL(string:latest["url"] as? String ?? "")
+        guard let page,page.scheme=="https" else {update=nil;return}
+        let downloads=data["downloads"] as? [String:Any]
+        var sources=((downloads?["urls"] as? [String]) ?? (downloads == nil ? [latest["url"] as? String ?? ""]:[])).compactMap {URL(string:$0)}.filter {$0.scheme=="https"}
+        if let path=downloads?["path"] as? String,path.hasPrefix("/") {sources+=client.origins().compactMap {URL(string:$0+path)}}
+        let found=ReleaseUpdate(version:version,build:latest["build"] as? Int ?? 0,mandatory:data["mandatory"] as? Bool == true,page:page,
+            direct:direct && (latest["sha256"] as? String)?.count==64 && !sources.isEmpty,sha256:latest["sha256"] as? String ?? "",
+            size:(latest["sizeBytes"] as? NSNumber)?.int64Value ?? 0,notes:String((latest["notes"] as? String ?? "").prefix(400)),sources:sources)
+        if found.build != update?.build {downloader?.cancel();downloadError=""}
+        update=found
+    }
+    /// "Later" on the banner hides that build for three days; a newer build shows again at once.
+    func dismissed(_ update:ReleaseUpdate)->Bool {
+        !update.mandatory && UserDefaults.standard.integer(forKey:"updateDismissedBuild")==update.build && Date().timeIntervalSince1970-UserDefaults.standard.double(forKey:"updateDismissedAt")<3*86400
+    }
+    func dismiss(_ update:ReleaseUpdate) {
+        UserDefaults.standard.set(update.build,forKey:"updateDismissedBuild");UserDefaults.standard.set(Date().timeIntervalSince1970,forKey:"updateDismissedAt");objectWillChange.send()
+    }
+    /// Mac: downloads the DMG with progress, then opens it. iPhone (and builds without a digest): opens the page.
+    func startUpdate(_ update:ReleaseUpdate,open:(URL)->Void) {
+        guard update.direct else {open(update.page);return}
+        if let ready=UpdateDownloader.downloaded(update) {installUpdate(ready);return}
+        guard !downloading else {return}
+        downloading=true;downloadError="";downloadProgress=nil
+        Journal.add("update: download \(update.version)+\(update.build) (\(update.size/1024) KB)")
+        let job=UpdateDownloader(update:update) {[weak self] progress in self?.downloadProgress=progress}
+        downloader=job
+        Task {
+            do {
+                let file=try await job.run()
+                Journal.add("update: done");downloading=false;downloader=nil
+                if !connected {installUpdate(file)}
+            } catch {
+                downloading=false;downloader=nil
+                let reason:String
+                switch error as? UpdateDownloader.Failure {case .cancelled:reason="";case .digest:reason="digest";case .storage:reason="storage";default:reason="network"}
+                if !reason.isEmpty {Journal.add("update: failed (\(reason))");downloadError=reason}
+            }
+        }
+    }
+    func cancelUpdate() {downloader?.cancel()}
+    /// Opens the verified DMG: the user drags the new version over the old one.
+    func installUpdate(_ file:URL) {
+        #if os(macOS)
+        NSWorkspace.shared.open(file)
+        #endif
     }
     func toggle() async throws {
         #if targetEnvironment(simulator)

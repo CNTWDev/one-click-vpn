@@ -127,16 +127,7 @@ struct ClientView:View {
     }
     /// Update and announcement notes: one compact card each, only when there is something to say.
     @ViewBuilder private var notices:some View {
-        if let update=model.update {
-            HStack(spacing:12) {
-                VStack(alignment:.leading,spacing:3) {
-                    Text(L10n.text("update_available",update.version)).font(.system(size:VeilbirdStyle.body,weight:.medium))
-                    Text(L10n.text(update.mandatory ? "update_required_detail":"update_available_detail")).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary)
-                }
-                Spacer(minLength:8)
-                Link(L10n.text("update_now"),destination:update.url).font(.system(size:VeilbirdStyle.detail+1,weight:.semibold)).foregroundStyle(VeilbirdStyle.accent)
-            }.padding(14).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
-        }
+        if let update=model.update {UpdateBanner(update:update)}
         if !model.announcement.isEmpty {
             Text(model.announcement).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).frame(maxWidth:.infinity,alignment:.leading)
                 .padding(14).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
@@ -155,7 +146,13 @@ struct ClientView:View {
     private func tabItem(_ title:String,_ icon:String,_ index:Int)->some View {
         let selected=tab==index
         return Button {tab=index} label:{
-            VStack(spacing:3) {Image(systemName:icon).font(.system(size:21));Text(title).font(.system(size:10,weight:.medium))}
+            VStack(spacing:3) {
+                // A small dot on the account tab while an update waits (the banner can be dismissed, the dot stays).
+                Image(systemName:icon).font(.system(size:21)).overlay(alignment:.topTrailing) {
+                    if index==2 && model.update != nil {Rectangle().fill(VeilbirdStyle.accent).frame(width:6,height:6).offset(x:5,y:-1)}
+                }
+                Text(title).font(.system(size:10,weight:.medium))
+            }
                 .frame(maxWidth:.infinity,minHeight:44).foregroundStyle(selected ? VeilbirdStyle.accent:VeilbirdStyle.secondary).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
     }
@@ -507,8 +504,8 @@ struct ClientView:View {
                         .toggleStyle(.switch).controlSize(.small).tint(VeilbirdStyle.accent).padding(.horizontal,16).frame(minHeight:40)
                     #endif
                     Hairline()
-                    settingRow(L10n.text("check_for_updates"),model.update.map {L10n.text("update_available",$0.version)} ?? L10n.text("up_to_date")) {
-                        if let update=model.update {openURL(update.url)} else {Task {await model.checkForUpdate();if model.update == nil {model.message=L10n.text("up_to_date")}}}
+                    settingRow(L10n.text("check_for_updates"),updateValue) {
+                        if let update=model.update {model.startUpdate(update) {openURL($0)}} else {Task {await model.checkForUpdate();if model.update == nil {model.message=L10n.text("up_to_date")}}}
                     }
                 }
                 Button {
@@ -654,5 +651,84 @@ private extension View {
         #else
         self.autocorrectionDisabled()
         #endif
+    }
+}
+
+extension ClientView {
+    /// The account row's value: the same state as the banner.
+    var updateValue:String {
+        guard let update=model.update else {return L10n.text("up_to_date")}
+        if model.downloading {return L10n.text("update_downloading_value","\(UpdateBanner.percent(model.downloadProgress,update))%")}
+        if update.direct && UpdateDownloader.downloaded(update) != nil {return L10n.text("update_open_installer")}
+        return L10n.text("update_banner_title",update.version)
+    }
+}
+
+/// The update banner on the home screen: available, downloading (size, time left, a bar of square blocks), ready, failed.
+struct UpdateBanner:View {
+    @EnvironmentObject private var model:ClientModel
+    @Environment(\.openURL) private var openURL
+    let update:ReleaseUpdate
+
+    static func percent(_ progress:UpdateDownloader.Progress?,_ update:ReleaseUpdate)->Int {
+        Int(min(100,max(0,(progress?.received ?? 0)*100/max(1,progress?.size ?? update.size))))
+    }
+    private var meta:String {
+        let progress=model.downloadProgress,format=ByteCountFormatter()
+        let seconds=progress?.seconds ?? -1
+        let left=seconds<0 ? "":(seconds<60 ? L10n.text("update_seconds","\(seconds)"):L10n.text("update_minutes","\((seconds+59)/60)"))
+        return "\(format.string(fromByteCount:progress?.received ?? 0)) / \(format.string(fromByteCount:update.size))"+(left.isEmpty ? "":" · "+L10n.text("update_time_left",left))
+    }
+    var body:some View {
+        if model.downloading {downloading}
+        else if update.direct,let file=UpdateDownloader.downloaded(update) {
+            row(L10n.text("update_ready_title",update.version),L10n.text("update_ready_detail_idle")) {button(L10n.text("update_open_installer"),filled:true) {model.installUpdate(file)}}
+        } else if !model.downloadError.isEmpty {
+            row(L10n.text("update_failed_title",update.version),L10n.text(model.downloadError=="digest" ? "update_failed_digest":model.downloadError=="storage" ? "update_failed_storage":"update_failed_network")) {
+                button(L10n.text("update_retry")) {model.startUpdate(update) {openURL($0)}}
+            }
+        } else if !model.dismissed(update) {
+            row(L10n.text(update.mandatory ? "update_required_title":"update_banner_title",update.version),
+                update.mandatory ? L10n.text("update_required_detail"):(update.notes.split(separator:"\n").first.map {String($0).trimmingCharacters(in:.whitespaces)} ?? L10n.text("update_available_detail"))) {
+                button(L10n.text("update_action")) {model.startUpdate(update) {openURL($0)}}
+                if !update.mandatory {
+                    Button {model.dismiss(update)} label:{Image(systemName:"xmark").font(.system(size:11,weight:.semibold)).foregroundStyle(VeilbirdStyle.faint).frame(width:32,height:32).contentShape(Rectangle())}
+                        .buttonStyle(.plain).accessibilityLabel(L10n.text("update_later"))
+                }
+            }
+        }
+    }
+    private var downloading:some View {
+        let percent=Self.percent(model.downloadProgress,update)
+        return VStack(alignment:.leading,spacing:10) {
+            HStack(spacing:8) {
+                VStack(alignment:.leading,spacing:3) {
+                    Text(L10n.text(update.mandatory ? "update_required_title":"update_downloading_title",update.version)).font(.system(size:VeilbirdStyle.body,weight:.medium)).lineLimit(1)
+                    Text(meta).font(.system(size:VeilbirdStyle.detail-1,design:.monospaced)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
+                }
+                Spacer(minLength:8)
+                Text(verbatim:"\(percent)%").font(Pixel.font(VeilbirdStyle.mac ? 20:24)).foregroundStyle(VeilbirdStyle.accent)
+                if !update.mandatory {Button(L10n.text("cancel")) {model.cancelUpdate()}.buttonStyle(.plain).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).padding(.horizontal,6)}
+            }
+            HStack(spacing:3) {ForEach(0..<30,id:\.self) {index in Rectangle().fill(index<percent*30/100 ? VeilbirdStyle.accent:VeilbirdStyle.raised).frame(height:6)}}
+                .accessibilityHidden(true)
+        }.padding(14).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+            .accessibilityElement(children:.combine).accessibilityLabel(L10n.text("update_downloading_title",update.version)+", \(percent)%")
+    }
+    private func row<Actions:View>(_ title:String,_ detail:String,@ViewBuilder actions:()->Actions)->some View {
+        HStack(spacing:8) {
+            VStack(alignment:.leading,spacing:3) {
+                Text(title).font(.system(size:VeilbirdStyle.body,weight:.medium)).lineLimit(1)
+                Text(detail).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2)
+            }
+            Spacer(minLength:8)
+            actions()
+        }.padding(.leading,14).padding(.trailing,8).padding(.vertical,12).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+    }
+    private func button(_ title:String,filled:Bool=false,action:@escaping ()->Void)->some View {
+        Button(action:action) {
+            Text(title).font(.system(size:VeilbirdStyle.detail+1,weight:.semibold)).foregroundStyle(filled ? VeilbirdStyle.onAccent:VeilbirdStyle.accent)
+                .padding(.horizontal,12).frame(minHeight:VeilbirdStyle.mac ? 28:36).background(filled ? VeilbirdStyle.accent:Color.clear,in:RoundedRectangle(cornerRadius:8))
+        }.buttonStyle(.plain)
     }
 }

@@ -29,7 +29,15 @@ public partial class MainWindow : Window {
     private string page="connect",nodeId=Settings.Get("nodeId"),nodeName=Settings.Get("nodeName");
     private bool busy,measuring,quitting,trayHintShown,failed,showPassword;
     private string failure="";
-    private (string Version,bool Mandatory,Uri Download)? update;
+    private ReleaseUpdate? update;
+    // The update banner and the account row follow one state: available, downloading, ready, failed.
+    private bool downloading;
+    private JsonObject? download;
+    private string downloadError="";
+    private ContentControl? bannerHost;
+    private TextBlock? updateRowValue;
+    // Checks a few seconds after launch, then every six hours while the app runs (often for days in the tray).
+    private readonly DispatcherTimer updateTimer=new() {Interval=TimeSpan.FromSeconds(3)},downloadTimer=new() {Interval=TimeSpan.FromMilliseconds(300)};
     private string announcement="";
     private readonly DispatcherTimer refresh=new() {Interval=TimeSpan.FromSeconds(1)},toastTimer=new() {Interval=TimeSpan.FromSeconds(5)};
     private string lastView="";
@@ -64,7 +72,20 @@ public partial class MainWindow : Window {
         SourceInitialized+=(_,_)=>DarkFrame();
         SetupTray();
         Closing+=OnClosing;
-        Render();CheckForUpdate(false);_=Crash.Send(api);
+        updateTimer.Tick+=(_,_)=>{
+            // Not while a connection is being set up: the check would compete with it for the network.
+            if(connection.Active&&connection.Since is null) {updateTimer.Interval=TimeSpan.FromSeconds(10);return;}
+            updateTimer.Interval=TimeSpan.FromHours(6);CheckForUpdate(false);
+        };
+        updateTimer.Start();
+        downloadTimer.Tick+=async(_,_)=>{
+            if(!downloading) {downloadTimer.Stop();return;}
+            try {download=JsonNode.Parse(await Task.Run(core.Progress)) as JsonObject;} catch {/* next tick */}
+            ShowUpdate();
+        };
+        Render();_=Crash.Send(api);
+        // Installed by an update while connected: reconnect as before.
+        if(Settings.Get("reconnectAfterUpdate")=="1") {Settings.Set("reconnectAfterUpdate","0");Journal.Add("update: installed, reconnecting");if(api.SignedIn) Toggle();}
     }
 
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
@@ -210,10 +231,117 @@ public partial class MainWindow : Window {
     }
     private async void CheckForUpdate(bool announce) {
         try {
-            if(await api.LatestRelease() is not { } found) return;
-            if(found.Update?.Version!=update?.Version||found.Announcement!=announcement) {update=found.Update;announcement=found.Announcement;if(!busy) Render();}
+            if(await api.LatestRelease() is not { } found) {if(announce) Notify(L10n.Text("unable_to_reach_the_service_check_your_network_and"));return;}
+            if(found.Update?.Build!=update?.Build||found.Announcement!=announcement) {
+                if(downloading&&found.Update?.Build!=update?.Build) await Task.Run(core.CancelDownload);
+                update=found.Update;announcement=found.Announcement;downloadError="";if(!busy) Render();
+            }
             if(announce&&update is null) Notify(L10n.Text("up_to_date"));
-        } catch {/* checked again on next launch */}
+        } catch {/* checked again later */}
+    }
+
+    // ---- Updates: downloaded by the core (mirror first, then the server, resuming), then the installer runs silently.
+    private enum UpdatePhase {Available,Downloading,Ready,Failed}
+    private static string UpdateFile(ReleaseUpdate available)=>System.IO.Path.Combine(System.IO.Path.GetTempPath(),"TrackNothing-update",$"TrackNothing-{available.Build}-setup.exe");
+    private static bool Downloaded(ReleaseUpdate available) {var file=new FileInfo(UpdateFile(available));return file.Exists&&file.Length==available.Size;}
+    private UpdatePhase Phase(ReleaseUpdate available)=>downloading?UpdatePhase.Downloading:Downloaded(available)?UpdatePhase.Ready:downloadError.Length>0?UpdatePhase.Failed:UpdatePhase.Available;
+    /// A "later" hides that build for three days; a newer build shows again at once.
+    private static bool Dismissed(ReleaseUpdate available)=>!available.Mandatory&&Settings.Get("updateDismissedBuild")==available.Build.ToString()
+        &&DateTime.TryParse(Settings.Get("updateDismissedAt"),null,System.Globalization.DateTimeStyles.RoundtripKind,out var at)&&DateTime.UtcNow-at<TimeSpan.FromDays(3);
+    private (long Received,long Size,long Seconds) Progress(ReleaseUpdate available) {
+        var size=download?["size"]?.GetValue<long>()??0;
+        return (download?["received"]?.GetValue<long>()??0,size>0?size:available.Size,download?["seconds"]?.GetValue<long>()??-1);
+    }
+    private int Percent(ReleaseUpdate available) {var (received,size,_)=Progress(available);return (int)Math.Clamp(received*100/Math.Max(1,size),0,100);}
+    /// "18.7 MB / 41.2 MB · about 10 s"; the time appears once the core's rate has settled.
+    private string DownloadMeta(ReleaseUpdate available) {
+        var (received,size,seconds)=Progress(available);
+        var left=seconds<0?"":seconds<60?L10n.Text("update_seconds",seconds.ToString("N0",L10n.Culture)):L10n.Text("update_minutes",((seconds+59)/60).ToString("N0",L10n.Culture));
+        return $"{Bytes(received)} / {Bytes(size)}"+(left.Length==0?"":" · "+L10n.Text("update_time_left",left));
+    }
+    /// Fills the home banner and the account row; called on every progress tick.
+    private void ShowUpdate() {
+        if(updateRowValue is not null) updateRowValue.Text=update is not { } row?L10n.Text("up_to_date"):Phase(row) switch {
+            UpdatePhase.Downloading=>L10n.Text("update_downloading_value",Percent(row)+"%"),
+            UpdatePhase.Ready=>L10n.Text("update_install"),
+            _=>L10n.Text("update_banner_title",row.Version)};
+        if(bannerHost is null) return;
+        if(update is not { } available||Phase(available)==UpdatePhase.Available&&Dismissed(available)) {bannerHost.Content=null;bannerHost.Visibility=Visibility.Collapsed;return;}
+        bannerHost.Visibility=Visibility.Visible;
+        bannerHost.Content=Phase(available) switch {
+            UpdatePhase.Downloading=>ProgressCard(available),
+            UpdatePhase.Ready=>BannerRow(L10n.Text("update_ready_title",available.Version),L10n.Text(connection.Active?"update_ready_detail":"update_ready_detail_idle"),BannerButton(L10n.Text("update_install"),true,()=>InstallUpdate(available))),
+            UpdatePhase.Failed=>BannerRow(L10n.Text("update_failed_title",available.Version),
+                L10n.Text(downloadError switch {"digest"=>"update_failed_digest","storage"=>"update_failed_storage",_=>"update_failed_network"}),BannerButton(L10n.Text("update_retry"),false,()=>StartDownload(available))),
+            _=>BannerRow(L10n.Text(available.Mandatory?"update_required_title":"update_banner_title",available.Version),
+                available.Mandatory?L10n.Text("update_required_detail"):available.Notes.Split('\n').FirstOrDefault(line=>line.Trim().Length>0)?.Trim()??L10n.Text("update_available_detail"),
+                BannerButton(L10n.Text("update_action"),false,()=>StartDownload(available)),available.Mandatory?null:LaterButton(available)),
+        };
+    }
+    private static Button BannerButton(string title,bool filled,Action onClick) {
+        var button=new Button {Content=title,FontSize=13,FontWeight=FontWeights.SemiBold,Height=32,Padding=new Thickness(12,0,12,0),Margin=new Thickness(8,0,0,0),
+            Foreground=filled?Look.OnAccent:Look.Accent,Background=filled?Look.Accent:Brushes.Transparent,VerticalAlignment=VerticalAlignment.Center};
+        button.Click+=(_,_)=>onClick();
+        return button;
+    }
+    private Button LaterButton(ReleaseUpdate available) {
+        var button=new Button {Width=32,Height=32,Padding=new Thickness(0),Margin=new Thickness(2,0,0,0),Content=Look.Icon("\uE711",11,Look.Faint),HorizontalContentAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
+        AutomationProperties.SetName(button,L10n.Text("update_later"));
+        button.Click+=(_,_)=>{Settings.Set("updateDismissedBuild",available.Build.ToString());Settings.Set("updateDismissedAt",DateTime.UtcNow.ToString("o"));ShowUpdate();};
+        return button;
+    }
+    private static Border BannerRow(string title,string detail,Button action,Button? later=null) {
+        var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
+        texts.Children.Add(Words(title,13,strong:true));texts.Children.Add(Words(detail,12,Look.Secondary,top:2));
+        var actions=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};actions.Children.Add(action);if(later is not null) actions.Children.Add(later);
+        return new Border {Background=Look.Surface,CornerRadius=new CornerRadius(8),Padding=new Thickness(14,10,later is null?10:4,10),Child=Columns(new FrameworkElement(),texts,actions),Margin=new Thickness(0,0,0,8)};
+    }
+    /// Title, size and time left, a big percentage, and a bar of square blocks (the brand's pixel accent).
+    private Border ProgressCard(ReleaseUpdate available) {
+        var percent=Percent(available);
+        var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
+        texts.Children.Add(Single(L10n.Text(available.Mandatory?"update_required_title":"update_downloading_title",available.Version),13,strong:true));
+        var meta=Single(DownloadMeta(available),12,Look.Secondary);meta.Margin=new Thickness(0,3,0,0);texts.Children.Add(meta);
+        var right=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
+        right.Children.Add(new TextBlock {Text=percent+"%",FontFamily=Look.Dots,FontSize=24,Foreground=Look.Accent,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(8,0,0,0)});
+        if(!available.Mandatory) {var cancel=new Button {Content=L10n.Text("cancel"),FontSize=13,Height=32,Padding=new Thickness(10,0,10,0),Foreground=Look.Secondary,Background=Brushes.Transparent,VerticalAlignment=VerticalAlignment.Center};
+            cancel.Click+=async(_,_)=>await Task.Run(core.CancelDownload);right.Children.Add(cancel);}
+        var blocks=new UniformGrid {Rows=1,Columns=40,Margin=new Thickness(0,10,8,0)};
+        for(var i=0;i<40;i++) blocks.Children.Add(new Rectangle {Height=6,Margin=new Thickness(0,0,i<39?3:0,0),Fill=i<percent*40/100?Look.Accent:Look.Raised});
+        AutomationProperties.SetName(blocks,percent+"%");
+        var stack=new StackPanel();stack.Children.Add(Columns(new FrameworkElement(),texts,right));stack.Children.Add(blocks);
+        return new Border {Background=Look.Surface,CornerRadius=new CornerRadius(8),Padding=new Thickness(14,12,6,12),Child=stack,Margin=new Thickness(0,0,0,8)};
+    }
+    private async void StartDownload(ReleaseUpdate available) {
+        if(downloading) return;
+        if(Downloaded(available)) {InstallUpdate(available);return;}
+        // An older server sends no digest: only the download page is possible.
+        if(!available.InApp) {Process.Start(new ProcessStartInfo(available.Download.AbsoluteUri) {UseShellExecute=true});return;}
+        downloading=true;downloadError="";download=null;ShowUpdate();downloadTimer.Start();
+        var file=UpdateFile(available);
+        Journal.Add($"update: download {available.Version}+{available.Build} ({available.Size/1024} KB, {(available.Urls.Length==0?"server":"mirror first")})");
+        JsonObject result;
+        try {
+            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(file)!);
+            foreach(var stale in Directory.GetFiles(System.IO.Path.GetDirectoryName(file)!).Where(f=>!System.IO.Path.GetFileName(f).StartsWith(System.IO.Path.GetFileName(file),StringComparison.Ordinal))) File.Delete(stale);
+            result=await api.DownloadUpdate(available,file);
+        } catch(Exception error) {result=new JsonObject {["state"]="failed",["error"]=error is IOException?"storage":"network"};}
+        downloading=false;downloadTimer.Stop();download=result;
+        var state=result["state"]?.GetValue<string>();
+        Journal.Add($"update: {state}"+(result["source"]?.GetValue<string>() is { Length: >0 } source?" via "+source:"")+(result["error"]?.GetValue<string>() is { Length: >0 } code?$" ({code} {Journal.Scrub(result["detail"]?.GetValue<string>()??"")})":""));
+        if(state=="failed") downloadError=result["error"]?.GetValue<string>() is { Length: >0 } failure?failure:"network";
+        ShowUpdate();
+        // Straight to the installer when nobody would lose a connection; otherwise the banner offers Install.
+        if(state=="done"&&!connection.Active&&IsVisible) InstallUpdate(available);
+    }
+    /// Runs the verified installer silently; it closes this app, upgrades in place and starts the new version.
+    private void InstallUpdate(ReleaseUpdate available) {
+        if(!Downloaded(available)) {StartDownload(available);return;}
+        Settings.Set("reconnectAfterUpdate",connection.Active?"1":"0");
+        Journal.Add($"update: running installer {available.Build}");
+        try {Process.Start(new ProcessStartInfo(UpdateFile(available),"/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS") {UseShellExecute=false});}
+        catch(Exception error) {Journal.Add("update: installer did not start ("+error.GetType().Name+")");Settings.Set("reconnectAfterUpdate","0");Notify(L10n.Text("update_failed"));return;}
+        Quit();
     }
     private async void Work(Func<Task> action) {
         if(busy) return;
@@ -308,7 +436,7 @@ public partial class MainWindow : Window {
     // ---- Pages ----
     private void Render() {
         ContentPanel.Children.Clear();FullPanel.Children.Clear();NavigationPanel.Children.Clear();HeaderSlot.Content=null;
-        ring=null;ringButton=null;statusTitle=statusDetail=statusTimer=stream=usageTotal=usageUntil=null;statusDot=null;location=null;badgeKey="";
+        ring=null;ringButton=null;statusTitle=statusDetail=statusTimer=stream=usageTotal=usageUntil=null;statusDot=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
         var view=api.SignedIn?page:"login";
         var full=view=="connect";
         Scroller.Visibility=full?Visibility.Collapsed:Visibility.Visible;FullPanel.Visibility=full?Visibility.Visible:Visibility.Collapsed;
@@ -347,15 +475,7 @@ public partial class MainWindow : Window {
     private FrameworkElement? Notices() {
         if(update is null&&announcement.Length==0) return null;
         var stack=new StackPanel();
-        if(update is { } available) {
-            var link=new Button {Content=L10n.Text("update_open_download"),Foreground=Look.Accent,FontSize=13,FontWeight=FontWeights.SemiBold,Height=32,Padding=new Thickness(8,0,8,0)};
-            link.Click+=(_,_)=>Process.Start(new ProcessStartInfo(available.Download.AbsoluteUri) {UseShellExecute=true});
-            var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
-            texts.Children.Add(Words(L10n.Text("update_available",available.Version),13,strong:true));
-            texts.Children.Add(Words(L10n.Text(available.Mandatory?"update_required_detail":"update_available_detail"),12,Look.Secondary,top:2));
-            var grid=Columns(new FrameworkElement(),texts,link);
-            stack.Children.Add(new Border {Background=Look.Surface,CornerRadius=new CornerRadius(8),Padding=new Thickness(14,10,8,10),Child=grid,Margin=new Thickness(0,0,0,8)});
-        }
+        if(update is not null) {bannerHost=new ContentControl {Focusable=false};stack.Children.Add(bannerHost);ShowUpdate();}
         if(announcement.Length>0) stack.Children.Add(new Border {Background=Look.Surface,CornerRadius=new CornerRadius(8),Padding=new Thickness(14,10,14,10),Child=Words(announcement,12,Look.Secondary),Margin=new Thickness(0,0,0,8)});
         return stack;
     }
@@ -575,10 +695,11 @@ public partial class MainWindow : Window {
             Work(async()=>{if(connection.Active) await Task.Run(()=>core.KillSwitch(on));else await connection.KillSwitchChanged();});
         };
         var guardRow=new Border {Height=44,Padding=new Thickness(14,0,14,0),Child=Columns(new FrameworkElement(),Single(L10n.Text("kill_switch"),14),guard)};
-        var updates=SettingRow(L10n.Text("check_for_updates"),update is { } available?L10n.Text("update_available",available.Version):L10n.Text("up_to_date"),_=>{
-            if(update is { } found) Process.Start(new ProcessStartInfo(found.Download.AbsoluteUri) {UseShellExecute=true});
+        var updates=SettingRow(L10n.Text("check_for_updates"),L10n.Text("up_to_date"),_=>{
+            if(update is { } found) StartDownload(found);
             else CheckForUpdate(true);
         });
+        updateRowValue=((updates.Content as Grid)!.Children[2] as StackPanel)!.Children[0] as TextBlock;ShowUpdate();
         Add(Card(new FrameworkElement[]{devices,password,language,startupRow,guardRow,updates},14));
 
         var signOut=new Button {Content=L10n.Text("sign_out"),Height=40,Background=Look.Surface,Foreground=Look.Danger,HorizontalContentAlignment=HorizontalAlignment.Center};
