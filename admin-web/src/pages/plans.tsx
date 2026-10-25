@@ -52,20 +52,20 @@ export function PlansPage() {
           <td className="cell-main"><b>{plan.name}</b><small className="m-only">{planTerms(plan)}</small>{plan.isWelcome && <small>{t("新注册用户自动获得")}</small>}</td>
           <td className="m-hide">{plan.durationDays ? t("{0} 天", [plan.durationDays]) : t("长期有效")}</td>
           <td className="m-hide">{plan.quotaBytes ? formatBytes(plan.quotaBytes) : t("不限流量")}</td>
-          <td className="m-hide">{plan.deviceLimit ?? t("系统默认")}</td>
+          <td className="m-hide">{plan.deviceLimit ?? t("不限")}</td>
           <td className="cell-status"><Pill value={plan.enabled ? "enabled" : "disabled"} label={plan.enabled ? t("已启用") : t("已停用")} tone={plan.enabled ? "success" : "neutral"} /></td>
           <td className="align-right cell-actions"><div className="row-actions">
             <button className="button ghost small" disabled={busy} onClick={() => void save({ ...payload(plan), enabled: !plan.enabled }, plan.enabled ? t("套餐已停用。") : t("套餐已启用。"))}>{plan.enabled ? t("停用") : t("启用")}</button>
             <button className="button ghost small" onClick={() => edit(plan)}>{t("编辑")}</button></div></td>
         </tr>)}</tbody></table></div> : <Empty>{t("还没有套餐。")}</Empty>}
     </section>
-    {form && <Modal title={form.id ? t("编辑套餐") : t("新建套餐")} description={t("天数留空表示长期有效，流量留空表示不限，设备上限留空跟随系统默认。")} onClose={() => setForm(null)}
+    {form && <Modal title={form.id ? t("编辑套餐") : t("新建套餐")} description={t("天数、流量和设备上限留空都表示不限。设备数包括客户端、订阅和节点配置。")} onClose={() => setForm(null)}
       footer={<><InlineNotice notice={formNotice} /><div className="form-actions"><button type="button" className="button ghost" onClick={() => setForm(null)}>{t("取消")}</button><button type="submit" form="plan-form" className="button primary" disabled={busy}>{busy ? t("保存中…") : t("保存")}</button></div></>}>
       <form id="plan-form" className="form-grid" onSubmit={(event) => void submit(event)}>
         <label className="span-2">{t("名称")}<input required maxLength={60} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder={t("月卡")} /></label>
         <label>{t("有效天数")}<input type="number" min={1} max={3650} placeholder={t("长期有效")} value={form.days} onChange={(event) => setForm({ ...form, days: event.target.value })} /></label>
         <label>{t("流量（GB）")}<input type="number" min={0.1} step={0.1} placeholder={t("不限流量")} value={form.gb} onChange={(event) => setForm({ ...form, gb: event.target.value })} /></label>
-        <label>{t("设备上限")}<input type="number" min={1} max={100} placeholder={t("系统默认")} value={form.devices} onChange={(event) => setForm({ ...form, devices: event.target.value })} /></label>
+        <label>{t("设备上限")}<input type="number" min={1} max={100} placeholder={t("不限")} value={form.devices} onChange={(event) => setForm({ ...form, devices: event.target.value })} /></label>
         <label>{t("状态")}<select value={form.enabled ? "on" : "off"} onChange={(event) => setForm({ ...form, enabled: event.target.value === "on", isWelcome: event.target.value === "on" && form.isWelcome })}><option value="on">{t("启用")}</option><option value="off">{t("停用")}</option></select></label>
         <label className="grant-check span-2"><input type="checkbox" disabled={!form.enabled} checked={form.isWelcome} onChange={(event) => setForm({ ...form, isWelcome: event.target.checked })} />{t("新注册用户自动获得这个套餐")}</label>
       </form>

@@ -1318,19 +1318,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Device limit reached. Revoke an old device in Account and try again."
+            "value": "Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "授权设备已满，请在「账号」解除旧设备的授权后重试。"
+            "value": "设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Достигнут лимит устройств. Отзовите старое устройство в аккаунте и повторите."
+            "value": "Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
           }
         }
       }
@@ -1341,19 +1341,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Device limit reached. Revoke an old device and try again."
+            "value": "Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "授权设备已满，请解除旧设备的授权后重试。"
+            "value": "设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Достигнут лимит устройств. Отзовите старое устройство и повторите."
+            "value": "Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
           }
         }
       }
@@ -1364,19 +1364,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Device limit reached. Revoke an old device in Account and try again."
+            "value": "Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "授权设备已满，请到「账号」解除一台旧设备的授权后重试。"
+            "value": "设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Достигнут лимит устройств. Отзовите старое устройство в аккаунте и повторите."
+            "value": "Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
           }
         }
       }
@@ -1400,6 +1400,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Новые устройства добавляются сами"
+          }
+        }
+      }
+    },
+    "devices_unlimited": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlimited"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不限"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Без лимита"
           }
         }
       }

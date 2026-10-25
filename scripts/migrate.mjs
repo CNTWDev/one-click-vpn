@@ -519,6 +519,22 @@ const migrations = [
     CREATE INDEX IF NOT EXISTS traffic_counters_observed_idx ON traffic_counters(observed_at);
     CREATE INDEX IF NOT EXISTS audit_created_idx ON audit_logs(created_at);
   `)],
+  ["003-device-limits", async (db) => {
+    // An empty device limit now means unlimited, like an empty period or quota. Everything keeps what empty
+    // meant before (the system default), except accounts from before grants (unlimited) and the welcome plan (1 device).
+    const n = Number(process.env.VEILBIRD_NATIVE_DEVICE_LIMIT || 3), fallback = Number.isInteger(n) && n >= 1 && n <= 100 ? n : 3;
+    await db.query("UPDATE access_plans SET device_limit = CASE WHEN is_welcome THEN 1 ELSE $1 END WHERE device_limit IS NULL", [fallback]);
+    await db.query("UPDATE access_grants SET device_limit = $1 WHERE device_limit IS NULL AND source <> 'migration'", [fallback]);
+    await db.query(`UPDATE users u SET access_device_limit = (SELECT CASE WHEN bool_or(g.device_limit IS NULL) THEN NULL ELSE max(g.device_limit) END
+      FROM access_grants g WHERE g.user_id = u.id AND g.status = 'active' AND g.starts_at <= now() AND (g.ends_at IS NULL OR g.ends_at > now())
+        AND (g.quota_bytes IS NULL OR g.used_bytes < g.quota_bytes))`);
+    // Everything that takes a device: app sign-ins, subscriptions and node configs, oldest first wins past the limit.
+    await db.query(`CREATE OR REPLACE VIEW account_slots AS
+      SELECT user_id, id, created_at FROM native_enrollments WHERE status <> 'revoked'
+      UNION ALL
+      SELECT user_id, id, created_at::timestamptz FROM access_credentials
+      WHERE deleted_at IS NULL AND status <> 'revoked' AND (expires_at IS NULL OR expires_at::timestamptz > now())`);
+  }],
 ];
 
 const client = await pool.connect();

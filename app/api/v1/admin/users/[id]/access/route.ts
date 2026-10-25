@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { requestAdmin } from "../../../../../../../server/request-auth";
 import { jsonError, readJson } from "../../../../../../../server/http";
 import { reconcileUserAccess } from "../../../../../../../server/credential-access";
-import { describe, EntitlementError, grantAccess, publicGrant, revokeGrant, userGrants } from "../../../../../../../server/entitlements";
+import { describe, deviceSlots, EntitlementError, grantAccess, publicGrant, revokeGrant, userGrants } from "../../../../../../../server/entitlements";
 
 export const runtime = "nodejs";
 
 async function view(userId: string) {
-  const grants = await userGrants(userId);
-  return { access: describe(grants), grants: grants.map((grant) => publicGrant(grant)) };
+  const [grants, devices] = await Promise.all([userGrants(userId), deviceSlots(userId)]);
+  // devices: the limit in force (the account's own override first; null = unlimited) and what takes one.
+  return { access: describe(grants), devices, grants: grants.map((grant) => publicGrant(grant)) };
 }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {

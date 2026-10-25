@@ -194,7 +194,7 @@ class ConnectionService : VpnService() {
             // After Doze the lease may already have lapsed: one renewal attempt before closing the tunnel.
             if (now >= renewAt || now >= deadline) {
                 try { acquire() } catch (e: ApiFailure) {
-                    if (e.code in listOf("AUTH_REQUIRED", "DEVICE_REVOKED", "MEMBERSHIP_EXPIRED", "QUOTA_EXHAUSTED", "ACCOUNT_UNAVAILABLE", "MANAGED_ACCESS_REQUIRED", "CLIENT_UPDATE_REQUIRED")) { fail(e); return }
+                    if (e.code in listOf("AUTH_REQUIRED", "DEVICE_REVOKED", "DEVICE_LIMIT_REACHED", "MEMBERSHIP_EXPIRED", "QUOTA_EXHAUSTED", "ACCOUNT_UNAVAILABLE", "MANAGED_ACCESS_REQUIRED", "CLIENT_UPDATE_REQUIRED")) { fail(e); return }
                     Journal.add("lease: renewal failed (${e.code}), retrying"); renewAt = now + 15000
                 } catch (_: Exception) { renewAt = now + 15000 }
                 if (SystemClock.elapsedRealtime() >= deadline) { Journal.add("lease: expired"); api.report("LEASE_RENEWAL_FAILED", nodeId); stopConnection(R.string.connection_authorization_expired_connect_again); return }

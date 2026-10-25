@@ -85,6 +85,9 @@ struct ClientView:View {
     private func caption(_ text:String)->some View {
         Text(text).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).padding(.horizontal,4).frame(maxWidth:.infinity,alignment:.leading)
     }
+    private func deviceLimit(_ account:[String:Any])->String {
+        (account["limit"] as? Int).map {L10n.number($0)} ?? L10n.text("devices_unlimited")
+    }
     private func settingRow(_ title:String,_ value:String,action:@escaping ()->Void)->some View {
         Button(action:action) {
             HStack(spacing:8) {
@@ -459,7 +462,7 @@ struct ClientView:View {
                 }.padding(.horizontal,4).opacity(model.account.isEmpty ? 0:1)
                 usageCard
                 CardGroup {
-                    settingRow(L10n.text("authorized_devices"),"\(L10n.number(model.account["used"] as? Int ?? 0)) / \(L10n.number(model.account["limit"] as? Int ?? 0))") {tab=4}
+                    settingRow(L10n.text("authorized_devices"),"\(L10n.number(model.account["used"] as? Int ?? 0)) / \(deviceLimit(model.account))") {tab=4}
                     Hairline()
                     languageChooser(settingRow(L10n.text("language"),currentLanguage.name) {choosingLanguage=true})
                     Hairline()
@@ -540,7 +543,7 @@ struct ClientView:View {
             VStack(alignment:.leading,spacing:10) {
                 subPageHeader(L10n.text("authorized_devices")) {tab=2}
                 HStack(alignment:.bottom) {
-                    Text(L10n.text("devices_used",L10n.number(model.account["used"] as? Int ?? 0),L10n.number(model.account["limit"] as? Int ?? 0))).font(.system(size:VeilbirdStyle.detail))
+                    Text(L10n.text("devices_used",L10n.number(model.account["used"] as? Int ?? 0),deviceLimit(model.account))).font(.system(size:VeilbirdStyle.detail))
                     Spacer(minLength:12)
                     Text(L10n.text("devices_join_automatically")).font(.system(size:mac ? 11:12)).multilineTextAlignment(.trailing)
                 }.foregroundStyle(VeilbirdStyle.secondary).padding(.horizontal,4)

@@ -60,10 +60,11 @@
   <data name="development_server_address" xml:space="preserve"><value>开发服务地址</value></data>
   <data name="development_title" xml:space="preserve"><value>TrackNothing — 开发版</value></data>
   <data name="device" xml:space="preserve"><value>设备</value></data>
-  <data name="device_limit_reached_account_hint" xml:space="preserve"><value>授权设备已满，请在「账号」解除旧设备的授权后重试。</value></data>
-  <data name="device_limit_reached_revoke_an_old_device_and_try" xml:space="preserve"><value>授权设备已满，请解除旧设备的授权后重试。</value></data>
-  <data name="device_limit_reached_revoke_an_old_device_in_account" xml:space="preserve"><value>授权设备已满，请到「账号」解除一台旧设备的授权后重试。</value></data>
+  <data name="device_limit_reached_account_hint" xml:space="preserve"><value>设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。</value></data>
+  <data name="device_limit_reached_revoke_an_old_device_and_try" xml:space="preserve"><value>设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。</value></data>
+  <data name="device_limit_reached_revoke_an_old_device_in_account" xml:space="preserve"><value>设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。</value></data>
   <data name="devices_join_automatically" xml:space="preserve"><value>新设备首次连接自动加入</value></data>
+  <data name="devices_unlimited" xml:space="preserve"><value>不限</value></data>
   <data name="devices_used" xml:space="preserve"><value>已用 {0} / {1}</value></data>
   <data name="disconnect_action" xml:space="preserve"><value>断开连接</value></data>
   <data name="disconnect_before_changing_location" xml:space="preserve"><value>请先断开连接，再更换位置。</value></data>

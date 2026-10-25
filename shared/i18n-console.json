@@ -3211,10 +3211,6 @@
     "Add access to restore",
     "Добавьте доступ, чтобы восстановить"
   ],
-  "不限": [
-    "Unlimited",
-    "Без лимита"
-  ],
   "全部节点合计": [
     "Total across all nodes",
     "Сумма по всем узлам"
@@ -3394,5 +3390,41 @@
   "正在加载账号": [
     "Loading accounts",
     "Загрузка аккаунтов"
+  ],
+  "不限设备": [
+    "Unlimited devices",
+    "Без лимита устройств"
+  ],
+  "{0} / {1} 台": [
+    "{0} / {1}",
+    "{0} / {1}"
+  ],
+  "已用 {0} · 含订阅和节点配置": [
+    "{0} in use · subscriptions and configs included",
+    "Занято: {0} · включая подписки и конфигурации"
+  ],
+  "跟随账号权益（{0}）": [
+    "From account access ({0})",
+    "По доступу аккаунта ({0})"
+  ],
+  "设备数（含订阅和节点配置）：{0} / {1}": [
+    "Devices (subscriptions and configs included): {0} / {1}",
+    "Устройства (включая подписки и конфигурации): {0} / {1}"
+  ],
+  "留空则跟随账号权益。": [
+    "Leave empty to follow the account's access.",
+    "Оставьте пустым, чтобы использовать доступ аккаунта."
+  ],
+  "天数、流量和设备上限留空都表示不限。设备数包括客户端、订阅和节点配置。": [
+    "Leave days, traffic or devices empty for no limit. Devices include apps, subscriptions and node configs.",
+    "Пустые дни, трафик или устройства — без ограничений. Устройства включают приложения, подписки и конфигурации."
+  ],
+  "设备数已达上限，请先删除不用的设备、订阅或配置": [
+    "Device limit reached. Remove a device, subscription or config you no longer use first.",
+    "Достигнут лимит устройств. Сначала удалите ненужное устройство, подписку или конфигурацию."
+  ],
+  "设备数已超出账号上限，请删除不用的设备、订阅或配置，或联系管理员": [
+    "This account is over its device limit. Remove a device, subscription or config you no longer use, or contact your administrator.",
+    "Аккаунт превысил лимит устройств. Удалите ненужное устройство, подписку или конфигурацию или обратитесь к администратору."
   ]
 }

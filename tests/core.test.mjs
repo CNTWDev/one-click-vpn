@@ -280,6 +280,7 @@ test("account access: welcome traffic, metering, exhaustion, stacked grants and 
     assert.equal(view.access.until, null, "the welcome gift has no end date");
     assert.equal(view.access.quotaBytes, 10 * GB);
     assert.equal(view.grants[0].source, "welcome");
+    assert.equal(view.access.deviceLimit, 1, "new accounts start with one device");
     assert.equal((await fetch(`${base}/api/v1/admin/users/${userId}/status`, { method: "POST", headers: admin, body: JSON.stringify({ status: "active" }) })).status, 200);
     // A WireGuard credential of this account, written directly: another sign-in would run into the login rate limit.
     const identityKey = Buffer.from(x25519.getPublicKey(x25519.utils.randomSecretKey())).toString("base64");
@@ -304,6 +305,7 @@ test("account access: welcome traffic, metering, exhaustion, stacked grants and 
     const month = await act({ action: "grant", planId: "month" });
     assert.equal(month.access.state, "active");
     assert.equal(month.access.quotaBytes, null, "an unlimited grant in force means no quota");
+    assert.equal(month.access.deviceLimit, 3, "the starter plans keep the old default of 3 devices");
     assert.ok(Math.abs(Date.parse(month.access.until) - Date.now() - 30 * day) < 60_000);
     const stacked = await act({ action: "grant", planId: "month" });
     assert.ok(Math.abs(Date.parse(stacked.access.until) - Date.now() - 60 * day) < 60_000, "a renewal starts where the current month ends");
@@ -324,7 +326,10 @@ test("account access: welcome traffic, metering, exhaustion, stacked grants and 
     const list = (await plans.json()).plans;
     assert.equal(list.filter((plan) => plan.isWelcome).length, 1);
     assert.equal(list.find((plan) => plan.isWelcome).name, "Trial 5 GB");
-    await fetch(`${base}/api/v1/admin/plans`, { method: "POST", headers: admin, body: JSON.stringify({ id: "welcome", name: "新用户赠送", quotaBytes: 10 * GB, isWelcome: true }) });
+    assert.equal(list.find((plan) => plan.isWelcome).deviceLimit, null, "an empty device limit is unlimited");
+    const unlimited = await act({ action: "grant", note: "permanent" });
+    assert.equal(unlimited.access.deviceLimit, null, "any grant in force without a device limit lifts it");
+    await fetch(`${base}/api/v1/admin/plans`, { method: "POST", headers: admin, body: JSON.stringify({ id: "welcome", name: "新用户赠送", quotaBytes: 10 * GB, deviceLimit: 1, isWelcome: true }) });
     const users = (await (await fetch(`${base}/api/v1/admin/users`, { headers: admin })).json()).users;
     assert.equal(users.find((user) => user.id === userId).access.state, "active");
     assert.equal(users.find((user) => user.email === "owner@example.com").access.until, null);
@@ -837,6 +842,8 @@ test("credential controls preserve independent user/admin locks and recoverable 
   const userId = await userIdFor(email, adminToken);
   const statusPath = `/api/v1/admin/users/${userId}/status`;
   assert.equal((await call(statusPath, adminToken, { status: "active" })).status, 200);
+  // New accounts get one device; this account needs several credentials.
+  assert.equal((await call(`/api/v1/admin/users/${userId}/access`, adminToken, { action: "grant", note: "test" })).status, 200);
   let token = await login(email);
   const clientPrivateKey = Buffer.from(x25519.utils.randomSecretKey());
   const created = await call("/api/v1/credentials", token, { name: "Reusable", protocol: "wireguard", publicKey: Buffer.from(x25519.getPublicKey(clientPrivateKey)).toString("base64") });

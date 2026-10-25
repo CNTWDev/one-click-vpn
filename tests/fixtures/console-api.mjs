@@ -14,13 +14,13 @@ const users = [
 ];
 
 const plans = [
-  { id: "plan_welcome", name: "新用户赠送", durationDays: null, quotaBytes: 10 * GB, deviceLimit: null, isWelcome: true, enabled: true, sortOrder: 0 },
-  { id: "plan_day", name: "1 天体验", durationDays: 1, quotaBytes: null, deviceLimit: null, isWelcome: false, enabled: true, sortOrder: 1 },
+  { id: "plan_welcome", name: "新用户赠送", durationDays: null, quotaBytes: 10 * GB, deviceLimit: 1, isWelcome: true, enabled: true, sortOrder: 0 },
+  { id: "plan_day", name: "1 天体验", durationDays: 1, quotaBytes: null, deviceLimit: 3, isWelcome: false, enabled: true, sortOrder: 1 },
   { id: "plan_month", name: "Monthly unlimited for families and small teams", durationDays: 30, quotaBytes: 300 * GB, deviceLimit: 5, isWelcome: false, enabled: true, sortOrder: 2 },
   { id: "plan_year", name: "年卡", durationDays: 365, quotaBytes: null, deviceLimit: 10, isWelcome: false, enabled: false, sortOrder: 3 },
 ];
 const grant = (id, source, state, extra) => ({ id, source, planId: null, planName: "", state, startsAt: "2026-09-25T00:00:00Z", endsAt: null, quotaBytes: null, usedBytes: 0, deviceLimit: null, reference: null, note: "", createdAt: "2026-09-25T00:00:00Z", revokedAt: null, ...extra });
-const accountAccess = { access: { state: "active", until: days(5), endedAt: null, quotaBytes: 100 * GB, usedBytes: 93.4 * GB, remainingBytes: 6.6 * GB, deviceLimit: 5, upcoming: 1 }, grants: [
+const accountAccess = { access: { state: "active", until: days(5), endedAt: null, quotaBytes: 100 * GB, usedBytes: 93.4 * GB, remainingBytes: 6.6 * GB, deviceLimit: 5, upcoming: 1 }, devices: { limit: 5, used: 6 }, grants: [
   grant("g4", "order", "upcoming", { planId: "plan_month", planName: "Monthly unlimited for families and small teams", startsAt: days(5), endsAt: days(35), quotaBytes: 300 * GB, deviceLimit: 5, reference: "order_9f8e7d6c5b4a", note: "Renewal paid by bank transfer, reference 2026-10-24-000173" }),
   grant("g3", "admin", "active", { planId: "plan_month", planName: "月卡", startsAt: days(-25), endsAt: days(5), quotaBytes: 100 * GB, usedBytes: 93.4 * GB, deviceLimit: 5 }),
   grant("g2", "welcome", "exhausted", { planId: "plan_welcome", planName: "新用户赠送", quotaBytes: 10 * GB, usedBytes: 10 * GB }),
