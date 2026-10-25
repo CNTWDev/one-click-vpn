@@ -55,7 +55,7 @@ VEILBIRD_RELEASE_MIRROR_SECRET_ACCESS_KEY=<RAM 用户 AccessKey Secret>
 VEILBIRD_RELEASE_MIRROR_PUBLIC_BASE_URL=https://<CDN 加速域名>
 ```
 
-阿里云侧：CDN 源站选这个 bucket，配 HTTPS 证书；bucket 私有时打开「阿里云 OSS 私有 Bucket 回源」；打开「Range 回源」（断点续传）；RAM 用户只给这个 bucket 的 `oss:PutObject`。
+阿里云侧：CDN 源站选这个 bucket，配 HTTPS 证书；bucket 私有时打开「阿里云 OSS 私有 Bucket 回源」；打开「Range 回源」（断点续传）；RAM 用户只给这个 bucket 的 `oss:PutObject` 和 `oss:DeleteObject`（Console 删除安装包时会一并删掉 OSS 上的文件；CDN 缓存会在过期后自然失效，急用可在 CDN 控制台刷新该 URL）。
 
 ## 客户端更新
 
