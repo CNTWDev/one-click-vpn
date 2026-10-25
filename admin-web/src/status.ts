@@ -16,7 +16,7 @@ const dictionary: Record<string, [label: string, tone: Tone]> = {
   "never-connected": ["尚未连接", W], "telemetry-delayed": ["状态延迟", W], "admin-disabled": ["管理员已停用", W],
   "account-disabled": ["账号已停用", W], "user-disabled": ["用户已停用", W], not_configured: ["未配置", N], unknown: ["未知", N],
   managed: ["已托管", S], permissive: ["全部放行", W], unverified: ["未验证", N],
-  reachable: ["已放行", S], unreachable: ["未放行", D], suspected: ["疑似未放行", W], listening: ["监听中", S], cancelled: ["已取消", N],
+  reachable: ["已放行", S], unreachable: ["未放行", D], listening: ["监听中", S], cancelled: ["已取消", N],
   info: ["信息", P], warning: ["警告", W],
 };
 

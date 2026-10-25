@@ -1725,7 +1725,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.15.0",
+        "version": "agent 2.16.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
@@ -1763,7 +1763,7 @@ def adopt_controller_origin(target):
     CONTROLLER = target
     try:
         request_json("/api/v1/agent/heartbeat", {"nodeId": NODE_ID, "token": TOKEN, "hostname": socket.gethostname(),
-                                                 "version": "agent 2.15.0", "capabilities": capabilities()})
+                                                 "version": "agent 2.16.0", "capabilities": capabilities()})
         lines = CONFIG_ENV.read_text().splitlines()
         lines = [f"NORTHSTAR_CONTROLLER_URL={target}" if line.startswith("NORTHSTAR_CONTROLLER_URL=") else line for line in lines]
         if f"NORTHSTAR_CONTROLLER_URL={target}" not in lines:
@@ -1779,8 +1779,65 @@ def adopt_controller_origin(target):
     return True
 
 
+PORT_CHECK_COMMENT = "northstar-portcheck"
+
+
+def port_check_rules(check):
+    """Count-only rules (no target) for the marker packets the Controller sends during a port check.
+
+    They sit in raw PREROUTING, before conntrack and any host firewall, so a non-zero count proves the
+    packets got past the cloud security group and reached this machine. The marker is the packet length.
+    """
+    rules = []
+    for item in check.get("ports") or []:
+        transport, port = item.get("transport"), item.get("port")
+        if transport not in ("udp", "tcp") or not isinstance(port, int) or not 0 < port < 65536:
+            continue
+        for tool, length in (("iptables", check.get("length4")), ("ip6tables", check.get("length6"))):
+            if not isinstance(length, int) or shutil.which(tool) is None:
+                continue
+            rules.append(((transport, port), tool, ["PREROUTING", "-p", transport, "--dport", str(port), "-m", "length", "--length", str(length),
+                                                  "-m", "comment", "--comment", f"{PORT_CHECK_COMMENT}-{transport}-{port}"]))
+    return rules
+
+
+def port_check_count(tool, table, comment):
+    listing = run_optional([tool, "-t", table, "-nvxL", "PREROUTING"])
+    return sum(int(line.split()[0]) for line in listing.stdout.splitlines() if f"/* {comment} */" in line and line.split()[0].isdigit())
+
+
+def run_port_check(check, wait=time.sleep):
+    rules, installed = port_check_rules(check), []
+    try:
+        for listener, tool, rule in rules:
+            for table in ("raw", "mangle"):
+                if run_optional([tool, "-t", table, "-I", *rule]).returncode == 0:
+                    installed.append((listener, tool, table, rule))
+                    break
+        wait(min(max(int(check.get("seconds") or 8), 2), 20))
+        packets = {}
+        for listener, tool, table, rule in installed:
+            packets[listener] = packets.get(listener, 0) + port_check_count(tool, table, rule[-1])
+    finally:
+        for _, tool, table, rule in installed:
+            while run_optional([tool, "-t", table, "-D", *rule]).returncode == 0:
+                pass
+    results = [{"transport": transport, "port": port, "packets": packets[(transport, port)]} for (transport, port) in packets]
+    return {"id": check.get("id"), "results": results, "error": "" if installed or not rules else "could not add counting rules"}
+
+
 def poll_tasks():
-    response = request_json("/api/v1/agent/tasks/pull", {"nodeId": NODE_ID, "token": TOKEN, "limit": 10, "nativePeers": True})
+    response = request_json("/api/v1/agent/tasks/pull", {"nodeId": NODE_ID, "token": TOKEN, "limit": 10, "nativePeers": True, "portCheck": True})
+    check = response.get("portCheck")
+    if isinstance(check, dict):
+        try:
+            outcome = run_port_check(check)
+        except Exception as error:
+            outcome = {"id": check.get("id"), "results": [], "error": command_failure_detail(error)[-500:]}
+        try:
+            request_json("/api/v1/agent/port-check", {"nodeId": NODE_ID, "token": TOKEN, **outcome})
+        except Exception as error:
+            log_failure("port check result", error)
     try:
         apply_pulled_tasks(response.get("tasks", []))
     finally:

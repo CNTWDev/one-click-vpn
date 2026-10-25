@@ -72,7 +72,10 @@ const actionEvents = [
   ["info", "upgrade", "Uploading Controller Agent release"], ["info", "connecting", "Worker accepted the operation and is connecting to the node"],
 ].map(([level, phase, message], i) => ({ id: `ev_${i}`, action_id: "act_1", sequence: 10 - i, level, phase, message, created_at: ago(30 + i) }));
 const connectivity = { status: "degraded", agentChannel: "connected", lastAuthenticatedHeartbeat: now, firewall: { manager: "ufw", inputPolicy: "drop" },
-  protocols: [{ protocol: "wireguard", state: "ready", configured: true, taskStatus: null, lastError: "", transport: "udp", port: 51820, installed: true, runtimeActive: true, listening: true, hostFirewall: "open", cloudFirewall: "unknown" },
+  protocols: [{ protocol: "wireguard", state: "ready", configured: true, taskStatus: null, lastError: "", transport: "udp", port: 51820, installed: true, runtimeActive: true, listening: true, hostFirewall: "open", cloudFirewall: "unknown",
+      ports: [{ transport: "udp", port: 51820, hostFirewall: "managed", cloudFirewall: "reachable", checkedAt: ago(12) }] },
+    { protocol: "stealth", state: "ready", configured: true, taskStatus: null, lastError: "", transport: "udp", port: 8443, installed: true, runtimeActive: true, listening: true, hostFirewall: "managed", cloudFirewall: "unreachable",
+      ports: [{ transport: "udp", port: 8443, hostFirewall: "managed", cloudFirewall: "unreachable", checkedAt: ago(12) }, { transport: "tcp", port: 8443, hostFirewall: "managed", cloudFirewall: "reachable", checkedAt: null }] },
     { protocol: "vless", state: "error", configured: true, taskStatus: "failed", lastError: "address already in use", transport: "tcp", port: 443, installed: true, runtimeActive: false, listening: false, hostFirewall: "open", cloudFirewall: "unknown" }],
   note: "Cloud firewall rules cannot be inspected from the node; confirm the provider security group allows these ports." };
 
@@ -116,6 +119,7 @@ export function consoleApi({ signedIn = true } = {}) {
     if (/^\/api\/v1\/admin\/users\/[^/]+\/native-access$/.test(pathname)) return [200, { enabled: true, devices: [], credentials: [] }];
     if (pathname === "/api/nodes") return [200, { nodes }];
     if (pathname === "/api/nodes/agent-release") return [200, { version: "2.10.0", revision: "test" }];
+    if (/^\/api\/nodes\/[^/]+\/port-check$/.test(pathname)) return [200, { check: null, udp: "agent-outdated" }];
     if (/^\/api\/nodes\/[^/]+$/.test(pathname) && method === "GET") return [200, { node: nodes.find((n) => pathname.endsWith(n.id)), actions, actionEvents, reconcile: { observed: [{ protocol: "vless", appliedRevision: 14, status: "applied", lastError: "", updatedAt: now }], tasks: [{ id: "task_1", protocol: "vless", taskType: "apply", desiredRevision: 15, status: "failed", attempts: 3, lastError: "xray: failed to bind 0.0.0.0:443", createdAt: ago(20), startedAt: ago(19), finishedAt: ago(18) }] }, connectivity }];
     if (pathname === "/api/regions") return [200, { regions }];
     if (pathname === "/api/v1/site") return [200, { id: "default", name: "TrackNothing", logoSvg: "", isDefault: true, portalOrigin: "https://app.example.com", consoleOrigin: "https://console.example.com", apiOrigin: "https://api.example.com" }];

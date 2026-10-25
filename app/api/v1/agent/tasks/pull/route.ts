@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cleanText, jsonError, readJson } from "../../../../../../server/http";
 import { agentTokenFromRequest, authenticateAgent } from "../../../../../../server/agent";
 import { listNativeLeasePeers, pullReconcileTasks } from "../../../../../../server/control-db";
+import { takePortCheckFor } from "../../../../../../server/port-check";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,8 @@ export async function POST(request: Request) {
     const limit = Math.min(Math.max(Number(body.limit || 10), 1), 20);
     const tasks = await pullReconcileTasks(nodeId, limit);
     const nativePeers = body.nativePeers === true ? { nativePeers: await listNativeLeasePeers(nodeId) } : {};
-    return NextResponse.json({ ...nativePeers, tasks: tasks.map((task) => ({
+    const portCheck = body.portCheck === true ? takePortCheckFor(nodeId) : undefined;
+    return NextResponse.json({ ...nativePeers, ...(portCheck ? { portCheck } : {}), tasks: tasks.map((task) => ({
       id: task.id,
       protocol: task.protocol,
       taskType: task.task_type,

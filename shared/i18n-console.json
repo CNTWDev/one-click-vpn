@@ -3403,8 +3403,36 @@
     "Blocked",
     "Закрыт"
   ],
-  "疑似未放行": [
-    "Likely blocked",
-    "Вероятно закрыт"
+  "从 Controller 经公网向各端口发包，Agent 确认是否收到。": [
+    "The Controller sends packets to each port over the internet; the Agent confirms they arrived.",
+    "Controller шлёт пакеты на каждый порт через интернет, Agent подтверждает получение."
+  ],
+  "正在检测，约 15 秒…": [
+    "Checking, about 15 seconds…",
+    "Проверка, около 15 секунд…"
+  ],
+  "检测完成，结果几秒内更新。": [
+    "Check finished; results update in a few seconds.",
+    "Проверка завершена, результаты обновятся через несколько секунд."
+  ],
+  "检测失败：Agent 没有回应，稍后重试。": [
+    "Check failed: the Agent did not answer. Try again later.",
+    "Проверка не удалась: Agent не ответил. Повторите позже."
+  ],
+  "TCP 已重新检测；UDP 检测需要先升级 Agent 到 2.16。": [
+    "TCP re-checked; upgrade the Agent to 2.16 to check UDP.",
+    "TCP проверен заново; для проверки UDP обновите Agent до 2.16."
+  ],
+  "检测中…": [
+    "Checking…",
+    "Проверка…"
+  ],
+  "检测端口": [
+    "Check ports",
+    "Проверить порты"
+  ],
+  "检测于 ": [
+    "checked ",
+    "проверено "
   ]
 }
