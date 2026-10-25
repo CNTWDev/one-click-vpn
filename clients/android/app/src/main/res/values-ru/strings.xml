@@ -21,6 +21,7 @@
   <string name="back_action">Назад</string>
   <string name="cancel">Отмена</string>
   <string name="change_location">Изменить локацию  ›</string>
+  <string name="change_password">Сменить пароль</string>
   <string name="check_for_updates">Проверить обновления</string>
   <string name="choose_a_location_then_connect_from_the_home_screen">Выберите локацию и подключитесь с главного экрана.</string>
   <string name="choose_a_location_then_return_to_connect">Выберите локацию и вернитесь к подключению.</string>
@@ -75,12 +76,14 @@
   <string name="disconnecting">Отключение…</string>
   <string name="download_amount">↓ Приём %1$s</string>
   <string name="email">Электронная почта</string>
+  <string name="enter_a_valid_email">Введите корректный email.</string>
   <string name="enter_a_valid_https_server_address">Введите корректный HTTPS-адрес сервера.</string>
   <string name="enter_an_https_server_address_first">Сначала введите HTTPS-адрес сервера.</string>
   <string name="enter_email">Введите почту</string>
   <string name="enter_password">Введите пароль</string>
   <string name="enter_your_email_and_password">Введите почту и пароль.</string>
   <string name="finding_best_route">Подбираем лучший маршрут · Нажмите, чтобы отменить</string>
+  <string name="forgot_password">Забыли пароль?</string>
   <string name="got_it">Понятно</string>
   <string name="hide_password">Скрыть пароль</string>
   <string name="incorrect_email_or_password">Неверная почта или пароль.</string>
@@ -114,6 +117,7 @@
   <string name="open_at_login">Запускать при входе</string>
   <string name="open_main_window">Открыть окно</string>
   <string name="password">Пароль</string>
+  <string name="password_reset_unavailable">Сброс пароля по email сейчас недоступен. Обратитесь к администратору.</string>
   <string name="quality_fair">Средне</string>
   <string name="quality_good">Хорошо</string>
   <string name="quality_poor">Плохо</string>
@@ -122,6 +126,12 @@
   <string name="quota_exhausted_hint">Трафик закончился. Обратитесь к администратору, чтобы добавить трафик.</string>
   <string name="refresh_devices">Обновить устройства</string>
   <string name="refresh_locations">Обновить локации</string>
+  <string name="reset_by_email">Сброс пароля по email</string>
+  <string name="reset_change_detail">Мы отправим на %1$s ссылку для нового пароля. Она действует 1 час. После смены пароля на всех устройствах нужно войти заново.</string>
+  <string name="reset_confirm_detail">Мы отправим ссылку для сброса на %1$s. Она действует 1 час.</string>
+  <string name="reset_enter_email_first">Сначала введите email: ссылка для сброса придёт на него.</string>
+  <string name="reset_link_sent">Если этот email зарегистрирован, письмо для сброса придёт в течение нескольких минут.</string>
+  <string name="reset_link_sent_to">Отправлено на %1$s. Задайте новый пароль по ссылке из письма.</string>
   <string name="retest_latency">Проверить</string>
   <string name="retry_action">Повторить</string>
   <string name="revoke_access">Отозвать доступ</string>
@@ -140,6 +150,7 @@
   <string name="search_locations_or_regions">Поиск локаций или регионов</string>
   <string name="secure_storage_is_unavailable_unlock_your_device_and_try">Защищённое хранилище недоступно. Разблокируйте устройство и повторите.</string>
   <string name="select_an_available_location_for_you">Самая быстрая локация, при сбое — следующая</string>
+  <string name="send_reset_link">Отправить</string>
   <string name="server_address">Адрес сервера</string>
   <string name="server_address_url">Адрес сервера https://…</string>
   <string name="share_action">Поделиться</string>

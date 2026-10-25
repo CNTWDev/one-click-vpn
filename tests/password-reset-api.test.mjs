@@ -33,7 +33,7 @@ test("Password reset: admin link and email link set a new password once and sign
   const databaseUrl = process.env.VEILBIRD_TEST_DATABASE_URL;
   const base = "http://127.0.0.1:3197";
   const sink = await smtpSink();
-  const env = { ...process.env, NODE_ENV: "production", VEILBIRD_DATABASE_URL: databaseUrl, VEILBIRD_MASTER_KEY: Buffer.alloc(32, 9).toString("base64"), VEILBIRD_ADMIN_EMAIL: "owner@example.com", VEILBIRD_ADMIN_PASSWORD: "test-password-123", VEILBIRD_PUBLIC_ORIGIN: base };
+  const env = { ...process.env, NODE_ENV: "production", VEILBIRD_DATABASE_URL: databaseUrl, VEILBIRD_MASTER_KEY: Buffer.alloc(32, 9).toString("base64"), VEILBIRD_ADMIN_EMAIL: "owner@example.com", VEILBIRD_ADMIN_PASSWORD: "test-password-123", VEILBIRD_PUBLIC_ORIGIN: base, VEILBIRD_NATIVE_ACCESS_ENABLED: "1" };
   await promisify(execFile)(process.execPath, ["scripts/migrate.mjs"], { env });
   const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", "3197"], { env, stdio: "ignore" });
   const pool = new pg.Pool({ connectionString: databaseUrl });
@@ -49,6 +49,9 @@ test("Password reset: admin link and email link set a new password once and sign
     const session = (await login("first-password-1")).headers.get("set-cookie").split(";")[0];
     assert.deepEqual(await (await fetch(base + "/api/v1/auth/password-reset")).json(), { email: false });
     assert.equal((await post("/api/v1/auth/password-reset", { email })).status, 503);
+    const native = await post("/api/v2/native/password-reset", { email });
+    assert.equal(native.status, 503);
+    assert.equal((await native.json()).code, "PASSWORD_RESET_UNAVAILABLE");
 
     // Administrator link: needs an admin, refuses the owner, never returns a password.
     assert.equal((await post(`/api/v1/admin/users/${id}/password-reset`, {})).status, 403);
@@ -93,6 +96,15 @@ test("Password reset: admin link and email link set a new password once and sign
     assert.equal((await post("/api/v1/auth/password-reset/confirm", { token: mailed, password: "third-password-3" })).status, 200);
     assert.equal((await login("third-password-3")).status, 200);
     assert.equal((await (await post("/api/v1/auth/password-reset/confirm", { token: mailed, password: "fourth-password-4" })).json()).error, "This reset link is invalid or has expired");
+
+    // The apps ask for the same email, without a session, and get the same answer for unknown addresses.
+    assert.equal((await (await post("/api/v2/native/password-reset", { email: "not-an-email" })).json()).code, "INVALID_EMAIL");
+    assert.deepEqual(await (await post("/api/v2/native/password-reset", { email: "nobody@example.com", language: "zh" })).json(), { status: "received" });
+    sink.messages.length = 0;
+    assert.deepEqual(await (await post("/api/v2/native/password-reset", { email: email.toUpperCase(), language: "zh" })).json(), { status: "received" });
+    for (let attempt = 0; attempt < 50 && !sink.messages.length; attempt++) await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(sink.messages.length, 1);
+    assert.match(sink.messages[0], new RegExp(`To: ${email}`));
   } finally {
     server.kill(); await pool.end(); sink.server.close();
   }

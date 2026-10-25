@@ -16,6 +16,7 @@
 | 路由 | 用途 |
 | --- | --- |
 | POST `/api/v2/native/login` | email/password/identityKey/platform/deviceName；返回滑动会话（默认 30 天，`VEILBIRD_NATIVE_SESSION_DAYS`），不占额度 |
+| POST `/api/v2/native/password-reset` | email/language；无需会话。发送 Portal 的一次性重置链接（1 小时），无论邮箱是否存在都返回 `{status:"received"}`；未配置邮件 `PASSWORD_RESET_UNAVAILABLE`(503)，超限 `RATE_LIMITED`(429)。重置后该账号所有设备需重新登录 |
 | POST `/api/v2/native/challenge` | action + request；返回 id/payload/expiresAt，60 秒有效 |
 | POST `/api/v2/native/connect` | challengeId/signature/request；request 包含 publicKey 和可选 nodeId；登记、签发或续租 |
 | GET `/api/v2/native/account` | 自己的账号、设备、额度、有效期、近 30 天流量 |

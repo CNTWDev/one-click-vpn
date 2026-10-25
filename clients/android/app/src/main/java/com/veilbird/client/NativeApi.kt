@@ -108,6 +108,8 @@ class NativeApi(context: Context) {
         val data = request("login", JSONObject().put("email", email).put("password", password).put("identityKey", key).put("platform", "android").put("deviceName", android.os.Build.MODEL))
         saveSecret("token", data.getString("accessToken"))
     }
+    /** Emails the Portal's reset link; the answer is the same whether or not the address has an account. */
+    fun requestPasswordReset(email: String) { request("password-reset", JSONObject().put("email", email).put("language", L10n.locale.language)) }
     fun action(action: String, input: JSONObject): JSONObject {
         val challenge = request("challenge", JSONObject().put("action", action).put("request", input))
         val der = Signature.getInstance("SHA256withECDSA").run {
@@ -138,6 +140,8 @@ fun friendlyResource(error: Throwable): Int = when ((error as? ApiFailure)?.code
     "CLIENT_ACCESS_NOT_ENABLED" -> R.string.client_access_is_not_enabled_on_the_server_contact
     "SERVER_REQUIRED" -> R.string.enter_an_https_server_address_first
     "RATE_LIMITED" -> R.string.too_many_attempts_try_again_later
+    "PASSWORD_RESET_UNAVAILABLE" -> R.string.password_reset_unavailable
+    "INVALID_EMAIL" -> R.string.enter_a_valid_email
     "CLIENT_UPDATE_REQUIRED" -> R.string.client_update_required
     "UPDATE_FAILED" -> R.string.update_failed
     else -> R.string.unable_to_reach_the_service_check_your_network_and

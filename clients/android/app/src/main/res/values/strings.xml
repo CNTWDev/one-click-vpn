@@ -21,6 +21,7 @@
   <string name="back_action">Back</string>
   <string name="cancel">Cancel</string>
   <string name="change_location">Change location  ›</string>
+  <string name="change_password">Change password</string>
   <string name="check_for_updates">Check for updates</string>
   <string name="choose_a_location_then_connect_from_the_home_screen">Choose a location, then connect from the home screen.</string>
   <string name="choose_a_location_then_return_to_connect">Choose a location, then return to Connect.</string>
@@ -75,12 +76,14 @@
   <string name="disconnecting">Disconnecting…</string>
   <string name="download_amount">↓ Down %1$s</string>
   <string name="email">Email</string>
+  <string name="enter_a_valid_email">Enter a valid email address.</string>
   <string name="enter_a_valid_https_server_address">Enter a valid HTTPS server address.</string>
   <string name="enter_an_https_server_address_first">Enter an HTTPS server address first.</string>
   <string name="enter_email">Enter email</string>
   <string name="enter_password">Enter password</string>
   <string name="enter_your_email_and_password">Enter your email and password.</string>
   <string name="finding_best_route">Finding the best route · Tap to cancel</string>
+  <string name="forgot_password">Forgot password?</string>
   <string name="got_it">Got it</string>
   <string name="hide_password">Hide password</string>
   <string name="incorrect_email_or_password">Incorrect email or password.</string>
@@ -114,6 +117,7 @@
   <string name="open_at_login">Open at login</string>
   <string name="open_main_window">Open main window</string>
   <string name="password">Password</string>
+  <string name="password_reset_unavailable">Password reset by email isn\'t available right now. Contact your administrator.</string>
   <string name="quality_fair">Fair</string>
   <string name="quality_good">Good</string>
   <string name="quality_poor">Poor</string>
@@ -122,6 +126,12 @@
   <string name="quota_exhausted_hint">Your traffic is used up. Contact your administrator to add more.</string>
   <string name="refresh_devices">Refresh devices</string>
   <string name="refresh_locations">Refresh locations</string>
+  <string name="reset_by_email">Reset password by email</string>
+  <string name="reset_change_detail">We\'ll email a link to %1$s to set a new password. It works for 1 hour. Afterwards, every device signs in again with the new password.</string>
+  <string name="reset_confirm_detail">We\'ll send a reset link to %1$s. It works for 1 hour.</string>
+  <string name="reset_enter_email_first">Enter your email first. The reset link is sent there.</string>
+  <string name="reset_link_sent">If that email has an account, a reset email arrives within minutes.</string>
+  <string name="reset_link_sent_to">Sent to %1$s. Set your new password from the email.</string>
   <string name="retest_latency">Test again</string>
   <string name="retry_action">Try again</string>
   <string name="revoke_access">Revoke access</string>
@@ -140,6 +150,7 @@
   <string name="search_locations_or_regions">Search locations or regions</string>
   <string name="secure_storage_is_unavailable_unlock_your_device_and_try">Secure storage is unavailable. Unlock your device and try again.</string>
   <string name="select_an_available_location_for_you">Fastest location, switches if one fails</string>
+  <string name="send_reset_link">Send link</string>
   <string name="server_address">Server address</string>
   <string name="server_address_url">Server address https://…</string>
   <string name="share_action">Share</string>
