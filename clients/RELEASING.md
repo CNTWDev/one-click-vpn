@@ -19,7 +19,7 @@ Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次�
 
 3. 同一页面的 Variables 标签新建 `VEILBIRD_API_ORIGIN`，值是你的 API 地址（例如 `https://api.example.com`）。打包时写进 App，用户安装后不用手填服务器地址。
 
-4. 所有正常账号都能直接登录客户端并连接，订阅照常可用；设备数上限来自账号的套餐（后台「套餐」，新用户默认 1 台），客户端、订阅和节点配置合计计数，也可在账号「访问详情」里单独设置。如果服务器 `.env` 里有 `VEILBIRD_NATIVE_ACCESS_ENABLED=0`，改成 `1` 或删掉这一行，再运行 `sudo ./one-click-update.sh`。
+4. 所有正常账号都能直接登录客户端并连接，订阅照常可用；设备数上限来自账号的套餐（后台「套餐」，新用户默认 1 台），客户端、订阅和节点配置合计计数；改某个账号的上限就在「访问详情」里给它更换套餐。如果服务器 `.env` 里有 `VEILBIRD_NATIVE_ACCESS_ENABLED=0`，改成 `1` 或删掉这一行，再运行 `sudo ./one-click-update.sh`。
 
 不需要 Google Play、Google 开发者账号或代码混淆：自签名 APK 可以直接安装，用户首次安装时允许「安装未知来源应用」即可。Windows 安装程序未做代码签名，首次运行时 SmartScreen 会提示「更多信息 → 仍要运行」；以后想去掉这个提示，可以买代码签名证书（如 Azure Trusted Signing）。App 每次启动会请求一次管理员权限，用于创建虚拟网卡和路由。
 

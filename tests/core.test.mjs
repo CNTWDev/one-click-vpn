@@ -329,10 +329,19 @@ test("account access: welcome traffic, metering, exhaustion, stacked grants and 
     assert.equal(list.find((plan) => plan.isWelcome).deviceLimit, null, "an empty device limit is unlimited");
     const unlimited = await act({ action: "grant", note: "permanent" });
     assert.equal(unlimited.access.deviceLimit, null, "any grant in force without a device limit lifts it");
+    // Changing plans ends everything in force or queued, so the account holds the new plan alone.
+    const switched = await act({ action: "switch", planId: "month" });
+    assert.deepEqual(switched.grants.filter((grant) => grant.state === "active" || grant.state === "upcoming").map((grant) => grant.planId), ["month"]);
+    assert.equal(switched.access.deviceLimit, 3);
+    assert.ok(Math.abs(Date.parse(switched.access.until) - Date.now() - 30 * day) < 60_000, "the new plan starts now");
+    const legacy = await act({ action: "switch", planId: "legacy" });
+    assert.deepEqual([legacy.access.until, legacy.access.quotaBytes, legacy.access.deviceLimit], [null, null, null], "the legacy plan has no limits");
     await fetch(`${base}/api/v1/admin/plans`, { method: "POST", headers: admin, body: JSON.stringify({ id: "welcome", name: "新用户赠送", quotaBytes: 10 * GB, deviceLimit: 1, isWelcome: true }) });
     const users = (await (await fetch(`${base}/api/v1/admin/users`, { headers: admin })).json()).users;
     assert.equal(users.find((user) => user.id === userId).access.state, "active");
     assert.equal(users.find((user) => user.email === "owner@example.com").access.until, null);
+    const ownerId = users.find((user) => user.email === "owner@example.com").id;
+    assert.equal((await pool.query("SELECT plan_id FROM access_grants WHERE user_id=$1 AND source='migration'", [ownerId])).rows[0]?.plan_id, "legacy", "accounts from before plans hold the legacy plan");
   } finally {
     await pool.query("DELETE FROM traffic_daily WHERE node_id = $1", [nodeId]);
     await pool.query("DELETE FROM nodes WHERE id = $1", [nodeId]);

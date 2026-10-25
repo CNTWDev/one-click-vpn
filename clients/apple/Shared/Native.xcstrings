@@ -1381,6 +1381,29 @@
         }
       }
     },
+    "devices_configs_note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ more subscriptions or server configs also use slots. You can delete unused ones in the web portal."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另有 %1$@ 个订阅或节点配置也占用名额，可以在网页门户删除不用的。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ещё подписок или конфигураций, занимающих места: %1$@. Ненужные можно удалить на веб-портале."
+          }
+        }
+      }
+    },
     "devices_join_automatically": {
       "extractionState": "manual",
       "localizations": {

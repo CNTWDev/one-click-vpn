@@ -11,7 +11,7 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
   execFileSync(process.execPath,["scripts/migrate.mjs"],{env,stdio:"pipe"});
   const pool=new pg.Pool({connectionString:database});
   const stamp=new Date().toISOString(),user=`native_${Date.now()}`,node=`${user}_node`,password="test-password-123";
-  await pool.query("INSERT INTO users(id,email,display_name,password_hash,status,role,native_only,native_device_limit,created_at,updated_at) VALUES($1,$2,'Native test',$3,'active','user',TRUE,1,$4,$4)",[user,`${user}@example.com`,hashPassword(password),stamp]);
+  await pool.query("INSERT INTO users(id,email,display_name,password_hash,status,role,native_only,access_device_limit,created_at,updated_at) VALUES($1,$2,'Native test',$3,'active','user',TRUE,1,$4,$4)",[user,`${user}@example.com`,hashPassword(password),stamp]);
   await pool.query(`INSERT INTO nodes(id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,status,last_heartbeat_at,server_public_key,agent_capabilities_json,created_at,updated_at)
     VALUES($1,'Test node','Test','192.0.2.1','root','password','','','','online',$2,$3,$4,$2,$2)`,[node,stamp,randomBytes(32).toString("base64"),JSON.stringify({nativeLeaseEnforcement:1,connectivity:{protocols:{wireguard:{runtimeActive:true,listening:true}}}})]);
   await pool.query("INSERT INTO vpn_services(node_id,protocol,listen_port,subnet,status,created_at,updated_at) VALUES($1,'wireguard',51820,'10.70.0.0/24','healthy',$2,$2)",[node,stamp]);
@@ -105,12 +105,12 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     const counted=(await call("account",undefined,loser.token)).data;
     assert.deepEqual([counted.used,counted.configs,counted.limit],[2,1,1]);
     assert.equal((await call("connect",await proof(loser,"connect",{...input,publicKey:randomBytes(32).toString("base64")}),loser.token)).data.code,"DEVICE_LIMIT_REACHED","past a lowered limit only the first devices connect");
-    await pool.query("UPDATE users SET native_device_limit=NULL WHERE id=$1",[user]);
-    assert.equal((await call("account",undefined,loser.token)).data.limit,null,"no override and no limiting grant: unlimited");
+    await pool.query("UPDATE users SET access_device_limit=NULL WHERE id=$1",[user]);
+    assert.equal((await call("account",undefined,loser.token)).data.limit,null,"no limiting grant: unlimited");
     const lifted=await call("connect",await proof(loser,"connect",{...input,publicKey:randomBytes(32).toString("base64")}),loser.token);
     assert.equal(lifted.status,200,JSON.stringify(lifted.data));
     await pool.query("DELETE FROM access_credentials WHERE id=$1",[`${user}_cfg`]);
-    await pool.query("UPDATE users SET native_device_limit=1 WHERE id=$1",[user]);
+    await pool.query("UPDATE users SET access_device_limit=1 WHERE id=$1",[user]);
     await pool.query("UPDATE users SET access_until=$2 WHERE id=$1",[user,new Date(Date.now()-1000).toISOString()]);
     assert.equal((await call("connect",await proof(loser,"connect",input),loser.token)).data.code,"MEMBERSHIP_EXPIRED");
     // A grant whose traffic is used up: a different code, so the apps can say why.

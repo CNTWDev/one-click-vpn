@@ -556,6 +556,7 @@ struct ClientView:View {
                         }
                     }
                 }
+                if let configs=model.account["configs"] as? Int,configs>0 {caption(L10n.text("devices_configs_note",L10n.number(configs))).padding(.top,2)}
                 caption(L10n.text("revoke_release_hint")).padding(.top,2)
             }.padding(.horizontal,16).padding(.bottom,20)
         }.task {try? await model.loadAccount()}

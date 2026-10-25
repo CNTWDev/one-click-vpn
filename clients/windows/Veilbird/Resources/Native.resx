@@ -63,6 +63,7 @@
   <data name="device_limit_reached_account_hint" xml:space="preserve"><value>Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again.</value></data>
   <data name="device_limit_reached_revoke_an_old_device_and_try" xml:space="preserve"><value>Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again.</value></data>
   <data name="device_limit_reached_revoke_an_old_device_in_account" xml:space="preserve"><value>Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again.</value></data>
+  <data name="devices_configs_note" xml:space="preserve"><value>{0} more subscriptions or server configs also use slots. You can delete unused ones in the web portal.</value></data>
   <data name="devices_join_automatically" xml:space="preserve"><value>New devices join on first connect</value></data>
   <data name="devices_unlimited" xml:space="preserve"><value>Unlimited</value></data>
   <data name="devices_used" xml:space="preserve"><value>{0} of {1} used</value></data>

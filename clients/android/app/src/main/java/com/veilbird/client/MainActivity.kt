@@ -657,6 +657,7 @@ class MainActivity : Activity() {
             }
             if (rows.isEmpty()) add(text(L10n.text(R.string.no_authorized_devices_yet_they_appear_after_their_first), 14f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) })
             else add(group(rows, inset = 66))
+            if (data.optInt("configs") > 0) add(text(L10n.text(R.string.devices_configs_note, L10n.number(data.optInt("configs"))), 12f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, top = 12)
             add(text(L10n.text(R.string.revoke_release_hint), 12f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, top = 12)
         }
     }

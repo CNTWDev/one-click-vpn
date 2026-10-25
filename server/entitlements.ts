@@ -12,6 +12,7 @@ import { addAudit, dbQuery, getDb } from "./db";
  * the traffic quota and the device limit. With several grants in force the account gets the largest
  * device limit. Devices are app sign-ins, subscriptions and node configs together (the account_slots
  * view); past the limit, only the first ones the account added keep working ({@link withinDeviceLimitSql}).
+ * Accounts from before plans hold the "legacy" plan, which has no limit at all.
  */
 
 export type GrantSource = "admin" | "gift" | "welcome" | "order" | "migration";
@@ -37,9 +38,9 @@ export function accessSql(alias = "u"): string {
   return `(${alias}.status='active' AND ${alias}.access_ok AND (${alias}.access_until IS NULL OR ${alias}.access_until>now()))`;
 }
 
-/** The account's device limit over a users row: its own override (Console), else its grants. NULL = unlimited. */
+/** The account's device limit over a users row, from its grants. NULL = unlimited. */
 export function deviceLimitSql(alias = "u"): string {
-  return `COALESCE(${alias}.native_device_limit,${alias}.access_device_limit)`;
+  return `${alias}.access_device_limit`;
 }
 
 /** Whether a device of the account (by its account_slots created_at and id) is among the first `limit` it added. */
@@ -163,12 +164,15 @@ export type GrantInput = {
   /** Without a plan: days of validity, an end date, or neither for no end. */
   days?: number | null; endsAt?: string | null; quotaBytes?: number | null; deviceLimit?: number | null;
   source: GrantSource; reference?: string | null; note?: string; actorId?: string | null;
+  /** Switch plans: end the account's current and upcoming grants, so the new one starts now and stands alone. */
+  replace?: boolean;
 };
 
 /**
  * The only way to give an account time or traffic: Console, the welcome gift and future payment
  * callbacks all come here. A timed grant starts where the account's current timed coverage ends,
  * so renewals stack; anything else starts now. A repeated `reference` returns the earlier grant.
+ * With `replace`, the grants still in force are revoked first, in the same transaction.
  */
 export async function grantAccess(userId: string, input: GrantInput) {
   if (input.reference) {
@@ -188,6 +192,10 @@ export async function grantAccess(userId: string, input: GrantInput) {
   const result = await inTransaction(async (client) => {
     const grants = await lockedGrants(client, userId);
     const now = Date.now();
+    if (input.replace) {
+      for (const grant of grants.filter((item) => item.status === "active" && (item.ends_at === null || item.ends_at.getTime() > now))) grant.status = "revoked";
+      await client.query("UPDATE access_grants SET status='revoked',revoked_at=now() WHERE user_id=$1 AND status='active' AND (ends_at IS NULL OR ends_at>now())", [userId]);
+    }
     const timedEnd = Math.max(now, ...grants.filter((grant) => live(grant, now) && grant.ends_at).map((grant) => grant.ends_at!.getTime()));
     const startsAt = days !== null ? new Date(timedEnd) : new Date(now);
     const end = days !== null ? new Date(startsAt.getTime() + days * 86_400_000) : endsAt;
@@ -199,7 +207,7 @@ export async function grantAccess(userId: string, input: GrantInput) {
     return { grant, changed };
   });
   await addAudit({ actorUserId: input.actorId || userId, action: "account.access_granted", targetType: "user", targetId: userId,
-    metadata: { grantId: result.grant.id, source: input.source, planId: plan?.id || null, days, quotaBytes: quota, endsAt: result.grant.ends_at, reference: input.reference || null } });
+    metadata: { grantId: result.grant.id, source: input.source, replace: !!input.replace, planId: plan?.id || null, days, quotaBytes: quota, endsAt: result.grant.ends_at, reference: input.reference || null } });
   return result;
 }
 

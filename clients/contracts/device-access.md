@@ -51,6 +51,6 @@
 
 ## 会员与旁路
 
-当前权益见 `server/entitlements.ts`：设备上限 = 账号单独覆盖 > 生效权益中最大的上限，留空为不限。客户端登录、订阅和节点配置合计占用设备数（`account_slots`）；达到上限时新设备返回 `DEVICE_LIMIT_REACHED`；上限降低后只有最早加入的 N 个仍可连接，其余连接时返回 `DEVICE_LIMIT_REACHED`。到期返回 `MEMBERSHIP_EXPIRED`，流量用完返回 `QUOTA_EXHAUSTED`。支付事件仍待实现。
+当前权益见 `server/entitlements.ts`：设备上限 = 生效权益中最大的上限，留空为不限（升级前的老账号挂「老用户」套餐：不限期、不限流量、不限设备）。客户端登录、订阅和节点配置合计占用设备数（`account_slots`）；达到上限时新设备返回 `DEVICE_LIMIT_REACHED`；上限降低后只有最早加入的 N 个仍可连接，其余连接时返回 `DEVICE_LIMIT_REACHED`。到期返回 `MEMBERSHIP_EXPIRED`，流量用完返回 `QUOTA_EXHAUSTED`。支付事件仍待实现。
 
 账号 `native_only` 默认 false，保留第三方客户端。试点只允许从未导出 Profile 的账号开启。managed 模式阻止传统凭据使用、配置签发/下载、订阅生成，并在数据库 Profile 写入处加账号锁下的检查。旧账号迁移需要换发、节点收敛和回滚方案，当前明确拒绝直接切换。短期 WireGuard 私钥仍有可复制窗口，Apple/Windows 当前保护的是加密存储，并非不可导出硬件证明；不能声称抵抗 root、管理员或被攻陷的客户端。

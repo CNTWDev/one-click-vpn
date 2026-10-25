@@ -19,17 +19,14 @@ export async function updateNativeAccess(userId: string, actor: string, body: Re
       await c.query("UPDATE native_leases SET expires_at=now() WHERE enrollment_id=$1",[body.enrollmentId]);
     });
   } else if (body.action === "settings") {
-    const limit=body.limit;
-    if (limit !== null && (!Number.isInteger(limit) || Number(limit)<1 || Number(limit)>100)) throw new NativeError("INVALID_DEVICE_LIMIT");
     if (typeof body.managed !== "boolean") throw new NativeError("INVALID_REQUEST");
     await transaction(async c => {
       const user=(await c.query("SELECT native_only FROM users WHERE id=$1 FOR UPDATE",[userId])).rows[0];
       // Do not promise strict isolation while previously exported credentials can still exist on offline nodes.
       if (body.managed && !user.native_only && (await c.query("SELECT p.id FROM connection_profiles p JOIN devices d ON d.id=p.device_id WHERE d.user_id=$1 LIMIT 1",[userId])).rowCount) throw new NativeError("LEGACY_ACCESS_MIGRATION_REQUIRED",409);
-      // A lower limit needs no clean-up first: past it, only the devices added first keep connecting.
       const used=Number((await c.query("SELECT COUNT(*) AS count FROM native_enrollments WHERE user_id=$1 AND status<>'revoked'",[userId])).rows[0].count);
       if (!body.managed && used) throw new NativeError("REVOKE_DEVICES_FIRST",409,{used});
-      await c.query("UPDATE users SET native_only=$2,native_device_limit=$3 WHERE id=$1",[userId,body.managed,limit]);
+      await c.query("UPDATE users SET native_only=$2 WHERE id=$1",[userId,body.managed]);
     });
   } else throw new NativeError("INVALID_REQUEST");
   await reconcileUserAccess(userId);

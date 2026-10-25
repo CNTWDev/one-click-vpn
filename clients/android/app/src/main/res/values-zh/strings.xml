@@ -61,6 +61,7 @@
   <string name="device_limit_reached_account_hint">设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。</string>
   <string name="device_limit_reached_revoke_an_old_device_and_try">设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。</string>
   <string name="device_limit_reached_revoke_an_old_device_in_account">设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。</string>
+  <string name="devices_configs_note">另有 %1$s 个订阅或节点配置也占用名额，可以在网页门户删除不用的。</string>
   <string name="devices_join_automatically">新设备首次连接自动加入</string>
   <string name="devices_unlimited">不限</string>
   <string name="devices_used">已用 %1$s / %2$s</string>

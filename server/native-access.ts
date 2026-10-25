@@ -54,7 +54,7 @@ export async function nativeSession(request: Request): Promise<Session> {
 }
 export async function nativeAccount(session: Session) {
   await dbExec("UPDATE native_enrollments SET status='revoked' WHERE user_id=$1 AND status='revoking' AND release_after<=now()",[session.user_id]);
-  const user = (await dbQuery<{email:string;display_name:string;native_only:boolean;native_device_limit:number|null}>("SELECT email,display_name,native_only,native_device_limit FROM users WHERE id=$1",[session.user_id]))[0];
+  const user = (await dbQuery<{email:string;display_name:string;native_only:boolean}>("SELECT email,display_name,native_only FROM users WHERE id=$1",[session.user_id]))[0];
   const slots = await deviceSlots(session.user_id);
   const access = await accountAccess(session.user_id);
   const devices = await dbQuery(`SELECT id,device_name AS name,platform,status,created_at AS "createdAt",last_seen_at AS "lastSeenAt",release_after AS "releaseAfter",
@@ -65,7 +65,7 @@ export async function nativeAccount(session: Session) {
   traffic.days=await dbQuery("SELECT day::text AS day,(SUM(upload_bytes)+SUM(download_bytes))::text AS bytes FROM traffic_daily WHERE user_id=$1 AND day >= $2 GROUP BY day ORDER BY day",[session.user_id,since]);
   // expiresAt stays for apps that predate `access`: the end of the current period, null when it has none.
   return { name:user.display_name,email:user.email,managed:user.native_only,// limit null = unlimited; used counts subscriptions and node configs too, configs is how many of them.
-    limit:slots.limit,limitSource:user.native_device_limit!==null?"override":"plan",used:slots.used,configs:slots.used-devices.filter(d=>d.status!=="revoked").length,
+    limit:slots.limit,used:slots.used,configs:slots.used-devices.filter(d=>d.status!=="revoked").length,
     expiresAt:access.state==="active"?access.until:access.endedAt,access,devices,traffic };
 }
 async function candidates() {

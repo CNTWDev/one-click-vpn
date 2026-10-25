@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 async function view(userId: string) {
   const [grants, devices] = await Promise.all([userGrants(userId), deviceSlots(userId)]);
-  // devices: the limit in force (the account's own override first; null = unlimited) and what takes one.
+  // devices: the limit from the account's plan (null = unlimited) and what takes one.
   return { access: describe(grants), devices, grants: grants.map((grant) => publicGrant(grant)) };
 }
 
@@ -17,7 +17,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   return NextResponse.json(await view((await context.params).id), { headers: { "Cache-Control": "no-store" } });
 }
 
-/** { action: "grant", planId } | { action: "grant", days | endsAt, quotaGb, deviceLimit, gift, note } | { action: "revoke", grantId } */
+/** { action: "switch", planId } | { action: "grant", planId } | { action: "grant", days | endsAt, quotaGb, deviceLimit, gift, note } | { action: "revoke", grantId } */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const admin = await requestAdmin(request);
   if (!admin) return jsonError("Administrator authentication required", 403);
@@ -33,6 +33,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         quotaBytes: quotaGb === null ? null : Math.round(quotaGb * 1024 ** 3), deviceLimit: number(body.deviceLimit),
         source: body.gift === true ? "gift" : "admin", note: typeof body.note === "string" ? body.note : "", actorId: admin.id,
       });
+    } else if (body.action === "switch" && typeof body.planId === "string" && body.planId) {
+      await grantAccess(id, { planId: body.planId, source: "admin", replace: true, note: typeof body.note === "string" ? body.note : "", actorId: admin.id });
     } else if (body.action === "revoke" && typeof body.grantId === "string") await revokeGrant(id, body.grantId, admin.id);
     else return jsonError("Unsupported action");
     // Re-admit or drop the account on its nodes now instead of on their next heartbeat.

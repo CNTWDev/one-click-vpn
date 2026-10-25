@@ -973,5 +973,10 @@
     "zh": "不限",
     "en": "Unlimited",
     "ru": "Без лимита"
+  },
+  "devices_configs_note": {
+    "zh": "另有 {0} 个订阅或节点配置也占用名额，可以在网页门户删除不用的。",
+    "en": "{0} more subscriptions or server configs also use slots. You can delete unused ones in the web portal.",
+    "ru": "Ещё подписок или конфигураций, занимающих места: {0}. Ненужные можно удалить на веб-портале."
   }
 }
