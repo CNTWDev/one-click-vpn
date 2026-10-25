@@ -163,10 +163,6 @@ function parseJson<T>(value: string, fallback: T): T {
   try { return JSON.parse(value) as T; } catch { return fallback; }
 }
 
-export async function ensureControlPlaneSchema(): Promise<void> {
-  await dbQuery("SELECT 1");
-}
-
 export async function findActiveCredentialAuthority(realm: string, protocol: Protocol): Promise<CredentialAuthority | undefined> {
   return (await dbQuery<CredentialAuthority>(`SELECT * FROM credential_authorities
     WHERE realm = $1 AND protocol = $2 AND status = 'active' ORDER BY created_at DESC LIMIT 1`, [realm, protocol]))[0];
@@ -278,11 +274,6 @@ export async function revokeDevice(id: string): Promise<Device | undefined> {
     await exec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE device_id = $2 AND status IN ('issued', 'active')", [timestamp, id]);
   });
   return findDevice(id);
-}
-
-export async function touchDevice(id: string): Promise<void> {
-  const timestamp = now();
-  await dbExec("UPDATE devices SET last_seen_at = $1, updated_at = $2 WHERE id = $3", [timestamp, timestamp, id]);
 }
 
 export async function createAccessCredential(input: {
@@ -647,14 +638,6 @@ export async function activateConnectionProfile(id: string): Promise<ConnectionP
 
 export async function expireConnectionProfile(id: string): Promise<void> {
   await dbExec("UPDATE connection_profiles SET status = 'expired', updated_at = $1 WHERE id = $2 AND status IN ('issued', 'active')", [now(), id]);
-}
-
-export async function revokeConnectionProfilesForDevice(deviceId: string): Promise<void> {
-  await dbExec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE device_id = $2 AND status IN ('issued', 'active')", [now(), deviceId]);
-}
-
-export async function revokeConnectionProfilesForCredential(credentialId: string): Promise<void> {
-  await dbExec("UPDATE connection_profiles SET status = 'revoked', updated_at = $1 WHERE credential_id = $2 AND status IN ('issued', 'active')", [now(), credentialId]);
 }
 
 export async function upsertDesiredConfig(input: { nodeId: string; protocol: Protocol; payload: Record<string, unknown>; hashPayload?: Record<string, unknown> }): Promise<DesiredConfig> {

@@ -290,7 +290,7 @@ API route 只负责鉴权、输入校验和响应映射，账号审核、Credent
 | `GET` | `/api/v1/usage/credentials` | 按凭据查询流量（兼容旧 Profile 明细） |
 | `GET` | `/api/v1/usage/regions` | 按区域查询流量 |
 
-`/api/v1/devices` 和 `/api/access/*` 保留为旧原生客户端兼容路径；新 Portal 与新客户端应使用 Credential/Profile API，不再向用户暴露设备模型。
+`/api/v1/devices` 保留为旧原生客户端兼容路径（`/api/access/*` 已于 2026-10 删除）；新 Portal 与新客户端应使用 Credential/Profile API，不再向用户暴露设备模型。
 
 ### 管理员审核 API
 

@@ -32,11 +32,6 @@
   ],
   "exclude": [
     "node_modules",
-    "worker",
-    "vite.config.ts",
-    "build",
-    "examples",
-    "db/index.ts",
     "tests",
     "portal-web",
     "admin-web"

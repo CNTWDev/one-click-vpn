@@ -154,13 +154,6 @@ async function buildDesiredStateLocked(nodeId: string, protocol: Protocol, optio
   return desired;
 }
 
-export async function selectVpnService(input: { protocol: Protocol; regionId?: string }) {
-  const candidates = await selectVpnServices(input);
-  const selected = candidates[0];
-  if (!selected) throw new Error(input.regionId ? "No healthy VPN service is available in this region" : "No healthy VPN service is available");
-  return selected;
-}
-
 export async function selectVpnServices(input: { protocol: Protocol; regionId?: string }) {
   const services = (await listVpnServices()).filter((service) => service.protocol === input.protocol && service.enabled && service.status === "healthy");
   const nodes = await listControlNodes();
@@ -184,11 +177,6 @@ export async function selectVpnServices(input: { protocol: Protocol; regionId?: 
     return active === true && observed?.listening === true;
   }).sort((left, right) => left.users - right.users || (profileCounts.get(left.id) || 0) - (profileCounts.get(right.id) || 0) || left.name.localeCompare(right.name))
     .map((node) => ({ node, service: services.find((item) => item.node_id === node.id)! }));
-}
-
-export async function issueScheduledConnectionProfile(input: Omit<Parameters<typeof issueConnectionProfile>[0], "nodeId"> & { regionId?: string }): Promise<ConnectionProfile> {
-  const selected = await selectVpnService({ protocol: input.protocol, regionId: input.regionId });
-  return issueConnectionProfile({ ...input, nodeId: selected.node.id });
 }
 
 export async function issueRegionalConnectionProfiles(input: Omit<Parameters<typeof issueConnectionProfile>[0], "nodeId" | "regionalEndpoints"> & { regionId?: string }): Promise<ConnectionProfile[]> {

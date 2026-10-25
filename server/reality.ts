@@ -76,8 +76,6 @@ async function decryptUsers(rows: Awaited<ReturnType<typeof realityUserRows>>) {
 /** Telemetry identities currently granted on a node (no secrets are decrypted). */
 export async function realityUserIdentities(nodeId: string) { return new Set((await realityUserRows(nodeId)).map((row) => row.email)); }
 
-export async function realityUsers(nodeId: string) { return decryptUsers(await realityUserRows(nodeId)); }
-
 export async function realityClientSecretId(credentialId: string) {
   const row = (await dbQuery<{ private_key_secret_id: string }>(`SELECT private_key_secret_id FROM subscriptions WHERE credential_id=$1
     UNION ALL SELECT id FROM secret_materials WHERE kind='vless_client:' || $1 AND owner_node_id IS NULL LIMIT 1`, [credentialId]))[0];
