@@ -2255,14 +2255,6 @@
     "Withdraw",
     "Отозвать"
   ],
-  "删除草稿": [
-    "Delete draft",
-    "Удалить черновик"
-  ],
-  "删除 {0} 的草稿记录？对象存储里的文件不会被删除。": [
-    "Delete the draft for {0}? The file in object storage is not deleted.",
-    "Удалить черновик {0}? Файл в объектном хранилище не удаляется."
-  ],
   "已更新": [
     "Updated",
     "Обновлено"
@@ -3710,5 +3702,21 @@
   "控制面磁盘已用 {0}": [
     "Controller disk {0} full",
     "Диск Controller заполнен на {0}"
+  ],
+  "删除安装包": [
+    "Delete package",
+    "Удалить пакет"
+  ],
+  "删除 {0}？记录和安装包文件（包括 OSS/CDN 上的副本）都会删除，无法恢复。": [
+    "Delete {0}? The record and the installer file (including the OSS/CDN copy) are deleted. This cannot be undone.",
+    "Удалить {0}? Запись и файл установщика (включая копию в OSS/CDN) будут удалены без возможности восстановления."
+  ],
+  "已发布的版本需要先撤回，再删除。": [
+    "Withdraw a published release before deleting it.",
+    "Сначала отзовите опубликованный выпуск, затем удалите его."
+  ],
+  "删除存储里的安装包失败，记录已保留，请检查 OSS 密钥是否有删除权限后重试。": [
+    "Could not delete the installer from storage. The record was kept; check that the OSS key may delete objects, then retry.",
+    "Не удалось удалить установщик из хранилища. Запись сохранена; проверьте, что ключ OSS может удалять объекты, и повторите."
   ]
 }

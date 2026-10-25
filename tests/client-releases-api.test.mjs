@@ -38,6 +38,7 @@ function artifactServer(files) {
       request.on("data", (chunk) => chunks.push(chunk)).on("end", () => { files[request.url.split("?")[0]] = Buffer.concat(chunks); response.writeHead(200).end(); });
       return;
     }
+    if (request.method === "DELETE") { delete files[request.url.split("?")[0]]; response.writeHead(204).end(); return; }
     const body = files[request.url];
     response.writeHead(body ? 200 : 404, body ? { "Content-Length": String(body.length) } : {}).end(body || "missing");
   });
@@ -45,7 +46,7 @@ function artifactServer(files) {
 }
 
 test("client releases: CI drafts, verified artifacts, promotion, permanent links and minimum builds", { skip: !database, timeout: 120000 }, async () => {
-  const installer = Buffer.from("northstar-msix-v2"), cdn = await artifactServer({ "/v2.msix": installer, "/v3.msix": Buffer.from("northstar-msix-v3"), "/v4.msix": Buffer.from("northstar-msix-v4") });
+  const installer = Buffer.from("northstar-msix-v2"), cdnFiles = { "/v2.msix": installer, "/v3.msix": Buffer.from("northstar-msix-v3"), "/v4.msix": Buffer.from("northstar-msix-v4") }, cdn = await artifactServer(cdnFiles);
   const admin = { email: `release_${Date.now()}@example.com`, password: "release-admin-password-1" };
   const env = { VEILBIRD_DATABASE_URL: database, VEILBIRD_MASTER_KEY: Buffer.alloc(32, 7).toString("base64"), VEILBIRD_RELEASE_TOKEN: token,
     VEILBIRD_ADMIN_EMAIL: admin.email, VEILBIRD_ADMIN_PASSWORD: admin.password, VEILBIRD_NATIVE_ACCESS_ENABLED: "1", NODE_EXTRA_CA_CERTS: cdn.ca,
@@ -184,8 +185,10 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
       const apk = Buffer.from("veilbird-apk-v3".repeat(1000)), meta = { platform: "android", arch: "arm64", version: "1.2.0", build: 12, fileName: "TrackNothing-1.2.0-arm64.apk" };
       const stored = await (await fetch(`${base}/api/v1/admin/client-releases/files?${new URLSearchParams({ ...meta, upload: crypto.randomUUID(), offset: "0", final: "1" })}`,
         { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: apk })).json();
-      assert.equal((await fetch(`${base}/api/v1/admin/client-releases`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...meta, channel: "beta", minOs: "Android 8.0", storageKey: stored.storageKey, publish: true }) })).status, 200);
+      const createdResponse = await fetch(`${base}/api/v1/admin/client-releases`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...meta, channel: "beta", minOs: "Android 8.0", storageKey: stored.storageKey, publish: true }) });
+      assert.equal(createdResponse.status, 200);
+      const created = await createdResponse.json();
       const mirrored = `${cdn.origin}/bucket/clients/android/arm64/1.2.0%2B12/TrackNothing-1.2.0-arm64.apk`;
       let check;
       for (let attempt = 0; attempt < 50; attempt++) {
@@ -196,6 +199,20 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
       assert.deepEqual(check.downloads, { urls: [mirrored], path: "/api/v1/client-releases/files/clients/android/arm64/1.2.0%2B12/TrackNothing-1.2.0-arm64.apk" });
       check = await (await fetch(`${base}/api/v1/client-releases/latest?platform=android&arch=arm64&build=1&channel=beta`)).json();
       assert.equal(check.latest.url, mirrored, "older apps that only read url download from the mirror too");
+
+      // Deleting a package removes the record, the Controller's copy and the mirror's copy; published builds are withdrawn first.
+      const login = await fetch(`${base}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(admin) });
+      const cookie = login.headers.get("set-cookie").split(";")[0];
+      const act = (headers, action) => fetch(`${base}/api/v1/admin/client-releases/${created.id}`, { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      const objectPath = new URL(mirrored).pathname;
+      assert.ok(cdnFiles[objectPath], "the mirror holds the copy");
+      assert.equal((await act({ Authorization: `Bearer ${token}` }, "delete")).status, 403, "the release token cannot delete");
+      assert.equal((await act({ Cookie: cookie }, "delete")).status, 409, "a published build is withdrawn first");
+      assert.equal((await act({ Cookie: cookie }, "withdraw")).status, 200);
+      assert.equal((await act({ Cookie: cookie }, "delete")).status, 200);
+      assert.equal(cdnFiles[objectPath], undefined, "the mirror's copy is deleted");
+      assert.equal((await fetch(base + check.downloads.path)).status, 404, "the Controller's copy is deleted");
+      assert.equal((await pool.query("SELECT id FROM client_releases WHERE id=$1", [created.id])).rowCount, 0);
     });
 
     await withServer({ ...env, VEILBIRD_CLIENT_RELEASES_JSON: '{"privateSigningKey":"SECRET"}' }, 3396, async (base) => {

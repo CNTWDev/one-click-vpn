@@ -43,6 +43,8 @@ const errors: Record<string, string> = {
   RELEASE_STORAGE_NOT_CONFIGURED: "对象存储未配置，无法上传。",
   USE_OBJECT_STORAGE_UPLOAD: "当前使用对象存储，请刷新页面后重试。",
   INVALID_DISTRIBUTION: "上传的安装包只能用于直接下载。",
+  WITHDRAW_BEFORE_DELETE: "已发布的版本需要先撤回，再删除。",
+  RELEASE_FILE_DELETE_FAILED: "删除存储里的安装包失败，记录已保留，请检查 OSS 密钥是否有删除权限后重试。",
 };
 const extensions = ".apk,.aab,.zip,.dmg,.pkg,.msix,.msixbundle,.exe,.msi";
 const defaultArch: Record<Platform, string> = { android: "universal", ios: "universal", macos: "universal", windows: "x64" };
@@ -156,7 +158,7 @@ export function ReleasesPage() {
       ? { title: t("晋升为正式版"), message: t("{0} 将成为正式版，固定下载链接和客户端更新检查会立即指向它。", [label]), confirmLabel: t("晋升正式版") }
       : action === "withdraw"
         ? { title: t("撤回版本"), message: t("撤回 {0}？固定下载链接会回到上一个已发布版本。", [label]), confirmLabel: t("撤回"), danger: true }
-        : { title: t("删除草稿"), message: t("删除 {0} 的草稿记录？对象存储里的文件不会被删除。", [label]), confirmLabel: t("删除"), danger: true }))) return;
+        : { title: t("删除安装包"), message: t("删除 {0}？记录和安装包文件（包括 OSS/CDN 上的副本）都会删除，无法恢复。", [label]), confirmLabel: t("删除"), danger: true }))) return;
     await run(() => api(`/api/v1/admin/client-releases/${release.id}`, { method: "POST", body: JSON.stringify({ action }) }), t("已更新"));
   }
   async function saveMinimum(platform: Platform) {
@@ -372,7 +374,7 @@ export function ReleasesPage() {
             {release.status !== "published" && <button className="button ghost small" disabled={busy} onClick={() => void act(release, "publish")}>{t("发布")}</button>}
             {release.channel === "beta" && release.status !== "withdrawn" && !release.version.includes("-") && release.distribution !== "testflight" && <button className="button primary small" disabled={busy} onClick={() => void act(release, "promote")}>{t("晋升正式版")}</button>}
             {release.status === "published" && <button className="button danger small" disabled={busy} onClick={() => void act(release, "withdraw")}>{t("撤回")}</button>}
-            {release.status === "draft" && <button className="button danger small" disabled={busy} onClick={() => void act(release, "delete")}>{t("删除")}</button>}
+            {release.status !== "published" && <button className="button danger small" disabled={busy} onClick={() => void act(release, "delete")}>{t("删除")}</button>}
           </div></td></tr>)}</tbody></table></div>
           : <Empty>{platformFilter === "all" ? t("还没有任何版本。在上方上传安装包，或用 npm run release:client 发布。") : t("这个平台还没有版本。")}</Empty>}
       </section>

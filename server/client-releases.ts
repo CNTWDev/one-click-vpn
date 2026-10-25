@@ -7,7 +7,7 @@ import {
 import { addAudit, dbExec, dbQuery } from "./db";
 import { requestAdmin } from "./request-auth";
 import { apiOrigin } from "./config";
-import { appendLocalArtifact, copyToMirror, inspectArtifact, inspectLocalArtifact, localArtifactPath, localArtifactUrl, maxInstallerBytes, presignReleaseUpload, releaseMirror, releaseObjectKey, releaseStorage, uploadChunkBytes } from "./release-storage";
+import { appendLocalArtifact, copyToMirror, deleteStoredObject, inspectArtifact, inspectLocalArtifact, localArtifactPath, localArtifactUrl, maxInstallerBytes, presignReleaseUpload, releaseMirror, releaseObjectKey, releaseStorage, uploadChunkBytes } from "./release-storage";
 import { writeOperationalLog } from "./operational-logs";
 
 export class ReleaseError extends Error {
@@ -131,7 +131,11 @@ export async function syncReleaseMirrors(): Promise<void> {
       await dbExec("UPDATE client_releases SET mirror_attempts=mirror_attempts+1 WHERE id=$1", [row.id]);
       try {
         const url = await copyToMirror(mirror, row.storage_key!, localArtifactPath(storage, row.storage_key!), Number(row.size_bytes));
-        await dbExec("UPDATE client_releases SET mirror_url=$2,mirror_error='',updated_at=now() WHERE id=$1", [row.id, url]);
+        // Deleted while it was copying: take the copy back off the CDN.
+        if (!(await dbExec("UPDATE client_releases SET mirror_url=$2,mirror_error='',updated_at=now() WHERE id=$1", [row.id, url]))) {
+          await deleteStoredObject(mirror, row.storage_key!).catch(() => undefined);
+          continue;
+        }
         await writeOperationalLog({ component: "controller", level: "info", message: "client_release.mirrored", action: "client_release.mirrored",
           fields: { release: row.id, platform: row.platform, build: row.build } }).catch(() => undefined);
       } catch (error) {
@@ -289,10 +293,11 @@ export async function transitionRelease(actor: ReleaseActor, id: string, action:
     changed = await dbExec("UPDATE client_releases SET rollout_percent=$2,updated_at=now() WHERE id=$1 AND status<>'withdrawn'", [id, percent]);
   } else if (action === "delete") {
     requireAdmin(actor);
-    changed = await dbExec("DELETE FROM client_releases WHERE id=$1 AND status='draft'", [id]);
-    const storage = releaseStorage();
-    // Drafts uploaded to the Controller's own volume are removed with them; object storage is left untouched.
-    if (changed && storage.mode === "local" && release.storageKey) await rm(localArtifactPath(storage, release.storageKey), { force: true }).catch(() => undefined);
+    // Published builds are withdrawn first (that step keeps a build reachable for the minimum version).
+    if (release.status === "published") throw new ReleaseError("WITHDRAW_BEFORE_DELETE", 409);
+    // Files go first, so a failed delete keeps the record and can simply be retried.
+    if (release.storageKey) await deleteReleaseFiles(release.storageKey);
+    changed = await dbExec("DELETE FROM client_releases WHERE id=$1 AND status IN ('draft','withdrawn')", [id]);
   } else throw new ReleaseError("INVALID_ACTION");
   if (!changed) throw new ReleaseError("INVALID_RELEASE_STATE", 409);
   if (action === "withdraw" || action === "rollout") {
@@ -306,6 +311,21 @@ export async function transitionRelease(actor: ReleaseActor, id: string, action:
   await addAudit({ actorUserId: actorId(actor), action: `client_release.${action}`, targetType: "client_release", targetId: id,
     metadata: { actor: actorLabel(actor), ...(action === "rollout" ? { percent: extra?.percent } : {}) } });
   return action === "delete" ? { id, deleted: true } : findRelease(id);
+}
+
+/** Removes an uploaded installer everywhere it is stored: the Controller's volume or release bucket, and the CDN mirror. */
+async function deleteReleaseFiles(key: string) {
+  const storage = releaseStorage();
+  try {
+    let mirror: ReturnType<typeof releaseMirror> = null;
+    try { mirror = releaseMirror(); } catch { /* A broken mirror configuration never blocks deleting. */ }
+    if (mirror) await deleteStoredObject(mirror, key);
+    if (storage.mode === "s3") await deleteStoredObject(storage, key);
+  } catch (error) {
+    console.error("Release delete", (error as Error).message);
+    throw new ReleaseError("RELEASE_FILE_DELETE_FAILED", 502);
+  }
+  if (storage.mode === "local") await rm(localArtifactPath(storage, key), { force: true }).catch(() => undefined);
 }
 
 async function stableBuildAtLeast(platform: ClientPlatform, build: number) {

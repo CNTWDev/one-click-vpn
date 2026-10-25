@@ -50,7 +50,7 @@ const hmac = (key: Buffer | string, value: string) => createHmac("sha256", key).
 
 /** AWS Signature Version 4 query-string presigning (path-style). */
 export function presignS3Url(input: {
-  method: "GET" | "PUT"; endpoint: string; bucket: string; key: string; region: string;
+  method: "GET" | "PUT" | "DELETE"; endpoint: string; bucket: string; key: string; region: string;
   accessKeyId: string; secretAccessKey: string; expiresSeconds: number; now?: Date; virtualHost?: boolean;
 }): string {
   const now = input.now || new Date();
@@ -170,6 +170,21 @@ export function releaseMirror(env: Record<string, string | undefined> = process.
   if (style !== "virtual" && style !== "path") throw new Error("VEILBIRD_RELEASE_MIRROR_ADDRESSING must be virtual or path");
   return { endpoint: endpoint.origin, bucket: value("BUCKET"), region: value("REGION") || "auto", accessKeyId: value("ACCESS_KEY_ID"),
     secretAccessKey: value("SECRET_ACCESS_KEY"), publicBaseUrl: publicBaseUrl.href.replace(/\/+$/, ""), virtualHost: style === "virtual" };
+}
+
+/**
+ * Deletes one object from an S3-compatible bucket (the release bucket or the download mirror).
+ * A missing object counts as deleted, so a retry after a partial failure succeeds.
+ */
+export async function deleteStoredObject(target: { endpoint: string; bucket: string; region: string; accessKeyId: string; secretAccessKey: string; virtualHost?: boolean },
+  key: string, fetcher: typeof fetch = fetch): Promise<void> {
+  const url = presignS3Url({ method: "DELETE", endpoint: target.endpoint, bucket: target.bucket, key, region: target.region,
+    accessKeyId: target.accessKeyId, secretAccessKey: target.secretAccessKey, expiresSeconds: 600, virtualHost: target.virtualHost });
+  const response = await fetcher(url, { method: "DELETE", redirect: "error", signal: AbortSignal.timeout(30_000) });
+  if (!response.ok && response.status !== 404) {
+    const code = (await response.text().catch(() => "")).match(/<Code>([^<]+)<\/Code>/)?.[1];
+    throw new Error(`Delete failed (HTTP ${response.status}${code ? `, ${code}` : ""})`);
+  }
 }
 
 export const mirrorUrl = (mirror: ReleaseMirror, key: string) => `${mirror.publicBaseUrl}/${key.split("/").map(encode).join("/")}`;
