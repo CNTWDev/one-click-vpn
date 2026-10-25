@@ -461,6 +461,29 @@
         }
       }
     },
+    "change_password": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change password"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修改密码"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сменить пароль"
+          }
+        }
+      }
+    },
     "check_for_updates": {
       "extractionState": "manual",
       "localizations": {
@@ -1726,6 +1749,29 @@
         }
       }
     },
+    "enter_a_valid_email": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a valid email address."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入有效的邮箱地址。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Введите корректный email."
+          }
+        }
+      }
+    },
     "enter_a_valid_https_server_address": {
       "extractionState": "manual",
       "localizations": {
@@ -1860,6 +1906,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Подбираем лучший маршрут · Нажмите, чтобы отменить"
+          }
+        }
+      }
+    },
+    "forgot_password": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forgot password?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "忘记密码？"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Забыли пароль?"
           }
         }
       }
@@ -2623,6 +2692,29 @@
         }
       }
     },
+    "password_reset_unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password reset by email isn't available right now. Contact your administrator."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂时无法通过邮件重置密码，请联系管理员。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сброс пароля по email сейчас недоступен. Обратитесь к администратору."
+          }
+        }
+      }
+    },
     "quality_fair": {
       "extractionState": "manual",
       "localizations": {
@@ -2803,6 +2895,144 @@
           "stringUnit": {
             "state": "translated",
             "value": "Обновить локации"
+          }
+        }
+      }
+    },
+    "reset_by_email": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset password by email"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通过邮件重置密码"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сброс пароля по email"
+          }
+        }
+      }
+    },
+    "reset_change_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We'll email a link to %1$@ to set a new password. It works for 1 hour. Afterwards, every device signs in again with the new password."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我们会把修改密码的链接发到 %1$@，1 小时内有效。改完后，所有设备都需要用新密码重新登录。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Мы отправим на %1$@ ссылку для нового пароля. Она действует 1 час. После смены пароля на всех устройствах нужно войти заново."
+          }
+        }
+      }
+    },
+    "reset_confirm_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We'll send a reset link to %1$@. It works for 1 hour."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我们会把重置链接发到 %1$@，1 小时内有效。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Мы отправим ссылку для сброса на %1$@. Она действует 1 час."
+          }
+        }
+      }
+    },
+    "reset_enter_email_first": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter your email first. The reset link is sent there."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先填写邮箱，重置链接会发到这个邮箱。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сначала введите email: ссылка для сброса придёт на него."
+          }
+        }
+      }
+    },
+    "reset_link_sent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If that email has an account, a reset email arrives within minutes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如果该邮箱已注册，几分钟内会收到重置邮件。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Если этот email зарегистрирован, письмо для сброса придёт в течение нескольких минут."
+          }
+        }
+      }
+    },
+    "reset_link_sent_to": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent to %1$@. Set your new password from the email."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已发送到 %1$@，请在邮件里设置新密码。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отправлено на %1$@. Задайте новый пароль по ссылке из письма."
           }
         }
       }
@@ -3217,6 +3447,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Самая быстрая локация, при сбое — следующая"
+          }
+        }
+      }
+    },
+    "send_reset_link": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send link"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发送"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отправить"
           }
         }
       }

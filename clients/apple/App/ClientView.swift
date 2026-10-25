@@ -17,6 +17,8 @@ struct ClientView:View {
     @State private var password=""
     @State private var showPassword=false
     @State private var revoke:[String:Any]?
+    /// The address a reset link is about to be sent to, while the confirmation is showing.
+    @State private var resetEmail:String?
     @State private var search=""
     @State private var tab=0
     @State private var versionTaps=0
@@ -62,6 +64,20 @@ struct ClientView:View {
             Button(L10n.text("cancel"),role:.cancel) {revoke=nil}
             Button(L10n.text("revoke_access"),role:.destructive) {if let device=revoke {model.work {_ = try await model.api().action("revoke",["enrollmentId":device["id"] as? String ?? ""]);if device["isCurrent"] as? Bool == true {model.manager?.connection.stopVPNTunnel()};try await model.loadAccount()}};revoke=nil}
         } message:{Text(L10n.text("this_device_will_lose_access_the_slot_is_released"))}
+        // "Forgot password" and "change password" both email the Portal's reset link; the new password is set there.
+        .alert(L10n.text("reset_by_email"),isPresented:Binding(get:{resetEmail != nil},set:{if !$0 {resetEmail=nil}})) {
+            Button(L10n.text("cancel"),role:.cancel) {resetEmail=nil}
+            Button(L10n.text("send_reset_link")) {
+                if let address=resetEmail {
+                    let signedIn=model.signedIn
+                    model.work {
+                        try await model.api().requestPasswordReset(email:address)
+                        model.message=signedIn ? L10n.text("reset_link_sent_to",address):L10n.text("reset_link_sent")
+                    }
+                }
+                resetEmail=nil
+            }
+        } message:{Text(resetEmail.map {L10n.text(model.signedIn ? "reset_change_detail":"reset_confirm_detail",$0)} ?? "")}
         #if os(iOS)
         .sheet(isPresented:$choosingLanguage) {languageSheet.presentationDetents([.height(360)]).presentationDragIndicator(.visible)}
         #endif
@@ -96,7 +112,7 @@ struct ClientView:View {
                 Text(value).font(.system(size:VeilbirdStyle.body)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
                 Image(systemName:"chevron.right").font(.system(size:mac ? 10:13,weight:.semibold)).foregroundStyle(VeilbirdStyle.faint)
             }.padding(.horizontal,16).frame(minHeight:mac ? 40:50)
-        }.buttonStyle(RowButton()).accessibilityLabel(title+": "+value)
+        }.buttonStyle(RowButton()).accessibilityLabel(value.isEmpty ? title:title+": "+value)
     }
     @ViewBuilder private var messageBanner:some View {
         if !model.message.isEmpty {
@@ -230,9 +246,16 @@ struct ClientView:View {
                         Button {showPassword.toggle()} label:{Image(systemName:showPassword ? "eye.slash":"eye").foregroundStyle(VeilbirdStyle.secondary).frame(width:44,height:44).contentShape(Rectangle())}
                             .buttonStyle(.plain).accessibilityLabel(L10n.text(showPassword ? "hide_password":"show_password")).padding(.trailing,4)
                     }
+                    HStack {
+                        Spacer()
+                        Button(L10n.text("forgot_password")) {
+                            let address=email.trimmingCharacters(in:.whitespaces)
+                            if address.isEmpty {model.message=L10n.text("reset_enter_email_first")} else {resetEmail=address}
+                        }.buttonStyle(.plain).font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary).padding(.horizontal,4).frame(minHeight:mac ? 28:36).contentShape(Rectangle()).disabled(model.busy)
+                    }
                     Button {login()} label:{
                         if model.busy {ProgressView().controlSize(.small).tint(VeilbirdStyle.onAccent)} else {Text(L10n.text("sign_in_action"))}
-                    }.buttonStyle(PrimaryButton()).disabled(model.busy || email.trimmingCharacters(in:.whitespaces).isEmpty || password.isEmpty).padding(.top,22)
+                    }.buttonStyle(PrimaryButton()).disabled(model.busy || email.trimmingCharacters(in:.whitespaces).isEmpty || password.isEmpty).padding(.top,mac ? 6:10)
                 }.padding(.top,mac ? 28:44)
             }.padding(.horizontal,mac ? 32:28).padding(.bottom,24).frame(maxWidth:460).frame(maxWidth:.infinity)
         }
@@ -463,6 +486,8 @@ struct ClientView:View {
                 usageCard
                 CardGroup {
                     settingRow(L10n.text("authorized_devices"),"\(L10n.number(model.account["used"] as? Int ?? 0)) / \(deviceLimit(model.account))") {tab=4}
+                    Hairline()
+                    settingRow(L10n.text("change_password"),"") {if !email.isEmpty {resetEmail=email}}
                     Hairline()
                     languageChooser(settingRow(L10n.text("language"),currentLanguage.name) {choosingLanguage=true})
                     Hairline()

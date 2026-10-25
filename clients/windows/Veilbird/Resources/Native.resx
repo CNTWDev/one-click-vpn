@@ -23,6 +23,7 @@
   <data name="back_action" xml:space="preserve"><value>Back</value></data>
   <data name="cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="change_location" xml:space="preserve"><value>Change location  ›</value></data>
+  <data name="change_password" xml:space="preserve"><value>Change password</value></data>
   <data name="check_for_updates" xml:space="preserve"><value>Check for updates</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>Choose a location, then connect from the home screen.</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>Choose a location, then return to Connect.</value></data>
@@ -78,12 +79,14 @@
   <data name="disconnecting" xml:space="preserve"><value>Disconnecting…</value></data>
   <data name="download_amount" xml:space="preserve"><value>↓ Down {0}</value></data>
   <data name="email" xml:space="preserve"><value>Email</value></data>
+  <data name="enter_a_valid_email" xml:space="preserve"><value>Enter a valid email address.</value></data>
   <data name="enter_a_valid_https_server_address" xml:space="preserve"><value>Enter a valid HTTPS server address.</value></data>
   <data name="enter_an_https_server_address_first" xml:space="preserve"><value>Enter an HTTPS server address first.</value></data>
   <data name="enter_email" xml:space="preserve"><value>Enter email</value></data>
   <data name="enter_password" xml:space="preserve"><value>Enter password</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Enter your email and password.</value></data>
   <data name="finding_best_route" xml:space="preserve"><value>Finding the best route · Tap to cancel</value></data>
+  <data name="forgot_password" xml:space="preserve"><value>Forgot password?</value></data>
   <data name="got_it" xml:space="preserve"><value>Got it</value></data>
   <data name="hide_password" xml:space="preserve"><value>Hide password</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Incorrect email or password.</value></data>
@@ -117,6 +120,7 @@
   <data name="open_at_login" xml:space="preserve"><value>Open at login</value></data>
   <data name="open_main_window" xml:space="preserve"><value>Open main window</value></data>
   <data name="password" xml:space="preserve"><value>Password</value></data>
+  <data name="password_reset_unavailable" xml:space="preserve"><value>Password reset by email isn't available right now. Contact your administrator.</value></data>
   <data name="quality_fair" xml:space="preserve"><value>Fair</value></data>
   <data name="quality_good" xml:space="preserve"><value>Good</value></data>
   <data name="quality_poor" xml:space="preserve"><value>Poor</value></data>
@@ -125,6 +129,12 @@
   <data name="quota_exhausted_hint" xml:space="preserve"><value>Your traffic is used up. Contact your administrator to add more.</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>Refresh devices</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Refresh locations</value></data>
+  <data name="reset_by_email" xml:space="preserve"><value>Reset password by email</value></data>
+  <data name="reset_change_detail" xml:space="preserve"><value>We'll email a link to {0} to set a new password. It works for 1 hour. Afterwards, every device signs in again with the new password.</value></data>
+  <data name="reset_confirm_detail" xml:space="preserve"><value>We'll send a reset link to {0}. It works for 1 hour.</value></data>
+  <data name="reset_enter_email_first" xml:space="preserve"><value>Enter your email first. The reset link is sent there.</value></data>
+  <data name="reset_link_sent" xml:space="preserve"><value>If that email has an account, a reset email arrives within minutes.</value></data>
+  <data name="reset_link_sent_to" xml:space="preserve"><value>Sent to {0}. Set your new password from the email.</value></data>
   <data name="retest_latency" xml:space="preserve"><value>Test again</value></data>
   <data name="retry_action" xml:space="preserve"><value>Try again</value></data>
   <data name="revoke_access" xml:space="preserve"><value>Revoke access</value></data>
@@ -143,6 +153,7 @@
   <data name="search_locations_or_regions" xml:space="preserve"><value>Search locations or regions</value></data>
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>Secure storage is unavailable. Unlock your device and try again.</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>Fastest location, switches if one fails</value></data>
+  <data name="send_reset_link" xml:space="preserve"><value>Send link</value></data>
   <data name="server_address" xml:space="preserve"><value>Server address</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Server address https://…</value></data>
   <data name="share_action" xml:space="preserve"><value>Share</value></data>

@@ -560,6 +560,7 @@ public partial class MainWindow : Window {
         if(account["traffic"] is { } traffic) Add(UsageCard(traffic),0,16);
 
         var devices=SettingRow(L10n.Text("authorized_devices"),$"{Number(account["used"]).ToString("N0",L10n.Culture)} / {DeviceLimit(account)}",_=>{page="devices";Render();});
+        var password=SettingRow(L10n.Text("change_password"),"",_=>ResetPassword(email,L10n.Text("reset_change_detail",email),L10n.Text("reset_link_sent_to",email)));
         var language=SettingRow(L10n.Text("language"),LanguageName(L10n.Preference),ChooseLanguage);
         var startup=new ToggleButton {Style=(Style)FindResource("Switch"),IsChecked=LoginTask.Enabled,VerticalAlignment=VerticalAlignment.Center};
         AutomationProperties.SetName(startup,L10n.Text("open_at_login"));
@@ -569,7 +570,7 @@ public partial class MainWindow : Window {
             if(update is { } found) Process.Start(new ProcessStartInfo(found.Download.AbsoluteUri) {UseShellExecute=true});
             else CheckForUpdate(true);
         });
-        Add(Card(new FrameworkElement[]{devices,language,startupRow,updates},14));
+        Add(Card(new FrameworkElement[]{devices,password,language,startupRow,updates},14));
 
         var signOut=new Button {Content=L10n.Text("sign_out"),Height=40,Background=Look.Surface,Foreground=Look.Danger,HorizontalContentAlignment=HorizontalAlignment.Center};
         signOut.Click+=(_,_)=>{
@@ -590,7 +591,7 @@ public partial class MainWindow : Window {
         right.Children.Add(Single(value,13,Look.Secondary));
         var chevron=Look.Icon("",10,Look.Faint);chevron.Margin=new Thickness(8,0,0,0);right.Children.Add(chevron);
         var row=new Button {Height=44,Content=Columns(new FrameworkElement(),Single(title,14),right)};
-        AutomationProperties.SetName(row,title+": "+value);
+        AutomationProperties.SetName(row,value.Length==0?title:title+": "+value);
         row.Click+=(_,_)=>onClick(row);
         return row;
     }
@@ -700,13 +701,24 @@ public partial class MainWindow : Window {
         Reveal();
         var field=new Grid();field.Children.Add(hidden);field.Children.Add(shown);field.Children.Add(eye);Add(field);
         AutomationProperties.SetName(origin,L10n.Text("server_address"));AutomationProperties.SetName(email,L10n.Text("email"));AutomationProperties.SetName(hidden,L10n.Text("password"));AutomationProperties.SetName(shown,L10n.Text("password"));
-        var login=Add(Primary(L10n.Text("sign_in_action")),24,0);
+        var forgot=Add(new Button {Style=(Style)FindResource("Bare"),Content=new Border {Padding=new Thickness(8,0,2,0),Child=Single(L10n.Text("forgot_password"),12,Look.Secondary)},HorizontalAlignment=HorizontalAlignment.Right,Height=30},4,0);
+        forgot.Click+=(_,_)=>{
+            var address=email.Text.Trim();
+            if(address.Length==0) {Notify(L10n.Text("reset_enter_email_first"));email.Focus();return;}
+            ResetPassword(address,L10n.Text("reset_confirm_detail",address),L10n.Text("reset_link_sent"),()=>api.Origin=origin.Text.Trim());
+        };
+        var login=Add(Primary(L10n.Text("sign_in_action")),8,0);
         login.IsDefault=true;
         login.Click+=(_,_)=>{
             var password=showPassword?shown.Text:hidden.Password;
             if(string.IsNullOrWhiteSpace(email.Text)||password.Length==0) {Notify(L10n.Text("enter_your_email_and_password"));return;}
             Work(async()=>{api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password);hidden.Clear();shown.Clear();page="connect";Render();CheckForUpdate(false);});
         };
+    }
+    /// Both "forgot password" and "change password" email the Portal's reset link; the new password is set there.
+    private void ResetPassword(string email,string detail,string sent,Action? before=null) {
+        if(MessageBox.Show(this,detail,L10n.Text("reset_by_email"),MessageBoxButton.OKCancel)!=MessageBoxResult.OK) return;
+        Work(async()=>{before?.Invoke();await api.RequestPasswordReset(email);Notify(sent);});
     }
     private static readonly (string Code,string Name)[] Languages={("system",""),("zh","简体中文"),("en","English"),("ru","Русский")};
     private static string LanguageName(string code)=>code=="system"?L10n.Text("language_system"):Languages.FirstOrDefault(l=>l.Code==code).Name??"English";

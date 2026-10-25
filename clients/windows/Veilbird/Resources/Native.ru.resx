@@ -23,6 +23,7 @@
   <data name="back_action" xml:space="preserve"><value>Назад</value></data>
   <data name="cancel" xml:space="preserve"><value>Отмена</value></data>
   <data name="change_location" xml:space="preserve"><value>Изменить локацию  ›</value></data>
+  <data name="change_password" xml:space="preserve"><value>Сменить пароль</value></data>
   <data name="check_for_updates" xml:space="preserve"><value>Проверить обновления</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>Выберите локацию и подключитесь с главного экрана.</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>Выберите локацию и вернитесь к подключению.</value></data>
@@ -78,12 +79,14 @@
   <data name="disconnecting" xml:space="preserve"><value>Отключение…</value></data>
   <data name="download_amount" xml:space="preserve"><value>↓ Приём {0}</value></data>
   <data name="email" xml:space="preserve"><value>Электронная почта</value></data>
+  <data name="enter_a_valid_email" xml:space="preserve"><value>Введите корректный email.</value></data>
   <data name="enter_a_valid_https_server_address" xml:space="preserve"><value>Введите корректный HTTPS-адрес сервера.</value></data>
   <data name="enter_an_https_server_address_first" xml:space="preserve"><value>Сначала введите HTTPS-адрес сервера.</value></data>
   <data name="enter_email" xml:space="preserve"><value>Введите почту</value></data>
   <data name="enter_password" xml:space="preserve"><value>Введите пароль</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Введите почту и пароль.</value></data>
   <data name="finding_best_route" xml:space="preserve"><value>Подбираем лучший маршрут · Нажмите, чтобы отменить</value></data>
+  <data name="forgot_password" xml:space="preserve"><value>Забыли пароль?</value></data>
   <data name="got_it" xml:space="preserve"><value>Понятно</value></data>
   <data name="hide_password" xml:space="preserve"><value>Скрыть пароль</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Неверная почта или пароль.</value></data>
@@ -117,6 +120,7 @@
   <data name="open_at_login" xml:space="preserve"><value>Запускать при входе</value></data>
   <data name="open_main_window" xml:space="preserve"><value>Открыть окно</value></data>
   <data name="password" xml:space="preserve"><value>Пароль</value></data>
+  <data name="password_reset_unavailable" xml:space="preserve"><value>Сброс пароля по email сейчас недоступен. Обратитесь к администратору.</value></data>
   <data name="quality_fair" xml:space="preserve"><value>Средне</value></data>
   <data name="quality_good" xml:space="preserve"><value>Хорошо</value></data>
   <data name="quality_poor" xml:space="preserve"><value>Плохо</value></data>
@@ -125,6 +129,12 @@
   <data name="quota_exhausted_hint" xml:space="preserve"><value>Трафик закончился. Обратитесь к администратору, чтобы добавить трафик.</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>Обновить устройства</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Обновить локации</value></data>
+  <data name="reset_by_email" xml:space="preserve"><value>Сброс пароля по email</value></data>
+  <data name="reset_change_detail" xml:space="preserve"><value>Мы отправим на {0} ссылку для нового пароля. Она действует 1 час. После смены пароля на всех устройствах нужно войти заново.</value></data>
+  <data name="reset_confirm_detail" xml:space="preserve"><value>Мы отправим ссылку для сброса на {0}. Она действует 1 час.</value></data>
+  <data name="reset_enter_email_first" xml:space="preserve"><value>Сначала введите email: ссылка для сброса придёт на него.</value></data>
+  <data name="reset_link_sent" xml:space="preserve"><value>Если этот email зарегистрирован, письмо для сброса придёт в течение нескольких минут.</value></data>
+  <data name="reset_link_sent_to" xml:space="preserve"><value>Отправлено на {0}. Задайте новый пароль по ссылке из письма.</value></data>
   <data name="retest_latency" xml:space="preserve"><value>Проверить</value></data>
   <data name="retry_action" xml:space="preserve"><value>Повторить</value></data>
   <data name="revoke_access" xml:space="preserve"><value>Отозвать доступ</value></data>
@@ -143,6 +153,7 @@
   <data name="search_locations_or_regions" xml:space="preserve"><value>Поиск локаций или регионов</value></data>
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>Защищённое хранилище недоступно. Разблокируйте устройство и повторите.</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>Самая быстрая локация, при сбое — следующая</value></data>
+  <data name="send_reset_link" xml:space="preserve"><value>Отправить</value></data>
   <data name="server_address" xml:space="preserve"><value>Адрес сервера</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Адрес сервера https://…</value></data>
   <data name="share_action" xml:space="preserve"><value>Поделиться</value></data>
