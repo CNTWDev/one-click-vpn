@@ -133,7 +133,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         Journal.add("connect: ready in \(Int(Date().timeIntervalSince(started)*1000)) ms via \(carrying)")
     }
     /// All transports at once; true when at least one answers. Failures are remembered only when another transport worked.
-    private func probe(initial:Bool=false) async -> Bool {
+    private func probe(initial:Bool=false,report shouldReport:Bool?=nil) async -> Bool {
         let names=transports.joined(separator:",")
         let results=await Task.detached {Transports.parseProbe(CoreProbe(names,Transports.testURL,5000))}.value
         lastProbe=Date()
@@ -142,6 +142,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         let failed=results.filter {$0.value<0 && ($0.key != "wireguard" || leaseReady)}.map {$0.key}
         if initial || !failed.isEmpty {Journal.add("probe: "+transports.map {name in (results[name] ?? -1)>=0 ? "\(name) \(results[name]!) ms":"\(name) no answer"}.joined(separator:", "))}
         if !working.isEmpty {Transports.remember(network,failed:failed,working:working)}
+        // Tells the server which of this node's ports answer from here (Console: 云防火墙); off the connect path.
+        if shouldReport ?? initial,!working.isEmpty {
+            let summary=(working.map {"\($0)=ok"}+failed.map {"\($0)=fail"}).joined(separator:",")
+            Task {await report("TRANSPORT_PROBE",summary,network:network)}
+        }
         updateCarrying()
         return !working.isEmpty
     }
@@ -151,10 +156,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     }
     private func status() async -> Bool {(try? await api?.request("status/\(leaseId)")["ready"] as? Bool) ?? false}
     /// Failure codes and scrubbed error texts (no keys, addresses or traffic), so operators can see which builds and nodes fail and why.
-    private func report(_ code:String,_ detail:String="") async {
+    private func report(_ code:String,_ detail:String="",network:String="") async {
         var event:[String:Any]=["code":code,"at":ISO8601DateFormatter().string(from:Date())]
         if !nodeId.isEmpty {event["nodeId"]=nodeId}
         if !detail.isEmpty {event["detail"]=detail}
+        if !network.isEmpty {event["network"]=network}
         if let attempt=api?.attempt {event["attempt"]=attempt}
         _ = try? await api?.request("diagnostics",["events":[event]])
     }
@@ -195,7 +201,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             if Date()>=deadline {await fail("LEASE_RENEWAL_FAILED","ACCESS_EXPIRED");return}
         } else if !leaseReady,await status() {
             // WireGuard became usable: test it now so traffic moves to the lightest transport right away.
-            leaseReady=true;Journal.add("lease: WireGuard ready");_ = await probe()
+            leaseReady=true;Journal.add("lease: WireGuard ready");_ = await probe(report:true)
         }
         let current=Transports.networkKey(monitor.currentPath)
         if current != network && current != "unknown" {Journal.add("network: changed to \(current)");network=current;lastProbe=Date.distantPast}

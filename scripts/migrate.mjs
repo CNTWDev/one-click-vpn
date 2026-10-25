@@ -519,6 +519,14 @@ const migrations = [
     CREATE INDEX IF NOT EXISTS traffic_counters_observed_idx ON traffic_counters(observed_at);
     CREATE INDEX IF NOT EXISTS audit_created_idx ON audit_logs(created_at);
   `)],
+  ["003-node-transport-reach", async (db) => db.query(`
+    -- Which app transports answered on a node, per network (a one-way hash from the app): tells a closed
+    -- UDP port in a cloud security group from a network that blocks UDP. Rows older than 7 days are dropped.
+    CREATE TABLE IF NOT EXISTS node_transport_reach (
+      node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, transport TEXT NOT NULL, network TEXT NOT NULL,
+      ok_at TIMESTAMPTZ, failed_at TIMESTAMPTZ, PRIMARY KEY (node_id, transport, network)
+    );
+  `)],
 ];
 
 const client = await pool.connect();

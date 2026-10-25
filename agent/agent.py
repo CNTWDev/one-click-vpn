@@ -367,11 +367,44 @@ def replace_input_rule(comment, old_listener, new_listener):
     if old_listener is not None and old_listener != new_listener:
         while run_optional(rule("-D", old_listener)).returncode == 0:
             pass
+        firewall_manager_port("remove", old_listener)
     if new_listener is not None and run_optional(rule("-C", new_listener)).returncode != 0:
         try:
             run_fixed(rule("-I", new_listener))
         except subprocess.CalledProcessError as error:
             raise RuntimeError("firewall configuration failed: " + command_failure_detail(error)) from error
+    if new_listener is not None:
+        firewall_manager_port("add", new_listener)
+
+
+def active_firewall_manager():
+    """firewalld or ufw when one of them is running, else None (plain iptables)."""
+    if shutil.which("firewall-cmd") is not None and run_optional(["firewall-cmd", "--state"]).returncode == 0:
+        return "firewalld"
+    if shutil.which("ufw") is not None and "Status: active" in run_optional(["ufw", "status"]).stdout:
+        return "ufw"
+    return None
+
+
+def firewall_manager_port(operation, listener):
+    """Mirror a managed port into firewalld or ufw, runtime and permanent.
+
+    firewalld keeps its own nftables table, so an iptables ACCEPT alone does not open the
+    port there; ufw honours the iptables rule but would drop it after a reboot or reload.
+    """
+    transport, port = listener
+    manager = active_firewall_manager()
+    spec = f"{port}/{transport}"
+    try:
+        if manager == "firewalld":
+            flag = "--add-port" if operation == "add" else "--remove-port"
+            run_fixed(["firewall-cmd", f"{flag}={spec}"])
+            run_fixed(["firewall-cmd", "--permanent", f"{flag}={spec}"])
+        elif manager == "ufw":
+            run_fixed(["ufw", "allow", spec] if operation == "add" else ["ufw", "--force", "delete", "allow", spec])
+    except (subprocess.CalledProcessError, OSError) as error:
+        if operation == "add":
+            raise RuntimeError(f"{manager} could not open {spec}: " + command_failure_detail(error)) from error
 
 
 WIREGUARD_TCP_MSS = 1240  # 1280-byte client MTU minus IPv4 and TCP headers
@@ -1410,16 +1443,23 @@ def configured_listener(config_path, default_port, default_transport):
     return transport, port
 
 
+def firewall_manager_open(manager, transport, port):
+    if manager == "firewalld":
+        return run_optional(["firewall-cmd", f"--query-port={port}/{transport}"]).returncode == 0
+    if manager == "ufw":
+        return re.search(rf"^{port}/{transport}\s+ALLOW", run_optional(["ufw", "status"]).stdout, re.MULTILINE) is not None
+    return True
+
+
 def firewall_snapshot(protocol_specs):
-    manager = "iptables" if shutil.which("iptables") else "unknown"
-    if shutil.which("ufw") is not None:
-        manager = "ufw"
-    elif shutil.which("firewall-cmd") is not None:
-        manager = "firewalld"
+    active = active_firewall_manager()
+    manager = active or ("iptables" if shutil.which("iptables") else "unknown")
     managed_rules = {}
     for name, spec in protocol_specs.items():
         command = ["iptables", "-C", "INPUT", "-p", spec["transport"], "--dport", str(spec["port"]), "-m", "comment", "--comment", spec["comment"], "-j", "ACCEPT"]
-        managed_rules[f"{spec['transport']}/{spec['port']}"] = command_succeeds(command) if shutil.which("iptables") else None
+        rule = command_succeeds(command) if shutil.which("iptables") else None
+        # Under firewalld the iptables rule is not enough: the port must be open there too.
+        managed_rules[f"{spec['transport']}/{spec['port']}"] = (rule and firewall_manager_open(active, spec["transport"], spec["port"])) if rule is not None else None
     return {"manager": manager, "inputPolicy": input_policy(), "managedRules": managed_rules}
 
 
@@ -1438,6 +1478,7 @@ def connectivity_snapshot():
     protocol_specs = {
         "vless": {"transport": "tcp", "port": vless_port, "comment": "northstar-vless"},
         "stealth": {"transport": "udp", "port": stealth_port, "comment": "northstar-stealth-udp"},
+        "stealth-tcp": {"transport": "tcp", "port": stealth_port, "comment": "northstar-stealth-tcp"},
         "wireguard": {"transport": wireguard_transport, "port": wireguard_port, "comment": VPN_PORTS["wireguard"]["comment"]},
         "openvpn": {"transport": openvpn_transport, "port": openvpn_port, "comment": VPN_PORTS["openvpn"]["comment"]},
     }
@@ -1684,7 +1725,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.14.0",
+        "version": "agent 2.15.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
@@ -1722,7 +1763,7 @@ def adopt_controller_origin(target):
     CONTROLLER = target
     try:
         request_json("/api/v1/agent/heartbeat", {"nodeId": NODE_ID, "token": TOKEN, "hostname": socket.gethostname(),
-                                                 "version": "agent 2.14.0", "capabilities": capabilities()})
+                                                 "version": "agent 2.15.0", "capabilities": capabilities()})
         lines = CONFIG_ENV.read_text().splitlines()
         lines = [f"NORTHSTAR_CONTROLLER_URL={target}" if line.startswith("NORTHSTAR_CONTROLLER_URL=") else line for line in lines]
         if f"NORTHSTAR_CONTROLLER_URL={target}" not in lines:
