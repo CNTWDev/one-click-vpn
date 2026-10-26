@@ -49,6 +49,8 @@ export type DbNode = {
   metrics_json?: string | null;
   deployment_policy?: "standard" | "custom" | "agent-only";
   policy_version?: number;
+  /** Set while the node is paused: hidden from apps, subscriptions and new configs, still serving existing ones. */
+  paused_at?: string | null;
 };
 
 export type NodeMetrics = {
@@ -522,6 +524,11 @@ export async function countRunningNodeActions(nodeId: string, excludeActionId?: 
   const rows = await dbQuery<{ count: string }>(`SELECT COUNT(*)::text AS count FROM node_actions
     WHERE node_id = $1 AND status IN ('queued', 'running')${excludeActionId ? " AND id <> $2" : ""}`, excludeActionId ? [nodeId, excludeActionId] : [nodeId]);
   return Number(rows[0]?.count || 0);
+}
+
+/** Pausing only changes what apps, subscriptions and new configs offer; the node and its existing users are untouched. */
+export async function setNodePaused(id: string, paused: boolean): Promise<boolean> {
+  return (await dbExec(`UPDATE nodes SET paused_at = ${paused ? "COALESCE(paused_at, $2)" : "NULL"}, updated_at = $2 WHERE id = $1`, [id, now()])) === 1;
 }
 
 export async function deleteNode(id: string): Promise<boolean> {

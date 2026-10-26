@@ -40,7 +40,7 @@ const node = (id, name, region, ip, user, port, extra = {}) => ({ id, name, plac
 const nodes = [
   node("n1", "13.245.35.167@Cape Town", "r1", "13.245.35.167", "root", 10022, { metrics: metrics(2, 17, 3) }),
   node("n2", "190.92.202.34@Singapore", "r2", "190.92.202.34", "root", 22, { metrics: metrics(3, 16, 18, 117.6e6, 112.9e6), monthlyTraffic: monthly(1843.2, 1907.5) }),
-  node("n3", "3.139.105.5(US)", "r3", "3.139.105.5", "ubuntu", 22, { metrics: metrics(2, 48, 3, 90, 40), monthlyTraffic: monthly(0.004, 0.006) }),
+  node("n3", "3.139.105.5(US)", "r3", "3.139.105.5", "ubuntu", 22, { metrics: metrics(2, 48, 3, 90, 40), monthlyTraffic: monthly(0.004, 0.006), paused_at: now }),
   node("n4", "Johor-bytedance", "r4", "101.47.28.201", "root", 22, { metrics: metrics(100, 94, 71), has_ssh_credential: true }),
   node("n5", "sao-paulo-edge-gateway-primary-with-a-very-long-hostname", "r5", "2001:db8:85a3::8a2e:370:7334", "administrator", 65022, { status: "offline", last_seen: "2 days ago", metrics: null, monthlyTraffic: null, deployment_policy: "custom", policy_version: 1, version: "agent 2.9.4" }),
 ];

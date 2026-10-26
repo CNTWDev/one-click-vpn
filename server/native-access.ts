@@ -70,8 +70,8 @@ export async function nativeAccount(session: Session) {
     limit:slots.limit,used:slots.used,configs:slots.used-devices.filter(d=>d.status!=="revoked").length,
     expiresAt:access.state==="active"?access.until:access.endedAt,access,devices,traffic };
 }
-async function candidates() {
-  return (await selectVpnServices({protocol:"wireguard"})).filter(({node})=>node.capabilities.nativeLeaseEnforcement === 1);
+async function candidates(includePaused=false) {
+  return (await selectVpnServices({protocol:"wireguard",includePaused})).filter(({node})=>node.capabilities.nativeLeaseEnforcement === 1);
 }
 /** Node CPU percent from a heartbeat under 3 minutes old; clients use it to steer away from busy nodes. */
 function nodeLoad(metrics: string | null | undefined): number | null {
@@ -117,7 +117,11 @@ function checkEntitlement(user:Entitlement) {
 export async function nativeConnect(session:Session,body:Record<string,unknown>) {
   const input=await consume(session,"connect",body);
   if(typeof input.publicKey!=="string" || !/^[A-Za-z0-9+/]{43}=$/.test(input.publicKey) || Buffer.from(input.publicKey,"base64").length!==32) throw new NativeError("INVALID_KEY");
-  const available=await candidates(), chosen=input.nodeId?available.find(({node})=>node.id===input.nodeId):available[0];
+  const available=await candidates(true);
+  let chosen=input.nodeId?available.find(({node})=>node.id===input.nodeId):available.find(({node})=>!node.paused_at);
+  // A paused node takes no new connections; a device already connected there keeps renewing until it disconnects.
+  if(chosen?.node.paused_at && !(await dbQuery(`SELECT 1 FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id
+    WHERE l.node_id=$1 AND e.user_id=$2 AND e.identity_thumbprint=$3 AND l.expires_at>now()`,[chosen.node.id,session.user_id,session.identity_thumbprint])).length) chosen=undefined;
   if(!chosen || !chosen.node.server_public_key) throw new NativeError("NODE_UNAVAILABLE",409);
   const {node,service}=chosen;
   const result=await transaction(async client=>{
@@ -184,7 +188,7 @@ export async function nativeConnect(session:Session,body:Record<string,unknown>)
 }
 /** The other transports, and why some are missing (logged, never sent to the app). */
 async function fallbackProxies(node:{id:string;ip:string;public_endpoint:string|null},enrollmentId:string):Promise<{proxies:Array<Record<string,unknown>>;reason:string}> {
-  const pick=async(protocol:"vless"|"stealth")=>(await selectVpnServices({protocol})).find((item)=>item.node.id===node.id)?.service;
+  const pick=async(protocol:"vless"|"stealth")=>(await selectVpnServices({protocol,includePaused:true})).find((item)=>item.node.id===node.id)?.service;
   try {
     await ensureNativeSecret(enrollmentId);
     const services={vless:await pick("vless"),stealth:await pick("stealth")};

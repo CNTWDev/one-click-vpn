@@ -571,6 +571,10 @@ const migrations = [
     ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS mirror_error TEXT NOT NULL DEFAULT '';
     ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS mirror_attempts INTEGER NOT NULL DEFAULT 0;
   `)],
+  ["008-node-pause", async (db) => db.query(`
+    -- A paused node keeps running and serving existing configs, but apps, subscriptions and new configs no longer offer it.
+    ALTER TABLE nodes ADD COLUMN IF NOT EXISTS paused_at TEXT;
+  `)],
 ];
 
 const client = await pool.connect();

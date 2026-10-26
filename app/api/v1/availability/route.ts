@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const user = await requestUser(request);
   if (!user) return jsonError("Active user authentication required", 403);
   const [regions, nodes, services] = await Promise.all([listRegions(), listControlNodes(), listVpnServices()]);
-  const onlineNodes = nodes.filter((node) => node.status === "online" && node.last_heartbeat_at && Date.now() - new Date(node.last_heartbeat_at).getTime() < 90_000);
+  const onlineNodes = nodes.filter((node) => !node.paused_at && node.status === "online" && node.last_heartbeat_at && Date.now() - new Date(node.last_heartbeat_at).getTime() < 90_000);
   // One protocol lookup per online node, not one per node × service.
   const nodeProtocols = new Map(await Promise.all(onlineNodes.map(async (node) => [node.id, await listNodeProtocols(node.id)] as const)));
   const available = [];

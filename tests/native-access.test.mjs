@@ -57,6 +57,15 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     await pool.query("INSERT INTO observed_configs(node_id,protocol,applied_revision,observed_hash,status,updated_at) VALUES($1,'wireguard',$2,'test','applied',$3)",[node,result.revision,stamp]);
     await pool.query("UPDATE desired_configs SET revision=revision+1 WHERE node_id=$1",[node]);
     assert.equal((await call(`status/${result.leaseId}`,undefined,winner.token)).data.ready,true,"another client's pending revision must not block an applied lease");
+    // A paused node leaves the list and takes no new connections; the device already on it keeps renewing.
+    await pool.query("UPDATE nodes SET paused_at=$2 WHERE id=$1",[node,stamp]);
+    assert.equal((await call("nodes",undefined,winner.token)).data.nodes.some(n=>n.id===node),false);
+    assert.equal((await call("connect",await proof(loser,"connect",{...input,publicKey:randomBytes(32).toString("base64")}),loser.token)).data.code,"NODE_UNAVAILABLE");
+    assert.equal((await call("connect",await proof(loser,"connect",{publicKey:randomBytes(32).toString("base64")}),loser.token)).data.code,"NODE_UNAVAILABLE","automatic pick skips it");
+    const kept=await call("connect",await proof(winner,"connect",{...input,publicKey:randomBytes(32).toString("base64")}),winner.token);
+    assert.equal(kept.status,200,JSON.stringify(kept.data));assert.equal(kept.data.leaseId,result.leaseId);
+    await pool.query("UPDATE nodes SET paused_at=NULL WHERE id=$1",[node]);
+    assert.equal((await call("nodes",undefined,winner.token)).data.nodes.some(n=>n.id===node),true);
     const revoke=await proof(winner,"revoke",{enrollmentId:result.enrollmentId});assert.equal((await call("revoke",revoke,winner.token)).status,200);
     assert.equal((await call("account",undefined,winner.token)).data.used,1,"slot retained until lease deadline");
     assert.equal((await call(`status/${result.leaseId}`,undefined,winner.token)).status,403);
