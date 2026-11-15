@@ -182,7 +182,7 @@ public sealed class Connection(NativeApi api,Core core) {
                 }
                 if(DateTime.UtcNow-renewedAt>=OfflineGrace) {Journal.Add("lease: expired");await Fail("LEASE_RENEWAL_FAILED","connection_authorization_expired_connect_again");return;}
             } else if(!leaseReady&&await Status()) {
-                // WireGuard became usable: test it now so traffic moves to the lightest transport right away.
+                // WireGuard became usable: test it now so the fallback group can count on it right away.
                 leaseReady=true;Journal.Add("lease: WireGuard ready");await Probe(report:true);
             }
             if(now-lastNetworkCheck>TimeSpan.FromSeconds(30)) {

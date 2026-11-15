@@ -211,7 +211,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             catch {Journal.add("lease: renewal failed, retrying");renewAt=Date().addingTimeInterval(Date().timeIntervalSince(renewedAt)<300 ? 15:60)}
             if Date().timeIntervalSince(renewedAt)>=offlineGrace {await fail("LEASE_RENEWAL_FAILED","ACCESS_EXPIRED");return}
         } else if !leaseReady,await status() {
-            // WireGuard became usable: test it now so traffic moves to the lightest transport right away.
+            // WireGuard became usable: test it now so the fallback group can count on it right away.
             leaseReady=true;Journal.add("lease: WireGuard ready");_ = await probe(report:true)
         }
         let current=Transports.networkKey(monitor.currentPath)
