@@ -52,17 +52,29 @@ function parsePreviousNames(value: string | undefined): string[] {
   catch { return []; }
 }
 
-async function realityUserRows(nodeId: string) {
-  const rows = await dbQuery<{ secret_id: string; email: string; fingerprint: string }>(`SELECT DISTINCT COALESCE(s.private_key_secret_id, k.id) AS secret_id, c.identity_key AS email, material.fingerprint FROM access_credentials c
+/** VLESS users of a node: subscriptions and single VLESS configs with a live profile there. */
+async function credentialUserRows(nodeId: string, onlySubscriptions = false) {
+  return dbQuery<{ secret_id: string; email: string; fingerprint: string }>(`SELECT DISTINCT COALESCE(s.private_key_secret_id, k.id) AS secret_id, c.identity_key AS email, material.fingerprint FROM access_credentials c
     LEFT JOIN subscriptions s ON s.credential_id=c.id
     LEFT JOIN secret_materials k ON k.kind='vless_client:' || c.id AND k.owner_node_id IS NULL
     JOIN secret_materials material ON material.id=COALESCE(s.private_key_secret_id, k.id)
     JOIN users u ON u.id=c.user_id JOIN connection_profiles p ON p.credential_id=c.id
     WHERE p.node_id=$1 AND p.protocol='vless' AND p.status='active' AND p.expires_at>$2
     AND c.status='active' AND NOT c.user_disabled AND NOT c.admin_disabled AND c.deleted_at IS NULL
-    AND (c.expires_at IS NULL OR c.expires_at>$2) AND ${accessSql()} AND ${withinDeviceLimitSql("u","c.created_at::timestamptz","c.id")} AND NOT u.native_only ORDER BY c.identity_key`, [nodeId,new Date().toISOString()]);
+    AND (c.expires_at IS NULL OR c.expires_at>$2) AND ${accessSql()} AND ${withinDeviceLimitSql("u","c.created_at::timestamptz","c.id")} AND NOT u.native_only ${onlySubscriptions ? "AND s.id IS NOT NULL" : ""} ORDER BY c.identity_key`, [nodeId,new Date().toISOString()]);
+}
+
+async function realityUserRows(nodeId: string) {
   // TrackNothing app devices fall back to this node's VLESS port when UDP is blocked.
-  return [...rows, ...await nativeUserRows()];
+  return [...await credentialUserRows(nodeId), ...await nativeUserRows()];
+}
+
+/**
+ * Subscriptions with VLESS access on this node. They also get the node's stealth service (Hysteria2 and
+ * XHTTP) with the same UUID, so a subscription has the apps' fallback lines (see stealth.ts).
+ */
+export function subscriptionUserRows(nodeId: string) {
+  return credentialUserRows(nodeId, true);
 }
 
 async function decryptUsers(rows: Awaited<ReturnType<typeof realityUserRows>>) {

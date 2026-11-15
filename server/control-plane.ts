@@ -103,7 +103,12 @@ export async function ensureDefaultNodeProtocols(nodeId: string): Promise<void> 
 }
 
 export async function rebuildDesiredState(nodeId: string, protocol: Protocol, options: { force?: boolean } = {}) {
-  return withReconcileLock(nodeId, protocol, () => buildDesiredStateLocked(nodeId, protocol, options));
+  const desired = await withReconcileLock(nodeId, protocol, () => buildDesiredStateLocked(nodeId, protocol, options));
+  // Subscriptions with VLESS access on a node also use its stealth service (stealth.ts), so their access moves together.
+  if (protocol === "vless" && (await findVpnService(nodeId, "stealth"))?.enabled) {
+    await withReconcileLock(nodeId, "stealth", () => buildDesiredStateLocked(nodeId, "stealth", {})).catch(() => undefined);
+  }
+  return desired;
 }
 
 async function vlessDesiredReality(nodeId: string, listenPort: number) {

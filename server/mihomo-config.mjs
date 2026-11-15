@@ -10,11 +10,18 @@ const ruleSet = (kind, name, behavior, group) => ({ type: "http", behavior, form
 /** Fixed YAML keys + JSON flow values: no interpolation of user data into YAML syntax. */
 /**
  * @param {Array<Record<string, unknown> & { name: string; type: string }>} proxies
- * @param {{ mode?: "smart" | "global"; group?: string }} [options] `group` names the main selector after the site (no commas).
+ * @param {{ mode?: "smart" | "global"; group?: string; nodes?: Array<{ name: string; proxies: string[] }> }} [options]
+ *   `group` names the main selector after the site (no commas). `nodes` groups several lines of one node:
+ *   the node becomes one hidden fallback group (first line that answers wins) and is what users pick.
  */
 export function renderMihomoConfig(proxies, options = {}) {
   if (!proxies.length) throw new Error("节点尚未就绪，请稍后刷新订阅");
-  const names = proxies.map((proxy) => proxy.name);
+  const nodes = (options.nodes || []).filter((node) => node.proxies.length > 1);
+  const grouped = new Set(nodes.flatMap((node) => node.proxies));
+  const names = options.nodes
+    ? options.nodes.map((node) => node.proxies.length > 1 ? node.name : node.proxies[0]).filter(Boolean)
+    : proxies.map((proxy) => proxy.name);
+  for (const proxy of proxies) if (options.nodes && !grouped.has(proxy.name) && !names.includes(proxy.name)) names.push(proxy.name);
   const smart = (options.mode || "smart") === "smart";
   const group = options.group || "TrackNothing";
   const config = {
@@ -33,6 +40,8 @@ export function renderMihomoConfig(proxies, options = {}) {
       // The client's own "Global" switch uses this group; without it Mihomo defaults to DIRECT.
       // It follows the main group's choice unless a node is picked here.
       { name: "GLOBAL", type: "select", proxies: [group, "自动选择", ...names] },
+      // A blocked UDP port or a disturbed 443 moves the node to its next line within one check.
+      ...nodes.map((node) => ({ name: node.name, type: "fallback", proxies: node.proxies, url: "https://www.gstatic.com/generate_204", interval: 120, hidden: true })),
     ],
     ...(smart ? { "rule-providers": {
       private_domain: ruleSet("geosite", "private", "domain", group), cn_domain: ruleSet("geosite", "cn", "domain", group), cn_ip: ruleSet("geoip", "cn", "ipcidr", group),
