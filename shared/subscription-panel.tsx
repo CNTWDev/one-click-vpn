@@ -14,14 +14,15 @@ const clients = [
 ];
 const bytes = (value: string) => { const n = Number(value); return n >= 1073741824 ? `${(n/1073741824).toFixed(2)} GB` : `${(n/1048576).toFixed(1)} MB`; };
 
-export function SubscriptionPanel({ api, admin = false, createOnly = false, availableProtocols = ["wireguard", "vless"], onCreated }: { api: Api; admin?: boolean; createOnly?: boolean; availableProtocols?: string[]; onCreated?: (credentialId: string, token: string) => void }) {
+export function SubscriptionPanel({ api, admin = false, createOnly = false, availableProtocols = ["vless"], onCreated }: { api: Api; admin?: boolean; createOnly?: boolean; availableProtocols?: string[]; onCreated?: (credentialId: string, token: string) => void }) {
   const { t, locale } = useI18n();
   const date = (value: string | null) => value ? formatDate(value, locale) : t("尚未拉取");
   const endpoint = admin ? "/api/v1/admin/subscriptions" : "/api/v1/subscriptions";
   const [items, setItems] = useState<Item[]>([]), [customName, setName] = useState<string | null>(null);
   const name = customName ?? t("我的订阅");
-  const [protocol, setProtocol] = useState("wireguard"), [client, setClient] = useState("hiddify");
-  const effectiveProtocol = availableProtocols.includes(protocol) ? protocol : availableProtocols.find((p) => ["wireguard", "vless"].includes(p)) || "";
+  const [client, setClient] = useState("hiddify");
+  // Every subscription is VLESS (REALITY + Hysteria2 + XHTTP per node); it needs nodes with VLESS.
+  const ready = availableProtocols.includes("vless");
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState<LocalizedMessage>("");
   const [link, setLink] = useState(""), [confirm, setConfirm] = useState<{ item: Item; action: string } | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -49,7 +50,7 @@ export function SubscriptionPanel({ api, admin = false, createOnly = false, avai
   async function create(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError(""); setNotice("");
     try {
-      const result = await api<{ token: string; credentialId: string }>(endpoint, { method: "POST", body: JSON.stringify({ name, protocol: effectiveProtocol }) });
+      const result = await api<{ token: string; credentialId: string }>(endpoint, { method: "POST", body: JSON.stringify({ name }) });
       showLink(result.token); setNotice(message("订阅已创建。首次节点权限同步通常需要几十秒；看到已同步节点后再导入。以后可在“我的连接”验证登录密码后再次获取链接。")); if (!createOnly) await refresh(); onCreated?.(result.credentialId, result.token);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
@@ -73,8 +74,7 @@ export function SubscriptionPanel({ api, admin = false, createOnly = false, avai
     {!admin && <div className="subscription-setup"><form onSubmit={create}>
       <label>{t("给订阅取个名字")}<input required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("例如：日常使用")} /></label>
       <label>{t("使用的客户端")}<select value={client} onChange={(e) => setClient(e.target.value)}>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-      <details><summary>{t("连接方式")}</summary><label>{t("底层协议")}<select value={effectiveProtocol} onChange={(e) => setProtocol(e.target.value)}>{availableProtocols.includes("wireguard") && <option value="wireguard">WireGuard</option>}{availableProtocols.includes("vless") && <option value="vless">VLESS + REALITY</option>}</select></label><small>{t("订阅包含该方式下的全部可用节点。新服务须管理员先部署。WireGuard 多端同时使用请各建一份订阅。")}</small></details>
-      <button className="subscription-primary" disabled={busy || !effectiveProtocol}>{busy ? t("处理中…") : effectiveProtocol ? t("创建订阅") : t("暂无可用节点")}</button>
+      <button className="subscription-primary" disabled={busy || !ready}>{busy ? t("处理中…") : ready ? t("创建订阅") : t("暂无可用节点")}</button>
     </form><aside><h3>{t("三步开始使用")}</h3><ol><li>{t("安装")} <a href={selected.url} target="_blank" rel="noreferrer">{selected.name}</a><small>{selected.platform}</small></li><li>{t("创建订阅，复制链接并在客户端添加订阅。")}</li><li>{t("打开连接，选择「自动选择」或手动切换节点。")}</li></ol><p>{t("支持订阅更新；手机后台刷新由客户端和系统决定。建议开启客户端自动更新，新增节点未出现时手动刷新。")}</p><p>{t("官方 WireGuard / OpenVPN 客户端请切换到“指定节点”，下载配置文件。")}</p></aside></div>}
     {link && <div className="subscription-link"><b>{t("个人订阅链接 · 请勿分享或上传转换网站")}</b><input readOnly aria-label={t("订阅链接")} value={link} onFocus={(e) => e.target.select()} /><div className="subscription-actions"><button onClick={() => void copy()}>{t("复制链接")}</button><a className="subscription-import" href={importUrl}>{t("尝试导入")} {selected.name}</a><button onClick={() => setLink("")}>{t("隐藏链接")}</button></div><small>{t("若客户端没有打开，请使用复制链接导入。刷新失败时先检查节点同步状态。")}</small></div>}
     {!createOnly && <div className="subscription-list">{items.map((item) => {

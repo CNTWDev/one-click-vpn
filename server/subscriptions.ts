@@ -1,9 +1,8 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { x25519 } from "@noble/curves/ed25519.js";
 import { addAudit, dbExec, dbQuery } from "./db";
 import { withKeyedLock } from "./reconcile-lock";
 import { hashToken } from "./crypto";
-import { createAccessCredential, findDesiredConfig, listConnectionProfiles } from "./control-db";
+import { createAccessCredential, findAccessCredential, findDesiredConfig, listConnectionProfiles } from "./control-db";
 import { activateProfile, issueConnectionProfile, rebuildDesiredState, selectVpnServices } from "./control-plane";
 import { assertCredentialUsable, manageCredentialAccess } from "./credential-access";
 import { createSecretMaterial, readSecretMaterial } from "./secret-materials";
@@ -32,19 +31,17 @@ function locked<T>(key: string, work: () => Promise<T>): Promise<T> {
   return withKeyedLock(key, work);
 }
 
-/** New subscriptions are VLESS: REALITY plus the stealth lines. Existing WireGuard subscriptions keep working. */
-export async function createSubscription(userId: string, name: string, protocol: "wireguard" | "vless" = "vless") {
+/** A subscription is VLESS: REALITY plus the stealth lines (Hysteria2, XHTTP) on every ready node. */
+export async function createSubscription(userId: string, name: string) {
   return locked(`subscription-create:${userId}`, async () => {
     if ((await listSubscriptions(userId)).filter((s) => s.status === "active").length >= 20) throw new Error("最多创建 20 份有效订阅");
-    const key = protocol === "wireguard" ? randomBytes(32) : null;
-    const identityKey = key ? Buffer.from(x25519.getPublicKey(key)).toString("base64") : randomUUID();
-    const credential = await createAccessCredential({ userId, displayName: name, protocol, identityKey });
+    const credential = await createAccessCredential({ userId, displayName: name, protocol: "vless", identityKey: randomUUID() });
     // VLESS authorization UUID is distinct from its public telemetry identity and encrypted at rest.
-    const secret = await createSecretMaterial({ kind: `subscription_key:${credential.id}`, value: key ? key.toString("base64") : randomUUID() });
+    const secret = await createSecretMaterial({ kind: `subscription_key:${credential.id}`, value: randomUUID() });
     const token = randomBytes(32).toString("base64url"), id = `sub_${randomUUID()}`, timestamp = new Date().toISOString();
     const linkSecret = await createSecretMaterial({ kind: `subscription_link:${id}`, value: token });
     await dbExec(`INSERT INTO subscriptions (id,credential_id,token_hash,private_key_secret_id,created_at,updated_at,token_secret_id)
-      VALUES ($1,$2,$3,$4,$5,$5,$6)`, [id,credential.id,hashToken(token),secret?.id || null,timestamp,linkSecret.id]);
+      VALUES ($1,$2,$3,$4,$5,$5,$6)`, [id,credential.id,hashToken(token),secret.id,timestamp,linkSecret.id]);
     await addAudit({ actorUserId: userId, action: "subscription.created", targetType: "subscription", targetId: id });
     return { id, credentialId: credential.id, token };
   });
@@ -76,16 +73,13 @@ export async function manageSubscription(id: string, action: string, actor: { id
   });
 }
 
-/** Has the Agent applied a revision that contains this credential? Later unrelated revisions don't matter. */
-async function accessApplied(profileId: string, nodeId: string, protocol: "wireguard" | "vless", identityKey: string) {
-  const desired = await findDesiredConfig(nodeId, protocol);
+/** Has the Agent applied a VLESS revision that contains this credential? Later unrelated revisions don't matter. */
+async function accessApplied(profileId: string, nodeId: string, identityKey: string) {
+  const desired = await findDesiredConfig(nodeId, "vless");
   const applied = (await dbQuery<{ applied_revision: number; status: string }>(
-    "SELECT applied_revision,status FROM observed_configs WHERE node_id=$1 AND protocol=$2", [nodeId,protocol]))[0];
+    "SELECT applied_revision,status FROM observed_configs WHERE node_id=$1 AND protocol='vless'", [nodeId]))[0];
   if (!desired || !applied || !["applied", "succeeded"].includes(applied.status)) return false;
-  const member = protocol === "wireguard"
-    ? ((desired.payload.peers || []) as Array<{ publicKey?: string }>).some((peer) => peer.publicKey === identityKey)
-    : (await realityUserIdentities(nodeId)).has(identityKey);
-  if (!member) {
+  if (!(await realityUserIdentities(nodeId)).has(identityKey)) {
     await dbExec("UPDATE connection_profiles SET included_revision=NULL WHERE id=$1", [profileId]);
     return false;
   }
@@ -113,6 +107,37 @@ async function stealthLines(node: { id: string }, host: string, port: number, uu
   return { before, after };
 }
 
+const WIREGUARD_GRACE_MS = 7 * 86400_000;
+
+/**
+ * Subscriptions used to be WireGuard or VLESS; now they are all VLESS. An old WireGuard subscription moves
+ * to a new VLESS credential under the same link, so its next refresh brings the new lines. The new credential
+ * takes over the old one's device (no free slot needed, ranked just before it, so a device limit drops the
+ * WireGuard one first). The WireGuard credential keeps working for 7 days for devices that have not refreshed.
+ * Runs from the minute jobs; once no WireGuard subscription is left it is one empty query.
+ * TODO(2026-12): remove together with the last WireGuard subscription credentials.
+ */
+export async function upgradeWireGuardSubscriptions(): Promise<number> {
+  const rows = await dbQuery<{ id: string }>(`SELECT s.id FROM subscriptions s JOIN access_credentials c ON c.id=s.credential_id
+    WHERE c.protocol='wireguard' AND c.status='active' AND c.deleted_at IS NULL`);
+  for (const { id } of rows) {
+    await locked(`subscription:${id}`, async () => {
+      const sub = (await dbQuery<Subscription>("SELECT * FROM subscriptions WHERE id=$1", [id]))[0];
+      const old = sub && await findAccessCredential(sub.credential_id);
+      if (!old || old.protocol !== "wireguard") return;
+      const credential = await createAccessCredential({ userId: old.user_id, displayName: old.display_name, protocol: "vless", identityKey: randomUUID(), replacesCredential: true });
+      const grace = new Date(Date.now() + WIREGUARD_GRACE_MS).toISOString();
+      await dbExec("UPDATE access_credentials SET created_at=$1,expires_at=$2,user_disabled=$3,admin_disabled=$4 WHERE id=$5",
+        [new Date(Date.parse(old.created_at) - 1).toISOString(), old.expires_at, old.user_disabled, old.admin_disabled, credential.id]);
+      const secret = await createSecretMaterial({ kind: `subscription_key:${credential.id}`, value: randomUUID() });
+      await dbExec("UPDATE subscriptions SET credential_id=$1,private_key_secret_id=$2,updated_at=$3 WHERE id=$4", [credential.id, secret.id, new Date().toISOString(), id]);
+      await dbExec("UPDATE access_credentials SET expires_at=$1,updated_at=$2 WHERE id=$3 AND (expires_at IS NULL OR expires_at>$1)", [grace, new Date().toISOString(), old.id]);
+      await addAudit({ actorUserId: old.user_id, action: "subscription.upgraded", targetType: "subscription", targetId: id, metadata: { from: old.id, to: credential.id } });
+    }).catch((error) => console.error("Subscription upgrade failed", id, error));
+  }
+  return rows.length;
+}
+
 export async function downloadSubscription(token: string, options: { format?: SubscriptionFormat; mode?: RoutingMode; group?: string; userAgent?: string | null } = {}) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("订阅不可用");
   const initial = (await dbQuery<Subscription>("SELECT * FROM subscriptions WHERE token_hash=$1", [hashToken(token)]))[0];
@@ -121,35 +146,28 @@ export async function downloadSubscription(token: string, options: { format?: Su
     const sub = (await dbQuery<Subscription>("SELECT * FROM subscriptions WHERE id=$1 AND token_hash=$2", [initial.id,hashToken(token)]))[0];
     if (!sub) throw new Error("订阅不可用");
     const credential = await assertCredentialUsable(sub.credential_id);
-    if (credential.protocol !== "wireguard" && credential.protocol !== "vless") throw new Error("订阅协议不受支持");
+    // A WireGuard subscription not upgraded yet answers 503, so the client keeps its working config.
+    if (credential.protocol !== "vless") throw new Error("订阅正在升级");
     const key = sub.private_key_secret_id ? await readSecretMaterial(sub.private_key_secret_id) : undefined;
-    const candidates = await selectVpnServices({ protocol: credential.protocol });
+    if (!key) throw new Error("订阅不可用");
     const format = options.format || "clash";
-    const client = credential.protocol === "vless" ? subscriptionClient(format, options.userAgent ?? null) : { hysteria2: false, xhttp: false };
+    const client = subscriptionClient(format, options.userAgent ?? null);
+    const candidates = await selectVpnServices({ protocol: "vless" });
     const stealthServices = new Map((client.hysteria2 || client.xhttp ? await selectVpnServices({ protocol: "stealth" }) : []).map((item) => [item.node.id, item.service]));
-    const nodes: SubscriptionNode[] = [];
     const profiles = await listConnectionProfiles({ credentialId: credential.id });
-    const proxies: SubscriptionProxy[] = [];
     const regions = new Map((await dbQuery<{ id: string; name: string; code: string }>("SELECT id,name,code FROM regions")).map((row) => [row.id, row]));
-    const usedNames = new Set<string>();
+    const proxies: SubscriptionProxy[] = [], nodes: SubscriptionNode[] = [], usedNames = new Set<string>();
     for (const { node, service } of candidates) {
       try {
-      let profile = profiles.find((p) => p.node_id === node.id && ["issued", "active"].includes(p.status)
-        && new Date(p.expires_at).getTime() > Date.now() && p.endpoint.host === (node.public_endpoint || node.ip) && p.endpoint.port === service.listen_port);
-      if (!profile) profile = await issueConnectionProfile({ credentialId: credential.id, nodeId: node.id, protocol: credential.protocol, clientPrivateKey: key });
-      if (profile.status === "issued") profile = await activateProfile(profile.id, credential.user_id);
-      // A healthy process alone doesn't prove that THIS user's access has reached the node.
-      if (!(await accessApplied(profile.id, node.id, credential.protocol, credential.identity_key))) continue;
-      const region = node.region_id ? regions.get(node.region_id) : undefined;
-      const name = proxyName({ countryCode: region?.code, region: region?.name, nodeName: node.name, nodeId: node.id }, usedNames);
-      const payload = profile.protocol_payload;
-      if (credential.protocol === "wireguard") {
-        if (!key || !profile.client_address || !node.server_public_key) continue;
-        proxies.push({ name, type: "wireguard", server: profile.endpoint.host, port: profile.endpoint.port,
-          ip: profile.client_address.split("/")[0], "private-key": key, "public-key": node.server_public_key,
-          "allowed-ips": ["0.0.0.0/0"], "persistent-keepalive": 25, udp: true, "remote-dns-resolve": true, dns: profile.dns, mtu: 1280 });
-      } else {
-        if (!key) continue;
+        let profile = profiles.find((p) => p.node_id === node.id && ["issued", "active"].includes(p.status)
+          && new Date(p.expires_at).getTime() > Date.now() && p.endpoint.host === (node.public_endpoint || node.ip) && p.endpoint.port === service.listen_port);
+        if (!profile) profile = await issueConnectionProfile({ credentialId: credential.id, nodeId: node.id, protocol: "vless" });
+        if (profile.status === "issued") profile = await activateProfile(profile.id, credential.user_id);
+        // A healthy process alone doesn't prove that THIS user's access has reached the node.
+        if (!(await accessApplied(profile.id, node.id, credential.identity_key))) continue;
+        const region = node.region_id ? regions.get(node.region_id) : undefined;
+        const name = proxyName({ countryCode: region?.code, region: region?.name, nodeName: node.name, nodeId: node.id }, usedNames);
+        const payload = profile.protocol_payload;
         const reality: SubscriptionProxy = { name, type: "vless", server: profile.endpoint.host, port: profile.endpoint.port,
           uuid: key, network: "tcp", tls: true, udp: true, flow: "xtls-rprx-vision", servername: payload.serverName,
           "client-fingerprint": "chrome", "reality-opts": { "public-key": payload.publicKey, "short-id": payload.shortId } };
@@ -162,17 +180,16 @@ export async function downloadSubscription(token: string, options: { format?: Su
         lines.forEach((line, index) => { line.name = names[index]; });
         proxies.push(...lines);
         nodes.push({ name, proxies: lines });
-      }
       } catch {
         // A full address pool or failed node must not invalidate the other ready nodes.
         await addAudit({ actorUserId: credential.user_id, action: "subscription.node-pending", targetType: "node", targetId: node.id,
-          metadata: { subscriptionId: sub.id, protocol: credential.protocol } });
+          metadata: { subscriptionId: sub.id, protocol: "vless" } });
       }
     }
     // Re-check revocations that may have arrived through the legacy credential/account management endpoints.
     await assertCredentialUsable(credential.id);
     const content = format === "v2ray" ? renderV2raySubscription(proxies)
-      : renderSubscription(proxies, { mode: options.mode, group: options.group, nodes: nodes.length ? nodes.map((node) => ({ name: node.name, proxies: node.proxies.map((line) => line.name) })) : undefined });
+      : renderSubscription(proxies, { mode: options.mode, group: options.group, nodes: nodes.map((node) => ({ name: node.name, proxies: node.proxies.map((line) => line.name) })) });
     await dbExec("UPDATE subscriptions SET last_fetched_at=$1 WHERE id=$2", [new Date().toISOString(),sub.id]);
     // Clients such as Clash show this as the plan's usage and end date.
     const access = await accountAccess(credential.user_id);
