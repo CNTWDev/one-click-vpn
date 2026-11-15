@@ -56,6 +56,7 @@ export const sharedCatalog: Record<string, readonly [en: string, ru: string]> = 
   "连接不存在": ["Connection not found", "Подключение не найдено"],
   "配置不存在": ["Configuration not found", "Конфигурация не найдена"],
   "请填写名称并选择连接方式": ["Enter a name and choose a connection type", "Введите название и выберите тип подключения"],
+  "请填写名称": ["Enter a name", "Введите название"],
   "验证次数过多，请稍后重试": ["Too many verification attempts. Try again later.", "Слишком много попыток проверки. Повторите позже."],
   "登录密码不正确": ["Incorrect account password", "Неверный пароль аккаунта"],
   "订阅正在更新，请稍后重试": ["Subscription is updating. Try again shortly.", "Подписка обновляется. Повторите чуть позже."],

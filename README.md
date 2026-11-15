@@ -413,9 +413,16 @@ and advanced settings allow WireGuard or VLESS selection for Hiddify/Mihomo. Ope
 uses its native client format. Existing regional/multi-node files remain usable and are
 labelled as legacy regional configurations; they are not converted automatically.
 
-A subscription contains all currently eligible, synchronized nodes
-for its selected protocol (WireGuard or VLESS + REALITY). It is not a mixed-protocol
-bundle. Clients can select a node or use the automatic latency-selection group.
+A subscription contains all currently eligible, synchronized nodes. New subscriptions
+are VLESS; on a node with the stealth service (Agent 2.12+, UDP+TCP 8443) each node
+carries the apps' three lines with the subscription's one UUID: Hysteria2 (Salamander,
+certificate pinned), VLESS REALITY (TCP 443) and VLESS REALITY over XHTTP (TCP 8443).
+Mihomo/Clash shows one entry per node, a hidden fallback group over its lines, plus the
+automatic latency-selection group. Share-link clients list the lines as `Node`,
+`Node · 备用 1`, `Node · 备用 2`. Lines are sent by User-Agent: no XHTTP for mihomo older
+than 1.19.22, REALITY only for Hiddify, Hysteria2 in share links only for v2rayN/v2rayNG
+(pinSHA256). Stealth traffic counts against the subscription like REALITY traffic.
+Existing WireGuard subscriptions keep working; the Portal no longer creates new ones.
 
 - Supported target formats: Mihomo/Clash Meta YAML (JSON-compatible YAML).
   Use **Clash Verge Rev** on macOS/Windows/Linux, or **Hiddify** on

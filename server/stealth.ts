@@ -6,9 +6,9 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { dbExec, dbQuery, withTransaction } from "./db";
 import { hashToken } from "./crypto";
-import { collectUserBundles, realitySettings } from "./reality";
+import { collectUserBundles, realitySettings, subscriptionUserRows } from "./reality";
 import { createSecretMaterial, findSecretMaterialByKind, readSecretMaterial } from "./secret-materials";
-import type { VpnService } from "./control-db";
+import { findDesiredConfig, type VpnService } from "./control-db";
 import { nativeUserRows } from "./native-users";
 
 /**
@@ -78,18 +78,33 @@ export async function ensureNativeSecret(enrollmentId: string): Promise<string> 
   return (await readSecretMaterial(first.id)) || value;
 }
 
+// The Agent refuses a list longer than this (agent.py stealth_config), which would stop the service for everyone.
+export const STEALTH_MAX_USERS = 4096;
+const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+
+/**
+ * Who may use the node's stealth service: every app device, then the subscriptions with VLESS access on
+ * this node (same UUID as their REALITY line; traffic is counted under the subscription's identity).
+ */
+export async function stealthUserRows(nodeId: string) {
+  const native = await nativeUserRows();
+  const subscriptions = (await subscriptionUserRows(nodeId)).filter((row) => UUID.test(row.email));
+  const seen = new Set(native.map((row) => row.email));
+  return [...native, ...subscriptions.filter((row) => !seen.has(row.email))].slice(0, STEALTH_MAX_USERS);
+}
+
 /** Encrypted user list for the node, reused while the source rows are unchanged. */
 export async function stealthUsersSecret(nodeId: string) {
-  const rows = await nativeUserRows();
+  const rows = await stealthUserRows(nodeId);
   const sourceFingerprint = hashToken(JSON.stringify(rows));
   const previous = await findSecretMaterialByKind("stealth_users_bundle", nodeId);
   if (previous?.source_fingerprint === sourceFingerprint) return previous.id;
   const users = await Promise.all(rows.map(async (row) => {
     const id = await readSecretMaterial(row.secret_id);
-    if (!id) throw new Error("App device secret unavailable");
+    if (!id) throw new Error("Stealth user secret unavailable");
     return { id, email: row.email };
   }));
-  const value = JSON.stringify(users);
+  const value = JSON.stringify(users.filter((user) => UUID.test(user.id)));
   const material = previous?.fingerprint === hashToken(value) ? previous : await createSecretMaterial({ kind: "stealth_users_bundle", ownerNodeId: nodeId, value });
   await dbExec("UPDATE secret_materials SET source_fingerprint=$1 WHERE id=$2", [sourceFingerprint, material.id]);
   await collectUserBundles(nodeId);
@@ -126,4 +141,24 @@ export async function nativeProxies(node: NodeAddress, enrollmentId: string, ser
   if (stealth) proxies.push({ name: "xhttp", type: "vless", server: host, port: stealth.port, uuid, network: "xhttp", tls: true, udp: true,
     servername: reality.server_name, "client-fingerprint": "chrome", "reality-opts": realityOpts, "xhttp-opts": { path: stealth.server.xhttpPath } });
   return proxies;
+}
+
+/**
+ * Has the node's stealth service loaded this subscription? True once the Agent applied a revision built from
+ * the current user list and the subscription is on it. A list that changed since then is rebuilt here, so
+ * the lines appear on a later refresh instead of pointing at a node that would refuse them.
+ */
+export async function stealthAccessApplied(nodeId: string, identityKey: string, rebuild: () => Promise<unknown>): Promise<boolean> {
+  const rows = await stealthUserRows(nodeId);
+  if (!rows.some((row) => row.email === identityKey)) return false;
+  const desired = await findDesiredConfig(nodeId, "stealth");
+  const bundleId = typeof desired?.payload.usersSecretId === "string" ? desired.payload.usersSecretId : "";
+  const bundle = bundleId ? (await dbQuery<{ source_fingerprint: string | null }>("SELECT source_fingerprint FROM secret_materials WHERE id=$1", [bundleId]))[0] : undefined;
+  if (!desired || bundle?.source_fingerprint !== hashToken(JSON.stringify(rows))) {
+    await rebuild().catch(() => undefined);
+    return false;
+  }
+  const applied = (await dbQuery<{ applied_revision: number; status: string }>(
+    "SELECT applied_revision,status FROM observed_configs WHERE node_id=$1 AND protocol='stealth'", [nodeId]))[0];
+  return Boolean(applied && ["applied", "succeeded"].includes(applied.status) && Number(applied.applied_revision) >= desired.revision);
 }

@@ -136,6 +136,7 @@ export const onboardingCatalog: Record<string, readonly [string, string]> = {
   "VLESS · 推荐": ["VLESS · Recommended", "VLESS · Рекомендуется"],
   "WireGuard 订阅仅支持 Clash / Hiddify；多台设备同时使用请各建一份。": ["WireGuard subscriptions support Clash / Hiddify only. Create one per device for simultaneous use.", "Подписки WireGuard поддерживают только Clash / Hiddify. Для одновременной работы создайте отдельную подписку для каждого устройства."],
   "VLESS 订阅支持 Clash、Hiddify、Shadowrocket、v2rayNG，可多设备同时使用。": ["VLESS subscriptions support Clash, Hiddify, Shadowrocket and v2rayNG, including simultaneous devices.", "Подписки VLESS поддерживают Clash, Hiddify, Shadowrocket и v2rayNG, в том числе на нескольких устройствах одновременно."],
+  "每个节点自带备用线路，连不上时自动切换。支持 Clash、Hiddify、Shadowrocket、v2rayNG。": ["Each node has backup lines and switches automatically. Works with Clash, Hiddify, Shadowrocket and v2rayNG.", "У каждого узла есть резервные линии с автопереключением. Работает с Clash, Hiddify, Shadowrocket и v2rayNG."],
   "导入或扫码": ["Import or scan", "Импортируйте или сканируйте"],
   "创建后点客户端按钮一键导入；手机打开二维码扫一扫即可。": ["After creation, click your client to import, or scan the QR code on your phone.", "После создания нажмите кнопку клиента для импорта или отсканируйте QR-код на телефоне."],
   "需要 WireGuard / OpenVPN 官方客户端的固定配置？": ["Need a fixed configuration for the official WireGuard / OpenVPN client?", "Нужна отдельная конфигурация для официального клиента WireGuard / OpenVPN?"],

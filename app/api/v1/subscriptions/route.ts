@@ -18,8 +18,9 @@ export async function POST(request: Request) {
   if (!user) return jsonError("Authentication required", 401);
   try {
     const body = await readJson(request), name = cleanText(body.name, 120);
-    if (!name || !["wireguard", "vless"].includes(String(body.protocol))) return jsonError("请填写名称并选择连接方式");
-    const subscription = await createSubscription(user.id,name,body.protocol as "wireguard" | "vless");
+    // Every new subscription is VLESS (REALITY + Hysteria2 + XHTTP per node); the protocol field of older Portals is ignored.
+    if (!name) return jsonError("请填写名称");
+    const subscription = await createSubscription(user.id,name);
     // Prepare initial access now; the first agent acknowledgement arrives asynchronously.
     try { await downloadSubscription(subscription.token); } catch { /* Keep the link; don't mint a second identity on retry. */ }
     return NextResponse.json(subscription, { status: 201, headers });

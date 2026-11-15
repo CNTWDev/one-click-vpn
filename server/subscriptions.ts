@@ -4,11 +4,12 @@ import { addAudit, dbExec, dbQuery } from "./db";
 import { withKeyedLock } from "./reconcile-lock";
 import { hashToken } from "./crypto";
 import { createAccessCredential, findDesiredConfig, listConnectionProfiles } from "./control-db";
-import { activateProfile, issueConnectionProfile, selectVpnServices } from "./control-plane";
+import { activateProfile, issueConnectionProfile, rebuildDesiredState, selectVpnServices } from "./control-plane";
 import { assertCredentialUsable, manageCredentialAccess } from "./credential-access";
 import { createSecretMaterial, readSecretMaterial } from "./secret-materials";
-import { proxyName, renderSubscription, renderV2raySubscription, type RoutingMode, type SubscriptionFormat, type SubscriptionProxy } from "./subscription-format";
-import { realityUserIdentities } from "./reality";
+import { lineNames, proxyName, renderSubscription, renderV2raySubscription, subscriptionClient, type RoutingMode, type SubscriptionClient, type SubscriptionFormat, type SubscriptionNode, type SubscriptionProxy } from "./subscription-format";
+import { realitySettings, realityUserIdentities } from "./reality";
+import { ensureStealthServer, STEALTH_SNI, stealthAccessApplied } from "./stealth";
 import { accountAccess } from "./entitlements";
 
 type Subscription = { id: string; credential_id: string; token_hash: string; token_secret_id: string | null; private_key_secret_id: string | null; created_at: string; updated_at: string; last_fetched_at: string | null };
@@ -31,7 +32,8 @@ function locked<T>(key: string, work: () => Promise<T>): Promise<T> {
   return withKeyedLock(key, work);
 }
 
-export async function createSubscription(userId: string, name: string, protocol: "wireguard" | "vless") {
+/** New subscriptions are VLESS: REALITY plus the stealth lines. Existing WireGuard subscriptions keep working. */
+export async function createSubscription(userId: string, name: string, protocol: "wireguard" | "vless" = "vless") {
   return locked(`subscription-create:${userId}`, async () => {
     if ((await listSubscriptions(userId)).filter((s) => s.status === "active").length >= 20) throw new Error("最多创建 20 份有效订阅");
     const key = protocol === "wireguard" ? randomBytes(32) : null;
@@ -93,7 +95,25 @@ async function accessApplied(profileId: string, nodeId: string, protocol: "wireg
   return applied.applied_revision >= Number(row?.included_revision ?? desired.revision);
 }
 
-export async function downloadSubscription(token: string, options: { format?: SubscriptionFormat; mode?: RoutingMode; group?: string } = {}) {
+/**
+ * The node's stealth lines for a VLESS subscription, in the apps' order: Hysteria2 before REALITY, XHTTP after.
+ * Same UUID as the REALITY line. Only once the node has loaded the subscription (stealthAccessApplied).
+ */
+async function stealthLines(node: { id: string }, host: string, port: number, uuid: string, identityKey: string, client: SubscriptionClient) {
+  if (!client.hysteria2 && !client.xhttp) return { before: [], after: [] };
+  if (!(await stealthAccessApplied(node.id, identityKey, () => rebuildDesiredState(node.id, "stealth")))) return { before: [], after: [] };
+  const reality = await realitySettings(node.id);
+  if (!reality) return { before: [], after: [] };
+  const { server } = await ensureStealthServer(node.id);
+  const before: SubscriptionProxy[] = client.hysteria2 ? [{ name: "", type: "hysteria2", server: host, port, password: uuid, obfs: "salamander",
+    "obfs-password": server.obfsPassword, sni: STEALTH_SNI, "skip-cert-verify": true, fingerprint: server.fingerprint, alpn: ["h3"], udp: true }] : [];
+  const after: SubscriptionProxy[] = client.xhttp ? [{ name: "", type: "vless", server: host, port, uuid, network: "xhttp", tls: true, udp: true,
+    servername: reality.server_name, "client-fingerprint": "chrome", "reality-opts": { "public-key": reality.public_key, "short-id": reality.short_id },
+    "xhttp-opts": { path: server.xhttpPath } }] : [];
+  return { before, after };
+}
+
+export async function downloadSubscription(token: string, options: { format?: SubscriptionFormat; mode?: RoutingMode; group?: string; userAgent?: string | null } = {}) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("订阅不可用");
   const initial = (await dbQuery<Subscription>("SELECT * FROM subscriptions WHERE token_hash=$1", [hashToken(token)]))[0];
   if (!initial) throw new Error("订阅不可用");
@@ -104,6 +124,10 @@ export async function downloadSubscription(token: string, options: { format?: Su
     if (credential.protocol !== "wireguard" && credential.protocol !== "vless") throw new Error("订阅协议不受支持");
     const key = sub.private_key_secret_id ? await readSecretMaterial(sub.private_key_secret_id) : undefined;
     const candidates = await selectVpnServices({ protocol: credential.protocol });
+    const format = options.format || "clash";
+    const client = credential.protocol === "vless" ? subscriptionClient(format, options.userAgent ?? null) : { hysteria2: false, xhttp: false };
+    const stealthServices = new Map((client.hysteria2 || client.xhttp ? await selectVpnServices({ protocol: "stealth" }) : []).map((item) => [item.node.id, item.service]));
+    const nodes: SubscriptionNode[] = [];
     const profiles = await listConnectionProfiles({ credentialId: credential.id });
     const proxies: SubscriptionProxy[] = [];
     const regions = new Map((await dbQuery<{ id: string; name: string; code: string }>("SELECT id,name,code FROM regions")).map((row) => [row.id, row]));
@@ -126,9 +150,18 @@ export async function downloadSubscription(token: string, options: { format?: Su
           "allowed-ips": ["0.0.0.0/0"], "persistent-keepalive": 25, udp: true, "remote-dns-resolve": true, dns: profile.dns, mtu: 1280 });
       } else {
         if (!key) continue;
-        proxies.push({ name, type: "vless", server: profile.endpoint.host, port: profile.endpoint.port,
+        const reality: SubscriptionProxy = { name, type: "vless", server: profile.endpoint.host, port: profile.endpoint.port,
           uuid: key, network: "tcp", tls: true, udp: true, flow: "xtls-rprx-vision", servername: payload.serverName,
-          "client-fingerprint": "chrome", "reality-opts": { "public-key": payload.publicKey, "short-id": payload.shortId } });
+          "client-fingerprint": "chrome", "reality-opts": { "public-key": payload.publicKey, "short-id": payload.shortId } };
+        const stealth = stealthServices.get(node.id);
+        // A stealth problem on one node never costs the subscription its REALITY line there.
+        const extra = stealth ? await stealthLines(node, profile.endpoint.host, stealth.listen_port, key, credential.identity_key, client).catch(() => ({ before: [], after: [] }))
+          : { before: [], after: [] };
+        const lines = [...extra.before, reality, ...extra.after];
+        const names = lineNames(name, lines.length, format);
+        lines.forEach((line, index) => { line.name = names[index]; });
+        proxies.push(...lines);
+        nodes.push({ name, proxies: lines });
       }
       } catch {
         // A full address pool or failed node must not invalidate the other ready nodes.
@@ -138,8 +171,8 @@ export async function downloadSubscription(token: string, options: { format?: Su
     }
     // Re-check revocations that may have arrived through the legacy credential/account management endpoints.
     await assertCredentialUsable(credential.id);
-    const format = options.format || "clash";
-    const content = format === "v2ray" ? renderV2raySubscription(proxies) : renderSubscription(proxies, { mode: options.mode, group: options.group });
+    const content = format === "v2ray" ? renderV2raySubscription(proxies)
+      : renderSubscription(proxies, { mode: options.mode, group: options.group, nodes: nodes.length ? nodes.map((node) => ({ name: node.name, proxies: node.proxies.map((line) => line.name) })) : undefined });
     await dbExec("UPDATE subscriptions SET last_fetched_at=$1 WHERE id=$2", [new Date().toISOString(),sub.id]);
     // Clients such as Clash show this as the plan's usage and end date.
     const access = await accountAccess(credential.user_id);

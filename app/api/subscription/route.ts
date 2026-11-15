@@ -15,7 +15,8 @@ export async function GET(request: Request) {
   if (!allowSubscriptionFetch(request,hashToken(token))) return new Response("请稍后重试", { status: 429, headers: { ...headers, "Retry-After": "900" } });
   try {
     const group = proxyGroupName(await siteForRequest(request));
-    const result = await downloadSubscription(token, { format: subscriptionFormat(params.get("format"), request.headers.get("user-agent")), mode: routingMode(params.get("mode")), group });
+    const userAgent = request.headers.get("user-agent");
+    const result = await downloadSubscription(token, { format: subscriptionFormat(params.get("format"), userAgent), mode: routingMode(params.get("mode")), group, userAgent });
     const yaml = result.format === "clash";
     return new Response(result.content, { headers: { ...headers, "Content-Type": yaml ? "application/yaml; charset=utf-8" : "text/plain; charset=utf-8",
       "Content-Disposition": `attachment; filename="${encodeURIComponent(group)}.${yaml ? "yaml" : "txt"}"`, "profile-update-interval": "1",
