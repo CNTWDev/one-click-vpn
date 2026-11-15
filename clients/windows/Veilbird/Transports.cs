@@ -9,13 +9,13 @@ using System.Text.Json.Nodes;
 namespace Veilbird;
 
 /// <summary>
-/// How the app reaches a node; the same ladder as the other apps, lightest first: WireGuard, Hysteria2 with
-/// obfuscation, VLESS REALITY on TCP 443, REALITY over XHTTP. All are tested at once and the first that answers
+/// How the app reaches a node; the same ladder as the other apps and the subscriptions: Hysteria2 with
+/// obfuscation, VLESS REALITY on TCP 443, REALITY over XHTTP, then WireGuard (easy to recognise, so last). All are tested at once and the first that answers
 /// in ladder order carries traffic. A transport that failed on a network while another worked goes to the end
 /// of the ladder there for a week.
 /// </summary>
 public static class Transports {
-    public static readonly string[] Ladder={"wireguard","hysteria2","reality","xhttp"};
+    public static readonly string[] Ladder={"hysteria2","reality","xhttp","wireguard"};
     public const string Group="TrackNothing";
     public const string TestUrl="https://www.gstatic.com/generate_204";
     private static readonly TimeSpan Memory=TimeSpan.FromDays(7);

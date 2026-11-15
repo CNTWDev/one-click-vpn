@@ -1,6 +1,6 @@
 # TrackNothing 原生客户端工作区
 
-状态：**开发验证阶段，不是正式可分发版本**。三端共用同一个 mihomo 内核（`core/`）和同一套策略：WireGuard → Hysteria2 → REALITY → XHTTP 自动降级、节点综合评分、智能分流 / 全局、隐藏诊断日志。Windows 托盘、Mac 菜单栏可一键连接 / 断开和切换路由；Android 有下拉快捷开关；iPhone / Mac 有「快捷指令」连接 / 断开。真机联网尚未验收。CI 不自动发布开发产物。
+状态：**开发验证阶段，不是正式可分发版本**。三端共用同一个 mihomo 内核（`core/`）和同一套策略：Hysteria2 → REALITY → XHTTP → WireGuard 自动降级（与订阅相同）、节点综合评分、智能分流 / 全局、隐藏诊断日志。Windows 托盘、Mac 菜单栏可一键连接 / 断开和切换路由；Android 有下拉快捷开关；iPhone / Mac 有「快捷指令」连接 / 断开。真机联网尚未验收。CI 不自动发布开发产物。
 
 统一入口：`npm run clients:doctor` 检查本机工具；`npm run clients:build -- android` / `apple` / `windows` 构建后台、两个网页端与指定客户端；不指定平台构建全部。此命令**不部署服务器、不上传安装包**。正式一键联合发布尚未完成，不能把一次开发构建当成正式发布。
 

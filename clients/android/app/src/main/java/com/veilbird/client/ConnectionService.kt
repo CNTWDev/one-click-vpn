@@ -209,7 +209,7 @@ class ConnectionService : VpnService() {
                 } catch (_: Exception) { renewAt = retry }
                 if (SystemClock.elapsedRealtime() - renewedAt >= OFFLINE_GRACE) { Journal.add("lease: expired"); api.report("LEASE_RENEWAL_FAILED", nodeId); stopConnection(R.string.connection_authorization_expired_connect_again); return }
             } else if (!leaseReady) {
-                // WireGuard became usable: test it now so traffic moves to the lightest transport without waiting for the next round.
+                // WireGuard became usable: test it now so the fallback group can count on it without waiting for the next round.
                 if (status()) { leaseReady = true; Journal.add("lease: WireGuard ready"); probe(report = true) }
             }
             if (now - lastNetworkCheck > 30000) {

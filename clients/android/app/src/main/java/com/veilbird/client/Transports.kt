@@ -9,15 +9,15 @@ import org.json.JSONObject
 import java.security.MessageDigest
 
 /**
- * How the app reaches a node. Every node offers the same ladder, lightest first: WireGuard
- * (UDP, least CPU and battery), Hysteria2 with obfuscation (UDP, fast on lossy links), VLESS
- * REALITY (TCP 443, looks like an ordinary HTTPS site) and REALITY over XHTTP (TCP, plain
- * HTTP requests, for networks that cut long-lived TLS streams). All are tried at once; the
- * first one that answers in ladder order carries traffic. A transport that failed on a network
- * while another worked goes to the end of the ladder there for a week.
+ * How the app reaches a node. Every node offers the same ladder as the subscriptions: Hysteria2
+ * with obfuscation (UDP, hard to fingerprint, fast on lossy links), VLESS REALITY (TCP 443, looks
+ * like an ordinary HTTPS site), REALITY over XHTTP (TCP, plain HTTP requests, for networks that
+ * cut long-lived TLS streams), then WireGuard (UDP, easy to recognise, so last). All are tried at
+ * once; the first one that answers in ladder order carries traffic. A transport that failed on a
+ * network while another worked goes to the end of the ladder there for a week.
  */
 object Transports {
-    val ladder = listOf("wireguard", "hysteria2", "reality", "xhttp")
+    val ladder = listOf("hysteria2", "reality", "xhttp", "wireguard")
     const val GROUP = "TrackNothing"
     const val TEST_URL = "https://www.gstatic.com/generate_204"
     private const val MEMORY_DAYS = 7L
