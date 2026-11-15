@@ -77,12 +77,36 @@ test("subscriptions: Hysteria2 + REALITY + XHTTP per node once the node loaded t
     const beat = await fetch(`${base}/api/v1/agent/heartbeat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
       nodeId: node, token: agentToken, capabilities: { connectivity }, usageSnapshots: [{ protocol: "stealth", identityKey: identity, rxBytes: 1000, txBytes: 5000, counterEpoch: "e1" }] }) });
     assert.equal(beat.status, 200, await beat.text());
+    // This bare heartbeat advertises no protocols; put the node back as the real Agent would report it.
+    await pool.query("UPDATE node_protocols SET status='enabled' WHERE node_id=$1", [node]);
     const daily = (await pool.query("SELECT credential_id,protocol,upload_bytes,download_bytes FROM traffic_daily WHERE user_id=$1", [user])).rows;
     assert.deepEqual(daily.map((row) => [row.credential_id, row.protocol, Number(row.upload_bytes), Number(row.download_bytes)]), [[credentialId, "stealth", 1000, 5000]]);
 
+    // An old WireGuard subscription moves to VLESS under the same link (minute jobs, first run 15 s after start);
+    // its WireGuard credential stays usable for 7 days.
+    const wgCred = `cred_wg_${user}`, wgDevice = `dev_wg_${user}`, wgToken = randomBytes(32).toString("base64url");
+    const old = new Date(Date.now() - 86400000).toISOString(), farFuture = new Date(Date.now() + 365 * 86400000).toISOString();
+    await pool.query("INSERT INTO devices(id,user_id,display_name,platform,app_version,public_key,status,created_at,updated_at) VALUES($1,$2,'Old WG','web','credential-1.0.0',$3,'active',$4,$4)", [wgDevice, user, randomBytes(32).toString("base64"), old]);
+    await pool.query("INSERT INTO access_credentials(id,user_id,device_id,display_name,protocol,identity_key,status,created_at,updated_at,expires_at) VALUES($1,$2,$3,'Old WG','wireguard',$4,'active',$5,$5,$6)", [wgCred, user, wgDevice, randomBytes(32).toString("base64"), old, farFuture]);
+    await pool.query("INSERT INTO subscriptions(id,credential_id,token_hash,created_at,updated_at) VALUES($1,$2,$3,$4,$4)", [`sub_wg_${user}`, wgCred, createHash("sha256").update(wgToken).digest("hex"), old]);
+    let upgraded;
+    for (let i = 0; i < 60 && !upgraded; i++) {
+      upgraded = (await pool.query("SELECT c.protocol,c.created_at FROM subscriptions s JOIN access_credentials c ON c.id=s.credential_id WHERE s.id=$1 AND c.protocol='vless'", [`sub_wg_${user}`])).rows[0];
+      if (!upgraded) await new Promise((r) => setTimeout(r, 1000));
+    }
+    assert.ok(upgraded, "WireGuard subscription upgraded");
+    assert.ok(Date.parse(upgraded.created_at) < Date.parse(old), "new credential ranks before the old one for device limits");
+    const wgLeft = (await pool.query("SELECT status,expires_at FROM access_credentials WHERE id=$1", [wgCred])).rows[0];
+    assert.equal(wgLeft.status, "active");
+    assert.ok(Math.abs(Date.parse(wgLeft.expires_at) - Date.now() - 7 * 86400000) < 120000, "WireGuard keeps 7 days");
+    assert.equal((await fetchSubscription(wgToken, "clash-verge/v2.2.3")).status, 503, "node has not loaded the new credential yet");
+    await applyAll();
+    const wgConfig = parseConfig(await (await fetchSubscription(wgToken, "clash-verge/v2.2.3")).text());
+    assert.deepEqual(wgConfig.proxies.map((p) => p.type), ["hysteria2", "vless", "vless"]);
+
     // Revoking the subscription takes it off the stealth service too.
     const before = (await pool.query("SELECT revision FROM desired_configs WHERE node_id=$1 AND protocol='stealth'", [node])).rows[0].revision;
-    const sub = (await (await fetch(`${base}/api/v1/subscriptions`, { headers: auth })).json()).subscriptions[0];
+    const sub = (await (await fetch(`${base}/api/v1/subscriptions`, { headers: auth })).json()).subscriptions.find((item) => item.credential_id === credentialId);
     assert.equal((await fetch(`${base}/api/v1/subscriptions`, { method: "PATCH", headers: auth, body: JSON.stringify({ id: sub.id, action: "revoke" }) })).status, 200);
     assert.ok((await pool.query("SELECT revision FROM desired_configs WHERE node_id=$1 AND protocol='stealth'", [node])).rows[0].revision > before);
   } finally {

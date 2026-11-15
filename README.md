@@ -422,7 +422,8 @@ automatic latency-selection group. Share-link clients list the lines as `Node`,
 `Node · 备用 1`, `Node · 备用 2`. Lines are sent by User-Agent: no XHTTP for mihomo older
 than 1.19.22, REALITY only for Hiddify, Hysteria2 in share links only for v2rayN/v2rayNG
 (pinSHA256). Stealth traffic counts against the subscription like REALITY traffic.
-Existing WireGuard subscriptions keep working; the Portal no longer creates new ones.
+Older WireGuard subscriptions are moved to VLESS under the same link by the minute jobs; their
+WireGuard credential keeps working 7 days for devices that have not refreshed yet.
 
 - Supported target formats: Mihomo/Clash Meta YAML (JSON-compatible YAML).
   Use **Clash Verge Rev** on macOS/Windows/Linux, or **Hiddify** on

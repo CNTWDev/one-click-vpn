@@ -1,3 +1,4 @@
+import { upgradeWireGuardSubscriptions } from "./subscriptions";
 import { dbExec, dbQuery } from "./db";
 import { runAccessJobs } from "./access-jobs";
 import { expireDueConnectionProfiles } from "./control-db";
@@ -17,6 +18,8 @@ let lastBoundaryCheck = new Date(Date.now() - 10 * MINUTE);
  */
 export async function runMinuteJobs(): Promise<void> {
   const until = new Date();
+  // One-time move of old WireGuard subscriptions to VLESS (subscriptions.ts); an empty query afterwards.
+  if (await upgradeWireGuardSubscriptions()) markAccessChanged();
   const refreshed = await runAccessJobs();
   const expired = await expireDueConnectionProfiles();
   const boundary = (await dbQuery<{ passed: boolean }>(`SELECT
