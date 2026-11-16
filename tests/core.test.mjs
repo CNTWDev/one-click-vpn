@@ -232,7 +232,7 @@ test("Agent operations expose release, recover expired tasks and preserve live t
     assert.equal((await fetch(`${base}/api/nodes/agent-release`)).status, 401);
     const release = await fetch(`${base}/api/nodes/agent-release`, { headers });
     assert.equal(release.status, 200);
-    assert.equal((await release.json()).version, "agent 2.18.0");
+    assert.equal((await release.json()).version, readFileSync(path.join(root, "agent/agent.py"), "utf8").match(/"version": "(agent [\d.]+)"/)[1], "the release served is the bundled Agent");
     const timestamp = new Date().toISOString();
     await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at)
       VALUES ($1,'Operations','Test','127.0.0.9','root','password','','','',$2,$2)`, [nodeId,timestamp]);
@@ -297,6 +297,11 @@ test("account access: welcome traffic, metering, exhaustion, stacked grants and 
     assert.equal(view.access.usedBytes, 5000, "both directions count against the quota");
     // Leave 1 KB of the 10 GB and send 2 KB: the account runs out and the overrun stays recorded.
     await pool.query("UPDATE access_grants SET used_bytes=quota_bytes-1024 WHERE user_id=$1 AND source='welcome'", [userId]);
+    const overview = async () => (await (await fetch(`${base}/api/v1/admin/overview-stats`, { headers: admin })).json());
+    let stats = await overview();
+    assert.ok(stats.online.users >= 1 && stats.online.devices >= 1, "a fresh WireGuard handshake counts as online");
+    assert.equal(stats.nearQuota.find((item) => item.userId === userId)?.quotaBytes, 10 * GB, "an account with 1 KB left is listed as nearly used up");
+    assert.equal(stats.expiring.some((item) => item.userId === userId), false, "the welcome gift never expires");
     assert.equal((await beat(2000, 5048)).status, 200);
     view = await access();
     assert.equal(view.access.state, "exhausted");
@@ -334,6 +339,11 @@ test("account access: welcome traffic, metering, exhaustion, stacked grants and 
     assert.deepEqual(switched.grants.filter((grant) => grant.state === "active" || grant.state === "upcoming").map((grant) => grant.planId), ["month"]);
     assert.equal(switched.access.deviceLimit, 3);
     assert.ok(Math.abs(Date.parse(switched.access.until) - Date.now() - 30 * day) < 60_000, "the new plan starts now");
+    assert.equal((await overview()).expiring.some((item) => item.userId === userId), false, "30 days left is not soon");
+    await pool.query("UPDATE users SET access_until = now() + interval '2 days' WHERE id=$1", [userId]);
+    stats = await overview();
+    assert.ok(stats.expiring.find((item) => item.userId === userId)?.expiresAt, "2 days left is listed as expiring");
+    assert.equal(stats.nearQuota.some((item) => item.userId === userId), false, "an unlimited month is never nearly used up");
     const legacy = await act({ action: "switch", planId: "legacy" });
     assert.deepEqual([legacy.access.until, legacy.access.quotaBytes, legacy.access.deviceLimit], [null, null, null], "the legacy plan has no limits");
     await fetch(`${base}/api/v1/admin/plans`, { method: "POST", headers: admin, body: JSON.stringify({ id: "welcome", name: "新用户赠送", quotaBytes: 10 * GB, deviceLimit: 2, isWelcome: true }) });
@@ -556,7 +566,8 @@ test("v1 bearer session can manage a device", integrationOptions, async () => {
     headers: { Authorization: `Bearer ${session.accessToken}` },
   });
   assert.equal(devices.status, 200);
-  assert.equal((await devices.json()).devices.length, 1);
+  // The owner keeps devices from earlier tests and earlier runs on the same database; look for this one.
+  assert.equal((await devices.json()).devices.filter((item) => item.id === deviceBody.device.id).length, 1);
 
   const credential = await fetch(`${base}/api/v1/credentials`, {
     method: "POST",

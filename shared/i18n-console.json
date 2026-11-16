@@ -3662,5 +3662,177 @@
   "每个账号一份订阅，包含全部节点，可导入任意多个应用。按账号管理访问权限。": [
     "Each account has one subscription with every server, usable in any number of apps. Manage access per account.",
     "У каждого аккаунта одна подписка со всеми серверами, её можно добавить в любое число приложений. Доступом управляют на уровне аккаунта."
+  ],
+  "设备上限应为 1–100。": [
+    "Device limit must be between 1 and 100.",
+    "Лимит устройств должен быть от 1 до 100."
+  ],
+  "系统默认（{0}）": [
+    "System default ({0})",
+    "По умолчанию ({0})"
+  ],
+  "会员有效期（UTC）": [
+    "Membership expires (UTC)",
+    "Срок подписки (UTC)"
+  ],
+  "已授权": [
+    "Authorized",
+    "Авторизовано"
+  ],
+  "台 · 留空额度跟随系统默认，留空有效期表示不限期。": [
+    "devices · Leave the limit blank to use the system default; leave the expiry blank for no expiry.",
+    "устройств · Пустой лимит означает значение по умолчанию, пустой срок — без ограничения срока."
+  ],
+  "将 {0} 从 {1} 升级至 {2}。通过 SSH 更新程序并重启 Agent，保留身份和 VPN 配置。": [
+    "Upgrade {0} from {1} to {2}. Updates and restarts Agent via SSH, preserving its identity and VPN configuration.",
+    "Обновить {0} с {1} до {2}. Agent обновится и перезапустится через SSH с сохранением идентификатора и настроек VPN."
+  ],
+  "个区域 ·": [
+    "regions ·",
+    "регионов ·"
+  ],
+  "成功 /": [
+    "succeeded /",
+    "успешно /"
+  ],
+  "处理中 /": [
+    "in progress /",
+    "выполняется /"
+  ],
+  "新凭据默认有效 365 天，旧证书保留原期限。停用或撤销可提前终止使用；换发后需用户重新导入配置。": [
+    "New credentials are valid for 365 days by default. Existing certificates retain their original expiry. Disable or revoke to end access early; users must import new configurations after reissuance.",
+    "Новые реквизиты по умолчанию действуют 365 дней. Старые сертификаты сохраняют свой срок. Отключите или отзовите доступ для досрочного прекращения; после перевыпуска пользователям нужно импортировать новые конфигурации."
+  ],
+  "{0} 的访问资产": [
+    "Access assets for {0}",
+    "Ресурсы доступа: {0}"
+  ],
+  "客户端授权设备与会员额度": [
+    "Authorized devices and membership limits",
+    "Авторизованные устройства и лимиты подписки"
+  ],
+  "登记、发布和撤回 TrackNothing 客户端；门户下载、固定下载链接和客户端更新检查都读取这里。": [
+    "Register, publish and withdraw TrackNothing clients. Portal downloads, permanent download links and client update checks all read from here.",
+    "Регистрация, публикация и отзыв клиентов TrackNothing. Загрузки на портале, постоянные ссылки и проверка обновлений используют эти данные."
+  ],
+  "安装包存储：外部（手动上传后登记 HTTPS 地址）": [
+    "Installer storage: external (upload manually, then register the HTTPS address).",
+    "Хранилище установщиков: внешнее (загрузите вручную, затем зарегистрируйте HTTPS-адрес)."
+  ],
+  "发布时间": [
+    "Published",
+    "Опубликовано"
+  ],
+  "还没有登记任何版本。可以用 npm run release:client 上传，或在下方手动登记。": [
+    "No releases yet. Upload with npm run release:client, or register one manually below.",
+    "Выпусков пока нет. Загрузите через npm run release:client или зарегистрируйте вручную ниже."
+  ],
+  "先把安装包上传到可公开访问的 HTTPS 地址。Controller 会下载一次，记录真实的 SHA-256 和大小。": [
+    "Upload the installer to a public HTTPS address first. The Controller downloads it once to record its real SHA-256 and size.",
+    "Сначала загрузите установщик по публичному HTTPS-адресу. Controller скачает его один раз и запишет фактический SHA-256 и размер."
+  ],
+  "{0} / {1} 份凭据": [
+    "{0} / {1} credentials",
+    "Реквизиты: {0} / {1}"
+  ],
+  "{0} 份有效配置 · {1} 张有效证书": [
+    "{0} active configurations · {1} active certificates",
+    "Конфигурации: {0} · сертификаты: {1}"
+  ],
+  "来自套餐": [
+    "From plan",
+    "Из тарифа"
+  ],
+  "系统默认或单独设置": [
+    "System default or per-account",
+    "По умолчанию или вручную"
+  ],
+  "跟随套餐或系统默认（{0}）": [
+    "Plan or system default ({0})",
+    "Тариф или по умолчанию ({0})"
+  ],
+  "系统默认": [
+    "System default",
+    "По умолчанию"
+  ],
+  "天数留空表示长期有效，流量留空表示不限，设备上限留空跟随系统默认。": [
+    "Leave days empty for no end date, traffic empty for unlimited, and devices empty for the system default.",
+    "Пустые дни — бессрочно, пустой трафик — без лимита, пустые устройства — по умолчанию."
+  ],
+  "已用 {0} · 含订阅和节点配置": [
+    "{0} in use · subscriptions and configs included",
+    "Занято: {0} · включая подписки и конфигурации"
+  ],
+  "设备数（含订阅和节点配置）：{0} / {1}": [
+    "Devices (subscriptions and configs included): {0} / {1}",
+    "Устройства (включая подписки и конфигурации): {0} / {1}"
+  ],
+  "天数、流量和设备上限留空都表示不限。设备数包括客户端、订阅和节点配置。": [
+    "Leave days, traffic or devices empty for no limit. Devices include apps, subscriptions and node configs.",
+    "Пустые дни, трафик или устройства — без ограничений. Устройства включают приложения, подписки и конфигурации."
+  ],
+  "设备数已达上限，请先删除不用的设备、订阅或配置": [
+    "Device limit reached. Remove a device, subscription or config you no longer use first.",
+    "Достигнут лимит устройств. Сначала удалите ненужное устройство, подписку или конфигурацию."
+  ],
+  "设备数已超出账号上限，请删除不用的设备、订阅或配置，或联系管理员": [
+    "This account is over its device limit. Remove a device, subscription or config you no longer use, or contact your administrator.",
+    "Аккаунт превысил лимит устройств. Удалите ненужное устройство, подписку или конфигурацию или обратитесь к администратору."
+  ],
+  "识别结果": [
+    "Detected",
+    "Распознано"
+  ],
+  "{0} 个需关注 →": [
+    "{0} need attention →",
+    "Требуют внимания: {0} →"
+  ],
+  "当前在线": [
+    "Online now",
+    "Сейчас онлайн"
+  ],
+  "{0} 台设备 · 共 {1} 个账号": [
+    "{0} devices · {1} accounts",
+    "Устройств: {0} · аккаунтов: {1}"
+  ],
+  "共 {0} 个账号": [
+    "{0} accounts",
+    "Аккаунтов: {0}"
+  ],
+  "公网网卡出站流量，按 UTC 自然月累计": [
+    "Outbound public traffic, per UTC calendar month",
+    "Исходящий публичный трафик за календарный месяц (UTC)"
+  ],
+  "上月 {0}": [
+    "last month {0}",
+    "прошлый месяц {0}"
+  ],
+  "当前速率": [
+    "Current speed",
+    "Текущая скорость"
+  ],
+  "入 {0} · {1} 个节点": [
+    "In {0} · {1} nodes",
+    "Вх. {0} · узлов: {1}"
+  ],
+  "{0} · 即将到期": [
+    "{0} · expires soon",
+    "{0} · скоро истекает"
+  ],
+  "续期 →": [
+    "Renew →",
+    "Продлить →"
+  ],
+  "{0} · 流量已用 {1}%": [
+    "{0} · {1}% of data used",
+    "{0} · трафик израсходован на {1}%"
+  ],
+  "调整 →": [
+    "Adjust →",
+    "Изменить →"
+  ],
+  "节点本月流量": [
+    "Server traffic this month",
+    "Трафик серверов за месяц"
   ]
 }

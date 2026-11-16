@@ -47,6 +47,8 @@ test("Password reset: admin link and email link set a new password once and sign
     await pool.query("UPDATE users SET status='active' WHERE id=$1", [id]);
     const login = (password) => post("/api/v1/auth/web-login", { email, password });
     const session = (await login("first-password-1")).headers.get("set-cookie").split(";")[0];
+    // Start without mail: the test database keeps the settings this test saved on an earlier run.
+    await pool.query("DELETE FROM mail_settings");
     assert.deepEqual(await (await fetch(base + "/api/v1/auth/password-reset")).json(), { email: false });
     assert.equal((await post("/api/v1/auth/password-reset", { email })).status, 503);
     const native = await post("/api/v2/native/password-reset", { email });
