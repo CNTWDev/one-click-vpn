@@ -32,10 +32,9 @@ export function subscriptionLink(token: string, origin = window.location.origin)
 }
 const base64Url = (value: string) => btoa(String.fromCharCode(...new TextEncoder().encode(value))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 export const importUrls = {
+  // Clash Verge Rev, ClashX Meta and Clash Meta for Android all register clash://install-config.
   clash: (link: string, name: string) => `clash://install-config?url=${encodeURIComponent(link)}&name=${encodeURIComponent(name)}`,
-  // Hiddify reads the raw (still percent-encoded) path of hiddify://import/<url>, so an encoded URL there fails
-  // to import; its query form decodes `url` properly and keeps the token's own query string intact.
-  hiddify: (link: string, name: string) => `hiddify://import?url=${encodeURIComponent(link)}&name=${encodeURIComponent(name)}`,
+  stash: (link: string, name: string) => `stash://install-config?url=${encodeURIComponent(link)}&name=${encodeURIComponent(name)}`,
   shadowrocket: (link: string, name: string) => `shadowrocket://add/sub://${base64Url(link)}?remark=${encodeURIComponent(name)}`,
 };
 

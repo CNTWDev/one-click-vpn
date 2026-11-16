@@ -58,6 +58,11 @@ export function portalApi({ signedIn = true, empty = false, site = null } = {}) 
       { id: "enr_2", name: "Pixel 8", platform: "android", lastSeenAt: ago(130), connected: false, region: null },
     ], online: empty ? { apps: 0, subscription: 0, total: 0 } : { apps: 1, subscription: 3, total: 4 } }];
     if (pathname === "/api/v1/usage/summary") return [200, { totals: { totalBytes: 44.9 * GB, uploadBytes: 3.2 * GB, downloadBytes: 41.7 * GB }, daily, updatedAt: now }];
+    if (pathname === "/api/v1/usage/breakdown") return [200, empty ? { totals: { totalBytes: 0, uploadBytes: 0, downloadBytes: 0 }, nodes: [], devices: [] } : { totals: { totalBytes: 12.4 * GB, uploadBytes: 1.2 * GB, downloadBytes: 11.2 * GB },
+      nodes: [{ nodeId: "n2", name: nodes[1].name, countryCode: "US", totalBytes: 6.2 * GB }, { nodeId: "n1", name: nodes[0].name, countryCode: "SG", totalBytes: 3.9 * GB }, { nodeId: "n3", name: "Tokyo 05", countryCode: null, totalBytes: 0.6 * GB }],
+      devices: [{ deviceId: "d1", name: "Aleksandra's ThinkPad X1 Carbon Gen 12 (office)", platform: "windows", subscription: false, totalBytes: 7.1 * GB },
+        { deviceId: "d2", name: "iPhone 16 Pro Max · Shadowrocket (family plan, living room)", platform: "web", subscription: true, totalBytes: 4.0 * GB },
+        { deviceId: "d3", name: "Office router", platform: "web", subscription: false, totalBytes: 1.3 * GB }] }];
     if (pathname === "/api/v1/subscriptions") return [200, { subscription: empty ? null : subscription }];
     if (pathname === "/api/v1/client-releases") return [200, { releases, history }];
     return [200, {}];

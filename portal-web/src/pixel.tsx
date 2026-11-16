@@ -50,14 +50,3 @@ export function DataStream({ count = 16, salt = 0, className = "" }: { count?: n
   }, []);
   return <span className={`pixel-stream ${className}`.trim()} aria-hidden="true">{digits(now, count, salt)}</span>;
 }
-
-/** 30 days of usage as columns of square blocks, the last seven days lit. */
-export function UsageBlocks({ values }: { values: number[] }) {
-  if (!values.length) return null;
-  const rows = 5, top = Math.max(...values, 1), pitch = 6, block = 4, gap = 2, width = 4;
-  const lit = values.map((value) => value <= 0 ? 1 : Math.max(1, Math.round(rows * value / top)));
-  return <svg className="pixel-blocks" viewBox={`0 0 ${values.length * (width + gap) - gap} ${(rows - 1) * pitch + block}`} preserveAspectRatio="none" shapeRendering="crispEdges" aria-hidden="true">
-    {lit.map((count, i) => <path key={i} className={i >= values.length - 7 ? "recent" : undefined}
-      d={Array.from({ length: count }, (_, r) => `M${i * (width + gap)},${(rows - 1 - r) * pitch}h${width}v${block}h-${width}z`).join("")} />)}
-  </svg>;
-}

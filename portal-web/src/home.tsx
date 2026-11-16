@@ -9,7 +9,8 @@ import { api, isUnauthorized } from "./api";
 import { Brand } from "./brand";
 import { detectPlatform, formatBytes } from "./format";
 import { PortalLanguagePicker } from "./language";
-import { HeroRing, UsageBlocks } from "./pixel";
+import { HeroRing } from "./pixel";
+import { QuotaBlocks, UsageCard, type Usage } from "./usage-card";
 import { AccountSubscription, useAccountSubscription } from "./account-subscription";
 import { InlineError, Skeleton, Time, useToasts } from "./ui";
 import "./home.css";
@@ -23,7 +24,6 @@ type Account = { expiresAt: string | null; access: Access; deviceLimit: number |
 const SOON_DAYS = 7;
 /** Whole days left until an end date, or null when the access has no end. */
 const daysLeft = (until: string | null) => until ? Math.max(0, Math.ceil((Date.parse(until) - Date.now()) / 86_400_000)) : null;
-type Usage = { totals: { totalBytes: number; uploadBytes?: number; downloadBytes?: number }; daily?: { day: string; totalBytes: number }[] };
 type Releases = { releases: ClientRelease[]; history: ClientRelease[] };
 
 const platformNames: Record<ClientPlatform, string> = { android: "Android", ios: "iPhone / iPad", macos: "macOS", windows: "Windows" };
@@ -36,14 +36,11 @@ const figure = (bytes: number) => { const [value, unit = ""] = formatBytes(bytes
 /** Dates as figures read the same in every language: 2027-03-01. */
 const isoDate = (value: string) => { const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? value : `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`; };
 
-/** Daily totals for the last 30 days, oldest first, with empty days as zero. */
-function lastDays(usage: Usage) {
-  const perDay = new Map((usage.daily || []).map((row) => [String(row.day).slice(0, 10), row.totalBytes]));
-  return Array.from({ length: 30 }, (_, index) => {
-    const day = new Date(Date.now() - (29 - index) * 86_400_000);
-    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
-    return perDay.get(key) || 0;
-  });
+/** Days until the remaining traffic runs out at the last seven days' average, or null when nothing was used. */
+function daysToEmpty(usage: Usage | null, remaining: number) {
+  const week = (usage?.daily || []).filter((row) => Date.parse(String(row.day).slice(0, 10)) >= Date.now() - 7 * 86_400_000);
+  const perDay = week.reduce((sum, row) => sum + (Number(row.totalBytes) || 0), 0) / 7;
+  return perDay > 0 ? Math.max(1, Math.floor(remaining / perDay)) : null;
 }
 
 /** Desktop builds come per architecture; ARM Windows reports itself only through client hints. */
@@ -81,7 +78,7 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
   }, []);
   const loadAccount = useCallback(async () => {
     try {
-      const [nextAccount, nextUsage] = await Promise.all([api<Account>("/api/v1/account"), api<Usage>("/api/v1/usage/summary")]);
+      const [nextAccount, nextUsage] = await Promise.all([api<Account>("/api/v1/account"), api<Usage>(`/api/v1/usage/summary?from=${new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10)}`)]);
       setAccount(nextAccount); setUsage(nextUsage); setAccountError("");
     } catch (caught) {
       if (isUnauthorized(caught)) onLogout(); else setAccountError((caught as Error).message);
@@ -128,27 +125,31 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
   const over = !!account && account.deviceLimit !== null && account.deviceCount > account.deviceLimit;
   const crowded = !!account && account.deviceLimit !== null && account.online.total > account.deviceLimit;
   const low = access?.state === "active" && quota !== null && (access.remainingBytes || 0) <= quota * 0.1;
+  // Warn ahead of time: a quarter left, or the recent pace runs it out within a week (and before the account ends).
+  const share = quota ? Math.round(((access?.remainingBytes || 0) / quota) * 100) : 100;
+  const runsOut = quota !== null && access ? daysToEmpty(usage, access.remainingBytes || 0) : null;
+  const tight = access?.state === "active" && quota !== null && (share <= 25 || (runsOut !== null && runsOut <= 7 && (left === null || runsOut < left)));
   return <main className="dashboard home">
     {dialog}{toasts}
     <Topbar user={user} onLogout={onLogout} />
     <AccountSubscription state={subscription} nodes={nodes} notify={notify} onLogout={onLogout} />
 
     {paused && <p className="callout warning home-access-notice" role="status">{access.state === "exhausted" ? t("流量已用完，暂时无法连接。请联系管理员增加流量。") : access.state === "expired" ? t("账号已到期，暂时无法连接。请联系管理员续期。") : t("账号暂未开通使用权限，请联系管理员。")}</p>}
+    {!paused && tight ? <p className="callout warning home-access-notice" role="status">{runsOut !== null ? t("流量还剩 {0}%，按最近 7 天的用量大约 {1} 天后用完。", [share, runsOut]) : t("流量还剩 {0}%。", [share])}</p>
+      : !paused && ending && <p className="callout warning home-access-notice" role="status">{t("账号还剩 {0} 天到期，到期后无法连接。请联系管理员续期。", [left ?? 0])}</p>}
     <section className="card home-stats" aria-label={t("账号概况")}>
       <div><small>{access?.state === "expired" ? t("已到期") : t("有效期至")}</small>{account ? account.expiresAt ? <strong className={`pixel-figure${ending ? " warning-text" : ""}`}>{isoDate(account.expiresAt)}</strong> : <strong>{t("长期有效")}</strong> : <Skeleton height={30} width="60%" />}
         {account?.expiresAt && <span className={`home-stat-note${ending ? " warning-text" : ""}`}>{ending ? t("还剩 {0} 天", [left ?? 0]) : date(account.expiresAt)}</span>}</div>
-      {quota !== null && access ? <div><small>{t("剩余流量")}</small>
+      <div><small>{t("剩余流量")}</small>{!account ? <Skeleton height={30} width="40%" /> : quota !== null && access ? <>
         <span className="home-traffic"><strong className={`pixel-figure${low ? " warning-text" : ""}`}>{figure(access.remainingBytes || 0)[0]}<span className="unit">{figure(access.remainingBytes || 0)[1]}</span></strong>
-          <i className={`home-quota${low ? " low" : ""}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (access.usedBytes / quota) * 100)}%` }} /></i></span>
-        <span className="home-stat-note">{t("已用 {0} / {1} · 全部节点合计", [formatBytes(access.usedBytes), formatBytes(quota)])}</span></div>
-      : <div><small>{t("近 30 天流量")}</small>
-        {usage ? <span className="home-traffic"><strong className="pixel-figure">{figure(usage.totals.totalBytes)[0]}<span className="unit">{figure(usage.totals.totalBytes)[1]}</span></strong><UsageBlocks values={lastDays(usage)} /></span> : <Skeleton height={30} width="40%" />}
-        {usage && <span className="home-stat-note mono">↓ {formatBytes(usage.totals.downloadBytes || 0)} · ↑ {formatBytes(usage.totals.uploadBytes || 0)}</span>}</div>}
+          <QuotaBlocks used={access.usedBytes} quota={quota} low={low || tight} /></span>
+        <span className="home-stat-note">{t("已用 {0} / {1} · 全部节点合计", [formatBytes(access.usedBytes), formatBytes(quota)])}</span></> : <strong>{t("不限")}</strong>}</div>
       <div><small>{t("设备")}</small>{account ? <strong className={`pixel-figure${over ? " warning-text" : ""}`}>{account.deviceCount}<span className="unit">/ {account.deviceLimit ?? t("不限")}</span></strong> : <Skeleton height={30} width="40%" />}
         {over && account.deviceLimit !== null ? <span className="home-stat-note warning-text">{t("超出上限，只有最早的 {0} 个可用", [account.deviceLimit])}</span>
           : account && <span className={`home-stat-note${crowded ? " warning-text" : ""}`}>{t("现在在线 {0} 处", [account.online.total])}</span>}</div>
     </section>
     {accountError && <InlineError message={accountError} onRetry={() => void loadAccount()} />}
+    <UsageCard usage={usage} onLogout={onLogout} />
 
     <section className="card home-list" aria-labelledby="devices-title">
       <h2 id="devices-title">{t("我的设备")}</h2>

@@ -447,14 +447,16 @@ certificate pinned), VLESS REALITY (TCP 443) and VLESS REALITY over XHTTP (TCP 8
 Mihomo/Clash shows one entry per node, a hidden fallback group over its lines, plus the
 automatic latency-selection group. Share-link clients list the lines as `Node`,
 `Node · 备用 1`, `Node · 备用 2`. Lines are sent by User-Agent: no XHTTP for mihomo older
-than 1.19.22, REALITY only for Hiddify, Hysteria2 in share links only for v2rayN/v2rayNG
+than 1.19.22, REALITY only for Hiddify (old imports), REALITY + XHTTP for Stash (no Hysteria2
+pin there; VLESS lines also carry `sni`), Hysteria2 in share links only for v2rayN/v2rayNG
 (pinSHA256). Stealth traffic counts against the subscription like REALITY traffic.
 Older WireGuard subscriptions are moved to VLESS under the same link by the minute jobs; their
 WireGuard credential keeps working 7 days for devices that have not refreshed yet.
 
 - Supported target formats: Mihomo/Clash Meta YAML (JSON-compatible YAML).
-  Use **Clash Verge Rev** on macOS/Windows/Linux, or **Hiddify** on
-  iOS/Android/macOS/Windows/Linux. Import the personal URL as a remote subscription,
+  The Portal offers the same list on every device: Clash Verge Rev (Mac/Windows/Linux),
+  ClashX Meta (Mac), v2rayN (Windows), Clash Meta for Android, v2rayNG (Android),
+  Shadowrocket, Stash (iPhone/iPad) (`portal-web/src/client-options.ts`). Import the personal URL as a remote subscription,
   not as a local file. Actual support depends on the installed client/core version.
   Official WireGuard/OpenVPN clients continue using the existing file-download flow.
 - The response requests hourly refresh; the actual schedule is client-dependent,
@@ -581,8 +583,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) and
 ### Agent 2.18: one subscription per account
 
 - **Portal home.** Every account has one subscription with every node. It is created the
-  first time the user imports it, never by hand. The home page imports it into Clash,
-  Hiddify or Shadowrocket with one tap (v2rayNG copies the link), and shows the QR code
+  first time the user imports it, never by hand. The home page lists the same apps with
+  their platforms on every device: one tap through `clash://`,
+  `stash://` or `shadowrocket://`; v2rayNG and v2rayN copy the link, and shows the QR code
   and link without asking for a password; resetting the link asks for one. Single-node
   WireGuard / OpenVPN / VLESS configs are made on their own page. Accounts with several
   older subscriptions keep the oldest as the account subscription; the others keep working
