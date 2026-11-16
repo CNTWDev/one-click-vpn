@@ -11,6 +11,17 @@ export function subscriptionFormat(requested: string | null, userAgent: string |
   return /shadowrocket|v2rayn|v2rayng|quantumult|nekobox|loon/.test(agent) ? "v2ray" : "clash";
 }
 
+const APP_NAMES: Array<[RegExp, string]> = [
+  [/shadowrocket/, "Shadowrocket"], [/hiddify/, "Hiddify"], [/v2rayng/, "v2rayNG"], [/v2rayn/, "v2rayN"], [/stash/, "Stash"],
+  [/clash.?verge|verge/, "Clash Verge"], [/clashx/, "ClashX"], [/nekobox/, "NekoBox"], [/loon/, "Loon"], [/quantumult/, "Quantumult X"],
+  [/mihomo|clash/, "Clash"],
+];
+/** The app behind a subscription refresh, by its User-Agent ("Shadowrocket"), or "" when unknown. */
+export function subscriptionAppName(userAgent: string | null): string {
+  const agent = (userAgent || "").toLowerCase();
+  return APP_NAMES.find(([pattern]) => pattern.test(agent))?.[1] || "";
+}
+
 export function routingMode(requested: string | null): RoutingMode {
   return requested === "global" ? "global" : "smart";
 }

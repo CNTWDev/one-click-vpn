@@ -22,10 +22,10 @@ test("Portal language negotiation and safe fallback", () => {
   assert.equal(isPreference("system"), true);
   assert.equal(isPreference("invalid"), false);
   assert.equal(createTranslator("ru")("用户自定义节点"), "用户自定义节点");
-  assert.equal(createTranslator("en")("推荐：{0}", ["My $& <server>"]), "Recommended: My $& <server>");
-  const notice = message("推荐：{0}", ["My custom name"]);
-  assert.equal(translateMessage(notice, createTranslator("ru")), "Рекомендуется: My custom name");
-  assert.equal(translateMessage(notice, createTranslator("en")), "Recommended: My custom name");
+  assert.equal(createTranslator("en")("到期 {0}", ["My $& <server>"]), "Expires My $& <server>");
+  const notice = message("到期 {0}", ["My custom name"]);
+  assert.equal(translateMessage(notice, createTranslator("ru")), "Истекает My custom name");
+  assert.equal(translateMessage(notice, createTranslator("en")), "Expires My custom name");
 });
 
 test("All Portal translations exist, preserve placeholders and have nonempty EN/RU text", async () => {
@@ -38,8 +38,7 @@ test("All Portal translations exist, preserve placeholders and have nonempty EN/
       assert.doesNotMatch(value, /[\u3400-\u9fff]/u, key);
     }
   }
-  const files = ["main.tsx", "credential-dashboard.tsx", "action-dialog.tsx", "subscription-access.tsx", "region-map.tsx", "language.tsx", "home.tsx", "onboarding.tsx", "node-creator.tsx", "ui.tsx"].map((name) => `portal-web/src/${name}`);
-  files.push("shared/subscription-panel.tsx");
+  const files = (await fs.readdir("portal-web/src")).filter((name) => name.endsWith(".tsx")).map((name) => `portal-web/src/${name}`);
   for (const file of files) {
     const source = await fs.readFile(file, "utf8");
     const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);

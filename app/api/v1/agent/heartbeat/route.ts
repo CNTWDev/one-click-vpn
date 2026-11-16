@@ -10,6 +10,7 @@ import { recordTrafficSnapshots, type UsageSnapshot } from "../../../../../serve
 import { collectUserBundles } from "../../../../../server/reality";
 import { currentAgentOrigin } from "../../../../../server/agent-domain";
 import { adoptNodeIdentity } from "../../../../../server/db";
+import { recordOnlineClients } from "../../../../../server/online-clients";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,8 @@ export async function POST(request: Request) {
     const usageSnapshots = Array.isArray(body.usageSnapshots) ? body.usageSnapshots.filter((value): value is UsageSnapshot => Boolean(value && typeof value === "object" && !Array.isArray(value))) : [];
     // Traffic first: the online-user count in the node row reads the counters just written.
     await recordTrafficSnapshots(nodeId, usageSnapshots);
+    // Agents 2.18+: hashed source addresses per subscription, for the account's "online now" count.
+    recordOnlineClients(body.onlineClients);
     await recordAgentHeartbeat({
       nodeId,
       version: cleanText(body.version, 64),

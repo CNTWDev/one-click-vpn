@@ -1,17 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clientFormat, clientProtocol, clientOptions, usableCredential } from "../portal-web/src/client-options.ts";
+import { apps, appsFor, runsOn, usableCredential } from "../portal-web/src/client-options.ts";
 
-test("client choice separates user-facing app from server protocol and download format", () => {
-  assert.equal(clientOptions.length, 4);
-  assert.equal(clientProtocol("hiddify"), "wireguard");
-  assert.equal(clientFormat("hiddify"), "mihomo");
-  assert.equal(clientProtocol("clash"), "wireguard");
-  assert.equal(clientFormat("clash"), "mihomo");
-  assert.equal(clientProtocol("wireguard"), "wireguard");
-  assert.equal(clientFormat("wireguard"), "native");
-  assert.equal(clientProtocol("openvpn"), "openvpn");
-  assert.equal(clientFormat("openvpn"), "native");
+test("apps are ordered for the visitor's device and only marked where they run", () => {
+  assert.deepEqual(appsFor("ios"), ["shadowrocket", "hiddify", "clash", "v2rayng"]);
+  assert.deepEqual(appsFor("android"), ["hiddify", "v2rayng", "clash", "shadowrocket"]);
+  assert.deepEqual(appsFor("windows").slice(0, 2), ["clash", "hiddify"]);
+  for (const platform of ["ios", "android", "mac", "windows", "linux"]) {
+    assert.equal(appsFor(platform).length, Object.keys(apps).length);
+    assert.ok(runsOn(appsFor(platform).find((id) => runsOn(id, platform)), platform));
+  }
+  assert.equal(runsOn("shadowrocket", "android"), false);
+  assert.equal(runsOn("v2rayng", "ios"), false);
+  assert.equal(runsOn("clash", "mac"), true);
 });
 test("available connection count excludes disabled, expired and blocked credentials", () => {
   const item = { status: "active", userDisabled: false, adminDisabled: false, accountStatus: "active", expiresAt: "2027-01-01T00:00:00Z" };

@@ -33,7 +33,7 @@ const sourceLabels = (): Record<AccessGrant["source"], string> => ({ admin: t("�
 const stateLabels = (): Record<AccessGrant["state"], string> => ({ active: t("生效中"), upcoming: t("待生效"), expired: t("已到期"), exhausted: t("已用完"), revoked: t("已撤销") });
 const stateTones: Record<AccessGrant["state"], "success" | "progress" | "neutral" | "danger"> = { active: "success", upcoming: "progress", expired: "neutral", exhausted: "danger", revoked: "neutral" };
 
-type View = { access: AccountAccess; devices: { limit: number | null; used: number }; grants: AccessGrant[] };
+type View = { access: AccountAccess; devices: { limit: number | null; used: number }; online: { apps: number; subscription: number; total: number }; grants: AccessGrant[] };
 type Form = { mode: "switch" | "add"; plan: string; period: "forever" | "days" | "date"; days: string; date: string; traffic: "unlimited" | "gb"; gb: string; devices: string; gift: boolean; note: string };
 const emptyForm: Form = { mode: "add", plan: "", period: "days", days: "30", date: "", traffic: "unlimited", gb: "", devices: "", gift: false, note: "" };
 
@@ -94,7 +94,9 @@ export function AccessPanel({ userId, onChanged }: { userId: string; onChanged?:
         {access.quotaBytes !== null ? <><span>{t("已用 {0} / {1}", [formatBytes(access.usedBytes), formatBytes(access.quotaBytes)])}</span><i className={`quota-bar${(access.remainingBytes || 0) <= access.quotaBytes * 0.1 ? " low" : ""}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (access.usedBytes / access.quotaBytes) * 100)}%` }} /></i></> : <span>{t("全部节点合计")}</span>}</article>
       {view && <article className={view.devices.limit !== null && view.devices.used > view.devices.limit ? "tone-warning" : ""}><small>{t("设备")}</small>
         <b>{view.devices.limit === null ? t("不限") : t("{0} / {1} 台", [view.devices.used, view.devices.limit])}</b>
-        <span>{view.devices.limit !== null && view.devices.used > view.devices.limit ? t("超出上限，只有最早的 {0} 个可用", [view.devices.limit]) : t("已用 {0} · 含订阅和节点配置", [view.devices.used])}</span></article>}
+        <span>{view.devices.limit !== null && view.devices.used > view.devices.limit ? t("超出上限，只有最早的 {0} 个可用", [view.devices.limit]) : t("客户端登录和单节点配置")}</span></article>}
+      {view && <article className={view.devices.limit !== null && view.online.total > view.devices.limit ? "tone-warning" : ""}><small>{t("现在在线")}</small>
+        <b>{view.online.total}</b><span>{t("客户端 {0} · 订阅 {1} 处", [view.online.apps, view.online.subscription])}</span></article>}
     </div>}
     {form && <form className="grant-form" onSubmit={(event) => void submit(event)}>
       <label className="span-2">{switching ? t("新套餐") : t("内容")}<select value={form.plan} onChange={(event) => setForm({ ...form, plan: event.target.value })}>

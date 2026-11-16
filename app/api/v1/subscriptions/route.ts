@@ -1,45 +1,45 @@
 import { NextResponse } from "next/server";
 import { requestUser } from "../../../../server/request-auth";
 import { cleanText, jsonError, readJson } from "../../../../server/http";
-import { createSubscription, downloadSubscription, listSubscriptions, manageSubscription } from "../../../../server/subscriptions";
+import { accountSubscription, manageSubscription, resetAccountSubscriptionLink } from "../../../../server/subscriptions";
 import { findUserByEmail } from "../../../../server/db";
 import { verifyPassword } from "../../../../server/password";
 import { allowLoginAttempt, recordAuthFailure } from "../../../../server/rate-limit";
 
 export const runtime = "nodejs";
 const headers = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" };
+
+/** The account's one subscription (with its link, for its signed-in owner), or null before first use. */
 export async function GET(request: Request) {
   const user = await requestUser(request);
   if (!user) return jsonError("Authentication required", 401);
-  return NextResponse.json({ subscriptions: await listSubscriptions(user.id) }, { headers });
+  return NextResponse.json({ subscription: await accountSubscription(user.id) }, { headers });
 }
+
+/** First use: makes the account's subscription. Calling it again returns the same one. */
 export async function POST(request: Request) {
   const user = await requestUser(request);
   if (!user) return jsonError("Authentication required", 401);
-  try {
-    const body = await readJson(request), name = cleanText(body.name, 120);
-    // Every new subscription is VLESS (REALITY + Hysteria2 + XHTTP per node); the protocol field of older Portals is ignored.
-    if (!name) return jsonError("请填写名称");
-    const subscription = await createSubscription(user.id,name);
-    // Prepare initial access now; the first agent acknowledgement arrives asynchronously.
-    try { await downloadSubscription(subscription.token); } catch { /* Keep the link; don't mint a second identity on retry. */ }
-    return NextResponse.json(subscription, { status: 201, headers });
-  } catch (error) { return jsonError(error instanceof Error ? error.message : "创建失败", 409); }
+  try { return NextResponse.json({ subscription: await accountSubscription(user.id, true) }, { headers }); }
+  catch (error) { return jsonError(error instanceof Error ? error.message : "创建失败", 409); }
 }
+
+/** reset-link (password checked, the old link stops at once); delete of a subscription from before accounts had one. */
 export async function PATCH(request: Request) {
   const user = await requestUser(request);
   if (!user) return jsonError("Authentication required", 401);
   try {
     const body = await readJson(request), action = cleanText(body.action, 32);
-    // Normalise once: checking the raw value let "reveal-link " skip the password check.
-    if (["reveal-link", "reset-link"].includes(action)) {
+    if (action === "reset-link") {
       if (!allowLoginAttempt(request, user.email)) return jsonError("验证次数过多，请稍后重试", 429);
       const account = await findUserByEmail(user.email);
       if (!(await verifyPassword(typeof body.password === "string" ? body.password : "", account?.password_hash))) {
         recordAuthFailure(request, "wrong-password");
         return jsonError("登录密码不正确", 403);
       }
+      return NextResponse.json({ subscription: await resetAccountSubscriptionLink(user.id) }, { headers });
     }
+    if (action !== "delete") return jsonError("不支持的订阅操作");
     return NextResponse.json(await manageSubscription(cleanText(body.id,128),action,{ id: user.id, admin: false }), { headers });
   } catch (error) { return jsonError(error instanceof Error ? error.message : "操作失败", 409); }
 }

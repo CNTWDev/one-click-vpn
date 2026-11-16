@@ -1,6 +1,5 @@
 /** Pure formatting helpers; callers can supply the selected Portal locale. */
 export const protocolLabel = (value: string) => value === "wireguard" ? "WireGuard" : value === "openvpn" ? "OpenVPN" : value === "vless" ? "VLESS + REALITY" : value;
-export const protocolBadge = (value: string) => value === "wireguard" ? "WG" : value === "openvpn" ? "OVPN" : value === "vless" ? "VLESS" : value.toUpperCase();
 
 export function formatBytes(bytes = 0) {
   if (!bytes) return "0 B";
@@ -27,17 +26,11 @@ export function relativeLabel(value?: string | null, fallback = "尚无记录", 
   return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(Math.round(seconds / unit[1]), unit[0]);
 }
 
-/** Subscription URL builder; the server defaults to format=clash and mode=smart, so only non-defaults are added. */
-export type SubscriptionFormat = "clash" | "v2ray";
-export type RoutingMode = "smart" | "global";
-export function subscriptionLink(token: string, options: { format?: SubscriptionFormat; mode?: RoutingMode } = {}, origin = window.location.origin) {
-  const query = new URLSearchParams({ token });
-  if (options.format === "v2ray") query.set("format", "v2ray");
-  if (options.mode === "global") query.set("mode", "global");
-  return `${origin}/api/subscription?${query.toString()}`;
+/** The subscription URL. One link for every app: the server picks Clash YAML or share links from the app's User-Agent. */
+export function subscriptionLink(token: string, origin = window.location.origin) {
+  return `${origin}/api/subscription?${new URLSearchParams({ token }).toString()}`;
 }
 const base64Url = (value: string) => btoa(String.fromCharCode(...new TextEncoder().encode(value))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-/** `name` is the profile name the client shows: the site's name. */
 export const importUrls = {
   clash: (link: string, name: string) => `clash://install-config?url=${encodeURIComponent(link)}&name=${encodeURIComponent(name)}`,
   // Hiddify reads the raw (still percent-encoded) path of hiddify://import/<url>, so an encoded URL there fails

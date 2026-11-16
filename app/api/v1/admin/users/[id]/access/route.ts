@@ -3,13 +3,14 @@ import { requestAdmin } from "../../../../../../../server/request-auth";
 import { jsonError, readJson } from "../../../../../../../server/http";
 import { reconcileUserAccess } from "../../../../../../../server/credential-access";
 import { describe, deviceSlots, EntitlementError, grantAccess, publicGrant, revokeGrant, userGrants } from "../../../../../../../server/entitlements";
+import { accountOnline } from "../../../../../../../server/online-clients";
 
 export const runtime = "nodejs";
 
 async function view(userId: string) {
-  const [grants, devices] = await Promise.all([userGrants(userId), deviceSlots(userId)]);
-  // devices: the limit from the account's plan (null = unlimited) and what takes one.
-  return { access: describe(grants), devices, grants: grants.map((grant) => publicGrant(grant)) };
+  const [grants, devices, online] = await Promise.all([userGrants(userId), deviceSlots(userId), accountOnline(userId)]);
+  // devices: the limit from the account's plan (null = unlimited) and what takes one; online: places in use now.
+  return { access: describe(grants), devices, online, grants: grants.map((grant) => publicGrant(grant)) };
 }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {

@@ -282,12 +282,12 @@ export async function createAccessCredential(input: {
   displayName: string;
   protocol: Protocol;
   identityKey: string;
-  /** Takes over an existing credential's device (subscription upgrade), so it needs no free slot. */
-  replacesCredential?: boolean;
+  /** A subscription's credential is not a device (see account_slots), so it needs no free slot. */
+  subscription?: boolean;
 }): Promise<AccessCredential> {
   if ((await dbQuery<{native_only:boolean}>("SELECT native_only FROM users WHERE id=$1",[input.userId]))[0]?.native_only) throw new Error("Please connect using the TrackNothing app");
-  // A subscription or node config takes a device, like an app sign-in.
-  if (!input.replacesCredential) await assertDeviceSlot(input.userId);
+  // A node config takes a device, like an app sign-in.
+  if (!input.subscription) await assertDeviceSlot(input.userId);
   const credentialId = `cred_${randomUUID()}`;
   const deviceId = `dev_${randomUUID()}`;
   const timestamp = now();

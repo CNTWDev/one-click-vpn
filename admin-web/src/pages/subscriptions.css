@@ -1,4 +1,4 @@
-/* Shared by Portal and Console. Reads the host app's design tokens; fallbacks reproduce the dark Console look. */
+/* Console subscription list. Reads the Console design tokens. */
 .subscription-panel{--sp-accent:var(--accent,#c0e58e);--sp-accent-contrast:var(--accent-contrast,#15220f);--sp-surface:var(--surface,#111a14);--sp-surface-2:var(--surface-2,#18221a);--sp-border:var(--border,#344036);--sp-text:var(--text,#e8eee9);--sp-text-2:var(--text-2,#aab7ac);--sp-danger:var(--danger,#f08a76);--sp-success:var(--success,#9fd36b);--sp-radius:var(--radius,16px);--sp-radius-sm:var(--radius-sm,10px)}
 .subscription-panel{margin:24px 0;padding:28px;border:1px solid var(--sp-border);border-radius:var(--sp-radius);background:var(--sp-surface);color:var(--sp-text);font-size:14px}
 .subscription-panel *{box-sizing:border-box}
@@ -7,27 +7,13 @@
 .subscription-panel p,.subscription-panel small{color:var(--sp-text-2);line-height:1.65}
 .subscription-kicker{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--sp-accent)}
 .subscription-heading,.subscription-row{display:flex;justify-content:space-between;align-items:center;gap:20px}
-.subscription-panel button,.subscription-import{display:inline-flex;align-items:center;justify-content:center;min-height:42px;border:1px solid var(--sp-border);border-radius:var(--sp-radius-sm);padding:9px 16px;background:var(--sp-surface-2);color:var(--sp-text);font:inherit;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none}
-.subscription-panel button:hover,.subscription-import:hover{border-color:color-mix(in srgb,var(--sp-accent) 55%,var(--sp-border))}
+.subscription-panel button{display:inline-flex;align-items:center;justify-content:center;min-height:42px;border:1px solid var(--sp-border);border-radius:var(--sp-radius-sm);padding:9px 16px;background:var(--sp-surface-2);color:var(--sp-text);font:inherit;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none}
+.subscription-panel button:hover{border-color:color-mix(in srgb,var(--sp-accent) 55%,var(--sp-border))}
 .subscription-panel button:disabled{opacity:.45;cursor:not-allowed}
 .subscription-panel .subscription-primary{background:var(--sp-accent);color:var(--sp-accent-contrast);border-color:var(--sp-accent);font-weight:700}
 .subscription-panel .subscription-danger{color:var(--sp-danger)}
-.subscription-panel .subscription-danger-solid,.subscription-confirm .subscription-danger-solid{background:var(--sp-danger);border-color:var(--sp-danger);color:var(--danger-contrast,#fff);font-weight:700}
-.subscription-setup{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin:22px 0}
-.subscription-setup form{display:grid;gap:16px;align-content:start}
-.subscription-panel label{display:grid;gap:8px;font-size:14px;font-weight:600}
-.subscription-panel input,.subscription-panel select{width:100%;min-height:44px;padding:10px 12px;border-radius:var(--sp-radius-sm);border:1px solid var(--sp-border);background:var(--sp-surface);color:var(--sp-text);font:inherit;font-weight:400}
-.subscription-panel details{border:1px solid var(--sp-border);border-radius:var(--sp-radius-sm);padding:0 14px}
-.subscription-panel details summary{list-style:none;display:flex;align-items:center;justify-content:space-between;min-height:44px;cursor:pointer;color:var(--sp-text-2);font-weight:600}
-.subscription-panel details summary::-webkit-details-marker{display:none}
-.subscription-panel details summary::after{content:"";width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);transition:transform .15s}
-.subscription-panel details[open] summary::after{transform:rotate(-135deg) translateY(-2px)}
-.subscription-panel details label{margin:4px 0 12px}
-.subscription-panel aside{padding:22px;background:var(--sp-surface-2);border-radius:var(--sp-radius-sm)}
-.subscription-panel ol{padding-left:22px;line-height:1.8;margin:0 0 12px}
 .subscription-panel li{margin-bottom:10px}
 .subscription-panel li small,.subscription-row b small{display:block;font-weight:400;font-size:12px}
-.subscription-panel a{color:var(--sp-accent);font-weight:600}
 .subscription-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 .subscription-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px}
 .subscription-list article{padding:20px;border:1px solid var(--sp-border);border-radius:var(--sp-radius-sm);min-width:0}
@@ -35,8 +21,6 @@
 .subscription-row>div{min-width:0}
 .subscription-row>div small{overflow-wrap:anywhere}
 .subscription-row b{white-space:nowrap;text-align:right}
-.subscription-link{padding:20px;border:1px solid var(--sp-accent);border-radius:var(--sp-radius-sm);margin:20px 0}
-.subscription-link input{margin:12px 0}
 .subscription-error{padding:12px 14px;background:color-mix(in srgb,var(--sp-danger) 14%,transparent);color:var(--sp-danger)!important;border-radius:var(--sp-radius-sm)}
 .subscription-notice{padding:12px 14px;background:color-mix(in srgb,var(--sp-success) 14%,transparent);color:var(--sp-text)!important;border-radius:var(--sp-radius-sm)}
 .subscription-empty{padding:22px;text-align:center}
@@ -49,9 +33,7 @@
   .subscription-heading{display:block}
   .subscription-heading>button{margin:4px 0 12px}
   .subscription-heading h2{font-size:20px}
-  .subscription-setup{grid-template-columns:minmax(0,1fr);gap:18px}
   .subscription-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
   .subscription-actions>button,.subscription-actions>a{white-space:nowrap;padding:10px 8px}
-  .subscription-panel aside{padding:16px}
   .subscription-confirm>div{max-height:90dvh;overflow:auto}
 }

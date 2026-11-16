@@ -26,7 +26,7 @@ const ControllerPage = lazy(() => import("./pages/controller").then((module) => 
 const ReleasesPage = lazy(() => import("./pages/releases").then((module) => ({ default: module.ReleasesPage })));
 const SitesPage = lazy(() => import("./pages/sites").then((module) => ({ default: module.SitesPage })));
 const PlansPage = lazy(() => import("./pages/plans").then((module) => ({ default: module.PlansPage })));
-const SubscriptionPanel = lazy(() => import("../../shared/subscription-panel").then((module) => ({ default: module.SubscriptionPanel })));
+const SubscriptionPanel = lazy(() => import("./pages/subscriptions").then((module) => ({ default: module.SubscriptionPanel })));
 const LogsPage = lazy(() => import("./pages/logs").then((module) => ({ default: module.LogsPage })));
 
 type PageId = "overview" | "topology" | "users" | "plans" | "subscriptions" | "nodes" | "services" | "regions" | "controller" | "sites" | "logs" | "releases";
@@ -160,7 +160,7 @@ function App() {
           {page === "topology" && <TopologyPage nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
           {page === "users" && <UsersPage onChanged={() => void refreshCore()} />}
           {page === "plans" && <PlansPage />}
-          {page === "subscriptions" && <SubscriptionPanel api={api} admin />}
+          {page === "subscriptions" && <SubscriptionPanel api={api} />}
           {page === "nodes" && <NodesPage nodes={nodes} regions={regions} loading={dataLoading} onRefresh={refreshCore} />}
           {page === "services" && <ServicesPage nodes={nodes} />}
           {page === "regions" && <RegionsPage regions={regions} nodes={nodes} onRefresh={refreshCore} />}

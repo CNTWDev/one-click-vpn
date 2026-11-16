@@ -12,13 +12,12 @@ import { createRoot } from "react-dom/client";
 import { api } from "./api";
 import { DataStream } from "./pixel";
 import "./styles.css";
-import "./region-map.css";
 
 // Signed-in pages load on demand, so the sign-in screen does not wait for them (or for the QR code library).
 const loadHome = () => import("./home");
-const loadDashboard = () => import("./credential-dashboard");
+const loadSingleNode = () => import("./single-node");
 const Home = lazy(() => loadHome().then((module) => ({ default: module.Home })));
-const CredentialDashboard = lazy(() => loadDashboard().then((module) => ({ default: module.CredentialDashboard })));
+const SingleNode = lazy(() => loadSingleNode().then((module) => ({ default: module.SingleNode })));
 
 type User = {
   id: string;
@@ -79,10 +78,8 @@ function Auth({ mode, onMode, onUser, notice }: {
   }
 
   const site = useSite(), siteName = site?.name || PRODUCT_NAME;
-  // Only the default site has its own apps; other sites still hand out subscriptions.
-  const apps = site?.isDefault !== false;
   const title = mode === "login" ? t("登录 {0}", [siteName]) : mode === "register" ? t("申请使用 VPN") : t("找回密码");
-  const subtitle = mode === "login" ? apps ? t("登录后下载客户端，用同一账号即可使用。") : t("使用已审核的账号继续，获取你的订阅链接。") : mode === "register" ? t("提交后由管理员人工审核。")
+  const subtitle = mode === "login" ? t("登录后点一下，就能把全部节点导入你的客户端。") : mode === "register" ? t("提交后由管理员人工审核。")
     : resetSent ? t("如果该邮箱已注册，重置链接很快会发到邮箱，1 小时内有效。")
       : resetByEmail === false ? t("请联系管理员，为你生成重置密码的链接。") : t("输入注册邮箱，我们会发送重置链接。");
   const askEmail = mode !== "forgot" || (resetByEmail && !resetSent);
@@ -95,7 +92,7 @@ function Auth({ mode, onMode, onUser, notice }: {
         <span className="auth-mark"><BrandMark size={176} logoSvg={site?.logoSvg} /></span>
         <span className="home-stream"><DataStream /><DataStream count={12} salt={1} className="dim" /></span>
       </div>
-      <p className="intro-copy">{apps ? t("审核通过后，下载客户端登录即可使用，无需导入配置。") : t("审核通过后一键创建订阅，导入客户端或扫码即用。")}</p>
+      <p className="intro-copy">{t("审核通过后，一键导入常用客户端，或扫码在手机上使用。")}</p>
     </section>
     <form className="auth-panel" onSubmit={submit}>
       <h2>{title}</h2>
@@ -165,7 +162,6 @@ export default function App() {
   const [resetToken, setResetToken] = useState(readResetToken);
   const [notice, setNotice] = useState("");
   const [manual, setManual] = useState(readManual);
-  const site = useSite();
 
   useEffect(() => {
     const follow = () => { const token = readResetToken(); if (token) setResetToken(token); setManual(readManual()); };
@@ -185,7 +181,7 @@ export default function App() {
       void Promise.all([
         api<{ user: User }>("/api/v1/auth/me").then((result) => {
           // Fetch the signed-in page while the site settings are still loading.
-          if (result.user?.status === "active") void (readManual() ? loadDashboard() : loadHome()).catch(() => undefined);
+          if (result.user?.status === "active") void (readManual() ? loadSingleNode() : loadHome()).catch(() => undefined);
           setUser(result.user);
         }).catch(() => undefined),
         loadSite().then((site) => applySiteToDocument(site)),
@@ -205,9 +201,7 @@ export default function App() {
   if (user?.status === "active" && !loading) {
     // #manual keeps the browser's Back button working between the two pages.
     const go = (next: boolean) => { if (next) window.location.hash = "manual"; else window.history.replaceState(null, "", window.location.pathname + window.location.search); setManual(next); window.scrollTo(0, 0); };
-    // The apps are built for the default site only; other sites keep subscriptions as their home.
-    const page = site?.isDefault === false ? <CredentialDashboard user={user} onLogout={() => void logout()} />
-      : manual ? <CredentialDashboard user={user} onLogout={() => void logout()} onBack={() => go(false)} /> : <Home user={user} onLogout={() => void logout()} onManual={() => go(true)} />;
+    const page = manual ? <SingleNode user={user} onLogout={() => void logout()} onBack={() => go(false)} /> : <Home user={user} onLogout={() => void logout()} onManual={() => go(true)} />;
     return <Suspense fallback={connecting}>{page}</Suspense>;
   }
   return <><PortalLanguagePicker floating />{loading ? connecting

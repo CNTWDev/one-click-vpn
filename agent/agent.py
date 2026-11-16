@@ -1039,6 +1039,26 @@ def schedule_vless_restart(delay=VLESS_RESTART_DELAY):
         atomic_write(VLESS_RESTART_DUE, str(time.time() + delay))
 
 
+def enable_vless_online_stats():
+    """Agents before 2.18 wrote Xray configs without statsUserOnline; add it and pick it up at the next quiet restart."""
+    if not VLESS_CONFIG.exists():
+        return False
+    config = json.loads(VLESS_CONFIG.read_text())
+    level = config.setdefault("policy", {}).setdefault("levels", {}).setdefault("0", {})
+    if level.get("statsUserOnline"):
+        return False
+    level["statsUserOnline"] = True
+    candidate = STATE_DIR / "vless-online-candidate.json"
+    atomic_write(candidate, json.dumps(config))
+    try:
+        run_fixed([str(XRAY_PATH), "run", "-test", "-config", str(candidate)])
+    finally:
+        candidate.unlink(missing_ok=True)
+    atomic_write(VLESS_CONFIG, json.dumps(config))
+    schedule_vless_restart()
+    return True
+
+
 def run_due_vless_restart(now=None):
     try:
         due = float(VLESS_RESTART_DUE.read_text())
@@ -1081,7 +1101,8 @@ def vless_config(desired, bundle, target):
     return {
         "log": {"loglevel": "warning", "access": "none"},
         "api": {"tag": "api", "services": ["StatsService", "HandlerService"]}, "stats": {},
-        "policy": {"levels": {"0": {"statsUserUplink": True, "statsUserDownlink": True}}},
+        # statsUserOnline: which addresses each user is connected from (online_clients), for the account's online count.
+        "policy": {"levels": {"0": {"statsUserUplink": True, "statsUserDownlink": True, "statsUserOnline": True}}},
         "inbounds": [
             {"tag": "vless", "listen": "0.0.0.0", "port": port, "protocol": "vless",
              "settings": {"clients": clients, "decryption": "none"},
@@ -1186,6 +1207,37 @@ def vless_usage_snapshots():
     return [{**user, "counterEpoch": epoch} for user in users.values()]
 
 
+def online_client_hash(address):
+    """Short hash of a source address: the Controller counts distinct places per subscription without storing addresses."""
+    return hashlib.sha256(f"tn-online:{address}".encode()).hexdigest()[:16]
+
+
+def vless_online_clients():
+    """Addresses connected to each VLESS user right now, from Xray's online stats (statsUserOnline)."""
+    if not XRAY_PATH.exists() or not VLESS_CONFIG.exists():
+        return {}
+    result = run_optional([str(XRAY_PATH), "api", "statsgetallonlineusers", "--server=127.0.0.1:10085"])
+    if result.returncode != 0:
+        return {}
+    try:
+        users = json.loads(result.stdout).get("users") or []
+    except (ValueError, TypeError, AttributeError):
+        return {}
+    clients = {}
+    for name in users[:500] if isinstance(users, list) else []:
+        match = UUID_PATTERN.search(str(name))
+        if not match:
+            continue
+        listing = run_optional([str(XRAY_PATH), "api", "statsonlineiplist", "--server=127.0.0.1:10085", "-email", match.group(0)])
+        try:
+            addresses = json.loads(listing.stdout).get("ips") or {} if listing.returncode == 0 else {}
+        except (ValueError, TypeError, AttributeError):
+            continue
+        if isinstance(addresses, dict) and addresses:
+            clients.setdefault(match.group(0), set()).update(online_client_hash(address) for address in list(addresses)[:64])
+    return clients
+
+
 def ensure_mihomo():
     if MIHOMO_PATH.exists():
         return
@@ -1271,6 +1323,8 @@ def stealth_api_secret():
 STEALTH_EPOCH = base64.urlsafe_b64encode(os.urandom(9)).decode()
 stealth_connections = {}
 stealth_totals = {}
+# Source addresses per stealth user and when they were last connected (online_clients).
+stealth_addresses = {}
 LOCAL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
@@ -1292,6 +1346,9 @@ def poll_stealth_usage():
         key, upload, download = connection.get("id"), connection.get("upload"), connection.get("download")
         if not UUID_PATTERN.fullmatch(user) or not isinstance(key, str) or not isinstance(upload, int) or not isinstance(download, int):
             continue
+        source = (connection.get("metadata") or {}).get("sourceIP")
+        if isinstance(source, str) and source:
+            stealth_addresses.setdefault(user, {})[source] = time.time()
         _, previous_upload, previous_download = stealth_connections.get(key, (user, 0, 0))
         totals = stealth_totals.setdefault(user, [0, 0])
         totals[0] += max(0, upload - previous_upload)
@@ -1303,6 +1360,24 @@ def poll_stealth_usage():
 def stealth_usage_snapshots():
     return [{"protocol": "stealth", "identityKey": user, "rxBytes": upload, "txBytes": download, "counterEpoch": STEALTH_EPOCH}
             for user, (upload, download) in stealth_totals.items()]
+
+
+def online_clients():
+    """For the heartbeat: per subscription identity, hashes of the addresses connected over REALITY, Hysteria2 or XHTTP."""
+    clients = {}
+    try:
+        clients = vless_online_clients()
+    except Exception as error:
+        log_failure("VLESS online clients", error)
+    cutoff = time.time() - 90
+    for user in list(stealth_addresses):
+        recent = {address for address, seen in stealth_addresses[user].items() if seen >= cutoff}
+        if recent:
+            stealth_addresses[user] = {address: seen for address, seen in stealth_addresses[user].items() if seen >= cutoff}
+            clients.setdefault(user, set()).update(online_client_hash(address) for address in list(recent)[:64])
+        else:
+            del stealth_addresses[user]
+    return [{"identityKey": user, "clients": sorted(hashes)[:64]} for user, hashes in clients.items()]
 
 
 def stealth_listen_port():
@@ -1859,11 +1934,12 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.17.0",
+        "version": "agent 2.18.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
         "usageSnapshots": wireguard_usage_snapshots() + openvpn_usage_snapshots() + vless_usage_snapshots() + stealth_usage_snapshots(),
+        "onlineClients": online_clients(),
         "nodeIdentity": node_identity(),
     })
     try:
@@ -1898,7 +1974,7 @@ def adopt_controller_origin(target):
     CONTROLLER = target
     try:
         request_json("/api/v1/agent/heartbeat", {"nodeId": NODE_ID, "token": TOKEN, "hostname": socket.gethostname(),
-                                                 "version": "agent 2.17.0", "capabilities": capabilities()})
+                                                 "version": "agent 2.18.0", "capabilities": capabilities()})
         lines = CONFIG_ENV.read_text().splitlines()
         lines = [f"NORTHSTAR_CONTROLLER_URL={target}" if line.startswith("NORTHSTAR_CONTROLLER_URL=") else line for line in lines]
         if f"NORTHSTAR_CONTROLLER_URL={target}" not in lines:
@@ -2070,6 +2146,10 @@ def main():
         restore_openvpn()
     except Exception as error:
         log_failure("OpenVPN restore", command_failure_detail(error))
+    try:
+        enable_vless_online_stats()
+    except Exception as error:
+        log_failure("VLESS online stats", error)
     last_heartbeat_attempt = 0
     last_offline_check = 0
     threading.Thread(target=task_poller, name="task-poller", daemon=True).start()

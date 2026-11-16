@@ -60,10 +60,10 @@
   <string name="development_server_address">Адрес сервера разработки</string>
   <string name="development_title">TrackNothing — Версия для разработки</string>
   <string name="device">Устройство</string>
-  <string name="device_limit_reached_account_hint">Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите.</string>
-  <string name="device_limit_reached_revoke_an_old_device_and_try">Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите.</string>
-  <string name="device_limit_reached_revoke_an_old_device_in_account">Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите.</string>
-  <string name="devices_configs_note">Ещё подписок или конфигураций, занимающих места: %1$s. Ненужные можно удалить на веб-портале.</string>
+  <string name="device_limit_reached_account_hint">Достигнут лимит устройств (конфигурации для одного сервера тоже считаются, подписка — нет). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите.</string>
+  <string name="device_limit_reached_revoke_an_old_device_and_try">Достигнут лимит устройств (конфигурации для одного сервера тоже считаются, подписка — нет). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите.</string>
+  <string name="device_limit_reached_revoke_an_old_device_in_account">Достигнут лимит устройств (конфигурации для одного сервера тоже считаются, подписка — нет). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите.</string>
+  <string name="devices_configs_note">Ещё конфигураций для одного сервера, занимающих места: %1$s. Ненужные можно удалить на веб-портале.</string>
   <string name="devices_join_automatically">Новые устройства добавляются сами</string>
   <string name="devices_unlimited">Без лимита</string>
   <string name="devices_used">Занято %1$s из %2$s</string>
