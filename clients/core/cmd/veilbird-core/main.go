@@ -119,6 +119,13 @@ func main() {
 			}
 			timeout, _ := strconv.Atoi(fields[3])
 			reply(core.Probe(fields[1], fields[2], timeout))
+		case "reach":
+			if len(fields) != 3 {
+				reply("-1")
+				continue
+			}
+			timeout, _ := strconv.Atoi(fields[2])
+			reply(strconv.Itoa(core.Reach(fields[1], timeout)))
 		case "now":
 			if len(fields) != 2 {
 				reply("")

@@ -174,6 +174,9 @@ class DataStream(context: Context) : TextView(context) {
 class UsageBars(context: Context) : View(context) {
     var values: List<Long> = emptyList()
         set(value) { field = value; invalidate() }
+    /** How many trailing columns are lit (the chosen range); the rest are dimmed. */
+    var recent = 7
+        set(value) { field = value; invalidate() }
     private val density = resources.displayMetrics.density
     private val paint = Paint()
     override fun onDraw(canvas: Canvas) {
@@ -184,7 +187,7 @@ class UsageBars(context: Context) : View(context) {
         val max = values.max().coerceAtLeast(1)
         values.forEachIndexed { i, v ->
             val lit = if (v <= 0) 1 else maxOf(1, Math.round(rows * v.toFloat() / max))
-            paint.color = if (i >= count - 7) Palette.accent else Color.rgb(94, 117, 80)
+            paint.color = if (i >= count - recent) Palette.accent else Color.rgb(94, 117, 80)
             val left = i * (w + gap)
             for (r in 0 until lit) canvas.drawRect(left, height - r * pitch - block, left + w, height - r * pitch, paint)
         }
@@ -208,6 +211,41 @@ class SignalBars(context: Context) : View(context) {
             bar.set(left, height - h, left + w, height.toFloat())
             paint.color = if (i < level) color else Color.rgb(46, 58, 48)
             canvas.drawRect(bar, paint)
+        }
+    }
+}
+
+/**
+ * The last 40 seconds of the connection: download as columns of square dots rising from a hairline, upload as
+ * dimmer columns hanging below it. Both scale to the busiest second shown, so the shape stays readable at any speed.
+ */
+class RateBars(context: Context) : View(context) {
+    companion object { const val COUNT = 40 }
+    private var down: List<Long> = emptyList()
+    private var up: List<Long> = emptyList()
+    private val density = resources.displayMetrics.density
+    private val paint = Paint()
+    init { importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO }
+    fun set(down: List<Long>, up: List<Long>) { this.down = down; this.up = up; invalidate() }
+    override fun onDraw(canvas: Canvas) {
+        val block = 4 * density; val pitch = 6 * density
+        val pitchX = width.toFloat() / COUNT; val w = minOf(block, pitchX - 1 * density)
+        val axis = height * 0.64f
+        val topRows = maxOf(1, ((axis - 2 * density + pitch - block) / pitch).toInt())
+        val bottomRows = maxOf(1, ((height - axis - 2 * density + pitch - block) / pitch).toInt())
+        paint.color = Color.rgb(38, 51, 42)
+        canvas.drawRect(0f, axis, width.toFloat(), axis + density, paint)
+        val max = maxOf(1L, (down + up).maxOrNull() ?: 1L)
+        // Newest on the right; an empty start before the first samples.
+        val offset = COUNT - down.size
+        for (i in down.indices) {
+            val left = (offset + i) * pitchX + (pitchX - w) / 2
+            val lit = if (down[i] <= 0) 1 else maxOf(1, Math.round(topRows * down[i].toFloat() / max))
+            paint.color = Palette.accent
+            for (r in 0 until lit) canvas.drawRect(left, axis - 2 * density - r * pitch - block, left + w, axis - 2 * density - r * pitch, paint)
+            val litUp = if (up.getOrElse(i) { 0 } <= 0) 0 else maxOf(1, Math.round(bottomRows * up[i].toFloat() / max))
+            paint.color = Color.rgb(94, 117, 80)
+            for (r in 0 until litUp) canvas.drawRect(left, axis + 3 * density + r * pitch, left + w, axis + 3 * density + r * pitch + block, paint)
         }
     }
 }

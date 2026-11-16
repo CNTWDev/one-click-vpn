@@ -72,3 +72,9 @@ func TestBuildParsesOnEveryPlatform(t *testing.T) {
 		t.Fatal("unknown platform accepted")
 	}
 }
+
+func TestReachWithoutCoreAnswersMinusOne(t *testing.T) {
+	if got := Reach("not an address", 100); got != -1 {
+		t.Fatalf("Reach(bad) = %d, want -1", got)
+	}
+}
