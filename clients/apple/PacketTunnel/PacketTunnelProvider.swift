@@ -244,6 +244,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         switch String(decoding:messageData,as:UTF8.self) {
         case "journal":completionHandler?(Data(Journal.read().utf8));return
         case "journal-clear":Journal.clear();completionHandler?(nil);return
+        // The activity view: kept by the core in memory while connected, cleared when it stops.
+        case "activity":completionHandler?(Data(CoreActivity().utf8));return
         case let message where message.hasPrefix("check "):
             // The connection check, timed from here so every leg leaves through the right path: the small page and the
             // node outside the tunnel (DIRECT), the test page through the transport carrying traffic now.
