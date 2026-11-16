@@ -18,6 +18,8 @@ public static class Transports {
     public static readonly string[] Ladder={"hysteria2","reality","xhttp","wireguard"};
     public const string Group="TrackNothing";
     public const string TestUrl="https://www.gstatic.com/generate_204";
+    /// Answers fast from nearly every network (mainland China and Russia too): the connection check times it outside the tunnel.
+    public const string LocalUrl="http://captive.apple.com/hotspot-detect.html";
     private static readonly TimeSpan Memory=TimeSpan.FromDays(7);
     private static readonly string MemoryPath=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Veilbird","transports.json");
 

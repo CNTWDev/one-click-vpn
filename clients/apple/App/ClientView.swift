@@ -24,6 +24,10 @@ struct ClientView:View {
     @State private var versionTaps=0
     @State private var firstTap=Date.distantPast
     @State private var choosingLanguage=false
+    @State private var checking=false
+    @State private var checkRunning=false
+    @State private var checkResult:[String:Int]?
+    @State private var usageRange="30d"
     #if os(macOS)
     @State private var openAtLogin=SMAppService.mainApp.status == .enabled
     #endif
@@ -80,6 +84,9 @@ struct ClientView:View {
         } message:{Text(resetEmail.map {L10n.text(model.signedIn ? "reset_change_detail":"reset_confirm_detail",$0)} ?? "")}
         #if os(iOS)
         .sheet(isPresented:$choosingLanguage) {languageSheet.presentationDetents([.height(360)]).presentationDragIndicator(.visible)}
+        .sheet(isPresented:$checking) {checkSheet.presentationDetents([.height(560)]).presentationDragIndicator(.visible)}
+        #else
+        .sheet(isPresented:$checking) {checkSheet.frame(width:360)}
         #endif
     }
 
@@ -278,6 +285,7 @@ struct ClientView:View {
             HStack(spacing:10) {PixelMark(size:22);Wordmark(size:19);Spacer()}.frame(height:44)
             #endif
             notices
+            switchNote(state)
             Spacer(minLength:16)
             Button {toggleConnection()} label:{ConnectRing(state:state,size:size)}.buttonStyle(.plain)
                 .accessibilityLabel(L10n.text(state == .idle ? "connect_action":(state == .failed ? "retry_action":(state == .connecting ? "cancel":"disconnect_action"))))
@@ -288,10 +296,12 @@ struct ClientView:View {
                         .font(.system(size:mac ? 22:28,weight:.bold))
                 }
                 stateDetail(state).font(.system(size:mac ? 13:15)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).monospacedDigit().lineLimit(2)
+                if state == .connected && model.status != "connection_confirming" {RateBars(down:model.rxHistory,up:model.txHistory).frame(width:238,height:mac ? 44:50).padding(.top,2)}
                 DataStream(running:state == .connecting || state == .connected,size:mac ? 14:15).padding(.top,mac ? 12:16)
             }.padding(.top,mac ? 24:28).animation(reduceMotion ? nil:.easeInOut(duration:0.2),value:state)
             Spacer(minLength:16)
-            Button {tab=1} label:{currentLocationRow}.buttonStyle(RowButton())
+            // Connected, the location row opens the connection check; otherwise the location list.
+            Button {if state == .connected {checkResult=nil;checking=true} else {tab=1}} label:{currentLocationRow}.buttonStyle(RowButton())
                 .background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius+4)).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius+4))
                 .accessibilityHint(L10n.text("tap_to_change"))
             usageStrip.padding(.top,16)
@@ -315,6 +325,78 @@ struct ClientView:View {
         case .idle:Text(L10n.text(model.update?.mandatory == true ? "update_required_detail":"tap_ring_to_connect"))
         }
     }
+    /// One line when automatic mode switched location during this connection; closed per switch.
+    @ViewBuilder private func switchNote(_ state:RingState)->some View {
+        let from=model.switchedFrom
+        if state == .connected && !from.isEmpty && from != model.dismissedSwitch && from != model.nodeName {
+            HStack(spacing:12) {
+                Rectangle().fill(VeilbirdStyle.accent).frame(width:6,height:6)
+                Text(L10n.text("switched_location",from,model.nodeName)).font(.system(size:mac ? 12:13)).lineLimit(2).frame(maxWidth:.infinity,alignment:.leading)
+                Button {model.dismissedSwitch=from} label:{Image(systemName:"xmark").font(.system(size:11,weight:.semibold)).foregroundStyle(VeilbirdStyle.secondary).frame(width:36,height:36).contentShape(Rectangle())}
+                    .buttonStyle(.plain).accessibilityLabel(L10n.text("close"))
+            }.padding(.leading,14).padding(.trailing,4).frame(minHeight:44).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).padding(.top,4)
+        }
+    }
+    /// The connection check: your network (a small page outside the tunnel), to the location (TCP outside the tunnel),
+    /// opening a page (through the transport carrying traffic), then one sentence on which leg is slow.
+    private var checkSheet:some View {
+        let r=checkResult
+        let local=r?["local"] ?? -2, node=r?["node"] ?? -2, web=r?["web"] ?? -2
+        let localSlow=local<0 || local>300, nodeSlow=node<0 || node>300, webSlow=web<0 || web>1200
+        let verdict:String={
+            if checkRunning || r == nil {return L10n.text("check_running")}
+            if local<0 && node<0 && web<0 {return L10n.text("check_failed")}
+            if localSlow && (nodeSlow || webSlow) {return L10n.text("check_local_slow")}
+            if nodeSlow {return L10n.text("check_node_slow",model.nodeName)}
+            if webSlow {return L10n.text("check_web_slow")}
+            if localSlow {return L10n.text("check_local_slow")}
+            return L10n.text("check_ok")
+        }()
+        return VStack(alignment:.leading,spacing:0) {
+            HStack(alignment:.firstTextBaseline) {
+                Text(L10n.text("check_title")).font(.system(size:mac ? 17:20,weight:.semibold)).accessibilityAddTraits(.isHeader)
+                Spacer(minLength:12)
+                Text(checkRunning || r == nil ? L10n.text("check_running"):model.nodeName).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
+            }.padding(.bottom,10)
+            checkLeg(L10n.text("check_local"),L10n.text("check_local_detail"),checkRunning ? -2:local,limit:300)
+            checkLeg(L10n.text("check_node"),model.nodeName,checkRunning ? -2:node,limit:300)
+            checkLeg(L10n.text("check_web"),L10n.text("check_web_detail"),checkRunning ? -2:web,limit:1200)
+            Text(verdict).font(.system(size:mac ? 13:14)).frame(maxWidth:.infinity,alignment:.leading).padding(14)
+                .background(VeilbirdStyle.raised,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).padding(.top,12)
+            if let region=model.connectedRegion,!region.isEmpty {
+                HStack {Text(L10n.text("check_exit")).foregroundStyle(VeilbirdStyle.secondary);Spacer();Text(region).lineLimit(1)}.font(.system(size:13)).frame(minHeight:40).padding(.horizontal,2)
+            }
+            Spacer(minLength:12)
+            if !checkRunning && r != nil && !localSlow && (nodeSlow || webSlow) {
+                Button {checking=false;tab=1} label:{Text(L10n.text("change_location").replacingOccurrences(of:"›",with:"").trimmingCharacters(in:.whitespaces)).frame(maxWidth:.infinity)}
+                    .buttonStyle(PrimaryButton()).padding(.bottom,10)
+            }
+            Button {runCheck()} label:{Text(L10n.text("check_again")).font(.system(size:VeilbirdStyle.body)).frame(maxWidth:.infinity).frame(height:mac ? 40:48)}
+                .buttonStyle(RowButton()).background(VeilbirdStyle.raised,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).disabled(checkRunning)
+        }.padding(20).background(VeilbirdStyle.surface.ignoresSafeArea()).foregroundStyle(VeilbirdStyle.text)
+        .environment(\.locale,L10n.locale).preferredColorScheme(.dark)
+        .task {if checkResult == nil {runCheck()}}
+    }
+    private func runCheck() {
+        guard !checkRunning else {return}
+        checkRunning=true
+        Task {let result=await model.connectionCheck();checkResult=result ?? ["local":-1,"node":-1,"web":-1];checkRunning=false}
+    }
+    /// One leg: a square in the leg's color, its name over what it measures, and the time (or "No answer").
+    private func checkLeg(_ title:String,_ detail:String,_ ms:Int,limit:Int)->some View {
+        let color:Color=ms == -2 ? VeilbirdStyle.faint:(ms<0 ? VeilbirdStyle.danger:(ms>limit ? VeilbirdStyle.fair:VeilbirdStyle.accent))
+        return HStack(spacing:14) {
+            Rectangle().fill(color).frame(width:8,height:8)
+            VStack(alignment:.leading,spacing:2) {
+                Text(title).font(.system(size:VeilbirdStyle.body,weight:.medium))
+                Text(detail).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
+            }
+            Spacer(minLength:12)
+            if ms == -2 {Text(verbatim:"—").font(Pixel.font(22)).foregroundStyle(color)}
+            else if ms<0 {Text(L10n.text("check_no_answer")).font(.system(size:14)).foregroundStyle(color)}
+            else {Text(L10n.text("latency_ms",L10n.number(ms))).font(Pixel.font(22)).foregroundStyle(color)}
+        }.frame(minHeight:mac ? 50:58)
+    }
     private func toggleConnection() {
         if !model.connected && model.update?.mandatory == true {model.message=L10n.text("update_required_detail");return}
         model.work {try await model.toggle()}
@@ -326,7 +408,8 @@ struct ClientView:View {
         let title:String, detail:String, badge:Badge
         if model.connected && !id.isEmpty {
             title=model.nodeName.isEmpty ? L10n.text("location"):model.nodeName
-            detail=automatic ? (ms(quality).map {L10n.text("connected_automatic_detail",$0)} ?? L10n.text("automatic")):(quality.map(summary) ?? L10n.text("tap_to_change"))
+            let base=automatic ? (ms(quality).map {L10n.text("connected_automatic_detail",$0)} ?? L10n.text("automatic")):(quality.map(summary) ?? L10n.text("tap_to_change"))
+            detail=model.since != nil ? base+" · "+L10n.text("tap_to_check"):base
             badge=Badge(code:model.code(id,name:title))
         } else if automatic {
             title=L10n.text("automatic")
@@ -523,22 +606,32 @@ struct ClientView:View {
             }.padding(.horizontal,16).padding(.top,mac ? 8:8).padding(.bottom,20)
         }.task {if model.account.isEmpty {model.work {try await model.loadAccount()}} else {try? await model.loadAccount()}}
     }
-    /// 30-day total, a bar per day, and the download / upload split.
+    /// Today / this month / 30 days: the range's total, a bar per day for the last 30 days with the range lit, and for 30 days
+    /// the download / upload split. Days are the server's (UTC) days.
     @ViewBuilder private var usageCard:some View {
         if let traffic=model.account["traffic"] as? [String:Any] {
             let down=Int64(String(describing:traffic["downloadBytes"] ?? "0")) ?? 0, up=Int64(String(describing:traffic["uploadBytes"] ?? "0")) ?? 0
             let days=dailyUsage(traffic)
+            let today=days.last ?? 0
+            let dayOfMonth=Calendar(identifier:.gregorian).dateComponents(in:TimeZone(identifier:"UTC")!,from:Date()).day ?? 1
+            let month=days.suffix(min(30,dayOfMonth)).reduce(0,+)
             VStack(alignment:.leading,spacing:mac ? 10:12) {
-                HStack {
-                    Text(L10n.text("traffic_30_days")).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary)
-                    Spacer()
-                    if !days.isEmpty {Text(L10n.text("daily")).font(.system(size:mac ? 11:12)).foregroundStyle(VeilbirdStyle.secondary)}
+                HStack(spacing:2) {
+                    ForEach([("today","usage_today"),("month","usage_this_month"),("30d","last_30_days")],id:\.0) {item in
+                        Button {usageRange=item.0} label:{
+                            Text(L10n.text(item.1)).font(.system(size:mac ? 12:13,weight:.medium)).lineLimit(1).padding(.horizontal,12).frame(height:mac ? 26:32)
+                                .foregroundStyle(usageRange==item.0 ? VeilbirdStyle.text:VeilbirdStyle.secondary)
+                                .background(usageRange==item.0 ? VeilbirdStyle.raised:Color.clear,in:RoundedRectangle(cornerRadius:8)).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityAddTraits(usageRange==item.0 ? .isSelected:[])
+                    }
+                }.padding(2).background(VeilbirdStyle.ground,in:RoundedRectangle(cornerRadius:10))
+                totalText(bytes(usageRange=="today" ? today:(usageRange=="month" ? month:down+up)))
+                if !days.isEmpty {UsageBars(values:days,recent:usageRange=="today" ? 1:(usageRange=="month" ? min(30,dayOfMonth):30)).frame(height:mac ? 46:58)}
+                if usageRange=="30d" {
+                    HStack(spacing:20) {
+                        Text(L10n.text("download_amount",bytes(down)));Text(L10n.text("upload_amount",bytes(up)))
+                    }.font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()
                 }
-                totalText(bytes(down+up))
-                if !days.isEmpty {UsageBars(values:days).frame(height:mac ? 46:58)}
-                HStack(spacing:20) {
-                    Text(L10n.text("download_amount",bytes(down)));Text(L10n.text("upload_amount",bytes(up)))
-                }.font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()
             }.padding(16).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
         }
     }
@@ -551,8 +644,8 @@ struct ClientView:View {
     private func dailyUsage(_ traffic:[String:Any])->[Int64] {
         guard let days=traffic["days"] as? [[String:Any]],!days.isEmpty else {return []}
         var perDay:[String:Int64]=[:]
-        for day in days {perDay[day["day"] as? String ?? ""]=Int64(String(describing:day["bytes"] ?? "0")) ?? 0}
-        let formatter=DateFormatter();formatter.calendar=Calendar(identifier:.gregorian);formatter.locale=Locale(identifier:"en_US_POSIX");formatter.dateFormat="yyyy-MM-dd"
+        for day in days {perDay[String((day["day"] as? String ?? "").prefix(10))]=Int64(String(describing:day["bytes"] ?? "0")) ?? 0}
+        let formatter=DateFormatter();formatter.calendar=Calendar(identifier:.gregorian);formatter.locale=Locale(identifier:"en_US_POSIX");formatter.timeZone=TimeZone(identifier:"UTC");formatter.dateFormat="yyyy-MM-dd"
         return (0..<30).reversed().map {offset in perDay[formatter.string(from:Date().addingTimeInterval(-Double(offset)*86400))] ?? 0}
     }
     private func platformName(_ value:String)->String? {

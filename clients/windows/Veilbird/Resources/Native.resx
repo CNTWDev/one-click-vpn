@@ -25,7 +25,22 @@
   <data name="cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="change_location" xml:space="preserve"><value>Change location  ›</value></data>
   <data name="change_password" xml:space="preserve"><value>Change password</value></data>
+  <data name="check_again" xml:space="preserve"><value>Check again</value></data>
+  <data name="check_exit" xml:space="preserve"><value>Exit location</value></data>
+  <data name="check_failed" xml:space="preserve"><value>Nothing answered. Try again in a moment.</value></data>
   <data name="check_for_updates" xml:space="preserve"><value>Check for updates</value></data>
+  <data name="check_local" xml:space="preserve"><value>Your network</value></data>
+  <data name="check_local_detail" xml:space="preserve"><value>Outside the tunnel</value></data>
+  <data name="check_local_slow" xml:space="preserve"><value>Your own network is slow. Try another Wi‑Fi or mobile data.</value></data>
+  <data name="check_no_answer" xml:space="preserve"><value>No answer</value></data>
+  <data name="check_node" xml:space="preserve"><value>To the location</value></data>
+  <data name="check_node_slow" xml:space="preserve"><value>{0} is slow right now. Another location will be faster.</value></data>
+  <data name="check_ok" xml:space="preserve"><value>All good: every leg is fast.</value></data>
+  <data name="check_running" xml:space="preserve"><value>Measuring each leg…</value></data>
+  <data name="check_title" xml:space="preserve"><value>Connection check</value></data>
+  <data name="check_web" xml:space="preserve"><value>Opening a page</value></data>
+  <data name="check_web_detail" xml:space="preserve"><value>Through the location</value></data>
+  <data name="check_web_slow" xml:space="preserve"><value>The location is slow to reach the web. Try again later or pick another one.</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>Choose a location, then connect from the home screen.</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>Choose a location, then return to Connect.</value></data>
   <data name="choose_a_location_veilbird_takes_care_of_the_rest" xml:space="preserve"><value>Choose a location. TrackNothing takes care of the rest.</value></data>
@@ -34,6 +49,7 @@
   <data name="client_access_is_not_enabled_on_the_server" xml:space="preserve"><value>Client access is not enabled on the server.</value></data>
   <data name="client_access_is_not_enabled_on_the_server_contact" xml:space="preserve"><value>Client access is not enabled on the server. Contact your administrator.</value></data>
   <data name="client_update_required" xml:space="preserve"><value>This version is no longer supported. Download the latest TrackNothing to sign in or connect.</value></data>
+  <data name="close" xml:space="preserve"><value>Close</value></data>
   <data name="confirming_connection_status" xml:space="preserve"><value>Confirming connection…</value></data>
   <data name="connect_action" xml:space="preserve"><value>Connect</value></data>
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>Connect automatically or choose your own location.</value></data>
@@ -173,9 +189,11 @@
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Sign in to TrackNothing. No imports or configuration needed.</value></data>
   <data name="sign_out" xml:space="preserve"><value>Sign out</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Simulator build · Verify VPN connections on a signed physical-device build</value></data>
+  <data name="switched_location" xml:space="preserve"><value>{0} did not answer, switched to {1}</value></data>
   <data name="system_extension_failed" xml:space="preserve"><value>Couldn't enable the VPN component. Reinstall TrackNothing and try again.</value></data>
   <data name="tap_ring_to_connect" xml:space="preserve"><value>Tap the ring to connect</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>Tap to change location</value></data>
+  <data name="tap_to_check" xml:space="preserve"><value>Tap to check</value></data>
   <data name="test_after_disconnecting" xml:space="preserve"><value>Latency is tested while disconnected. Showing the last results.</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>The simulator is for UI testing only. Test the VPN on a signed physical-device build.</value></data>
   <data name="this_development_build_lacks_signing_entitlements_configure_your_developer" xml:space="preserve"><value>This development build lacks signing entitlements. Configure your developer team and sign it first.</value></data>
@@ -223,6 +241,8 @@
   <data name="update_seconds" xml:space="preserve"><value>{0} s</value></data>
   <data name="update_time_left" xml:space="preserve"><value>about {0}</value></data>
   <data name="upload_amount" xml:space="preserve"><value>↑ Up {0}</value></data>
+  <data name="usage_this_month" xml:space="preserve"><value>This month</value></data>
+  <data name="usage_today" xml:space="preserve"><value>Today</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 Valid until · </value></data>
   <data name="valid_until_label" xml:space="preserve"><value>Valid until</value></data>

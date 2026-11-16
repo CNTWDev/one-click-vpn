@@ -111,8 +111,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     }
     private func nextNode(_ code:String) async {
         Journal.add("switch: \(nodeName) failed (\(code)), trying the next location")
+        let failed=nodeName
         await report(code);nodeId=fallbacks.removeFirst()
-        publish {$0["status"]="connection_confirming";$0["since"]=nil}
+        // The app shows one line about the switch ("Tokyo 03 did not answer, switched to Tokyo 05").
+        publish {$0["status"]="connection_confirming";$0["since"]=nil;$0["switchedFrom"]=failed}
     }
     private func bringUp() async throws {
         let started=Date()
@@ -242,6 +244,19 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         switch String(decoding:messageData,as:UTF8.self) {
         case "journal":completionHandler?(Data(Journal.read().utf8));return
         case "journal-clear":Journal.clear();completionHandler?(nil);return
+        case let message where message.hasPrefix("check "):
+            // The connection check, timed from here so every leg leaves through the right path: the small page and the
+            // node outside the tunnel (DIRECT), the test page through the transport carrying traffic now.
+            let address=String(message.dropFirst(6))
+            Task.detached {
+                let delay={(result:String)->Int in Int(result.split(separator:"=").last ?? "") ?? -1}
+                let local=delay(CoreProbe("DIRECT",Transports.localURL,3000))
+                let node=address.isEmpty ? -1:CoreReach(address,3000)
+                let current=CoreNow(Transports.group)
+                let web=current.isEmpty ? -1:delay(CoreProbe(current,Transports.testURL,5000))
+                completionHandler?(try? JSONSerialization.data(withJSONObject:["local":local,"node":node,"web":web]))
+            }
+            return
         default:break
         }
         stateLock.lock();let state=snapshot;stateLock.unlock()

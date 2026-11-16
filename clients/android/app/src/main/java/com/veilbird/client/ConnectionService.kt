@@ -23,6 +23,8 @@ object ConnectionStateStore {
     /** Bytes per second over the last tick. */
     @Volatile var rxRate = 0L
     @Volatile var txRate = 0L
+    /** The location automatic mode gave up on during this connection, for the one-line note on the connect page. */
+    @Volatile var switchedFrom = ""
 }
 
 /** Thrown when no transport of a node answers from this network. */
@@ -65,7 +67,7 @@ class ConnectionService : VpnService() {
         if (ConnectionStateStore.active) return START_NOT_STICKY
         startForeground(1, notification(L10n.text(R.string.connecting)))
         ConnectionStateStore.active = true; ConnectionStateStore.messageId = R.string.authorizing_and_connecting
-        ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L
+        ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L; ConnectionStateStore.switchedFrom = ""
         // Always-on VPN starts the service without extras: use the location chosen in the app.
         nodeId = intent?.getStringExtra("nodeId") ?: getSharedPreferences("preferences", MODE_PRIVATE).getString("nodeId", "")!!
         api.attempt = java.util.UUID.randomUUID().toString().replace("-", "").take(16)
@@ -114,6 +116,7 @@ class ConnectionService : VpnService() {
     private fun nextNode(code: String): Boolean {
         if (fallbacks.isEmpty()) return false
         Journal.add("switch: ${ConnectionStateStore.node} failed ($code), trying the next location")
+        ConnectionStateStore.switchedFrom = ConnectionStateStore.node
         api.report(code, nodeId)
         nodeId = fallbacks.removeAt(0); ConnectionStateStore.messageId = R.string.authorizing_and_connecting
         ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L

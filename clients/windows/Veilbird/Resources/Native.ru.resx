@@ -25,7 +25,22 @@
   <data name="cancel" xml:space="preserve"><value>Отмена</value></data>
   <data name="change_location" xml:space="preserve"><value>Изменить локацию  ›</value></data>
   <data name="change_password" xml:space="preserve"><value>Сменить пароль</value></data>
+  <data name="check_again" xml:space="preserve"><value>Проверить снова</value></data>
+  <data name="check_exit" xml:space="preserve"><value>Точка выхода</value></data>
+  <data name="check_failed" xml:space="preserve"><value>Ответа нет. Попробуйте чуть позже.</value></data>
   <data name="check_for_updates" xml:space="preserve"><value>Проверить обновления</value></data>
+  <data name="check_local" xml:space="preserve"><value>Ваша сеть</value></data>
+  <data name="check_local_detail" xml:space="preserve"><value>Без туннеля</value></data>
+  <data name="check_local_slow" xml:space="preserve"><value>Медленная ваша сеть. Попробуйте другой Wi‑Fi или мобильный интернет.</value></data>
+  <data name="check_no_answer" xml:space="preserve"><value>Нет ответа</value></data>
+  <data name="check_node" xml:space="preserve"><value>До узла</value></data>
+  <data name="check_node_slow" xml:space="preserve"><value>{0} сейчас медленный. Другой узел будет быстрее.</value></data>
+  <data name="check_ok" xml:space="preserve"><value>Всё в порядке: все участки быстрые.</value></data>
+  <data name="check_running" xml:space="preserve"><value>Измеряем каждый участок…</value></data>
+  <data name="check_title" xml:space="preserve"><value>Проверка связи</value></data>
+  <data name="check_web" xml:space="preserve"><value>Открытие страницы</value></data>
+  <data name="check_web_detail" xml:space="preserve"><value>Через узел</value></data>
+  <data name="check_web_slow" xml:space="preserve"><value>Узел медленно открывает сайты. Попробуйте позже или выберите другой.</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>Выберите локацию и подключитесь с главного экрана.</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>Выберите локацию и вернитесь к подключению.</value></data>
   <data name="choose_a_location_veilbird_takes_care_of_the_rest" xml:space="preserve"><value>Выберите локацию. Остальное сделает TrackNothing.</value></data>
@@ -34,6 +49,7 @@
   <data name="client_access_is_not_enabled_on_the_server" xml:space="preserve"><value>Доступ клиентов не включён на сервере.</value></data>
   <data name="client_access_is_not_enabled_on_the_server_contact" xml:space="preserve"><value>Доступ клиентов не включён на сервере. Обратитесь к администратору.</value></data>
   <data name="client_update_required" xml:space="preserve"><value>Эта версия больше не поддерживается. Скачайте последнюю версию TrackNothing, чтобы войти или подключиться.</value></data>
+  <data name="close" xml:space="preserve"><value>Закрыть</value></data>
   <data name="confirming_connection_status" xml:space="preserve"><value>Проверка подключения…</value></data>
   <data name="connect_action" xml:space="preserve"><value>Подключиться</value></data>
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>Подключайтесь автоматически или выбирайте локацию.</value></data>
@@ -173,9 +189,11 @@
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Войдите в TrackNothing. Импорт и настройка не нужны.</value></data>
   <data name="sign_out" xml:space="preserve"><value>Выйти</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Версия для симулятора · Проверяйте VPN на подписанной сборке для устройства</value></data>
+  <data name="switched_location" xml:space="preserve"><value>{0} не ответил, переключено на {1}</value></data>
   <data name="system_extension_failed" xml:space="preserve"><value>Не удалось включить VPN-компонент. Переустановите TrackNothing и попробуйте снова.</value></data>
   <data name="tap_ring_to_connect" xml:space="preserve"><value>Нажмите на кольцо, чтобы подключиться</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>Нажмите, чтобы сменить</value></data>
+  <data name="tap_to_check" xml:space="preserve"><value>Нажмите для проверки</value></data>
   <data name="test_after_disconnecting" xml:space="preserve"><value>Задержка проверяется без подключения. Показаны последние результаты.</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>Симулятор предназначен только для интерфейса. Проверяйте VPN на подписанной сборке для устройства.</value></data>
   <data name="this_development_build_lacks_signing_entitlements_configure_your_developer" xml:space="preserve"><value>В сборке отсутствуют разрешения подписи. Настройте команду разработчика и подпишите сборку.</value></data>
@@ -223,6 +241,8 @@
   <data name="update_seconds" xml:space="preserve"><value>{0} с</value></data>
   <data name="update_time_left" xml:space="preserve"><value>около {0}</value></data>
   <data name="upload_amount" xml:space="preserve"><value>↑ Отдача {0}</value></data>
+  <data name="usage_this_month" xml:space="preserve"><value>Этот месяц</value></data>
+  <data name="usage_today" xml:space="preserve"><value>Сегодня</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 Действует до · </value></data>
   <data name="valid_until_label" xml:space="preserve"><value>Действует до</value></data>

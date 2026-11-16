@@ -20,6 +20,8 @@ object Transports {
     val ladder = listOf("hysteria2", "reality", "xhttp", "wireguard")
     const val GROUP = "TrackNothing"
     const val TEST_URL = "https://www.gstatic.com/generate_204"
+    /** Answers fast from nearly every network (mainland China and Russia too): the connection check times it outside the tunnel. */
+    const val LOCAL_URL = "http://captive.apple.com/hotspot-detect.html"
     private const val MEMORY_DAYS = 7L
 
     /**

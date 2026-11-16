@@ -156,3 +156,27 @@ func Total() string {
 	up, down := statistic.DefaultManager.Total()
 	return fmt.Sprintf("%d %d", up, down)
 }
+
+// Reach times a TCP connect to address (host:port) outside the tunnel, through the core's DIRECT
+// outbound (bound to the physical network). It returns milliseconds, or -1 when nothing answered.
+// The connection check uses it for the leg from this device to the node.
+func Reach(address string, timeoutMs int) int {
+	direct, ok := tunnel.Proxies()["DIRECT"]
+	if !ok {
+		return -1
+	}
+	metadata := &C.Metadata{NetWork: C.TCP}
+	if err := metadata.SetRemoteAddress(address); err != nil {
+		return -1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
+	defer cancel()
+	started := time.Now()
+	conn, err := direct.DialContext(ctx, metadata)
+	if err != nil {
+		return -1
+	}
+	elapsed := int(time.Since(started).Milliseconds())
+	_ = conn.Close()
+	return elapsed
+}

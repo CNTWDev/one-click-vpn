@@ -20,6 +20,12 @@ import ServiceManagement
     @Published var since:Date?
     @Published var rxRate=0
     @Published var txRate=0
+    /// Download / upload rates of the last 40 seconds for the connect page's chart, newest last.
+    @Published var rxHistory:[Int]=[]
+    @Published var txHistory:[Int]=[]
+    /// The location automatic mode gave up on during this connection; the note is dismissed per switch.
+    @Published var switchedFrom=""
+    @Published var dismissedSwitch=""
     @Published var selected=UserDefaults.standard.string(forKey:"selectedNode") ?? "" {didSet {UserDefaults.standard.set(selected,forKey:"selectedNode")}}
     @Published var selectedName=UserDefaults.standard.string(forKey:"selectedNodeName") ?? "" {didSet {UserDefaults.standard.set(selectedName,forKey:"selectedNodeName")}}
     @Published var routing=UserDefaults.standard.string(forKey:"routing") ?? "smart" {didSet {UserDefaults.standard.set(routing,forKey:"routing")}}
@@ -81,6 +87,26 @@ import ServiceManagement
         measuring=false
     }
     func loadAccount() async throws {account=try await api().request("account")}
+    /// The connection check's three legs in milliseconds (-1 = no answer), measured by the tunnel: "local", "node", "web".
+    func connectionCheck() async -> [String:Int]? {
+        if nodes.isEmpty {try? await loadNodes()}
+        let node=nodes.first {$0["id"] as? String == connectedNodeId}
+        var address=""
+        if let probe=node?["probe"] as? [String:Any],let host=probe["host"] as? String,!host.isEmpty,let port=probe["port"] as? Int {
+            address=(host.contains(":") ? "[\(host)]":host)+":\(port)"
+        }
+        guard let session=manager?.connection as? NETunnelProviderSession else {return nil}
+        let message="check "+address
+        return await withCheckedContinuation {(done:CheckedContinuation<[String:Int]?,Never>) in
+            do {
+                try session.sendProviderMessage(Data(message.utf8)) {data in
+                    done.resume(returning:data.flatMap {try? JSONSerialization.jsonObject(with:$0) as? [String:Int]})
+                }
+            } catch {done.resume(returning:nil)}
+        }
+    }
+    /// The region of the connected location, for the check's exit line.
+    var connectedRegion:String? {nodes.first {$0["id"] as? String == connectedNodeId}?["region"] as? String}
     func restore() async {
         do {
             signedIn=try SecureStorage.read("token") != nil
@@ -194,7 +220,7 @@ import ServiceManagement
         case .connecting,.reasserting:status="connecting"
         case .disconnecting:status="disconnecting"
         default:
-            status="not_connected";since=nil;rxRate=0;txRate=0
+            status="not_connected";since=nil;rxRate=0;txRate=0;rxHistory=[];txHistory=[];switchedFrom=""
             // The tunnel went down on its own shortly after a requested start: show it as a failed attempt.
             if let attempt,Date().timeIntervalSince(attempt)>2 {
                 self.attempt=nil;failed=true;failure=L10n.text("unable_to_connect_check_your_network_and_try_again")
@@ -209,6 +235,10 @@ import ServiceManagement
                 self.nodeName=state["node"] as? String ?? self.nodeName;self.connectedNodeId=state["nodeId"] as? String ?? ""
                 self.since=(state["since"] as? Double).map {Date(timeIntervalSince1970:$0)}
                 self.rxRate=state["rx"] as? Int ?? 0;self.txRate=state["tx"] as? Int ?? 0
+                self.switchedFrom=state["switchedFrom"] as? String ?? ""
+                if self.since != nil {
+                    self.rxHistory=Array((self.rxHistory+[self.rxRate]).suffix(RateBars.count));self.txHistory=Array((self.txHistory+[self.txRate]).suffix(RateBars.count))
+                }
             }
         }
     }

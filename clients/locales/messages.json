@@ -1173,5 +1173,105 @@
     "en": "Open VPN settings",
     "zh": "打开 VPN 设置",
     "ru": "Открыть настройки VPN"
+  },
+  "check_title": {
+    "zh": "线路体检",
+    "en": "Connection check",
+    "ru": "Проверка связи"
+  },
+  "check_local": {
+    "zh": "本地网络",
+    "en": "Your network",
+    "ru": "Ваша сеть"
+  },
+  "check_local_detail": {
+    "zh": "不经过节点",
+    "en": "Outside the tunnel",
+    "ru": "Без туннеля"
+  },
+  "check_node": {
+    "zh": "到节点",
+    "en": "To the location",
+    "ru": "До узла"
+  },
+  "check_web": {
+    "zh": "打开网页",
+    "en": "Opening a page",
+    "ru": "Открытие страницы"
+  },
+  "check_web_detail": {
+    "zh": "经节点访问外网",
+    "en": "Through the location",
+    "ru": "Через узел"
+  },
+  "check_running": {
+    "zh": "正在逐段测量…",
+    "en": "Measuring each leg…",
+    "ru": "Измеряем каждый участок…"
+  },
+  "check_again": {
+    "zh": "重新检测",
+    "en": "Check again",
+    "ru": "Проверить снова"
+  },
+  "check_ok": {
+    "zh": "线路正常，三段都很快。",
+    "en": "All good: every leg is fast.",
+    "ru": "Всё в порядке: все участки быстрые."
+  },
+  "check_local_slow": {
+    "zh": "慢在本地网络。换个 Wi‑Fi，或改用移动数据试试。",
+    "en": "Your own network is slow. Try another Wi‑Fi or mobile data.",
+    "ru": "Медленная ваша сеть. Попробуйте другой Wi‑Fi или мобильный интернет."
+  },
+  "check_node_slow": {
+    "zh": "{0} 现在很慢，换个节点会更快。",
+    "en": "{0} is slow right now. Another location will be faster.",
+    "ru": "{0} сейчас медленный. Другой узел будет быстрее."
+  },
+  "check_web_slow": {
+    "zh": "节点访问外网偏慢，稍后再试或换个节点。",
+    "en": "The location is slow to reach the web. Try again later or pick another one.",
+    "ru": "Узел медленно открывает сайты. Попробуйте позже или выберите другой."
+  },
+  "check_failed": {
+    "zh": "没有测到结果，请稍后再试。",
+    "en": "Nothing answered. Try again in a moment.",
+    "ru": "Ответа нет. Попробуйте чуть позже."
+  },
+  "check_exit": {
+    "zh": "出口位置",
+    "en": "Exit location",
+    "ru": "Точка выхода"
+  },
+  "check_no_answer": {
+    "zh": "无响应",
+    "en": "No answer",
+    "ru": "Нет ответа"
+  },
+  "tap_to_check": {
+    "zh": "轻点体检",
+    "en": "Tap to check",
+    "ru": "Нажмите для проверки"
+  },
+  "switched_location": {
+    "zh": "{0} 没有响应，已换到 {1}",
+    "en": "{0} did not answer, switched to {1}",
+    "ru": "{0} не ответил, переключено на {1}"
+  },
+  "close": {
+    "zh": "关闭",
+    "en": "Close",
+    "ru": "Закрыть"
+  },
+  "usage_today": {
+    "zh": "今日",
+    "en": "Today",
+    "ru": "Сегодня"
+  },
+  "usage_this_month": {
+    "zh": "本月",
+    "en": "This month",
+    "ru": "Этот месяц"
   }
 }

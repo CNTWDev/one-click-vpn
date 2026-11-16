@@ -18,6 +18,8 @@ public sealed class Connection(NativeApi api,Core core) {
     public DateTime? Since {get;private set;}
     public long RxRate {get;private set;}
     public long TxRate {get;private set;}
+    /// The location automatic mode left because it stopped answering, for the one-line note; empty otherwise.
+    public string SwitchedFrom {get;private set;}="";
     /// The connection dropped with the kill switch on: traffic stays blocked until the user connects again or
     /// turns the kill switch off.
     public bool Blocking {get;private set;}
@@ -49,7 +51,7 @@ public sealed class Connection(NativeApi api,Core core) {
     }
     private async Task Attempt(string nodeId,bool smart) {
         var wasBlocking=Blocking;
-        Active=true;Blocking=false;Since=null;RxRate=TxRate=0;NodeId=nodeId;failures=0;Set("authorizing_and_connecting");
+        Active=true;Blocking=false;Since=null;RxRate=TxRate=0;NodeId=nodeId;failures=0;SwitchedFrom="";Set("authorizing_and_connecting");
         try {
             await Task.Run(()=>core.KillSwitch(KillSwitchOn));
             keys=await Task.Run(core.NewKeypair);
@@ -97,6 +99,7 @@ public sealed class Connection(NativeApi api,Core core) {
     private async Task NextNode(string code) {
         Journal.Add($"switch: {NodeName} failed ({code}), trying the next location");
         await api.Report(code,NodeId);
+        if(NodeName.Length>0) SwitchedFrom=NodeName;
         NodeId=fallbacks[0];fallbacks.RemoveAt(0);Since=null;Set("authorizing_and_connecting");
     }
     private async Task BringUp(bool smart) {

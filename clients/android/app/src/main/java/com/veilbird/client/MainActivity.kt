@@ -44,6 +44,8 @@ import android.widget.TextView
 import android.widget.Toast
 import org.json.JSONObject
 import java.time.LocalDate
+import java.time.ZoneOffset
+import com.veilbird.core.Core
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
@@ -82,6 +84,14 @@ class MainActivity : Activity() {
     private var nodeTitle: TextView? = null
     private var nodeDetail: TextView? = null
     private var nodeBadge: FrameLayout? = null
+    private var rateBars: RateBars? = null
+    private var switchNote: View? = null
+    private var switchText: TextView? = null
+    // The note is dismissed per switch: a later switch shows it again.
+    private var dismissedSwitch = ""
+    // Download / upload rates of the last 40 seconds for the connect page's chart, newest last.
+    private val rxHistory = ArrayDeque<Long>(); private val txHistory = ArrayDeque<Long>()
+    private var usageRange = "30d"
     private val refresh = object : Runnable {
         override fun run() { showState(); if (visible) handler.postDelayed(this, 1000) }
     }
@@ -226,6 +236,7 @@ class MainActivity : Activity() {
     private fun render() {
         banner = null; updateRowValue = null
         ring = null; stateTitle = null; stateDot = null; stateDetail = null; stateTimer = null; stream = null; nodeTitle = null; nodeDetail = null; nodeBadge = null
+        rateBars = null; switchNote = null; switchText = null
         val side = maxOf(20.dp, (resources.displayMetrics.widthPixels - 560.dp) / 2)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 4.dp, side, 20.dp) }
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Palette.ground); fitsSystemWindows = true }
@@ -287,6 +298,16 @@ class MainActivity : Activity() {
             addView(wordmark(18f))
         }, height = 48.dp)
         notices()
+        switchNote = row(48).apply {
+            setPadding(16.dp, 0, 4.dp, 0); background = rounded(Palette.surface, 12); visibility = View.GONE
+            addView(View(this@MainActivity).apply { setBackgroundColor(Palette.accent) }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 12.dp })
+            switchText = text("", 13f).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }.also { addView(it, LinearLayout.LayoutParams(0, -2, 1f)) }
+            addView(FrameLayout(this@MainActivity).apply {
+                background = pressable(Color.TRANSPARENT, 10); contentDescription = L10n.text(R.string.close)
+                addView(icon(R.drawable.ic_close, Palette.secondary, 14), FrameLayout.LayoutParams(14.dp, 14.dp, Gravity.CENTER))
+                setOnClickListener { dismissedSwitch = ConnectionStateStore.switchedFrom; showState() }
+            }, LinearLayout.LayoutParams(44.dp, 44.dp))
+        }.also { add(it, top = 4) }
         spacer(1f)
         ring = ConnectRing(this).apply {
             isClickable = true; isFocusable = true
@@ -302,9 +323,12 @@ class MainActivity : Activity() {
         add(titleRow, top = 28)
         stateTimer = text("", 34f).apply { gravity = Gravity.CENTER; typeface = Pixel.font(this@MainActivity); letterSpacing = 0.02f }.also { add(it, top = 10) }
         stateDetail = text("", 14f, Palette.secondary).apply { gravity = Gravity.CENTER; maxLines = 2 }.also { add(it, top = 8) }
-        stream = DataStream(this).also { add(it, top = 22) }
+        rateBars = RateBars(this).apply { visibility = View.GONE }.also { add(it, height = 50.dp, width = 238.dp, top = 10, gravity = Gravity.CENTER_HORIZONTAL) }
+        stream = DataStream(this).also { add(it, top = 18) }
         spacer(1f)
-        val node = row(68).apply { background = pressable(Palette.surface, 16); contentDescription = L10n.text(R.string.tap_to_change); setOnClickListener { if (!busy) { page = "nodes"; render() } } }
+        // Connected, the location row opens the connection check; otherwise it opens the location list.
+        val node = row(68).apply { background = pressable(Palette.surface, 16); contentDescription = L10n.text(R.string.tap_to_change)
+            setOnClickListener { if (busy) return@setOnClickListener; if (ConnectionStateStore.active && ConnectionStateStore.since > 0) connectionCheck() else { page = "nodes"; render() } } }
         nodeBadge = badge(null).also { node.addView(it) }
         val names = titles(" ", " "); node.addView(names)
         nodeTitle = names.getChildAt(0) as TextView; nodeDetail = names.getChildAt(1) as TextView
@@ -357,6 +381,15 @@ class MainActivity : Activity() {
         val elapsed = if (state == ConnectRing.State.CONNECTED) DateUtils.formatElapsedTime((SystemClock.elapsedRealtime() - since) / 1000) else ""
         stateTimer?.apply { text = elapsed; visibility = if (elapsed.isEmpty()) View.GONE else View.VISIBLE }
         stream?.running = state == ConnectRing.State.CONNECTING || state == ConnectRing.State.CONNECTED
+        if (state == ConnectRing.State.CONNECTED) {
+            rxHistory.addLast(ConnectionStateStore.rxRate); txHistory.addLast(ConnectionStateStore.txRate)
+            while (rxHistory.size > RateBars.COUNT) { rxHistory.removeFirst(); txHistory.removeFirst() }
+        } else { rxHistory.clear(); txHistory.clear() }
+        rateBars?.apply { visibility = if (state == ConnectRing.State.CONNECTED) View.VISIBLE else View.GONE; set(rxHistory.toList(), txHistory.toList()) }
+        val from = ConnectionStateStore.switchedFrom
+        val noteShown = state == ConnectRing.State.CONNECTED && from.isNotEmpty() && from != dismissedSwitch && from != ConnectionStateStore.node
+        switchText?.text = if (noteShown) L10n.text(R.string.switched_location, from, ConnectionStateStore.node) else ""
+        switchNote?.visibility = if (noteShown) View.VISIBLE else View.GONE
         stateDetail?.text = when (state) {
             ConnectRing.State.CONNECTED -> if (ConnectionStateStore.messageId == R.string.confirming_connection_status) ConnectionStateStore.message
                 else L10n.text(R.string.connection_rates, mbps(ConnectionStateStore.rxRate), mbps(ConnectionStateStore.txRate))
@@ -375,7 +408,8 @@ class MainActivity : Activity() {
         when {
             active && id.isNotEmpty() -> {
                 title.text = ConnectionStateStore.node
-                nodeDetail?.text = if (automatic) ms(quality)?.let { L10n.text(R.string.connected_automatic_detail, it) } ?: L10n.text(R.string.automatic) else quality?.let { summary(it) } ?: L10n.text(R.string.tap_to_change)
+                val base = if (automatic) ms(quality)?.let { L10n.text(R.string.connected_automatic_detail, it) } ?: L10n.text(R.string.automatic) else quality?.let { summary(it) } ?: L10n.text(R.string.tap_to_change)
+                nodeDetail?.text = if (ConnectionStateStore.since > 0) base + " · " + L10n.text(R.string.tap_to_check) else base
                 fillBadge(badge, Directory.code(id, ConnectionStateStore.node), null, Palette.text)
             }
             automatic -> {
@@ -636,36 +670,48 @@ class MainActivity : Activity() {
             }, top = 4)
         }
     }
-    /** 30-day total, a bar per day, and the download / upload split. */
+    /**
+     * Today / this month / 30 days: the total for the range in the pixel face, a bar per day for the last 30 days with
+     * the range lit, and for 30 days the download / upload split. Days are the server's (UTC) days.
+     */
     private fun usageCard(data: JSONObject) {
         val traffic = data.optJSONObject("traffic") ?: return
         val down = traffic.optString("downloadBytes", "0").toLongOrNull() ?: 0; val up = traffic.optString("uploadBytes", "0").toLongOrNull() ?: 0
-        val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = rounded(Palette.surface, 16); setPadding(16.dp, 18.dp, 16.dp, 16.dp) }
-        card.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            addView(text(L10n.text(R.string.traffic_30_days), 13f, Palette.secondary), LinearLayout.LayoutParams(0, -2, 1f))
-            addView(text(L10n.text(R.string.daily), 12f, Palette.secondary))
-        })
-        // "143 GB": the number large, its unit small and muted.
-        val total = bytes(down + up); val split = total.indexOfLast { it.isWhitespace() || it == ' ' }
-        val styled = SpannableString(total)
-        if (split > 0) {
-            styled.setSpan(AbsoluteSizeSpan(16, true), split, total.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            styled.setSpan(ForegroundColorSpan(Palette.secondary), split, total.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        }
-        card.addView(text(styled, 42f).apply { typeface = Pixel.font(this@MainActivity) }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 14.dp })
         val perDay = HashMap<String, Long>()
-        traffic.optJSONArray("days")?.let { days -> for (i in 0 until days.length()) days.optJSONObject(i)?.let { perDay[it.optString("day")] = it.optString("bytes", "0").toLongOrNull() ?: 0 } }
-        if (perDay.isNotEmpty()) {
-            val today = LocalDate.now()
-            card.addView(UsageBars(this).apply { values = (29 downTo 0).map { perDay[today.minusDays(it.toLong()).toString()] ?: 0L }; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO },
-                LinearLayout.LayoutParams(-1, 58.dp).apply { topMargin = 14.dp })
+        traffic.optJSONArray("days")?.let { days -> for (i in 0 until days.length()) days.optJSONObject(i)?.let { perDay[it.optString("day").take(10)] = it.optString("bytes", "0").toLongOrNull() ?: 0 } }
+        val today = LocalDate.now(ZoneOffset.UTC)
+        val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = rounded(Palette.surface, 16); setPadding(16.dp, 14.dp, 16.dp, 16.dp) }
+        val ranges = listOf("today" to R.string.usage_today, "month" to R.string.usage_this_month, "30d" to R.string.last_30_days)
+        val switcher = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; background = rounded(Palette.ground, 10); setPadding(2.dp, 2.dp, 2.dp, 2.dp) }
+        val figure = text("", 42f).apply { typeface = Pixel.font(this@MainActivity) }
+        val bars = UsageBars(this).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO; values = (29 downTo 0).map { perDay[today.minusDays(it.toLong()).toString()] ?: 0L } }
+        val split = text(L10n.text(R.string.download_amount, bytes(down)) + "    " + L10n.text(R.string.upload_amount, bytes(up)), 13f, Palette.secondary)
+        fun pick(range: String) {
+            usageRange = range
+            for (i in 0 until switcher.childCount) (switcher.getChildAt(i) as TextView).apply {
+                val on = ranges[i].first == range
+                setTextColor(if (on) Palette.text else Palette.secondary); background = if (on) rounded(Palette.selected, 8) else null
+                contentDescription = text.toString() + if (on) L10n.text(R.string.current_page) else ""
+            }
+            val total = when (range) {
+                "today" -> perDay[today.toString()] ?: 0L
+                "month" -> perDay.filterKeys { it.startsWith(today.toString().take(7)) }.values.sum()
+                else -> down + up
+            }
+            // "143 GB": the number large, its unit small and muted.
+            val label = bytes(total); val cut = label.indexOfLast { it.isWhitespace() || it == '\u00A0' }
+            figure.text = SpannableString(label).apply { if (cut > 0) { setSpan(AbsoluteSizeSpan(16, true), cut, label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); setSpan(ForegroundColorSpan(Palette.secondary), cut, label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) } }
+            bars.recent = when (range) { "today" -> 1; "month" -> today.dayOfMonth.coerceAtMost(30); else -> 30 }
+            split.visibility = if (range == "30d") View.VISIBLE else View.GONE
         }
-        card.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            addView(text(L10n.text(R.string.download_amount, bytes(down)), 13f, Palette.secondary), LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 20.dp })
-            addView(text(L10n.text(R.string.upload_amount, bytes(up)), 13f, Palette.secondary))
-        }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 14.dp })
+        for ((key, title) in ranges) switcher.addView(text(L10n.text(title), 13f, Palette.secondary, 500).apply {
+            gravity = Gravity.CENTER; maxLines = 1; setPadding(12.dp, 0, 12.dp, 0); setOnClickListener { pick(key) }
+        }, LinearLayout.LayoutParams(-2, 32.dp))
+        card.addView(LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; addView(switcher) })
+        card.addView(figure, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 14.dp })
+        if (perDay.isNotEmpty()) card.addView(bars, LinearLayout.LayoutParams(-1, 58.dp).apply { topMargin = 14.dp })
+        card.addView(split, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 14.dp })
+        pick(usageRange)
         add(card, top = 20)
     }
     private fun devices() {
@@ -779,6 +825,103 @@ class MainActivity : Activity() {
             addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND); setDimAmount(0.6f)
             @Suppress("DEPRECATION") navigationBarColor = Palette.surface
         }
+    }
+
+    /**
+     * The connection check: three legs timed on demand. Your network = a small page fetched outside the tunnel,
+     * to the location = a TCP connect to the node outside the tunnel, opening a page = the test page through the
+     * transport carrying traffic now. One sentence then says which leg is slow.
+     */
+    private fun connectionCheck() {
+        val nodeId = ConnectionStateStore.nodeId; val nodeName = ConnectionStateStore.node
+        val dialog = Dialog(this).apply { requestWindowFeature(Window.FEATURE_NO_TITLE) }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(20.dp, 10.dp, 20.dp, 24.dp)
+            background = GradientDrawable().apply { setColor(Palette.surface); val r = 24.dp.toFloat(); cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f) }
+        }
+        box.addView(View(this).apply { background = rounded(Color.rgb(46, 58, 48), 2) }, LinearLayout.LayoutParams(36.dp, 4.dp).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
+        head.addView(text(L10n.text(R.string.check_title), 19f, Palette.text, 600).apply { accessibilityHeading() }, LinearLayout.LayoutParams(0, -2, 1f))
+        val status = text("", 12f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
+        head.addView(status, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 12.dp })
+        box.addView(head, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 18.dp })
+        class Leg(val mark: View, val value: TextView)
+        fun leg(title: String, detail: String): Leg {
+            val r = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = 58.dp }
+            val mark = View(this).apply { setBackgroundColor(Palette.faint) }
+            r.addView(mark, LinearLayout.LayoutParams(8.dp, 8.dp).apply { marginEnd = 14.dp })
+            r.addView(titles(title, detail), LinearLayout.LayoutParams(0, -2, 1f))
+            val value = text("—", 22f).apply { typeface = Pixel.font(this@MainActivity); gravity = Gravity.END; maxLines = 1 }
+            r.addView(value, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 12.dp })
+            box.addView(r, LinearLayout.LayoutParams(-1, -2))
+            return Leg(mark, value)
+        }
+        val local = leg(L10n.text(R.string.check_local), L10n.text(R.string.check_local_detail))
+        val toNode = leg(L10n.text(R.string.check_node), nodeName)
+        val web = leg(L10n.text(R.string.check_web), L10n.text(R.string.check_web_detail))
+        val verdict = text("", 14f).apply { background = rounded(Color.rgb(27, 36, 29), 12); setPadding(16.dp, 14.dp, 16.dp, 14.dp) }
+        box.addView(verdict, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12.dp })
+        Directory.regions[nodeId]?.let { region ->
+            box.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = 44.dp; setPadding(2.dp, 0, 2.dp, 0)
+                addView(text(L10n.text(R.string.check_exit), 13f, Palette.secondary), LinearLayout.LayoutParams(0, -2, 1f))
+                addView(text(region, 13f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp })
+        }
+        val other = text(L10n.text(R.string.change_location).replace("›", "").trim(), 15f, Palette.onAccent, 600).apply {
+            gravity = Gravity.CENTER; background = pressable(Palette.accent, 12); visibility = View.GONE
+            setOnClickListener { dialog.dismiss(); page = "nodes"; render() }
+        }
+        box.addView(other, LinearLayout.LayoutParams(-1, 48.dp).apply { topMargin = 12.dp })
+        val again = text(L10n.text(R.string.check_again), 15f).apply { gravity = Gravity.CENTER; background = pressable(Color.rgb(27, 36, 29), 12) }
+        box.addView(again, LinearLayout.LayoutParams(-1, 48.dp).apply { topMargin = 10.dp })
+        val ok = Palette.accent; val slow = Palette.fair; val bad = Palette.danger
+        fun show(leg: Leg, ms: Int, limit: Int) {
+            val color = when { ms < 0 -> bad; ms > limit -> slow; else -> ok }
+            leg.mark.setBackgroundColor(color); leg.value.setTextColor(color)
+            leg.value.text = if (ms < 0) L10n.text(R.string.check_no_answer) else L10n.text(R.string.latency_ms, L10n.number(ms))
+            leg.value.textSize = if (ms < 0) 14f else 22f; leg.value.typeface = if (ms < 0) Typeface.DEFAULT else Pixel.font(this)
+        }
+        var running = false
+        fun runCheck() {
+            if (running) return
+            running = true
+            status.text = L10n.text(R.string.check_running); verdict.text = L10n.text(R.string.check_running); other.visibility = View.GONE
+            for (leg in listOf(local, toNode, web)) { leg.mark.setBackgroundColor(Palette.faint); leg.value.setTextColor(Palette.faint); leg.value.text = "—"; leg.value.textSize = 22f; leg.value.typeface = Pixel.font(this) }
+            Thread {
+                fun delay(result: String) = result.substringAfter('=', "-1").toIntOrNull() ?: -1
+                val a = try { delay(Core.probe("DIRECT", Transports.LOCAL_URL, 3000)) } catch (_: Exception) { -1 }
+                val b = Directory.probes[nodeId]?.let { try { Core.reach(it, 3000).toInt() } catch (_: Exception) { -1 } } ?: -1
+                val current = try { Core.now(Transports.GROUP) } catch (_: Exception) { "" }
+                val c = if (current.isEmpty()) -1 else try { delay(Core.probe(current, Transports.TEST_URL, 5000)) } catch (_: Exception) { -1 }
+                runOnUiThread {
+                    running = false
+                    if (!dialog.isShowing) return@runOnUiThread
+                    show(local, a, 300); show(toNode, b, 300); show(web, c, 1200)
+                    status.text = nodeName
+                    val nodeSlow = b < 0 || b > 300; val localSlow = a < 0 || a > 300; val webSlow = c < 0 || c > 1200
+                    verdict.text = when {
+                        a < 0 && b < 0 && c < 0 -> L10n.text(R.string.check_failed)
+                        localSlow && (nodeSlow || webSlow) -> L10n.text(R.string.check_local_slow)
+                        nodeSlow -> L10n.text(R.string.check_node_slow, nodeName)
+                        webSlow -> L10n.text(R.string.check_web_slow)
+                        localSlow -> L10n.text(R.string.check_local_slow)
+                        else -> L10n.text(R.string.check_ok)
+                    }
+                    other.visibility = if (!localSlow && (nodeSlow || webSlow)) View.VISIBLE else View.GONE
+                }
+            }.start()
+        }
+        again.setOnClickListener { runCheck() }
+        dialog.setContentView(box)
+        dialog.show()
+        dialog.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT)); setGravity(Gravity.BOTTOM)
+            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND); setDimAmount(0.6f)
+            @Suppress("DEPRECATION") navigationBarColor = Palette.surface
+        }
+        runCheck()
     }
 
     private fun <T> work(task: () -> T, success: (T) -> Unit) {
@@ -930,9 +1073,15 @@ class MainActivity : Activity() {
 /** Names and country codes of the locations seen this session, for the connect page's badge and "fastest" line. */
 object Directory {
     val nodes = ConcurrentHashMap<String, Pair<String, String?>>()
+    /** "host:port" each node answers TCP on (the latency probe), and its region name: for the connection check. */
+    val probes = ConcurrentHashMap<String, String>()
+    val regions = ConcurrentHashMap<String, String>()
     fun remember(list: org.json.JSONArray) {
         for (i in 0 until list.length()) list.optJSONObject(i)?.let { node ->
-            nodes[node.getString("id")] = node.getString("name") to node.optString("countryCode").takeIf { it.length == 2 }?.uppercase()
+            val id = node.getString("id")
+            nodes[id] = node.getString("name") to node.optString("countryCode").takeIf { it.length == 2 }?.uppercase()
+            node.optJSONObject("probe")?.let { probe -> if (probe.optString("host").isNotEmpty()) probes[id] = probe.optString("host").let { if (it.contains(':')) "[$it]" else it } + ":" + probe.optInt("port") }
+            node.optString("region").takeIf { it.isNotBlank() && it != "null" }?.let { regions[id] = it }
         }
     }
     /** The country code, or the name's first letter when the location has no region. */

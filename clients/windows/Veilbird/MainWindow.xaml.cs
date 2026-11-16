@@ -51,6 +51,14 @@ public partial class MainWindow : Window {
     private TextBlock? statusTitle,statusDetail,statusTimer,stream,usageTotal,usageUntil;
     private Rectangle? statusDot;
     private (ContentControl Badge,TextBlock Title,TextBlock Detail)? location;
+    private RateBars? rateBars,flyRate;
+    private Border? switchNote,flyNote;
+    private TextBlock? switchText,flyNoteText;
+    // The note is dismissed per switch: a later switch shows it again.
+    private string dismissedSwitch="";
+    // Download / upload rates of the last 40 seconds for the rate chart, newest last.
+    private readonly List<long> rxHistory=new(),txHistory=new();
+    private string usageRange="30d";
     private string badgeKey="";
     private Window? flyout;
     private DateTime flyoutHidden=DateTime.MinValue;
@@ -66,7 +74,7 @@ public partial class MainWindow : Window {
         TitleLogo.Content=Look.Mark(16,Look.Accent);
         connection=new Connection(api,core);
         connection.Changed+=()=>Dispatcher.InvokeAsync(()=>{UpdateLive();UpdateTray();});
-        refresh.Tick+=(_,_)=>UpdateLive();refresh.Start();
+        refresh.Tick+=(_,_)=>{SampleRates();UpdateLive();};refresh.Start();
         toastTimer.Tick+=(_,_)=>{toastTimer.Stop();Toast.Visibility=Visibility.Collapsed;};
         Toast.MouseLeftButtonUp+=(_,_)=>{toastTimer.Stop();Toast.Visibility=Visibility.Collapsed;};
         SourceInitialized+=(_,_)=>DarkFrame();
@@ -152,7 +160,7 @@ public partial class MainWindow : Window {
         _=RefreshAccount();
     }
     private Window BuildFlyout() {
-        var window=new Window {Width=300,Height=400,WindowStyle=WindowStyle.None,AllowsTransparency=true,Background=Brushes.Transparent,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,
+        var window=new Window {Width=300,Height=440,WindowStyle=WindowStyle.None,AllowsTransparency=true,Background=Brushes.Transparent,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,
             FontFamily=FontFamily,UseLayoutRounding=true,Title="TrackNothing"};
         window.Deactivated+=(_,_)=>{if(window.IsVisible) {window.Hide();flyoutHidden=DateTime.UtcNow;}};
         var root=new DockPanel {LastChildFill=false};
@@ -168,13 +176,20 @@ public partial class MainWindow : Window {
         var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(14,0,12,0)};texts.Children.Add(title);texts.Children.Add(detail);
         var card=new Border {CornerRadius=new CornerRadius(8),Padding=new Thickness(16),BorderThickness=new Thickness(1),Child=Columns(mark,texts,toggle)};
         DockPanel.SetDock(card,Dock.Top);root.Children.Add(card);
+        var (note,noteText)=SwitchNote(12);note.Margin=new Thickness(0,10,0,0);
+        DockPanel.SetDock(note,Dock.Top);root.Children.Add(note);
+        var rate=new RateBars {Height=36,Margin=new Thickness(2,12,2,0),Visibility=Visibility.Collapsed};
+        DockPanel.SetDock(rate,Dock.Top);root.Children.Add(rate);
 
         var badge=new ContentControl();
         var place=new TextBlock {FontSize=13,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap};
         var placeDetail=new TextBlock {FontSize=11,Foreground=Look.Secondary,Margin=new Thickness(0,2,0,0),TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap};
         var placeTexts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,8,0)};placeTexts.Children.Add(place);placeTexts.Children.Add(placeDetail);
         var placeRow=new Button {Height=52,Padding=new Thickness(12,0,12,0),Background=Look.Hex("#1A221C"),Margin=new Thickness(0,14,0,0),Content=Columns(badge,placeTexts,Look.Icon("",10,Look.Secondary))};
-        placeRow.Click+=(_,_)=>{page="nodes";Render();ShowFromTray();};
+        placeRow.Click+=(_,_)=>{
+            if(connection.Active&&connection.Since is not null) {ShowFromTray();ConnectionCheck();}
+            else {page="nodes";Render();ShowFromTray();}
+        };
         DockPanel.SetDock(placeRow,Dock.Top);root.Children.Add(placeRow);
 
         var usage=new TextBlock {Text="—",FontSize=13,FontWeight=FontWeights.SemiBold};var until=new TextBlock {Text="—",FontSize=13,FontWeight=FontWeights.SemiBold};
@@ -191,6 +206,7 @@ public partial class MainWindow : Window {
         window.Content=new Border {Background=Look.Hex("#121915"),BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(16),Child=root};
         TextElement.SetForeground(window,Look.Text);
         fly=(card,mark,title,detail,toggle,badge,place,placeDetail,usage,until);
+        flyRate=rate;flyNote=note;flyNoteText=noteText;
         return window;
     }
     private void UpdateFlyout() {
@@ -206,6 +222,7 @@ public partial class MainWindow : Window {
         f.Switch.IsChecked=connection.Active;f.Switch.IsEnabled=!busy||connection.Active;
         var place=Location();
         f.Badge.Content=Look.Badge(place.Code,28);f.Location.Text=place.Title;f.LocationDetail.Text=place.Detail;
+        ShowRates(flyRate,state);ShowSwitch(flyNote,flyNoteText,state);
         ShowFigures(f.Usage,f.Until);
     }
 
@@ -433,9 +450,125 @@ public partial class MainWindow : Window {
         return button;
     }
 
+    // ---- Rate chart, switch note and connection check ----
+    /// One sample a second while connected; cleared otherwise.
+    private void SampleRates() {
+        if(connection.Active&&connection.Since is not null) {
+            rxHistory.Add(connection.RxRate);txHistory.Add(connection.TxRate);
+            if(rxHistory.Count>RateBars.Count) {rxHistory.RemoveAt(0);txHistory.RemoveAt(0);}
+        } else {rxHistory.Clear();txHistory.Clear();}
+    }
+    private void ShowRates(RateBars? bars,RingState state) {
+        if(bars is null) return;
+        var on=state==RingState.Connected;
+        bars.Visibility=on?Visibility.Visible:Visibility.Collapsed;
+        if(on) bars.Set(rxHistory.ToArray(),txHistory.ToArray());
+    }
+    /// "Tokyo 03 did not answer, switched to Tokyo 05": one line with a close button, shown after automatic switching.
+    private (Border Note,TextBlock Text) SwitchNote(double size) {
+        var text=Single("",size);text.Margin=new Thickness(12,0,8,0);
+        var close=new Button {Width=32,Height=32,Padding=new Thickness(0),Content=Look.Icon("\uE711",10,Look.Secondary),HorizontalContentAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
+        AutomationProperties.SetName(close,L10n.Text("close"));
+        close.Click+=(_,_)=>{dismissedSwitch=connection.SwitchedFrom;UpdateLive();};
+        var dot=new Rectangle {Width=6,Height=6,Fill=Look.Accent,VerticalAlignment=VerticalAlignment.Center};
+        var note=new Border {Background=Look.Surface,CornerRadius=new CornerRadius(8),Padding=new Thickness(14,4,4,4),Child=Columns(dot,text,close),Visibility=Visibility.Collapsed};
+        return (note,text);
+    }
+    private void ShowSwitch(Border? note,TextBlock? text,RingState state) {
+        if(note is null||text is null) return;
+        var from=connection.SwitchedFrom;
+        var shown=state==RingState.Connected&&from.Length>0&&from!=dismissedSwitch&&from!=connection.NodeName&&connection.NodeName.Length>0;
+        text.Text=shown?L10n.Text("switched_location",from,connection.NodeName):"";
+        note.Visibility=shown?Visibility.Visible:Visibility.Collapsed;
+        if(shown) AutomationProperties.SetName(note,text.Text);
+    }
+    private JsonNode? NodeData(string id)=>nodesData?.FirstOrDefault(node=>node?["id"]?.GetValue<string>()==id);
+    /// "host:port" the node answers TCP on (its latency probe), outside the tunnel.
+    private static string? ProbeAddress(JsonNode? node) {
+        var host=node?["probe"]?["host"]?.GetValue<string>();var port=node?["probe"]?["port"]?.GetValue<int>()??0;
+        if(string.IsNullOrEmpty(host)||port is <1 or >65535) return null;
+        return (host.Contains(':')?$"[{host}]":host)+":"+port;
+    }
+    /// The connection check: three legs timed on demand. Your network = a small page fetched outside the tunnel,
+    /// to the location = a TCP connect to the node outside the tunnel, opening a page = the test page through the
+    /// transport carrying traffic now. One sentence then says which leg is slow.
+    private async void ConnectionCheck() {
+        if(nodesData is null) {try {await LoadNodes();} catch {/* the node leg shows no answer */}}
+        var id=connection.NodeId;var name=connection.NodeName.Length>0?connection.NodeName:directory.TryGetValue(id,out var known)?known.Name:L10n.Text("location");
+        var node=NodeData(id);var address=ProbeAddress(node);var region=node?["region"]?.GetValue<string>()??"";
+        var window=new Window {Owner=this,Width=ActualWidth-32,SizeToContent=SizeToContent.Height,WindowStyle=WindowStyle.None,AllowsTransparency=true,Background=Brushes.Transparent,
+            ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.CenterOwner,FontFamily=FontFamily,UseLayoutRounding=true,Title=L10n.Text("check_title"),
+            Language=Language};
+        TextOptions.SetTextFormattingMode(window,TextFormattingMode.Display);
+        window.Deactivated+=(_,_)=>{if(window.IsVisible) window.Close();};
+        window.KeyDown+=(_,e)=>{if(e.Key==Key.Escape) window.Close();};
+        var stack=new StackPanel();
+        var status=Single("",12,Look.Secondary);status.Margin=new Thickness(12,0,4,0);status.HorizontalAlignment=HorizontalAlignment.Right;
+        var close=IconButton("\uE711",L10n.Text("close"),window.Close);
+        var right=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};right.Children.Add(status);right.Children.Add(close);
+        stack.Children.Add(Columns(Single(L10n.Text("check_title"),17,strong:true),new FrameworkElement(),right));
+        (Rectangle Mark,TextBlock Value) Leg(string title,string detail) {
+            var mark=new Rectangle {Width=8,Height=8,Fill=Look.Faint,VerticalAlignment=VerticalAlignment.Center};
+            var value=new TextBlock {Text="—",FontFamily=Look.Dots,FontSize=20,Foreground=Look.Faint,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.NoWrap,Margin=new Thickness(8,0,0,0)};
+            var texts=TwoLines(title,detail);texts.Margin=new Thickness(14,0,8,0);
+            stack.Children.Add(new Border {Height=56,Child=Columns(mark,texts,value)});
+            return (mark,value);
+        }
+        var local=Leg(L10n.Text("check_local"),L10n.Text("check_local_detail"));
+        var toNode=Leg(L10n.Text("check_node"),name);
+        var web=Leg(L10n.Text("check_web"),L10n.Text("check_web_detail"));
+        var verdict=Words("",13);verdict.TextWrapping=TextWrapping.Wrap;
+        stack.Children.Add(new Border {Background=Look.Hex("#1B241D"),CornerRadius=new CornerRadius(8),Padding=new Thickness(14,12,14,12),Margin=new Thickness(0,8,0,0),Child=verdict});
+        if(region.Length>0) {
+            var exit=Columns(Single(L10n.Text("check_exit"),12,Look.Secondary),new FrameworkElement(),Single(region,12));
+            exit.Margin=new Thickness(2,12,2,0);stack.Children.Add(exit);
+        }
+        var other=Primary(L10n.Text("change_location").Replace("›","").Trim());other.Margin=new Thickness(0,14,0,0);other.Visibility=Visibility.Collapsed;
+        other.Click+=(_,_)=>{window.Close();page="nodes";Render();};
+        stack.Children.Add(other);
+        var again=Plain(L10n.Text("check_again"));again.Height=40;again.Margin=new Thickness(0,10,0,0);
+        stack.Children.Add(again);
+        window.Content=new Border {Background=Look.Hex("#121915"),BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(20,14,14,18),Child=stack};
+        TextElement.SetForeground(window,Look.Text);
+        void Paint((Rectangle Mark,TextBlock Value) leg,long ms,long limit) {
+            var color=ms<0?Look.Danger:ms>limit?Look.Fair:Look.Accent;
+            leg.Mark.Fill=color;leg.Value.Foreground=color;
+            if(ms<0) {leg.Value.Text=L10n.Text("check_no_answer");leg.Value.FontFamily=FontFamily;leg.Value.FontSize=13;}
+            else {leg.Value.Text=L10n.Text("latency_ms",ms.ToString("N0",L10n.Culture));leg.Value.FontFamily=Look.Dots;leg.Value.FontSize=20;}
+        }
+        var running=false;
+        async void RunCheck() {
+            if(running) return;
+            running=true;again.IsEnabled=false;other.Visibility=Visibility.Collapsed;
+            status.Text=L10n.Text("check_running");verdict.Text=L10n.Text("check_running");
+            foreach(var leg in new[]{local,toNode,web}) {leg.Mark.Fill=Look.Faint;leg.Value.Foreground=Look.Faint;leg.Value.Text="—";leg.Value.FontFamily=Look.Dots;leg.Value.FontSize=20;}
+            long a=-1,b=-1,c=-1;
+            await Task.Run(()=>{
+                try {a=core.ProbeUrl("DIRECT",Transports.LocalUrl,3000);} catch {/* no answer */}
+                try {if(address is not null) b=core.Reach(address,3000);} catch {/* no answer */}
+                try {var now=core.Now(Transports.Group);if(now.Length>0) c=core.ProbeUrl(now,Transports.TestUrl,5000);} catch {/* no answer */}
+            });
+            running=false;again.IsEnabled=true;
+            if(!window.IsVisible) return;
+            Paint(local,a,300);Paint(toNode,b,300);Paint(web,c,1200);
+            status.Text=name;
+            bool localSlow=a<0||a>300,nodeSlow=b<0||b>300,webSlow=c<0||c>1200;
+            verdict.Text=a<0&&b<0&&c<0?L10n.Text("check_failed")
+                :localSlow&&(nodeSlow||webSlow)?L10n.Text("check_local_slow")
+                :nodeSlow?L10n.Text("check_node_slow",name)
+                :webSlow?L10n.Text("check_web_slow")
+                :localSlow?L10n.Text("check_local_slow"):L10n.Text("check_ok");
+            other.Visibility=!localSlow&&(nodeSlow||webSlow)?Visibility.Visible:Visibility.Collapsed;
+        }
+        again.Click+=(_,_)=>RunCheck();
+        window.Show();window.Activate();
+        RunCheck();
+    }
+
     // ---- Pages ----
     private void Render() {
         ContentPanel.Children.Clear();FullPanel.Children.Clear();NavigationPanel.Children.Clear();HeaderSlot.Content=null;
+        rateBars=null;switchNote=null;switchText=null;
         ring=null;ringButton=null;statusTitle=statusDetail=statusTimer=stream=usageTotal=usageUntil=null;statusDot=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
         var view=api.SignedIn?page:"login";
         var full=view=="connect";
@@ -483,7 +616,11 @@ public partial class MainWindow : Window {
     private void Home() {
         var layout=new Grid {Margin=new Thickness(16,8,16,16)};
         layout.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});layout.RowDefinitions.Add(new RowDefinition {Height=new GridLength(1,GridUnitType.Star)});layout.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});
-        if(Notices() is { } notes) layout.Children.Add(notes);
+        var top=new StackPanel();
+        if(Notices() is { } notes) top.Children.Add(notes);
+        var (homeNote,homeText)=SwitchNote(13);homeNote.Margin=new Thickness(0,0,0,8);top.Children.Add(homeNote);
+        switchNote=homeNote;switchText=homeText;
+        layout.Children.Add(top);
 
         ring=new Ring();
         ringButton=new Button {Style=(Style)FindResource("Bare"),Content=ring.View,HorizontalAlignment=HorizontalAlignment.Center};
@@ -495,8 +632,10 @@ public partial class MainWindow : Window {
         statusTimer=new TextBlock {FontFamily=Look.Dots,FontSize=30,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,8,0,0),Visibility=Visibility.Collapsed};
         statusDetail=new TextBlock {FontSize=13,Foreground=Look.Secondary,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(8,6,8,0),MaxHeight=40,TextTrimming=TextTrimming.CharacterEllipsis};
         stream=new TextBlock {FontFamily=Look.Dots,FontSize=14,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,14,0,0)};
+        // Connected, the live rate chart takes the decorative stream's place.
+        rateBars=new RateBars {Width=238,Height=44,Margin=new Thickness(0,12,0,0),HorizontalAlignment=HorizontalAlignment.Center,Visibility=Visibility.Collapsed};
         var center=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
-        center.Children.Add(ringButton);center.Children.Add(titleRow);center.Children.Add(statusTimer);center.Children.Add(statusDetail);center.Children.Add(stream);
+        center.Children.Add(ringButton);center.Children.Add(titleRow);center.Children.Add(statusTimer);center.Children.Add(statusDetail);center.Children.Add(rateBars);center.Children.Add(stream);
         Grid.SetRow(center,1);layout.Children.Add(center);
 
         var badge=new ContentControl();
@@ -504,7 +643,8 @@ public partial class MainWindow : Window {
         var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,8,0)};texts.Children.Add(title);texts.Children.Add(detail);
         var row=new Button {Height=60,Background=Look.Surface,BorderBrush=Look.Hex("#0FECF1E8"),BorderThickness=new Thickness(1),Content=Columns(badge,texts,Look.Icon("",11,Look.Secondary))};
         AutomationProperties.SetHelpText(row,L10n.Text("tap_to_change"));
-        row.Click+=(_,_)=>{if(!busy) {page="nodes";Render();}};
+        // Connected, the location row opens the connection check; otherwise the location list.
+        row.Click+=(_,_)=>{if(busy) return;if(connection.Active&&connection.Since is not null) ConnectionCheck();else {page="nodes";Render();}};
         location=(badge,title,detail);
         usageTotal=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold};usageUntil=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold};
         var cells=Cells(("last_30_days",usageTotal,12),("valid_until_label",usageUntil,12));cells.Margin=new Thickness(4,14,4,0);
@@ -554,6 +694,7 @@ public partial class MainWindow : Window {
         if(active&&id.Length>0) {
             var name=connection.NodeName.Length>0?connection.NodeName:directory.TryGetValue(id,out var entry)?entry.Name:L10n.Text("location");
             var detail=automatic?(Ms(quality) is { } ms?L10n.Text("connected_automatic_detail",ms):L10n.Text("automatic")):quality is not null?Summary(quality):L10n.Text("tap_to_change");
+            if(connection.Since is not null) detail+=" · "+L10n.Text("tap_to_check");
             return (name,detail,Code(id,name));
         }
         if(automatic) {
@@ -725,32 +866,50 @@ public partial class MainWindow : Window {
         row.Click+=(_,_)=>onClick(row);
         return row;
     }
-    /// 30-day total, a bar per day, and the download / upload split.
-    private static Border UsageCard(JsonNode traffic) {
+    /// Today / this month / 30 days: the range's total in the dot face, a bar per day for the last 30 days with the
+    /// range lit, and for 30 days the download / upload split. Days are the server's (UTC) days.
+    private Border UsageCard(JsonNode traffic) {
         long down=Number(traffic["downloadBytes"]),up=Number(traffic["uploadBytes"]);
+        var perDay=new Dictionary<string,long>();
+        if(traffic["days"] is JsonArray list) foreach(var day in list) if(day?["day"]?.GetValue<string>() is { Length: >=10 } date) perDay[date[..10]]=Number(day["bytes"]);
+        var today=DateTime.UtcNow.Date;
+        string Key(DateTime day)=>day.ToString("yyyy-MM-dd",System.Globalization.CultureInfo.InvariantCulture);
+        var days=Enumerable.Range(0,30).Reverse().Select(offset=>perDay.TryGetValue(Key(today.AddDays(-offset)),out var bytes)?bytes:0).ToList();
         var stack=new StackPanel();
-        var days=DailyUsage(traffic);
-        var header=new DockPanel();
-        if(days.Count>0) {var daily=Single(L10n.Text("daily"),11,Look.Secondary);DockPanel.SetDock(daily,Dock.Right);header.Children.Add(daily);}
-        header.Children.Add(Single(L10n.Text("traffic_30_days"),12,Look.Secondary));
-        stack.Children.Add(header);
-        var total=Bytes(down+up).Split(' ',2);
-        var figure=new TextBlock {Margin=new Thickness(0,8,0,0)};
-        figure.Inlines.Add(new Run(total[0]) {FontFamily=Look.Dots,FontSize=34});
-        if(total.Length>1) figure.Inlines.Add(new Run(" "+total[1]) {FontSize=14,FontWeight=FontWeights.SemiBold,Foreground=Look.Secondary});
-        stack.Children.Add(figure);
-        if(days.Count>0) stack.Children.Add(new UsageBlocks(days) {Height=46,Margin=new Thickness(0,12,0,0)});
+        var ranges=new[]{("today","usage_today"),("month","usage_this_month"),("30d","last_30_days")};
+        var switcher=new StackPanel {Orientation=Orientation.Horizontal};
+        var figure=new TextBlock {Margin=new Thickness(0,12,0,0)};
+        var blocks=perDay.Count>0?new UsageBlocks(days) {Height=46,Margin=new Thickness(0,12,0,0)}:null;
         var split=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,10,0,0)};
         split.Children.Add(Single(L10n.Text("download_amount",Bytes(down)),12,Look.Secondary));
         var upload=Single(L10n.Text("upload_amount",Bytes(up)),12,Look.Secondary);upload.Margin=new Thickness(20,0,0,0);split.Children.Add(upload);
+        void Pick(string range) {
+            usageRange=range;
+            for(var i=0;i<switcher.Children.Count;i++) if(switcher.Children[i] is Button choice) {
+                var on=ranges[i].Item1==range;
+                choice.Background=on?Look.Selected:Brushes.Transparent;choice.Foreground=on?Look.Text:Look.Secondary;choice.FontWeight=on?FontWeights.SemiBold:FontWeights.Normal;
+                AutomationProperties.SetName(choice,L10n.Text(ranges[i].Item2)+(on?L10n.Text("current_page"):""));
+            }
+            var month=Key(today)[..7];
+            var total=range switch {"today"=>perDay.TryGetValue(Key(today),out var t)?t:0,"month"=>perDay.Where(x=>x.Key.StartsWith(month,StringComparison.Ordinal)).Sum(x=>x.Value),_=>down+up};
+            // "143 GB": the number large, its unit small and muted.
+            var parts=Bytes(total).Split(' ',2);
+            figure.Inlines.Clear();
+            figure.Inlines.Add(new Run(parts[0]) {FontFamily=Look.Dots,FontSize=34});
+            if(parts.Length>1) figure.Inlines.Add(new Run(" "+parts[1]) {FontSize=14,FontWeight=FontWeights.SemiBold,Foreground=Look.Secondary});
+            if(blocks is not null) blocks.Recent=range switch {"today"=>1,"month"=>Math.Min(today.Day,30),_=>30};
+            split.Visibility=range=="30d"?Visibility.Visible:Visibility.Collapsed;
+        }
+        foreach(var (key,title) in ranges) {
+            var choice=new Button {Content=L10n.Text(title),FontSize=12,Height=28,Padding=new Thickness(10,0,10,0),HorizontalContentAlignment=HorizontalAlignment.Center};
+            choice.Click+=(_,_)=>Pick(key);switcher.Children.Add(choice);
+        }
+        stack.Children.Add(new Border {Background=Look.Ground,CornerRadius=new CornerRadius(9),Padding=new Thickness(2),HorizontalAlignment=HorizontalAlignment.Left,Child=switcher});
+        stack.Children.Add(figure);
+        if(blocks is not null) stack.Children.Add(blocks);
         stack.Children.Add(split);
+        Pick(usageRange);
         return new Border {Background=Look.Surface,CornerRadius=new CornerRadius(8),Padding=new Thickness(16),Child=stack};
-    }
-    private static List<long> DailyUsage(JsonNode traffic) {
-        if(traffic["days"] is not JsonArray days||days.Count==0) return new();
-        var perDay=new Dictionary<string,long>();
-        foreach(var day in days) if(day?["day"]?.GetValue<string>() is { } date) perDay[date]=Number(day["bytes"]);
-        return Enumerable.Range(0,30).Reverse().Select(offset=>perDay.TryGetValue(DateTime.Now.AddDays(-offset).ToString("yyyy-MM-dd",System.Globalization.CultureInfo.InvariantCulture),out var bytes)?bytes:0).ToList();
     }
     private FrameworkElement SubHeader(string title) {
         var back=IconButton("",L10n.Text("back_action"),()=>{page="account";Render();});back.HorizontalAlignment=HorizontalAlignment.Left;
@@ -896,7 +1055,10 @@ public partial class MainWindow : Window {
         if(stream is not null) {
             var running=state is RingState.Connecting or RingState.Connected;
             stream.Text=running&&Motion?Look.Stream(DateTime.UtcNow):Look.StreamIdle;stream.Foreground=running?Look.StreamOn:Look.StreamOff;
+            stream.Visibility=state==RingState.Connected?Visibility.Collapsed:Visibility.Visible;
         }
+        ShowRates(rateBars,state);
+        ShowSwitch(switchNote,switchText,state);
         if(location is { } place) {
             var (title,detail,code)=Location();
             place.Title.Text=title;place.Detail.Text=detail;
