@@ -20,34 +20,26 @@ while [ "$#" -gt 0 ]; do
     --no-cache) no_cache="yes"; shift ;;
     --tag) image_tag=${2:-}; shift 2 ;;
     -h|--help)
-      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|veilbird|portal-web|admin-web] [--no-cache] [--tag <commit>]"
+      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|backend,portal,console,static] [--no-cache] [--tag <commit>]"
       echo "  --tag  run the registry images of an earlier commit (rollback); needs VEILBIRD_IMAGE_PREFIX in .env"
       exit 0
       ;;
     *)
-      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|veilbird|portal-web|admin-web] [--no-cache] [--tag <commit>]" >&2
+      echo "Usage: ./scripts/deploy.sh [deploy|logs|ps] [--service all|backend,portal,console,static] [--no-cache] [--tag <commit>]" >&2
       exit 2
       ;;
   esac
 done
 
-case "$service" in
-  all) ;;
-  controller|veilbird|northstar) service="veilbird" ;;
-  portal) service="portal-web" ;;
-  admin) service="admin-web" ;;
-  portal-web|admin-web) ;;
-  *) echo "Unknown service: $service. Use all, veilbird, portal-web, or admin-web." >&2; exit 2 ;;
-esac
-
+usage_services="all, or a comma list of: backend, portal, console, static"
 if [ "$mode" = "deploy" ] && [ "$service_explicit" = "no" ] && [ -t 0 ] && [ -t 1 ]; then
   echo ""
   echo "TrackNothing deployment wizard"
   echo "Choose what you want to update:"
-  echo "  1) all         Controller + Portal + Admin + static target (recommended for releases)"
-  echo "  2) veilbird    Controller/API only"
-  echo "  3) portal-web  Portal only"
-  echo "  4) admin-web   Admin only"
+  echo "  1) all       Backend + Portal + Console + static site (recommended for releases)"
+  echo "  2) backend   Controller/API only"
+  echo "  3) portal    Portal only"
+  echo "  4) console   Console only"
   printf "Select [1]: "
   read -r choice
   case "${choice:-1}" in
@@ -57,8 +49,21 @@ if [ "$mode" = "deploy" ] && [ "$service_explicit" = "no" ] && [ -t 0 ] && [ -t 
     4) service="admin-web" ;;
     *) echo "Invalid selection: $choice" >&2; exit 2 ;;
   esac
-  echo "Selected service: $service"
 fi
+
+# --service takes "all" or a comma-separated list; it becomes the space-separated list of Compose services.
+targets=""
+for name in $(printf '%s' "$service" | tr ',' ' '); do
+  normalized=$(normalize_service "$name")
+  case "$normalized" in
+    all) targets="$ALL_SERVICES" ;;
+    ""|agent) echo "Unknown service: $name. Use $usage_services." >&2; exit 2 ;;
+    *) case " $targets " in *" $normalized "*) ;; *) targets="$targets $normalized" ;; esac ;;
+  esac
+done
+targets=$(echo $targets)
+[ -n "$targets" ] || { echo "No service selected. Use $usage_services." >&2; exit 2; }
+includes() { case " $targets " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 
 case "$mode" in
   logs)
@@ -71,6 +76,7 @@ case "$mode" in
     ;;
 esac
 
+acquire_deploy_lock
 "$SCRIPT_DIR/ensure-postgres-env.sh"
 "$SCRIPT_DIR/ensure-service-origins.sh"
 "$SCRIPT_DIR/check-env.sh"
@@ -92,7 +98,7 @@ else
 fi
 # A changed Loki config is a bind mount Compose cannot see; its checksum makes "up -d loki" recreate it.
 export VEILBIRD_LOKI_CONFIG_SHA=$(cksum < deploy/loki/loki.yml | cut -d ' ' -f 1)
-echo "Deploying build $VEILBIRD_BUILD_REV (service: $service)"
+echo "Deploying build $VEILBIRD_BUILD_REV: $targets"
 
 echo "Starting PostgreSQL and waiting for it to become healthy..."
 compose up -d db
@@ -104,7 +110,7 @@ wait_for_healthy() {
     echo "$service_name container was not created." >&2
     compose ps --all >&2
     compose logs --tail=120 "$service_name" >&2 || true
-    exit 1
+    return 1
   fi
 
   healthy=""
@@ -127,11 +133,11 @@ wait_for_healthy() {
     compose ps --all >&2
     docker inspect --format '{{range .State.Health.Log}}{{println .ExitCode .Output}}{{end}}' "$container_id" >&2 || true
     compose logs --tail=120 "$service_name" >&2 || true
-    exit 1
+    return 1
   fi
 }
 
-wait_for_healthy db
+wait_for_healthy db || exit 1
 echo "PostgreSQL is healthy."
 
 # Operational logs used to sit in a bundled MinIO; Loki now keeps them on its own volume (under /loki/fs,
@@ -147,18 +153,37 @@ if [ -n "$old_log_store" ]; then
 fi
 compose up -d loki
 
-if [ "$service" = "all" ]; then
-  build_targets="veilbird portal-web admin-web reality-target"
-  up_targets="veilbird portal-web admin-web reality-target"
-else
-  build_targets="$service"
-  up_targets="$service"
-  if [ "$service" != "veilbird" ]; then
-    # A frontend needs a healthy Controller, but does not recreate it.
-    compose up -d --remove-orphans veilbird
-    wait_for_healthy veilbird
+if ! includes veilbird; then
+  # A frontend needs a running Controller but must not touch it: "compose up veilbird" would recreate it
+  # (its image tag and build revision change with every commit) and upgrade it without a backup.
+  backend_id=$(compose ps -q veilbird 2>/dev/null || true)
+  if [ -z "$backend_id" ]; then
+    echo "The backend is not deployed yet. Deploy it first: sudo ./one-click-update.sh --only backend" >&2
+    exit 1
   fi
+  [ "$(docker inspect --format '{{.State.Running}}' "$backend_id" 2>/dev/null)" = "true" ] || compose start veilbird
+  wait_for_healthy veilbird || exit 1
 fi
+
+# The image each target runs now is tagged ":previous", so a release that fails its health check goes back
+# to it (and the Docker cleanup, which removes only untagged images, keeps it).
+prefix_name=${image_prefix:-tracknothing}
+rollback_ready=""
+for target in $targets; do
+  current=$(compose ps -q "$target" 2>/dev/null || true)
+  [ -n "$current" ] || continue
+  image_id=$(docker inspect --format '{{.Image}}' "$current" 2>/dev/null || true)
+  [ -n "$image_id" ] || continue
+  if docker tag "$image_id" "$prefix_name-$target:previous" 2>/dev/null; then
+    rollback_ready="$rollback_ready $target"
+    if [ "$target" = "veilbird" ]; then
+      previous_rev=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$current" 2>/dev/null | sed -n 's/^VEILBIRD_BUILD_REV=//p' | head -n 1)
+    fi
+  fi
+done
+
+build_targets="$targets"
+up_targets="$targets"
 
 pulled="no"
 if [ "$VEILBIRD_IMAGE_TAG" != "local" ]; then
@@ -184,15 +209,41 @@ fi
 
 echo "Starting: $up_targets"
 # --remove-orphans also retires the pre-rename "northstar" container that held port 3000.
+# --no-deps: only the selected modules are recreated; the others keep running untouched.
 compose up -d --force-recreate --remove-orphans --no-deps $up_targets
 
-if [ "$service" = "all" ]; then
-  wait_for_healthy veilbird
-  wait_for_healthy portal-web
-  wait_for_healthy admin-web
-  wait_for_healthy reality-target
-else
-  wait_for_healthy "$service"
+unhealthy=""
+for target in $targets; do
+  wait_for_healthy "$target" || unhealthy="$unhealthy $target"
+done
+
+if [ -n "$unhealthy" ]; then
+  echo "" >&2
+  echo "The new version did not become healthy:$unhealthy" >&2
+  rollback_targets=""
+  for target in $targets; do
+    case " $rollback_ready " in *" $target "*) rollback_targets="$rollback_targets $target" ;; esac
+  done
+  if [ -z "$rollback_targets" ]; then
+    echo "There is no previous version to go back to (first deployment of these modules)." >&2
+    exit 1
+  fi
+  echo "Going back to the previous version of:$rollback_targets" >&2
+  # Every module of this release goes back together, so the frontends and the backend still match.
+  VEILBIRD_IMAGE_TAG=previous VEILBIRD_BUILD_REV=${previous_rev:-$VEILBIRD_BUILD_REV} \
+    compose up -d --force-recreate --no-deps $rollback_targets
+  rolled_back="yes"
+  for target in $rollback_targets; do wait_for_healthy "$target" || rolled_back="no"; done
+  if [ "$rolled_back" = "yes" ]; then
+    echo "Rolled back: the previous version is running again." >&2
+  else
+    echo "The previous version did not come back healthy either. Check: ./scripts/deploy.sh logs" >&2
+  fi
+  if includes veilbird; then
+    echo "Database changes made by the new version, if any, stay applied. If the previous version misbehaves," >&2
+    echo "restore the backup taken just before this update (./backups, ./scripts/restore-postgres.sh)." >&2
+  fi
+  exit 1
 fi
 
 if command -v curl >/dev/null 2>&1; then
@@ -216,28 +267,17 @@ if command -v curl >/dev/null 2>&1; then
       *) echo "Error: $service_name map returned $map_type instead of image/webp. Deployment verification failed." >&2; exit 1 ;;
     esac
   }
-  case "$service" in
-    all)
-      check_frontend_map portal-web 3100
-      check_frontend_map admin-web 3200
-      check_endpoint veilbird 3000 /api/health
-      check_endpoint portal-web 3100 /health
-      check_endpoint portal-web 3100 /api/health
-      check_endpoint admin-web 3200 /health
-      check_endpoint admin-web 3200 /api/health
-      ;;
-    veilbird) check_endpoint veilbird 3000 /api/health ;;
-    portal-web)
-      check_frontend_map portal-web 3100
-      check_endpoint portal-web 3100 /health
-      check_endpoint portal-web 3100 /api/health
-      ;;
-    admin-web)
-      check_frontend_map admin-web 3200
-      check_endpoint admin-web 3200 /health
-      check_endpoint admin-web 3200 /api/health
-      ;;
-  esac
+  if includes veilbird; then check_endpoint veilbird 3000 /api/health; fi
+  if includes portal-web; then
+    check_frontend_map portal-web 3100
+    check_endpoint portal-web 3100 /health
+    check_endpoint portal-web 3100 /api/health
+  fi
+  if includes admin-web; then
+    check_frontend_map admin-web 3200
+    check_endpoint admin-web 3200 /health
+    check_endpoint admin-web 3200 /api/health
+  fi
 fi
 
 # Runtime logs are optional for recovery, so a log store problem is a warning, not a failed deploy.
@@ -285,10 +325,16 @@ sh "$SCRIPT_DIR/setup-nginx-limits.sh" || echo "Warning: Nginx request limits we
 # Cleanup runs only after a healthy deploy, so a failed one still has its previous images.
 sh "$SCRIPT_DIR/prune-docker.sh" || echo "Warning: Docker cleanup failed; deployment is unaffected." >&2
 
+# What each module runs now; one-click-update.sh compares it with new commits to pick what to update.
+mkdir -p "$APP_DIR/.deployed"
+deployed_commit=$(git rev-parse HEAD)
+[ -z "$image_tag" ] || deployed_commit=$(git rev-parse --verify --quiet "$image_tag^{commit}" || echo "$image_tag")
+for target in $targets; do echo "$deployed_commit" > "$APP_DIR/.deployed/$target"; done
+
 compose ps
-echo "Northstar deployment is healthy (service: $service)."
+echo "TrackNothing deployment is healthy: $targets"
 echo "Controller: http://127.0.0.1:3000"
 echo "Portal: http://127.0.0.1:3100"
-echo "Admin: http://127.0.0.1:3200"
+echo "Console: http://127.0.0.1:3200"
 echo "Static target: http://127.0.0.1:3300 (public HTTPS requires one-time setup)"
 echo "Logs: ./scripts/deploy.sh logs"

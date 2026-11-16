@@ -194,35 +194,59 @@ Upgrading an install from before the Veilbird rename needs no manual steps:
 and data volumes, the database and Edge Nodes stay as they are. Portal and
 Console users sign in once more because the session cookies were renamed.
 
-Recommended upgrade, including a PostgreSQL backup:
+Recommended upgrade:
 
 ```bash
 sudo ./one-click-update.sh
 ```
 
+It pulls the latest code and updates only the modules whose code changed since
+they were last deployed, and prints the plan first, e.g. `Updating: console` /
+`Unchanged, left running: backend, portal, static site`. The four modules:
+
+| Module | What it is | Updated when these change |
+| --- | --- | --- |
+| backend | Controller/API (`veilbird`), migrations run on start | `app/`, `server/`, `agent/`, `scripts/migrate.mjs`, dependencies, `shared/` |
+| portal | Customer Portal (`portal-web`) | `portal-web/`, `shared/`, dependencies |
+| console | Admin Console (`admin-web`) | `admin-web/`, `shared/`, dependencies |
+| agent | The Agent on every node | its version differs from the one the backend carries |
+
+Changes to the apps, docs, tests or host scripts rebuild nothing; a file the
+script does not recognise rebuilds every module. A database backup is taken
+only when the backend is updated, and only the chosen modules are recreated:
+the others keep running untouched. If nothing changed, nothing is rebuilt.
+
+After the server modules, node Agents that are behind are upgraded: the node with
+the fewest users first, the rest only if it comes back healthy (each node's VPN
+services restart once; a failed node rolls itself back within 90 s). Offline nodes
+and old Agents without a saved SSH login are listed for Console → 节点.
+
+Options:
+
+```bash
+sudo ./one-click-update.sh --only console          # just these modules (comma list:
+sudo ./one-click-update.sh --only backend,console  #   backend, portal, console, agent, static)
+sudo ./one-click-update.sh --only agent            # only upgrade node Agents
+sudo ./one-click-update.sh --all                   # rebuild and restart everything
+sudo ./one-click-update.sh --no-agent              # leave node Agents for later
+```
+
+`--service veilbird|portal-web|admin-web|all` still works and means the same as `--only`.
+When a frontend is chosen by hand while the backend has undeployed changes, the
+script warns, because a new page may need the new API.
+
+Before replacing a module, the image it runs is tagged `:previous`. If the new
+version does not become healthy, every module of that update goes back to its
+previous image automatically (database changes stay; the backup taken before the
+update is in `./backups`). Only one update runs at a time. What each module last
+deployed is kept in `.deployed/` (delete it to make the next update rebuild all).
+
 You can also run the deployment script directly. In an interactive terminal it
-opens a guided menu for `all`, `veilbird`, `portal-web`, or `admin-web`:
+opens a guided menu; with `--service` it stays non-interactive:
 
 ```bash
-sudo ./scripts/deploy.sh
+sudo ./scripts/deploy.sh --service backend,portal
 ```
-
-When called by automation or with an explicit `--service`, it stays non-interactive.
-
-For a small, isolated change, update only the affected service:
-
-```bash
-sudo ./one-click-update.sh --service veilbird     # Controller/API
-sudo ./one-click-update.sh --service portal-web   # Portal
-sudo ./one-click-update.sh --service admin-web    # Admin
-```
-
-Regional multi-node profiles change both the Controller and Portal, so deploy them
-together with `sudo ./one-click-update.sh --service all`.
-
-`veilbird` and `all` create a database backup. Frontend-only updates skip the
-database backup and do not restart the Controller. Use the full update when a
-change touches dependencies, migrations, Compose configuration, or shared code.
 
 Updates clean up after themselves so the disk does not fill over time: only the
 newest 10 database dumps in `./backups` are kept (`VEILBIRD_BACKUP_KEEP` in `.env`,
