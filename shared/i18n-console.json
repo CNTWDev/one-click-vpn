@@ -1247,14 +1247,6 @@
     "All servers →",
     "Все серверы →"
   ],
-  "全球节点分布": [
-    "Global server coverage",
-    "Серверы по всему миру"
-  ],
-  "完整拓扑 →": [
-    "Full topology →",
-    "Вся топология →"
-  ],
   "已切换为自动选择：各节点将自动探测并使用各自最合适的目标。": [
     "Automatic selection enabled. Each server will probe and choose its own best target.",
     "Автовыбор включён. Каждый сервер проверит цели и выберет наиболее подходящую."

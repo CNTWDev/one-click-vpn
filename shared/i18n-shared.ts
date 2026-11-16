@@ -12,7 +12,6 @@ export const sharedCatalog: Record<string, readonly [en: string, ru: string]> = 
   "隐藏密码": ["Hide password", "Скрыть пароль"],
   "清除节点日志": ["Clear server logs", "Очистить журналы сервера"],
   "清除全部日志": ["Clear all logs", "Очистить все журналы"],
-  "区域数：{0} · 在线节点：{1}/{2}": ["Regions: {0} · Servers online: {1}/{2}", "Регионов: {0} · Серверов в сети: {1}/{2}"],
   "{0} · 等待账号审核": ["{0} · Awaiting approval", "{0} · Ожидает одобрения"],
   "最近 {0} 天总流量": ["Total traffic · last {0} days", "Общий трафик · за последние {0} дн."],
   "成功：{0} / 处理中：{1} / 异常：{2}": ["Succeeded: {0} / In progress: {1} / Issues: {2}", "Успешно: {0} / Выполняется: {1} / Ошибок: {2}"],

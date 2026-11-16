@@ -156,7 +156,7 @@ function App() {
       <div className="content">
         {error && <div className="inline-notice error" role="alert"><span>{error}</span><button className="text-button" onClick={() => void refreshCore()}>{t("重试")}</button></div>}
         <Suspense fallback={<div className="page-loading" role="status"><i /><i /><i /></div>}>
-          {page === "overview" && <OverviewPage pendingUsers={pendingUsers} activeUsers={userCounts?.active ?? 0} nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
+          {page === "overview" && <OverviewPage pendingUsers={pendingUsers} activeUsers={userCounts?.active ?? 0} nodes={nodes} onRefresh={refreshCore} />}
           {page === "topology" && <TopologyPage nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
           {page === "users" && <UsersPage onChanged={() => void refreshCore()} />}
           {page === "plans" && <PlansPage />}
