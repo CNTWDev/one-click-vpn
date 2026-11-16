@@ -68,3 +68,7 @@ tsconfig.tsbuildinfo
 *.p12
 *.pfx
 *.mobileprovision
+
+# local deploy state
+/.deploy.lock/
+/.deployed/
