@@ -36,7 +36,7 @@ struct ClientView:View {
     private let mac=VeilbirdStyle.mac
     var body:some View {
         ZStack {
-            VeilbirdStyle.ground.ignoresSafeArea()
+            SpaceView().ignoresSafeArea()
             HStack(spacing:0) {
             VStack(spacing:0) {
                 if model.signedIn {
@@ -159,7 +159,7 @@ struct ClientView:View {
             tabItem(L10n.text("activity_title"),"waveform.path.ecg",5)
             tabItem(L10n.text("account"),"person",2)
         }.padding(.horizontal,12).padding(.top,7).padding(.bottom,2)
-        .background(VeilbirdStyle.ground.opacity(0.94).ignoresSafeArea(edges:.bottom))
+        .background(Color(red:7/255,green:11/255,blue:9/255).opacity(0.6).ignoresSafeArea(edges:.bottom))
         .overlay(alignment:.top) {Rectangle().fill(VeilbirdStyle.hairline).frame(height:0.5)}
     }
     private func tabItem(_ title:String,_ icon:String,_ index:Int)->some View {

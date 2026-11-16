@@ -62,6 +62,8 @@ class MainActivity : Activity() {
     private var updateRowValue: TextView? = null
     private var launched = false
     private lateinit var content: LinearLayout
+    /** One backdrop for the app's life, so its slow drift carries on across pages. */
+    private val space by lazy { SpaceView(this) }
     private val executor = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
     private var selectedId = ""
@@ -115,7 +117,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState); api = NativeApi(this); updater = Updater(this, api)
         val settings = getSharedPreferences("preferences", MODE_PRIVATE)
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", "")!!; selectedCode = settings.getString("nodeCode", "")!!
-        @Suppress("DEPRECATION") window.apply { statusBarColor = Palette.ground; navigationBarColor = Palette.ground; decorView.systemUiVisibility = 0 }
+        @Suppress("DEPRECATION") window.apply { statusBarColor = Color.rgb(1, 2, 2); navigationBarColor = Color.rgb(3, 6, 5); decorView.systemUiVisibility = 0 }
         render()
         executor.execute { Crash.send(this, api) }
         // The Quick Settings tile could not start the VPN from the background: connect now that the app is open.
@@ -244,13 +246,14 @@ class MainActivity : Activity() {
         rateBars = null; switchNote = null; switchText = null; activityBody = null
         val side = maxOf(20.dp, (resources.displayMetrics.widthPixels - 560.dp) / 2)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 4.dp, side, 20.dp) }
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Palette.ground); fitsSystemWindows = true }
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; fitsSystemWindows = true }
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             isIndeterminate = true; indeterminateTintList = ColorStateList.valueOf(Palette.accent); visibility = if (busy) View.VISIBLE else View.INVISIBLE
         }
         root.addView(progress, LinearLayout.LayoutParams(-1, 2.dp))
         root.addView(ScrollView(this).apply { isFillViewport = true; overScrollMode = View.OVER_SCROLL_NEVER; addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
-        setContentView(root)
+        (space.parent as? ViewGroup)?.removeView(space)
+        setContentView(FrameLayout(this).apply { setBackgroundColor(Palette.ground); addView(space, FrameLayout.LayoutParams(-1, -1)); addView(root, FrameLayout.LayoutParams(-1, -1)) })
         val signedIn = api.secret("token") != null
         // A new page eases in (short fade and rise); re-renders of the same page stay still.
         val view = if (signedIn) page else "login"
@@ -270,7 +273,7 @@ class MainActivity : Activity() {
         handler.removeCallbacks(refresh); if (visible) handler.post(refresh)
     }
     private fun tabBar() = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
+        orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(140, 7, 11, 9))
         addView(View(this@MainActivity).apply { setBackgroundColor(Palette.hairline) }, LinearLayout.LayoutParams(-1, 1))
         val tabs = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12.dp, 6.dp, 12.dp, 6.dp) }
         for ((tab, title, res) in listOf(Triple("connect", R.string.connect_tab, R.drawable.ic_tab_connect), Triple("nodes", R.string.locations, R.drawable.ic_tab_nodes), Triple("activity", R.string.activity_title, R.drawable.ic_tab_activity), Triple("account", R.string.account, R.drawable.ic_tab_account))) {
