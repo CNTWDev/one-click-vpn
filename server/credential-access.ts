@@ -10,7 +10,7 @@ export class AccessEndedError extends Error {
 
 /** The account added more devices than its limit and this subscription or config came after the first ones. */
 export class DeviceLimitReachedError extends Error {
-  constructor() { super("设备数已超出账号上限，请删除不用的设备、订阅或配置，或联系管理员"); this.name = "DeviceLimitReachedError"; }
+  constructor() { super("设备数已超出账号上限，请删除不用的设备或配置，或联系管理员"); this.name = "DeviceLimitReachedError"; }
 }
 
 export type CredentialAction = "enable" | "disable" | "revoke" | "delete";

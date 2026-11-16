@@ -1364,19 +1364,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again."
+            "value": "Device limit reached (single-server configs count too; the subscription does not). Revoke an old device in Account, or delete an unused config in the portal, and try again."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。"
+            "value": "设备数已达账号上限（单节点配置也算在内，订阅不算）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
+            "value": "Достигнут лимит устройств (конфигурации для одного сервера тоже считаются, подписка — нет). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
           }
         }
       }
@@ -1387,19 +1387,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again."
+            "value": "Device limit reached (single-server configs count too; the subscription does not). Revoke an old device in Account, or delete an unused config in the portal, and try again."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。"
+            "value": "设备数已达账号上限（单节点配置也算在内，订阅不算）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
+            "value": "Достигнут лимит устройств (конфигурации для одного сервера тоже считаются, подписка — нет). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
           }
         }
       }
@@ -1410,19 +1410,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again."
+            "value": "Device limit reached (single-server configs count too; the subscription does not). Revoke an old device in Account, or delete an unused config in the portal, and try again."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。"
+            "value": "设备数已达账号上限（单节点配置也算在内，订阅不算）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
+            "value": "Достигнут лимит устройств (конфигурации для одного сервера тоже считаются, подписка — нет). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
           }
         }
       }
@@ -1433,19 +1433,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ more subscriptions or server configs also use slots. You can delete unused ones in the web portal."
+            "value": "%1$@ single-server configs also use slots. You can delete unused ones in the web portal."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "另有 %1$@ 个订阅或节点配置也占用名额，可以在网页门户删除不用的。"
+            "value": "另有 %1$@ 个单节点配置也占用名额，可以在网页门户删除不用的。"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ещё подписок или конфигураций, занимающих места: %1$@. Ненужные можно удалить на веб-портале."
+            "value": "Ещё конфигураций для одного сервера, занимающих места: %1$@. Ненужные можно удалить на веб-портале."
           }
         }
       }

@@ -66,7 +66,7 @@ export async function nativeAccount(session: Session) {
   // Per-day totals for the small usage chart in the apps; days without traffic are absent.
   traffic.days=await dbQuery("SELECT day::text AS day,(SUM(upload_bytes)+SUM(download_bytes))::text AS bytes FROM traffic_daily WHERE user_id=$1 AND day >= $2 GROUP BY day ORDER BY day",[session.user_id,since]);
   // expiresAt stays for apps that predate `access`: the end of the current period, null when it has none.
-  return { name:user.display_name,email:user.email,managed:user.native_only,// limit null = unlimited; used counts subscriptions and node configs too, configs is how many of them.
+  return { name:user.display_name,email:user.email,managed:user.native_only,// limit null = unlimited; used counts single-node configs too, configs is how many of them.
     limit:slots.limit,used:slots.used,configs:slots.used-devices.filter(d=>d.status!=="revoked").length,
     expiresAt:access.state==="active"?access.until:access.endedAt,access,devices,traffic };
 }

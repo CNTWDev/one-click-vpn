@@ -21,7 +21,7 @@ export function NativeAccessPanel({userId}:{userId:string}) {
   return <section className="access-subsection"><h3>{t("TrackNothing 授权设备")}</h3><InlineNotice notice={notice}/>{data&&<>
     <p>{t("所有账号都能用 TrackNothing 客户端登录连接，设备上限由账号套餐决定。选择「仅 TrackNothing」会同时停用该账号的订阅和第三方配置。")}</p>
     <div className="account-access-toolbar"><label>{t("访问方式")}<select disabled={busy} value={managed?"managed":"legacy"} onChange={e=>setManaged(e.target.value==="managed")}><option value="legacy">{t("客户端和订阅都可用")}</option><option value="managed">{t("仅 TrackNothing · 严格授权设备")}</option></select></label><button className="button primary" disabled={busy} onClick={()=>void update({action:"settings",managed})}>{t("保存设置")}</button></div>
-    <p>{t("设备数（含订阅和节点配置）：{0} / {1}", [data.used, data.limit ?? t("不限")])}</p>
+    <p>{t("设备数（含单节点配置）：{0} / {1}", [data.used, data.limit ?? t("不限")])}</p>
     <div className="review-list">{data.devices.filter(d=>d.status!=="revoked").map(d=><div key={d.id}><span className="grow"><b>{d.name}</b><small>{d.platform} · {t("最近使用 {0}", [formatTime(d.lastSeenAt)])}</small>{d.status==="revoking"&&<small>{t("解除中，预计 {0} 后释放额度", [formatTime(d.releaseAfter)])}</small>}</span><button className="button danger" disabled={busy||d.status!=="active"} onClick={async()=>{if(await confirm({title:t("解除设备授权"),message:t("解除 {0} 的授权？这台设备将无法继续连接。", [d.name]),confirmLabel:t("解除授权"),danger:true}))await update({action:"revoke",enrollmentId:d.id});}}>{t("解除授权")}</button></div>)}</div>
   </>}</section>;
 }

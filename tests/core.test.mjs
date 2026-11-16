@@ -62,7 +62,7 @@ test("regional profiles provide protocol-appropriate multi-node behavior", async
   const controlPlane = readFileSync(path.join(root, "server/control-plane.ts"), "utf8");
   const openVpnPki = readFileSync(path.join(root, "server/openvpn-pki.ts"), "utf8");
   const heartbeat = readFileSync(path.join(root, "app/api/v1/agent/heartbeat/route.ts"), "utf8");
-  const portal = readFileSync(path.join(root, "portal-web/src/credential-dashboard.tsx"), "utf8");
+  const portal = readFileSync(path.join(root, "portal-web/src/single-node.tsx"), "utf8");
   assert.match(controlPlane, /export async function issueRegionalConnectionProfiles/);
   assert.match(controlPlane, /input\.protocol === "wireguard"/);
   assert.match(controlPlane, /regionalEndpoints: regionalCandidates\.map/);
@@ -150,14 +150,13 @@ test("administrator account access exposes certificates, traffic attribution, an
 test("user access is credential-first and shared OpenVPN sessions remain separately metered", () => {
   const migration = readFileSync(path.join(root, "scripts/migrate.mjs"), "utf8");
   const credentialRoute = readFileSync(path.join(root, "app/api/v1/credentials/route.ts"), "utf8");
-  const portal = readFileSync(path.join(root, "portal-web/src/credential-dashboard.tsx"), "utf8");
+  const portal = readFileSync(path.join(root, "portal-web/src/single-node.tsx"), "utf8");
   const agent = readFileSync(path.join(root, "agent/agent.py"), "utf8");
   const traffic = readFileSync(path.join(root, "server/traffic.ts"), "utf8");
   assert.match(migration, /CREATE TABLE IF NOT EXISTS access_credentials/);
   assert.match(migration, /session_key TEXT NOT NULL DEFAULT ''/);
   assert.match(credentialRoute, /createAccessCredential/);
-  assert.match(portal, /我的连接/);
-  assert.match(portal, /window\.setInterval/);
+  assert.match(portal, /单个节点配置/);
   assert.match(agent, /"duplicate-cn"/);
   assert.match(agent, /"sessionKey": session_key/);
   assert.match(traffic, /export async function credentialAccessOverview/);
@@ -281,7 +280,7 @@ test("account access: welcome traffic, metering, exhaustion, stacked grants and 
     assert.equal(view.access.until, null, "the welcome gift has no end date");
     assert.equal(view.access.quotaBytes, 10 * GB);
     assert.equal(view.grants[0].source, "welcome");
-    assert.equal(view.access.deviceLimit, 1, "new accounts start with one device");
+    assert.equal(view.access.deviceLimit, 2, "new accounts start with two devices");
     assert.equal((await fetch(`${base}/api/v1/admin/users/${userId}/status`, { method: "POST", headers: admin, body: JSON.stringify({ status: "active" }) })).status, 200);
     // A WireGuard credential of this account, written directly: another sign-in would run into the login rate limit.
     const identityKey = Buffer.from(x25519.getPublicKey(x25519.utils.randomSecretKey())).toString("base64");
@@ -347,7 +346,7 @@ test("account access: welcome traffic, metering, exhaustion, stacked grants and 
     assert.equal(stats.nearQuota.some((item) => item.userId === userId), false, "an unlimited month is never nearly used up");
     const legacy = await act({ action: "switch", planId: "legacy" });
     assert.deepEqual([legacy.access.until, legacy.access.quotaBytes, legacy.access.deviceLimit], [null, null, null], "the legacy plan has no limits");
-    await fetch(`${base}/api/v1/admin/plans`, { method: "POST", headers: admin, body: JSON.stringify({ id: "welcome", name: "新用户赠送", quotaBytes: 10 * GB, deviceLimit: 1, isWelcome: true }) });
+    await fetch(`${base}/api/v1/admin/plans`, { method: "POST", headers: admin, body: JSON.stringify({ id: "welcome", name: "新用户赠送", quotaBytes: 10 * GB, deviceLimit: 2, isWelcome: true }) });
     const users = (await (await fetch(`${base}/api/v1/admin/users`, { headers: admin })).json()).users;
     assert.equal(users.find((user) => user.id === userId).access.state, "active");
     assert.equal(users.find((user) => user.email === "owner@example.com").access.until, null);
@@ -612,7 +611,7 @@ test("v1 bearer session can manage a device", integrationOptions, async () => {
   assert.ok((await refresh.json()).accessToken);
 });
 
-test("subscriptions provision stable multi-node VLESS profiles and enforce access", integrationOptions, async () => {
+test("the account subscription is made on first use, takes no device and provisions stable VLESS profiles", integrationOptions, async () => {
   const parseConfig = (text) => Object.fromEntries(text.trim().split("\n").map((line) => [line.slice(0,line.indexOf(":")),JSON.parse(line.slice(line.indexOf(":")+1))]));
   const pool = new pg.Pool({ connectionString: databaseUrl });
   const json = { "Content-Type": "application/json" };
@@ -635,9 +634,6 @@ test("subscriptions provision stable multi-node VLESS profiles and enforce acces
       VALUES ($1,'wireguard',1,'udp',51820,'10.70.0.0/24','["1.1.1.1"]','healthy',$2,$2)`, [id,timestamp]);
     await pool.query(`INSERT INTO node_protocols (node_id,protocol,status,updated_at) VALUES ($1,'wireguard','enabled',$2),($1,'vless','enabled',$2)`, [id,timestamp]);
     await pool.query("UPDATE nodes SET region_id=(SELECT id FROM regions ORDER BY id LIMIT 1) WHERE id=$1",[id]);
-    // Subscriptions carry VLESS/REALITY only, so every subscription node runs it.
-    const vless = await call(`/api/nodes/${id}/services`, { protocol: "vless", action: "enable", serverName: "www.example.com" }, true);
-    assert.equal(vless.status,200,await vless.clone().text());
   };
   const ack = async () => {
     await pool.query(`INSERT INTO observed_configs (node_id,protocol,applied_revision,observed_hash,status,last_error,updated_at)
@@ -650,51 +646,72 @@ test("subscriptions provision stable multi-node VLESS profiles and enforce acces
     const availability = await (await call("/api/v1/availability")).json();
     assert.ok(availability.nodes.some((n) => n.id===nodes[0] && n.protocols.includes("wireguard")));
     assert.doesNotMatch(JSON.stringify(availability),/credential_ciphertext|agent_token_hash/);
-    const created = await call("/api/v1/subscriptions", { name: "All nodes" });
-    assert.equal(created.status,201);
-    const sub = await created.json();
-    assert.equal((await patch(sub.id,"reveal-link",false,"wrong-password")).status,403);
-    const revealed = await patch(sub.id,"reveal-link");
-    assert.equal(revealed.status,200);
-    assert.equal((await revealed.json()).token,sub.token,"retrieving a link must not rotate it");
-    assert.equal((await patch(sub.id,"reveal-link",true)).status,400,"admins cannot retrieve private links");
-    const otherUserReveal = await fetch(`${base}/api/v1/subscriptions`,{method:"PATCH",headers:{...json,Cookie:cookie},body:JSON.stringify({id:sub.id,action:"reveal-link",password:"test-password-123"})});
-    assert.equal(otherUserReveal.status,409,"an authenticated different owner cannot retrieve the link");
+    const enableVless = async (node) => {
+      const service = await call(`/api/nodes/${node}/services`, { protocol: "vless", action: "enable", serverName: "www.example.com" },true);
+      assert.equal(service.status,200,await service.text());
+    };
+    await enableVless(nodes[0]);
+    assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.cloudflare.com" },true)).status,200,"initial target can be corrected before issuing profiles");
+    assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.example.com" },true)).status,200);
+    await ack();
+    // One subscription per account, made on first use; the signed-in owner sees its link without a password.
+    assert.equal((await (await call("/api/v1/subscriptions")).json()).subscription,null,"accounts that never import get no subscription");
+    const created = await call("/api/v1/subscriptions", {});
+    assert.equal(created.status,200);
+    let sub = (await created.json()).subscription;
+    assert.ok(sub.token);
+    const again = (await (await call("/api/v1/subscriptions", {})).json()).subscription;
+    assert.deepEqual([again.id,again.token],[sub.id,sub.token],"asking again returns the same subscription and link");
+    assert.equal((await (await call("/api/v1/subscriptions")).json()).subscription.token,sub.token);
+    const subCredentialId = (await pool.query("SELECT credential_id FROM subscriptions WHERE id=$1",[sub.id])).rows[0].credential_id;
+    const slots = async () => Number((await pool.query("SELECT count(*) FROM account_slots WHERE user_id=$1",[userId])).rows[0].count);
+    assert.equal(await slots(),0,"the subscription takes no device");
+    assert.equal((await patch(sub.id,"reveal-link")).status,400,"links are no longer revealed by password");
+    assert.equal((await patch(sub.id,"reset-link",false,"wrong-password")).status,403);
     const encryptedLink = (await pool.query("SELECT k.ciphertext FROM subscriptions s JOIN secret_materials k ON k.id=s.token_secret_id WHERE s.id=$1",[sub.id])).rows[0];
     assert.ok(encryptedLink.ciphertext);
     assert.notEqual(encryptedLink.ciphertext,sub.token);
     let url = `${base}/api/subscription?token=${sub.token}`;
-    assert.equal((await fetch(url)).status,503, "never publish a node before its VLESS service is applied");
+    assert.equal((await fetch(url)).status,503, "never publish unacknowledged peers");
     await ack();
-    assert.equal((await fetch(url)).status,503, "never publish a node before it has applied this user");
-    await ack();
-    let response = await fetch(url);
+    let response = await fetch(url, { headers: { "User-Agent": "Shadowrocket/2070 CFNetwork/1568.100.1 Darwin/24.0.0" } });
     assert.equal(response.status,200);
     assert.match(response.headers.get("cache-control"),/no-store/);
+    const fetched = (await pool.query("SELECT last_fetch_client FROM subscriptions WHERE id=$1",[sub.id])).rows[0];
+    assert.equal(fetched.last_fetch_client,"Shadowrocket","the owner sees which app refreshed last");
+    response = await fetch(url);
+    assert.equal(response.status,200);
     let config = parseConfig(await response.text());
     assert.equal(config.proxies.length,1);
     assert.equal(config.proxies[0].type,"vless");
-    const originalKey = config.proxies[0].uuid;
-    const count = async () => Number((await pool.query("SELECT COUNT(*) FROM connection_profiles WHERE credential_id=$1", [sub.credentialId])).rows[0].count);
+    assert.match(config.proxies[0].uuid,/^[a-f0-9-]{36}$/);
+    assert.equal(config.proxies[0].servername,"www.example.com");
+    assert.ok(config.proxies[0]["reality-opts"]["public-key"]);
+    const uuid = config.proxies[0].uuid;
+    const count = async () => Number((await pool.query("SELECT COUNT(*) FROM connection_profiles WHERE credential_id=$1", [subCredentialId])).rows[0].count);
     assert.equal(await count(),1);
     await fetch(url); assert.equal(await count(),1, "refresh must not rotate identity or append duplicate profiles");
     await addNode(nodes[1]);
+    await enableVless(nodes[1]);
     assert.equal((await fetch(url)).status,200, "retain ready node while new node synchronizes");
-    await ack();
-    await fetch(url); // the new node gets this user's profile now, and applies it with the next ack
-    await ack();
-    config = parseConfig(await (await fetch(url)).text());
+    // The new node takes the user once its REALITY service is up; each refresh picks up what the node has applied.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await ack();
+      config = parseConfig(await (await fetch(url)).text());
+      if (config.proxies.length === 2) break;
+    }
     assert.equal(config.proxies.length,2);
-    assert.ok(config.proxies.every((p) => p.uuid === originalKey), "every node serves the same subscription identity");
-    const reset = await patch(sub.id,"reset-link");
+    assert.ok(config.proxies.every((p) => p.uuid === uuid));
+    const reset = await patch(undefined,"reset-link");
     assert.equal(reset.status,200);
     assert.equal((await fetch(url)).status,503);
-    url = `${base}/api/subscription?token=${(await reset.json()).token}`;
+    sub = (await reset.json()).subscription;
+    url = `${base}/api/subscription?token=${sub.token}`;
     assert.equal((await fetch(url)).status,200);
     assert.equal((await call("/api/v1/admin/subscriptions")).status,403);
     assert.equal((await patch(sub.id,"disable",true)).status,200);
     assert.equal((await fetch(url)).status,503);
-    assert.equal((await patch(sub.id,"enable")).status,409);
+    assert.notEqual((await patch(sub.id,"enable")).status,200,"only administrators lift their own lock");
     assert.equal((await patch(sub.id,"enable",true)).status,200);
     await ack();
     const fixedKey = x25519.utils.randomSecretKey();
@@ -706,46 +723,36 @@ test("subscriptions provision stable multi-node VLESS profiles and enforce acces
     assert.equal(fixedProfiles.length,1);
     assert.equal(fixedProfiles[0].nodeId,nodes[1]);
     assert.equal((await call("/api/v1/profiles",{credentialId:fixedCredential.id,nodeId:"missing-node",protocol:"wireguard"})).status,409);
-    assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.cloudflare.com" },true)).status,200,"initial target can be corrected before issuing profiles");
-    assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.example.com" },true)).status,200);
-    await ack();
-    const vless = await call("/api/v1/subscriptions", { name: "TCP connection", protocol: "vless" });
-    assert.equal(vless.status,201);
-    const vsub = await vless.json();
-    await ack();
-    response = await fetch(`${base}/api/subscription?token=${vsub.token}`);
-    assert.equal(response.status,200);
-    config = parseConfig(await response.text());
-    assert.equal(config.proxies[0].type,"vless");
-    assert.match(config.proxies[0].uuid,/^[a-f0-9-]{36}$/);
-    assert.equal(config.proxies[0].servername,"www.example.com");
-    assert.ok(config.proxies[0]["reality-opts"]["public-key"]);
     // Changing the target is a smooth switch: keys stay, the old SNI stays accepted, issued profiles move to the new SNI.
     assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.cloudflare.com" },true)).status,200);
     let switched = (await pool.query("SELECT server_name,previous_server_names FROM reality_settings WHERE node_id=$1",[nodes[0]])).rows[0];
     assert.equal(switched.server_name,"www.cloudflare.com");
     assert.deepEqual(JSON.parse(switched.previous_server_names),["www.example.com"]);
-    assert.equal((await pool.query("SELECT protocol_payload_json FROM connection_profiles WHERE credential_id=$1 AND node_id=$2",[vsub.credentialId,nodes[0]])).rows.map((row) => JSON.parse(row.protocol_payload_json).serverName).join(),"www.cloudflare.com");
+    assert.equal((await pool.query("SELECT protocol_payload_json FROM connection_profiles WHERE credential_id=$1 AND node_id=$2",[subCredentialId,nodes[0]])).rows.map((row) => JSON.parse(row.protocol_payload_json).serverName).join(),"www.cloudflare.com");
     assert.equal((await call(`/api/nodes/${nodes[0]}/services`, { protocol: "vless", action: "redeploy", serverName: "www.example.com" },true)).status,200);
     switched = (await pool.query("SELECT server_name,previous_server_names FROM reality_settings WHERE node_id=$1",[nodes[0]])).rows[0];
     assert.deepEqual([switched.server_name,JSON.parse(switched.previous_server_names)],["www.example.com",["www.cloudflare.com"]]);
     await ack();
     assert.doesNotMatch(JSON.stringify(config),/serverBundleSecretId|privateKey|secret_/);
     const agentToken = "subscription-test-agent";
-    const telemetryId = (await pool.query("SELECT identity_key FROM access_credentials WHERE id=$1", [vsub.credentialId])).rows[0].identity_key;
-    assert.notEqual(telemetryId,config.proxies[0].uuid,"telemetry must not reveal the VLESS authorization secret");
+    const telemetryId = (await pool.query("SELECT identity_key FROM access_credentials WHERE id=$1", [subCredentialId])).rows[0].identity_key;
+    assert.notEqual(telemetryId,uuid,"telemetry must not reveal the VLESS authorization secret");
     await pool.query("UPDATE nodes SET agent_token_hash=$1 WHERE id=$2", [createHash("sha256").update(agentToken).digest("hex"),nodes[0]]);
     const beat = await fetch(`${base}/api/v1/agent/heartbeat`, { method: "POST", headers: json, body: JSON.stringify({
-      nodeId: nodes[0], token: agentToken, version: "agent 2.8.0",
+      nodeId: nodes[0], token: agentToken, version: "agent 2.18.0",
       capabilities: { protocols: ["wireguard", "vless"], connectivity: { protocols: { wireguard: { runtimeActive: true, listening: true }, vless: { runtimeActive: true, listening: true } } } },
       usageSnapshots: [{ protocol: "vless", identityKey: telemetryId, rxBytes: 123, txBytes: 456, counterEpoch: "process-1" }],
+      // Two places use the subscription now; malformed entries are ignored.
+      onlineClients: [{ identityKey: telemetryId, clients: ["0123456789abcdef", "fedcba9876543210", "not-a-hash"] }, { identityKey: "bad", clients: ["0123456789abcdef"] }],
     }) });
     assert.equal(beat.status,200);
+    const account = await (await call("/api/v1/account")).json();
+    assert.deepEqual(account.online,{ apps: 0, subscription: 2, total: 2 },"places using the subscription are counted, not stored");
     const heartbeatAgain = () => fetch(`${base}/api/v1/agent/heartbeat`, { method: "POST", headers: json, body: JSON.stringify({
-      nodeId: nodes[0], token: agentToken, version: "agent 2.8.0",
+      nodeId: nodes[0], token: agentToken, version: "agent 2.18.0",
       capabilities: { protocols: ["wireguard", "vless"], connectivity: { protocols: { wireguard: { runtimeActive: true, listening: true }, vless: { runtimeActive: true, listening: true } } } },
     }) });
-    const originalSecret = (await pool.query("SELECT ciphertext,id FROM secret_materials WHERE id=(SELECT private_key_secret_id FROM subscriptions WHERE id=$1)", [vsub.id])).rows[0];
+    const originalSecret = (await pool.query("SELECT ciphertext,id FROM secret_materials WHERE id=(SELECT private_key_secret_id FROM subscriptions WHERE id=$1)", [sub.id])).rows[0];
     const bundleCount = async () => Number((await pool.query("SELECT COUNT(*) FROM secret_materials WHERE kind='vless_users_bundle' AND owner_node_id=$1", [nodes[0]])).rows[0].count);
     const initialBundleCount = await bundleCount();
     // Unchanged fingerprints avoid decrypting every client UUID on every heartbeat.
@@ -770,12 +777,12 @@ test("subscriptions provision stable multi-node VLESS profiles and enforce acces
     await heartbeatAgain();
     assert.equal((await pool.query("SELECT id FROM secret_materials WHERE id=$1", [oldBundleId])).rowCount,0,"unreferenced old bundles are collected");
     const overview = await (await call("/api/v1/credentials")).json();
-    const usage = overview.credentials.find((c) => c.id === vsub.credentialId);
+    const usage = overview.credentials.find((c) => c.id === subCredentialId);
     assert.equal(usage.totalBytes,579);
-    assert.equal(usage.subscriptionId,vsub.id);
+    assert.equal(usage.subscriptionId,sub.id);
     assert.equal(usage.online,true);
     await pool.query("UPDATE users SET status='suspended' WHERE id=$1", [userId]);
-    assert.equal((await fetch(`${base}/api/subscription?token=${vsub.token}`)).status,503);
+    assert.equal((await fetch(url)).status,503);
     await pool.query("UPDATE users SET status='active' WHERE id=$1", [userId]);
     const desiredUsers = async () => {
       const payload = JSON.parse((await pool.query("SELECT payload_json FROM desired_configs WHERE node_id=$1 AND protocol='vless'", [nodes[0]])).rows[0].payload_json);
@@ -784,13 +791,12 @@ test("subscriptions provision stable multi-node VLESS profiles and enforce acces
       assert.equal(response.status,200);
       return JSON.parse((await response.json()).value);
     };
-    assert.equal((await desiredUsers()).length,2, "both subscriptions are VLESS users of this node");
-    assert.equal((await patch(vsub.id,"revoke",true)).status,200);
-    assert.equal((await desiredUsers()).length,1, "revocation removes server authorization");
-    assert.equal((await fetch(`${base}/api/subscription?token=${vsub.token}`)).status,503);
-    const list = await (await call("/api/v1/subscriptions")).json();
-    assert.equal(list.subscriptions.length,2);
-    assert.doesNotMatch(JSON.stringify(list),/token_hash|private_key_secret_id|token_secret_id/);
+    assert.equal((await desiredUsers()).length,1);
+    assert.equal((await patch(sub.id,"revoke",true)).status,200);
+    assert.equal((await desiredUsers()).length,0, "revocation removes server authorization");
+    assert.equal((await fetch(url)).status,503);
+    const afterRevoke = await (await call("/api/v1/subscriptions")).json();
+    assert.equal(afterRevoke.subscription,null,"a revoked subscription is no longer the account's");
     await ack();
     const standalone = await call("/api/v1/credentials",{name:"Fixed REALITY",protocol:"vless"});
     assert.equal(standalone.status,201);
@@ -804,10 +810,10 @@ test("subscriptions provision stable multi-node VLESS profiles and enforce acces
     const singleConfig = parseConfig(await exported.text());
     assert.equal(singleConfig.proxies.length,1);
     assert.equal(singleConfig.proxies[0].type,"vless");
-    assert.equal((await desiredUsers()).length,2,"standalone VLESS authorizes on the selected node (next to the first subscription)");
+    assert.equal((await desiredUsers()).length,1,"standalone VLESS authorizes on the selected node");
     assert.equal((await call(`/api/v1/profiles/${vp.id}/download?format=mihomo`,undefined,true)).status,404);
     assert.equal((await call(`/api/v1/credentials/${vc.id}/revoke`,{})).status,200);
-    assert.equal((await desiredUsers()).length,1);
+    assert.equal((await desiredUsers()).length,0);
     assert.equal((await call(`/api/v1/profiles/${vp.id}/download?format=mihomo`)).status,409);
     // Exhaust the legacy /24, then verify the Agent version gate and expanded allocator.
     await pool.query("UPDATE vpn_services SET subnet='10.70.0.0/20' WHERE node_id=$1 AND protocol='wireguard'", [nodes[0]]);
@@ -829,13 +835,16 @@ test("subscriptions provision stable multi-node VLESS profiles and enforce acces
     assert.equal(expandedProfile.status,201);
     assert.equal((await expandedProfile.json()).profile.clientAddress,"10.70.0.255/32");
     await pool.query("DELETE FROM devices WHERE id LIKE $1 || '-pool-%'", [nodes[0]]);
-    await pool.query("UPDATE subscriptions SET token_secret_id=NULL WHERE id=$1",[sub.id]);
-    const legacyReveal = await patch(sub.id,"reveal-link");
-    assert.equal(legacyReveal.status,409);
-    assert.match((await legacyReveal.json()).error,/旧订阅/);
-    await pool.query("UPDATE access_credentials SET expires_at='2000-01-01T00:00:00.000Z' WHERE id=$1", [sub.credentialId]);
+    // A subscription from before links were stored keeps working, but its link can only be replaced.
+    const second = (await (await call("/api/v1/subscriptions", {})).json()).subscription;
+    assert.notEqual(second.id,sub.id);
+    url = `${base}/api/subscription?token=${second.token}`;
+    await pool.query("UPDATE subscriptions SET token_secret_id=NULL WHERE id=$1",[second.id]);
+    assert.equal((await (await call("/api/v1/subscriptions")).json()).subscription.token,null);
+    const secondCredential = (await pool.query("SELECT credential_id FROM subscriptions WHERE id=$1",[second.id])).rows[0].credential_id;
+    await pool.query("UPDATE access_credentials SET expires_at='2000-01-01T00:00:00.000Z' WHERE id=$1", [secondCredential]);
     assert.equal((await fetch(url)).status,503,"expired subscriptions cannot download cached keys");
-    assert.equal((await patch(sub.id,"delete")).status,200);
+    assert.equal((await patch(second.id,"delete")).status,200);
     assert.equal((await fetch(url)).status,503);
   } finally {
     await pool.query("DELETE FROM nodes WHERE id=ANY($1::text[])", [nodes]);
@@ -868,7 +877,7 @@ test("credential controls preserve independent user/admin locks and recoverable 
   const userId = await userIdFor(email, adminToken);
   const statusPath = `/api/v1/admin/users/${userId}/status`;
   assert.equal((await call(statusPath, adminToken, { status: "active" })).status, 200);
-  // New accounts get one device; this account needs several credentials.
+  // New accounts get two devices; this account needs several credentials.
   assert.equal((await call(`/api/v1/admin/users/${userId}/access`, adminToken, { action: "grant", note: "test" })).status, 200);
   let token = await login(email);
   const clientPrivateKey = Buffer.from(x25519.utils.randomSecretKey());

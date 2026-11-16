@@ -575,6 +575,26 @@ const migrations = [
     -- A paused node keeps running and serving existing configs, but apps, subscriptions and new configs no longer offer it.
     ALTER TABLE nodes ADD COLUMN IF NOT EXISTS paused_at TEXT;
   `)],
+  ["009-account-subscription", async (db) => {
+    // Every account has one subscription with every node, imported into as many apps as the owner likes; it no
+    // longer takes a device. Devices are app sign-ins and single-node configs; how many places use the
+    // subscription at once is counted from the nodes instead (server/online-clients.ts).
+    await db.query(`CREATE OR REPLACE VIEW account_slots AS
+      SELECT user_id, id, created_at FROM native_enrollments WHERE status <> 'revoked'
+      UNION ALL
+      SELECT c.user_id, c.id, c.created_at::timestamptz FROM access_credentials c
+      WHERE c.deleted_at IS NULL AND c.status <> 'revoked' AND (c.expires_at IS NULL OR c.expires_at::timestamptz > now())
+        AND NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.credential_id = c.id)`);
+    // The app that last refreshed the subscription ("Shadowrocket"), shown to its owner.
+    await db.query("ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS last_fetch_client TEXT NOT NULL DEFAULT ''");
+    // New accounts get 2 devices instead of 1, including the welcome grants already handed out.
+    await db.query("UPDATE access_plans SET device_limit = 2 WHERE is_welcome AND device_limit = 1");
+    await db.query("UPDATE access_grants SET device_limit = 2 WHERE source = 'welcome' AND device_limit = 1");
+    await db.query(`UPDATE users u SET access_device_limit = (SELECT CASE WHEN bool_or(g.device_limit IS NULL) THEN NULL ELSE max(g.device_limit) END
+      FROM access_grants g WHERE g.user_id = u.id AND g.status = 'active' AND g.starts_at <= now() AND (g.ends_at IS NULL OR g.ends_at > now())
+        AND (g.quota_bytes IS NULL OR g.used_bytes < g.quota_bytes))
+      WHERE EXISTS (SELECT 1 FROM access_grants g WHERE g.user_id = u.id AND g.source = 'welcome')`);
+  }],
 ];
 
 const client = await pool.connect();

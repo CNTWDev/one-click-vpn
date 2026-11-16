@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-test("Portal i18n: system language, persistence, auth, both connection modes and mobile", { skip: !process.env.VEILBIRD_TEST_PLAYWRIGHT }, async () => {
+test("Portal i18n: system language, persistence, auth, subscription import, single-node configs and mobile", { skip: !process.env.VEILBIRD_TEST_PLAYWRIGHT }, async () => {
   const { chromium } = await import(process.env.VEILBIRD_TEST_PLAYWRIGHT);
   const port = 3394, base = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ["frontend-server.mjs"], { env: { ...process.env, STATIC_DIR: path.resolve("dist/portal-web"), PORT: String(port) }, stdio: "ignore" });
@@ -20,7 +20,7 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     context.setDefaultTimeout(10000);
     const page = await context.newPage(), errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
-    let signedIn = false, badLogin = true, firstRun = false, created, profileCreated;
+    let signedIn = false, badLogin = true, firstRun = false, subscription = null, created, profileCreated;
     const now = new Date().toISOString();
     const user = { id: "user", displayName: "Test User", email: "test@example.com", status: "active", role: "user" };
     const credential = { id: "sub-credential", name: "Personal", protocol: "wireguard", subscriptionId: "sub", status: "active", state: "online", userDisabled: false, adminDisabled: false, accountStatus: "active", online: true, connectionCount: 1, syncStatus: "applied", totalBytes: 2048, uploadBytes: 1024, downloadBytes: 1024, createdAt: now, expiresAt: "2027-10-06T12:00:00Z", lastActivityAt: now };
@@ -31,7 +31,11 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
       else if (pathname === "/api/v1/auth/web-login") { if (badLogin) { status = 401; body = { error: "Invalid email or password" }; } else { signedIn = true; body = { user }; } }
       else if (pathname === "/api/v1/auth/register") { status = 202; body = { status: "received" }; }
       else if (pathname === "/api/v1/availability") body = { regions: [{ id: "sg", name: "Singapore", code: "SG", country: "Singapore", protocols: ["wireguard", "vless", "openvpn"], status: "available" }], nodes: [{ id: "node", name: "Node 1", regionId: "sg", regionName: "Singapore", protocols: ["wireguard", "vless", "openvpn"] }] };
-      else if (pathname === "/api/v1/credentials") body = method === "POST" ? { credential: { ...credential, id: "new" } } : { credentials: firstRun ? [] : [...(created ? [{ ...credential, id: "new-sub", subscriptionId: "new-subscription", name: created.name }] : []), credential, { ...credential, id: "single", name: "Office", subscriptionId: null }] };
+      else if (pathname === "/api/v1/credentials") {
+        if (method === "POST") created = route.request().postDataJSON();
+        // "sub-credential" is an earlier subscription (not the account's), "single" a single-node config.
+        body = method === "POST" ? { credential: { ...credential, id: "single", subscriptionId: null } } : { credentials: firstRun ? [] : [credential, { ...credential, id: "single", name: "Office", subscriptionId: null }] };
+      }
       else if (pathname === "/api/v1/profiles") {
         if (method === "POST") profileCreated = route.request().postDataJSON();
         const profile = { id: "profile", credentialId: "single", protocol: "wireguard", status: "active", regionCode: "SG", regionName: "Singapore", nodeName: "Node 1", issuedAt: now, expiresAt: credential.expiresAt };
@@ -39,12 +43,12 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
       }
       else if (pathname.endsWith("/activate")) body = { profile: { id: "profile", protocol: "wireguard", status: "active" } };
       else if (pathname.endsWith("/download")) { await route.fulfill({ contentType: "text/plain", body: "# Test configuration" }); return; }
-      else if (pathname === "/api/v1/account") body = { expiresAt: null, deviceLimit: 3, devices: [{ id: "enr", name: "Pixel 8", platform: "android", lastSeenAt: now, connected: true, region: "Singapore" }] };
+      else if (pathname === "/api/v1/account") body = { expiresAt: null, deviceLimit: 3, deviceCount: 2, online: { apps: 1, subscription: 2, total: 3 }, devices: [{ id: "enr", name: "Pixel 8", platform: "android", lastSeenAt: now, connected: true, region: "Singapore" }] };
       else if (pathname === "/api/v1/usage/summary") body = { totals: { totalBytes: 4096, uploadBytes: 2048, downloadBytes: 2048 }, daily: [] };
       else if (pathname === "/api/v1/subscriptions") {
-        if (method === "POST") { created = route.request().postDataJSON(); body = { token: "test-token", credentialId: "new-sub" }; }
-        else if (method === "PATCH") { status = 403; body = { error: "登录密码不正确" }; }
-        else body = { subscriptions: [] };
+        if (method === "POST") subscription = { id: "account-sub", token: "t".repeat(43), usable: true, lastFetchedAt: now, lastFetchClient: "Hiddify" };
+        if (method === "PATCH") { status = 403; body = { error: "登录密码不正确" }; }
+        else body = { subscription: firstRun ? null : subscription };
       }
       await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     });
@@ -85,44 +89,47 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await page.getByLabel("Электронная почта").fill("test@example.com");
     await page.getByLabel("Пароль", { exact: true }).fill("test-password-123");
     await page.getByRole("button", { name: "Войти", exact: true }).click();
-    // Home is the app download; subscriptions and configs sit one click away.
+    // Home imports the account's one subscription; single-node configs sit one click away.
+    await page.getByRole("heading", { name: "Выберите приложение для импорта", level: 1 }).waitFor();
     await page.getByRole("heading", { name: "Мои устройства", level: 2 }).waitFor();
     await noChinese();
-    await page.locator(".home-manual").click();
-    await page.getByRole("heading", { name: "Мои подключения", level: 2 }).waitFor();
-    await page.getByRole("button", { name: /Копировать ссылку/ }).click();
+    assert.equal(subscription, null, "the subscription is made on first use, not on sign-in");
+    await page.getByRole("button", { name: "Показать QR-код и ссылку" }).click();
+    assert.match(await page.getByLabel("Ссылка подписки", { exact: true }).inputValue(), /\/api\/subscription\?token=t{43}$/);
+    assert.equal(subscription.id, "account-sub");
+    await page.getByText("Используется в местах: 2", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Ссылка утекла? Сбросьте её" }).click();
     await page.getByLabel("Пароль аккаунта").fill("incorrect");
-    await page.getByRole("button", { name: "Подтвердить и продолжить" }).click();
+    await page.getByRole("button", { name: "Проверить и сбросить" }).click();
     await page.getByText("Неверный пароль аккаунта", { exact: true }).waitFor();
-    await page.getByRole("button", { name: "Отмена", exact: true }).click();
-    await page.getByRole("button", { name: "Новое подключение", exact: true }).click();
-    await page.getByRole("heading", { name: "Новое подключение" }).waitFor();
+    await page.getByRole("dialog").getByRole("button", { name: "Отмена", exact: true }).click();
     await noChinese();
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator("summary").filter({ hasText: "Импорт на другом устройстве" }).click();
     await noOverflow();
-    await page.getByLabel("Название подписки").fill("My custom subscription");
-    await chooseLanguage("en");
-    assert.equal(await page.getByLabel("Subscription name").inputValue(), "My custom subscription");
-    await page.getByRole("button", { name: "Create subscription", exact: true }).click();
-    await page.getByLabel("Subscription link", { exact: true }).waitFor();
-    assert.equal(created.name, "My custom subscription");
     await noChinese();
-    await page.getByRole("button", { name: "New connection", exact: true }).click();
-    await page.locator('.mode-switch button').nth(1).click();
-    const downloadResponse = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith("/download"));
-    await page.getByRole("button", { name: "Create and download" }).click();
-    await downloadResponse;
+    await page.locator(".home-manual").click();
+    await page.getByRole("heading", { name: "Конфигурации для одного сервера", level: 1 }).waitFor();
+    await noChinese();
+    await noOverflow();
+    await chooseLanguage("en");
+    await page.getByLabel("Name (to tell them apart)").fill("My laptop");
+    await page.getByRole("button", { name: "Create config", exact: true }).click();
+    await page.getByText("Config created. Download or copy it under Your configs below.", { exact: true }).waitFor();
+    assert.equal(created.name, "My laptop");
+    assert.equal(created.protocol, "wireguard");
     assert.equal(profileCreated.nodeId, "node");
+    await page.getByRole("heading", { name: "Earlier subscriptions", level: 2 }).waitFor();
+    const office = page.locator(".home-list li").filter({ hasText: "Office" });
+    const downloadResponse = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith("/download"));
+    await office.getByRole("button", { name: "Download", exact: true }).click();
+    await downloadResponse;
     await noChinese();
     await chooseLanguage("ru");
     await noOverflow();
-    await page.locator(".list-item").filter({ hasText: "Office" }).click();
-    await page.getByRole("button", { name: "Управление подключением", exact: true }).click();
-    await page.getByRole("menuitem", { name: "Переименовать", exact: true }).click();
-    await page.getByRole("dialog").getByRole("heading", { name: "Переименовать подключение" }).waitFor();
+    await office.getByRole("button", { name: "Другие действия", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Удалить", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Отмена", exact: true }).click();
-    await page.getByText("Конфигурации и сертификаты", { exact: true }).click();
-    await page.locator("summary").filter({ hasText: "Карта доступных регионов" }).click();
     await noChinese();
     await noOverflow();
     await page.setViewportSize({ width: 320, height: 844 });
@@ -139,17 +146,19 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     });
     assert.equal(await page.locator("html").getAttribute("lang"), "en-US", "manual preference wins over system changes");
     await chooseLanguage("system");
-    await page.getByRole("heading", { name: "我的连接", level: 2 }).waitFor();
+    await page.getByRole("heading", { name: "单个节点配置", level: 1 }).waitFor();
     // A second same-origin tab updates the stored preference; the first tab follows.
     const secondPage = await context.newPage();
     await secondPage.goto(`${base}/health`);
     await secondPage.evaluate(() => localStorage.setItem("veilbird.portal.language", "ru"));
-    await page.getByRole("heading", { name: "Мои подключения", level: 2 }).waitFor();
+    await page.getByRole("heading", { name: "Конфигурации для одного сервера", level: 1 }).waitFor();
     await secondPage.close();
     await chooseLanguage("en");
-    // Home: one row per platform, unreleased ones say so; versions and checksums sit behind one disclosure.
+    // Own apps sit under the import: one row per platform, unreleased ones say so; versions behind one disclosure.
     await page.getByRole("button", { name: "Back to home", exact: true }).click();
-    await page.getByRole("heading", { name: "Download TrackNothing", level: 1 }).waitFor();
+    await page.getByRole("heading", { name: "Pick your app to import", level: 1 }).waitFor();
+    await page.getByRole("heading", { name: "Or use our app", level: 2 }).waitFor();
+    await page.getByText("Coming soon", { exact: true }).first().waitFor();
     assert.equal(await page.getByText("Coming soon", { exact: true }).count(), 4);
     await page.getByText("In use · Singapore", { exact: true }).waitFor();
     let catalogUnavailable = true;
@@ -162,8 +171,8 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await page.getByText("Could not load client releases. Please try again later.", { exact: true }).waitFor();
     catalogUnavailable = false;
     await page.getByRole("button", { name: "Retry", exact: true }).click();
-    await page.locator(".home-list li").filter({ hasText: "Windows" }).getByRole("link", { name: "Download", exact: true }).waitFor();
-    assert.equal(await page.locator(".home-list li").filter({ hasText: "Windows" }).getByRole("link").getAttribute("href"), "/download/windows/x64", "permanent link, so a cached page never serves a stale installer");
+    await page.locator(".home-own li").filter({ hasText: "Windows" }).getByRole("link", { name: "Download", exact: true }).waitFor();
+    assert.equal(await page.locator(".home-own li").filter({ hasText: "Windows" }).getByRole("link").getAttribute("href"), "/download/windows/x64", "permanent link, so a cached page never serves a stale installer");
     await page.locator("summary").filter({ hasText: "Version details and earlier versions" }).click();
     assert.equal(await page.locator(".home-versions a").nth(1).getAttribute("href"), "https://downloads.example.com/veilbird-0.9.exe", "earlier versions link to their own immutable file");
     await page.setViewportSize({ width: 390, height: 844 });
@@ -172,14 +181,17 @@ test("Portal i18n: system language, persistence, auth, both connection modes and
     await page.getByRole("heading", { name: "Мои устройства", level: 2 }).waitFor();
     await noChinese();
     await page.screenshot({ path: path.join(directory, "home-ru-mobile.png"), fullPage: true });
+    // A new account: no subscription yet and no configs.
     firstRun = true;
     await page.goto(`${base}/#manual`);
     await page.reload();
-    await page.getByRole("heading", { name: "Три шага для начала" }).waitFor();
+    await page.getByRole("heading", { name: "Конфигурации для одного сервера", level: 1 }).waitFor();
+    assert.equal(await page.getByRole("heading", { name: "Ваши конфигурации" }).count(), 0);
     await noChinese();
     await noOverflow();
     await chooseLanguage("en");
-    await page.getByRole("heading", { name: "Get started in three steps" }).waitFor();
+    await page.getByRole("button", { name: "Back to home", exact: true }).click();
+    await page.getByRole("heading", { name: "Pick your app to import", level: 1 }).waitFor();
     await noChinese();
     assert.deepEqual(errors, []);
     console.log(`Portal i18n screenshots: ${directory}`);
