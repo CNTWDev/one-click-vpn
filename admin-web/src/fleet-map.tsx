@@ -52,7 +52,7 @@ function openCluster(cluster: RegionCluster) {
   navigate("nodes", { focus: target.id });
 }
 
-export function FleetMap({ nodes, regions, controller, compact = false }: { nodes: NodeRecord[]; regions: Region[]; controller?: ControllerMapLocation | null; compact?: boolean }) {
+export function FleetMap({ nodes, regions, controller }: { nodes: NodeRecord[]; regions: Region[]; controller?: ControllerMapLocation | null }) {
   useConsoleLanguage();
   const [mapFailed, setMapFailed] = useState(false);
   const [mapRetry, setMapRetry] = useState(0);
@@ -95,8 +95,8 @@ export function FleetMap({ nodes, regions, controller, compact = false }: { node
   const controlMapLabel = controlLabel.length > 24 ? `${controlLabel.slice(0, 23)}…` : controlLabel;
   const controlLabelOnLeft = control.x > 790;
 
-  return <section className={`fleet-map-panel ${compact ? "compact" : ""}`}>
-    {!compact && <div className="fleet-map-head"><div><h2>{t("全球节点态势")}</h2><p>{t("按区域聚合 Edge Node，点击节点标记查看节点详情。")}</p></div><div className="fleet-map-stats"><span><b>{clusters.length}</b>{t("覆盖区域")}</span><span><b>{online}/{nodes.length}</b>{t("节点在线")}</span><span><b>{hasControllerGps ? controlLabel : t("未设置")}</b>Controller GPS</span><a className="text-button" href={href("regions")}>{t("管理区域 →")}</a></div></div>}
+  return <section className="fleet-map-panel">
+    <div className="fleet-map-head"><div><h2>{t("全球节点态势")}</h2><p>{t("按区域聚合 Edge Node，点击节点标记查看节点详情。")}</p></div><div className="fleet-map-stats"><span><b>{clusters.length}</b>{t("覆盖区域")}</span><span><b>{online}/{nodes.length}</b>{t("节点在线")}</span><span><b>{hasControllerGps ? controlLabel : t("未设置")}</b>Controller GPS</span><a className="text-button" href={href("regions")}>{t("管理区域 →")}</a></div></div>
     <div className="fleet-map-stage">
       <div className="fleet-map-scan" />
       <svg viewBox="0 0 1010 666" role="img" aria-label={t("TrackNothing 全球 VPN 节点分布图")}>
@@ -119,6 +119,6 @@ export function FleetMap({ nodes, regions, controller, compact = false }: { node
       <div className="fleet-map-caption"><span>{hasControllerGps ? t("动态连线：Controller GPS → Agent 区域") : t("动态连线：Agent 管理通道（Controller GPS 未设置）")}</span><small>{t("不代表用户 VPN 流量路径")}</small></div>
       <div className="fleet-map-attribution">Map data · @svg-maps/world · CC BY 4.0</div>
     </div>
-    {!compact && <div className="fleet-map-footer"><div className="fleet-map-legend"><span><i className="online" />{t("在线")}</span><span><i className="provisioning" />{t("部署中")}</span><span><i className="attention" />{t("需关注")}</span><span><i className="offline" />{t("离线")}</span></div><div className="coverage-gaps"><b>{gaps.length ? t("基础覆盖空白") : t("基础全球覆盖已齐备")}</b>{gaps.length ? gaps.map((gap) => <button key={gap.name} onClick={() => navigate("regions")}><span>＋ {t(gap.name)}</span><small>{t(gap.detail)}</small></button>) : <small>{t("可结合用户位置与延迟继续扩容。")}</small>}</div></div>}
+    <div className="fleet-map-footer"><div className="fleet-map-legend"><span><i className="online" />{t("在线")}</span><span><i className="provisioning" />{t("部署中")}</span><span><i className="attention" />{t("需关注")}</span><span><i className="offline" />{t("离线")}</span></div><div className="coverage-gaps"><b>{gaps.length ? t("基础覆盖空白") : t("基础全球覆盖已齐备")}</b>{gaps.length ? gaps.map((gap) => <button key={gap.name} onClick={() => navigate("regions")}><span>＋ {t(gap.name)}</span><small>{t(gap.detail)}</small></button>) : <small>{t("可结合用户位置与延迟继续扩容。")}</small>}</div></div>
   </section>;
 }

@@ -1,20 +1,16 @@
 import { t, useConsoleLanguage } from "../i18n";
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { FleetMap } from "../fleet-map";
 import { Icon } from "../icons";
 import { href } from "../router";
-import type { AdminUser, ControllerInfo, NodeRecord, OverviewStats, Region } from "../types";
+import type { AdminUser, NodeRecord, OverviewStats } from "../types";
 import { Empty, formatBytes, formatRate, PageHeader, Pill, StateDot, Time } from "./shared";
 
-const MAP_KEY = "veilbird-console-overview-map";
-function readMapOpen() { try { return window.localStorage.getItem(MAP_KEY) !== "closed"; } catch { return true; } }
 
-export function OverviewPage({ pendingUsers: pending, activeUsers, nodes, regions, controllerSettings, onRefresh }: {
-  pendingUsers: AdminUser[]; activeUsers: number; nodes: NodeRecord[]; regions: Region[]; controllerSettings?: ControllerInfo["settings"] | null; onRefresh: () => Promise<void>;
+export function OverviewPage({ pendingUsers: pending, activeUsers, nodes, onRefresh }: {
+  pendingUsers: AdminUser[]; activeUsers: number; nodes: NodeRecord[]; onRefresh: () => Promise<void>;
 }) {
   useConsoleLanguage();
-  const [mapOpen, setMapOpen] = useState(readMapOpen);
   const attention = nodes.filter((node) => node.status !== "online");
   const online = nodes.length - attention.length;
   const [stats, setStats] = useState<OverviewStats | null>(null);
@@ -27,15 +23,11 @@ export function OverviewPage({ pendingUsers: pending, activeUsers, nodes, region
   const live = nodes.filter((node) => node.status === "online" && node.metrics?.network?.wanTxBytesPerSecond !== undefined);
   const rateTx = live.reduce((sum, node) => sum + (node.metrics!.network!.wanTxBytesPerSecond ?? 0), 0);
   const rateRx = live.reduce((sum, node) => sum + (node.metrics!.network!.wanRxBytesPerSecond ?? 0), 0);
-  const byTraffic = [...nodes].sort((left, right) => (right.monthlyTraffic?.txBytes ?? -1) - (left.monthlyTraffic?.txBytes ?? -1)).slice(0, 6);
+  const byTraffic = [...nodes].sort((left, right) => (right.monthlyTraffic?.txBytes ?? -1) - (left.monthlyTraffic?.txBytes ?? -1)).slice(0, 8);
   const topTx = byTraffic[0]?.monthlyTraffic?.txBytes || 0;
   const expiring = stats?.expiring ?? [];
   const nearQuota = stats?.nearQuota ?? [];
   const todo = pending.length + attention.length + expiring.length + nearQuota.length;
-  function toggleMap() {
-    const next = !mapOpen; setMapOpen(next);
-    try { window.localStorage.setItem(MAP_KEY, next ? "open" : "closed"); } catch { /* remembered for this tab only */ }
-  }
   return <>
     <PageHeader title={t("运维总览")} description={t("从账号准入到边缘节点，集中查看当前需要处理的事项。")} actions={<button className="button ghost" onClick={() => { void onRefresh(); void loadStats(); }}><Icon name="refresh" size={16} />{t("刷新")}</button>} />
     <section className="metric-grid">
@@ -59,9 +51,5 @@ export function OverviewPage({ pendingUsers: pending, activeUsers, nodes, region
         {nodes.length ? <div className="compact-list traffic-rank">{byTraffic.map((node) => <a key={node.id} href={href("nodes", { focus: node.id })}><StateDot value={node.status} /><b>{node.name}</b><em>{node.monthlyTraffic ? formatBytes(node.monthlyTraffic.txBytes) : "—"}</em><i className="rank-bar"><b style={{ width: `${topTx && node.monthlyTraffic ? Math.max(2, node.monthlyTraffic.txBytes / topTx * 100) : 0}%` }} /></i></a>)}</div> : <Empty action={<a className="button primary" href={href("nodes")}>{t("添加节点")}</a>}>{t("尚未部署节点。")}</Empty>}
       </section>
     </div>
-    <section className={`overview-map ${mapOpen ? "" : "collapsed"}`}>
-      <div className="overview-map-head"><button className="overview-map-toggle" aria-expanded={mapOpen} onClick={toggleMap}><Icon name="chevron" /><b>{t("全球节点分布")}</b><small>{t("区域数：{0} · 在线节点：{1}/{2}", [regions.length, online, nodes.length])}</small></button><a className="text-button" href={href("topology")}>{t("完整拓扑 →")}</a></div>
-      {mapOpen && <FleetMap compact nodes={nodes} regions={regions} controller={controllerSettings} />}
-    </section>
   </>;
 }

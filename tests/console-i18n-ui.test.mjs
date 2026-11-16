@@ -26,6 +26,7 @@ test("Console locales: all routes, persisted choice, forms and mobile layout", {
       else if (url.pathname === "/api/auth/login") { signedIn = true; body = { user }; }
       else if (url.pathname === "/api/v1/admin/users") body = { counts: { pending: 0, active: 1, rejected: 0, suspended: 0 }, users: url.searchParams.get("status") === "pending" ? [] : [user] };
       else if (url.pathname === "/api/nodes") body = { nodes: [] };
+      else if (url.pathname === "/api/v1/admin/overview-stats") body = { online: { users: 0, devices: 0 }, lastMonth: null, expiring: [], nearQuota: [] };
       else if (url.pathname === "/api/regions") { if (method === "POST") region = route.request().postDataJSON(); body = { regions: [] }; }
       else if (url.pathname === "/api/controller") body = { settings: { display_name: "NORTHSTAR", location_label: "", latitude: null, longitude: null, location_source: "unset" }, status: "healthy", publicOrigin: "https://example.com", publicHost: "example.com", publicIp: "192.0.2.1", build: "test", runtime: { uptimeSeconds: 5000, nodeVersion: "22", rssBytes: 1048576, heapUsedBytes: 524288, load1: 0.25, observedAt: new Date().toISOString() } };
       else if (url.pathname === "/api/vpn-services") body = { services: [] };
