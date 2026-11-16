@@ -240,3 +240,7 @@ export type OperationalLogLine = {
 
 /** Accounts per status, sent with every user list. */
 export type UserCounts = Record<AdminUser["status"], number>;
+
+/** Console overview figures the node list cannot give: who is online now, last month and accounts about to run out. */
+export type OverviewAccount = { userId: string; displayName: string; email: string; expiresAt: string | null; usedBytes: number; quotaBytes: number };
+export type OverviewStats = { online: { users: number; devices: number }; lastMonth: { txBytes: number; rxBytes: number } | null; expiring: OverviewAccount[]; nearQuota: OverviewAccount[] };

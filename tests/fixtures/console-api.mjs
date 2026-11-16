@@ -116,6 +116,9 @@ export function consoleApi({ signedIn = true } = {}) {
     if (/^\/api\/v1\/admin\/users\/[^/]+\/password-reset$/.test(pathname)) return [200, { url: `https://app.very-long-subdomain.example.com/#reset=usr_6f1c2d3e-4b5a-6978-8a9b-0c1d2e3f4a5b.1792000000.${"x".repeat(43)}`, expiresAt: "2026-10-24T10:00:00Z" }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/access$/.test(pathname)) return [200, accountAccess];
     if (pathname === "/api/v1/admin/plans") return [200, { plans }];
+    if (pathname === "/api/v1/admin/overview-stats") return [200, { online: { users: 37, devices: 52 }, lastMonth: { txBytes: 2.31 * 1024 ** 4, rxBytes: 2.44 * 1024 ** 4 },
+      expiring: [{ userId: "u-exp", displayName: "Aleksandra Konstantinopolskaya", email: "aleksandra.konstantinopolskaya@very-long-company-domain.example", expiresAt: new Date(Date.now() + 3 * 86400e3).toISOString(), usedBytes: 0, quotaBytes: 0 }],
+      nearQuota: [{ userId: "u-quota", displayName: "Lin Wei", email: "lin.wei@example.com", expiresAt: null, usedBytes: 8.6 * 1024 ** 3, quotaBytes: 10 * 1024 ** 3 }] }];
     if (/^\/api\/v1\/admin\/users\/[^/]+\/native-access$/.test(pathname)) return [200, { enabled: true, devices: [], credentials: [] }];
     if (pathname === "/api/nodes" && method !== "POST") return [200, { nodes }];
     if (pathname === "/api/nodes/agent-release") return [200, { version: "2.10.0", revision: "test" }];
