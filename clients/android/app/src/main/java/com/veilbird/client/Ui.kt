@@ -249,3 +249,48 @@ class RateBars(context: Context) : View(context) {
         }
     }
 }
+
+/** A share of the largest row as square dots: lit for the share, dim for the rest (activity ranking). */
+class DotBar(context: Context, private val share: Double, private val color: Int) : View(context) {
+    private val density = resources.displayMetrics.density
+    private val paint = Paint()
+    init { importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO }
+    override fun onDraw(canvas: Canvas) {
+        val block = 4 * density; val pitch = 6 * density
+        val count = maxOf(1, ((width + pitch - block) / pitch).toInt())
+        val lit = if (share <= 0) 0 else maxOf(1, Math.round(count * share.coerceAtMost(1.0)).toInt())
+        for (i in 0 until count) {
+            paint.color = if (i < lit) color else Color.rgb(31, 41, 34)
+            canvas.drawRect(i * pitch, 0f, i * pitch + block, minOf(block, height.toFloat()), paint)
+        }
+    }
+}
+
+/** Traffic per hour of the day, proxied (lime) under direct (dim green), in pixel blocks; the current hour is marked. */
+class HourBars(context: Context) : View(context) {
+    private var hours: List<Pair<Long, Long>> = emptyList()
+    private var now = 0
+    private val density = resources.displayMetrics.density
+    private val paint = Paint()
+    init { importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO }
+    fun set(hours: List<Pair<Long, Long>>, now: Int) { this.hours = hours; this.now = now; invalidate() }
+    override fun onDraw(canvas: Canvas) {
+        val block = 3 * density; val pitch = 4 * density
+        val pitchX = width.toFloat() / 24; val w = minOf(pitchX - 2 * density, 8 * density)
+        val rows = maxOf(1, ((height - 4 * density + pitch - block) / pitch).toInt())
+        val max = maxOf(1L, hours.maxOfOrNull { it.first + it.second } ?: 1L)
+        for (i in 0 until 24) {
+            val (p, d) = hours.getOrElse(i) { 0L to 0L }
+            val left = i * pitchX + (pitchX - w) / 2
+            val total = if (p + d <= 0) 0 else maxOf(1, Math.round(rows * (p + d).toFloat() / max))
+            val proxied = if (p <= 0) 0 else maxOf(1, minOf(total, Math.round(total * p.toFloat() / (p + d))))
+            val bottom = height - 4 * density
+            if (total == 0) { paint.color = Color.rgb(31, 41, 34); canvas.drawRect(left, bottom - block, left + w, bottom, paint) }
+            for (r in 0 until total) {
+                paint.color = if (r < proxied) Palette.accent else Color.rgb(74, 92, 64)
+                canvas.drawRect(left, bottom - r * pitch - block, left + w, bottom - r * pitch, paint)
+            }
+            if (i == now) { paint.color = Palette.secondary; canvas.drawRect(left, height - 2 * density, left + w, height.toFloat(), paint) }
+        }
+    }
+}

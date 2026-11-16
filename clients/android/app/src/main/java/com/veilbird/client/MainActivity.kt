@@ -92,8 +92,13 @@ class MainActivity : Activity() {
     // Download / upload rates of the last 40 seconds for the connect page's chart, newest last.
     private val rxHistory = ArrayDeque<Long>(); private val txHistory = ArrayDeque<Long>()
     private var usageRange = "30d"
+    // Activity tab: which view, which connections, and the part refreshed each second.
+    private var activityTab = "conns"
+    private var activityFilter = "all"
+    private var activityBody: LinearLayout? = null
+    private var activityLoading = false
     private val refresh = object : Runnable {
-        override fun run() { showState(); if (visible) handler.postDelayed(this, 1000) }
+        override fun run() { showState(); if (page == "activity") loadActivity(); if (visible) handler.postDelayed(this, 1000) }
     }
     private val downloadTick = object : Runnable {
         override fun run() { if (!downloading) return; download = updater.progress(); showUpdate(); handler.postDelayed(this, 300) }
@@ -129,7 +134,7 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         when (page) {
             "devices", "logs" -> { page = "account"; render() }
-            "nodes", "account" -> { page = "connect"; render() }
+            "nodes", "account", "activity" -> { page = "connect"; render() }
             else -> super.onBackPressed()
         }
     }
@@ -236,7 +241,7 @@ class MainActivity : Activity() {
     private fun render() {
         banner = null; updateRowValue = null
         ring = null; stateTitle = null; stateDot = null; stateDetail = null; stateTimer = null; stream = null; nodeTitle = null; nodeDetail = null; nodeBadge = null
-        rateBars = null; switchNote = null; switchText = null
+        rateBars = null; switchNote = null; switchText = null; activityBody = null
         val side = maxOf(20.dp, (resources.displayMetrics.widthPixels - 560.dp) / 2)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 4.dp, side, 20.dp) }
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Palette.ground); fitsSystemWindows = true }
@@ -257,17 +262,18 @@ class MainActivity : Activity() {
             "nodes" -> nodes()
             "devices" -> devices()
             "logs" -> logs()
+            "activity" -> activity()
             else -> account()
         }
         showUpdate()
-        if (page in listOf("connect", "nodes", "account")) root.addView(tabBar())
+        if (page in listOf("connect", "nodes", "activity", "account")) root.addView(tabBar())
         handler.removeCallbacks(refresh); if (visible) handler.post(refresh)
     }
     private fun tabBar() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         addView(View(this@MainActivity).apply { setBackgroundColor(Palette.hairline) }, LinearLayout.LayoutParams(-1, 1))
         val tabs = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12.dp, 6.dp, 12.dp, 6.dp) }
-        for ((tab, title, res) in listOf(Triple("connect", R.string.connect_tab, R.drawable.ic_tab_connect), Triple("nodes", R.string.locations, R.drawable.ic_tab_nodes), Triple("account", R.string.account, R.drawable.ic_tab_account))) {
+        for ((tab, title, res) in listOf(Triple("connect", R.string.connect_tab, R.drawable.ic_tab_connect), Triple("nodes", R.string.locations, R.drawable.ic_tab_nodes), Triple("activity", R.string.activity_title, R.drawable.ic_tab_activity), Triple("account", R.string.account, R.drawable.ic_tab_account))) {
             val selected = tab == page; val color = if (selected) Palette.accent else Palette.secondary
             tabs.addView(LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; background = pressable(Color.TRANSPARENT, 12)
@@ -283,6 +289,157 @@ class MainActivity : Activity() {
         }
         addView(tabs)
     }
+    // ---- Activity: this connection's open connections and where its traffic went. Kept by the core in memory while
+    // connected, forgotten on disconnect; nothing is stored or sent.
+    private val directColor = Color.rgb(74, 92, 64)
+    private fun activity() {
+        pageTitle(L10n.text(R.string.activity_title))
+        add(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 0, 0)
+            addView(View(this@MainActivity).apply { setBackgroundColor(Color.rgb(94, 117, 80)) }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 8.dp })
+            addView(text(L10n.text(R.string.activity_local_only), 12f, Palette.faint).apply { maxLines = 2 }, LinearLayout.LayoutParams(0, -2, 1f))
+        }, top = -6, bottom = 14)
+        add(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; setPadding(2.dp, 2.dp, 2.dp, 2.dp); background = rounded(Color.rgb(20, 27, 22), 12)
+            for ((key, title) in listOf("conns" to R.string.activity_connections, "rank" to R.string.activity_ranking)) {
+                val selected = key == activityTab
+                addView(text(L10n.text(title), 13f, if (selected) Palette.text else Palette.secondary, 500).apply {
+                    gravity = Gravity.CENTER; maxLines = 1
+                    background = if (selected) rounded(Color.rgb(42, 54, 44), 10) else pressable(Color.TRANSPARENT, 10)
+                    contentDescription = L10n.text(title) + if (selected) L10n.text(R.string.current_page) else ""
+                    setOnClickListener { if (!selected) { activityTab = key; render() } }
+                }, LinearLayout.LayoutParams(0, -1, 1f))
+            }
+        }, height = 36.dp, bottom = 12)
+        activityBody = add(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }) as LinearLayout
+        fillActivity(null)
+    }
+    private fun loadActivity() {
+        if (activityLoading || activityBody == null) return
+        if (!(ConnectionStateStore.active && ConnectionStateStore.since > 0)) { fillActivity(null); return }
+        activityLoading = true
+        executor.execute {
+            val data = try { JSONObject(Core.activity()) } catch (_: Exception) { null }
+            runOnUiThread { activityLoading = false; if (page == "activity") fillActivity(data) }
+        }
+    }
+    private fun fillActivity(data: JSONObject?) {
+        val body = activityBody ?: return
+        body.removeAllViews()
+        if (data == null || !(ConnectionStateStore.active && ConnectionStateStore.since > 0)) {
+            body.addView(text(L10n.text(R.string.activity_empty), 14f, Palette.secondary).apply { gravity = Gravity.CENTER },
+                LinearLayout.LayoutParams(-1, -2).apply { topMargin = 72.dp; leftMargin = 24.dp; rightMargin = 24.dp })
+            return
+        }
+        if (activityTab == "rank") activityRanking(body, data) else activityConnections(body, data)
+    }
+    private fun square(color: Int, size: Int = 6) = View(this).apply { setBackgroundColor(color); layoutParams = LinearLayout.LayoutParams(size.dp, size.dp) }
+    private fun rate(value: Long) = if (value <= 0) "0 B/s" else bytes(value) + "/s"
+    private fun activityConnections(body: LinearLayout, data: JSONObject) {
+        val conns = data.optJSONArray("conns") ?: org.json.JSONArray()
+        val all = (0 until conns.length()).mapNotNull { conns.optJSONObject(it) }
+        val proxied = all.count { it.optBoolean("proxy") }
+        body.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            for ((key, title, color) in listOf(Triple("all", R.string.activity_all, null), Triple("proxy", R.string.activity_proxy, Palette.accent), Triple("direct", R.string.activity_direct, directColor))) {
+                val selected = key == activityFilter
+                val count = when (key) { "proxy" -> proxied; "direct" -> all.size - proxied; else -> all.size }
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(12.dp, 0, 12.dp, 0)
+                    background = GradientDrawable().apply { cornerRadius = 8.dp.toFloat(); setStroke(1.dp, if (selected) Palette.accent else Color.rgb(38, 51, 42)) }
+                    if (color != null) addView(square(color).apply { (layoutParams as LinearLayout.LayoutParams).marginEnd = 6.dp })
+                    addView(text(L10n.text(title), 13f, if (selected) Palette.text else Palette.secondary))
+                    addView(text(L10n.number(count), 11f, if (selected) Palette.text else Palette.secondary).apply { typeface = Typeface.MONOSPACE },
+                        LinearLayout.LayoutParams(-2, -2).apply { marginStart = 6.dp })
+                    contentDescription = L10n.text(title) + " " + L10n.number(count)
+                    setOnClickListener { activityFilter = key; fillActivity(data) }
+                }, LinearLayout.LayoutParams(-2, 30.dp).apply { marginEnd = 8.dp })
+            }
+        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 6.dp })
+        val shown = all.filter { activityFilter == "all" || it.optBoolean("proxy") == (activityFilter == "proxy") }.take(100)
+        for (c in shown) {
+            val proxy = c.optBoolean("proxy"); val speed = c.optLong("rate")
+            val exit = if (proxy) ConnectionStateStore.node.ifEmpty { c.optString("via") } else L10n.text(R.string.activity_direct)
+            val route = SpannableString(c.optString("rule") + " → " + exit).apply {
+                setSpan(ForegroundColorSpan(if (proxy) Palette.text else Palette.secondary), length - exit.length, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            body.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = 58.dp; setPadding(4.dp, 8.dp, 4.dp, 8.dp)
+                addView(square(if (proxy) Palette.accent else directColor).apply { (layoutParams as LinearLayout.LayoutParams).marginEnd = 12.dp })
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(text(c.optString("host"), 15f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.MIDDLE })
+                    addView(text(route, 12f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(text(rate(speed), 12f, if (speed > 0) Palette.text else Color.rgb(94, 107, 91)).apply { typeface = Typeface.MONOSPACE; maxLines = 1 },
+                    LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
+            })
+            body.addView(View(this).apply { setBackgroundColor(Color.rgb(22, 30, 24)) }, LinearLayout.LayoutParams(-1, 1))
+        }
+        if (shown.isEmpty()) body.addView(text(L10n.text(R.string.activity_nothing), 13f, Palette.secondary), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 16.dp; marginStart = 4.dp })
+    }
+    private fun card() = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL; setPadding(18.dp, 16.dp, 18.dp, 16.dp)
+        background = GradientDrawable().apply { setColor(Color.rgb(18, 25, 21)); cornerRadius = 16.dp.toFloat(); setStroke(1, Color.rgb(31, 42, 34)) }
+    }
+    private fun legend(proxy: Boolean, value: Long, free: Boolean = false) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+        addView(square(if (proxy) Palette.accent else directColor).apply { (layoutParams as LinearLayout.LayoutParams).marginEnd = 6.dp })
+        addView(text(L10n.text(if (proxy) R.string.activity_proxy else R.string.activity_direct) + " ", 12f, if (proxy) Palette.text else Palette.secondary).apply { maxLines = 1 })
+        addView(text(bytes(value), 12f).apply { typeface = Typeface.MONOSPACE; maxLines = 1 })
+        if (free) addView(text(" · " + L10n.text(R.string.activity_direct_free), 12f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
+    }
+    private fun activityRanking(body: LinearLayout, data: JSONObject) {
+        val p = data.optLong("proxy"); val d = data.optLong("direct")
+        val summary = card()
+        summary.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM
+            val parts = bytes(p + d).split(' ', '\u00A0', limit = 2)
+            addView(text(parts[0], 36f).apply { typeface = Pixel.font(this@MainActivity) })
+            addView(text(parts.getOrElse(1) { "" }, 14f, Palette.secondary).apply { typeface = Typeface.MONOSPACE }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 6.dp; bottomMargin = 4.dp })
+            addView(View(this@MainActivity), LinearLayout.LayoutParams(0, 1, 1f))
+            addView(text(L10n.text(R.string.activity_this_session), 12f, Palette.secondary), LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = 4.dp })
+        })
+        val hours = data.optJSONArray("hours")
+        val values = (0 until 24).map { i -> hours?.optJSONArray(i)?.let { it.optLong(0) to it.optLong(1) } ?: (0L to 0L) }
+        summary.addView(HourBars(this).apply { set(values, java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) }, LinearLayout.LayoutParams(-1, 48.dp).apply { topMargin = 12.dp })
+        // Proxied vs direct as one bar split in two.
+        summary.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            if (p + d == 0L) addView(View(this@MainActivity).apply { setBackgroundColor(Palette.raised) }, LinearLayout.LayoutParams(0, -1, 1f))
+            else {
+                if (p > 0) addView(View(this@MainActivity).apply { setBackgroundColor(Palette.accent) }, LinearLayout.LayoutParams(0, -1, p.toFloat()))
+                if (d > 0) addView(View(this@MainActivity).apply { setBackgroundColor(directColor) }, LinearLayout.LayoutParams(0, -1, d.toFloat()).apply { if (p > 0) marginStart = 3.dp })
+            }
+        }, LinearLayout.LayoutParams(-1, 8.dp).apply { topMargin = 12.dp })
+        summary.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            addView(legend(true, p))
+            addView(View(this@MainActivity), LinearLayout.LayoutParams(0, 1, 1f))
+            addView(legend(false, d, free = true), LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 10.dp })
+        body.addView(summary, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12.dp })
+        body.addView(rankList(L10n.text(R.string.activity_by_domain), data.optJSONArray("domains"), mono = false, note = null), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12.dp })
+        body.addView(rankList(L10n.text(R.string.activity_by_rule), data.optJSONArray("rules"), mono = true, note = L10n.text(R.string.activity_no_apps)))
+    }
+    private fun rankList(title: String, rows: org.json.JSONArray?, mono: Boolean, note: String?) = card().apply {
+        setPadding(18.dp, 14.dp, 18.dp, 14.dp)
+        addView(text(title, 12f, Palette.secondary, 500), LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = 4.dp })
+        val list = (0 until (rows?.length() ?: 0)).mapNotNull { rows?.optJSONObject(it) }
+        val top = maxOf(1L, list.firstOrNull()?.optLong("bytes") ?: 1L)
+        for (r in list) addView(LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, 6.dp, 0, 6.dp)
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(text(r.optString("name"), if (mono) 12.5f else 13f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.MIDDLE; if (mono) typeface = Typeface.MONOSPACE })
+                addView(DotBar(this@MainActivity, r.optLong("bytes").toDouble() / top, if (r.optBoolean("proxy")) Palette.accent else directColor), LinearLayout.LayoutParams(-1, 4.dp).apply { topMargin = 6.dp })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(text(bytes(r.optLong("bytes")), 12f).apply { typeface = Typeface.MONOSPACE; maxLines = 1; gravity = Gravity.END }, LinearLayout.LayoutParams(78.dp, -2).apply { marginStart = 12.dp })
+        })
+        if (list.isEmpty()) addView(text(L10n.text(R.string.activity_nothing), 12f, Palette.secondary), LinearLayout.LayoutParams(-2, -2).apply { topMargin = 6.dp })
+        if (note != null) addView(text(note, 11f, Palette.faint), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp })
+    }
+
     /** Update and announcement notes: one compact card each, only when there is something to say. */
     private fun notices() {
         banner = add(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }) as LinearLayout
