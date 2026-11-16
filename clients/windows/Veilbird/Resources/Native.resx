@@ -8,6 +8,37 @@
   <data name="account" xml:space="preserve"><value>Account</value></data>
   <data name="account_device_quota" xml:space="preserve"><value>Authorized devices   {0} / {1}</value></data>
   <data name="account_valid_until" xml:space="preserve"><value>Valid until · {0}</value></data>
+  <data name="activity_all" xml:space="preserve"><value>All</value></data>
+  <data name="activity_app" xml:space="preserve"><value>App</value></data>
+  <data name="activity_by_app" xml:space="preserve"><value>By app</value></data>
+  <data name="activity_by_domain" xml:space="preserve"><value>By domain</value></data>
+  <data name="activity_by_rule" xml:space="preserve"><value>By rule</value></data>
+  <data name="activity_connections" xml:space="preserve"><value>Connections</value></data>
+  <data name="activity_direct" xml:space="preserve"><value>Direct</value></data>
+  <data name="activity_direct_free" xml:space="preserve"><value>not counted</value></data>
+  <data name="activity_dns" xml:space="preserve"><value>DNS</value></data>
+  <data name="activity_dns_note" xml:space="preserve"><value>Proxied names are resolved by the location, so your local DNS never sees them.</value></data>
+  <data name="activity_domain" xml:space="preserve"><value>Domain</value></data>
+  <data name="activity_down" xml:space="preserve"><value>Down</value></data>
+  <data name="activity_duration" xml:space="preserve"><value>Time</value></data>
+  <data name="activity_empty" xml:space="preserve"><value>Connect to see this device's connections, top sites and DNS lookups.</value></data>
+  <data name="activity_filter" xml:space="preserve"><value>Filter by domain, rule or app</value></data>
+  <data name="activity_local_only" xml:space="preserve"><value>Kept on this device only, cleared when you disconnect</value></data>
+  <data name="activity_no_apps" xml:space="preserve"><value>The system VPN cannot see which app opened a connection, so this ranks by rule.</value></data>
+  <data name="activity_nothing" xml:space="preserve"><value>No connections yet.</value></data>
+  <data name="activity_out" xml:space="preserve"><value>Exit</value></data>
+  <data name="activity_peak" xml:space="preserve"><value>Peak {0}:00 · {1}</value></data>
+  <data name="activity_per_hour" xml:space="preserve"><value>This connection · per hour</value></data>
+  <data name="activity_proxy" xml:space="preserve"><value>Proxied</value></data>
+  <data name="activity_ranking" xml:space="preserve"><value>Top</value></data>
+  <data name="activity_resolved_by_node" xml:space="preserve"><value>Resolved by the location</value></data>
+  <data name="activity_result" xml:space="preserve"><value>Answer</value></data>
+  <data name="activity_route" xml:space="preserve"><value>Route</value></data>
+  <data name="activity_rule" xml:space="preserve"><value>Rule</value></data>
+  <data name="activity_this_session" xml:space="preserve"><value>This connection</value></data>
+  <data name="activity_time" xml:space="preserve"><value>Time</value></data>
+  <data name="activity_title" xml:space="preserve"><value>Activity</value></data>
+  <data name="activity_traffic" xml:space="preserve"><value>Traffic</value></data>
   <data name="all_locations" xml:space="preserve"><value>All locations</value></data>
   <data name="allow_system_extension" xml:space="preserve"><value>Allow the TrackNothing system extension in System Settings → Privacy &amp; Security. It connects once allowed.</value></data>
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>Allow the system to add a VPN on first connection. Manage authorized devices in Account.</value></data>

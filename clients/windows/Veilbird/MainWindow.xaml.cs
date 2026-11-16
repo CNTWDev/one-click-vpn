@@ -59,6 +59,9 @@ public partial class MainWindow : Window {
     // Download / upload rates of the last 40 seconds for the rate chart, newest last.
     private readonly List<long> rxHistory=new(),txHistory=new();
     private string usageRange="30d";
+    // The activity panel beside the app's column, signed in only; filled from the core once a second.
+    private ActivityPanel? activity;
+    private bool activityLoading;
     private string badgeKey="";
     private Window? flyout;
     private DateTime flyoutHidden=DateTime.MinValue;
@@ -74,7 +77,7 @@ public partial class MainWindow : Window {
         TitleLogo.Content=Look.Mark(16,Look.Accent);
         connection=new Connection(api,core);
         connection.Changed+=()=>Dispatcher.InvokeAsync(()=>{UpdateLive();UpdateTray();});
-        refresh.Tick+=(_,_)=>{SampleRates();UpdateLive();};refresh.Start();
+        refresh.Tick+=(_,_)=>{SampleRates();UpdateLive();RefreshActivity();};refresh.Start();
         toastTimer.Tick+=(_,_)=>{toastTimer.Stop();Toast.Visibility=Visibility.Collapsed;};
         Toast.MouseLeftButtonUp+=(_,_)=>{toastTimer.Stop();Toast.Visibility=Visibility.Collapsed;};
         SourceInitialized+=(_,_)=>DarkFrame();
@@ -450,6 +453,32 @@ public partial class MainWindow : Window {
         return button;
     }
 
+    // ---- Activity panel ----
+    /// Signed in, the window widens to hold the activity panel; signed out it is the small window again.
+    private void ShowActivity(bool on) {
+        var width=on?1040.0:380.0;
+        if(on) {
+            // Rebuilt after a language change so its labels follow.
+            if(activity is null||activity.Tag as string!=L10n.Culture.Name) {activity=new ActivityPanel {Tag=L10n.Culture.Name};ActivityHost.Content=activity;}
+            ActivityHost.Visibility=Visibility.Visible;
+        } else {ActivityHost.Visibility=Visibility.Collapsed;ActivityHost.Content=null;activity=null;}
+        if(Width==width) return;
+        Width=width;
+        // Keep the wider window on the screen it is on.
+        var area=SystemParameters.WorkArea;
+        if(Left+width>area.Right) Left=Math.Max(area.Left,area.Right-width-8);
+    }
+    private async void RefreshActivity() {
+        if(activity is null||activityLoading||!IsVisible||WindowState==WindowState.Minimized) return;
+        if(!connection.Active||connection.Since is null) {activity.Update(null,"");return;}
+        activityLoading=true;
+        try {
+            var json=await Task.Run(core.Activity);
+            activity?.Update(JsonNode.Parse(json),connection.NodeName);
+        } catch {/* the next tick tries again */}
+        finally {activityLoading=false;}
+    }
+
     // ---- Rate chart, switch note and connection check ----
     /// One sample a second while connected; cleared otherwise.
     private void SampleRates() {
@@ -496,7 +525,7 @@ public partial class MainWindow : Window {
         if(nodesData is null) {try {await LoadNodes();} catch {/* the node leg shows no answer */}}
         var id=connection.NodeId;var name=connection.NodeName.Length>0?connection.NodeName:directory.TryGetValue(id,out var known)?known.Name:L10n.Text("location");
         var node=NodeData(id);var address=ProbeAddress(node);var region=node?["region"]?.GetValue<string>()??"";
-        var window=new Window {Owner=this,Width=ActualWidth-32,SizeToContent=SizeToContent.Height,WindowStyle=WindowStyle.None,AllowsTransparency=true,Background=Brushes.Transparent,
+        var window=new Window {Owner=this,Width=348,SizeToContent=SizeToContent.Height,WindowStyle=WindowStyle.None,AllowsTransparency=true,Background=Brushes.Transparent,
             ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.CenterOwner,FontFamily=FontFamily,UseLayoutRounding=true,Title=L10n.Text("check_title"),
             Language=Language};
         TextOptions.SetTextFormattingMode(window,TextFormattingMode.Display);
@@ -576,6 +605,7 @@ public partial class MainWindow : Window {
         if(view!=lastView) {Scroller.ScrollToTop();Enter(full?FullPanel:ContentPanel);}
         lastView=view;
         Language=System.Windows.Markup.XmlLanguage.GetLanguage(L10n.Culture.IetfLanguageTag);
+        ShowActivity(api.SignedIn);
         if(!api.SignedIn) {
             // Before sign-in the only language entry is this small globe; afterwards it is a row on the account page.
             accountData=null;nodesData=null;

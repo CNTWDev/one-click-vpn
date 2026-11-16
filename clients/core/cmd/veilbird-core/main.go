@@ -119,6 +119,8 @@ func main() {
 			}
 			timeout, _ := strconv.Atoi(fields[3])
 			reply(core.Probe(fields[1], fields[2], timeout))
+		case "activity":
+			reply(core.Activity())
 		case "reach":
 			if len(fields) != 3 {
 				reply("-1")

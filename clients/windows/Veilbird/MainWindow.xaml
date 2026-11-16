@@ -3,7 +3,7 @@
   <WindowChrome.WindowChrome><WindowChrome CaptionHeight="32" ResizeBorderThickness="0" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/></WindowChrome.WindowChrome>
   <Border BorderBrush="#1FECF1E8" BorderThickness="1">
     <Grid>
-      <Grid.RowDefinitions><RowDefinition Height="32"/><RowDefinition Height="44"/><RowDefinition Height="2"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
       <DockPanel LastChildFill="True">
         <Button x:Name="CloseButton" DockPanel.Dock="Right" Style="{StaticResource Bare}" Width="46" Height="32" WindowChrome.IsHitTestVisibleInChrome="True" Click="OnCloseClick">
           <TextBlock Text="&#xE8BB;" FontFamily="{StaticResource Icons}" FontSize="10"/>
@@ -17,16 +17,24 @@
         </StackPanel>
       </DockPanel>
       <!-- Pages switch with text tabs and a short lime underline; the right side holds the page's one action. -->
-      <DockPanel Grid.Row="1" Margin="16,0,12,0" LastChildFill="False">
-        <StackPanel x:Name="NavigationPanel" DockPanel.Dock="Left" Orientation="Horizontal"/>
-        <ContentControl x:Name="HeaderSlot" DockPanel.Dock="Right" VerticalAlignment="Center"/>
-      </DockPanel>
-      <ProgressBar x:Name="BusyBar" Grid.Row="2" Height="2" Margin="16,0" IsIndeterminate="True" Foreground="{StaticResource Accent}" Background="Transparent" BorderThickness="0" Visibility="Hidden"/>
-      <ScrollViewer x:Name="Scroller" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False"><StackPanel x:Name="ContentPanel" Margin="16,8,16,16"/></ScrollViewer>
-      <Grid x:Name="FullPanel" Grid.Row="3" Visibility="Collapsed"/>
-      <Border x:Name="Toast" Grid.Row="3" VerticalAlignment="Bottom" Margin="16,0,16,16" Padding="14,10" CornerRadius="8" Background="{StaticResource Raised}" BorderBrush="#66F0907A" BorderThickness="1" Visibility="Collapsed" Cursor="Hand">
-        <TextBlock x:Name="ToastText" FontSize="13"/>
-      </Border>
+      <!-- The app's own column (pages and tabs) and, once signed in, the activity panel beside it. -->
+      <Grid Grid.Row="1">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="378"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="2"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+          <DockPanel Grid.Row="0" Margin="16,0,12,0" LastChildFill="False">
+            <StackPanel x:Name="NavigationPanel" DockPanel.Dock="Left" Orientation="Horizontal"/>
+            <ContentControl x:Name="HeaderSlot" DockPanel.Dock="Right" VerticalAlignment="Center"/>
+          </DockPanel>
+          <ProgressBar x:Name="BusyBar" Grid.Row="1" Height="2" Margin="16,0" IsIndeterminate="True" Foreground="{StaticResource Accent}" Background="Transparent" BorderThickness="0" Visibility="Hidden"/>
+          <ScrollViewer x:Name="Scroller" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False"><StackPanel x:Name="ContentPanel" Margin="16,8,16,16"/></ScrollViewer>
+          <Grid x:Name="FullPanel" Grid.Row="2" Visibility="Collapsed"/>
+          <Border x:Name="Toast" Grid.Row="2" VerticalAlignment="Bottom" Margin="16,0,16,16" Padding="14,10" CornerRadius="8" Background="{StaticResource Raised}" BorderBrush="#66F0907A" BorderThickness="1" Visibility="Collapsed" Cursor="Hand">
+            <TextBlock x:Name="ToastText" FontSize="13"/>
+          </Border>
+        </Grid>
+        <ContentControl x:Name="ActivityHost" Grid.Column="1" Focusable="False" Visibility="Collapsed"/>
+      </Grid>
     </Grid>
   </Border>
 </Window>

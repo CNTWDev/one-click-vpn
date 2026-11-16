@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/metacubex/mihomo/config"
@@ -76,5 +77,42 @@ func TestBuildParsesOnEveryPlatform(t *testing.T) {
 func TestReachWithoutCoreAnswersMinusOne(t *testing.T) {
 	if got := Reach("not an address", 100); got != -1 {
 		t.Fatalf("Reach(bad) = %d, want -1", got)
+	}
+}
+
+func TestSiteGroupsByRegistrablePart(t *testing.T) {
+	cases := map[string]string{
+		"objects.githubusercontent.com": "githubusercontent.com",
+		"mirrors.tuna.tsinghua.edu.cn":  "tsinghua.edu.cn",
+		"www.bbc.co.uk":                 "bbc.co.uk",
+		"github.com":                    "github.com",
+		"1.2.3.4":                       "1.2.3.4",
+		"localhost":                     "localhost",
+	}
+	for in, want := range cases {
+		if got := site(in); got != want {
+			t.Errorf("site(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestActivityWithoutCoreIsEmpty(t *testing.T) {
+	var out struct {
+		Conns []any      `json:"conns"`
+		Hours [][2]int64 `json:"hours"`
+		DNS   []any      `json:"dns"`
+	}
+	if err := json.Unmarshal([]byte(Activity()), &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Conns) != 0 || len(out.Hours) != 24 || out.DNS == nil {
+		t.Fatalf("unexpected %+v", out)
+	}
+}
+
+func TestTopRanksByBytes(t *testing.T) {
+	rows := top(map[string]*amount{"a": {Proxy: 5}, "b": {Direct: 9}, "c": {Proxy: 1, Direct: 1}}, 2)
+	if len(rows) != 2 || rows[0].Name != "b" || rows[0].Proxy || rows[1].Name != "a" || !rows[1].Proxy {
+		t.Fatalf("unexpected %+v", rows)
 	}
 }

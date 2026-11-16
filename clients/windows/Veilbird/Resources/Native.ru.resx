@@ -8,6 +8,37 @@
   <data name="account" xml:space="preserve"><value>Аккаунт</value></data>
   <data name="account_device_quota" xml:space="preserve"><value>Устройства   {0} / {1}</value></data>
   <data name="account_valid_until" xml:space="preserve"><value>Действует до · {0}</value></data>
+  <data name="activity_all" xml:space="preserve"><value>Все</value></data>
+  <data name="activity_app" xml:space="preserve"><value>Приложение</value></data>
+  <data name="activity_by_app" xml:space="preserve"><value>По приложениям</value></data>
+  <data name="activity_by_domain" xml:space="preserve"><value>По доменам</value></data>
+  <data name="activity_by_rule" xml:space="preserve"><value>По правилам</value></data>
+  <data name="activity_connections" xml:space="preserve"><value>Соединения</value></data>
+  <data name="activity_direct" xml:space="preserve"><value>Напрямую</value></data>
+  <data name="activity_direct_free" xml:space="preserve"><value>не учитывается</value></data>
+  <data name="activity_dns" xml:space="preserve"><value>DNS</value></data>
+  <data name="activity_dns_note" xml:space="preserve"><value>Имена через VPN разрешает узел, локальный DNS их не видит.</value></data>
+  <data name="activity_domain" xml:space="preserve"><value>Домен</value></data>
+  <data name="activity_down" xml:space="preserve"><value>Приём</value></data>
+  <data name="activity_duration" xml:space="preserve"><value>Время</value></data>
+  <data name="activity_empty" xml:space="preserve"><value>Подключитесь, чтобы увидеть соединения, топ и DNS-запросы этого устройства.</value></data>
+  <data name="activity_filter" xml:space="preserve"><value>Фильтр: домен, правило, приложение</value></data>
+  <data name="activity_local_only" xml:space="preserve"><value>Только на этом устройстве, стирается при отключении</value></data>
+  <data name="activity_no_apps" xml:space="preserve"><value>Системный VPN не видит, какое приложение открыло соединение, поэтому топ по правилам.</value></data>
+  <data name="activity_nothing" xml:space="preserve"><value>Пока нет соединений.</value></data>
+  <data name="activity_out" xml:space="preserve"><value>Выход</value></data>
+  <data name="activity_peak" xml:space="preserve"><value>Пик {0}:00 · {1}</value></data>
+  <data name="activity_per_hour" xml:space="preserve"><value>Это подключение · по часам</value></data>
+  <data name="activity_proxy" xml:space="preserve"><value>Через VPN</value></data>
+  <data name="activity_ranking" xml:space="preserve"><value>Топ</value></data>
+  <data name="activity_resolved_by_node" xml:space="preserve"><value>Разрешено узлом</value></data>
+  <data name="activity_result" xml:space="preserve"><value>Ответ</value></data>
+  <data name="activity_route" xml:space="preserve"><value>Маршрут</value></data>
+  <data name="activity_rule" xml:space="preserve"><value>Правило</value></data>
+  <data name="activity_this_session" xml:space="preserve"><value>Это подключение</value></data>
+  <data name="activity_time" xml:space="preserve"><value>Время</value></data>
+  <data name="activity_title" xml:space="preserve"><value>Активность</value></data>
+  <data name="activity_traffic" xml:space="preserve"><value>Трафик</value></data>
   <data name="all_locations" xml:space="preserve"><value>Все локации</value></data>
   <data name="allow_system_extension" xml:space="preserve"><value>Разрешите системное расширение TrackNothing в «Системные настройки → Конфиденциальность и безопасность». После этого подключение продолжится.</value></data>
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>При первом подключении разрешите добавление VPN. Управляйте устройствами в аккаунте.</value></data>
