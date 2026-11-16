@@ -59,7 +59,7 @@ export function PlansPage() {
             <button className="button ghost small" onClick={() => edit(plan)}>{t("编辑")}</button></div></td>
         </tr>)}</tbody></table></div> : <Empty>{t("还没有套餐。")}</Empty>}
     </section>
-    {form && <Modal title={form.id ? t("编辑套餐") : t("新建套餐")} description={t("天数、流量和设备上限留空都表示不限。设备数包括客户端、订阅和节点配置。")} onClose={() => setForm(null)}
+    {form && <Modal title={form.id ? t("编辑套餐") : t("新建套餐")} description={t("天数、流量和设备上限留空都表示不限。设备数包括客户端登录和单节点配置；订阅不占设备。")} onClose={() => setForm(null)}
       footer={<><InlineNotice notice={formNotice} /><div className="form-actions"><button type="button" className="button ghost" onClick={() => setForm(null)}>{t("取消")}</button><button type="submit" form="plan-form" className="button primary" disabled={busy}>{busy ? t("保存中…") : t("保存")}</button></div></>}>
       <form id="plan-form" className="form-grid" onSubmit={(event) => void submit(event)}>
         <label className="span-2">{t("名称")}<input required maxLength={60} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder={t("月卡")} /></label>

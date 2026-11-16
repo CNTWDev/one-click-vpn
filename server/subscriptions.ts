@@ -6,12 +6,12 @@ import { createAccessCredential, findAccessCredential, findDesiredConfig, listCo
 import { activateProfile, issueConnectionProfile, rebuildDesiredState, selectVpnServices } from "./control-plane";
 import { assertCredentialUsable, manageCredentialAccess } from "./credential-access";
 import { createSecretMaterial, readSecretMaterial } from "./secret-materials";
-import { lineNames, proxyName, renderSubscription, renderV2raySubscription, subscriptionClient, type RoutingMode, type SubscriptionClient, type SubscriptionFormat, type SubscriptionNode, type SubscriptionProxy } from "./subscription-format";
+import { lineNames, proxyName, renderSubscription, renderV2raySubscription, subscriptionAppName, subscriptionClient, type RoutingMode, type SubscriptionClient, type SubscriptionFormat, type SubscriptionNode, type SubscriptionProxy } from "./subscription-format";
 import { realitySettings, realityUserIdentities } from "./reality";
 import { ensureStealthServer, STEALTH_SNI, stealthAccessApplied } from "./stealth";
 import { accountAccess } from "./entitlements";
 
-type Subscription = { id: string; credential_id: string; token_hash: string; token_secret_id: string | null; private_key_secret_id: string | null; created_at: string; updated_at: string; last_fetched_at: string | null };
+type Subscription = { id: string; credential_id: string; token_hash: string; token_secret_id: string | null; private_key_secret_id: string | null; created_at: string; updated_at: string; last_fetched_at: string | null; last_fetch_client: string };
 export async function listSubscriptions(userId?: string) {
   return dbQuery<Subscription & { user_id: string; display_name: string; protocol: string; status: string; user_disabled: boolean; admin_disabled: boolean; expires_at: string; email: string }>(
     `SELECT s.id,s.credential_id,s.created_at,s.updated_at,s.last_fetched_at,c.user_id,c.display_name,c.protocol,c.status,
@@ -31,43 +31,68 @@ function locked<T>(key: string, work: () => Promise<T>): Promise<T> {
   return withKeyedLock(key, work);
 }
 
-/** A subscription is VLESS: REALITY plus the stealth lines (Hysteria2, XHTTP) on every ready node. */
-export async function createSubscription(userId: string, name: string) {
-  return locked(`subscription-create:${userId}`, async () => {
-    if ((await listSubscriptions(userId)).filter((s) => s.status === "active").length >= 20) throw new Error("最多创建 20 份有效订阅");
-    const credential = await createAccessCredential({ userId, displayName: name, protocol: "vless", identityKey: randomUUID() });
-    // VLESS authorization UUID is distinct from its public telemetry identity and encrypted at rest.
-    const secret = await createSecretMaterial({ kind: `subscription_key:${credential.id}`, value: randomUUID() });
-    const token = randomBytes(32).toString("base64url"), id = `sub_${randomUUID()}`, timestamp = new Date().toISOString();
-    const linkSecret = await createSecretMaterial({ kind: `subscription_link:${id}`, value: token });
-    await dbExec(`INSERT INTO subscriptions (id,credential_id,token_hash,private_key_secret_id,created_at,updated_at,token_secret_id)
-      VALUES ($1,$2,$3,$4,$5,$5,$6)`, [id,credential.id,hashToken(token),secret.id,timestamp,linkSecret.id]);
-    await addAudit({ actorUserId: userId, action: "subscription.created", targetType: "subscription", targetId: id });
-    return { id, credentialId: credential.id, token };
+/** The account's subscription: its oldest one still in use. Later ones are from before every account had one. */
+const accountSubscriptionSql = `SELECT s.* FROM subscriptions s JOIN access_credentials c ON c.id=s.credential_id
+  WHERE c.user_id=$1 AND c.deleted_at IS NULL AND c.status<>'revoked' ORDER BY s.created_at,s.id LIMIT 1`;
+
+export type AccountSubscription = { id: string; token: string | null; usable: boolean; lastFetchedAt: string | null; lastFetchClient: string };
+
+/** Every node in one link: REALITY plus the stealth lines (Hysteria2, XHTTP). Not a device, so it needs no free slot. */
+async function createSubscription(userId: string) {
+  const credential = await createAccessCredential({ userId, displayName: "Subscription", protocol: "vless", identityKey: randomUUID(), subscription: true });
+  // VLESS authorization UUID is distinct from its public telemetry identity and encrypted at rest.
+  const secret = await createSecretMaterial({ kind: `subscription_key:${credential.id}`, value: randomUUID() });
+  const token = randomBytes(32).toString("base64url"), id = `sub_${randomUUID()}`, timestamp = new Date().toISOString();
+  const linkSecret = await createSecretMaterial({ kind: `subscription_link:${id}`, value: token });
+  await dbExec(`INSERT INTO subscriptions (id,credential_id,token_hash,private_key_secret_id,created_at,updated_at,token_secret_id)
+    VALUES ($1,$2,$3,$4,$5,$5,$6)`, [id,credential.id,hashToken(token),secret.id,timestamp,linkSecret.id]);
+  await addAudit({ actorUserId: userId, action: "subscription.created", targetType: "subscription", targetId: id });
+  return id;
+}
+
+/** The account's subscription with its link, made on first use (`create`), so an account that only uses the apps never has one. */
+export async function accountSubscription(userId: string, create = false): Promise<AccountSubscription | null> {
+  return locked(`subscription-account:${userId}`, async () => {
+    let sub = (await dbQuery<Subscription>(accountSubscriptionSql, [userId]))[0];
+    if (!sub && create) {
+      await createSubscription(userId);
+      sub = (await dbQuery<Subscription>(accountSubscriptionSql, [userId]))[0];
+      // Prepare access on every node now; the first agent acknowledgements arrive asynchronously.
+      const token = sub?.token_secret_id ? await readSecretMaterial(sub.token_secret_id) : undefined;
+      if (token) await downloadSubscription(token).catch(() => undefined);
+    }
+    if (!sub) return null;
+    // Links made before links were stored can't be shown again (null) until the owner resets them; apps keep using them.
+    const token = (sub.token_secret_id ? await readSecretMaterial(sub.token_secret_id) : undefined) || null;
+    const usable = await assertCredentialUsable(sub.credential_id).then(() => true, () => false);
+    return { id: sub.id, token, usable, lastFetchedAt: sub.last_fetched_at, lastFetchClient: sub.last_fetch_client || "" };
   });
 }
 
+async function newLink(id: string) {
+  const token = randomBytes(32).toString("base64url");
+  const linkSecret = await createSecretMaterial({ kind: `subscription_link:${id}`, value: token });
+  await dbExec("UPDATE subscriptions SET token_hash=$1,updated_at=$2,token_secret_id=$4 WHERE id=$3", [hashToken(token),new Date().toISOString(),id,linkSecret.id]);
+  return token;
+}
+
+/** A leaked link: the old one stops working at once and every app imports the new one. */
+export async function resetAccountSubscriptionLink(userId: string) {
+  const sub = (await dbQuery<Subscription>(accountSubscriptionSql, [userId]))[0];
+  if (!sub) throw new Error("订阅不存在");
+  await locked(`subscription:${sub.id}`, async () => {
+    await assertCredentialUsable(sub.credential_id);
+    await newLink(sub.id);
+    await addAudit({ actorUserId: userId, action: "subscription.link-reset", targetType: "subscription", targetId: sub.id });
+  });
+  return accountSubscription(userId);
+}
+
+/** Console: enable, disable, revoke or delete any subscription. Links are only ever handed to their owner. */
 export async function manageSubscription(id: string, action: string, actor: { id: string; admin: boolean }) {
   return locked(`subscription:${id}`, async () => {
     const sub = (await listSubscriptions(actor.admin ? undefined : actor.id)).find((s) => s.id === id);
     if (!sub) throw new Error("订阅不存在");
-    if (["reveal-link", "reset-link"].includes(action) && actor.admin) throw new Error("订阅链接仅本人可获取");
-    if (action === "reveal-link") {
-      await assertCredentialUsable(sub.credential_id);
-      const stored = (await dbQuery<Subscription>("SELECT * FROM subscriptions WHERE id=$1", [id]))[0];
-      const token = stored?.token_secret_id ? await readSecretMaterial(stored.token_secret_id) : undefined;
-      if (!token) throw new Error("旧订阅未保存可恢复的链接，请在更多操作中重置一次；已有配置不会因此撤销。");
-      await addAudit({ actorUserId: actor.id, action: "subscription.link-revealed", targetType: "subscription", targetId: id });
-      return { token };
-    }
-    if (action === "reset-link") {
-      await assertCredentialUsable(sub.credential_id);
-      const token = randomBytes(32).toString("base64url");
-      const linkSecret = await createSecretMaterial({ kind: `subscription_link:${id}`, value: token });
-      await dbExec("UPDATE subscriptions SET token_hash=$1,updated_at=$2,token_secret_id=$4 WHERE id=$3", [hashToken(token),new Date().toISOString(),id,linkSecret.id]);
-      await addAudit({ actorUserId: actor.id, action: "subscription.link-reset", targetType: "subscription", targetId: id });
-      return { token };
-    }
     if (!["enable", "disable", "revoke", "delete"].includes(action)) throw new Error("不支持的订阅操作");
     return manageCredentialAccess(sub.credential_id, action as "enable" | "disable" | "revoke" | "delete", actor);
   });
@@ -111,9 +136,8 @@ const WIREGUARD_GRACE_MS = 7 * 86400_000;
 
 /**
  * Subscriptions used to be WireGuard or VLESS; now they are all VLESS. An old WireGuard subscription moves
- * to a new VLESS credential under the same link, so its next refresh brings the new lines. The new credential
- * takes over the old one's device (no free slot needed, ranked just before it, so a device limit drops the
- * WireGuard one first). The WireGuard credential keeps working for 7 days for devices that have not refreshed.
+ * to a new VLESS credential under the same link, so its next refresh brings the new lines. The WireGuard
+ * credential keeps working for 7 days for devices that have not refreshed.
  * Runs from the minute jobs; once no WireGuard subscription is left it is one empty query.
  * TODO(2026-12): remove together with the last WireGuard subscription credentials.
  */
@@ -125,10 +149,10 @@ export async function upgradeWireGuardSubscriptions(): Promise<number> {
       const sub = (await dbQuery<Subscription>("SELECT * FROM subscriptions WHERE id=$1", [id]))[0];
       const old = sub && await findAccessCredential(sub.credential_id);
       if (!old || old.protocol !== "wireguard") return;
-      const credential = await createAccessCredential({ userId: old.user_id, displayName: old.display_name, protocol: "vless", identityKey: randomUUID(), replacesCredential: true });
+      const credential = await createAccessCredential({ userId: old.user_id, displayName: old.display_name, protocol: "vless", identityKey: randomUUID(), subscription: true });
       const grace = new Date(Date.now() + WIREGUARD_GRACE_MS).toISOString();
-      await dbExec("UPDATE access_credentials SET created_at=$1,expires_at=$2,user_disabled=$3,admin_disabled=$4 WHERE id=$5",
-        [new Date(Date.parse(old.created_at) - 1).toISOString(), old.expires_at, old.user_disabled, old.admin_disabled, credential.id]);
+      await dbExec("UPDATE access_credentials SET expires_at=$1,user_disabled=$2,admin_disabled=$3 WHERE id=$4",
+        [old.expires_at, old.user_disabled, old.admin_disabled, credential.id]);
       const secret = await createSecretMaterial({ kind: `subscription_key:${credential.id}`, value: randomUUID() });
       await dbExec("UPDATE subscriptions SET credential_id=$1,private_key_secret_id=$2,updated_at=$3 WHERE id=$4", [credential.id, secret.id, new Date().toISOString(), id]);
       await dbExec("UPDATE access_credentials SET expires_at=$1,updated_at=$2 WHERE id=$3 AND (expires_at IS NULL OR expires_at>$1)", [grace, new Date().toISOString(), old.id]);
@@ -190,7 +214,8 @@ export async function downloadSubscription(token: string, options: { format?: Su
     await assertCredentialUsable(credential.id);
     const content = format === "v2ray" ? renderV2raySubscription(proxies)
       : renderSubscription(proxies, { mode: options.mode, group: options.group, nodes: nodes.map((node) => ({ name: node.name, proxies: node.proxies.map((line) => line.name) })) });
-    await dbExec("UPDATE subscriptions SET last_fetched_at=$1 WHERE id=$2", [new Date().toISOString(),sub.id]);
+    // Only real refreshes say which app imported the link; the Portal's own preparation has no User-Agent.
+    if (options.userAgent !== undefined) await dbExec("UPDATE subscriptions SET last_fetched_at=$1,last_fetch_client=$3 WHERE id=$2", [new Date().toISOString(),sub.id,subscriptionAppName(options.userAgent)]);
     // Clients such as Clash show this as the plan's usage and end date.
     const access = await accountAccess(credential.user_id);
     const ends = [access.until, credential.expires_at].filter((value): value is string => Boolean(value)).map((value) => Date.parse(value));

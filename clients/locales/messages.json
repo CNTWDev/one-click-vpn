@@ -260,9 +260,9 @@
     "ru": "Для подключения разрешите использование VPN."
   },
   "device_limit_reached_revoke_an_old_device_in_account": {
-    "zh": "设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。",
-    "en": "Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again.",
-    "ru": "Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
+    "zh": "设备数已达账号上限（单节点配置也算在内，订阅不算）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。",
+    "en": "Device limit reached (single-server configs count too; the subscription does not). Revoke an old device in Account, or delete an unused config in the portal, and try again.",
+    "ru": "Достигнут лимит устройств (конфигурации для одного сервера тоже считаются, подписка — нет). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
   },
   "access_for_this_device_has_been_revoked_contact_your": {
     "zh": "这台设备的授权已解除，请联系管理员。",
@@ -480,9 +480,9 @@
     "ru": "Отключите VPN перед выходом."
   },
   "device_limit_reached_account_hint": {
-    "zh": "设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。",
-    "en": "Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again.",
-    "ru": "Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
+    "zh": "设备数已达账号上限（单节点配置也算在内，订阅不算）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。",
+    "en": "Device limit reached (single-server configs count too; the subscription does not). Revoke an old device in Account, or delete an unused config in the portal, and try again.",
+    "ru": "Достигнут лимит устройств (конфигурации для одного сервера тоже считаются, подписка — нет). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
   },
   "this_location_is_unavailable_try_another": {
     "zh": "节点暂时不可用，请换一个节点重试。",
@@ -585,9 +585,9 @@
     "ru": "Устройство потеряет доступ. Отозвать авторизацию?"
   },
   "device_limit_reached_revoke_an_old_device_and_try": {
-    "zh": "设备数已达账号上限（含订阅和节点配置）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。",
-    "en": "Device limit reached (subscriptions and server configs count too). Revoke an old device in Account, or delete an unused config in the portal, and try again.",
-    "ru": "Достигнут лимит устройств (подписки и конфигурации тоже считаются). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
+    "zh": "设备数已达账号上限（单节点配置也算在内，订阅不算）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。",
+    "en": "Device limit reached (single-server configs count too; the subscription does not). Revoke an old device in Account, or delete an unused config in the portal, and try again.",
+    "ru": "Достигнут лимит устройств (конфигурации для одного сервера тоже считаются, подписка — нет). Отзовите старое устройство в аккаунте или удалите ненужную конфигурацию на портале и повторите."
   },
   "unable_to_reach_the_service_check_your_network_or": {
     "zh": "暂时无法连接服务，请检查网络或联系管理员。",
@@ -1075,9 +1075,9 @@
     "ru": "Без лимита"
   },
   "devices_configs_note": {
-    "zh": "另有 {0} 个订阅或节点配置也占用名额，可以在网页门户删除不用的。",
-    "en": "{0} more subscriptions or server configs also use slots. You can delete unused ones in the web portal.",
-    "ru": "Ещё подписок или конфигураций, занимающих места: {0}. Ненужные можно удалить на веб-портале."
+    "zh": "另有 {0} 个单节点配置也占用名额，可以在网页门户删除不用的。",
+    "en": "{0} single-server configs also use slots. You can delete unused ones in the web portal.",
+    "ru": "Ещё конфигураций для одного сервера, занимающих места: {0}. Ненужные можно удалить на веб-портале."
   },
   "forgot_password": {
     "zh": "忘记密码？",

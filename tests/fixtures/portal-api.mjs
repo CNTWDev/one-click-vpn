@@ -10,6 +10,7 @@ const credentials = [
   credential("cred_wg_222222", "MacBook", "wireguard"),
   credential("cred_ov_333333", "Office router", "openvpn", { state: "idle", online: false, connectionCount: 0, expiringSoon: true, daysRemaining: 3, certificate: { id: "cert", serial: "4F:2A:91:0C:7B:33:12:EE:4F:2A:91:0C", subject: "CN=office-router-very-long-common-name", fingerprint: "SHA256:" + "f".repeat(43), notBefore: ago(9000), notAfter: "2027-05-06T00:00:00Z" } }),
   credential("cred_dis_444444", "Old laptop", "wireguard", { userDisabled: true, state: "disabled", online: false, connectionCount: 0 }),
+  credential("cred_sub_000000", "Family subscription made before every account had one (kept until deleted)", "vless", { subscriptionId: "sub_0" }),
 ];
 const regions = [
   { id: "sg", name: "Singapore", code: "SG", country: "Singapore", protocols: ["wireguard", "vless", "openvpn"], status: "available", protocolNodeCounts: { wireguard: 2, vless: 2, openvpn: 1 } },
@@ -33,6 +34,8 @@ const releases = [
 ];
 const history = [{ platform: "windows", arch: "x64", version: "1.1.3", build: 11, distribution: "direct", url: "https://downloads.example.com/Veilbird-1.1.3-windows-x64.exe", sha256: "c".repeat(64), minOs: "Windows 10 1809", publishedAt: ago(20000) }];
 
+const subscription = { id: "sub_1", token: "a".repeat(43), usable: true, lastFetchedAt: ago(4), lastFetchClient: "Shadowrocket" };
+
 /** A second brand with a long name and its own logo, to check the Portal on another site's domain. */
 export const otherSite = { id: "site_b", name: "Northern Lights Secure Access", isDefault: false, portalOrigin: "https://portal.northern.example", consoleOrigin: "", apiOrigin: "https://sub.northern.example",
   logoSvg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#6f90ff"/></svg>' };
@@ -53,9 +56,9 @@ export function portalApi({ signedIn = true, empty = false, site = null } = {}) 
       : { expiresAt: soon, access: { state: "active", until: soon, endedAt: null, quotaBytes: 100 * GB, usedBytes: 93.4 * GB, remainingBytes: 6.6 * GB } }), deviceLimit: empty ? null : 3, deviceCount: empty ? 0 : 4, devices: empty ? [] : [
       { id: "enr_1", name: "Aleksandra's ThinkPad X1 Carbon Gen 12 (office)", platform: "windows", lastSeenAt: now, connected: true, region: "São Paulo Metropolitan Area" },
       { id: "enr_2", name: "Pixel 8", platform: "android", lastSeenAt: ago(130), connected: false, region: null },
-    ] }];
+    ], online: empty ? { apps: 0, subscription: 0, total: 0 } : { apps: 1, subscription: 3, total: 4 } }];
     if (pathname === "/api/v1/usage/summary") return [200, { totals: { totalBytes: 44.9 * GB, uploadBytes: 3.2 * GB, downloadBytes: 41.7 * GB }, daily, updatedAt: now }];
-    if (pathname === "/api/v1/subscriptions") return [200, { subscriptions: [] }];
+    if (pathname === "/api/v1/subscriptions") return [200, { subscription: empty ? null : subscription }];
     if (pathname === "/api/v1/client-releases") return [200, { releases, history }];
     return [200, {}];
   };

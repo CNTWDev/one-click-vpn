@@ -6,7 +6,7 @@ import test from "node:test";
 import { otherSite, portalApi } from "./fixtures/portal-api.mjs";
 import { auditLayout, installWideFont } from "./fixtures/layout-audit.mjs";
 
-// The Portal's sign-in, request-access, onboarding and dashboard states, in every locale, at desktop / tablet / phone
+// The Portal's sign-in, request-access, home (subscription import) and single-node config states, in every locale, at desktop / tablet / phone
 // widths. Same audit as the Console: sideways scroll, text spill, overlap, clipped controls, glued words.
 // VEILBIRD_TEST_PLAYWRIGHT=<playwright-core entry> [VEILBIRD_TEST_BROWSER=<chromium>] [VEILBIRD_LAYOUT_SHOTS=<dir>]
 const locales = ["zh-CN", "en-US", "ru-RU"];
@@ -15,18 +15,18 @@ const views = [
   { name: "login", api: { signedIn: false }, ready: ".auth-panel" },
   { name: "register", api: { signedIn: false }, ready: ".auth-panel", open: (page) => page.locator(".auth-panel button.ghost.wide").click() },
   { name: "login-other-site", api: { signedIn: false, site: otherSite }, ready: ".auth-panel" },
-  { name: "home", ready: ".home .home-list li" },
+  { name: "home", ready: ".home .import-app" },
   { name: "home-empty", api: { empty: true }, ready: ".home .home-empty" },
-  // A Windows visitor gets the featured download with the app preview (ring and data stream) beside it.
-  { name: "home-windows", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36", ready: ".home .home-list li" },
-  { name: "home-details", ready: ".home .home-list li", open: (page) => page.locator(".home details > summary").click() },
-  { name: "onboarding", api: { empty: true }, hash: "#manual", ready: ".dashboard" },
-  { name: "dashboard-other-site", api: { site: otherSite }, ready: ".dashboard .list-item" },
-  { name: "dashboard", hash: "#manual", ready: ".dashboard .list-item" },
-  { name: "connection-openvpn", hash: "#manual", ready: ".dashboard .list-item", open: (page) => page.locator(".dashboard .list-item").nth(2).click() },
-  { name: "new-subscription", hash: "#manual", ready: ".dashboard .list-item", open: (page) => page.locator(".topbar-tools ~ * button.primary, .dashboard button.primary").first().click() },
-  { name: "new-single", hash: "#manual", ready: ".dashboard .list-item", open: async (page) => { await page.locator(".dashboard button.primary").first().click(); await page.locator(".mode-switch button").nth(1).click(); } },
-  { name: "details-open", hash: "#manual", ready: ".dashboard .list-item", open: async (page) => { for (const summary of await page.locator("details:not([open]) > summary").all()) await summary.click().catch(() => {}); } },
+  // The visitor's own platform comes first in both the import tiles and the app downloads.
+  { name: "home-windows", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36", ready: ".home .import-app" },
+  { name: "home-iphone", userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1", ready: ".home .import-app" },
+  { name: "home-link", ready: ".home .import-app", open: (page) => page.locator(".import-share button.secondary").click() },
+  { name: "home-reset", ready: ".home .import-reset", open: (page) => page.locator(".import-reset").click() },
+  { name: "home-details", ready: ".home .import-app", open: async (page) => { for (const summary of await page.locator(".home details:not([open]) > summary").all()) await summary.click().catch(() => {}); } },
+  { name: "home-other-site", api: { site: otherSite }, ready: ".home .import-app" },
+  { name: "manual", hash: "#manual", ready: ".dashboard .home-list li" },
+  { name: "manual-empty", api: { empty: true }, hash: "#manual", ready: ".dashboard .node-creator" },
+  { name: "manual-other-site", api: { site: otherSite }, hash: "#manual", ready: ".dashboard .home-list li" },
 ];
 
 test("Portal layout: no overflow, spill or overlap in any state, locale or width", { skip: !process.env.VEILBIRD_TEST_PLAYWRIGHT, timeout: 600000 }, async () => {

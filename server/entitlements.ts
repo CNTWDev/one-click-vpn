@@ -10,8 +10,9 @@ import { addAudit, dbQuery, getDb } from "./db";
  *
  * Each grant has three dimensions, and empty means unlimited in all of them: the period (permanent),
  * the traffic quota and the device limit. With several grants in force the account gets the largest
- * device limit. Devices are app sign-ins, subscriptions and node configs together (the account_slots
- * view); past the limit, only the first ones the account added keep working ({@link withinDeviceLimitSql}).
+ * device limit. Devices are app sign-ins and single-node configs (the account_slots view); past the limit,
+ * only the first ones the account added keep working ({@link withinDeviceLimitSql}). The account's subscription
+ * is not a device: how many places use it at once is counted from the nodes (online-clients.ts).
  * Accounts from before plans hold the "legacy" plan, which has no limit at all.
  */
 
@@ -43,15 +44,19 @@ export function deviceLimitSql(alias = "u"): string {
   return `${alias}.access_device_limit`;
 }
 
-/** Whether a device of the account (by its account_slots created_at and id) is among the first `limit` it added. */
+/**
+ * Whether a device of the account (by its account_slots created_at and id) is among the first `limit` it added.
+ * A subscription's credential is not a device, so it always is.
+ */
 export function withinDeviceLimitSql(alias: string, createdAt: string, id: string): string {
-  return `(${deviceLimitSql(alias)} IS NULL OR (SELECT count(*) FROM account_slots s WHERE s.user_id=${alias}.id AND (s.created_at,s.id)<(${createdAt},${id}))<${deviceLimitSql(alias)})`;
+  return `(${deviceLimitSql(alias)} IS NULL OR EXISTS (SELECT 1 FROM subscriptions sx WHERE sx.credential_id=${id})
+    OR (SELECT count(*) FROM account_slots s WHERE s.user_id=${alias}.id AND (s.created_at,s.id)<(${createdAt},${id}))<${deviceLimitSql(alias)})`;
 }
 
 const slotsSql = `SELECT ${deviceLimitSql("users")} AS "limit",(SELECT count(*) FROM account_slots s WHERE s.user_id=users.id)::int AS used FROM users WHERE id=$1`;
 const slotCount = (row?: { limit: number | null; used: number }) => ({ limit: row?.limit ?? null, used: Number(row?.used || 0) });
 
-/** Devices in use (app sign-ins, subscriptions, node configs) and the limit (null = unlimited). */
+/** Devices in use (app sign-ins, single-node configs) and the limit (null = unlimited). */
 export async function deviceSlots(userId: string) {
   return slotCount((await dbQuery<{ limit: number | null; used: number }>(slotsSql, [userId]))[0]);
 }
@@ -65,7 +70,7 @@ export async function assertDeviceSlot(userId: string, client?: PoolClient) {
 }
 
 export class DeviceLimitError extends Error {
-  constructor(public limit: number, public used: number) { super("设备数已达上限，请先删除不用的设备、订阅或配置"); }
+  constructor(public limit: number, public used: number) { super("设备数已达上限，请先删除不用的设备或配置"); }
 }
 
 const num = (value: string | number | null) => value === null ? null : Number(value);

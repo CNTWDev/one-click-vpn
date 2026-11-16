@@ -3,8 +3,7 @@ import { errorText } from "../../shared/i18n-errors";
 import { intlLocales } from "../../shared/i18n-core";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import QRCode from "qrcode";
-import { apps, type AppId } from "./client-options";
-import { dateLabel, protocolBadge, protocolLabel, relativeLabel } from "./format";
+import { dateLabel, relativeLabel } from "./format";
 
 /* Small, dependency-free building blocks shared by the Portal views. */
 
@@ -20,16 +19,6 @@ export const Icon = {
   check: (size?: number) => svg(<path d="M5 12.5l4.5 4.5L19 7.5" />, size),
   external: (size?: number) => svg(<><path d="M14 4h6v6M20 4l-9 9" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></>, size),
 };
-
-export function AppIcon({ id }: { id: AppId }) {
-  return <span className={`app-icon app-${id}`} aria-hidden="true">{apps[id].letter}</span>;
-}
-
-export function ProtocolBadge({ protocol, subscription = false }: { protocol: string; subscription?: boolean }) {
-  const { t } = useI18n();
-  // Same size and text for every connection; subscriptions only change the tint.
-  return <span className={`proto-badge ${subscription ? "sub" : protocol}`} aria-label={subscription ? t("{0} 订阅", [protocolLabel(protocol)]) : protocolLabel(protocol)}>{protocolBadge(protocol)}</span>;
-}
 
 /** Relative time with the absolute zh-CN time on hover. */
 export function Time({ value, fallback = "尚无记录", relative = true }: { value?: string | null; fallback?: string; relative?: boolean }) {

@@ -554,6 +554,26 @@ therefore keep the Portal/Admin dependency and build layers cached.
 See [ARCHITECTURE.md](ARCHITECTURE.md) and
 [docs/architecture](docs/architecture/README.md) for detailed design notes.
 
+### Agent 2.18: one subscription per account
+
+- **Portal home.** Every account has one subscription with every node. It is created the
+  first time the user imports it, never by hand. The home page imports it into Clash,
+  Hiddify or Shadowrocket with one tap (v2rayNG copies the link), and shows the QR code
+  and link without asking for a password; resetting the link asks for one. Single-node
+  WireGuard / OpenVPN / VLESS configs are made on their own page. Accounts with several
+  older subscriptions keep the oldest as the account subscription; the others keep working
+  and can only be deleted (single-node page, "之前创建的订阅").
+- **Devices.** The subscription no longer takes a device: app sign-ins and single-node
+  configs do. Welcome plans and grants move from 1 to 2 devices (migration 009).
+- **Online places.** Agent 2.18 reports, with each heartbeat, a 16-hex hash of every source
+  address using a subscription over REALITY, Hysteria2 or XHTTP (Xray `statsUserOnline`,
+  mihomo connections). The Controller keeps it in memory only for 3 minutes; the Portal and
+  Console show "现在在线", and accounts above their device limit are logged hourly as
+  `account.online_over_limit`. Nothing is blocked yet.
+
+Rollout: `sudo ./one-click-update.sh` (migration 009) → **升级 Agent** on each node to 2.18
+(Xray restarts once to turn on online stats). No new app builds are needed.
+
 ### Agent 2.17: outage tolerance, alerts and app entry points
 
 - **Controller outage.** App leases are renewed every 90 s and last 5 minutes. When the Agent

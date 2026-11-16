@@ -9,15 +9,16 @@ import { api, isUnauthorized } from "./api";
 import { Brand } from "./brand";
 import { detectPlatform, formatBytes } from "./format";
 import { PortalLanguagePicker } from "./language";
-import { DataStream, HeroRing, UsageBlocks } from "./pixel";
-import { Icon, InlineError, Skeleton, Time, useToasts } from "./ui";
+import { HeroRing, UsageBlocks } from "./pixel";
+import { AccountSubscription, useAccountSubscription } from "./account-subscription";
+import { InlineError, Skeleton, Time, useToasts } from "./ui";
 import "./home.css";
 
 type User = { email: string; displayName: string };
 type Device = { id: string; name: string; platform: string; lastSeenAt: string; connected: boolean; region: string | null };
 type Access = { state: "active" | "expired" | "exhausted" | "none"; until: string | null; quotaBytes: number | null; usedBytes: number; remainingBytes: number | null };
-/** deviceLimit null = unlimited; deviceCount includes subscriptions and node configs, which take a device too. */
-type Account = { expiresAt: string | null; access: Access; deviceLimit: number | null; deviceCount: number; devices: Device[] };
+/** deviceLimit null = unlimited; deviceCount = app sign-ins plus single-node configs; online = places in use right now. */
+type Account = { expiresAt: string | null; access: Access; deviceLimit: number | null; deviceCount: number; online: { apps: number; subscription: number; total: number }; devices: Device[] };
 
 const SOON_DAYS = 7;
 /** Whole days left until an end date, or null when the access has no end. */
@@ -55,15 +56,21 @@ function usePreferredArch() {
   return arch;
 }
 
-/** The current device's app first and alone; every other platform as one equal row; manual setup last. */
+/**
+ * Home: import the account's subscription into a third-party app first (every account has every node), then the
+ * account's figures and devices, a way to a single-node config, and our own apps last (only on the main site).
+ */
 export function Home({ user, onLogout, onManual }: { user: User; onLogout: () => void; onManual: () => void }) {
   const { t, locale } = useI18n();
   const site = useSite();
   const { ask, dialog } = useActionDialog();
   const { notify, toasts } = useToasts();
   const arch = usePreferredArch();
+  const subscription = useAccountSubscription(onLogout);
+  const ownApps = site?.isDefault !== false;
   const [releases, setReleases] = useState<Releases | null>(null), [releaseError, setReleaseError] = useState(false);
   const [account, setAccount] = useState<Account | null>(null), [usage, setUsage] = useState<Usage | null>(null), [accountError, setAccountError] = useState("");
+  const [nodes, setNodes] = useState<number | null>(null);
   const [busy, setBusy] = useState("");
 
   const loadReleases = useCallback(() => {
@@ -81,23 +88,25 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
     }
   }, [onLogout]);
   useEffect(() => {
-    const initial = window.setTimeout(() => { loadReleases(); void loadAccount(); }, 0);
+    const initial = window.setTimeout(() => {
+      if (ownApps) loadReleases();
+      void loadAccount();
+      void api<{ nodes: Array<{ protocols: string[] }> }>("/api/v1/availability").then((result) => setNodes((result.nodes || []).filter((node) => node.protocols.includes("vless")).length)).catch(() => undefined);
+    }, 0);
     const timer = window.setInterval(() => { if (!document.hidden) void loadAccount(); }, 30_000);
     return () => { window.clearTimeout(initial); window.clearInterval(timer); };
-  }, [loadReleases, loadAccount]);
+  }, [ownApps, loadReleases, loadAccount]);
 
   const mine = devicePlatform[detectPlatform()];
   const latest = (platform: ClientPlatform) => (releases?.releases || []).filter((item) => item.platform === platform);
-  /** One build per platform: this device's architecture, else a universal build, else the first. */
   // This device's architecture applies to its own platform only; other platforms lead with their common build.
   const pick = (platform: ClientPlatform) => { const items = latest(platform), want = platform === mine ? arch : "x64"; return items.find((item) => item.arch === want) || items.find((item) => item.arch === "universal") || items[0]; };
   const href = (item: ClientRelease, current = true) => item.distribution === "direct" && current ? `/download/${item.platform}/${item.arch}` : item.url;
-  const action = (item: ClientRelease, name: string) => item.distribution === "app-store" ? t("在 App Store 获取") : item.distribution === "testflight" ? t("通过 TestFlight 安装") : t("下载 {0} 版", [name]);
   const meta = (item: ClientRelease) => [item.version, item.arch === "universal" ? "" : item.arch, item.sizeBytes ? formatBytes(item.sizeBytes) : ""].filter(Boolean).join(" · ");
   const date = (value?: string) => { const parsed = new Date(value || ""); return Number.isNaN(parsed.getTime()) ? "" : new Intl.DateTimeFormat(intlLocales[locale], { dateStyle: "medium" }).format(parsed); };
   const siteName = site?.name || PRODUCT_NAME;
-  const featured = mine && releases ? pick(mine) : undefined;
-  const others = clientPlatforms.filter((platform) => platform !== (featured ? mine : undefined));
+  // This device's platform first, then the rest in the usual order.
+  const platforms = [...clientPlatforms].sort((a, b) => Number(b === mine) - Number(a === mine));
 
   async function signOut(device: Device) {
     const name = `${platformNames[device.platform as ClientPlatform] || device.platform} · ${device.name}`;
@@ -111,47 +120,18 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
     } finally { setBusy(""); }
   }
 
-  const preview = <div className="home-preview" aria-hidden="true">
-    <HeroRing />
-    <span className="home-stream"><DataStream /><DataStream count={12} salt={1} className="dim" /></span>
-  </div>;
-  const hero = !releases
-    ? <section className="home-hero" aria-busy={!releaseError}>{releaseError
-      ? <InlineError message={t("暂时无法获取客户端版本，请稍后重试。")} onRetry={loadReleases} />
-      : <div className="home-hero-text"><Skeleton width={120} /><Skeleton height={34} width="70%" /><Skeleton width="50%" /><Skeleton height={48} width={220} /></div>}{preview}</section>
-    : featured && mine
-      ? <section className="home-hero" aria-labelledby="home-title">
-        <div className="home-hero-text">
-          <p className="home-meta">{[platformNames[mine], meta(featured)].join(" · ")}</p>
-          <h1 id="home-title">{t("在 {0} 上使用 {1}", [platformNames[mine], siteName])}</h1>
-          <p className="home-lead">{t("下载安装后，用这个账号登录即可。")}</p>
-          <div className="home-download">
-            <a className="primary large" href={href(featured)} target="_blank" rel="noopener noreferrer">{Icon.download()}{action(featured, platformNames[mine])}</a>
-            {latest(mine).filter((item) => item !== featured).map((item) => <a key={item.arch} href={href(item)} target="_blank" rel="noopener noreferrer">{t("下载 {0} 版", [item.arch])}</a>)}
-          </div>
-        </div>
-        {preview}
-      </section>
-      : <section className="home-hero" aria-labelledby="home-title">
-        <div className="home-hero-text">
-          <p className="muted">{t("{0}，你好", [user.displayName])}</p>
-          <h1 id="home-title">{mine ? t("{0} 版即将推出", [platformNames[mine]]) : t("下载 {0} 客户端", [siteName])}</h1>
-          <p className="home-lead">{t("可以先在下面的设备上使用，用同一个账号登录。")}</p>
-          <div className="home-download"><button type="button" className="secondary wrap" onClick={onManual}>{t("在这台设备上用其他客户端")}</button></div>
-        </div>
-        {preview}
-      </section>;
-
   const devices = account?.devices || [];
+  const sub = subscription.subscription;
   const access = account?.access, quota = access?.quotaBytes ?? null, left = daysLeft(account?.expiresAt ?? null);
   const paused = access && access.state !== "active";
   const ending = access?.state === "active" && left !== null && left <= SOON_DAYS;
   const over = !!account && account.deviceLimit !== null && account.deviceCount > account.deviceLimit;
+  const crowded = !!account && account.deviceLimit !== null && account.online.total > account.deviceLimit;
   const low = access?.state === "active" && quota !== null && (access.remainingBytes || 0) <= quota * 0.1;
   return <main className="dashboard home">
     {dialog}{toasts}
     <Topbar user={user} onLogout={onLogout} />
-    {hero}
+    <AccountSubscription state={subscription} nodes={nodes} notify={notify} onLogout={onLogout} />
 
     {paused && <p className="callout warning home-access-notice" role="status">{access.state === "exhausted" ? t("流量已用完，暂时无法连接。请联系管理员增加流量。") : access.state === "expired" ? t("账号已到期，暂时无法连接。请联系管理员续期。") : t("账号暂未开通使用权限，请联系管理员。")}</p>}
     <section className="card home-stats" aria-label={t("账号概况")}>
@@ -165,22 +145,52 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
         {usage ? <span className="home-traffic"><strong className="pixel-figure">{figure(usage.totals.totalBytes)[0]}<span className="unit">{figure(usage.totals.totalBytes)[1]}</span></strong><UsageBlocks values={lastDays(usage)} /></span> : <Skeleton height={30} width="40%" />}
         {usage && <span className="home-stat-note mono">↓ {formatBytes(usage.totals.downloadBytes || 0)} · ↑ {formatBytes(usage.totals.uploadBytes || 0)}</span>}</div>}
       <div><small>{t("设备")}</small>{account ? <strong className={`pixel-figure${over ? " warning-text" : ""}`}>{account.deviceCount}<span className="unit">/ {account.deviceLimit ?? t("不限")}</span></strong> : <Skeleton height={30} width="40%" />}
-        {over && account.deviceLimit !== null && <span className="home-stat-note warning-text">{t("超出上限，只有最早的 {0} 个可用", [account.deviceLimit])}</span>}
-        {account && <a className="home-stat-note" href="#devices-title">{t("我的设备")}</a>}</div>
+        {over && account.deviceLimit !== null ? <span className="home-stat-note warning-text">{t("超出上限，只有最早的 {0} 个可用", [account.deviceLimit])}</span>
+          : account && <span className={`home-stat-note${crowded ? " warning-text" : ""}`}>{t("现在在线 {0} 处", [account.online.total])}</span>}</div>
     </section>
     {accountError && <InlineError message={accountError} onRetry={() => void loadAccount()} />}
 
-    <div className="home-columns">
-      <section className="card home-list" aria-labelledby="platforms-title">
-        <h2 id="platforms-title">{featured ? t("其他平台") : t("全部平台")}</h2>
-        <ul>{others.map((platform) => {
-          const item = releases ? pick(platform) : undefined;
-          return <li key={platform}>
-            <span className={`home-code${item ? "" : " off"}`} aria-hidden="true">{platformCodes[platform]}</span>
-            <span className="home-row-main"><b>{platformNames[platform]}</b><small>{!releases ? <Skeleton height={12} width={90} /> : item ? meta(item) : t("即将推出")}</small></span>
-            {item && <a className="secondary small" href={href(item)} target="_blank" rel="noopener noreferrer">{item.distribution === "direct" ? t("下载") : t("获取")}</a>}
-          </li>;
-        })}</ul>
+    <section className="card home-list" aria-labelledby="devices-title">
+      <h2 id="devices-title">{t("我的设备")}</h2>
+      {!account ? <ul><li><Skeleton height={36} /></li><li><Skeleton height={36} /></li></ul>
+        : devices.length || sub ? <ul>{devices.map((device) => <li key={device.id}>
+          <span className={`presence ${device.connected ? "online" : ""}`} role="img" aria-label={device.connected ? t("正在使用") : t("未连接")} />
+          <span className="home-row-main"><b>{platformNames[device.platform as ClientPlatform] || device.platform} · {device.name}</b>
+            <small>{device.connected ? device.region ? t("正在使用 · {0}", [device.region]) : t("正在使用") : <Time value={device.lastSeenAt} />}</small></span>
+          <button type="button" className="ghost small" disabled={busy === device.id} onClick={() => void signOut(device)}>{t("退出登录")}</button>
+        </li>)}
+          {sub && <li>
+            <span className={`presence ${account.online.subscription ? "online" : ""}`} role="img" aria-label={account.online.subscription ? t("正在使用") : t("未连接")} />
+            <span className="home-row-main"><b>{t("订阅链接")}</b>
+              <small>{account.online.subscription ? t("{0} 处正在使用", [account.online.subscription]) : sub.lastFetchedAt ? <>{[t("最近更新"), sub.lastFetchClient].filter(Boolean).join(" · ")} · <Time value={sub.lastFetchedAt} /></> : t("还没有应用导入")}</small></span>
+          </li>}</ul>
+          : <p className="hint home-empty">{t("还没有设备。导入订阅或登录客户端后会显示在这里。")}</p>}
+      {sub && <p className="hint">{t("订阅可以导入到任意多个应用，不占设备数。")}</p>}
+      {account && account.deviceCount > devices.length && <p className="hint">{t("另有 {0} 个单节点配置也算在设备数里，不用的可以在「单个节点配置」里删除。", [account.deviceCount - devices.length])}</p>}
+    </section>
+
+    <button type="button" className="home-manual" onClick={onManual}>
+      <span><b>{t("为单个节点创建配置")}</b><small>{t("选节点和协议，生成 WireGuard、OpenVPN 或 VLESS 单独配置")}</small></span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+    </button>
+
+    {ownApps && <section className="home-own" aria-labelledby="own-title">
+      <div className="home-own-text">
+        <HeroRing />
+        <p className="home-meta">{siteName} App</p>
+        <h2 id="own-title">{t("或者用我们的客户端")}</h2>
+        <p className="home-lead">{t("自动选择最快的线路，断线时自动切换。下载后用这个账号登录即可。")}</p>
+      </div>
+      <div className="card home-list">
+        {releaseError ? <InlineError message={t("暂时无法获取客户端版本，请稍后重试。")} onRetry={loadReleases} />
+          : <ul>{platforms.map((platform) => {
+            const item = releases ? pick(platform) : undefined;
+            return <li key={platform}>
+              <span className={`home-code${item ? "" : " off"}`} aria-hidden="true">{platformCodes[platform]}</span>
+              <span className="home-row-main"><b>{platformNames[platform]}{platform === mine && <span className="import-tag">{t("本机")}</span>}</b><small>{!releases ? <Skeleton height={12} width={90} /> : item ? meta(item) : t("即将推出")}</small></span>
+              {item && <a className={`${platform === mine ? "primary" : "secondary"} small`} href={href(item)} target="_blank" rel="noopener noreferrer">{item.distribution === "direct" ? t("下载") : t("获取")}</a>}
+            </li>;
+          })}</ul>}
         {releases && releases.releases.length > 0 && <details className="disclosure compact">
           <summary>{t("版本详情与历史版本")}</summary>
           <ul className="home-versions">{[...releases.releases.map((item) => ({ item, current: true })), ...releases.history.map((item) => ({ item, current: false }))].map(({ item, current }) => <li key={`${item.platform}:${item.arch}:${item.build}`}>
@@ -190,27 +200,8 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
             <a className="ghost small" href={href(item, current)} target="_blank" rel="noopener noreferrer">{item.distribution === "direct" ? t("下载") : t("获取")}</a>
           </li>)}</ul>
         </details>}
-      </section>
-
-      <section className="card home-list" aria-labelledby="devices-title">
-        <h2 id="devices-title">{t("我的设备")}</h2>
-        {!account ? <ul><li><Skeleton height={36} /></li><li><Skeleton height={36} /></li></ul>
-          : devices.length ? <ul>{devices.map((device) => <li key={device.id}>
-            <span className={`presence ${device.connected ? "online" : ""}`} role="img" aria-label={device.connected ? t("正在使用") : t("未连接")} />
-            <span className="home-row-main"><b>{platformNames[device.platform as ClientPlatform] || device.platform} · {device.name}</b>
-              <small>{device.connected ? device.region ? t("正在使用 · {0}", [device.region]) : t("正在使用") : <Time value={device.lastSeenAt} />}</small></span>
-            <button type="button" className="ghost small" disabled={busy === device.id} onClick={() => void signOut(device)}>{t("退出登录")}</button>
-          </li>)}</ul>
-            : <p className="hint home-empty">{t("还没有设备登录。安装客户端并登录后会显示在这里。")}</p>}
-        {devices.length > 0 && <p className="hint">{t("设备丢了？在这里让它退出登录。")}</p>}
-        {account && account.deviceCount > devices.length && <p className="hint">{t("另有 {0} 个订阅或节点配置也算在设备数里，可以在「使用其他客户端」里删除不用的。", [account.deviceCount - devices.length])}</p>}
-      </section>
-    </div>
-
-    <button type="button" className="home-manual" onClick={onManual}>
-      <span><b>{t("使用其他客户端")}</b><small>{t("Clash、Shadowrocket、WireGuard、OpenVPN 等，手动导入订阅或配置")}</small></span>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
-    </button>
+      </div>
+    </section>}
     <footer className="home-footer"><span className="home-footer-mark" aria-hidden="true">{siteName.toUpperCase()}</span><span>{t("{0} · 账号仅供本人使用，请勿分享。", [siteName])}</span></footer>
   </main>;
 }
