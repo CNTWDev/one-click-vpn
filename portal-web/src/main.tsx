@@ -1,4 +1,5 @@
 import { useI18n } from "../../shared/i18n";
+import { SpaceBackdrop } from "./space";
 import { Brand } from "./brand";
 import { BrandMark } from "../../shared/brand";
 import { PasswordInput } from "../../shared/password-input";
@@ -208,4 +209,4 @@ export default function App() {
     : !user ? <Auth mode={mode} onMode={setMode} onUser={setUser} notice={notice} /> : <Pending user={user} onLogout={() => void logout()} />}</>;
 }
 
-createRoot(document.getElementById("root")!).render(<PortalLanguage><App /></PortalLanguage>);
+createRoot(document.getElementById("root")!).render(<PortalLanguage><SpaceBackdrop /><App /></PortalLanguage>);
