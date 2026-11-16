@@ -17,7 +17,7 @@ const views = [
   { name: "login-other-site", api: { signedIn: false, site: otherSite }, ready: ".auth-panel" },
   { name: "home", ready: ".home .import-app" },
   { name: "home-empty", api: { empty: true }, ready: ".home .home-empty" },
-  // The visitor's own platform comes first in both the import tiles and the app downloads.
+  // The visitor's own platform comes first in the app downloads; the import tiles are the same everywhere.
   { name: "home-windows", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36", ready: ".home .import-app" },
   { name: "home-iphone", userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1", ready: ".home .import-app" },
   { name: "home-link", ready: ".home .import-app", open: (page) => page.locator(".import-share button.secondary").click() },

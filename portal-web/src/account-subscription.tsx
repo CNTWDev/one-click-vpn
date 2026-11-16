@@ -4,8 +4,8 @@ import { PasswordInput } from "../../shared/password-input";
 import { PRODUCT_NAME } from "../../shared/brand-name";
 import { useSite } from "../../shared/site";
 import { api, isUnauthorized } from "./api";
-import { apps, appsFor, otherPlatforms, type AppId } from "./client-options";
-import { detectPlatform, importUrls, platformName, subscriptionLink } from "./format";
+import { appOrder as order, apps, type AppId } from "./client-options";
+import { importUrls, subscriptionLink } from "./format";
 import { Icon, InlineError, Modal, QrCode, Skeleton, type Notify } from "./ui";
 
 /** The account's one subscription; null until first used. token is null for an early link that was never stored. */
@@ -45,12 +45,10 @@ export function AccountSubscription({ state, nodes, notify, onLogout }: {
   const { t } = useI18n();
   const site = useSite();
   const narrow = useNarrow();
-  const platform = detectPlatform();
   const name = site?.name || PRODUCT_NAME;
   const { subscription, error, ensure, setSubscription } = state;
   const [revealed, setRevealed] = useState(false), [busy, setBusy] = useState(false);
   const [resetting, setResetting] = useState(false), [password, setPassword] = useState(""), [resetError, setResetError] = useState("");
-  const order = appsFor(platform);
   const link = subscription?.token ? subscriptionLink(subscription.token, site?.apiOrigin) : "";
   const blocked = subscription ? !subscription.usable : false;
 
@@ -91,17 +89,17 @@ export function AccountSubscription({ state, nodes, notify, onLogout }: {
     v2rayng: t("链接已复制。在 v2rayNG 里点右上角 ＋，选「从剪贴板导入」。"),
     v2rayn: t("链接已复制。在 v2rayN 的「订阅分组设置」里添加，然后点「更新订阅」。"),
   };
-  const downloads = (ids: AppId[]) => ids.map((id, index) => <span key={id}>{index ? " · " : ""}<a href={apps[id].url} target="_blank" rel="noopener noreferrer">{apps[id].name}</a></span>);
+  const downloads = (ids: readonly AppId[]) => ids.map((id, index) => <span key={id}>{index ? " · " : ""}<a href={apps[id].url} target="_blank" rel="noopener noreferrer">{apps[id].name}</a></span>);
   const tiles = <div className="import-apps">{order.map((id) => <button key={id} type="button" className="import-app" disabled={busy || blocked} onClick={() => open(id)}>
     <span className="home-code" aria-hidden="true">{apps[id].code}</span>
-    <span className="home-row-main"><b>{apps[id].name}</b><small>{apps[id].import === "copy" ? t("复制链接后导入") : t("一键导入")}</small></span>
+    <span className="home-row-main"><b>{apps[id].name}</b><small>{apps[id].platforms}</small></span>
     {apps[id].import === "copy" ? <span className="import-icon" aria-hidden="true">{Icon.copy(18)}</span>
       : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>}
   </button>)}
-    {narrow && <button type="button" className="import-app" disabled={busy || blocked} onClick={() => void withLink((value) => copy(value))}>
+    <button type="button" className="import-app" disabled={busy || blocked} onClick={() => void withLink((value) => copy(value))}>
       <span className="home-code" aria-hidden="true">{Icon.copy(16)}</span>
       <span className="home-row-main"><b>{t("复制链接")}</b><small>{t("粘贴到任意客户端")}</small></span>
-    </button>}
+    </button>
   </div>;
 
   const shareBody = !subscription || !revealed
@@ -127,13 +125,10 @@ export function AccountSubscription({ state, nodes, notify, onLogout }: {
       <p className="home-meta">{nodes === null ? t("订阅 · 自动同步") : t("订阅 · {0} 个节点 · 自动同步", [nodes])}</p>
       <h1 id="home-title">{t("选择客户端，一键导入")}</h1>
       <p className="home-lead">{t("账号已包含全部节点。节点有增减时，客户端会自动更新，不需要再创建订阅。")}</p>
-      {subscription === undefined && !error ? <div className="import-apps">{order.map((key) => <Skeleton key={key} height={72} />)}</div> : tiles}
+      {subscription === undefined && !error ? <div className="import-apps">{[...order, "copy"].map((key) => <Skeleton key={key} height={72} />)}</div> : tiles}
       {error && <InlineError message={error} onRetry={() => void state.reload()} />}
       {blocked && <p className="hint warning-text">{t("账号暂时无法连接，恢复后才能导入。")}</p>}
       <p className="hint">{t("还没安装？")} {downloads(order)}</p>
-      <details className="disclosure compact import-platforms"><summary>{t("其他设备的客户端")}</summary>
-        <ul>{otherPlatforms(platform).map((item) => <li key={item.platform}><b>{platformName[item.platform]}</b><span>{downloads(item.apps)}</span></li>)}</ul>
-      </details>
     </div>
     {narrow
       ? <details className="card import-other"><summary><span><b>{t("在另一台设备上导入")}</b><small>{t("二维码和订阅链接")}</small></span></summary><div className="import-other-body">{share}</div></details>

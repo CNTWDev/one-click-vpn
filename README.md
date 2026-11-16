@@ -454,9 +454,9 @@ Older WireGuard subscriptions are moved to VLESS under the same link by the minu
 WireGuard credential keeps working 7 days for devices that have not refreshed yet.
 
 - Supported target formats: Mihomo/Clash Meta YAML (JSON-compatible YAML).
-  The Portal offers, per platform: iPhone/iPad Shadowrocket, Stash; Android Clash Meta
-  for Android, v2rayNG; macOS Clash Verge Rev, ClashX Meta; Windows Clash Verge Rev,
-  v2rayN; Linux Clash Verge Rev (`portal-web/src/client-options.ts`). Import the personal URL as a remote subscription,
+  The Portal offers the same list on every device: Clash Verge Rev (Mac/Windows/Linux),
+  ClashX Meta (Mac), v2rayN (Windows), Clash Meta for Android, v2rayNG (Android),
+  Shadowrocket, Stash (iPhone/iPad) (`portal-web/src/client-options.ts`). Import the personal URL as a remote subscription,
   not as a local file. Actual support depends on the installed client/core version.
   Official WireGuard/OpenVPN clients continue using the existing file-download flow.
 - The response requests hourly refresh; the actual schedule is client-dependent,
@@ -583,8 +583,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) and
 ### Agent 2.18: one subscription per account
 
 - **Portal home.** Every account has one subscription with every node. It is created the
-  first time the user imports it, never by hand. The home page shows only the
-  visitor's platform's apps (others under 「其他设备的客户端」): one tap through `clash://`,
+  first time the user imports it, never by hand. The home page lists the same apps with
+  their platforms on every device: one tap through `clash://`,
   `stash://` or `shadowrocket://`; v2rayNG and v2rayN copy the link, and shows the QR code
   and link without asking for a password; resetting the link asks for one. Single-node
   WireGuard / OpenVPN / VLESS configs are made on their own page. Accounts with several

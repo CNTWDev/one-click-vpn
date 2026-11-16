@@ -1,20 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { apps, appsFor, otherPlatforms, platformApps, platforms, usableCredential } from "../portal-web/src/client-options.ts";
+import { appOrder, apps, usableCredential } from "../portal-web/src/client-options.ts";
 
-test("each platform shows only its own apps; every app is listed somewhere", () => {
-  assert.deepEqual(appsFor("ios"), ["shadowrocket", "stash"]);
-  assert.deepEqual(appsFor("android"), ["clashmeta", "v2rayng"]);
-  assert.deepEqual(appsFor("mac"), ["clashverge", "clashx"]);
-  assert.deepEqual(appsFor("windows"), ["clashverge", "v2rayn"]);
-  assert.deepEqual(appsFor("linux"), ["clashverge"]);
-  assert.deepEqual(new Set(Object.values(platformApps).flat()), new Set(Object.keys(apps)));
-  for (const platform of platforms) {
-    const others = otherPlatforms(platform);
-    assert.equal(others.length, platforms.length - 1);
-    assert.ok(others.every((item) => item.platform !== platform));
+test("one app list for every device, each with its platforms and download page", () => {
+  assert.deepEqual(appOrder, ["clashverge", "clashx", "v2rayn", "clashmeta", "v2rayng", "shadowrocket", "stash"]);
+  assert.ok(!appOrder.includes("hiddify"));
+  for (const app of Object.values(apps)) {
+    assert.match(app.url, /^https:\/\//);
+    assert.ok(app.platforms.length > 0);
   }
-  for (const app of Object.values(apps)) assert.match(app.url, /^https:\/\//);
+  for (const platform of ["iPhone", "Android", "Mac", "Windows", "Linux"]) assert.ok(Object.values(apps).some((app) => app.platforms.includes(platform)), platform);
 });
 test("available connection count excludes disabled, expired and blocked credentials", () => {
   const item = { status: "active", userDisabled: false, adminDisabled: false, accountStatus: "active", expiresAt: "2027-01-01T00:00:00Z" };
