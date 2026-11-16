@@ -187,9 +187,9 @@ struct ActivityView:View {
     private var split:(proxy:Int,direct:Int) {(int(data?["proxy"]),int(data?["direct"]))}
     private func legend(_ proxy:Bool,_ bytes:Int,free:Bool=false)->some View {
         (Text("■ ").foregroundColor(proxy ? VeilbirdStyle.accent:Self.direct)
-            +Text(L10n.text(proxy ? "activity_proxy":"activity_direct")+" ")
-            +Text(Self.size(bytes)).font(.system(size:12,design:.monospaced)).foregroundColor(VeilbirdStyle.text)
-            +Text(free ? " · "+L10n.text("activity_direct_free"):""))
+            + Text(L10n.text(proxy ? "activity_proxy":"activity_direct")+" ")
+            + Text(Self.size(bytes)).font(.system(size:12,design:.monospaced)).foregroundColor(VeilbirdStyle.text)
+            + Text(free ? " · "+L10n.text("activity_direct_free"):""))
             .font(.system(size:12)).foregroundStyle(proxy ? VeilbirdStyle.text:VeilbirdStyle.secondary).lineLimit(1)
     }
     private var splitBar:some View {

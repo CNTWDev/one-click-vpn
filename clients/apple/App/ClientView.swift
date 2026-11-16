@@ -60,9 +60,9 @@ struct ClientView:View {
                     #endif
                 } else {loginView}
             }
+            // Mac signed in: the activity panel sits beside the app's column (the window widens to hold it).
+            .frame(width:mac && model.signedIn ? 380:nil)
             #if os(macOS)
-            // Signed in, the activity panel sits beside the app's column (the window widens to hold it).
-            .frame(width:model.signedIn ? 380:nil)
             if model.signedIn {
                 Rectangle().fill(Color(red:26/255,green:35/255,blue:28/255)).frame(width:1)
                 ActivityView()
