@@ -158,6 +158,7 @@ test("Portal i18n: system language, persistence, auth, subscription import, sing
     await page.getByRole("button", { name: "Back to home", exact: true }).click();
     await page.getByRole("heading", { name: "Pick your app to import", level: 1 }).waitFor();
     await page.getByRole("heading", { name: "Or use our app", level: 2 }).waitFor();
+    await page.getByText("Coming soon", { exact: true }).first().waitFor();
     assert.equal(await page.getByText("Coming soon", { exact: true }).count(), 4);
     await page.getByText("In use · Singapore", { exact: true }).waitFor();
     let catalogUnavailable = true;
