@@ -363,7 +363,7 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
       </form>
     </Modal>}
 
-    {install && <Modal title={t("{0} · 安装命令", [install.nodeName])} description={t("用 root 在节点上运行（非 root 账号把 | sh 换成 | sudo sh）。命令只能用一次，{0}前有效。", [formatTime(install.expiresAt)])} onClose={() => setInstall(null)}
+    {install && <Modal title={t("{0} · 安装命令", [install.nodeName])} description={t("用 root 在节点上运行（非 root 账号把 | sh 换成 | sudo sh）。节点上线前可重复运行，{0}前有效。", [formatTime(install.expiresAt)])} onClose={() => setInstall(null)}
       footer={<div className="form-actions"><span className="grow" /><button type="button" className="button ghost" onClick={() => setInstall(null)}>{t("关闭")}</button><button type="button" className="button primary" onClick={() => void navigator.clipboard.writeText(install.command).then(() => toast(t("已复制安装命令。")), () => toast(t("无法复制，请手动选择命令。"), "info"))}><Icon name="copy" size={16} />{t("复制命令")}</button></div>}>
       <pre className="install-command"><code>{install.command}</code></pre>
       <p className="form-note">{t("运行后节点自动安装 Agent 并出现在列表中，部署进度可在节点详情查看。需要能访问本 Controller 的 HTTPS 域名，不需要开放 SSH。")}</p>

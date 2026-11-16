@@ -3667,9 +3667,9 @@
     "{0} · Install command",
     "{0} · Команда установки"
   ],
-  "用 root 在节点上运行（非 root 账号把 | sh 换成 | sudo sh）。命令只能用一次，{0}前有效。": [
-    "Run it on the node as root (for other accounts replace | sh with | sudo sh). It works once, until {0}.",
-    "Выполните на узле от root (для других учётных записей замените | sh на | sudo sh). Команда одноразовая и действует до {0}."
+  "用 root 在节点上运行（非 root 账号把 | sh 换成 | sudo sh）。节点上线前可重复运行，{0}前有效。": [
+    "Run it on the node as root (for other accounts replace | sh with | sudo sh). It can be rerun until the node is online, until {0}.",
+    "Выполните на узле от root (для других учётных записей замените | sh на | sudo sh). Её можно запускать повторно, пока узел не в сети, до {0}."
   ],
   "已复制安装命令。": [
     "Install command copied.",
