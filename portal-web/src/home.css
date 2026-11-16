@@ -52,13 +52,9 @@
 .home-stats .unit { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; color: var(--text-2); margin-left: 6px; letter-spacing: 0; }
 .home-stat-note { font-size: 12px; color: var(--text-2); text-decoration: none; }
 a.home-stat-note { color: var(--accent); justify-self: start; }
-.home-quota { display: block; flex: 0 1 150px; height: 8px; margin-bottom: 4px; overflow: hidden; background: var(--border); }
-.home-quota > i { display: block; height: 100%; background: var(--accent); }
-.home-quota.low > i { background: var(--warning); }
 .home-stat-note.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .home-traffic { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; min-width: 0; }
 .home-traffic strong { flex: none; }
-.home-traffic .pixel-blocks { width: 150px; max-width: 50%; height: 28px; margin: 0; }
 /* Our own apps, last: the ring and a few words beside the platform list. */
 .home > .home-own { margin-top: 40px; }
 .home-own { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 48px; align-items: center; padding-top: 40px; border-top: 1px solid var(--border); }
@@ -106,7 +102,7 @@ a.home-stat-note { color: var(--accent); justify-self: start; }
   .home-stats > div + div { border-left: 0; border-top: 1px solid var(--border); }
   .home-stats strong { font-size: 16px; text-align: right; }
   .home-stats strong.pixel-figure { font-size: 20px; }
-  .home-stats .pixel-blocks, .home-stats .home-quota, .home-stat-note { display: none; }
+  .home-stats .quota-blocks, .home-stat-note { display: none; }
   .home-list { padding: 20px; }
   .home-own h2 { font-size: 21px; }
 }
@@ -114,3 +110,46 @@ a.home-stat-note { color: var(--accent); justify-self: start; }
 .manual-head .back-link { margin-left: -12px; }
 .home .secondary.wrap { white-space: normal; text-align: center; min-height: 42px; height: auto; padding-block: 8px; }
 .home-access-notice { margin-bottom: 0; }
+/* Remaining traffic as square blocks (lit = left). */
+.quota-blocks { flex: 0 1 150px; display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 2px; margin-bottom: 4px; min-width: 60px; }
+.quota-blocks > i { height: 8px; background: var(--border); }
+.quota-blocks > i.on { background: var(--accent); }
+.quota-blocks.low > i.on { background: var(--warning); }
+/* Usage card: range switch, the figure, daily columns of square dots, and where the traffic went. */
+.usage-card { display: grid; gap: 16px; }
+.usage-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.usage-head h2 { margin: 0; font-size: 16px; }
+.usage-ranges { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); max-width: 100%; }
+.usage-ranges button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--text-2); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.usage-ranges button:hover { color: var(--text); }
+.usage-ranges button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--border-strong); }
+.usage-figure { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; min-height: 34px; }
+.usage-figure strong.pixel-figure { font-size: 34px; line-height: 1; letter-spacing: .02em; }
+.usage-figure .unit { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; color: var(--text-2); margin-left: 6px; letter-spacing: 0; }
+.usage-chart-wrap { display: grid; gap: 6px; min-width: 0; }
+.usage-chart { display: flex; align-items: flex-end; justify-content: space-between; gap: 3px; height: 106px; overflow: hidden; border-bottom: 1px solid var(--border); padding-bottom: 2px; }
+.usage-chart > span { flex: 1 1 0; min-width: 2px; max-width: 14px; background: repeating-linear-gradient(to top, var(--accent) 0 4px, transparent 4px 6px); }
+.usage-chart > span.dim { background: repeating-linear-gradient(to top, color-mix(in srgb, var(--accent) 35%, transparent) 0 4px, transparent 4px 6px); }
+.usage-chart > span.future { background: repeating-linear-gradient(to top, var(--border) 0 4px, transparent 4px 6px); }
+.usage-axis { display: flex; justify-content: space-between; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; color: var(--text-2); }
+.usage-peak { margin: 0; font-size: 12px; color: var(--text-2); }
+.usage-ranks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 40px; padding-top: 8px; border-top: 1px solid var(--border); }
+.usage-ranks h3 { margin: 8px 0 4px; font-size: 14px; font-weight: 600; color: var(--text-2); }
+.usage-ranks ul { list-style: none; margin: 0; padding: 0; }
+.usage-ranks li { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+.usage-ranks .home-code { width: 40px; height: 28px; font-size: 13px; }
+.usage-ranks .hint { margin: 4px 0 0; }
+.usage-rank-main { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.usage-rank-main b { font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.usage-track { display: block; height: 6px; background: repeating-linear-gradient(to right, var(--border) 0 4px, transparent 4px 6px); }
+.usage-track > i { display: block; height: 100%; background: repeating-linear-gradient(to right, var(--accent) 0 4px, transparent 4px 6px); }
+.usage-rank-value { flex: none; min-width: 64px; text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+.usage-empty { margin: 0; }
+@media (max-width: 760px) {
+  .usage-ranks { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .usage-card { padding: 20px; }
+  .usage-figure strong.pixel-figure { font-size: 28px; }
+  .usage-chart { gap: 2px; }
+}

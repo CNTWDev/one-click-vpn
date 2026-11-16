@@ -23,6 +23,7 @@ const views = [
   { name: "home-link", ready: ".home .import-app", open: (page) => page.locator(".import-share button.secondary").click() },
   { name: "home-reset", ready: ".home .import-reset", open: (page) => page.locator(".import-reset").click() },
   { name: "home-details", ready: ".home .import-app", open: async (page) => { for (const summary of await page.locator(".home details:not([open]) > summary").all()) await summary.click().catch(() => {}); } },
+  { name: "home-usage-today", ready: ".home .usage-ranks li", open: (page) => page.locator(".usage-ranges button").first().click() },
   { name: "home-other-site", api: { site: otherSite }, ready: ".home .import-app" },
   { name: "manual", hash: "#manual", ready: ".dashboard .home-list li" },
   { name: "manual-empty", api: { empty: true }, hash: "#manual", ready: ".dashboard .node-creator" },

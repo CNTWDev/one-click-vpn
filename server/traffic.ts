@@ -235,6 +235,36 @@ export async function usageByDevices(userId: string, input: { from?: string; to?
   return { from, to, devices: rows.map((row) => ({ deviceId: row.device_id, displayName: row.display_name, platform: row.platform, ...numbers(row) })) };
 }
 
+/**
+ * The Portal's usage card: totals for a range plus where the traffic went, by node and by device (top six each).
+ * A device that carries the account's subscription is marked so the Portal can name it; app sign-ins keep their platform.
+ */
+export async function usageBreakdown(userId: string, input: { from?: string; to?: string }) {
+  const { from, to } = range(input);
+  const totals = (await dbQuery<{ upload_bytes: string; download_bytes: string }>(
+    "SELECT COALESCE(SUM(upload_bytes), 0)::text AS upload_bytes, COALESCE(SUM(download_bytes), 0)::text AS download_bytes FROM traffic_daily WHERE user_id = $1 AND day BETWEEN $2 AND $3", [userId, from, to],
+  ))[0] || { upload_bytes: "0", download_bytes: "0" };
+  const nodes = await dbQuery<{ node_id: string; name: string | null; code: string | null; upload_bytes: string; download_bytes: string }>(
+    `SELECT t.node_id, n.name, r.code, COALESCE(SUM(t.upload_bytes), 0)::text AS upload_bytes, COALESCE(SUM(t.download_bytes), 0)::text AS download_bytes
+      FROM traffic_daily t LEFT JOIN nodes n ON n.id = t.node_id LEFT JOIN regions r ON r.id = n.region_id
+      WHERE t.user_id = $1 AND t.day BETWEEN $2 AND $3 GROUP BY t.node_id, n.name, r.code
+      ORDER BY SUM(t.upload_bytes + t.download_bytes) DESC LIMIT 6`, [userId, from, to],
+  );
+  const devices = await dbQuery<{ device_id: string; name: string | null; platform: string | null; subscription: boolean; upload_bytes: string; download_bytes: string }>(
+    `SELECT t.device_id, d.display_name AS name, d.platform,
+      bool_or(EXISTS (SELECT 1 FROM subscriptions s WHERE s.credential_id = t.credential_id)) AS subscription,
+      COALESCE(SUM(t.upload_bytes), 0)::text AS upload_bytes, COALESCE(SUM(t.download_bytes), 0)::text AS download_bytes
+      FROM traffic_daily t LEFT JOIN devices d ON d.id = t.device_id
+      WHERE t.user_id = $1 AND t.day BETWEEN $2 AND $3 GROUP BY t.device_id, d.display_name, d.platform
+      ORDER BY SUM(t.upload_bytes + t.download_bytes) DESC LIMIT 6`, [userId, from, to],
+  );
+  return {
+    from, to, totals: numbers(totals),
+    nodes: nodes.map((row) => ({ nodeId: row.node_id, name: row.name || "", countryCode: row.code ? row.code.toUpperCase() : null, ...numbers(row) })),
+    devices: devices.map((row) => ({ deviceId: row.device_id, name: row.name || "", platform: row.platform || "", subscription: !!row.subscription, ...numbers(row) })),
+  };
+}
+
 export async function credentialAccessOverview(userId: string, input: { from?: string; to?: string } = {}) {
   const subscriptions = await dbQuery<{ id: string; credential_id: string }>("SELECT s.id,s.credential_id FROM subscriptions s JOIN access_credentials c ON c.id=s.credential_id WHERE c.user_id=$1", [userId]);
   const { from, to } = range(input);
