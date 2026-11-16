@@ -1273,5 +1273,160 @@
     "zh": "本月",
     "en": "This month",
     "ru": "Этот месяц"
+  },
+  "activity_title": {
+    "zh": "活动",
+    "en": "Activity",
+    "ru": "Активность"
+  },
+  "activity_local_only": {
+    "zh": "只记在本机，断开后清空",
+    "en": "Kept on this device only, cleared when you disconnect",
+    "ru": "Только на этом устройстве, стирается при отключении"
+  },
+  "activity_connections": {
+    "zh": "连接",
+    "en": "Connections",
+    "ru": "Соединения"
+  },
+  "activity_ranking": {
+    "zh": "排行",
+    "en": "Top",
+    "ru": "Топ"
+  },
+  "activity_traffic": {
+    "zh": "流量",
+    "en": "Traffic",
+    "ru": "Трафик"
+  },
+  "activity_dns": {
+    "zh": "DNS",
+    "en": "DNS",
+    "ru": "DNS"
+  },
+  "activity_all": {
+    "zh": "全部",
+    "en": "All",
+    "ru": "Все"
+  },
+  "activity_proxy": {
+    "zh": "加速",
+    "en": "Proxied",
+    "ru": "Через VPN"
+  },
+  "activity_direct": {
+    "zh": "直连",
+    "en": "Direct",
+    "ru": "Напрямую"
+  },
+  "activity_direct_free": {
+    "zh": "不占套餐",
+    "en": "not counted",
+    "ru": "не учитывается"
+  },
+  "activity_domain": {
+    "zh": "域名",
+    "en": "Domain",
+    "ru": "Домен"
+  },
+  "activity_app": {
+    "zh": "应用",
+    "en": "App",
+    "ru": "Приложение"
+  },
+  "activity_rule": {
+    "zh": "规则",
+    "en": "Rule",
+    "ru": "Правило"
+  },
+  "activity_out": {
+    "zh": "出口",
+    "en": "Exit",
+    "ru": "Выход"
+  },
+  "activity_down": {
+    "zh": "下行",
+    "en": "Down",
+    "ru": "Приём"
+  },
+  "activity_duration": {
+    "zh": "时长",
+    "en": "Time",
+    "ru": "Время"
+  },
+  "activity_by_domain": {
+    "zh": "按域名",
+    "en": "By domain",
+    "ru": "По доменам"
+  },
+  "activity_by_rule": {
+    "zh": "按规则",
+    "en": "By rule",
+    "ru": "По правилам"
+  },
+  "activity_by_app": {
+    "zh": "按应用",
+    "en": "By app",
+    "ru": "По приложениям"
+  },
+  "activity_this_session": {
+    "zh": "本次连接",
+    "en": "This connection",
+    "ru": "Это подключение"
+  },
+  "activity_per_hour": {
+    "zh": "本次连接 · 每小时",
+    "en": "This connection · per hour",
+    "ru": "Это подключение · по часам"
+  },
+  "activity_peak": {
+    "zh": "最高 {0} 时 · {1}",
+    "en": "Peak {0}:00 · {1}",
+    "ru": "Пик {0}:00 · {1}"
+  },
+  "activity_time": {
+    "zh": "时间",
+    "en": "Time",
+    "ru": "Время"
+  },
+  "activity_result": {
+    "zh": "结果",
+    "en": "Answer",
+    "ru": "Ответ"
+  },
+  "activity_route": {
+    "zh": "分流",
+    "en": "Route",
+    "ru": "Маршрут"
+  },
+  "activity_resolved_by_node": {
+    "zh": "由节点解析",
+    "en": "Resolved by the location",
+    "ru": "Разрешено узлом"
+  },
+  "activity_dns_note": {
+    "zh": "走加速的域名由节点解析，本机不会向本地 DNS 泄露这些查询。",
+    "en": "Proxied names are resolved by the location, so your local DNS never sees them.",
+    "ru": "Имена через VPN разрешает узел, локальный DNS их не видит."
+  },
+  "activity_filter": {
+    "zh": "过滤域名、规则或应用",
+    "en": "Filter by domain, rule or app",
+    "ru": "Фильтр: домен, правило, приложение"
+  },
+  "activity_empty": {
+    "zh": "连接后，这里会显示这台设备的连接、排行和 DNS 记录。",
+    "en": "Connect to see this device's connections, top sites and DNS lookups.",
+    "ru": "Подключитесь, чтобы увидеть соединения, топ и DNS-запросы этого устройства."
+  },
+  "activity_no_apps": {
+    "zh": "系统 VPN 看不到是哪个应用发起的连接，所以按规则统计。",
+    "en": "The system VPN cannot see which app opened a connection, so this ranks by rule.",
+    "ru": "Системный VPN не видит, какое приложение открыло соединение, поэтому топ по правилам."
+  },
+  "activity_nothing": {
+    "zh": "还没有连接。",
+    "en": "No connections yet.",
+    "ru": "Пока нет соединений."
   }
 }

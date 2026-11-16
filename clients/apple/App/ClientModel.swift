@@ -105,6 +105,19 @@ import ServiceManagement
             } catch {done.resume(returning:nil)}
         }
     }
+    /// The activity view's figures from the tunnel (open connections, rankings, hours, names looked up); nil when not connected.
+    @Published var activity:[String:Any]?
+    func loadActivity() async {
+        guard since != nil,let session=manager?.connection as? NETunnelProviderSession else {activity=nil;return}
+        let result=await withCheckedContinuation {(done:CheckedContinuation<[String:Any]?,Never>) in
+            do {
+                try session.sendProviderMessage(Data("activity".utf8)) {data in
+                    done.resume(returning:data.flatMap {try? JSONSerialization.jsonObject(with:$0) as? [String:Any]})
+                }
+            } catch {done.resume(returning:nil)}
+        }
+        if let result {activity=result}
+    }
     /// The region of the connected location, for the check's exit line.
     var connectedRegion:String? {nodes.first {$0["id"] as? String == connectedNodeId}?["region"] as? String}
     func restore() async {
@@ -220,7 +233,7 @@ import ServiceManagement
         case .connecting,.reasserting:status="connecting"
         case .disconnecting:status="disconnecting"
         default:
-            status="not_connected";since=nil;rxRate=0;txRate=0;rxHistory=[];txHistory=[];switchedFrom=""
+            status="not_connected";since=nil;rxRate=0;txRate=0;rxHistory=[];txHistory=[];switchedFrom="";activity=nil
             // The tunnel went down on its own shortly after a requested start: show it as a failed attempt.
             if let attempt,Date().timeIntervalSince(attempt)>2 {
                 self.attempt=nil;failed=true;failure=L10n.text("unable_to_connect_check_your_network_and_try_again")

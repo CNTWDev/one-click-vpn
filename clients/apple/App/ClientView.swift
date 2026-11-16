@@ -37,6 +37,7 @@ struct ClientView:View {
     var body:some View {
         ZStack {
             VeilbirdStyle.ground.ignoresSafeArea()
+            HStack(spacing:0) {
             VStack(spacing:0) {
                 if model.signedIn {
                     #if os(macOS)
@@ -49,14 +50,24 @@ struct ClientView:View {
                         case 1:nodesView
                         case 2:accountView
                         case 3:logsView
+                        case 5:ActivityView()
                         default:devicesView
                         }
                     }.id(tab).transition(.asymmetric(insertion:.opacity.combined(with:.offset(y:8)),removal:.identity))
                     .frame(maxWidth:560,maxHeight:.infinity).frame(maxWidth:.infinity)
                     #if os(iOS)
-                    if tab<3 {tabBar}
+                    if tab<3 || tab==5 {tabBar}
                     #endif
                 } else {loginView}
+            }
+            // Mac signed in: the activity panel sits beside the app's column (the window widens to hold it).
+            .frame(width:mac && model.signedIn ? 380:nil)
+            #if os(macOS)
+            if model.signedIn {
+                Rectangle().fill(Color(red:26/255,green:35/255,blue:28/255)).frame(width:1)
+                ActivityView()
+            }
+            #endif
             }
         }
         .overlay(alignment:.bottom) {messageBanner}
@@ -145,6 +156,7 @@ struct ClientView:View {
         HStack(spacing:0) {
             tabItem(L10n.text("connect_tab"),"slash.circle",0)
             tabItem(L10n.text("locations"),"globe",1)
+            tabItem(L10n.text("activity_title"),"waveform.path.ecg",5)
             tabItem(L10n.text("account"),"person",2)
         }.padding(.horizontal,12).padding(.top,7).padding(.bottom,2)
         .background(VeilbirdStyle.ground.opacity(0.94).ignoresSafeArea(edges:.bottom))

@@ -8,6 +8,37 @@
   <data name="account" xml:space="preserve"><value>我的</value></data>
   <data name="account_device_quota" xml:space="preserve"><value>授权设备   {0} / {1}</value></data>
   <data name="account_valid_until" xml:space="preserve"><value>有效期 · {0}</value></data>
+  <data name="activity_all" xml:space="preserve"><value>全部</value></data>
+  <data name="activity_app" xml:space="preserve"><value>应用</value></data>
+  <data name="activity_by_app" xml:space="preserve"><value>按应用</value></data>
+  <data name="activity_by_domain" xml:space="preserve"><value>按域名</value></data>
+  <data name="activity_by_rule" xml:space="preserve"><value>按规则</value></data>
+  <data name="activity_connections" xml:space="preserve"><value>连接</value></data>
+  <data name="activity_direct" xml:space="preserve"><value>直连</value></data>
+  <data name="activity_direct_free" xml:space="preserve"><value>不占套餐</value></data>
+  <data name="activity_dns" xml:space="preserve"><value>DNS</value></data>
+  <data name="activity_dns_note" xml:space="preserve"><value>走加速的域名由节点解析，本机不会向本地 DNS 泄露这些查询。</value></data>
+  <data name="activity_domain" xml:space="preserve"><value>域名</value></data>
+  <data name="activity_down" xml:space="preserve"><value>下行</value></data>
+  <data name="activity_duration" xml:space="preserve"><value>时长</value></data>
+  <data name="activity_empty" xml:space="preserve"><value>连接后，这里会显示这台设备的连接、排行和 DNS 记录。</value></data>
+  <data name="activity_filter" xml:space="preserve"><value>过滤域名、规则或应用</value></data>
+  <data name="activity_local_only" xml:space="preserve"><value>只记在本机，断开后清空</value></data>
+  <data name="activity_no_apps" xml:space="preserve"><value>系统 VPN 看不到是哪个应用发起的连接，所以按规则统计。</value></data>
+  <data name="activity_nothing" xml:space="preserve"><value>还没有连接。</value></data>
+  <data name="activity_out" xml:space="preserve"><value>出口</value></data>
+  <data name="activity_peak" xml:space="preserve"><value>最高 {0} 时 · {1}</value></data>
+  <data name="activity_per_hour" xml:space="preserve"><value>本次连接 · 每小时</value></data>
+  <data name="activity_proxy" xml:space="preserve"><value>加速</value></data>
+  <data name="activity_ranking" xml:space="preserve"><value>排行</value></data>
+  <data name="activity_resolved_by_node" xml:space="preserve"><value>由节点解析</value></data>
+  <data name="activity_result" xml:space="preserve"><value>结果</value></data>
+  <data name="activity_route" xml:space="preserve"><value>分流</value></data>
+  <data name="activity_rule" xml:space="preserve"><value>规则</value></data>
+  <data name="activity_this_session" xml:space="preserve"><value>本次连接</value></data>
+  <data name="activity_time" xml:space="preserve"><value>时间</value></data>
+  <data name="activity_title" xml:space="preserve"><value>活动</value></data>
+  <data name="activity_traffic" xml:space="preserve"><value>流量</value></data>
   <data name="all_locations" xml:space="preserve"><value>全部节点</value></data>
   <data name="allow_system_extension" xml:space="preserve"><value>请在“系统设置 → 隐私与安全性”中允许 TrackNothing 的系统扩展，允许后会自动连接。</value></data>
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>首次连接时，请允许系统添加 VPN。授权设备可在「我的」中管理。</value></data>

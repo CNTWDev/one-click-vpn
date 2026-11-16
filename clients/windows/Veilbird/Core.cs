@@ -101,6 +101,8 @@ public sealed class Core : IDisposable {
     public long ProbeUrl(string name,string url,int timeoutMs)=>Transports.ParseProbe(Call($"probe {name} {url} {timeoutMs}")).TryGetValue(name,out var ms)?ms:-1;
     /// A TCP connect to host:port outside the tunnel, in ms; -1 when it does not answer.
     public long Reach(string address,int timeoutMs)=>long.TryParse(Call($"reach {address} {timeoutMs}"),out var ms)?ms:-1;
+    /// Open connections, rankings, hourly split and names looked up since connecting (core.Activity), as JSON.
+    public string Activity()=>Call("activity");
     public string Now(string group)=>Call("now "+group);
     public (long Up,long Down) Rate() {
         var parts=Call("rate").Split(' ');
