@@ -16,9 +16,14 @@
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 .import-app:hover:not(:disabled) { border-color: var(--accent); }
 .import-app:disabled { opacity: .55; cursor: not-allowed; }
-.import-app > svg { flex: none; color: var(--text-2); }
-.import-app .home-code { width: 40px; height: 40px; font-size: 20px; }
+.import-app > svg, .import-icon { flex: none; display: flex; color: var(--text-2); }
+.import-app .home-code { width: 40px; height: 40px; font-size: 15px; }
 .import-tag { display: inline-block; margin-left: 8px; padding: 3px 6px; font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; vertical-align: 2px; max-width: 100%; overflow-wrap: anywhere; }
+.import-platforms { width: 100%; }
+.import-platforms > ul { display: grid; gap: 8px; margin: 0; padding: 0 0 4px; list-style: none; font-size: 13px; }
+.import-platforms li { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; min-width: 0; }
+.import-platforms li > b { font-weight: 600; }
+.import-platforms li > span { color: var(--text-2); overflow-wrap: anywhere; }
 .import-aside { display: grid; gap: 14px; align-content: start; min-width: 0; }
 .import-aside h2 { margin: 0; font-size: 16px; }
 .import-aside > .hint, .import-other-body > .hint { margin: 0; }

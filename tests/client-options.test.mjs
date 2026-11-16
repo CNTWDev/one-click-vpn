@@ -1,18 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { apps, appsFor, runsOn, usableCredential } from "../portal-web/src/client-options.ts";
+import { apps, appsFor, otherPlatforms, platformApps, platforms, usableCredential } from "../portal-web/src/client-options.ts";
 
-test("apps are ordered for the visitor's device and only marked where they run", () => {
-  assert.deepEqual(appsFor("ios"), ["shadowrocket", "hiddify", "clash", "v2rayng"]);
-  assert.deepEqual(appsFor("android"), ["hiddify", "v2rayng", "clash", "shadowrocket"]);
-  assert.deepEqual(appsFor("windows").slice(0, 2), ["clash", "hiddify"]);
-  for (const platform of ["ios", "android", "mac", "windows", "linux"]) {
-    assert.equal(appsFor(platform).length, Object.keys(apps).length);
-    assert.ok(runsOn(appsFor(platform).find((id) => runsOn(id, platform)), platform));
+test("each platform shows only its own apps; every app is listed somewhere", () => {
+  assert.deepEqual(appsFor("ios"), ["shadowrocket", "stash"]);
+  assert.deepEqual(appsFor("android"), ["clashmeta", "v2rayng"]);
+  assert.deepEqual(appsFor("mac"), ["clashverge", "clashx"]);
+  assert.deepEqual(appsFor("windows"), ["clashverge", "v2rayn"]);
+  assert.deepEqual(appsFor("linux"), ["clashverge"]);
+  assert.deepEqual(new Set(Object.values(platformApps).flat()), new Set(Object.keys(apps)));
+  for (const platform of platforms) {
+    const others = otherPlatforms(platform);
+    assert.equal(others.length, platforms.length - 1);
+    assert.ok(others.every((item) => item.platform !== platform));
   }
-  assert.equal(runsOn("shadowrocket", "android"), false);
-  assert.equal(runsOn("v2rayng", "ios"), false);
-  assert.equal(runsOn("clash", "mac"), true);
+  for (const app of Object.values(apps)) assert.match(app.url, /^https:\/\//);
 });
 test("available connection count excludes disabled, expired and blocked credentials", () => {
   const item = { status: "active", userDisabled: false, adminDisabled: false, accountStatus: "active", expiresAt: "2027-01-01T00:00:00Z" };

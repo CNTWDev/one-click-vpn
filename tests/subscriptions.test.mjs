@@ -135,6 +135,9 @@ test("each client only gets the lines it can use", () => {
   assert.deepEqual(subscriptionClient("clash", "mihomo/1.18.10"), { hysteria2: true, xhttp: false });
   assert.deepEqual(subscriptionClient("clash", "mihomo/2.0.0"), { hysteria2: true, xhttp: true });
   assert.deepEqual(subscriptionClient("clash", "HiddifyNext/2.5.7"), { hysteria2: false, xhttp: false });
+  // Stash: no documented Hysteria2 pin, so REALITY + XHTTP only, with the REALITY server name as `sni`.
+  assert.deepEqual(subscriptionClient("clash", "Stash/3.1.1 Clash/1.11.0"), { hysteria2: false, xhttp: true, sni: true });
+  assert.equal(subscriptionFormat(null, "Stash/3.1.1 Clash/1.11.0"), "clash");
   assert.deepEqual(subscriptionClient("v2ray", "Shadowrocket/2070"), { hysteria2: false, xhttp: true });
   assert.deepEqual(subscriptionClient("v2ray", "v2rayNG/1.10.2"), { hysteria2: true, xhttp: true });
   assert.deepEqual(lineNames("Tokyo", 1, "clash"), ["Tokyo"]);

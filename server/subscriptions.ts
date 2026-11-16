@@ -200,6 +200,7 @@ export async function downloadSubscription(token: string, options: { format?: Su
         const extra = stealth ? await stealthLines(node, profile.endpoint.host, stealth.listen_port, key, credential.identity_key, client).catch(() => ({ before: [], after: [] }))
           : { before: [], after: [] };
         const lines = [...extra.before, reality, ...extra.after];
+        if (client.sni) for (const line of lines) if (line.type === "vless") line.sni = line.servername;
         const names = lineNames(name, lines.length, format);
         lines.forEach((line, index) => { line.name = names[index]; });
         proxies.push(...lines);

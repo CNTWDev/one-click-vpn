@@ -30,20 +30,23 @@ export function routingMode(requested: string | null): RoutingMode {
 export type SubscriptionNode = { name: string; proxies: SubscriptionProxy[] };
 
 /** Which of a node's extra lines the requesting client can use. REALITY is always sent. */
-export type SubscriptionClient = { hysteria2: boolean; xhttp: boolean };
+export type SubscriptionClient = { hysteria2: boolean; xhttp: boolean; sni?: boolean };
 
 // mihomo dials VLESS over XHTTP from v1.19.22 on; an older core would try the line as plain TCP and fail.
 const MIHOMO_XHTTP = [1, 19, 22];
 
 /**
- * Clash YAML goes to mihomo cores, which pin the Hysteria2 certificate. Hiddify reads Clash YAML into
- * sing-box, whose pin and XHTTP support are unverified, so it keeps REALITY only. Share links carry the pin
+ * Clash YAML goes to mihomo cores, which pin the Hysteria2 certificate. Hiddify (no longer offered, but old
+ * imports still refresh) reads Clash YAML into sing-box, whose pin and XHTTP support are unverified, so it
+ * keeps REALITY only. Stash has its own core: it documents VLESS REALITY over XHTTP but no certificate pin
+ * for Hysteria2, and names the REALITY server name `sni`, so it gets REALITY + XHTTP with `sni` set. Share links carry the pin
  * as pinSHA256, which only clients known to check it get (the user rule: no Hysteria2 without a pin).
  */
 export function subscriptionClient(format: SubscriptionFormat, userAgent: string | null): SubscriptionClient {
   const agent = (userAgent || "").toLowerCase();
   if (format === "v2ray") return { hysteria2: /v2rayn/.test(agent), xhttp: true };
   if (/hiddify/.test(agent)) return { hysteria2: false, xhttp: false };
+  if (/stash/.test(agent)) return { hysteria2: false, xhttp: true, sni: true };
   const version = /mihomo\/v?(\d+)\.(\d+)\.(\d+)/.exec(agent)?.slice(1).map(Number);
   const older = version ? version.findIndex((part, index) => part !== MIHOMO_XHTTP[index]) : -1;
   return { hysteria2: true, xhttp: !version || older === -1 || version[older] > MIHOMO_XHTTP[older] };

@@ -11,7 +11,7 @@ export type AvailableNode = { id: string; name: string; regionId: string; region
 export const configProtocols = ["wireguard", "openvpn", "vless"] as const;
 
 const base64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
-const apps: Record<string, string> = { wireguard: "WireGuard", openvpn: "OpenVPN Connect", vless: "Shadowrocket · v2rayNG · Hiddify · Clash" };
+const apps: Record<string, string> = { wireguard: "WireGuard", openvpn: "OpenVPN Connect", vless: "Shadowrocket · v2rayNG · Clash" };
 
 /** Pick a node, then one of its protocols, name it: one config for that node only. */
 export function NodeCreator({ nodes, regions, deviceNote, onCreated, onUnauthorized }: {

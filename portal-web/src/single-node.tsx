@@ -71,7 +71,7 @@ export function SingleNode({ user, onLogout, onBack }: { user: User; onLogout: (
     const vless = item.protocol === "vless", profile = current(item.id)[0];
     const text = (await fetchText(`/api/v1/profiles/${profile.id}/download${vless ? "?format=uri" : ""}`)).trim();
     if (action === "copy") { await navigator.clipboard.writeText(text); notify(t("链接已复制，在客户端选择「从剪贴板导入」。")); return; }
-    setQr(vless ? { title: item.name, text, hint: t("Shadowrocket、v2rayNG、Hiddify 扫码即可添加这个节点。") }
+    setQr(vless ? { title: item.name, text, hint: t("Shadowrocket、v2rayNG 扫码即可添加这个节点。") }
       : { title: item.name, text, hint: t("WireGuard 手机客户端：＋ → 扫描二维码。二维码包含私钥，请勿截图分享。") });
   });
   async function remove(item: Credential) {
