@@ -339,10 +339,13 @@ Setting a new password signs the account out of the Portal and native clients.
 shows on the server as root:
 
 ```bash
-curl -fsSL https://<agent domain>/api/v1/agent/join/<one-time token> | sh
+curl -fsSL https://<agent domain>/api/v1/agent/join/<install token> | sh
 ```
 
-The token works once and expires after 1 hour; only its hash is stored. The script
+The token expires after 1 hour and stops working once the node it installed is online;
+only its hash is stored. Downloading it does not use it up, so a run that stopped (not
+root, network) can simply be repeated, and chat-app link previews (anything that is not
+`curl`/`wget`) are answered with a hint instead of the script. The script
 creates `/var/lib/northstar/node-id`, installs the Agent with this node's token and
 starts it; the node then appears online and the standard services are deployed. No SSH
 credential is stored and no inbound SSH is needed. Node details → **安装命令** creates a

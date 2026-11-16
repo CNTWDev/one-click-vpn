@@ -5,27 +5,33 @@ import { agentInstallScript, finishAgentInstall, waitForAgentHeartbeat } from ".
 import { currentAgentOrigin } from "./agent-domain";
 import { writeOperationalLog } from "./operational-logs";
 
-// Adding a node without SSH: Console shows a one-line install command with a one-time token (1 hour). Run as
-// root on the server, it downloads the install script from the Agent domain, which consumes the token and embeds
-// a fresh Agent token. The Controller never sees or stores an SSH credential, and the node needs no inbound SSH.
+// Adding a node without SSH: Console shows a one-line install command with a token valid for 1 hour. Run as root on
+// the server, it downloads the install script from the Agent domain, which embeds a fresh Agent token. The token is
+// used up when the Agent installed by it sends its first heartbeat, not by the download: a run that stops early (not
+// root, network) or a link preview that fetched the URL first must not burn it. Each download issues a new Agent
+// token, so the last run wins. The Controller never sees or stores an SSH credential, and the node needs no inbound SSH.
 const TOKEN_TTL_MS = 60 * 60_000;
 const INSTALL_WAIT_MS = 20 * 60_000;
 
 export async function createJoinCommand(nodeId: string): Promise<{ command: string; expiresAt: string }> {
   const token = randomBytes(24).toString("base64url");
   const expiresAt = new Date(Date.now() + TOKEN_TTL_MS).toISOString();
-  // A new command replaces the previous unused one.
-  await dbExec("DELETE FROM node_join_tokens WHERE node_id = $1 AND used_at IS NULL", [nodeId]);
+  // Opening the dialog again must not break a command already copied: each one works until it expires or the node is online.
   await dbExec("INSERT INTO node_join_tokens (token_hash, node_id, expires_at) VALUES ($1, $2, $3)", [hashToken(token), nodeId, expiresAt]);
   return { command: `curl -fsSL ${await currentAgentOrigin()}/api/v1/agent/join/${token} | sh`, expiresAt };
 }
 
-/** Marks the token used; null when it is unknown, used or expired. */
-export async function consumeJoinToken(token: string): Promise<string | null> {
+/** The node of a token that is neither used up nor expired; null otherwise. Does not use it up (see the top of this file). */
+export async function findJoinToken(token: string): Promise<string | null> {
   if (!/^[A-Za-z0-9_-]{32}$/.test(token)) return null;
-  const row = (await dbQuery<{ node_id: string }>(`UPDATE node_join_tokens SET used_at = now()
-    WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() RETURNING node_id`, [hashToken(token)]))[0];
+  const row = (await dbQuery<{ node_id: string }>(`SELECT node_id FROM node_join_tokens
+    WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()`, [hashToken(token)]))[0];
   return row?.node_id ?? null;
+}
+
+/** The Agent is online: the node's install command stops working. */
+async function retireJoinTokens(nodeId: string): Promise<void> {
+  await dbExec("UPDATE node_join_tokens SET used_at = now() WHERE node_id = $1 AND used_at IS NULL", [nodeId]);
 }
 
 /** Shell that prints a reason and fails, so `curl | sh` shows why instead of an HTTP status. */
@@ -43,6 +49,7 @@ export async function joinScript(nodeId: string): Promise<string> {
   const agentOrigin = await currentAgentOrigin();
   const install = agentInstallScript({ nodeId, agentToken, agentOrigin, progress: "text", firstStep: "Checking node prerequisites" });
   await updateNode(nodeId, { status: "provisioning", version: "agent installing", last_seen: "install command running", agent_token_hash: hashToken(agentToken) });
+  // A second run while the first is still installing finds that action active: the first one's wait covers both.
   const actionId = await addNodeAction(nodeId, "join", "running").catch(() => "");
   if (actionId) {
     await startNodeAction(actionId);
@@ -53,7 +60,7 @@ export async function joinScript(nodeId: string): Promise<string> {
   return `#!/bin/sh
 {
 set -eu
-[ "$(id -u)" -eq 0 ] || { echo 'Run the install command as root (sudo -i, then paste it again).' >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || { echo 'Run the install command as root: replace | sh with | sudo sh and run it again (the command still works).' >&2; exit 1; }
 # The same persistent identity file the SSH install reads (server/remote-ssh.ts).
 install -d -m 0700 /var/lib/northstar
 if [ ! -s /var/lib/northstar/node-id ]; then
@@ -86,6 +93,7 @@ async function awaitJoinedAgent(nodeId: string, actionId: string): Promise<void>
       await finishNodeAction(actionId, "failed", "", message);
       return;
     }
+    await retireJoinTokens(nodeId).catch(() => undefined);
     await updateNodeActionProgress(actionId, { phase: "services", progress: 90, message: "Agent is online; setting up VPN services" });
     await finishAgentInstall(nodeId, actionId);
     await finishNodeAction(actionId, "succeeded", "Installed by install command; no SSH credential is stored.");
