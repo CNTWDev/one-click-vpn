@@ -192,6 +192,8 @@ struct SignalBars:View {
 /// Daily usage as columns of square blocks; the last week is in full accent.
 struct UsageBars:View {
     let values:[Int64]
+    /// How many trailing columns are lit (the chosen range); the rest are dimmed.
+    var recent=7
     var body:some View {
         Canvas {context,area in
             guard !values.isEmpty else {return}
@@ -199,9 +201,33 @@ struct UsageBars:View {
             let block:CGFloat=4, pitch:CGFloat=6, rows=max(1,Int((area.height+pitch-block)/pitch)), top=max(values.max() ?? 1,1)
             for (i,value) in values.enumerated() {
                 let lit=value<=0 ? 1:max(1,Int((Double(rows)*Double(value)/Double(top)).rounded()))
-                let color=i>=values.count-7 ? VeilbirdStyle.accent:Color(red:94/255,green:117/255,blue:80/255)
+                let color=i>=values.count-recent ? VeilbirdStyle.accent:Color(red:94/255,green:117/255,blue:80/255)
                 let left=CGFloat(i)*(width+gap)
                 for r in 0..<lit {context.fill(Path(CGRect(x:left,y:area.height-CGFloat(r)*pitch-block,width:width,height:block)),with:.color(color))}
+            }
+        }.accessibilityHidden(true)
+    }
+}
+
+/// The last 40 seconds of the connection: download as columns of square dots rising from a hairline, upload as dimmer
+/// columns hanging below it. Both scale to the busiest second shown.
+struct RateBars:View {
+    static let count=40
+    let down:[Int], up:[Int]
+    var body:some View {
+        Canvas {context,area in
+            let block:CGFloat=4, pitch:CGFloat=6, step=area.width/CGFloat(RateBars.count), width=min(block,step-1)
+            let axis=(area.height*0.64).rounded()
+            let topRows=max(1,Int((axis-2+pitch-block)/pitch)), bottomRows=max(1,Int((area.height-axis-2+pitch-block)/pitch))
+            context.fill(Path(CGRect(x:0,y:axis,width:area.width,height:1)),with:.color(Color(red:38/255,green:51/255,blue:42/255)))
+            let top=max(1,(down+up).max() ?? 1), offset=RateBars.count-down.count
+            for (i,value) in down.enumerated() {
+                let left=CGFloat(offset+i)*step+(step-width)/2
+                let lit=value<=0 ? 1:max(1,Int((Double(topRows)*Double(value)/Double(top)).rounded()))
+                for r in 0..<lit {context.fill(Path(CGRect(x:left,y:axis-2-CGFloat(r)*pitch-block,width:width,height:block)),with:.color(VeilbirdStyle.accent))}
+                let sent=i<up.count ? up[i]:0
+                let litUp=sent<=0 ? 0:max(1,Int((Double(bottomRows)*Double(sent)/Double(top)).rounded()))
+                for r in 0..<litUp {context.fill(Path(CGRect(x:left,y:axis+3+CGFloat(r)*pitch,width:width,height:block)),with:.color(Color(red:94/255,green:117/255,blue:80/255)))}
             }
         }.accessibilityHidden(true)
     }

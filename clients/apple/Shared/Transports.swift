@@ -10,6 +10,8 @@ enum Transports {
     static let ladder=["hysteria2","reality","xhttp","wireguard"]
     static let group="TrackNothing"
     static let testURL="https://www.gstatic.com/generate_204"
+    /// Answers fast from nearly every network (mainland China and Russia too): the connection check times it outside the tunnel.
+    static let localURL="http://captive.apple.com/hotspot-detect.html"
     private static let memoryDays:TimeInterval=7
 
     /// A short one-way label for the network outside the tunnel: interface kind and gateways. Nothing that names the network is stored.
