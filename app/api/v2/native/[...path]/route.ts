@@ -33,7 +33,7 @@ async function handle(request:Request) {
     else {
       const session=await nativeSession(request);
       if(request.method==="GET"&&path==="account") result=await nativeAccount(session);
-      else if(request.method==="GET"&&path==="nodes") result=await nativeNodes();
+      else if(request.method==="GET"&&path==="nodes") result=await nativeNodes(session);
       else if(request.method==="GET"&&path?.startsWith("status/")) result=await nativeStatus(session,path.slice(7));
       else if(request.method==="POST"&&path==="challenge") result=await nativeChallenge(session,body);
       else if(request.method==="POST"&&path==="connect") {

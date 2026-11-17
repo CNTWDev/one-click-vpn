@@ -48,7 +48,31 @@ public static class Latency {
         }
         return null;
     }
+    /// The core's request through a node's transports (Core.Test); set once the core exists.
+    public static Func<string,Task<string>>? RealTest;
+    /// The wait for a request through a transport; mihomo's default, which Clash apps show.
+    private const int RealTimeoutMs=5000;
+    /// A request to the test page through every transport the device has on this node (the server's "test" list,
+    /// the lines a connect would use), the fastest answer in ms; -1 when none answers, null when not measured.
+    /// This is how Clash apps measure: it sees a node reached only over UDP, and one whose port answers but whose
+    /// transport is blocked after the handshake.
+    private static async Task<long?> Real(string id,JsonArray transports) {
+        if(RealTest is not { } test) return null;
+        try {
+            var input=new JsonObject {["nodes"]=new JsonObject {[id]=transports.DeepClone()},["url"]=Transports.TestUrl,["timeoutMs"]=RealTimeoutMs};
+            return JsonNode.Parse(await test(input.ToJsonString()))?[id]?.GetValue<long>();
+        } catch {return null;}
+    }
+    /// TCP connects give jitter and loss; the request through the transports, when the device has them, decides
+    /// whether the node answers and its latency. Devices that never connected (no "test" list) keep the TCP result.
     public static async Task<Quality> Measure(JsonNode node,int attempts=5) {
+        var pending=node["test"] is JsonArray { Count: >0 } transports&&node["id"]?.GetValue<string>() is { } id?Real(id,transports):null;
+        var tcp=await MeasureTcp(node,attempts);
+        if(pending is null||await pending is not { } delay) return tcp;
+        if(delay<0) return new(null,0,100,tcp.Load,tcp.Users);
+        return tcp.Latency is not null?tcp with {Latency=delay}:new(delay,0,0,tcp.Load,tcp.Users);
+    }
+    private static async Task<Quality> MeasureTcp(JsonNode node,int attempts) {
         var load=Load(node);var users=Users(node);
         var targets=new List<(IPAddress Address,int Port)>();
         // DNS once, so every attempt is a plain round trip.

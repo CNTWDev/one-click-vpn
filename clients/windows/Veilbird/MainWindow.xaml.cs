@@ -73,7 +73,7 @@ public partial class MainWindow : Window {
     private static bool Smart=>Settings.Get("routing","smart")=="smart";
 
     public MainWindow() {
-        api=new NativeApi(core);
+        api=new NativeApi(core);Latency.RealTest=core.Test;
         L10n.Initialize();InitializeComponent();api.Origin=api.SavedOrigin;
         TitleLogo.Content=Look.Mark(16,Look.Accent);
         connection=new Connection(api,core);

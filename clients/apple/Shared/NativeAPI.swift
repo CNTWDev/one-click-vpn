@@ -89,7 +89,8 @@ final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         let tried=origins()
         var all=headers;all["Accept"]="application/json"
         if body != nil {all["Content-Type"]="application/json"}
-        #if canImport(TunnelCore)
+        // The apps link the core only to measure nodes (VEILBIRD_APP) and keep calling the API themselves.
+        #if canImport(TunnelCore) && !VEILBIRD_APP
         var request:[String:Any]=["origins":tried,"method":method,"path":path,"headers":all,"timeoutMs":15000]
         if let body {request["body"]=String(decoding:body,as:UTF8.self)}
         let input=String(decoding:try JSONSerialization.data(withJSONObject:request),as:UTF8.self)
