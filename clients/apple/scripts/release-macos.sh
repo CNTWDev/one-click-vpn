@@ -92,8 +92,20 @@ notarize_dmg() {
   [[ -f "$dmg" ]] || { echo "$dmg not found: run \"$0 build\" first." >&2; exit 1; }
   local auth=(--key "$VEILBIRD_APPLE_API_KEY_PATH" --key-id "$VEILBIRD_APPLE_API_KEY_ID" --issuer "$VEILBIRD_APPLE_API_ISSUER_ID")
   local submission status
+  # Apple's API sometimes drops a connection (SSL error -1200): ask a few times before giving up.
+  notary_status() {
+    local attempt value
+    for attempt in 1 2 3 4 5; do
+      value=$(xcrun notarytool info "$1" "${auth[@]}" --output-format json 2>/dev/null | plutil -extract status raw -o - - 2>/dev/null) \
+        && { echo "$value"; return 0; }
+      sleep 20
+    done
+    return 1
+  }
   # VEILBIRD_NOTARY_RESUME=1: reuse the latest submission of this DMG (by file name) instead of submitting again.
   if [[ -n "${VEILBIRD_NOTARY_RESUME:-}" ]]; then
+    # Every submission of this team and its state, newest first (earlier builds included).
+    xcrun notarytool history "${auth[@]}" || true
     submission=$(xcrun notarytool history "${auth[@]}" --output-format json | node -e '
       const name = process.argv[1]; let input = "";
       process.stdin.on("data", (chunk) => input += chunk).on("end", () => {
@@ -107,15 +119,15 @@ notarize_dmg() {
   fi
   echo "Notarization submission: $submission"
   if ! xcrun notarytool wait "$submission" "${auth[@]}" --timeout 60m; then
-    status=$(xcrun notarytool info "$submission" "${auth[@]}" --output-format json | plutil -extract status raw -o - - 2>/dev/null || true)
-    if [[ "$status" == "In Progress" ]]; then
+    status=$(notary_status "$submission" || true)
+    if [[ "$status" == "In Progress" || -z "$status" ]]; then
       echo "::warning::Apple has not finished notarization $submission after 60 min. The signed DMG is kept as this" \
         "run's artifact. Finish it later without rebuilding: Run workflow with 平台 = macOS notarize and build =" \
         "${VEILBIRD_BUILD_NUMBER:-<this run number>}." >&2
       exit 1
     fi
   fi
-  status=$(xcrun notarytool info "$submission" "${auth[@]}" --output-format json | plutil -extract status raw -o - -)
+  status=$(notary_status "$submission") || { echo "Could not read the state of notarization $submission." >&2; exit 1; }
   if [[ "$status" != Accepted ]]; then
     xcrun notarytool log "$submission" "${auth[@]}" || true
     echo "Notarization $submission: $status (log above)." >&2; exit 1
