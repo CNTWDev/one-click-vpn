@@ -33,7 +33,7 @@ type testInput struct {
 // input is {"nodes":{"<node id>":[<mihomo proxy>,...]},"url":"...","timeoutMs":5000}. It needs no running core:
 // each transport is built on its own and dials directly (the apps are outside their own tunnel). The reply is
 // {"<node id>":{"ms":<fastest, or -1>,"lines":{"<transport name>":<milliseconds or -1>}}}, or {} when input
-// cannot be read. The apps show the lines as "线路 N" and keep the transport names in their hidden log.
+// cannot be read. The apps show the lines as "Line N" and keep the transport names in their hidden log.
 func Test(input string) string {
 	var request testInput
 	if err := json.Unmarshal([]byte(input), &request); err != nil || request.URL == "" {

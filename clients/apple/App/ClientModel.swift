@@ -92,7 +92,7 @@ import ServiceManagement
     /// The connected node's lines from the location list's last measurement (taken while disconnected, since the
     /// app's own requests go through the tunnel while connected); nil when the device has no line results.
     var connectedLines:[String:Int]? {Latency.recent(connectedNodeId)?.lines}
-    /// The transport carrying traffic now, for the check's "在用" mark.
+    /// The transport carrying traffic now, for the check's "in use" mark.
     func currentLine() async -> String {String(decoding:await providerMessage("status-line") ?? Data(),as:UTF8.self)}
     /// The speed test, run by the tunnel through the transport carrying traffic now: "start" (with the request), then
     /// "progress" until done; "stop" ends it. The reply is the core's status as JSON.

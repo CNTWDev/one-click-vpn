@@ -72,7 +72,7 @@ object Latency {
     private const val REAL_TIMEOUT_MS = 5000
 
     /**
-     * The transports a node can offer, in the order the apps show them as "线路 1…4": Hysteria2 (with port
+     * The transports a node can offer, in the order the apps show them as "Line 1…4": Hysteria2 (with port
      * hopping), REALITY on 443, REALITY on the node's spare TCP port, XHTTP. Users only see the numbers; the
      * transport names stay in the hidden log. WireGuard is not listed: it cannot be tested before a lease.
      */

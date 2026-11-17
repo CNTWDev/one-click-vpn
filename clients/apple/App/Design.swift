@@ -192,7 +192,7 @@ struct SignalBars:View {
     }
 }
 
-/// One cell per line of a node (线路 1…4): filled when it answers (amber when slow), outlined red when it does
+/// One cell per line of a node (Line 1…4): filled when it answers (amber when slow), outlined red when it does
 /// not, outlined grey when the node has no such line, filled dark while measuring.
 enum LineState {case ok,slow,down,off,wait}
 struct LineCells:View {

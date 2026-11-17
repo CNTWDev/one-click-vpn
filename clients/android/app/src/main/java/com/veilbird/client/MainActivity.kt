@@ -779,11 +779,11 @@ class MainActivity : Activity() {
     /** The node whose per-line detail is open in the list ("" = none); one at a time. */
     private var openNode = ""
     private fun lineName(index: Int) = L10n.text(R.string.line_n, L10n.number(index + 1))
-    /** Each line's cell (OK, SLOW, DOWN, OFF) in the order 线路 1…4; null when this device has no line results for the node. */
+    /** Each line's cell (OK, SLOW, DOWN, OFF) in the order Line 1…4; null when this device has no line results for the node. */
     private fun lineStates(quality: Quality?): List<Int>? = quality?.lines?.takeIf { it.isNotEmpty() }?.let { lines ->
         Latency.lineOrder.map { name -> lines[name]?.let { ms -> when { ms < 0 -> LineCells.DOWN; ms > 300 -> LineCells.SLOW; else -> LineCells.OK } } ?: LineCells.OFF }
     }
-    /** One sentence when a line is out ("线路 2 不通，已用线路 1"); null when every offered line works or none was measured. */
+    /** One sentence when a line is out ("Line 2 has no answer, using Line 1"); null when every offered line works or none was measured. */
     private fun linesNote(quality: Quality?): String? {
         val lines = quality?.lines?.takeIf { it.isNotEmpty() } ?: return null
         val offered = Latency.lineOrder.withIndex().filter { lines.containsKey(it.value) }
@@ -797,7 +797,7 @@ class MainActivity : Activity() {
             else -> L10n.text(R.string.lines_one_down, down.joinToString(join) { lineName(it.index) }, lineName(working.minBy { lines[it.value]!! }.index))
         }
     }
-    /** The quiet per-line grid under a node: a small cell, "线路 N" and its delay, two columns, indented to the name. */
+    /** The quiet per-line grid under a node: a small cell, "Line N" and its delay, two columns, indented to the name. */
     private fun lineDetail(quality: Quality?): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL; setPadding(66.dp, 0, 16.dp, 10.dp)
         val lines = quality?.lines ?: emptyMap()
@@ -1161,7 +1161,7 @@ class MainActivity : Activity() {
                 addView(text(region, 13f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp })
         }
-        // This node's lines (线路 1…4), each with its delay and the one carrying traffic marked "在用".
+        // This node's lines (Line 1…4), each with its delay and the one carrying traffic marked "in use".
         val linesLabel = text(L10n.text(R.string.check_lines), 12f, Palette.secondary).apply { visibility = View.GONE }
         box.addView(linesLabel, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14.dp })
         class LineBox(val cell: LineCells, val now: TextView, val value: TextView)

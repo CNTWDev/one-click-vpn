@@ -29,7 +29,7 @@ struct ClientView:View {
     @State private var checkResult:[String:Int]?
     /// The node whose per-line detail is open in the list ("" = none).
     @State private var openNode=""
-    /// The transport carrying traffic now (for "在用") and the speed test's last status from the tunnel.
+    /// The transport carrying traffic now (for "in use") and the speed test's last status from the tunnel.
     @State private var currentLine=""
     @State private var speedStatus:[String:Any]=["state":"idle"]
     @State private var speedLine=""
@@ -422,7 +422,7 @@ struct ClientView:View {
             currentLine=await line;checkRunning=false
         }
     }
-    /// This node's lines (线路 1…4) with their delay, "在用" on the one carrying traffic, and a note when one is out.
+    /// This node's lines (Line 1…4) with their delay, "in use" on the one carrying traffic, and a note when one is out.
     @ViewBuilder private var checkLines:some View {
         if let lines=model.connectedLines,let states=lineStates(lines) {
             Text(L10n.text("check_lines")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).padding(.top,14)
@@ -654,7 +654,7 @@ struct ClientView:View {
     }
     private func lineName(_ index:Int)->String {L10n.text("line_n",L10n.number(index+1))}
     private var listJoin:String {L10n.language.hasPrefix("zh") ? "、":", "}
-    /// Each line's cell in the order 线路 1…4; nil when this device has no line results for the node.
+    /// Each line's cell in the order Line 1…4; nil when this device has no line results for the node.
     private func lineStates(_ lines:[String:Int]?)->[LineState]? {
         guard let lines,!lines.isEmpty else {return nil}
         return Latency.lineOrder.map {name in
@@ -662,7 +662,7 @@ struct ClientView:View {
             return ms<0 ? .down:(ms>300 ? .slow:.ok)
         }
     }
-    /// One sentence when a line is out ("线路 2 不通，已用线路 1"); nil when every offered line works.
+    /// One sentence when a line is out ("Line 2 has no answer, using Line 1"); nil when every offered line works.
     private func linesNote(_ lines:[String:Int]?)->String? {
         guard let lines,!lines.isEmpty else {return nil}
         let offered=Latency.lineOrder.enumerated().filter {lines[$0.element] != nil}

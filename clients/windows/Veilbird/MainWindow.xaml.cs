@@ -584,7 +584,7 @@ public partial class MainWindow : Window {
             var exit=Columns(Single(L10n.Text("check_exit"),12,Look.Secondary),new FrameworkElement(),Single(region,12));
             exit.Margin=new Thickness(2,12,2,0);stack.Children.Add(exit);
         }
-        // This node's lines (线路 1…4), each with its delay and the one carrying traffic marked "在用".
+        // This node's lines (Line 1…4), each with its delay and the one carrying traffic marked "in use".
         var linesLabel=Single(L10n.Text("check_lines"),12,Look.Secondary);linesLabel.Margin=new Thickness(2,14,0,0);linesLabel.Visibility=Visibility.Collapsed;
         stack.Children.Add(linesLabel);
         var lineGrid=new UniformGrid {Columns=2,Margin=new Thickness(0,8,0,0),Visibility=Visibility.Collapsed};
@@ -947,16 +947,16 @@ public partial class MainWindow : Window {
         row.Click+=(_,_)=>Select("","");
         return row;
     }
-    // ---- Lines (线路 1…4) ----
+    // ---- Lines (Line 1…4) ----
     private enum LineState {Ok,Slow,Down,Off,Wait}
     /// The node whose per-line detail is open in the list ("" = none).
     private string openNode="";
     private static string LineName(int index)=>L10n.Text("line_n",(index+1).ToString(L10n.Culture));
     private static string ListJoin=>L10n.Culture.TwoLetterISOLanguageName=="zh"?"、":", ";
-    /// Each line's cell in the order 线路 1…4; null when this PC has no line results for the node.
+    /// Each line's cell in the order Line 1…4; null when this PC has no line results for the node.
     private static List<LineState>? LineStates(IReadOnlyDictionary<string,long>? lines)=>lines is not { Count: >0 }?null
         :Latency.LineOrder.Select(name=>lines.TryGetValue(name,out var ms)?ms<0?LineState.Down:ms>300?LineState.Slow:LineState.Ok:LineState.Off).ToList();
-    /// One sentence when a line is out ("线路 2 不通，已用线路 1"); null when every offered line works.
+    /// One sentence when a line is out ("Line 2 has no answer, using Line 1"); null when every offered line works.
     private static string? LinesNote(IReadOnlyDictionary<string,long>? lines) {
         if(lines is not { Count: >0 }) return null;
         var offered=Latency.LineOrder.Select((name,i)=>(Name:name,Index:i)).Where(x=>lines.ContainsKey(x.Name)).ToList();

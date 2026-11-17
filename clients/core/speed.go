@@ -18,7 +18,7 @@ import (
 	"github.com/metacubex/mihomo/tunnel"
 )
 
-// The connection check's speed test ("测网速"): latency and jitter from a few small requests, then a download of
+// The connection check's speed test ("Test speed"): latency and jitter from a few small requests, then a download of
 // a few seconds, all through the transport carrying traffic now, so it measures exactly what the user gets. It
 // runs only while connected and only on the current connection, never across every node, to spare data.
 // One test runs at a time; the apps poll SpeedProgress for the bar and the figures.

@@ -218,7 +218,7 @@ class SignalBars(context: Context) : View(context) {
 }
 
 /**
- * A node's lines (线路 1…4) as small square cells: filled when the line answered (amber when slow), an outline
+ * A node's lines (Line 1…4) as small square cells: filled when the line answered (amber when slow), an outline
  * in the danger color when it did not, a dim outline when the node does not offer it, plain while measuring.
  */
 class LineCells(context: Context) : View(context) {
