@@ -20,8 +20,8 @@ const views = [
   // The visitor's own platform comes first in the app downloads; the import tiles are the same everywhere.
   { name: "home-windows", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36", ready: ".home .import-app" },
   { name: "home-iphone", userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1", ready: ".home .import-app" },
-  { name: "home-link", ready: ".home .import-app", open: (page) => page.locator(".import-share button.secondary").click() },
-  { name: "home-reset", ready: ".home .import-reset", open: (page) => page.locator(".import-reset").click() },
+  { name: "home-link", ready: ".home .import-app", open: (page) => page.locator(".import-qr").click() },
+  { name: "home-reset", ready: ".home .import-qr", open: async (page) => { await page.locator(".import-qr").click(); await page.locator(".import-reset").click(); } },
   { name: "home-details", ready: ".home .import-app", open: async (page) => { for (const summary of await page.locator(".home details:not([open]) > summary").all()) await summary.click().catch(() => {}); } },
   { name: "home-usage-today", ready: ".home .usage-ranks li", open: (page) => page.locator(".usage-ranges button").first().click() },
   { name: "home-other-site", api: { site: otherSite }, ready: ".home .import-app" },
