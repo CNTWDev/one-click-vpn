@@ -27,7 +27,7 @@ Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次�
 
 ## 每次发版
 
-1. 改 `clients/version.json` 的版本号，提交后推送标签 `client-v<版本号>`；或在 GitHub → Actions →「Client release」→ Run workflow。
+1. 改 `clients/version.json` 的版本号，提交后推送标签 `client-v<版本号>`；或在 GitHub → Actions →「Client release」→ Run workflow。手动运行时在「平台」里选 `All`（三端一起，默认）、`Android`、`Windows` 或 `macOS`，运行列表里显示为 `Client release · <平台>`。推送标签总是三端一起。构建号是这个工作流的运行序号，不论选哪个平台都不会重复。
 2. 运行结束后，在该次运行页面底部 **Artifacts** 下载各平台的 zip（不用解压）：
    - `TrackNothing-android-…` → `TrackNothing-<版本>-<构建号>-arm64.apk`（几乎所有手机）和 `TrackNothing-<版本>-<构建号>.apk`（通用包，给少数 32 位手机和网页下载），两个都导入
    - `TrackNothing-windows-x64-…` → `TrackNothing-<版本>-<构建号>-win-x64-setup.exe`（arm64 同理，给 ARM 笔记本用）
@@ -94,6 +94,9 @@ VEILBIRD_RELEASE_MIRROR_PUBLIC_BASE_URL=https://<CDN 加速域名>
 | `VEILBIRD_MACOS_DEVELOPER_ID_P12_PASSWORD` | Secret | 导出 `.p12` 时设的密码 |
 
 之后每次运行「Client release」都会多出 `TrackNothing-macos-…`。CI 做的事：导入证书 → `scripts/apple-profiles.mjs` 取描述文件 → `clients/apple/scripts/release-macos.sh` 打包签名、生成 DMG、公证并钉订票据。本机有 Xcode 时也可以手动跑这个脚本（需要的环境变量写在脚本开头）。
+
+- 内核（mihomo）只编 Mac 需要的部分，并按内核代码缓存：内核没改的版本跳过这一步，Mac 大约 3 分钟加上公证时间。
+- 签好名的 DMG 在提交公证前就先存为运行的 Artifact，公证通过后再换成钉好票据的版本。新账号前几次公证可能要几十分钟；超过 60 分钟 CI 会停下并在运行页面给出公证编号，这时不用重编：等 Apple 通过（`xcrun notarytool info <编号>` 显示 Accepted），直接把这个 DMG 导入控制台即可，用户联网打开时系统会向 Apple 核验。
 
 ### 用户第一次安装
 

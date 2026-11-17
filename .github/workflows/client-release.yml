@@ -5,7 +5,9 @@ name: Client release
 # to stable stays a one-click decision in Console. Step-by-step guide: clients/RELEASING.md.
 #
 # Trigger: push a tag like client-v1.2.0 (the version must match clients/version.json),
-# or run manually. The build number is this workflow's run number.
+# or run manually. A manual run picks which clients to build in 「平台」: All (default), Android, Windows or macOS;
+# each run is listed as "Client release · <平台>". A tag push builds all three. Every run, whatever it builds, takes this workflow's next run number
+# as its build number, so builds stay unique and increasing across all platforms.
 #
 # Android (always): secrets VEILBIRD_ANDROID_KEYSTORE_BASE64, VEILBIRD_ANDROID_KEYSTORE_PASSWORD,
 #   VEILBIRD_ANDROID_KEY_ALIAS, VEILBIRD_ANDROID_KEY_PASSWORD (scripts/android-keystore.sh makes them).
@@ -16,10 +18,18 @@ name: Client release
 #   variables VEILBIRD_APPLE_TEAM_ID, VEILBIRD_APPLE_BUNDLE_ID; secrets VEILBIRD_APPLE_API_KEY_ID,
 #   VEILBIRD_APPLE_API_ISSUER_ID, VEILBIRD_APPLE_API_KEY_P8, VEILBIRD_MACOS_DEVELOPER_ID_P12 (base64),
 #   VEILBIRD_MACOS_DEVELOPER_ID_P12_PASSWORD. iPhone (TestFlight) comes later; see clients/RELEASING.md.
+#   The signed DMG is kept as an artifact before notarization; the notarized (stapled) copy replaces it.
 on:
   push:
     tags: ['client-v*']
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: 平台 / Platforms
+        type: choice
+        default: All
+        options: [All, Android, Windows, macOS]
+run-name: Client release · ${{ inputs.platforms || 'All' }}
 permissions:
   contents: read
 concurrency:
@@ -56,6 +66,7 @@ jobs:
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
   android:
     needs: prepare
+    if: (inputs.platforms || 'All') == 'All' || inputs.platforms == 'Android'
     runs-on: ubuntu-latest
     env:
       VEILBIRD_API_ORIGIN: ${{ vars.VEILBIRD_API_ORIGIN }}
@@ -123,6 +134,7 @@ jobs:
         if: always()
   windows:
     needs: prepare
+    if: (inputs.platforms || 'All') == 'All' || inputs.platforms == 'Windows'
     runs-on: windows-latest
     env:
       VEILBIRD_API_ORIGIN: ${{ vars.VEILBIRD_API_ORIGIN }}
@@ -162,6 +174,7 @@ jobs:
           --file "clients/windows/artifacts/TrackNothing-${{ needs.prepare.outputs.version }}-$env:VEILBIRD_BUILD_NUMBER-${{ matrix.runtime }}-setup.exe"
   macos:
     needs: prepare
+    if: (inputs.platforms || 'All') == 'All' || inputs.platforms == 'macOS'
     runs-on: macos-15
     env:
       VEILBIRD_API_ORIGIN: ${{ vars.VEILBIRD_API_ORIGIN }}
@@ -198,6 +211,13 @@ jobs:
           node-version: '22'
       - run: brew install xcodegen
         if: steps.ready.outputs.ready == 'true'
+      # The embedded core (mihomo, ~10 min to compile) is rebuilt only when it changes: build-apple.sh skips the
+      # build when the restored framework's stamp matches the sources.
+      - uses: actions/cache@v4
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          path: clients/apple/.deps/TunnelCore.xcframework
+          key: tunnelcore-macos-${{ hashFiles('clients/core/go.mod', 'clients/core/go.sum', 'clients/core/**/*.go', 'clients/core/build-apple.sh') }}
       - name: Import signing certificate and API key
         if: steps.ready.outputs.ready == 'true'
         env:
@@ -225,15 +245,26 @@ jobs:
           node scripts/apple-profiles.mjs --type MAC_APP_DIRECT
           --bundle "$VEILBIRD_APPLE_BUNDLE_ID.macos=VEILBIRD_MACOS_APP_PROFILE"
           --bundle "$VEILBIRD_APPLE_BUNDLE_ID.macos.tunnel=VEILBIRD_MACOS_TUNNEL_PROFILE" >> "$GITHUB_ENV"
-      - name: Build, sign and notarize
+      - name: Build and sign
         if: steps.ready.outputs.ready == 'true'
-        run: bash clients/apple/scripts/release-macos.sh
+        run: bash clients/apple/scripts/release-macos.sh build
+      # Kept before notarization, so a slow Apple check never loses the build (the notarized copy replaces it).
       - uses: actions/upload-artifact@v4
         if: steps.ready.outputs.ready == 'true'
         with:
           name: TrackNothing-macos-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
           path: clients/apple/artifacts/release/TrackNothing-*-macos.dmg
           if-no-files-found: error
+      - name: Notarize
+        if: steps.ready.outputs.ready == 'true'
+        run: bash clients/apple/scripts/release-macos.sh notarize
+      - uses: actions/upload-artifact@v4
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          name: TrackNothing-macos-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
+          path: clients/apple/artifacts/release/TrackNothing-*-macos.dmg
+          if-no-files-found: error
+          overwrite: true
       - name: Publish to beta
         if: steps.ready.outputs.ready == 'true' && needs.prepare.outputs.publish == 'true'
         run: >-
