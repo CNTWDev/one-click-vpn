@@ -89,12 +89,14 @@ test("Portal i18n: system language, persistence, auth, subscription import, sing
     await page.getByLabel("Электронная почта").fill("test@example.com");
     await page.getByLabel("Пароль", { exact: true }).fill("test-password-123");
     await page.getByRole("button", { name: "Войти", exact: true }).click();
-    // Home imports the account's one subscription; single-node configs sit one click away.
-    await page.getByRole("heading", { name: "Выберите приложение для импорта", level: 1 }).waitFor();
+    // Home leads with our own app; third-party apps import the account's one subscription beside it.
+    await page.getByRole("heading", { name: "Скачайте приложение и войдите", level: 1 }).waitFor();
+    await page.getByRole("heading", { name: "Уже пользуетесь другим приложением?", level: 2 }).waitFor();
     await page.getByRole("heading", { name: "Мои устройства", level: 2 }).waitFor();
     await noChinese();
     assert.equal(subscription, null, "the subscription is made on first use, not on sign-in");
-    await page.getByRole("button", { name: "Показать QR-код и ссылку" }).click();
+    await page.locator(".import-qr").click();
+    await page.getByRole("dialog").getByRole("heading", { name: "Отсканируйте телефоном" }).waitFor();
     assert.match(await page.getByLabel("Ссылка подписки", { exact: true }).inputValue(), /\/api\/subscription\?token=t{43}$/);
     assert.equal(subscription.id, "account-sub");
     await page.getByText("Используется в местах: 2", { exact: true }).waitFor();
@@ -103,9 +105,11 @@ test("Portal i18n: system language, persistence, auth, subscription import, sing
     await page.getByRole("button", { name: "Проверить и сбросить" }).click();
     await page.getByText("Неверный пароль аккаунта", { exact: true }).waitFor();
     await page.getByRole("dialog").getByRole("button", { name: "Отмена", exact: true }).click();
+    await page.getByRole("dialog").getByLabel("Ссылка подписки", { exact: true }).waitFor();
     await noChinese();
+    await page.keyboard.press("Escape");
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.locator("summary").filter({ hasText: "Импорт на другом устройстве" }).click();
+    await page.locator(".import-qr").getByText("Импорт на другом устройстве", { exact: true }).waitFor();
     await noOverflow();
     await noChinese();
     await page.locator(".home-manual").click();
@@ -154,10 +158,10 @@ test("Portal i18n: system language, persistence, auth, subscription import, sing
     await page.getByRole("heading", { name: "Конфигурации для одного сервера", level: 1 }).waitFor();
     await secondPage.close();
     await chooseLanguage("en");
-    // Own apps sit under the import: one row per platform, unreleased ones say so; versions behind one disclosure.
+    // Own apps come first: one row per platform, unreleased ones say so; versions behind one disclosure.
     await page.getByRole("button", { name: "Back to home", exact: true }).click();
-    await page.getByRole("heading", { name: "Pick your app to import", level: 1 }).waitFor();
-    await page.getByRole("heading", { name: "Or use our app", level: 2 }).waitFor();
+    await page.getByRole("heading", { name: "Get the app and sign in", level: 1 }).waitFor();
+    await page.getByRole("heading", { name: "Already use another app?", level: 2 }).waitFor();
     await page.getByText("Coming soon", { exact: true }).first().waitFor();
     assert.equal(await page.getByText("Coming soon", { exact: true }).count(), 4);
     await page.getByText("In use · Singapore", { exact: true }).waitFor();
@@ -171,8 +175,8 @@ test("Portal i18n: system language, persistence, auth, subscription import, sing
     await page.getByText("Could not load client releases. Please try again later.", { exact: true }).waitFor();
     catalogUnavailable = false;
     await page.getByRole("button", { name: "Retry", exact: true }).click();
-    await page.locator(".home-own li").filter({ hasText: "Windows" }).getByRole("link", { name: "Download", exact: true }).waitFor();
-    assert.equal(await page.locator(".home-own li").filter({ hasText: "Windows" }).getByRole("link").getAttribute("href"), "/download/windows/x64", "permanent link, so a cached page never serves a stale installer");
+    await page.locator(".home-app li").filter({ hasText: "Windows" }).getByRole("link", { name: "Download", exact: true }).waitFor();
+    assert.equal(await page.locator(".home-app li").filter({ hasText: "Windows" }).getByRole("link").getAttribute("href"), "/download/windows/x64", "permanent link, so a cached page never serves a stale installer");
     await page.locator("summary").filter({ hasText: "Version details and earlier versions" }).click();
     assert.equal(await page.locator(".home-versions a").nth(1).getAttribute("href"), "https://downloads.example.com/veilbird-0.9.exe", "earlier versions link to their own immutable file");
     await page.setViewportSize({ width: 390, height: 844 });
@@ -191,7 +195,7 @@ test("Portal i18n: system language, persistence, auth, subscription import, sing
     await noOverflow();
     await chooseLanguage("en");
     await page.getByRole("button", { name: "Back to home", exact: true }).click();
-    await page.getByRole("heading", { name: "Pick your app to import", level: 1 }).waitFor();
+    await page.getByRole("heading", { name: "Get the app and sign in", level: 1 }).waitFor();
     await noChinese();
     assert.deepEqual(errors, []);
     console.log(`Portal i18n screenshots: ${directory}`);

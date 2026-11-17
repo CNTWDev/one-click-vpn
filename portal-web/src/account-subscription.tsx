@@ -28,27 +28,21 @@ export function useAccountSubscription(onLogout: () => void) {
   return { subscription, setSubscription, error, reload: load, ensure };
 }
 
-const useNarrow = () => {
-  const query = "(max-width: 900px)";
-  const [narrow, setNarrow] = useState(() => window.matchMedia(query).matches);
-  useEffect(() => { const media = window.matchMedia(query), follow = () => setNarrow(media.matches); media.addEventListener("change", follow); return () => media.removeEventListener("change", follow); }, []);
-  return narrow;
-};
-
 /**
- * The home's first section: tap an app to import every node, or scan / copy the link on another device.
- * The link is the account's own, so a signed-in owner sees it without a password; resetting it asks for one.
+ * Third-party apps, beside our own app on the home (alone on other sites): tap an app to import every node, copy the
+ * link, or open the QR code for another device. The link is the account's own, so a signed-in owner sees it without a
+ * password; resetting it asks for one.
  */
-export function AccountSubscription({ state, nodes, notify, onLogout }: {
-  state: ReturnType<typeof useAccountSubscription>; nodes: number | null; notify: Notify; onLogout: () => void;
+export function AccountSubscription({ state, nodes, notify, onLogout, solo }: {
+  state: ReturnType<typeof useAccountSubscription>; nodes: number | null; notify: Notify; onLogout: () => void; solo: boolean;
 }) {
   const { t } = useI18n();
   const site = useSite();
-  const narrow = useNarrow();
   const name = site?.name || PRODUCT_NAME;
   const { subscription, error, ensure, setSubscription } = state;
-  const [revealed, setRevealed] = useState(false), [busy, setBusy] = useState(false);
-  const [resetting, setResetting] = useState(false), [password, setPassword] = useState(""), [resetError, setResetError] = useState("");
+  const [busy, setBusy] = useState(false);
+  // One dialog: the QR code and link, or the reset form opened from it.
+  const [dialog, setDialog] = useState<"share" | "reset" | null>(null), [password, setPassword] = useState(""), [resetError, setResetError] = useState("");
   const link = subscription?.token ? subscriptionLink(subscription.token, site?.apiOrigin) : "";
   const blocked = subscription ? !subscription.usable : false;
 
@@ -79,7 +73,7 @@ export function AccountSubscription({ state, nodes, notify, onLogout }: {
     setBusy(true); setResetError("");
     try {
       const result = await api<{ subscription: Subscription }>("/api/v1/subscriptions", { method: "PATCH", body: JSON.stringify({ action: "reset-link", password }) });
-      setSubscription(result.subscription); setResetting(false); setPassword(""); setRevealed(true);
+      setSubscription(result.subscription); setDialog("share"); setPassword("");
       notify(t("链接已重置，旧链接已失效。请在各个客户端重新导入。"));
     } catch (caught) { if (isUnauthorized(caught)) onLogout(); else setResetError((caught as Error).message); }
     finally { setBusy(false); }
@@ -90,57 +84,63 @@ export function AccountSubscription({ state, nodes, notify, onLogout }: {
     v2rayn: t("链接已复制。在 v2rayN 的「订阅分组设置」里添加，然后点「更新订阅」。"),
   };
   const downloads = (ids: readonly AppId[]) => ids.map((id, index) => <span key={id}>{index ? " · " : ""}<a href={apps[id].url} target="_blank" rel="noopener noreferrer">{apps[id].name}</a></span>);
-  const tiles = <div className="import-apps">{order.map((id) => <button key={id} type="button" className="import-app" disabled={busy || blocked} onClick={() => open(id)}>
-    <span className="home-code" aria-hidden="true">{apps[id].code}</span>
-    <span className="home-row-main"><b>{apps[id].name}</b><small>{apps[id].platforms}</small></span>
-    {apps[id].import === "copy" ? <span className="import-icon" aria-hidden="true">{Icon.copy(18)}</span>
-      : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>}
-  </button>)}
-    <button type="button" className="import-app" disabled={busy || blocked} onClick={() => void withLink((value) => copy(value))}>
-      <span className="home-code" aria-hidden="true">{Icon.copy(16)}</span>
-      <span className="home-row-main"><b>{t("复制链接")}</b><small>{t("粘贴到任意客户端")}</small></span>
+  async function share() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const current = await ensure();
+      if (!current.usable) notify(t("账号暂时无法连接，恢复后才能导入。"), "error"); else setDialog("share");
+    } catch (caught) { if (isUnauthorized(caught)) onLogout(); else notify((caught as Error).message, "error"); }
+    finally { setBusy(false); }
+  }
+  const startReset = () => { setResetError(""); setPassword(""); setDialog("reset"); };
+  const loading = subscription === undefined && !error;
+
+  return <article className={`home-third${solo ? " solo" : ""}`} aria-labelledby="third-title">
+    <p className="home-meta">{solo ? nodes === null ? t("订阅 · 自动同步") : t("订阅 · {0} 个节点 · 自动同步", [nodes]) : t("三方客户端")}</p>
+    {solo ? <h1 id="third-title">{t("选择客户端，一键导入")}</h1> : <h2 id="third-title">{t("已经在用别的客户端？")}</h2>}
+    <p className="hint">{solo ? t("账号已包含全部节点。节点有增减时，客户端会自动更新，不需要再创建订阅。")
+      : nodes === null ? t("点一下即可导入，自动同步。") : t("点一下即可导入，含全部 {0} 个节点，自动同步。", [nodes])}</p>
+    {loading ? <div className="import-apps">{[...order, "copy"].map((key) => <Skeleton key={key} height={44} />)}</div>
+      : <ul className="import-apps">{order.map((id) => <li key={id}><button type="button" className="import-app" disabled={busy || blocked} onClick={() => open(id)}>
+        <span className="home-code" aria-hidden="true">{apps[id].code}</span>
+        <span className="home-row-main"><b>{apps[id].name}</b><small>{apps[id].platforms}</small></span>
+        <span className="import-icon" aria-hidden="true">{apps[id].import === "copy" ? Icon.copy(16)
+          : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 17 17 7M8 7h9v9" /></svg>}</span>
+      </button></li>)}
+        <li><button type="button" className="import-app" disabled={busy || blocked} onClick={() => void withLink((value) => copy(value))}>
+          <span className="home-code" aria-hidden="true">{Icon.copy(16)}</span>
+          <span className="home-row-main"><b>{t("复制链接")}</b><small>{t("粘贴到任意客户端")}</small></span>
+        </button></li>
+      </ul>}
+    {error && <InlineError message={error} onRetry={() => void state.reload()} />}
+    {blocked && <p className="hint warning-text">{t("账号暂时无法连接，恢复后才能导入。")}</p>}
+    <p className="hint import-install">{t("还没安装？")} {downloads(order)}</p>
+    <button type="button" className="import-qr" disabled={busy || blocked || loading} onClick={() => void share()}>
+      <span className="import-qr-mini" aria-hidden="true" />
+      <span className="home-row-main"><b className="wide-only">{t("用手机扫码导入")}</b><b className="narrow-only">{t("在另一台设备上导入")}</b>
+        <small className="wide-only">{t("Shadowrocket、Stash、v2rayNG 都能扫")}</small><small className="narrow-only">{t("二维码和订阅链接")}</small></span>
+      <span className="import-qr-cta wide-only">{t("显示二维码")}</span>
     </button>
-  </div>;
 
-  const shareBody = !subscription || !revealed
-    ? <div className="import-share">
-      <span className="import-qr-cover" aria-hidden="true">{Icon.qr(40)}</span>
-      <button type="button" className="secondary wrap" disabled={busy || blocked || subscription === undefined} onClick={() => void withLink(() => setRevealed(true))}>{t("显示二维码和链接")}</button>
-    </div>
-    : !link
-      ? <p className="hint">{t("这个订阅创建得较早，链接无法再次显示。重置后会得到新链接，旧链接立即失效。")}</p>
-      : <div className="import-share">
-        <QrCode text={link} label={t("订阅链接二维码")} />
-        <div className="link-row"><input readOnly aria-label={t("订阅链接")} value={link} onFocus={(event) => event.target.select()} /><button type="button" className="ghost small" onClick={() => setRevealed(false)}>{t("隐藏")}</button></div>
-        <button type="button" className="primary wide" onClick={() => copy(link)}>{Icon.copy(16)}{t("复制链接")}</button>
-      </div>;
-  const share = <>
-    <p className="hint">{t("Shadowrocket、Stash、v2rayNG、Clash 扫码或粘贴都能用，格式会自动匹配。")}</p>
-    {shareBody}
-    {subscription && <button type="button" className="ghost small import-reset" onClick={() => { setResetError(""); setPassword(""); setResetting(true); }}>{t("链接泄露？重置链接")}</button>}
-  </>;
-
-  return <section className="home-import" aria-labelledby="home-title">
-    <div className="home-import-main">
-      <p className="home-meta">{nodes === null ? t("订阅 · 自动同步") : t("订阅 · {0} 个节点 · 自动同步", [nodes])}</p>
-      <h1 id="home-title">{t("选择客户端，一键导入")}</h1>
-      <p className="home-lead">{t("账号已包含全部节点。节点有增减时，客户端会自动更新，不需要再创建订阅。")}</p>
-      {subscription === undefined && !error ? <div className="import-apps">{[...order, "copy"].map((key) => <Skeleton key={key} height={72} />)}</div> : tiles}
-      {error && <InlineError message={error} onRetry={() => void state.reload()} />}
-      {blocked && <p className="hint warning-text">{t("账号暂时无法连接，恢复后才能导入。")}</p>}
-      <p className="hint">{t("还没安装？")} {downloads(order)}</p>
-    </div>
-    {narrow
-      ? <details className="card import-other"><summary><span><b>{t("在另一台设备上导入")}</b><small>{t("二维码和订阅链接")}</small></span></summary><div className="import-other-body">{share}</div></details>
-      : <aside className="card import-aside" aria-labelledby="import-qr-title"><h2 id="import-qr-title">{t("用手机扫码导入")}</h2>{share}</aside>}
-
-    <Modal open={resetting} title={t("重置订阅链接")} onClose={() => { if (!busy) setResetting(false); }}>
+    <Modal open={dialog === "share"} title={t("用手机扫码导入")} onClose={() => setDialog(null)}>
+      <div className="import-share">
+        <p className="hint">{t("Shadowrocket、Stash、v2rayNG、Clash 扫码或粘贴都能用，格式会自动匹配。")}</p>
+        {link ? <>
+          <QrCode text={link} label={t("订阅链接二维码")} />
+          <input readOnly aria-label={t("订阅链接")} value={link} onFocus={(event) => event.target.select()} />
+          <button type="button" className="primary wide" onClick={() => copy(link)}>{Icon.copy(16)}{t("复制链接")}</button>
+        </> : <p className="hint warning-text">{t("这个订阅创建得较早，链接无法再次显示。重置后会得到新链接，旧链接立即失效。")}</p>}
+        <button type="button" className="ghost small import-reset" onClick={startReset}>{t("链接泄露？重置链接")}</button>
+      </div>
+    </Modal>
+    <Modal open={dialog === "reset"} title={t("重置订阅链接")} onClose={() => { if (!busy) setDialog(null); }}>
       <form className="stack" onSubmit={(event) => void reset(event)}>
         <p>{t("旧链接会立即失效，所有客户端需要重新导入。")}</p>
         <label>{t("登录密码")}<PasswordInput showLabel={t("显示密码")} hideLabel={t("隐藏密码")} autoComplete="current-password" required maxLength={1024} autoFocus value={password} onChange={(event) => setPassword(event.target.value)} /></label>
         {resetError && <InlineError message={resetError} />}
-        <div className="dialog-actions"><button type="button" className="secondary" disabled={busy} onClick={() => setResetting(false)}>{t("取消")}</button><button className="danger" disabled={busy}>{busy ? t("验证中…") : t("验证并重置")}</button></div>
+        <div className="dialog-actions"><button type="button" className="secondary" disabled={busy} onClick={() => setDialog("share")}>{t("取消")}</button><button className="danger" disabled={busy}>{busy ? t("验证中…") : t("验证并重置")}</button></div>
       </form>
     </Modal>
-  </section>;
+  </article>;
 }
