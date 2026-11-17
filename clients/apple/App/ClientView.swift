@@ -302,16 +302,35 @@ struct ClientView:View {
             Spacer(minLength:16)
             Button {toggleConnection()} label:{ConnectRing(state:state,size:size)}.buttonStyle(.plain)
                 .accessibilityLabel(L10n.text(state == .idle ? "connect_action":(state == .failed ? "retry_action":(state == .connecting ? "cancel":"disconnect_action"))))
-            VStack(spacing:8) {
+            // The state block has one height in every state, so the ring never moves when a connection comes up or
+            // goes down: the time, rates and chart fade in and out of space that is always reserved, and the second
+            // line swaps between the time and a short message in the same slot.
+            VStack(spacing:0) {
                 HStack(spacing:10) {
-                    if state == .connected {Rectangle().fill(VeilbirdStyle.accent).frame(width:8,height:8)}
+                    Rectangle().fill(VeilbirdStyle.accent).frame(width:8,height:8).opacity(state == .connected ? 1:0)
                     Text(L10n.text(state == .connected ? "connected_status":(state == .connecting ? "connecting":(state == .failed ? "connect_failed_title":"not_connected"))))
-                        .font(.system(size:mac ? 22:28,weight:.bold))
+                        .font(.system(size:mac ? 22:28,weight:.bold)).lineLimit(1).contentTransition(.opacity)
+                    // A matching gap keeps the title itself centred whether the dot shows or not.
+                    Color.clear.frame(width:8,height:8)
                 }
-                stateDetail(state).font(.system(size:mac ? 13:15)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).monospacedDigit().lineLimit(2)
-                if state == .connected && model.status != "connection_confirming" {RateBars(down:model.rxHistory,up:model.txHistory).frame(width:238,height:mac ? 44:50).padding(.top,2)}
+                ZStack {
+                    if state == .connected,let since=model.since {
+                        TimelineView(.periodic(from:since,by:1)) {context in
+                            Text(verbatim:Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond)))
+                                .font(Pixel.font(mac ? 26:34)).foregroundStyle(VeilbirdStyle.text).lineLimit(1)
+                        }.transition(.opacity)
+                    } else {
+                        stateDetail(state).font(.system(size:mac ? 13:15)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center)
+                            .lineLimit(2).id(state).transition(.opacity)
+                    }
+                }.frame(height:mac ? 38:48).padding(.top,mac ? 4:6)
+                Text(model.status == "connection_confirming" ? L10n.text("connection_confirming"):L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate)))
+                    .font(.system(size:mac ? 12:13)).monospacedDigit().foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
+                    .frame(height:mac ? 16:18).opacity(state == .connected ? 1:0)
+                RateBars(down:model.rxHistory,up:model.txHistory).frame(width:238,height:mac ? 44:50).padding(.top,mac ? 8:10)
+                    .opacity(state == .connected && model.status != "connection_confirming" ? 1:0)
                 DataStream(running:state == .connecting || state == .connected,size:mac ? 14:15).padding(.top,mac ? 12:16)
-            }.padding(.top,mac ? 24:28).animation(reduceMotion ? nil:.easeInOut(duration:0.2),value:state)
+            }.padding(.top,mac ? 24:28).animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:state)
             Spacer(minLength:16)
             // Connected, the location row opens the connection check; otherwise the location list.
             Button {if state == .connected {checkResult=nil;checking=true} else {tab=1}} label:{currentLocationRow}.buttonStyle(RowButton())
@@ -319,20 +338,13 @@ struct ClientView:View {
                 .accessibilityHint(L10n.text("tap_to_change"))
             usageStrip.padding(.top,16)
         }.padding(.horizontal,mac ? 20:16).padding(.bottom,20).task {try? await model.loadAccount()}
+        // Notes that come and go above the ring (update, location switch) slide the page instead of snapping it.
+        .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:model.update)
+        .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:model.switchedFrom+"|"+model.dismissedSwitch)
     }
     @ViewBuilder private func stateDetail(_ state:RingState)->some View {
         switch state {
-        case .connected:
-            if model.status == "connection_confirming" {Text(L10n.text("connection_confirming"))}
-            else if let since=model.since {
-                VStack(spacing:8) {
-                    TimelineView(.periodic(from:since,by:1)) {context in
-                        Text(verbatim:Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond)))
-                            .font(Pixel.font(mac ? 26:34)).foregroundStyle(VeilbirdStyle.text)
-                    }
-                    Text(L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))).font(.system(size:mac ? 12:13,design:.monospaced))
-                }
-            }
+        case .connected:EmptyView()
         case .connecting:Text(L10n.text("finding_best_route"))
         case .failed:Text(model.failure)
         case .idle:Text(L10n.text(model.update?.mandatory == true ? "update_required_detail":"tap_ring_to_connect"))
