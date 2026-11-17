@@ -13,7 +13,7 @@ public sealed record Quality(long? Latency,long Jitter,int Loss,int? Load,int Us
     public string Grade=>Latency is null?"quality_unreachable":Score<150&&Loss==0?"quality_good":Score<300&&Loss<=20?"quality_fair":"quality_poor";
 }
 
-/// "Automatic" location: the best score from TCP connects to each node's probe port. The app itself is
+/// "Automatic" location: the best score from TCP connects to each node's probe ports. The app itself is
 /// outside its own tunnel (a DIRECT rule for Veilbird.exe), so this measures the direct path even while connected.
 public static class Latency {
     /// Last measurement per node id, so the home screen can show it without probing again.
@@ -22,20 +22,48 @@ public static class Latency {
     public static int? Load(JsonNode node)=>node["load"]?.GetValue<int>() is { } load&&load is >=0 and <=100?load:null;
     public static int Users(JsonNode node)=>node["users"]?.GetValue<int>() is { } users&&users>=0?users:0;
 
+    /// Long enough for one lost SYN to be resent (1 s) and still answer across a long, lossy route; mihomo's own
+    /// delay test (what Clash apps show) waits 5 s, so a shorter wait called slow but working nodes unreachable.
+    private const int TimeoutMs=3000;
+    /// Every TCP port the node answers on (REALITY, XHTTP); older servers only send "probe".
+    public static List<(string Host,int Port)> Probes(JsonNode node) {
+        var items=new List<JsonNode>();
+        if(node["probes"] is JsonArray array) items.AddRange(array.Where(item=>item is not null).Select(item=>item!));
+        else if(node["probe"] is { } single) items.Add(single);
+        return items.Select(item=>(Host:item["host"]?.GetValue<string>()??"",Port:item["port"]?.GetValue<int>()??0))
+            .Where(p=>p.Host.Length>0&&p.Port is >=1 and <=65535).Distinct().ToList();
+    }
+    /// Connects to every port at once and takes the first answer: a network that blocks one port (often 443)
+    /// still reaches the node on the other, as the app's own fallback transports would when connecting.
+    private static async Task<long?> Race(List<(IPAddress Address,int Port)> targets) {
+        using var timeout=new CancellationTokenSource(TimeoutMs);var clock=Stopwatch.StartNew();
+        var pending=targets.Select(async target=>{
+            using var socket=new TcpClient(target.Address.AddressFamily);
+            try {await socket.ConnectAsync(target.Address,target.Port,timeout.Token);return (long?)clock.ElapsedMilliseconds;}
+            catch {return null;}
+        }).ToList();
+        while(pending.Count>0) {
+            var finished=await Task.WhenAny(pending);pending.Remove(finished);
+            if(await finished is { } elapsed) {timeout.Cancel();return elapsed;}
+        }
+        return null;
+    }
     public static async Task<Quality> Measure(JsonNode node,int attempts=5) {
         var load=Load(node);var users=Users(node);
-        var host=node["probe"]?["host"]?.GetValue<string>();var port=node["probe"]?["port"]?.GetValue<int>()??0;
-        if(string.IsNullOrEmpty(host)||port is <1 or >65535) return new(null,0,100,load,users);
-        IPAddress? address;
+        var targets=new List<(IPAddress Address,int Port)>();
         // DNS once, so every attempt is a plain round trip.
-        try {address=IPAddress.TryParse(host,out var literal)?literal:(await Dns.GetHostAddressesAsync(host)).FirstOrDefault();} catch {address=null;}
-        if(address is null) return new(null,0,100,load,users);
+        foreach(var (host,port) in Probes(node)) {
+            try {
+                var address=IPAddress.TryParse(host,out var literal)?literal:(await Dns.GetHostAddressesAsync(host)).FirstOrDefault();
+                if(address is not null) targets.Add((address,port));
+            } catch {/* unresolved: skip this port */}
+        }
+        if(targets.Count==0) return new(null,0,100,load,users);
         var samples=new List<long>();
         for(var attempt=0;attempt<attempts;attempt++) {
             // Two misses in a row with nothing answered: the node is down, stop waiting on it.
             if(attempt==2&&samples.Count==0) return new(null,0,100,load,users);
-            using var socket=new TcpClient(address.AddressFamily);using var timeout=new CancellationTokenSource(1500);var clock=Stopwatch.StartNew();
-            try {await socket.ConnectAsync(address,port,timeout.Token);samples.Add(clock.ElapsedMilliseconds);} catch {/* unreachable this round */}
+            if(await Race(targets) is { } elapsed) samples.Add(elapsed);
         }
         var loss=(attempts-samples.Count)*100/attempts;
         if(samples.Count==0) return new(null,0,loss,load,users);

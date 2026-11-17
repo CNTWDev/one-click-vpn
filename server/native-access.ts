@@ -83,16 +83,25 @@ function nodeLoad(metrics: string | null | undefined): number | null {
   } catch { return null; }
 }
 export async function nativeNodes() {
-  // WireGuard ignores unknown peers, so clients time a TCP connect to the same host's REALITY port instead.
+  // WireGuard ignores unknown peers, so clients time TCP connects instead: the REALITY port and the stealth
+  // service's TCP port (XHTTP). A node answers if either does, the same way a subscription's per-node fallback
+  // group (Hysteria2 > REALITY > XHTTP) stays usable when one port is blocked on a network.
   // Nodes without one have no probe and keep the server's least-loaded order behind measured nodes.
-  const tcp=new Map((await selectVpnServices({protocol:"vless"})).map(({node,service})=>[node.id,service.listen_port]));
+  const ports=new Map<string,number[]>();
+  for(const protocol of ["vless","stealth"] as const) for(const {node,service} of await selectVpnServices({protocol})) {
+    const list=ports.get(node.id)||[];
+    if(!list.includes(service.listen_port)) list.push(service.listen_port);
+    ports.set(node.id,list);
+  }
   // The country code labels each location in the apps (a two-letter badge).
   const regions=new Map((await listRegions()).map((region)=>[region.id,region]));
   return {apiOrigins:await apiOrigins(),nodes:(await candidates()).map(({node})=>{
-    const port=tcp.get(node.id);
+    const host=node.public_endpoint||node.ip;
+    const probes=(ports.get(node.id)||[]).map((port)=>({host,port}));
     const countryCode=node.region_id?regions.get(node.region_id)?.code?.toUpperCase()||null:null;
     // load (CPU %) and users (online now) let the apps prefer a quieter node when latencies are close.
-    return {id:node.id,name:node.name,region:node.region,countryCode,protocol:"wireguard",probe:port?{host:node.public_endpoint||node.ip,port}:null,load:nodeLoad(node.metrics_json),users:Math.max(0,Number(node.users)||0)};
+    // probe (the first of probes) stays for app builds that only read one address.
+    return {id:node.id,name:node.name,region:node.region,countryCode,protocol:"wireguard",probe:probes[0]||null,probes,load:nodeLoad(node.metrics_json),users:Math.max(0,Number(node.users)||0)};
   })};
 }
 export async function nativeChallenge(session: Session, body: Record<string,unknown>) {

@@ -159,26 +159,45 @@ func Total() string {
 	return fmt.Sprintf("%d %d", up, down)
 }
 
-// Reach times a TCP connect to address (host:port) outside the tunnel, through the core's DIRECT
-// outbound (bound to the physical network). It returns milliseconds, or -1 when nothing answered.
-// The connection check uses it for the leg from this device to the node.
+// Reach times a TCP connect to address (host:port, or several separated by commas) outside the tunnel,
+// through the core's DIRECT outbound (bound to the physical network). Several addresses are tried at once and
+// the first answer counts, so a node still answers on a network that blocks one of its ports. It returns
+// milliseconds, or -1 when nothing answered. The connection check uses it for the leg from this device to the node.
 func Reach(address string, timeoutMs int) int {
 	direct, ok := tunnel.Proxies()["DIRECT"]
 	if !ok {
 		return -1
 	}
-	metadata := &C.Metadata{NetWork: C.TCP}
-	if err := metadata.SetRemoteAddress(address); err != nil {
+	var targets []*C.Metadata
+	for _, item := range strings.Split(address, ",") {
+		metadata := &C.Metadata{NetWork: C.TCP}
+		if item = strings.TrimSpace(item); item != "" && metadata.SetRemoteAddress(item) == nil {
+			targets = append(targets, metadata)
+		}
+	}
+	if len(targets) == 0 {
 		return -1
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
 	started := time.Now()
-	conn, err := direct.DialContext(ctx, metadata)
-	if err != nil {
-		return -1
+	answers := make(chan int, len(targets))
+	for _, metadata := range targets {
+		go func(metadata *C.Metadata) {
+			conn, err := direct.DialContext(ctx, metadata)
+			if err != nil {
+				answers <- -1
+				return
+			}
+			elapsed := int(time.Since(started).Milliseconds())
+			_ = conn.Close()
+			answers <- elapsed
+		}(metadata)
 	}
-	elapsed := int(time.Since(started).Milliseconds())
-	_ = conn.Close()
-	return elapsed
+	for range targets {
+		if elapsed := <-answers; elapsed >= 0 {
+			return elapsed
+		}
+	}
+	return -1
 }

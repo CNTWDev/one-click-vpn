@@ -544,11 +544,11 @@ public partial class MainWindow : Window {
         if(shown) AutomationProperties.SetName(note,text.Text);
     }
     private JsonNode? NodeData(string id)=>nodesData?.FirstOrDefault(node=>node?["id"]?.GetValue<string>()==id);
-    /// "host:port" the node answers TCP on (its latency probe), outside the tunnel.
+    /// "host:port,host:port" the node answers TCP on (its latency probes), outside the tunnel; the first answer counts.
     private static string? ProbeAddress(JsonNode? node) {
-        var host=node?["probe"]?["host"]?.GetValue<string>();var port=node?["probe"]?["port"]?.GetValue<int>()??0;
-        if(string.IsNullOrEmpty(host)||port is <1 or >65535) return null;
-        return (host.Contains(':')?$"[{host}]":host)+":"+port;
+        if(node is null) return null;
+        var list=Latency.Probes(node).Select(p=>(p.Host.Contains(':')?$"[{p.Host}]":p.Host)+":"+p.Port).ToList();
+        return list.Count==0?null:string.Join(",",list);
     }
     /// The connection check: three legs timed on demand. Your network = a small page fetched outside the tunnel,
     /// to the location = a TCP connect to the node outside the tunnel, opening a page = the test page through the
