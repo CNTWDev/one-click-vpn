@@ -8,7 +8,9 @@ import { dbExec, dbQuery, withTransaction } from "./db";
 import { hashToken } from "./crypto";
 import { collectUserBundles, realitySettings, subscriptionUserRows } from "./reality";
 import { createSecretMaterial, findSecretMaterialByKind, readSecretMaterial } from "./secret-materials";
-import { findDesiredConfig, type VpnService } from "./control-db";
+import { findDesiredConfig, findVpnService, type VpnService } from "./control-db";
+import { hopDesired, withHopping } from "./hop-ports";
+import { hopLines } from "./hop-reach";
 import { nativeUserRows } from "./native-users";
 
 /**
@@ -116,10 +118,13 @@ export async function stealthDesiredState(nodeId: string, listenPort: number) {
   const reality = await realitySettings(nodeId);
   if (!reality) throw new Error("请先启用 VLESS REALITY：抗封锁通道复用它的密钥和目标域名");
   const { secretId } = await ensureStealthServer(nodeId);
-  return { serverSecretId: secretId, realitySecretId: reality.secret_id, usersSecretId: await stealthUsersSecret(nodeId), listenPort };
+  const vless = await findVpnService(nodeId, "vless");
+  return { serverSecretId: secretId, realitySecretId: reality.secret_id, usersSecretId: await stealthUsersSecret(nodeId), listenPort,
+    // Port hopping and the spare REALITY port (hop-ports.ts); Agents before 2.19 ignore it.
+    hop: hopDesired(nodeId, listenPort, vless?.enabled ? vless.listen_port : undefined) };
 }
 
-type NodeAddress = { id: string; ip: string; public_endpoint: string | null };
+type NodeAddress = { id: string; ip: string; public_endpoint: string | null; capabilities?: Record<string, unknown> };
 
 /**
  * mihomo proxies for an app device on one node, lightest first after WireGuard (which the app
@@ -133,11 +138,16 @@ export async function nativeProxies(node: NodeAddress, enrollmentId: string, ser
   const host = node.public_endpoint || node.ip;
   const realityOpts = { "public-key": reality.public_key, "short-id": reality.short_id };
   const stealth = services.stealth && { port: services.stealth.listen_port, server: (await ensureStealthServer(node.id)).server };
+  const hop = await hopLines(node);
   const proxies: Array<Record<string, unknown>> = [];
-  if (stealth) proxies.push({ name: "hysteria2", type: "hysteria2", server: host, port: stealth.port, password: uuid,
-    obfs: "salamander", "obfs-password": stealth.server.obfsPassword, sni: STEALTH_SNI, "skip-cert-verify": true, fingerprint: stealth.server.fingerprint, alpn: ["h3"] });
-  if (services.vless) proxies.push({ name: "reality", type: "vless", server: host, port: services.vless.listen_port, uuid, network: "tcp", tls: true, udp: true,
+  if (stealth) proxies.push(withHopping({ name: "hysteria2", type: "hysteria2", server: host, port: stealth.port, password: uuid,
+    obfs: "salamander", "obfs-password": stealth.server.obfsPassword, sni: STEALTH_SNI, "skip-cert-verify": true, fingerprint: stealth.server.fingerprint, alpn: ["h3"] }, hop.udpPorts));
+  const realityLine = (name: string, port: number) => ({ name, type: "vless", server: host, port, uuid, network: "tcp", tls: true, udp: true,
     flow: "xtls-rprx-vision", servername: reality.server_name, "client-fingerprint": "chrome", "reality-opts": realityOpts });
+  if (services.vless) proxies.push(realityLine("reality", services.vless.listen_port));
+  // The same REALITY listener on the node's spare port, for networks that block 443 only. App builds without
+  // "reality-alt" in their ladder leave it out.
+  if (services.vless && hop.tcpPort) proxies.push(realityLine("reality-alt", hop.tcpPort));
   if (stealth) proxies.push({ name: "xhttp", type: "vless", server: host, port: stealth.port, uuid, network: "xhttp", tls: true, udp: true,
     servername: reality.server_name, "client-fingerprint": "chrome", "reality-opts": realityOpts, "xhttp-opts": { path: stealth.server.xhttpPath } });
   return proxies;

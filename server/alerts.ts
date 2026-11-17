@@ -12,7 +12,7 @@ import { writeOperationalLog } from "./operational-logs";
 // Controller restart neither repeats an alert nor forgets one.
 
 // kind + subject let Console show the problem in its own language; title and detail are the (Chinese) email text.
-type Problem = { key: string; kind: "node-offline" | "service" | "agent-outdated" | "disk"; subject: string; title: string; detail: string; delayMinutes: number };
+type Problem = { key: string; kind: "node-offline" | "service" | "agent-outdated" | "disk" | "transport-blocked"; subject: string; title: string; detail: string; delayMinutes: number };
 type Row = { key: string; firing_since: Date; notified_at: Date | null; detail: string };
 
 const startedAt = Date.now();
@@ -49,6 +49,43 @@ async function nodeProblems(): Promise<Problem[]> {
   return problems;
 }
 
+const TRANSPORT_LABELS: Record<string, string> = { hysteria2: "Hysteria2", reality: "REALITY", "reality-alt": "REALITY 备用端口", xhttp: "XHTTP" };
+// Console shows the subject in its own language: technical names only.
+const TRANSPORT_NAMES: Record<string, string> = { hysteria2: "Hysteria2", reality: "REALITY", "reality-alt": "REALITY alt", xhttp: "XHTTP" };
+
+/**
+ * A line blocked at one node: in the last 24 hours, apps on at least 2 networks (half or more of those that
+ * tried it there) could not reach this node's line while another line of the node answered, AND the same
+ * line worked to another node from those same networks. The last part tells a block on this node's
+ * address or port apart from a carrier that blocks the protocol everywhere (which no node change fixes).
+ * Networks are the apps' one-way labels (carrier or Wi-Fi hash); nothing about users is read.
+ */
+export async function blockedTransports() {
+  return dbQuery<{ node_id: string; name: string; transport: string; blocked: number; networks: number }>(`
+    WITH recent AS (
+      SELECT node_id, transport, network, ok_at, failed_at,
+        failed_at > now() - interval '24 hours' AND failed_at > COALESCE(ok_at, 'epoch') AS failing
+      FROM node_transport_reach
+      WHERE network <> 'controller' AND transport <> 'wireguard'
+        AND GREATEST(COALESCE(ok_at, 'epoch'), COALESCE(failed_at, 'epoch')) > now() - interval '24 hours')
+    SELECT r.node_id, n.name, r.transport,
+      COUNT(*) FILTER (WHERE r.failing AND EXISTS (SELECT 1 FROM recent o WHERE o.transport = r.transport AND o.network = r.network
+        AND o.node_id <> r.node_id AND o.ok_at > now() - interval '24 hours'))::int AS blocked,
+      COUNT(*)::int AS networks
+    FROM recent r JOIN nodes n ON n.id = r.node_id
+    GROUP BY r.node_id, n.name, r.transport`).then((rows) => rows.filter((row) => row.blocked >= 2 && row.blocked * 2 >= row.networks));
+}
+
+async function blockedProblems(): Promise<Problem[]> {
+  return (await blockedTransports()).map((row) => {
+    const label = TRANSPORT_LABELS[row.transport] || row.transport;
+    return { key: `transport-blocked:${row.node_id}:${row.transport}`, kind: "transport-blocked", subject: `${row.name} ${TRANSPORT_NAMES[row.transport] || row.transport}`,
+      title: `线路疑似被封：${row.name} ${label}`,
+      detail: `近 24 小时 ${row.blocked}/${row.networks} 个网络连不上这条线路，同一网络连别的节点的同一线路正常。客户端已自动改走其他线路；如果持续，可以考虑给节点换 IP。`,
+      delayMinutes: 30 };
+  });
+}
+
 async function diskProblem(): Promise<Problem[]> {
   try {
     // The container's root filesystem is the host disk that also holds the database and logs.
@@ -60,7 +97,7 @@ async function diskProblem(): Promise<Problem[]> {
 }
 
 export async function currentProblems(): Promise<Problem[]> {
-  return [...await nodeProblems(), ...await diskProblem()];
+  return [...await nodeProblems(), ...await blockedProblems(), ...await diskProblem()];
 }
 
 async function mail(lines: string[], title: string): Promise<{ subject: string; text: string }> {

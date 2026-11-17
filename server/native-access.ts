@@ -7,6 +7,7 @@ import { canonical, digest, identity, NativeError, verifyNativeProof } from "./n
 import { rebuildDesiredState, selectVpnServices } from "./control-plane";
 import { ipv4Address, ipv4Pool } from "./ipv4-pool";
 import { ensureNativeSecret, nativeProxies } from "./stealth";
+import { hopLines } from "./hop-reach";
 import { accessSql, accountAccess, assertDeviceSlot, DeviceLimitError, deviceSlots, withinDeviceLimitSql } from "./entitlements";
 import { writeOperationalLog } from "./operational-logs";
 import { apiOrigins } from "./api-origins";
@@ -91,6 +92,9 @@ export async function nativeNodes() {
   for(const protocol of ["vless","stealth"] as const) for(const {node,service} of await selectVpnServices({protocol})) {
     const list=ports.get(node.id)||[];
     if(!list.includes(service.listen_port)) list.push(service.listen_port);
+    // The spare REALITY port (hop-ports.ts) answers when only 443 is blocked on the device's network.
+    const spare=protocol==="vless"?(await hopLines(node)).tcpPort:null;
+    if(spare && !list.includes(spare)) list.push(spare);
     ports.set(node.id,list);
   }
   // The country code labels each location in the apps (a two-letter badge).
@@ -196,7 +200,7 @@ export async function nativeConnect(session:Session,body:Record<string,unknown>)
     proxies:fallback.proxies};
 }
 /** The other transports, and why some are missing (logged, never sent to the app). */
-async function fallbackProxies(node:{id:string;ip:string;public_endpoint:string|null},enrollmentId:string):Promise<{proxies:Array<Record<string,unknown>>;reason:string}> {
+async function fallbackProxies(node:{id:string;ip:string;public_endpoint:string|null;capabilities?:Record<string,unknown>},enrollmentId:string):Promise<{proxies:Array<Record<string,unknown>>;reason:string}> {
   const pick=async(protocol:"vless"|"stealth")=>(await selectVpnServices({protocol,includePaused:true})).find((item)=>item.node.id===node.id)?.service;
   try {
     await ensureNativeSecret(enrollmentId);

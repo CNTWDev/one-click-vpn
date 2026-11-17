@@ -128,12 +128,12 @@ test("share links: Hysteria2 pinned, XHTTP without flow, backups named after the
   assert.equal(Buffer.from(renderV2raySubscription([{ ...lines[0], fingerprint: "" }, lines[1]]), "base64").toString().trim().split("\n").length, 1);
 });
 test("each client only gets the lines it can use", () => {
-  assert.deepEqual(subscriptionClient("clash", "clash-verge/v2.2.3"), { hysteria2: true, xhttp: true });
-  assert.deepEqual(subscriptionClient("clash", "mihomo/1.19.33"), { hysteria2: true, xhttp: true });
-  assert.deepEqual(subscriptionClient("clash", "mihomo/v1.19.22"), { hysteria2: true, xhttp: true });
-  assert.deepEqual(subscriptionClient("clash", "mihomo/1.19.21"), { hysteria2: true, xhttp: false });
-  assert.deepEqual(subscriptionClient("clash", "mihomo/1.18.10"), { hysteria2: true, xhttp: false });
-  assert.deepEqual(subscriptionClient("clash", "mihomo/2.0.0"), { hysteria2: true, xhttp: true });
+  assert.deepEqual(subscriptionClient("clash", "clash-verge/v2.2.3"), { hysteria2: true, xhttp: true, hop: true });
+  assert.deepEqual(subscriptionClient("clash", "mihomo/1.19.33"), { hysteria2: true, xhttp: true, hop: true });
+  assert.deepEqual(subscriptionClient("clash", "mihomo/v1.19.22"), { hysteria2: true, xhttp: true, hop: true });
+  assert.deepEqual(subscriptionClient("clash", "mihomo/1.19.21"), { hysteria2: true, xhttp: false, hop: true });
+  assert.deepEqual(subscriptionClient("clash", "mihomo/1.18.10"), { hysteria2: true, xhttp: false, hop: true });
+  assert.deepEqual(subscriptionClient("clash", "mihomo/2.0.0"), { hysteria2: true, xhttp: true, hop: true });
   assert.deepEqual(subscriptionClient("clash", "HiddifyNext/2.5.7"), { hysteria2: false, xhttp: false });
   // Stash: no documented Hysteria2 pin, so REALITY + XHTTP only, with the REALITY server name as `sni`.
   assert.deepEqual(subscriptionClient("clash", "Stash/3.1.1 Clash/1.11.0"), { hysteria2: false, xhttp: true, sni: true });

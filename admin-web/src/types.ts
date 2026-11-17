@@ -192,7 +192,7 @@ export type NodeDiagnostics = {
       protocol: string; state: string; configured: boolean; taskStatus: string | null; lastError: string;
       transport: string; port: number; installed: boolean; runtimeActive: boolean; listening: boolean;
       hostFirewall: string; cloudFirewall: string;
-      ports?: Array<{ transport: string; port: number; hostFirewall: string; cloudFirewall: string; checkedAt?: string | null }>;
+      ports?: Array<{ transport: string; port: number; range?: string; role?: "hop" | "spare"; hostFirewall: string; cloudFirewall: string; checkedAt?: string | null }>;
     }>;
     note: string;
   };

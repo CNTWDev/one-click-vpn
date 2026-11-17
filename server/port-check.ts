@@ -5,6 +5,8 @@ import { findControlNode } from "./control-db";
 import { dbExec } from "./db";
 import { writeOperationalLog } from "./operational-logs";
 import { wakeAgent } from "./agent-wake";
+import { HOP_FROM, HOP_RANGE, HOP_UDP_KEY } from "./hop-ports";
+import { saveHopReach } from "./hop-reach";
 
 /**
  * Manual "检测端口" from the Console: the Controller sends marker UDP packets to a node over the
@@ -16,11 +18,13 @@ import { wakeAgent } from "./agent-wake";
  * outcome is kept per port in node_transport_reach under network "controller".
  */
 export type PortCheckPort = { transport: "udp" | "tcp"; port: number };
-export type PortCheckResult = PortCheckPort & { open: boolean };
+export type PortCheckResult = PortCheckPort & { open: boolean; range?: string };
 export type PortCheck = {
   id: string;
   nodeId: string;
   ports: PortCheckPort[];
+  /** Sample ports of the UDP hop range (hop-ports.ts), reported as one result for the whole range. */
+  hop: number[];
   payloadLength: number;
   status: "waiting" | "counting" | "done" | "failed";
   startedAt: number;
@@ -47,15 +51,16 @@ export function currentPortCheck(nodeId: string): PortCheck | undefined {
 }
 
 /** Starts a check of the node's UDP ports; the caller probes TCP ports itself. */
-export async function startPortCheck(nodeId: string, ports: PortCheckPort[]): Promise<PortCheck> {
+export async function startPortCheck(nodeId: string, ports: PortCheckPort[], hop: number[] = []): Promise<PortCheck> {
   const running = store.get(nodeId);
   if (running && (running.status === "waiting" || running.status === "counting")) return running;
   const node = await findControlNode(nodeId);
   if (!node) throw new Error("Node not found");
   const host = node.public_endpoint || node.ip;
-  const udp = ports.filter((item) => item.transport === "udp");
+  const samples = hop.filter((port) => !ports.some((item) => item.transport === "udp" && item.port === port));
+  const udp = [...ports.filter((item) => item.transport === "udp"), ...samples.map((port) => ({ transport: "udp" as const, port }))];
   const check: PortCheck = {
-    id: randomUUID(), nodeId, ports: udp, status: "waiting", startedAt: Date.now(), results: [], error: "",
+    id: randomUUID(), nodeId, ports: udp, hop: samples, status: "waiting", startedAt: Date.now(), results: [], error: "",
     // A length nobody else is likely to send to these ports in the same few seconds.
     payloadLength: 700 + Math.floor(Math.random() * 400),
   };
@@ -92,9 +97,17 @@ export async function recordPortCheck(nodeId: string, id: string, results: unkno
   if (error) { fail(check, error); return true; }
   const reported = (Array.isArray(results) ? results : []) as Array<{ transport?: unknown; port?: unknown; packets?: unknown }>;
   const counted = new Map(reported.map((item) => [`${item?.transport}/${item?.port}`, Number(item?.packets) > 0]));
-  const outcome = check.ports.filter((item) => counted.has(`${item.transport}/${item.port}`))
+  const all = check.ports.filter((item) => counted.has(`${item.transport}/${item.port}`))
     .map((item) => ({ ...item, open: counted.get(`${item.transport}/${item.port}`) === true }));
+  const samples = all.filter((item) => item.transport === "udp" && check.hop.includes(item.port));
+  const outcome: PortCheckResult[] = all.filter((item) => !samples.includes(item));
   for (const item of outcome) await saveControllerReach(nodeId, item);
+  if (samples.length) {
+    // Packets on any sample port prove the security group passes the range; random loss on one is no failure.
+    const open = samples.some((item) => item.open);
+    await saveHopReach(nodeId, HOP_UDP_KEY, open);
+    outcome.push({ transport: "udp", port: HOP_FROM, range: HOP_RANGE, open });
+  }
   finish(check, outcome);
   return true;
 }
@@ -111,7 +124,7 @@ function finish(check: PortCheck, results: PortCheckResult[]) {
   check.status = "done";
   check.results = results;
   void writeOperationalLog({ nodeId: check.nodeId, component: "controller", level: results.some((item) => !item.open) ? "warning" : "info",
-    action: "node.port_check", message: `Port check: ${results.map((item) => `${item.transport}/${item.port} ${item.open ? "open" : "closed"}`).join(", ") || "no UDP ports"}`,
+    action: "node.port_check", message: `Port check: ${results.map((item) => `${item.transport}/${item.range || item.port} ${item.open ? "open" : "closed"}`).join(", ") || "no UDP ports"}`,
     fields: { checkId: check.id } });
   return check;
 }

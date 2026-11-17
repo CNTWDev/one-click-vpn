@@ -63,7 +63,7 @@ class SelfUpgrade(unittest.TestCase):
             (root / "config.env").write_text("x")
             with patch.object(agent, "AGENT_DIR", root), patch.object(agent, "request_json", lambda path, payload: {"source": "print(1)\n"}):
                 with self.assertRaises(RuntimeError):
-                    agent.self_upgrade({"version": "agent 2.18.0", "sha256": "0" * 64})
+                    agent.self_upgrade({"version": "agent 2.19.0", "sha256": "0" * 64})
                 self.assertFalse((root / "upgrade.pending").exists())
 
 

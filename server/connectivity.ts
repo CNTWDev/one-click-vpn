@@ -1,5 +1,7 @@
 import { getNodeReconcileStatus, findControlNode, listVpnServices, type Protocol, type VpnService } from "./control-db";
 import { appTransports, tcpReachable, udpReach, udpStatus, type CloudFirewall } from "./port-reach";
+import { altTcpPort, HOP_FROM, HOP_RANGE, HOP_UDP_KEY, reportedHop } from "./hop-ports";
+import { hopReach } from "./hop-reach";
 
 export type ConnectivityState = "healthy" | "attention" | "provisioning" | "unavailable" | "not_configured" | "unknown";
 
@@ -67,6 +69,7 @@ export async function getNodeConnectivity(nodeId: string) {
   });
   const host = node.public_endpoint || node.ip;
   const udp = await udpReach(nodeId);
+  const hop = reportedHop(capabilities), reach = hop ? await hopReach(nodeId) : {};
   const hostFirewall = (transport: string, port: number) => managedRules[`${transport}/${port}`] === true ? "managed"
     : managedRules[`${transport}/${port}`] === false ? "attention" : firewall.inputPolicy === "accept" ? "permissive" : "unknown";
   // Every port a protocol listens on (stealth: Hysteria2 on UDP and XHTTP on TCP with the same number).
@@ -79,8 +82,21 @@ export async function getNodeConnectivity(nodeId: string) {
       const cloudFirewall: CloudFirewall = !item.configured || !item.listening ? "unverified" : await tcpReachable(host, port) ? "reachable" : "unreachable";
       return { transport, port, hostFirewall: hostFirewall(transport, port), cloudFirewall, checkedAt: null };
     }));
+    // Extra ports in front of the listener (Agent 2.19+): the UDP hop range for Hysteria2, the spare REALITY port.
+    // The redirect needs no host firewall rule; the cloud status is the Controller's last outside check.
+    const extra: Array<{ transport: string; port: number; range?: string; role: "hop" | "spare"; hostFirewall: string; cloudFirewall: CloudFirewall; checkedAt: string | null }> = [];
+    if (hop && item.configured && item.protocol === "stealth") {
+      const check = reach[HOP_UDP_KEY];
+      extra.push({ transport: "udp", port: HOP_FROM, range: HOP_RANGE, role: "hop", hostFirewall: hop.udp === HOP_RANGE ? "managed" : "attention",
+        cloudFirewall: check ? (check.open ? "reachable" : "unreachable") : "unverified", checkedAt: check ? new Date(check.at).toISOString() : null });
+    }
+    if (hop && item.configured && item.protocol === "vless") {
+      const spare = altTcpPort(nodeId), check = reach[`tcp/${spare}`];
+      extra.push({ transport: "tcp", port: spare, role: "spare", hostFirewall: hop.tcp === spare ? "managed" : "attention",
+        cloudFirewall: check ? (check.open ? "reachable" : "unreachable") : "unverified", checkedAt: check ? new Date(check.at).toISOString() : null });
+    }
     // Kept for older Console builds: the first port's status.
-    return { ...item, ports, hostFirewall: ports[0].hostFirewall, cloudFirewall: ports[0].cloudFirewall };
+    return { ...item, ports: [...ports, ...extra], hostFirewall: ports[0].hostFirewall, cloudFirewall: ports[0].cloudFirewall };
   }));
   const heartbeatAt = node.last_heartbeat_at || null;
   const heartbeatTime = heartbeatAt ? new Date(heartbeatAt).getTime() : Number.NaN;

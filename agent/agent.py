@@ -23,6 +23,7 @@ import sys
 import tempfile
 import time
 import ast
+import shlex
 import queue
 import ssl
 import platform
@@ -50,6 +51,7 @@ XRAY_PATH = Path("/opt/northstar-agent/bin/xray")
 MIHOMO_PATH = Path("/opt/northstar-agent/bin/mihomo")
 STEALTH_DIR = STATE_DIR / "stealth"
 STEALTH_CONFIG = STEALTH_DIR / "config.yaml"
+HOP_STATE = STEALTH_DIR / "hop.json"
 # mihomo's own API, loopback only: the Agent reads per-device traffic from it.
 STEALTH_API = "127.0.0.1:10086"
 STEALTH_API_SECRET = STEALTH_DIR / "api.secret"
@@ -1416,6 +1418,107 @@ def refresh_stealth_target():
         raise
 
 
+# Extra ports in front of the stealth and REALITY listeners (port hopping): nat PREROUTING redirects a
+# UDP range to Hysteria2 and one TCP port to REALITY. The redirect happens before the host firewall,
+# which therefore only sees (and only needs open) the real listener ports. Only the cloud security
+# group must let the range through. Rules are re-checked every minute, so a reboot or a firewalld
+# reload that drops them is repaired without a new task.
+HOP_COMMENT = "northstar-hop"
+hop_status = {"udp": None, "tcp": None}
+
+
+def valid_port(value):
+    return isinstance(value, int) and not isinstance(value, bool) and 0 < value < 65536
+
+
+def hop_wanted(hop):
+    """(transport, dport, target) for each redirect the desired state asks for; invalid parts are dropped."""
+    wanted = []
+    if not isinstance(hop, dict):
+        return wanted
+    low, high, udp_target = hop.get("udpFrom"), hop.get("udpTo"), hop.get("udpTarget")
+    if valid_port(low) and valid_port(high) and valid_port(udp_target) and low <= high and not low <= udp_target <= high:
+        wanted.append(("udp", f"{low}:{high}", udp_target))
+    tcp, tcp_target = hop.get("tcpPort"), hop.get("tcpTarget")
+    if valid_port(tcp) and valid_port(tcp_target) and tcp != tcp_target:
+        wanted.append(("tcp", str(tcp), tcp_target))
+    return wanted
+
+
+def hop_rule(transport, dport, target):
+    # Only traffic addressed to this machine: forwarded VPN traffic to remote hosts on these ports is untouched.
+    return ["PREROUTING", "-p", transport, "-m", "addrtype", "--dst-type", "LOCAL", "-m", transport, "--dport", dport,
+            "-m", "comment", "--comment", f"{HOP_COMMENT}-{transport}", "-j", "REDIRECT", "--to-ports", str(target)]
+
+
+def listening_ports(transport):
+    if shutil.which("ss") is None:
+        return set()
+    output = run_optional(["ss", "-H", "-l", "-n", "-u" if transport == "udp" else "-t"]).stdout
+    return {int(match) for match in re.findall(r":(\d+)\s", output + " ")}
+
+
+def hop_conflict(transport, dport, target):
+    """Another program listening inside the range would lose its traffic to the redirect: skip the rule then."""
+    low, _, high = dport.partition(":")
+    low, high = int(low), int(high or low)
+    return any(low <= port <= high and port != target for port in listening_ports(transport))
+
+
+def listed_hop_rules(tool):
+    """Our redirects as `iptables -S` prints them: (transport, dport, target, arguments for -D)."""
+    rules = []
+    for line in run_optional([tool, "-t", "nat", "-S", "PREROUTING"]).stdout.splitlines():
+        if f"{HOP_COMMENT}-" not in line or not line.startswith("-A PREROUTING "):
+            continue
+        transport = re.search(r" -p (\w+)", line)
+        dport = re.search(r" --dport (\S+)", line)
+        target = re.search(r" --to-ports (\d+)", line)
+        rules.append((transport.group(1) if transport else "", dport.group(1) if dport else "", int(target.group(1)) if target else 0, shlex.split(line)[1:]))
+    return rules
+
+
+def ensure_hop_rules():
+    """Make nat PREROUTING hold exactly the redirects in hop.json (none without the file)."""
+    global hop_status
+    try:
+        hop = json.loads(HOP_STATE.read_text()) if HOP_STATE.exists() else None
+    except (OSError, ValueError):
+        hop = None
+    wanted = hop_wanted(hop)
+    status = {"udp": None, "tcp": None}
+    for tool in ("iptables", "ip6tables"):
+        if shutil.which(tool) is None:
+            continue
+        listed = listed_hop_rules(tool)
+        for transport, dport, target, arguments in listed:
+            if (transport, dport, target) not in wanted:
+                run_optional([tool, "-t", "nat", "-D", *arguments])
+        present = {(transport, dport, target) for transport, dport, target, _ in listed}
+        for transport, dport, target in wanted:
+            # Checked only before adding: a short-lived socket in the range later must not make the rule flap.
+            ok = (transport, dport, target) in present or (not hop_conflict(transport, dport, target)
+                                                           and run_optional([tool, "-t", "nat", "-I", *hop_rule(transport, dport, target)]).returncode == 0)
+            # IPv4 decides what is reported; IPv6 is best effort (some kernels have no IPv6 nat).
+            if tool == "iptables" and ok:
+                status[transport] = dport.replace(":", "-") if transport == "udp" else int(dport)
+    hop_status = status
+    return status
+
+
+def apply_hop(hop):
+    if hop_wanted(hop):
+        STEALTH_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+        atomic_write(HOP_STATE, json.dumps(hop))
+    else:
+        HOP_STATE.unlink(missing_ok=True)
+    try:
+        ensure_hop_rules()
+    except Exception as error:
+        # Hopping is an extra: the listeners themselves stay up without it.
+        log_failure("port hopping", command_failure_detail(error))
+
+
 def stealth_sync_config(desired):
     server = json.loads(request_node_secret(desired.get("serverSecretId")))
     reality = json.loads(request_node_secret(desired.get("realitySecretId")))
@@ -1438,6 +1541,7 @@ def stealth_sync_config(desired):
     observed = {"observedHash": hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest(), "observedStatus": "applied"}
     active = command_succeeds(["systemctl", "is-active", "--quiet", "northstar-stealth"])
     if active and STEALTH_CONFIG.exists() and STEALTH_CONFIG.read_text() == text:
+        apply_hop(desired.get("hop"))
         return observed
     atomic_write(STEALTH_CONFIG, text)
     unit = f"""[Unit]
@@ -1463,6 +1567,7 @@ WantedBy=multi-user.target
     run_fixed(["systemctl", "is-active", "--quiet", "northstar-stealth"])
     for transport in ("tcp", "udp"):
         replace_input_rule(f"northstar-stealth-{transport}", (transport, old_port) if old_port else None, (transport, port))
+    apply_hop(desired.get("hop"))
     return observed
 
 
@@ -1473,6 +1578,7 @@ def disable_stealth():
         for transport in ("tcp", "udp"):
             replace_input_rule(f"northstar-stealth-{transport}", (transport, old_port), None)
     STEALTH_CONFIG.unlink(missing_ok=True)
+    apply_hop(None)
     return {"observedHash": hashlib.sha256(b"stealth-disabled").hexdigest(), "observedStatus": "disabled"}
 
 
@@ -1633,8 +1739,16 @@ def connectivity_snapshot():
         "wireguard": {"transport": wireguard_transport, "port": wireguard_port, "comment": VPN_PORTS["wireguard"]["comment"]},
         "openvpn": {"transport": openvpn_transport, "port": openvpn_port, "comment": VPN_PORTS["openvpn"]["comment"]},
     }
+    firewall = firewall_snapshot(protocol_specs)
+    # The redirects bypass the host firewall rules (see ensure_hop_rules): present means open.
+    if hop_status["udp"]:
+        firewall["managedRules"][f"udp/{hop_status['udp']}"] = True
+    if hop_status["tcp"]:
+        firewall["managedRules"][f"tcp/{hop_status['tcp']}"] = True
     return {
-        "firewall": firewall_snapshot(protocol_specs),
+        "firewall": firewall,
+        # Extra ports that are live (2.19+): the UDP hop range for Hysteria2, the spare TCP port for REALITY.
+        "hop": dict(hop_status),
         "protocols": {
             "vless": {"installed": XRAY_PATH.exists(), "runtimeActive": command_succeeds(["systemctl", "is-active", "--quiet", "northstar-vless"]) if XRAY_PATH.exists() else False,
                       "listening": socket_listening("tcp", vless_port), "port": vless_port, "transport": "tcp"},
@@ -1934,7 +2048,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.18.0",
+        "version": "agent 2.19.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
@@ -1974,7 +2088,7 @@ def adopt_controller_origin(target):
     CONTROLLER = target
     try:
         request_json("/api/v1/agent/heartbeat", {"nodeId": NODE_ID, "token": TOKEN, "hostname": socket.gethostname(),
-                                                 "version": "agent 2.18.0", "capabilities": capabilities()})
+                                                 "version": "agent 2.19.0", "capabilities": capabilities()})
         lines = CONFIG_ENV.read_text().splitlines()
         lines = [f"NORTHSTAR_CONTROLLER_URL={target}" if line.startswith("NORTHSTAR_CONTROLLER_URL=") else line for line in lines]
         if f"NORTHSTAR_CONTROLLER_URL={target}" not in lines:
@@ -2156,6 +2270,7 @@ def main():
     last_reality_refresh = 0
     last_reality_probe = 0
     last_stealth_poll = 0
+    last_hop_check = 0
     request_backoff_until = 0
     consecutive_request_failures = 0
     while True:
@@ -2175,6 +2290,12 @@ def main():
                 poll_stealth_usage()
             except Exception as error:
                 log_failure("stealth traffic", error)
+        if now - last_hop_check >= 60:
+            last_hop_check = now
+            try:
+                ensure_hop_rules()
+            except Exception as error:
+                log_failure("port hopping", command_failure_detail(error))
         if now - last_reality_probe >= 6 * 3600:
             last_reality_probe = now
             start_reality_probe()

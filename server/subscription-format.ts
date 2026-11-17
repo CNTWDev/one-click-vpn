@@ -26,11 +26,11 @@ export function routingMode(requested: string | null): RoutingMode {
   return requested === "global" ? "global" : "smart";
 }
 
-/** One node of a subscription: its lines in fallback order (Hysteria2, REALITY, XHTTP) under the node's name. */
+/** One node of a subscription: its lines in fallback order (Hysteria2, REALITY, spare-port REALITY, XHTTP) under the node's name. */
 export type SubscriptionNode = { name: string; proxies: SubscriptionProxy[] };
 
 /** Which of a node's extra lines the requesting client can use. REALITY is always sent. */
-export type SubscriptionClient = { hysteria2: boolean; xhttp: boolean; sni?: boolean };
+export type SubscriptionClient = { hysteria2: boolean; xhttp: boolean; sni?: boolean; hop?: boolean };
 
 // mihomo dials VLESS over XHTTP from v1.19.22 on; an older core would try the line as plain TCP and fail.
 const MIHOMO_XHTTP = [1, 19, 22];
@@ -49,7 +49,8 @@ export function subscriptionClient(format: SubscriptionFormat, userAgent: string
   if (/stash/.test(agent)) return { hysteria2: false, xhttp: true, sni: true };
   const version = /mihomo\/v?(\d+)\.(\d+)\.(\d+)/.exec(agent)?.slice(1).map(Number);
   const older = version ? version.findIndex((part, index) => part !== MIHOMO_XHTTP[index]) : -1;
-  return { hysteria2: true, xhttp: !version || older === -1 || version[older] > MIHOMO_XHTTP[older] };
+  // mihomo has hopped Hysteria2 ports (`ports`, `hop-interval`) since long before XHTTP.
+  return { hysteria2: true, xhttp: !version || older === -1 || version[older] > MIHOMO_XHTTP[older], hop: true };
 }
 
 /**
