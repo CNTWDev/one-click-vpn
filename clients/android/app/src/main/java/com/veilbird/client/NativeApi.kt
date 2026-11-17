@@ -27,6 +27,7 @@ class ApiFailure(val code: String) : Exception(code)
  * so a blocked domain or poisoned DNS does not lock the app out.
  */
 class NativeApi(context: Context) {
+    private val app = context.applicationContext
     private val prefs = context.getSharedPreferences("veilbird", Context.MODE_PRIVATE)
     /** The core's data directory (cached API addresses). */
     val home: String = File(context.filesDir, "core").apply { mkdirs() }.path
@@ -58,6 +59,8 @@ class NativeApi(context: Context) {
         } catch (_: Exception) { prefs.edit().remove(name).apply(); null }
     }
     fun saveSecret(name: String, value: String?) {
+        // Signing out, or into another account: the saved location list and measurements belonged to the old one.
+        if (name == "token" && (value == null || value != secret("token"))) NodeCache.clear(app)
         if (value == null) { prefs.edit().remove(name).apply(); return }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, store.getKey("veilbird-storage", null)) }
         prefs.edit().putString(name, b64(cipher.iv) + "." + b64(cipher.doFinal(value.toByteArray()))).apply()

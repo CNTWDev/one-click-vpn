@@ -98,7 +98,12 @@ class ConnectionService : VpnService() {
     /** Measured before the tunnel exists; if the list cannot be loaded the server picks the least-loaded node. */
     private fun chooseFastest() {
         // Measurements from the last minute (the location list) are reused, so connecting does not probe again.
-        val ranked = try { Latency.rank(api.request("nodes").getJSONArray("nodes"), attempts = 3, reuseMs = 60000) } catch (_: Exception) { emptyList() }
+        // The list this loads is saved too: the location page then opens with it, already fresh.
+        NodeCache.restore(this)
+        val ranked = try {
+            val nodes = api.request("nodes").getJSONArray("nodes"); NodeCache.save(this, nodes)
+            Latency.rank(nodes, attempts = 3, reuseMs = 60000).also { NodeCache.saveMeasured(this) }
+        } catch (_: Exception) { emptyList() }
         ranked.take(3).forEach { (node, quality) -> Journal.add("probe: ${node.optString("name")} ${quality.latency?.let { "${it} ms" } ?: "no answer"}, jitter ${quality.jitter} ms, loss ${quality.loss}%") }
         nodeId = ranked.firstOrNull()?.first?.getString("id") ?: ""
         fallbacks.clear(); fallbacks.addAll(ranked.drop(1).take(2).map { it.first.getString("id") })

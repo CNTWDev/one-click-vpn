@@ -31,8 +31,19 @@ import ServiceManagement
     @Published var routing=UserDefaults.standard.string(forKey:"routing") ?? "smart" {didSet {UserDefaults.standard.set(routing,forKey:"routing")}}
     /// Applied by TunnelControl.start, so from the next connection.
     @Published var killSwitch=UserDefaults.standard.bool(forKey:"killSwitch") {didSet {UserDefaults.standard.set(killSwitch,forKey:"killSwitch")}}
+    /// The location list in the order the page shows it. Saved on the device, so the page opens with it at once (also
+    /// right after launch) and refreshes in the background; a failed refresh keeps it. Cleared on sign-out.
     @Published var nodes:[[String:Any]]=[]
     @Published var measuring=false
+    /// Bumped as each measurement arrives, so the list redraws that row's figures in place.
+    @Published var measuredTick=0
+    /// When the saved list was loaded from the server.
+    private var nodesLoadedAt=Date(timeIntervalSince1970:UserDefaults.standard.double(forKey:"nodesLoadedAt"))
+    private var loadingNodes=false
+    /// The list changes rarely and people refresh it by hand: it is loaded when the app starts, and again when the app
+    /// comes back after this long (it can stay open for days). Opening the list page does not load it.
+    static let resumeAfter:TimeInterval=6*3600
+    private var foreground:AnyCancellable?
     @Published var account:[String:Any]=[:]
     @Published var manager:NETunnelProviderManager?
     /// A newer build from the release catalog, and the state of its download (Mac DMG; iPhone opens the store).
@@ -55,6 +66,16 @@ import ServiceManagement
     // Status is polled here, not in the window: on the Mac the menu bar keeps working after the window is closed.
     init() {
         Latency.realTests=true // the app measures nodes through their transports (Latency.swift)
+        restoreNodes()
+        #if os(iOS)
+        let active=UIApplication.willEnterForegroundNotification
+        #else
+        let active=NSApplication.didBecomeActiveNotification
+        #endif
+        foreground=NotificationCenter.default.publisher(for:active).sink {[weak self] _ in Task {@MainActor in
+            guard let self,Date().timeIntervalSince(self.nodesLoadedAt)>Self.resumeAfter else {return}
+            await self.refreshNodes()
+        }}
         CrashReports.shared.start();ticker=Timer.publish(every:1,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in self?.refreshStatus()}}
         // The apps stay open for days (menu bar, background): check again once six hours have passed.
         updateTicker=Timer.publish(every:900,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in await self?.checkIfDue()}}
@@ -75,18 +96,53 @@ import ServiceManagement
             if case AccessFailure.code("CLIENT_UPDATE_REQUIRED")=error {await checkForUpdate()}
         };busy=false}
     }
+    private func restoreNodes() {
+        let defaults=UserDefaults.standard
+        if let data=defaults.data(forKey:"measured") {Latency.restore(data)}
+        guard let data=defaults.data(forKey:"nodes"),let list=(try? JSONSerialization.jsonObject(with:data)) as? [[String:Any]] else {return}
+        nodes=list.sorted {(Latency.recent($0["id"] as? String ?? "")?.score ?? Int.max)<(Latency.recent($1["id"] as? String ?? "")?.score ?? Int.max)}
+    }
+    private func saveMeasured() {if let data=Latency.snapshot() {UserDefaults.standard.set(data,forKey:"measured")}}
+    /// Signing out: the saved list and measurements belonged to that account.
+    func forgetNodes() {
+        nodes=[];Latency.forget();nodesLoadedAt=.distantPast
+        for key in ["nodes","nodesLoadedAt","measured"] {UserDefaults.standard.removeObject(forKey:key)}
+    }
+    /// Loads the list and saves it. Rows that stay keep their place, new ones go to the end, removed ones leave; the
+    /// first list is ordered by this device's measurements. Throws on failure, leaving the list as it was.
     func loadNodes() async throws {
         let listed=(try await api().request("nodes"))["nodes"] as? [[String:Any]] ?? []
-        nodes=listed.sorted {(Latency.recent($0["id"] as? String ?? "")?.score ?? Int.max)<(Latency.recent($1["id"] as? String ?? "")?.score ?? Int.max)}
+        if let data=try? JSONSerialization.data(withJSONObject:listed) {UserDefaults.standard.set(data,forKey:"nodes")}
+        nodesLoadedAt=Date();UserDefaults.standard.set(nodesLoadedAt.timeIntervalSince1970,forKey:"nodesLoadedAt")
+        let byId=Dictionary(listed.compactMap {node in (node["id"] as? String).map {($0,node)}},uniquingKeysWith:{a,_ in a})
+        let kept=nodes.compactMap {byId[$0["id"] as? String ?? ""]}
+        let known=Set(kept.compactMap {$0["id"] as? String})
+        let added=listed.filter {!known.contains($0["id"] as? String ?? "")}
+        withAnimation(.easeInOut(duration:0.25)) {
+            nodes=kept.isEmpty ? added.sorted {(Latency.recent($0["id"] as? String ?? "")?.score ?? Int.max)<(Latency.recent($1["id"] as? String ?? "")?.score ?? Int.max)}:kept+added
+        }
         // While connected the app's own probes would run through the tunnel: keep the last results.
-        if !connected && nodes.contains(where:{Latency.recent($0["id"] as? String ?? "")==nil}) {await measure()}
+        if !connected && unmeasured {await measure()}
     }
-    func measure() async {
-        guard !measuring,!connected else {return}
+    /// In the background (at launch, on return after six hours, with the refresh button): nothing changes if it fails.
+    func refreshNodes() async {
+        guard signedIn,!loadingNodes else {return}
+        loadingNodes=true;defer {loadingNodes=false}
+        do {try await loadNodes()} catch {
+            if case AccessFailure.code("AUTH_REQUIRED")=error {signedIn=false}
+        }
+    }
+    /// A node this device never measured. Measuring is by hand otherwise; results are kept across launches, and
+    /// automatic mode measures again when it connects.
+    var unmeasured:Bool {nodes.contains {Latency.recent($0["id"] as? String ?? "") == nil}}
+    /// Measures nodes never measured (all of them when all is set, from the refresh button). Figures change row by row as results
+    /// arrive and earlier figures stay until then; the order stays as it is while the page is open.
+    func measure(all:Bool=false) async {
+        guard !measuring,!connected,!nodes.isEmpty else {return}
         measuring=true
-        let ranked=await Latency.rank(nodes)
-        nodes=ranked.map {$0.node}
-        measuring=false
+        let ranked=await Latency.rank(nodes,reuse:all ? 0:.infinity) {[weak self] _,_ in Task {@MainActor in self?.measuredTick+=1}}
+        measuring=false;measuredTick+=1
+        saveMeasured()
         if let api=try? api() {Task {await Latency.report(api,ranked)}}
     }
     /// The connected node's lines from the location list's last measurement (taken while disconnected, since the
@@ -147,7 +203,7 @@ import ServiceManagement
             #if !targetEnvironment(simulator)
             manager=try await TunnelControl.saved()
             #endif
-            if signedIn {try await loadNodes();if let client=try? api() {await CrashReports.shared.send(client)}}
+            if signedIn {await refreshNodes();if let client=try? api() {await CrashReports.shared.send(client)}}
         } catch {message=error.localizedDescription}
         // A few seconds after the first screen, so the check never holds up connecting.
         try? await Task.sleep(nanoseconds:3_000_000_000)

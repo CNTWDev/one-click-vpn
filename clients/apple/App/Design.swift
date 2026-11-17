@@ -170,11 +170,13 @@ struct Badge:View {
     var icon:String?=nil
     var tint:Color=VeilbirdStyle.text
     var size:CGFloat=VeilbirdStyle.mac ? 30:36
+    /// The selected location's tile: lime with dark text, so the row needs no extra mark.
+    var selected=false
     var body:some View {
         ZStack {
-            RoundedRectangle(cornerRadius:size*0.22).fill(VeilbirdStyle.raised)
-            if let icon {Image(systemName:icon).font(.system(size:size*0.44,weight:.medium)).foregroundStyle(tint)}
-            else {Text(code ?? "").font(Pixel.font(size*0.42)).foregroundStyle(tint == VeilbirdStyle.text ? VeilbirdStyle.accent:tint)}
+            RoundedRectangle(cornerRadius:size*0.22).fill(selected ? VeilbirdStyle.accent:VeilbirdStyle.raised)
+            if let icon {Image(systemName:icon).font(.system(size:size*0.44,weight:.medium)).foregroundStyle(selected ? VeilbirdStyle.onAccent:tint)}
+            else {Text(code ?? "").font(Pixel.font(size*0.42)).foregroundStyle(selected ? VeilbirdStyle.onAccent:(tint == VeilbirdStyle.text ? VeilbirdStyle.accent:tint))}
         }.frame(width:size,height:size).accessibilityHidden(true)
     }
 }

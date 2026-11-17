@@ -44,6 +44,7 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -118,7 +119,7 @@ class MainActivity : Activity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState); api = NativeApi(this); updater = Updater(this, api)
+        super.onCreate(savedInstanceState); api = NativeApi(this); updater = Updater(this, api); NodeCache.restore(this)
         val settings = getSharedPreferences("preferences", MODE_PRIVATE)
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", "")!!; selectedCode = settings.getString("nodeCode", "")!!
         @Suppress("DEPRECATION") window.apply { statusBarColor = Palette.ground; navigationBarColor = Palette.ground; decorView.systemUiVisibility = 0 }
@@ -129,6 +130,8 @@ class MainActivity : Activity() {
     }
     override fun onResume() {
         super.onResume(); visible = true; handler.post(refresh)
+        // At launch, and when the app comes back after six hours: refresh the location list quietly.
+        if (System.currentTimeMillis() - NodeCache.loadedAt > NodeCache.RESUME_MS || !nodesLoaded) { nodesLoaded = true; refreshNodes() }
         // At launch a few seconds after the first frame, then whenever the app returns after six hours or more.
         val due = !launched || System.currentTimeMillis() - updater.checkedAt > 6 * 3_600_000L
         launched = true
@@ -268,7 +271,7 @@ class MainActivity : Activity() {
 
     // ---- Pages
     private fun render() {
-        banner = null; updateRowValue = null
+        banner = null; updateRowValue = null; onNodes = null; onMeasured = null
         ring = null; stateTitle = null; stateDot = null; stateDetail = null; stateTimer = null; stateRates = null; accountDot = null; stream = null; nodeTitle = null; nodeDetail = null; nodeBadge = null
         rateBars = null; switchNote = null; switchText = null; activityBody = null
         val side = maxOf(20.dp, (resources.displayMetrics.widthPixels - 560.dp) / 2)
@@ -536,10 +539,8 @@ class MainActivity : Activity() {
         add(node, top = 24)
         usageStrip()
         showState()
-        if (Directory.nodes.isEmpty()) Thread {
-            val nodes = try { api.request("nodes").getJSONArray("nodes") } catch (_: Exception) { null } ?: return@Thread
-            Directory.remember(nodes); runOnUiThread { showState() }
-        }.start()
+        // Just signed in: no saved list yet, so load it for the location's name and code.
+        if (NodeCache.nodes(this) == null) refreshNodes()
     }
     /** What this account has left (or used) and how long it runs: two quiet figures under the location. */
     private fun usageStrip() {
@@ -706,22 +707,23 @@ class MainActivity : Activity() {
         routingChoice()
         val search = FrameLayout(this).also { add(it) }
         val automatic = selectedId.isEmpty()
+        // Selected = a lifted row and a lime tile; nothing is added, so the rows keep their layout.
         add(row(68).apply {
-            background = pressable(Palette.surface, 16).also { if (automatic) ((it as RippleDrawable).getDrawable(0) as GradientDrawable).setStroke(1.dp, Palette.alpha(Palette.accent, 115)) }
-            addView(badge(null, R.drawable.ic_sparkle, Palette.accent))
-            addView(titles(L10n.text(R.string.automatic), L10n.text(R.string.select_an_available_location_for_you)))
-            if (automatic) addView(icon(R.drawable.ic_check, Palette.accent, 20))
+            background = pressable(if (automatic) Palette.raised else Palette.surface, 16)
+            addView(badge(null, R.drawable.ic_sparkle, if (automatic) Palette.onAccent else Palette.accent).apply { if (automatic) background = rounded(Palette.accent, 8) })
+            addView(titles(L10n.text(R.string.automatic), L10n.text(R.string.select_an_available_location_for_you)).apply { if (automatic) (getChildAt(0) as TextView).weight(600) })
             contentDescription = L10n.text(R.string.automatic) + if (automatic) L10n.text(R.string.current_page) else ""
             setOnClickListener { if (!busy) select("", "", "") }
         }, top = 20)
         add(text(L10n.text(R.string.all_locations), 13f, Palette.secondary).apply { setPadding(4.dp, 0, 0, 0) }, top = 20, bottom = 8)
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also { add(it) }
-        work({ api.request("nodes").getJSONArray("nodes") }) { nodes ->
-            Directory.remember(nodes)
-            var query = ""
-            var ranked: List<Pair<JSONObject, Quality?>> = Latency.unmeasured(nodes).map { (node, _) -> node to Latency.recent[node.getString("id")] }
-                .sortedBy { it.second?.score ?: Long.MAX_VALUE }
-            if (nodes.length() > 6) search.addView(LinearLayout(this).apply {
+        var query = ""
+        // Shown in this order while the page is open: new measurements change the figures in place, never the order.
+        var ranked: List<Pair<JSONObject, Quality?>> = emptyList()
+        var nodes = JSONArray()
+        fun searchBox() {
+            if (nodes.length() <= 6 || search.childCount > 0) return
+            search.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; background = rounded(Palette.surface, 12); setPadding(14.dp, 0, 4.dp, 0)
                 addView(icon(R.drawable.ic_search, Palette.secondary, 16))
                 addView(field(L10n.text(R.string.search_locations_or_regions), kind = InputType.TYPE_TEXT_VARIATION_NORMAL).apply {
@@ -733,28 +735,75 @@ class MainActivity : Activity() {
                     })
                 }, LinearLayout.LayoutParams(0, -1, 1f))
             }, FrameLayout.LayoutParams(-1, 44.dp).apply { topMargin = 20.dp })
-            show(list, ranked, query)
-            fun measure() {
-                if (measuring) return
-                measuring = true; retest.alpha = 0.5f; progress?.visibility = View.VISIBLE; show(list, ranked, query)
-                Thread {
-                    val result = try { Latency.rank(nodes) } catch (_: Exception) { null }
-                    result?.let { Latency.report(applicationContext, api, it) }
-                    runOnUiThread {
-                        measuring = false
-                        if (isDestroyed) return@runOnUiThread
-                        if (!busy) progress?.visibility = View.INVISIBLE
-                        retest.alpha = 1f
-                        if (result != null && list.isAttachedToWindow) ranked = result
-                        if (list.isAttachedToWindow) show(list, ranked, query)
-                    }
-                }.start()
-            }
-            retest.setOnClickListener { measure() }
-            // Fresh results are kept for the session; opening the page again does not probe every node again.
-            // The app is outside its own VPN, so probes measure the direct path even while connected.
-            if (ranked.any { it.second == null }) measure()
         }
+        fun figures() { ranked = ranked.map { (node, _) -> node to Latency.recent[node.getString("id")] } }
+        // Coalesces one redraw per frame while results arrive node by node.
+        var redraw = false
+        fun redrawSoon() { if (redraw) return; redraw = true; list.postOnAnimation { redraw = false; if (list.isAttachedToWindow) { figures(); show(list, ranked, query) } } }
+        fun unmeasured() = (0 until nodes.length()).any { i -> Latency.recent[nodes.getJSONObject(i).getString("id")] == null }
+        fun measure(all: Boolean) {
+            if (measuring || nodes.length() == 0) return
+            measuring = true; retest.alpha = 0.5f; progress?.visibility = View.VISIBLE; show(list, ranked, query)
+            val input = nodes
+            Thread {
+                // Each result replaces that node's figures as it arrives; the earlier figures stay until then.
+                // The page shown when a result arrives redraws it (the person may have left and come back meanwhile).
+                val result = try { Latency.rank(input, reuseMs = if (all) 0 else Long.MAX_VALUE) { _, _ -> runOnUiThread { onMeasured?.invoke(false) } } } catch (_: Exception) { null }
+                if (result != null) { NodeCache.saveMeasured(applicationContext); Latency.report(applicationContext, api, result) }
+                runOnUiThread {
+                    measuring = false
+                    if (isDestroyed) return@runOnUiThread
+                    if (!busy) progress?.visibility = View.INVISIBLE
+                    onMeasured?.invoke(true)
+                }
+            }.start()
+        }
+        onMeasured = { done ->
+            if (done) retest.alpha = 1f
+            if (list.isAttachedToWindow) { if (done) { figures(); show(list, ranked, query); if (unmeasured()) measure(false) } else redrawSoon() }
+        }
+        /** A newer list: rows that stay keep their place and figures, new ones go to the end, removed ones leave. */
+        fun loaded(fresh: JSONArray, first: Boolean) {
+            nodes = fresh
+            val byId = (0 until fresh.length()).map { fresh.getJSONObject(it) }.associateBy { it.getString("id") }
+            ranked = if (first) byId.values.map { it to Latency.recent[it.getString("id")] }.sortedBy { it.second?.score ?: Long.MAX_VALUE }
+            else ranked.mapNotNull { (old, _) -> byId[old.getString("id")] }.let { kept ->
+                val known = kept.map { it.getString("id") }.toSet()
+                (kept + byId.values.filter { it.getString("id") !in known }).map { it to Latency.recent[it.getString("id")] }
+            }
+            searchBox(); show(list, ranked, query)
+            // Measuring is by hand (the refresh button); only nodes this device never measured are measured on their own.
+            // Results are kept across launches, and automatic mode measures again when it connects.
+            if (unmeasured()) measure(false)
+        }
+        retest.setOnClickListener { if (!measuring) { refreshNodes(); measure(true) } }
+        onNodes = { fresh -> if (list.isAttachedToWindow) loaded(fresh, ranked.isEmpty()) }
+        val cached = NodeCache.nodes(this)
+        if (cached != null) loaded(cached, true)
+        // First time on this device: nothing to show yet, so this one load shows progress and errors.
+        else work({ api.request("nodes").getJSONArray("nodes") }) { fresh -> NodeCache.save(this, fresh); loaded(fresh, true) }
+    }
+    /** Called with each newer location list the app loads in the background; set by the location page. */
+    private var onNodes: ((JSONArray) -> Unit)? = null
+    /** Called as each measurement arrives (false) and when all are done (true); set by the location page. */
+    private var onMeasured: ((Boolean) -> Unit)? = null
+    private var loadingNodes = false
+    /** Set once this run has loaded the list (or tried to). */
+    private var nodesLoaded = false
+    /** Loads the location list in the background and saves it; nothing changes on screen if it fails. */
+    private fun refreshNodes() {
+        if (loadingNodes || api.secret("token") == null) return
+        loadingNodes = true
+        Thread {
+            val fresh = try { api.request("nodes").getJSONArray("nodes") } catch (_: Exception) { null }
+            if (fresh != null) NodeCache.save(applicationContext, fresh)
+            runOnUiThread {
+                loadingNodes = false
+                if (fresh == null || isDestroyed) return@runOnUiThread
+                onNodes?.invoke(fresh)
+                if (page == "connect") showState()
+            }
+        }.start()
     }
     /** Smart (mainland China direct) or global routing; applies from the next connection. */
     private fun routingChoice() {
@@ -847,48 +896,62 @@ class MainActivity : Activity() {
             val unreachable = quality != null && quality.latency == null
             val states = lineStates(quality)
             val note = linesNote(quality)
-            val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = ColorDrawable(Color.TRANSPARENT) }
+            val selected = id == selectedId
+            // Selected = a lifted row, a lime tile and a bolder name; opened = a darker row (unless selected).
+            val rest = if (selected) Palette.raised else Color.TRANSPARENT
+            val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = ColorDrawable(rest) }
             val detail = lineDetail(quality).apply { visibility = if (openNode == id && states != null) View.VISIBLE else View.GONE }
+            // Fixed columns on every row: tile, name, delay (fixed width, right-aligned), line cells (fixed slot).
             val main = row(60).apply {
-                background = pressable(Color.TRANSPARENT, 0)
-                addView(badge(code, null, if (unreachable) Palette.faint else Palette.text))
-                addView(titles(name, note ?: region, if (unreachable) Palette.faint else Palette.text))
+                background = pressable(Color.TRANSPARENT, 0); setPadding(16.dp, 8.dp, 4.dp, 8.dp)
+                addView(badge(code, null, when { selected -> Palette.onAccent; unreachable -> Palette.faint; else -> Palette.text }).apply { if (selected) background = rounded(Palette.accent, 8) })
+                addView(titles(name, note ?: region, if (unreachable && !selected) Palette.faint else Palette.text).apply { if (selected) (getChildAt(0) as TextView).weight(600) })
                 val latency = when {
                     quality == null -> if (measuring) "…" else ""
                     unreachable -> L10n.text(R.string.quality_unreachable)
                     else -> ms(quality)!!
                 }
-                if (latency.isNotEmpty()) addView(text(latency, 13f, if (unreachable) Palette.danger else Palette.secondary).apply { typeface = Typeface.MONOSPACE }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
-                if (states == null && quality != null && !unreachable) addView(SignalBars(this@MainActivity).apply {
-                    level = when (quality.grade) { R.string.quality_good -> 3; R.string.quality_fair -> 2; else -> 1 }
-                    color = when (quality.grade) { R.string.quality_good -> Palette.accent; R.string.quality_fair -> Palette.fair; else -> Palette.danger }
-                }, LinearLayout.LayoutParams(14.dp, 12.dp).apply { marginStart = 8.dp })
-                if (id == selectedId) addView(icon(R.drawable.ic_check, Palette.accent, 20), LinearLayout.LayoutParams(20.dp, 20.dp).apply { marginStart = 10.dp })
-                contentDescription = name + ", " + (quality?.let { summary(it) } ?: "") + (note?.let { ", $it" } ?: "") + if (id == selectedId) L10n.text(R.string.current_page) else ""
+                addView(text(latency, 13f, if (unreachable) Palette.danger else Palette.secondary).apply {
+                    gravity = Gravity.END or Gravity.CENTER_VERTICAL; maxLines = 1
+                    if (!unreachable) { typeface = Typeface.MONOSPACE; fontFeatureSettings = "tnum" }
+                    setAutoSizeTextTypeUniformWithConfiguration(10, 13, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+                }, LinearLayout.LayoutParams(76.dp, 20.dp).apply { marginStart = 8.dp })
+                contentDescription = name + ", " + (quality?.let { summary(it) } ?: "") + (note?.let { ", $it" } ?: "") + if (selected) L10n.text(R.string.current_page) else ""
                 setOnClickListener { if (!busy) select(id, name, code) }
             }
             item.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
                 addView(main, LinearLayout.LayoutParams(0, -2, 1f))
-                // The four line cells: tap to open each line's result. Shown once this device has line results.
-                if (states != null || (measuring && Latency.offered(node).isNotEmpty())) addView(LineCells(this@MainActivity).apply {
-                    this.states = if (measuring) List(Latency.lineOrder.size) { LineCells.WAIT } else states!!
-                    background = pressable(Color.TRANSPARENT, 8)
-                    val working = states?.count { it == LineCells.OK || it == LineCells.SLOW } ?: 0
-                    contentDescription = L10n.text(R.string.lines_detail, name, L10n.number(states?.count { it != LineCells.OFF } ?: 0), L10n.number(working))
-                    if (states != null) setOnClickListener {
-                        val open = openNode != id
-                        val previous = openNode
-                        openNode = if (open) id else ""
-                        if (previous.isNotEmpty() && previous != id) list.findViewWithTag<View>("lines:$previous")?.let { expand(it, false) }
-                        expand(detail, open)
-                        item.background = if (open) ColorDrawable(Color.rgb(12, 15, 20)) else ColorDrawable(Color.TRANSPARENT)
-                    }
-                }, LinearLayout.LayoutParams(44.dp, 44.dp).apply { marginEnd = 6.dp })
+                // The cell slot is always there: the four line cells (tap to open each line's result), signal bars
+                // for a device without line results, or empty; old results stay drawn while a node is re-measured.
+                val slot = LinearLayout.LayoutParams(44.dp, 44.dp).apply { marginEnd = 6.dp }
+                when {
+                    states != null || (measuring && quality == null && Latency.offered(node).isNotEmpty()) -> addView(LineCells(this@MainActivity).apply {
+                        this.states = states ?: List(Latency.lineOrder.size) { LineCells.WAIT }
+                        background = pressable(Color.TRANSPARENT, 8)
+                        val working = states?.count { it == LineCells.OK || it == LineCells.SLOW } ?: 0
+                        contentDescription = L10n.text(R.string.lines_detail, name, L10n.number(states?.count { it != LineCells.OFF } ?: 0), L10n.number(working))
+                        if (states != null) setOnClickListener {
+                            val open = openNode != id
+                            val previous = openNode
+                            openNode = if (open) id else ""
+                            if (previous.isNotEmpty() && previous != id) list.findViewWithTag<View>("lines:$previous")?.let { expand(it, false) }
+                            expand(detail, open)
+                            item.background = ColorDrawable(if (open && !selected) Color.rgb(12, 15, 20) else rest)
+                        }
+                    }, slot)
+                    quality != null && !unreachable -> addView(FrameLayout(this@MainActivity).apply {
+                        addView(SignalBars(this@MainActivity).apply {
+                            level = when (quality.grade) { R.string.quality_good -> 3; R.string.quality_fair -> 2; else -> 1 }
+                            color = when (quality.grade) { R.string.quality_good -> Palette.accent; R.string.quality_fair -> Palette.fair; else -> Palette.danger }
+                        }, FrameLayout.LayoutParams(14.dp, 12.dp, Gravity.CENTER))
+                    }, slot)
+                    else -> addView(View(this@MainActivity), slot)
+                }
             }, LinearLayout.LayoutParams(-1, -2))
             detail.tag = "lines:$id"
             item.addView(detail, LinearLayout.LayoutParams(-1, -2))
-            if (openNode == id && states != null) item.background = ColorDrawable(Color.rgb(12, 15, 20))
+            if (openNode == id && states != null && !selected) item.background = ColorDrawable(Color.rgb(12, 15, 20))
             rows.add(item)
         }
         when {

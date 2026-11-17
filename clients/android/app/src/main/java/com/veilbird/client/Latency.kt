@@ -28,6 +28,19 @@ object Latency {
     /** Last measurement per node id, so the home screen can show it without probing again. */
     val recent = java.util.concurrent.ConcurrentHashMap<String, Quality>()
     private val measuredAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    fun forget() = measuredAt.clear()
+    /** The measurements as saved by NodeCache: {"id": {"at": ms, "quality": {...}}}. */
+    fun snapshot(): String = JSONObject().apply {
+        recent.forEach { (id, quality) -> put(id, JSONObject().put("at", measuredAt[id] ?: 0L).put("quality", quality.toJson())) }
+    }.toString()
+    fun restore(saved: String) = try {
+        val json = JSONObject(saved)
+        for (id in json.keys()) json.optJSONObject(id)?.let { entry ->
+            if (recent.containsKey(id)) return@let
+            entry.optJSONObject("quality")?.let { recent[id] = qualityFrom(it) }
+            measuredAt[id] = entry.optLong("at")
+        }
+    } catch (_: Exception) { }
     private fun users(node: JSONObject) = node.optInt("users", 0).coerceAtLeast(0)
     /**
      * Long enough for one lost SYN to be resent (1 s) and still answer across a long, lossy route; mihomo's own
@@ -155,7 +168,7 @@ object Latency {
      * Best first; unmeasured nodes follow in the server's least-loaded order. A node measured less than reuseMs ago
      * keeps that result (with the current load), so connecting right after the location list does not probe again.
      */
-    fun rank(nodes: JSONArray, attempts: Int = 5, reuseMs: Long = 0): List<Pair<JSONObject, Quality>> {
+    fun rank(nodes: JSONArray, attempts: Int = 5, reuseMs: Long = 0, each: ((String, Quality) -> Unit)? = null): List<Pair<JSONObject, Quality>> {
         val list = (0 until nodes.length()).map { nodes.getJSONObject(it) }
         if (list.isEmpty()) return emptyList()
         val pool = Executors.newFixedThreadPool(minOf(16, list.size))
@@ -164,7 +177,7 @@ object Latency {
                 val id = node.optString("id"); val known = recent[id]; val at = measuredAt[id] ?: 0L
                 val load = if (node.isNull("load")) null else node.optInt("load", -1).takeIf { it in 0..100 }
                 if (known != null && System.currentTimeMillis() - at < reuseMs) known.copy(load = load, users = users(node))
-                else measure(node, attempts).also { measuredAt[id] = System.currentTimeMillis() }
+                else measure(node, attempts).also { measuredAt[id] = System.currentTimeMillis(); recent[id] = it; each?.invoke(id, it) }
             } }
             return list.zip(pending.map { task -> try { task.get(25, TimeUnit.SECONDS) } catch (_: Exception) { Quality(null, 0, 100, null) } })
                 .onEach { (node, quality) -> recent[node.getString("id")] = quality }
