@@ -3,16 +3,28 @@
 // (no Mac, no waiting). Lists the team's recent submissions; with --name, reports the newest submission of that
 // file and, in GitHub Actions, writes status=<state> and id=<submission> to $GITHUB_OUTPUT.
 //
-//   VEILBIRD_APPLE_API_KEY_PATH=AuthKey.p8 VEILBIRD_APPLE_API_KEY_ID=... VEILBIRD_APPLE_API_ISSUER_ID=... \
-//   node scripts/apple-notary.mjs [--name TrackNothing-1.0.1-18-macos.dmg]
+//   node scripts/apple-notary.mjs [--config apple-notary.json] [--name TrackNothing-1.0.1-18-macos.dmg] [--build 18]
+//
+// Credentials: a JSON config {"keyPath": "AuthKey.p8", "keyId": "...", "issuerId": "..."} (--config, default
+// apple-notary.json next to this script; keyPath is relative to the config file), or the environment variables
+// VEILBIRD_APPLE_API_KEY_PATH, VEILBIRD_APPLE_API_KEY_ID, VEILBIRD_APPLE_API_ISSUER_ID (CI). --build N matches the
+// DMG of build N whatever its version.
 import { createPrivateKey, sign } from "node:crypto";
+import { existsSync } from "node:fs";
 import { appendFile, readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
-const { values: args } = parseArgs({ options: { name: { type: "string" } } });
+const { values: args } = parseArgs({ options: { config: { type: "string" }, name: { type: "string" }, build: { type: "string" } } });
 function fail(message) { console.error(message); process.exit(1); }
-const keyPath = process.env.VEILBIRD_APPLE_API_KEY_PATH, keyId = process.env.VEILBIRD_APPLE_API_KEY_ID, issuer = process.env.VEILBIRD_APPLE_API_ISSUER_ID;
-if (!keyPath || !keyId || !issuer) fail("Set VEILBIRD_APPLE_API_KEY_PATH, VEILBIRD_APPLE_API_KEY_ID and VEILBIRD_APPLE_API_ISSUER_ID.");
+const configPath = path.resolve(args.config ?? path.join(path.dirname(fileURLToPath(import.meta.url)), "apple-notary.json"));
+const config = existsSync(configPath) ? JSON.parse(await readFile(configPath, "utf8")) : {};
+if (args.config && !existsSync(configPath)) fail(`Config ${configPath} not found.`);
+const keyPath = config.keyPath ? path.resolve(path.dirname(configPath), config.keyPath.replace(/^~(?=\/)/, process.env.HOME ?? "~"))
+  : process.env.VEILBIRD_APPLE_API_KEY_PATH;
+const keyId = config.keyId ?? process.env.VEILBIRD_APPLE_API_KEY_ID, issuer = config.issuerId ?? process.env.VEILBIRD_APPLE_API_ISSUER_ID;
+if (!keyPath || !keyId || !issuer) fail(`Fill in ${configPath} (keyPath, keyId, issuerId) or set the VEILBIRD_APPLE_API_* variables.`);
 
 const b64url = (data) => Buffer.from(data).toString("base64url");
 const key = createPrivateKey(await readFile(keyPath, "utf8"));
@@ -42,11 +54,11 @@ console.log("Submitted (UTC)       State        File                            
 for (const item of submissions.slice(0, 20)) {
   console.log(`${item.createdDate.slice(0, 19).replace("T", " ")}   ${item.status.padEnd(12)} ${item.name.padEnd(37)} ${item.id}`);
 }
-if (!args.name) process.exit(0);
+if (!args.name && !args.build) process.exit(0);
 
-const found = submissions.find((item) => item.name === args.name);
-if (!found) fail(`No notarization submission of ${args.name}.`);
-console.log(`\n${args.name}: ${found.status} (${found.id})`);
+const found = submissions.find((item) => args.name ? item.name === args.name : item.name.endsWith(`-${args.build}-macos.dmg`));
+if (!found) fail(`No notarization submission of ${args.name ?? `build ${args.build}`}.`);
+console.log(`\n${found.name}: ${found.status} (${found.id})`);
 if (found.status === "Invalid" || found.status === "Rejected") {
   const log = (await api(`submissions/${found.id}/logs`)).data?.attributes?.developerLogUrl;
   if (log) console.log(await (await fetch(log)).text());
