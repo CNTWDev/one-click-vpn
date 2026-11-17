@@ -699,60 +699,74 @@ struct ClientView:View {
         let note=linesNote(quality?.lines)
         let offered=((node["test"] as? [[String:Any]]) ?? []).contains {Latency.lineOrder.contains($0["name"] as? String ?? "")}
         let open=openNode==id && states != nil
+        // Split into small pieces: as one expression the optimized (release) build cannot type-check it in time.
         return VStack(spacing:0) {
             HStack(spacing:0) {
-                Button {choose(id,name:name)} label:{
-                    HStack(spacing:14) {
-                        Badge(code:model.code(id,name:name),tint:unreachable ? VeilbirdStyle.faint:VeilbirdStyle.text,selected:selected)
-                        VStack(alignment:.leading,spacing:2) {
-                            Text(name).font(.system(size:VeilbirdStyle.body,weight:selected ? .semibold:.regular)).lineLimit(1)
-                            if let detail=note ?? region {Text(detail).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)}
-                        }.foregroundStyle(unreachable && !selected ? VeilbirdStyle.faint:VeilbirdStyle.text)
-                        Spacer(minLength:8)
-                        // Fixed columns on every row: the delay (fixed width, right-aligned) and the cell slot after it.
-                        Group {
-                            if let quality {
-                                if let text=ms(quality) {Text(text).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()}
-                                else {Text(L10n.text("quality_unreachable")).foregroundStyle(VeilbirdStyle.danger)}
-                            } else {Text(model.measuring ? "…":"").foregroundStyle(VeilbirdStyle.secondary)}
-                        }.font(.system(size:VeilbirdStyle.detail+1)).lineLimit(1).minimumScaleFactor(0.75)
-                        .frame(width:mac ? 64:76,alignment:.trailing)
-                    }.padding(.leading,16).padding(.trailing,4).frame(minHeight:mac ? 44:56).contentShape(Rectangle())
-                }.buttonStyle(RowButton()).accessibilityLabel(name+", "+(quality.map(summary) ?? "")+(note.map {", "+$0} ?? "")).accessibilityAddTraits(selected ? .isSelected:[])
-                // The cell slot is always there: the four line cells (tap to open each line's result), signal bars for a
-                // device without line results, or empty. Earlier results stay drawn while a node is measured again.
-                Group {
-                    if let states {
-                        Button {withAnimation(reduceMotion ? nil:.easeInOut(duration:0.26)) {openNode=open ? "":id}} label:{
-                            LineCells(states:states).frame(width:44,height:44).contentShape(Rectangle())
-                        }.buttonStyle(.plain)
-                        .accessibilityLabel(L10n.text("lines_detail",name,L10n.number(states.filter {$0 != .off}.count),L10n.number(states.filter {$0 == .ok || $0 == .slow}.count)))
-                        .accessibilityAddTraits(open ? .isSelected:[])
-                    } else if model.measuring && quality == nil && offered {
-                        LineCells(states:Array(repeating:.wait,count:Latency.lineOrder.count))
-                    } else if let quality,quality.latency != nil {
-                        let (level,color)=signal(quality);SignalBars(level:level,color:color)
-                    } else {Color.clear}
-                }.frame(width:44,height:44).padding(.trailing,8)
+                nodeMain(id:id,name:name,region:region,quality:quality,unreachable:unreachable,selected:selected,note:note)
+                nodeCells(id:id,name:name,quality:quality,states:states,offered:offered,open:open)
             }
-            if open, let lines=quality?.lines, let states {
-                // Quieter than the row: no outlines, small grey text, indented to the name.
-                LazyVGrid(columns:[GridItem(.flexible(),spacing:20),GridItem(.flexible())],spacing:0) {
-                    ForEach(Latency.lineOrder.indices,id:\.self) {i in
-                        let ms=lines[Latency.lineOrder[i]]
-                        HStack(spacing:7) {
-                            LineCells(states:[states[i]],size:4)
-                            Text(lineName(i)).foregroundStyle(VeilbirdStyle.faint)
-                            Spacer(minLength:4)
-                            Text(lineValue(ms)).font(.system(size:11,design:.monospaced)).monospacedDigit()
-                                .foregroundStyle(ms == nil ? VeilbirdStyle.faint:((ms ?? 0)<0 ? VeilbirdStyle.danger.opacity(0.75):VeilbirdStyle.secondary))
-                        }.font(.system(size:12)).frame(height:24).accessibilityElement(children:.combine)
-                    }
-                }.padding(.leading,mac ? 60:66).padding(.trailing,16).padding(.bottom,10)
-                .transition(.opacity)
-            }
+            if open,let lines=quality?.lines,let states {nodeLines(lines:lines,states:states)}
         }.background(selected ? VeilbirdStyle.raised:(open ? Color(red:12/255,green:15/255,blue:20/255):Color.clear))
         .animation(reduceMotion ? nil:.easeInOut(duration:0.2),value:selected)
+    }
+    private func nodeMain(id:String,name:String,region:String?,quality:Quality?,unreachable:Bool,selected:Bool,note:String?)->some View {
+        let tint:Color=unreachable ? VeilbirdStyle.faint:VeilbirdStyle.text
+        let nameTint:Color=unreachable && !selected ? VeilbirdStyle.faint:VeilbirdStyle.text
+        var spoken:String=name+", "+(quality.map(summary) ?? "")
+        if let note {spoken+=", "+note}
+        return Button {choose(id,name:name)} label:{
+            HStack(spacing:14) {
+                Badge(code:model.code(id,name:name),tint:tint,selected:selected)
+                VStack(alignment:.leading,spacing:2) {
+                    Text(name).font(.system(size:VeilbirdStyle.body,weight:selected ? .semibold:.regular)).lineLimit(1)
+                    if let detail=note ?? region {Text(detail).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)}
+                }.foregroundStyle(nameTint)
+                Spacer(minLength:8)
+                // Fixed columns on every row: the delay (fixed width, right-aligned) and the cell slot after it.
+                nodeDelay(quality).font(.system(size:VeilbirdStyle.detail+1)).lineLimit(1).minimumScaleFactor(0.75)
+                    .frame(width:mac ? 64:76,alignment:.trailing)
+            }.padding(.leading,16).padding(.trailing,4).frame(minHeight:mac ? 44:56).contentShape(Rectangle())
+        }.buttonStyle(RowButton()).accessibilityLabel(spoken).accessibilityAddTraits(selected ? .isSelected:[])
+    }
+    @ViewBuilder private func nodeDelay(_ quality:Quality?)->some View {
+        if let quality {
+            if let text=ms(quality) {Text(text).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()}
+            else {Text(L10n.text("quality_unreachable")).foregroundStyle(VeilbirdStyle.danger)}
+        } else {Text(model.measuring ? "…":"").foregroundStyle(VeilbirdStyle.secondary)}
+    }
+    /// The cell slot is always there: the four line cells (tap to open each line's result), signal bars for a
+    /// device without line results, or empty. Earlier results stay drawn while a node is measured again.
+    private func nodeCells(id:String,name:String,quality:Quality?,states:[LineState]?,offered:Bool,open:Bool)->some View {
+        Group {
+            if let states {
+                let total=L10n.number(states.filter {$0 != .off}.count),working=L10n.number(states.filter {$0 == .ok || $0 == .slow}.count)
+                Button {withAnimation(reduceMotion ? nil:.easeInOut(duration:0.26)) {openNode=open ? "":id}} label:{
+                    LineCells(states:states).frame(width:44,height:44).contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                .accessibilityLabel(L10n.text("lines_detail",name,total,working))
+                .accessibilityAddTraits(open ? .isSelected:[])
+            } else if model.measuring && quality == nil && offered {
+                LineCells(states:Array(repeating:.wait,count:Latency.lineOrder.count))
+            } else if let quality,quality.latency != nil {
+                let (level,color)=signal(quality);SignalBars(level:level,color:color)
+            } else {Color.clear}
+        }.frame(width:44,height:44).padding(.trailing,8)
+    }
+    /// Quieter than the row: no outlines, small grey text, indented to the name.
+    private func nodeLines(lines:[String:Int],states:[LineState])->some View {
+        LazyVGrid(columns:[GridItem(.flexible(),spacing:20),GridItem(.flexible())],spacing:0) {
+            ForEach(Latency.lineOrder.indices,id:\.self) {i in nodeLine(i,ms:lines[Latency.lineOrder[i]],state:states[i])}
+        }.padding(.leading,mac ? 60:66).padding(.trailing,16).padding(.bottom,10)
+        .transition(.opacity)
+    }
+    private func nodeLine(_ i:Int,ms:Int?,state:LineState)->some View {
+        let color:Color=ms == nil ? VeilbirdStyle.faint:((ms ?? 0)<0 ? VeilbirdStyle.danger.opacity(0.75):VeilbirdStyle.secondary)
+        return HStack(spacing:7) {
+            LineCells(states:[state],size:4)
+            Text(lineName(i)).foregroundStyle(VeilbirdStyle.faint)
+            Spacer(minLength:4)
+            Text(lineValue(ms)).font(.system(size:11,design:.monospaced)).monospacedDigit().foregroundStyle(color)
+        }.font(.system(size:12)).frame(height:24).accessibilityElement(children:.combine)
     }
     /// Connected (or reconnecting), one tap moves the VPN to the new location.
     private func choose(_ id:String,name:String) {
