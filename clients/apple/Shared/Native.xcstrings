@@ -3612,6 +3612,29 @@
         }
       }
     },
+    "location_retrying": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location not answering. Retrying · you can switch"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该位置无响应，正在重试 · 可换位置"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Локация не отвечает. Повтор · можно сменить"
+          }
+        }
+      }
+    },
     "location_unavailable_select_another": {
       "extractionState": "manual",
       "localizations": {
@@ -4436,6 +4459,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Мбит/с"
+          }
+        }
+      }
+    },
+    "reconnecting_status": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection lost. Reconnecting…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接中断，正在重连…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Связь прервалась. Переподключение…"
           }
         }
       }
@@ -6943,6 +6989,98 @@
           "stringUnit": {
             "state": "translated",
             "value": "VPN-подключение"
+          }
+        }
+      }
+    },
+    "waiting_for_network": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for network…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待网络恢复…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ожидание сети…"
+          }
+        }
+      }
+    },
+    "whats_new": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's new"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本版更新"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Что нового"
+          }
+        }
+      }
+    },
+    "whats_new_notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnects automatically after a drop, no need to connect again\nNo battery-draining checks while offline; reconnects as soon as the network is back\nSwitch locations while connected\nSee what's new in each version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "断线后自动重连，不用再手动重新连接\n没网时不再耗电探测，网络恢复后立刻连上\n连接中可以直接换位置\n可以查看每个版本的更新内容"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Автоматическое переподключение после обрыва связи\nБез лишних проверок и расхода батареи без сети; подключение сразу после её появления\nСмена локации без отключения\nСписок изменений каждой версии"
+          }
+        }
+      }
+    },
+    "whats_new_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's new in %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 更新内容"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Что нового в %1$@"
           }
         }
       }

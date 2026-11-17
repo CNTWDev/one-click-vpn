@@ -108,6 +108,21 @@ func Stop() {
 	statistic.DefaultManager.ResetStatistic()
 }
 
+// Reset closes every open connection but keeps the tunnel and proxies. The apps call it when the device's
+// network changes (Wi-Fi <-> mobile data): connections bound to the old network would otherwise hang until
+// they time out, while new ones leave through the new network right away.
+func Reset() {
+	lock.Lock()
+	defer lock.Unlock()
+	if !running {
+		return
+	}
+	statistic.DefaultManager.Range(func(c statistic.Tracker) bool {
+		_ = c.Close()
+		return true
+	})
+}
+
 // Probe tests the named proxies concurrently through url and returns
 // "name=delayMs" pairs separated by commas; -1 means the proxy did not answer.
 // The results also feed the health state that fallback groups choose from.

@@ -118,10 +118,14 @@ jobs:
           mv "$out/app-prod-arm64-v8a-release.apk" "$name-arm64.apk"
           mv "$out/app-prod-universal-release.apk" "$name.apk"
           ls -l TrackNothing-*.apk
+          # The version's notes from clients/CHANGELOG.md: Console 「导入 GitHub 构建包」 fills 更新说明 with them.
+          node scripts/client-changelog.mjs "${{ needs.prepare.outputs.version }}" > release-notes.md
       - uses: actions/upload-artifact@v4
         with:
           name: TrackNothing-android-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
-          path: TrackNothing-*.apk
+          path: |
+            TrackNothing-*.apk
+            release-notes.md
           if-no-files-found: error
       - uses: actions/setup-node@v4
         if: needs.prepare.outputs.publish == 'true'
@@ -134,8 +138,7 @@ jobs:
           for arch in arm64 universal; do
             file="$name.apk"; [[ $arch == arm64 ]] && file="$name-arm64.apk"
             node scripts/release-client.mjs --platform android --arch "$arch" --channel beta --publish \
-              --version "${{ needs.prepare.outputs.version }}" --build "$VEILBIRD_BUILD_NUMBER" --min-os "Android 8.0" \
-              --notes "${{ github.ref_name }} (${{ github.sha }})" --file "$file"
+              --version "${{ needs.prepare.outputs.version }}" --build "$VEILBIRD_BUILD_NUMBER" --min-os "Android 8.0" --file "$file"
           done
       - run: rm -f "$RUNNER_TEMP/release.jks"
         if: always()
@@ -167,17 +170,20 @@ jobs:
           node-version: '22'
       - shell: pwsh
         run: ./clients/windows/build.ps1 -Runtime ${{ matrix.runtime }} -Version ${{ needs.prepare.outputs.version }} -Build $env:VEILBIRD_BUILD_NUMBER -Installer
+      - shell: bash
+        run: node scripts/client-changelog.mjs "${{ needs.prepare.outputs.version }}" > clients/windows/artifacts/release-notes.md
       - uses: actions/upload-artifact@v4
         with:
           name: TrackNothing-windows-${{ matrix.arch }}-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
-          path: clients/windows/artifacts/TrackNothing-*-setup.exe
+          path: |
+            clients/windows/artifacts/TrackNothing-*-setup.exe
+            clients/windows/artifacts/release-notes.md
           if-no-files-found: error
       - shell: pwsh
         if: needs.prepare.outputs.publish == 'true'
         run: >-
           node scripts/release-client.mjs --platform windows --arch ${{ matrix.arch }} --channel beta --publish
           --version "${{ needs.prepare.outputs.version }}" --build "$env:VEILBIRD_BUILD_NUMBER" --min-os "Windows 10"
-          --notes "${{ github.ref_name }} (${{ github.sha }})"
           --file "clients/windows/artifacts/TrackNothing-${{ needs.prepare.outputs.version }}-$env:VEILBIRD_BUILD_NUMBER-${{ matrix.runtime }}-setup.exe"
   macos:
     needs: prepare
@@ -258,11 +264,15 @@ jobs:
         if: steps.ready.outputs.ready == 'true'
         run: bash clients/apple/scripts/release-macos.sh build
       # The signed DMG; 「macOS notarize」 replaces it with the stapled copy once Apple accepts it.
+      - if: steps.ready.outputs.ready == 'true'
+        run: node scripts/client-changelog.mjs "${{ needs.prepare.outputs.version }}" > clients/apple/artifacts/release/release-notes.md
       - uses: actions/upload-artifact@v4
         if: steps.ready.outputs.ready == 'true'
         with:
           name: TrackNothing-macos-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
-          path: clients/apple/artifacts/release/TrackNothing-*-macos.dmg
+          path: |
+            clients/apple/artifacts/release/TrackNothing-*-macos.dmg
+            clients/apple/artifacts/release/release-notes.md
           if-no-files-found: error
       # Apple's answer (minutes, sometimes hours) is awaited by the cheap Linux job notary-status, not on this Mac.
       - name: Submit for notarization
@@ -364,7 +374,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ needs.notary-status.outputs.artifact }}
-          path: clients/apple/artifacts/release/TrackNothing-*-macos.dmg
+          path: |
+            clients/apple/artifacts/release/TrackNothing-*-macos.dmg
+            clients/apple/artifacts/release/release-notes.md
           if-no-files-found: error
           overwrite: true
       - name: Publish to beta
@@ -372,7 +384,6 @@ jobs:
         run: >-
           node scripts/release-client.mjs --platform macos --arch universal --channel beta --publish
           --version "$VEILBIRD_VERSION" --build "$VEILBIRD_BUILD_NUMBER" --min-os "macOS 13"
-          --notes "${{ github.ref_name }} (${{ github.sha }}, notarized in run ${{ github.run_number }})"
           --file "clients/apple/artifacts/release/TrackNothing-$VEILBIRD_VERSION-$VEILBIRD_BUILD_NUMBER-macos.dmg"
       - name: Remove API key
         if: always()

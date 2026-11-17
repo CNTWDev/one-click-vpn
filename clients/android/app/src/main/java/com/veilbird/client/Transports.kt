@@ -50,6 +50,13 @@ object Transports {
         return raw.substringBefore(':') + ":" + digest.take(6).joinToString("") { "%02x".format(it) }
     }
 
+    /** Whether the device has a network outside the VPN at all; without one the VPN waits instead of probing. */
+    fun online(context: Context): Boolean = try {
+        val manager = context.getSystemService(ConnectivityManager::class.java)
+        @Suppress("DEPRECATION")
+        manager.allNetworks.any { network -> manager.getNetworkCapabilities(network)?.let { !it.hasTransport(NetworkCapabilities.TRANSPORT_VPN) && it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) } == true }
+    } catch (_: Exception) { true }
+
     private fun memory(context: Context) = context.getSharedPreferences("transports", Context.MODE_PRIVATE)
 
     /** Transports that failed on this network within the last week, while another one worked. */

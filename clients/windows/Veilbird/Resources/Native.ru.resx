@@ -160,6 +160,7 @@
   <data name="lines_one_down" xml:space="preserve"><value>{0} не отвечает, используется {1}</value></data>
   <data name="lines_only" xml:space="preserve"><value>Работает только {0}</value></data>
   <data name="location" xml:space="preserve"><value>Локация</value></data>
+  <data name="location_retrying" xml:space="preserve"><value>Локация не отвечает. Повтор · можно сменить</value></data>
   <data name="location_unavailable_select_another" xml:space="preserve"><value>Локация недоступна. Выберите другую.</value></data>
   <data name="locations" xml:space="preserve"><value>Локации</value></data>
   <data name="logs_detail" xml:space="preserve"><value>Только шаги подключения: без адресов, ключей и посещённых сайтов. Хранится 7 дней, до 512 КБ.</value></data>
@@ -196,6 +197,7 @@
   <data name="rate_unit_gbps" xml:space="preserve"><value>Гбит/с</value></data>
   <data name="rate_unit_kbps" xml:space="preserve"><value>Кбит/с</value></data>
   <data name="rate_unit_mbps" xml:space="preserve"><value>Мбит/с</value></data>
+  <data name="reconnecting_status" xml:space="preserve"><value>Связь прервалась. Переподключение…</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>Обновить устройства</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Обновить локации</value></data>
   <data name="reset_by_email" xml:space="preserve"><value>Сброс пароля по email</value></data>
@@ -306,6 +308,13 @@
   <data name="valid_until_label" xml:space="preserve"><value>Действует до</value></data>
   <data name="version_label" xml:space="preserve"><value>Версия {0}</value></data>
   <data name="vpn_connection" xml:space="preserve"><value>VPN-подключение</value></data>
+  <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
+  <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Автоматическое переподключение после обрыва связи
+Без лишних проверок и расхода батареи без сети; подключение сразу после её появления
+Смена локации без отключения
+Список изменений каждой версии</value></data>
+  <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>
   <data name="working" xml:space="preserve"><value>Подождите…</value></data>

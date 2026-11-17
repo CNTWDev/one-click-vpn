@@ -126,6 +126,8 @@ public sealed class Core : IDisposable {
         return parts.Length==2&&long.TryParse(parts[0],out var up)&&long.TryParse(parts[1],out var down)?(up,down):(0,0);
     }
     /// Removes the tun and closes every connection; the process stays for the next connection.
+    /// Closes open connections after a network change; the tunnel stays (core.Reset).
+    public void Reset() {try {Call("reset");} catch(IOException) {/* gone */}}
     public void Stop() {try {Call("stop");} catch(IOException) {/* already gone */}}
     /// A WireGuard key pair generated on this PC; the private key never leaves it.
     public (string Public,string Private) NewKeypair() {

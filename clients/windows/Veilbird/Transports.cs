@@ -41,6 +41,10 @@ public static class Transports {
         } catch(NetworkInformationException) {return "unknown";}
     }
 
+    /// Whether the PC has a network outside the tunnel at all (an adapter with a gateway); without one the
+    /// connection waits for Windows to report a change instead of probing.
+    public static bool Online()=>NetworkKey()!="unknown";
+
     private static JsonObject Load() {
         try {return File.Exists(MemoryPath)?JsonNode.Parse(File.ReadAllText(MemoryPath)) as JsonObject??new():new();} catch(Exception error) when (error is IOException or JsonException) {return new();}
     }

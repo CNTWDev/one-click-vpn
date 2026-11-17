@@ -81,6 +81,11 @@ import ServiceManagement
         updateTicker=Timer.publish(every:900,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in await self?.checkIfDue()}}
     }
     var connected:Bool {[.connected,.connecting,.reasserting].contains(manager?.connection.status)}
+    /// Tunnel status lines shown in place of the rates while connected.
+    static let notices:Set<String>=["connection_confirming","reconnecting_status","waiting_for_network","location_retrying"]
+    private var lastVPNStatus:NEVPNStatus = .invalid
+    private var reconnectTask:Task<Void,Never>?
+    private var reconnects=0
     /// The two-letter country code shown in a location's tile; the name's first letter when the node has none.
     func code(_ id:String,name:String)->String {
         let node=nodes.first {$0["id"] as? String == id}
@@ -202,6 +207,15 @@ import ServiceManagement
             signedIn=try SecureStorage.read("token") != nil
             #if !targetEnvironment(simulator)
             manager=try await TunnelControl.saved()
+            if let refused=Shared.refused {
+                // The tunnel stopped on a refusal while the app was closed: no more On Demand restarts, and say why.
+                await TunnelControl.stop(manager);Shared.refused=nil
+                failed=true;failure=AccessFailure.code(refused).localizedDescription
+            }
+            #if os(macOS)
+            // The user had left the VPN on when the Mac restarted or the app quit: connect again.
+            if signedIn && TunnelControl.wanted && !connected,let manager {Journal.add("connect: restoring at launch");try? await TunnelControl.resume(manager)}
+            #endif
             #endif
             if signedIn {await refreshNodes();if let client=try? api() {await CrashReports.shared.send(client)}}
         } catch {message=error.localizedDescription}
@@ -277,7 +291,7 @@ import ServiceManagement
         #if targetEnvironment(simulator)
         throw AccessFailure.code("SIMULATOR_UNSUPPORTED")
         #else
-        if connected {attempt=nil;manager?.connection.stopVPNTunnel();return}
+        if connected {attempt=nil;reconnectTask?.cancel();reconnectTask=nil;await TunnelControl.stop(manager);return}
         failed=false
         #if os(macOS)
         SystemExtension.shared.onApprovalNeeded={[weak self] in self?.message=L10n.text("allow_system_extension")}
@@ -289,6 +303,50 @@ import ServiceManagement
         manager=try await TunnelControl.start(origin:try api().origin,nodeId:selected,routing:routing)
         #endif
     }
+    /// Moves a running (or reconnecting) VPN to the selected location: stop, wait for it to go down, start again.
+    func reconnect() async throws {
+        await TunnelControl.stop(manager)
+        for _ in 0..<50 where connected || manager?.connection.status == .disconnecting {try await Task.sleep(nanoseconds:200_000_000)}
+        attempt=Date()
+        Journal.add("connect: switching location from the app")
+        manager=try await TunnelControl.start(origin:try api().origin,nodeId:selected,routing:routing)
+    }
+    /// The tunnel went down without the user disconnecting. It closes on its own only for a reason retrying cannot fix
+    /// (account, device, expired access) or a first attempt that failed; then the app stops keeping it on and says why.
+    /// Otherwise (it was killed or crashed) iOS On Demand starts it again, and on the Mac the app does, with backoff.
+    private func dropped(duringAttempt:Bool) {
+        guard TunnelControl.wanted,let connection=manager?.connection else {return}
+        connection.fetchLastDisconnectError {error in
+            Task {@MainActor in
+                let failure=error as NSError?
+                let code=failure?.domain == Shared.errorDomain ? failure?.userInfo["code"] as? String:nil
+                if duringAttempt || code == "ACCESS_EXPIRED" || Shared.fatal.contains(code ?? "") {
+                    Journal.add("disconnect: tunnel closed (\(code ?? "unknown")), not reconnecting")
+                    await TunnelControl.stop(self.manager);Shared.refused=nil
+                    if let code {self.failed=true;self.failure=AccessFailure.code(code).localizedDescription}
+                    if code == "AUTH_REQUIRED" {self.signedIn=false}
+                    return
+                }
+                #if os(macOS)
+                self.reconnectLater()
+                #endif
+            }
+        }
+    }
+    #if os(macOS)
+    private func reconnectLater() {
+        guard reconnectTask == nil else {return}
+        let delays:[Double]=[5,15,30,60,300]
+        let delay=delays[min(reconnects,delays.count-1)];reconnects+=1
+        Journal.add("reconnect: tunnel dropped, starting again in \(Int(delay)) s")
+        reconnectTask=Task {
+            try? await Task.sleep(nanoseconds:UInt64(delay*1_000_000_000))
+            reconnectTask=nil
+            guard !Task.isCancelled,TunnelControl.wanted,signedIn,!connected,let manager else {return}
+            do {try await TunnelControl.resume(manager)} catch {Journal.add("reconnect: failed to start (\(Journal.scrub(error.localizedDescription)))");reconnectLater()}
+        }
+    }
+    #endif
     /// The Mac tunnel's own log lines (they live in root's container); read while the tunnel is running.
     @Published var tunnelLog=""
     func loadTunnelLog() {
@@ -305,6 +363,12 @@ import ServiceManagement
         try? (manager?.connection as? NETunnelProviderSession)?.sendProviderMessage(Data("journal-clear".utf8)) {_ in}
     }
     func refreshStatus() {
+        let current=manager?.connection.status ?? .invalid
+        if current != lastVPNStatus {
+            let previous=lastVPNStatus;lastVPNStatus=current
+            if current == .connected {reconnects=0}
+            if current == .disconnected && [.connected,.connecting,.reasserting,.disconnecting].contains(previous) {dropped(duringAttempt:attempt != nil)}
+        }
         switch manager?.connection.status {
         case .connected:break
         case .connecting,.reasserting:status="connecting"

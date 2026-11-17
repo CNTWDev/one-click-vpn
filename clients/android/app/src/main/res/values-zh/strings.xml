@@ -158,6 +158,7 @@
   <string name="lines_one_down">%1$s 不通，已用 %2$s</string>
   <string name="lines_only">只有 %1$s 能用</string>
   <string name="location">连接位置</string>
+  <string name="location_retrying">该位置无响应，正在重试 · 可换位置</string>
   <string name="location_unavailable_select_another">节点不可用，请重新选择</string>
   <string name="locations">节点</string>
   <string name="logs_detail">只记录连接过程，不含地址、密钥和访问记录。保留 7 天，最多 512 KB。</string>
@@ -194,6 +195,7 @@
   <string name="rate_unit_gbps">Gb/s</string>
   <string name="rate_unit_kbps">Kb/s</string>
   <string name="rate_unit_mbps">Mb/s</string>
+  <string name="reconnecting_status">连接中断，正在重连…</string>
   <string name="refresh_devices">刷新设备状态</string>
   <string name="refresh_locations">刷新节点</string>
   <string name="reset_by_email">通过邮件重置密码</string>
@@ -303,6 +305,10 @@
   <string name="valid_until_label">有效期至</string>
   <string name="version_label">版本 %1$s</string>
   <string name="vpn_connection">VPN 连接</string>
+  <string name="waiting_for_network">等待网络恢复…</string>
+  <string name="whats_new">本版更新</string>
+  <string name="whats_new_notes">断线后自动重连，不用再手动重新连接\n没网时不再耗电探测，网络恢复后立刻连上\n连接中可以直接换位置\n可以查看每个版本的更新内容</string>
+  <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>
   <string name="working">正在处理，请稍候…</string>

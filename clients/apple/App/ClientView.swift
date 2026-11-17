@@ -19,6 +19,7 @@ struct ClientView:View {
     @State private var revoke:[String:Any]?
     /// The address a reset link is about to be sent to, while the confirmation is showing.
     @State private var resetEmail:String?
+    @State private var whatsNew=false
     @State private var search=""
     @State private var tab=0
     @State private var versionTaps=0
@@ -82,9 +83,13 @@ struct ClientView:View {
         .environment(\.locale, L10n.locale).preferredColorScheme(.dark)
         .animation(reduceMotion ? nil:.easeOut(duration:0.2),value:tab).animation(reduceMotion ? nil:.easeOut(duration:0.2),value:model.signedIn)
         .task {await model.restore()}
+        // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).
+        .alert(L10n.text("whats_new_title",appVersion),isPresented:$whatsNew) {
+            Button(L10n.text("got_it"),role:.cancel) {}
+        } message:{Text(L10n.text("whats_new_notes").split(separator:"\n").map {"· "+$0}.joined(separator:"\n"))}
         .alert(L10n.text("revoke_this_device_s_access"),isPresented:Binding(get:{revoke != nil},set:{if !$0 {revoke=nil}})) {
             Button(L10n.text("cancel"),role:.cancel) {revoke=nil}
-            Button(L10n.text("revoke_access"),role:.destructive) {if let device=revoke {model.work {_ = try await model.api().action("revoke",["enrollmentId":device["id"] as? String ?? ""]);if device["isCurrent"] as? Bool == true {model.manager?.connection.stopVPNTunnel()};try await model.loadAccount()}};revoke=nil}
+            Button(L10n.text("revoke_access"),role:.destructive) {if let device=revoke {model.work {_ = try await model.api().action("revoke",["enrollmentId":device["id"] as? String ?? ""]);if device["isCurrent"] as? Bool == true {await TunnelControl.stop(model.manager)};try await model.loadAccount()}};revoke=nil}
         } message:{Text(L10n.text("this_device_will_lose_access_the_slot_is_released"))}
         // "Forgot password" and "change password" both email the Portal's reset link; the new password is set there.
         .alert(L10n.text("reset_by_email"),isPresented:Binding(get:{resetEmail != nil},set:{if !$0 {resetEmail=nil}})) {
@@ -330,16 +335,17 @@ struct ClientView:View {
                             .lineLimit(2).id(state).transition(.opacity)
                     }
                 }.frame(height:mac ? 38:48).padding(.top,mac ? 4:6)
-                Text(model.status == "connection_confirming" ? L10n.text("connection_confirming"):L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate)))
+                Text(ClientModel.notices.contains(model.status) ? L10n.text(model.status):L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate)))
                     .font(.system(size:mac ? 12:13)).monospacedDigit().foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
                     .frame(height:mac ? 16:18).opacity(state == .connected ? 1:0)
                 RateBars(down:model.rxHistory,up:model.txHistory).frame(width:238,height:mac ? 44:50).padding(.top,mac ? 8:10)
-                    .opacity(state == .connected && model.status != "connection_confirming" ? 1:0)
+                    .opacity(state == .connected && !ClientModel.notices.contains(model.status) ? 1:0)
                 DataStream(running:state == .connecting || state == .connected,size:mac ? 14:15).padding(.top,mac ? 12:16)
             }.padding(.top,mac ? 24:28).animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:state)
             Spacer(minLength:16)
-            // Connected, the location row opens the connection check; otherwise the location list.
-            Button {if state == .connected {checkResult=nil;checking=true} else {tab=1}} label:{currentLocationRow}.buttonStyle(RowButton())
+            // Connected, the location row opens the connection check; otherwise, or while the chosen location does not
+            // answer, the location list (picking one there reconnects to it).
+            Button {if state == .connected && model.status != "location_retrying" {checkResult=nil;checking=true} else {tab=1}} label:{currentLocationRow}.buttonStyle(RowButton())
                 .cardOutline(VeilbirdStyle.radius+4).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius+4))
                 .accessibilityHint(L10n.text("tap_to_change"))
             usageStrip.padding(.top,16)
@@ -748,9 +754,11 @@ struct ClientView:View {
         }.background(selected ? VeilbirdStyle.raised:(open ? Color(red:12/255,green:15/255,blue:20/255):Color.clear))
         .animation(reduceMotion ? nil:.easeInOut(duration:0.2),value:selected)
     }
+    /// Connected (or reconnecting), one tap moves the VPN to the new location.
     private func choose(_ id:String,name:String) {
-        if model.connected {model.message=L10n.text("disconnect_before_changing_location");return}
+        let reconnect=model.connected && id != model.connectedNodeId
         model.selected=id;model.selectedName=name;tab=0
+        if reconnect {model.work {try await model.reconnect()}}
     }
 
     // MARK: Account
@@ -800,6 +808,8 @@ struct ClientView:View {
                     settingRow(L10n.text("check_for_updates"),updateValue) {
                         if let update=model.update {model.startUpdate(update) {openURL($0)}} else {Task {await model.checkForUpdate();if model.update == nil {model.message=L10n.text("up_to_date")}}}
                     }
+                    Hairline()
+                    settingRow(L10n.text("whats_new"),appVersion) {whatsNew=true}
                 }
                 Button {
                     if model.connected {model.message=L10n.text("disconnect_the_vpn_before_signing_out");return}
@@ -807,7 +817,7 @@ struct ClientView:View {
                 } label:{Text(L10n.text("sign_out")).font(.system(size:VeilbirdStyle.body)).foregroundStyle(VeilbirdStyle.danger).frame(maxWidth:.infinity).frame(height:mac ? 40:50)}
                     .buttonStyle(RowButton()).cardOutline(VeilbirdStyle.radius).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
                 // The diagnostic log has no visible entry: seven taps on the version open it.
-                Text(verbatim:"TRACKNOTHING "+(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")).font(Pixel.font(mac ? 12:13)).tracking(1.5).foregroundStyle(VeilbirdStyle.faint)
+                Text(verbatim:"TRACKNOTHING "+appVersion).font(Pixel.font(mac ? 12:13)).tracking(1.5).foregroundStyle(VeilbirdStyle.faint)
                     .frame(maxWidth:.infinity).padding(.vertical,4).contentShape(Rectangle()).onTapGesture {
                         if Date().timeIntervalSince(firstTap)>4 {versionTaps=0;firstTap=Date()}
                         versionTaps+=1
@@ -958,6 +968,7 @@ private extension View {
 }
 
 extension ClientView {
+    var appVersion:String {Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"}
     /// The account row's value: the same state as the banner.
     var updateValue:String {
         guard let update=model.update else {return L10n.text("up_to_date")}
@@ -971,6 +982,7 @@ extension ClientView {
 struct UpdateBanner:View {
     @EnvironmentObject private var model:ClientModel
     @Environment(\.openURL) private var openURL
+    @State private var notesShown=false
     let update:ReleaseUpdate
 
     static func percent(_ progress:UpdateDownloader.Progress?,_ update:ReleaseUpdate)->Int {
@@ -992,13 +1004,19 @@ struct UpdateBanner:View {
             }
         } else if !model.dismissed(update) {
             row(L10n.text(update.mandatory ? "update_required_title":"update_banner_title",update.version),
-                update.mandatory ? L10n.text("update_required_detail"):(update.notes.split(separator:"\n").first.map {String($0).trimmingCharacters(in:.whitespaces)} ?? L10n.text("update_available_detail"))) {
+                update.mandatory ? L10n.text("update_required_detail"):(L10n.notes(update.notes).first ?? L10n.text("update_available_detail"))) {
                 button(L10n.text("update_action")) {model.startUpdate(update) {openURL($0)}}
                 if !update.mandatory {
                     Button {model.dismiss(update)} label:{Image(systemName:"xmark").font(.system(size:11,weight:.semibold)).foregroundStyle(VeilbirdStyle.faint).frame(width:32,height:32).contentShape(Rectangle())}
                         .buttonStyle(.plain).accessibilityLabel(L10n.text("update_later"))
                 }
             }
+            // The banner shows the first improvement; a tap lists them all, with the update button.
+            .contentShape(Rectangle()).onTapGesture {if L10n.notes(update.notes).count>1 {notesShown=true}}
+            .alert(L10n.text("whats_new_title",update.version),isPresented:$notesShown) {
+                Button(L10n.text("update_later"),role:.cancel) {}
+                Button(L10n.text("update_action")) {model.startUpdate(update) {openURL($0)}}
+            } message:{Text(L10n.notes(update.notes).map {"· "+$0}.joined(separator:"\n"))}
         }
     }
     private var downloading:some View {

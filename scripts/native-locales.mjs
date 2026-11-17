@@ -1,8 +1,27 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { changelogNotes } from "./client-changelog.mjs";
 const root=fileURLToPath(new URL("../",import.meta.url));
 const messages=JSON.parse(fs.readFileSync(path.join(root,"clients/locales/messages.json"),"utf8"));
+// What's new in this build (我的 → 本版更新): generated from the version's section of clients/CHANGELOG.md, one item
+// per line. Every version needs a section in all three languages, so a version bump without notes fails the check.
+const version=JSON.parse(fs.readFileSync(path.join(root,"clients/version.json"),"utf8")).version;
+messages.whats_new_notes=Object.fromEntries(["zh","en","ru"].map(locale=>{
+  const items=changelogItems(changelogNotes(version),locale);
+  if(!items.length)throw Error(`clients/CHANGELOG.md: add "## ${version}" with "### ${locale}" items`);
+  return [locale,items.join("\n")];
+}));
+function changelogItems(notes,locale){
+  let block="";const items=[];
+  for(const line of notes.split("\n")){
+    const heading=line.trim().match(/^###\s*([a-z]{2})\s*$/i);
+    if(heading){block=heading[1].toLowerCase();continue;}
+    const item=line.trim().replace(/^[-*•]\s*/,"");
+    if(block===locale&&item)items.push(item);
+  }
+  return items;
+}
 const entries=Object.entries(messages).sort(([a],[b])=>a.localeCompare(b));
 const placeholders=value=>[...value.matchAll(/\{(\d+)\}/g)].map(m=>m[1]).sort().join(",");
 for(const [key,values] of entries) {

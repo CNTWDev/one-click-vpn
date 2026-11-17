@@ -27,7 +27,7 @@ Windows 版使用 WireGuard 官方隧道服务，需要在真机上验收一次�
 
 ## 每次发版
 
-1. 改 `clients/version.json` 的版本号，提交后推送标签 `client-v<版本号>`；或在 GitHub → Actions →「Client release」→ Run workflow。手动运行时在「平台」里选 `All`（三端一起，默认）、`Android`、`Windows` 或 `macOS`，运行列表里显示为 `Client release · <平台>`。推送标签总是三端一起。构建号是这个工作流的运行序号，不论选哪个平台都不会重复。
+1. 改 `clients/version.json` 的版本号，同时在 `clients/CHANGELOG.md` 最上面加这一版的更新记录（中英俄，格式见文件开头；缺了 `npm run i18n:check` 会报错）。这段记录会自动成为「更新说明」：CI 发布时填入，Console「导入 GitHub 构建包」时预填（构建包里的 `release-notes.md`），客户端更新横幅显示第一条、点开看全部，「我的 → 本版更新」显示当前版本的记录。然后提交后推送标签 `client-v<版本号>`；或在 GitHub → Actions →「Client release」→ Run workflow。手动运行时在「平台」里选 `All`（三端一起，默认）、`Android`、`Windows` 或 `macOS`，运行列表里显示为 `Client release · <平台>`。推送标签总是三端一起。构建号是这个工作流的运行序号，不论选哪个平台都不会重复。
 2. 运行结束后，在该次运行页面底部 **Artifacts** 下载各平台的 zip（不用解压）：
    - `TrackNothing-android-…` → `TrackNothing-<版本>-<构建号>-arm64.apk`（几乎所有手机）和 `TrackNothing-<版本>-<构建号>.apk`（通用包，给少数 32 位手机和网页下载），两个都导入
    - `TrackNothing-windows-x64-…` → `TrackNothing-<版本>-<构建号>-win-x64-setup.exe`（arm64 同理，给 ARM 笔记本用）

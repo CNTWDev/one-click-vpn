@@ -17,7 +17,7 @@ struct ConnectIntent:AppIntent {
     func perform() async throws -> some IntentResult {
         guard let manager=try await TunnelControl.saved() else {throw AccessFailure.code("CONNECT_FROM_APP_FIRST")}
         Journal.add("connect: requested from Shortcuts")
-        try manager.connection.startVPNTunnel(options:try TunnelControl.secrets())
+        try await TunnelControl.resume(manager)
         return .result()
     }
 }
@@ -25,7 +25,7 @@ struct DisconnectIntent:AppIntent {
     static var title:LocalizedStringResource=LocalizedStringResource("disconnect_action",table:"Native")
     static var openAppWhenRun=false
     func perform() async throws -> some IntentResult {
-        try await TunnelControl.saved()?.connection.stopVPNTunnel()
+        await TunnelControl.stop(try await TunnelControl.saved())
         return .result()
     }
 }

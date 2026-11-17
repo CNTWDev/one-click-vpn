@@ -8,10 +8,12 @@
 // --file uploads to whatever storage the Controller uses: a presigned URL with VEILBIRD_RELEASE_STORAGE=s3, otherwise
 // ordered chunks to its data volume (the default). --url registers an installer already hosted elsewhere
 // (or an App Store / TestFlight link with --distribution). The Controller verifies what it records.
+// Without --notes the version's section of clients/CHANGELOG.md becomes the release notes.
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { changelogNotes } from "./client-changelog.mjs";
 
 const { values: args } = parseArgs({ options: {
   platform: { type: "string" }, arch: { type: "string" }, channel: { type: "string", default: "beta" }, version: { type: "string" },
@@ -53,7 +55,7 @@ async function uploadChunks(bytes, fields) {
   }
 }
 
-const release = { platform: args.platform, arch, channel: args.channel, version: args.version, build, minOs: args["min-os"], notes: args.notes, distribution: args.distribution, publish: args.publish };
+const release = { platform: args.platform, arch, channel: args.channel, version: args.version, build, minOs: args["min-os"], notes: args.notes || changelogNotes(args.version), distribution: args.distribution, publish: args.publish };
 if (args.file) {
   const bytes = await readFile(args.file), sha256 = createHash("sha256").update(bytes).digest("hex"), size = bytes.byteLength;
   const fields = { platform: args.platform, arch, version: args.version, build, fileName: path.basename(args.file) };
