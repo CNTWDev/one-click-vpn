@@ -9,17 +9,18 @@
 #   VEILBIRD_APPLE_API_KEY_PATH (.p8 file), VEILBIRD_APPLE_API_KEY_ID, VEILBIRD_APPLE_API_ISSUER_ID.
 # Optional: VEILBIRD_API_ORIGIN (baked into the app), VEILBIRD_VERSION and VEILBIRD_BUILD_NUMBER.
 #
-# Usage: release-macos.sh [build|notarize|all]   (default all). CI runs build, keeps the signed DMG as a run
-# artifact, then runs notarize, so a slow Apple check never costs the build.
+# Usage: release-macos.sh [build|submit|notarize|all]   (default all). CI runs build, keeps the signed DMG as a run
+# artifact and runs submit (hands it to Apple without waiting); 「macOS notarize」 later runs notarize, which waits on
+# that same submission and staples the ticket.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mode=${1:-all}
 case $mode in
   build) required="VEILBIRD_APPLE_TEAM_ID VEILBIRD_APPLE_BUNDLE_ID VEILBIRD_MACOS_APP_PROFILE VEILBIRD_MACOS_TUNNEL_PROFILE" ;;
-  notarize) required="VEILBIRD_APPLE_API_KEY_PATH VEILBIRD_APPLE_API_KEY_ID VEILBIRD_APPLE_API_ISSUER_ID" ;;
+  submit|notarize) required="VEILBIRD_APPLE_API_KEY_PATH VEILBIRD_APPLE_API_KEY_ID VEILBIRD_APPLE_API_ISSUER_ID" ;;
   all) required="VEILBIRD_APPLE_TEAM_ID VEILBIRD_APPLE_BUNDLE_ID VEILBIRD_MACOS_APP_PROFILE VEILBIRD_MACOS_TUNNEL_PROFILE
                  VEILBIRD_APPLE_API_KEY_PATH VEILBIRD_APPLE_API_KEY_ID VEILBIRD_APPLE_API_ISSUER_ID" ;;
-  *) echo "Usage: $0 [build|notarize|all]" >&2; exit 2 ;;
+  *) echo "Usage: $0 [build|submit|notarize|all]" >&2; exit 2 ;;
 esac
 for name in $required; do
   [[ -n "${!name:-}" ]] || { echo "$name is not set (see clients/RELEASING.md)" >&2; exit 1; }
@@ -142,8 +143,19 @@ notarize_dmg() {
   echo "$dmg"
 }
 
+# Hands the DMG to Apple and returns at once (Apple usually takes minutes, a team's first submissions hours).
+submit_dmg() {
+  [[ -f "$dmg" ]] || { echo "$dmg not found: run \"$0 build\" first." >&2; exit 1; }
+  local submission
+  submission=$(xcrun notarytool submit "$dmg" --key "$VEILBIRD_APPLE_API_KEY_PATH" --key-id "$VEILBIRD_APPLE_API_KEY_ID" \
+    --issuer "$VEILBIRD_APPLE_API_ISSUER_ID" --output-format json | plutil -extract id raw -o - -)
+  echo "::notice::Submitted $(basename "$dmg") for notarization ($submission). Check and publish with Run workflow:" \
+    "平台 = macOS notarize, build = ${VEILBIRD_BUILD_NUMBER:-<this run number>}."
+}
+
 case $mode in
   build) build_dmg ;;
+  submit) submit_dmg ;;
   notarize) notarize_dmg ;;
   all) build_dmg; notarize_dmg ;;
 esac
