@@ -6,7 +6,7 @@ import TunnelCore
 
 /// One node as measured from this device: latency (a request through its transports when the device has them, else the
 /// median TCP connect time), jitter and failed attempts.
-struct Quality {
+struct Quality:Codable {
     let latency:Int?
     let jitter:Int
     let loss:Int
@@ -32,6 +32,23 @@ enum Latency {
     private static var measuredAt=[String:Date]()
     /// Last measurement per node id, so the home screen can show it without probing again.
     static func recent(_ id:String) -> Quality? {lock.lock();defer {lock.unlock()};return recentResults[id]}
+    /// When the node was last measured; nil when never.
+    static func measured(_ id:String) -> Date? {lock.lock();defer {lock.unlock()};return measuredAt[id]}
+    /// The measurements as the app saves them between launches: {"id": {"at": seconds, "quality": {...}}}.
+    static func snapshot() -> Data? {
+        lock.lock();defer {lock.unlock()}
+        var saved=[String:Saved]()
+        for (id,quality) in recentResults {saved[id]=Saved(at:measuredAt[id]?.timeIntervalSince1970 ?? 0,quality:quality)}
+        return try? JSONEncoder().encode(saved)
+    }
+    /// Puts saved measurements back, without replacing newer ones from this run.
+    static func restore(_ data:Data) {
+        guard let saved=try? JSONDecoder().decode([String:Saved].self,from:data) else {return}
+        lock.lock();defer {lock.unlock()}
+        for (id,entry) in saved where recentResults[id]==nil {recentResults[id]=entry.quality;measuredAt[id]=Date(timeIntervalSince1970:entry.at)}
+    }
+    static func forget() {lock.lock();recentResults=[:];measuredAt=[:];lock.unlock()}
+    private struct Saved:Codable {let at:Double;let quality:Quality}
     static func load(_ node:[String:Any]) -> Int? {(node["load"] as? Int).flatMap {(0...100).contains($0) ? $0:nil}}
     static func users(_ node:[String:Any]) -> Int {max(0,node["users"] as? Int ?? 0)}
 
@@ -173,12 +190,13 @@ enum Latency {
     }
     /// Best first; unmeasured nodes follow in the server's least-loaded order. A node measured less than reuse seconds
     /// ago keeps that result, so connecting right after the location list does not probe again.
-    static func rank(_ nodes:[[String:Any]],attempts:Int=5,reuse:TimeInterval=0) async -> [(node:[String:Any],quality:Quality)] {
+    /// each is called as every new measurement arrives (not for reused ones), so a list can update row by row.
+    static func rank(_ nodes:[[String:Any]],attempts:Int=5,reuse:TimeInterval=0,each:(@Sendable (String,Quality) -> Void)?=nil) async -> [(node:[String:Any],quality:Quality)] {
         let measured=await withTaskGroup(of:(Int,Quality).self) {group -> [Int:Quality] in
             for (index,node) in nodes.enumerated() {group.addTask {
                 if let quality=known(node,age:reuse) {return (index,quality)}
                 let quality=await measure(node,attempts:attempts)
-                if let id=node["id"] as? String {lock.lock();measuredAt[id]=Date();lock.unlock()}
+                if let id=node["id"] as? String {lock.lock();measuredAt[id]=Date();recentResults[id]=quality;lock.unlock();each?(id,quality)}
                 return (index,quality)
             }}
             var results=[Int:Quality]()

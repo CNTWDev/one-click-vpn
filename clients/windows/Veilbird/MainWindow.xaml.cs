@@ -95,7 +95,11 @@ public partial class MainWindow : Window {
             try {download=JsonNode.Parse(await Task.Run(core.Progress)) as JsonObject;} catch {/* next tick */}
             ShowUpdate();
         };
+        // The saved list shows at once; it is loaded again at launch and when the window comes back after six hours.
+        if(api.SignedIn&&NodeStore.Restore() is { } saved) Remember(saved);
+        Activated+=(_,_)=>{if(DateTime.UtcNow-NodeStore.LoadedAt>NodeStore.RefreshAfter) _=QuietNodes();};
         Render();_=Crash.Send(api);
+        _=QuietNodes();
         // Installed by an update while connected: reconnect as before.
         if(Settings.Get("reconnectAfterUpdate")=="1") {Settings.Set("reconnectAfterUpdate","0");Journal.Add("update: installed, reconnecting");if(api.SignedIn) Toggle();}
     }
@@ -399,8 +403,19 @@ public partial class MainWindow : Window {
         ToastText.Text=message;Toast.Visibility=Visibility.Visible;toastTimer.Stop();toastTimer.Start();
         if(!IsVisible) tray.ShowBalloonTip(3000,"TrackNothing",message,Forms.ToolTipIcon.None);
     }
+    /// Called with each newer location list loaded in the background, and as measurements arrive (false) and finish
+    /// (true); set by the location page.
+    private Action<JsonArray>? onNodes;
+    private Action<bool>? onMeasured;
+    private bool loadingNodes;
+    /// Loads the location list and saves it on disk.
     private async Task<JsonArray> LoadNodes() {
         var nodes=(await api.Request("nodes"))["nodes"]!.AsArray();
+        NodeStore.SaveNodes(nodes);
+        Remember(nodes);
+        return nodes;
+    }
+    private void Remember(JsonArray nodes) {
         nodesData=nodes;
         foreach(var node in nodes) {
             if(node?["id"]?.GetValue<string>() is not { } id) continue;
@@ -408,7 +423,6 @@ public partial class MainWindow : Window {
             var code=node["countryCode"]?.GetValue<string>() is { Length: >0 } country?country.ToUpperInvariant():name.Length>0?name[..1].ToUpperInvariant():"";
             directory[id]=(name,code);
         }
-        return nodes;
     }
     private async Task RefreshAccount() {
         try {var data=await api.Request("account");accountData=data;ShowUsage();UpdateFlyout();}
@@ -745,7 +759,7 @@ public partial class MainWindow : Window {
     // ---- Pages ----
     private void Render() {
         ContentPanel.Children.Clear();FullPanel.Children.Clear();NavigationPanel.Children.Clear();HeaderSlot.Content=null;
-        rateBars=null;switchNote=null;switchText=null;
+        rateBars=null;switchNote=null;switchText=null;onNodes=null;onMeasured=null;
         ring=null;ringButton=null;statusTitle=statusDetail=statusTimer=statusRates=stream=usageTotal=usageUntil=null;statusDot=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
         var view=api.SignedIn?page:"login";
         var full=view=="connect";
@@ -756,6 +770,8 @@ public partial class MainWindow : Window {
         ShowActivity(api.SignedIn);
         if(!api.SignedIn) {
             // Before sign-in the only language entry is this small globe; afterwards it is a row on the account page.
+            // Signed out: the saved list and measurements belonged to that account.
+            if(nodesData is not null||NodeStore.LoadedAt!=DateTime.MinValue) {NodeStore.Clear();directory.Clear();}
             accountData=null;nodesData=null;
             var globe=new StackPanel {Orientation=Orientation.Horizontal};
             globe.Children.Add(Look.Icon("",13,Look.Secondary));globe.Children.Add(new TextBlock {Text=LanguageName(L10n.Preference=="system"?L10n.Culture.TwoLetterISOLanguageName:L10n.Preference),FontSize=12,Foreground=Look.Secondary,Margin=new Thickness(6,0,0,0),VerticalAlignment=VerticalAlignment.Center});
@@ -838,9 +854,16 @@ public partial class MainWindow : Window {
         FullPanel.Children.Add(layout);
         ShowUsage();
         _=RefreshAccount();
-        if(directory.Count==0) _=QuietNodes();
+        if(nodesData is null) _=QuietNodes();
     }
-    private async Task QuietNodes() {try {await LoadNodes();badgeKey="";UpdateLive();} catch {/* codes fall back to initials */}}
+    /// In the background: at launch, when the window comes back after six hours, and with the refresh button. Nothing
+    /// changes on screen if it fails.
+    private async Task QuietNodes() {
+        if(loadingNodes||!api.SignedIn) return;
+        loadingNodes=true;
+        try {var fresh=await LoadNodes();badgeKey="";UpdateLive();onNodes?.Invoke(fresh);} catch {/* the saved list stays */}
+        finally {loadingNodes=false;}
+    }
     private string UsageText()=>accountData?["traffic"] is { } traffic?Bytes(Number(traffic["uploadBytes"])+Number(traffic["downloadBytes"])):"—";
     private void ShowUsage() {if(usageTotal is not null&&usageUntil is not null) ShowFigures(usageTotal,usageUntil);}
     /// Traffic left (or used in the last 30 days) and the end of the access period, tinted when either is running
@@ -895,40 +918,64 @@ public partial class MainWindow : Window {
         RoutingChoice();
         var list=new StackPanel();
         var query="";
+        // Shown in this order while the page is open: new measurements change the figures in place, never the order.
         var ranked=new List<(JsonNode Node,Quality? Quality)>();
-        void Rank(JsonArray nodes) {
-            ranked=nodes.Where(n=>n is not null).Select(n=>(n!,Latency.Recent.TryGetValue(n!["id"]!.GetValue<string>(),out var known)?known:(Quality?)null)).OrderBy(x=>x.Item2?.Score??long.MaxValue).ToList();
-        }
+        JsonArray nodes=new();
         var searchHost=Add(new ContentControl());
         Add(AutomaticRow(),12,0);
         Add(Caption(L10n.Text("all_locations")),20,8);
         ContentPanel.Children.Add(list);
-        void Build(JsonArray nodes) {
-            Rank(nodes);
-            if(nodes.Count>6&&searchHost.Content is null) searchHost.Content=Search(text=>{query=text;ShowNodes(list,ranked,query);});
-            ShowNodes(list,ranked,query);
+        Quality? Known(JsonNode node)=>Latency.Recent.TryGetValue(node["id"]!.GetValue<string>(),out var known)?known:null;
+        void Figures() {ranked=ranked.Select(x=>(x.Node,Known(x.Node))).ToList();}
+        bool Unmeasured()=>nodes.Any(n=>n is not null&&Known(n) is null);
+        // Coalesces the redraws while results arrive node by node.
+        var redraw=false;
+        void RedrawSoon() {
+            if(redraw) return;redraw=true;
+            Dispatcher.InvokeAsync(()=>{redraw=false;if(list.IsLoaded) {Figures();ShowNodes(list,ranked,query);}},DispatcherPriority.Render);
         }
-        async void Measure(JsonArray nodes) {
-            if(measuring||connection.Active) return;
+        async void Measure(bool all) {
+            if(measuring||connection.Active||nodes.Count==0) return;
             measuring=true;BusyBar.Visibility=Visibility.Visible;
             if(HeaderSlot.Content is Button refreshing) refreshing.IsEnabled=false;
             ShowNodes(list,ranked,query);
+            var input=nodes;
             try {
-                var result=await Latency.Rank(nodes);
-                ranked=result.Select(x=>(x.Node,(Quality?)x.Quality)).ToList();
+                // Each result replaces that node's figures as it arrives; the earlier figures stay until then. The page
+                // shown at the time redraws (the person may have left and come back meanwhile).
+                var result=await Latency.Rank(input,reuse:all?null:TimeSpan.MaxValue,each:(_,_)=>Dispatcher.InvokeAsync(()=>onMeasured?.Invoke(false)));
+                NodeStore.SaveMeasured(nodesData);
                 _=Latency.Report(api,result);
             } catch {/* keep the last results */}
             measuring=false;if(!busy) BusyBar.Visibility=Visibility.Hidden;
-            if(list.IsLoaded) {ShowNodes(list,ranked,query);if(HeaderSlot.Content is Button again) again.IsEnabled=!connection.Active;}
+            onMeasured?.Invoke(true);
         }
-        void Ready(JsonArray nodes) {
-            Build(nodes);
-            if(HeaderSlot.Content is Button refresh) {refresh.IsEnabled=!connection.Active;refresh.Click+=(_,_)=>Measure(nodes);}
-            // Fresh results are kept for the session; opening the page again does not probe every node again.
-            if(ranked.Any(x=>x.Quality is null)) Measure(nodes);
+        onMeasured=done=>{
+            if(!list.IsLoaded&&!done) return;
+            if(done&&HeaderSlot.Content is Button again) again.IsEnabled=!connection.Active;
+            if(done) {Figures();ShowNodes(list,ranked,query);if(Unmeasured()) Measure(false);} else RedrawSoon();
+        };
+        // A newer list: rows that stay keep their place and figures, new ones go to the end, removed ones leave.
+        void Apply(JsonArray fresh,bool first) {
+            nodes=fresh;
+            var byId=fresh.Where(n=>n is not null).Select(n=>n!).GroupBy(n=>n["id"]!.GetValue<string>()).ToDictionary(g=>g.Key,g=>g.First());
+            if(first) ranked=byId.Values.Select(n=>(n,Known(n))).OrderBy(x=>x.Item2?.Score??long.MaxValue).ToList();
+            else {
+                var kept=ranked.Select(x=>byId.GetValueOrDefault(x.Node["id"]!.GetValue<string>())).Where(n=>n is not null).Select(n=>n!).ToList();
+                var known=kept.Select(n=>n["id"]!.GetValue<string>()).ToHashSet();
+                ranked=kept.Concat(byId.Values.Where(n=>!known.Contains(n["id"]!.GetValue<string>()))).Select(n=>(n,Known(n))).ToList();
+            }
+            if(nodes.Count>6&&searchHost.Content is null) searchHost.Content=Search(text=>{query=text;ShowNodes(list,ranked,query);});
+            ShowNodes(list,ranked,query);
+            // Measuring is by hand (the refresh button); only nodes this PC never measured are measured on their own.
+            // Results are kept across launches, and automatic mode measures again when it connects.
+            if(Unmeasured()) Measure(false);
         }
-        if(nodesData is { } cached) Ready(cached);
-        else Work(async()=>Ready(await LoadNodes()));
+        if(HeaderSlot.Content is Button refresh) {refresh.IsEnabled=!connection.Active;refresh.Click+=(_,_)=>{if(measuring) return;_=QuietNodes();Measure(true);};}
+        onNodes=fresh=>{if(list.IsLoaded||ranked.Count==0) Apply(fresh,ranked.Count==0);};
+        if(nodesData is { } cached) Apply(cached,true);
+        // First time on this PC: nothing to show yet, so this one load shows progress and errors.
+        else Work(async()=>Apply(await LoadNodes(),true));
     }
     private FrameworkElement Search(Action<string> changed) {
         var box=new TextBox {Padding=new Thickness(30,0,10,0)};
@@ -941,8 +988,11 @@ public partial class MainWindow : Window {
     }
     private Button AutomaticRow() {
         var selected=nodeId.Length==0;
-        var row=new Button {Height=56,Background=Brushes.Transparent,BorderBrush=selected?Look.Hex("#73C6F26E"):Look.Line,BorderThickness=new Thickness(1),
-            Content=Columns(Look.Badge(null),TwoLines(L10n.Text("automatic"),L10n.Text("select_an_available_location_for_you"),strong:true),selected?Look.Icon("",14,Look.Accent):null)};
+        // Selected = a lifted row and a lime tile; no outline or check, so nothing moves.
+        var badge=Look.Badge(null);
+        if(selected) {badge.Background=Look.Accent;if(badge.Child is TextBlock star) star.Foreground=Look.OnAccent;}
+        var row=new Button {Height=56,Background=selected?Look.Raised:Brushes.Transparent,BorderBrush=Look.Line,BorderThickness=new Thickness(1),
+            Content=Columns(badge,TwoLines(L10n.Text("automatic"),L10n.Text("select_an_available_location_for_you"),strong:true))};
         AutomationProperties.SetName(row,L10n.Text("automatic")+(selected?L10n.Text("current_page"):""));
         row.Click+=(_,_)=>Select("","");
         return row;
@@ -987,26 +1037,31 @@ public partial class MainWindow : Window {
             var selected=id==nodeId;
             var states=LineStates(quality?.Lines);var note=LinesNote(quality?.Lines);
             var offered=node["test"] is JsonArray tests&&tests.Any(t=>t?["name"]?.GetValue<string>() is { } n&&Latency.LineOrder.Contains(n));
-            var right=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
-            if(quality is null) {if(measuring) right.Children.Add(Single("…",12,Look.Secondary));}
-            else if(Ms(quality) is { } ms) {
-                right.Children.Add(Single(ms,12,Look.Secondary));
-                if(states is null) {var (level,color)=Signal(quality);var bars=Look.Signal(level,color);bars.Margin=new Thickness(8,0,0,0);right.Children.Add(bars);}
-            } else right.Children.Add(Single(L10n.Text("quality_unreachable"),12,Look.Danger));
-            if(selected) {var check=Look.Icon("",13,Look.Accent);check.Margin=new Thickness(10,0,0,0);right.Children.Add(check);}
-            var label=note is null?Single(name+(region.Length>0&&region!=name?" · "+region:""),14,unreachable?Look.Faint:Look.Text):(FrameworkElement)TwoLines(name,note);
+            // Fixed columns on every row: tile, name, delay (fixed width, right-aligned), cell slot (always 44 wide).
+            // Selected = a lifted row, a lime tile and a bolder name; nothing is added, so the columns never move.
+            var latency=quality is null?(measuring?"…":""):Ms(quality) ?? L10n.Text("quality_unreachable");
+            var digits=new TextBlock {Text=latency,FontSize=12,Foreground=unreachable?Look.Danger:Look.Secondary,TextAlignment=TextAlignment.Right,VerticalAlignment=VerticalAlignment.Center};
+            if(!unreachable) Typography.SetNumeralAlignment(digits,FontNumeralAlignment.Tabular);
+            var right=new Border {Width=72,VerticalAlignment=VerticalAlignment.Center,
+                Child=new Viewbox {Stretch=Stretch.Uniform,StretchDirection=StretchDirection.DownOnly,HorizontalAlignment=HorizontalAlignment.Right,Child=digits}};
+            var label=note is null?Single(name+(region.Length>0&&region!=name?" · "+region:""),14,unreachable&&!selected?Look.Faint:Look.Text,strong:selected):(FrameworkElement)TwoLines(name,note,strong:selected);
             if(label is TextBlock single) single.Margin=new Thickness(12,0,8,0);
-            if(unreachable&&label is StackPanel two&&two.Children[0] is TextBlock title) title.Foreground=Look.Faint;
-            var row=new Button {Height=note is null?48:52,Content=Columns(Look.Badge(Code(id,name),28,unreachable?Look.Faint:null),label,right)};
-            AutomationProperties.SetName(row,name+(quality is not null?", "+Summary(quality):"")+(note is not null?", "+note:"")+(selected?L10n.Text("current_page"):""));
-            row.Click+=(_,_)=>Select(id,name);
-            var item=new Border {Background=Brushes.Transparent};
+            if(unreachable&&!selected&&label is StackPanel two&&two.Children[0] is TextBlock title) title.Foreground=Look.Faint;
+            var badge=Look.Badge(Code(id,name),28,selected?Look.OnAccent:unreachable?Look.Faint:null);
+            if(selected) badge.Background=Look.Accent;
+            var row=new Button {Height=note is null?48:52,Content=Columns(badge,label,right)};
+            var item=new Border {Background=selected?Look.Raised:Brushes.Transparent,Tag=selected};
             var stack=new StackPanel();item.Child=stack;
             var head=new Grid();head.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(1,GridUnitType.Star)});head.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});
             head.Children.Add(row);stack.Children.Add(head);
-            if(measuring&&offered) {
-                var waiting=LineCells(Enumerable.Repeat(LineState.Wait,Latency.LineOrder.Length));waiting.Width=44;waiting.Margin=new Thickness(0,0,6,0);
-                Grid.SetColumn(waiting,1);head.Children.Add(waiting);
+            // The cell slot is always there: the four line cells (tap to open each line's result), signal bars for a PC
+            // without line results, or empty. Earlier results stay drawn while a node is measured again.
+            if(states is null) {
+                FrameworkElement slot=measuring&&quality is null&&offered?LineCells(Enumerable.Repeat(LineState.Wait,Latency.LineOrder.Length))
+                    :quality is {Latency: not null}?Look.Signal(Signal(quality).Item1,Signal(quality).Item2):new Border();
+                slot.HorizontalAlignment=HorizontalAlignment.Center;slot.VerticalAlignment=VerticalAlignment.Center;
+                var holder=new Border {Width=44,Height=44,Margin=new Thickness(0,0,6,0),Child=slot};
+                Grid.SetColumn(holder,1);head.Children.Add(holder);
             } else if(states is not null&&quality?.Lines is { } lines) {
                 // Quieter than the row: no outlines, small grey text, indented to the name.
                 var grid=new UniformGrid {Columns=2,Margin=new Thickness(54,0,16,8)};
@@ -1021,7 +1076,7 @@ public partial class MainWindow : Window {
                 var open=openNode==id;
                 var detail=new Border {Child=grid,ClipToBounds=true,MaxHeight=open?double.PositiveInfinity:0,Opacity=open?1:0};
                 stack.Children.Add(detail);
-                if(open) item.Background=OpenRow;
+                if(open&&!selected) item.Background=OpenRow;
                 details[id]=(detail,item);
                 var toggle=new Button {Style=(Style)FindResource("Bare"),Width=44,Height=44,Margin=new Thickness(0,0,6,0),Content=LineCells(states),VerticalAlignment=VerticalAlignment.Center};
                 AutomationProperties.SetName(toggle,L10n.Text("lines_detail",name,states.Count(x=>x!=LineState.Off).ToString(L10n.Culture),states.Count(x=>x is LineState.Ok or LineState.Slow).ToString(L10n.Culture)));
@@ -1050,7 +1105,7 @@ public partial class MainWindow : Window {
         else height.Completed+=(_,_)=>{detail.BeginAnimation(FrameworkElement.MaxHeightProperty,null);detail.MaxHeight=0;};
         detail.BeginAnimation(FrameworkElement.MaxHeightProperty,height);
         detail.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(open?1:0,duration));
-        item.Background=open?OpenRow:Brushes.Transparent;
+        item.Background=item.Tag is true?Look.Raised:open?OpenRow:Brushes.Transparent;
     }
     /// Smart (mainland China direct) or global routing; applies from the next connection.
     private void RoutingChoice() {

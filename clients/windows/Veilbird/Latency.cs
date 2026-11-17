@@ -20,6 +20,27 @@ public static class Latency {
     /// Last measurement per node id, so the home screen can show it without probing again.
     public static readonly ConcurrentDictionary<string,Quality> Recent=new();
     private static readonly ConcurrentDictionary<string,DateTime> MeasuredAt=new();
+    /// The measurements as saved on disk: {"id": {"at": ms, "latency", "jitter", "loss", "load", "users", "lines"}}.
+    public static JsonObject Snapshot() {
+        var all=new JsonObject();
+        foreach(var (id,q) in Recent) {
+            var lines=q.Lines is null?null:new JsonObject(q.Lines.Select(x=>KeyValuePair.Create(x.Key,(JsonNode?)JsonValue.Create(x.Value))));
+            all[id]=new JsonObject {["at"]=MeasuredAt.TryGetValue(id,out var at)?new DateTimeOffset(at).ToUnixTimeMilliseconds():0,["latency"]=q.Latency,["jitter"]=q.Jitter,["loss"]=q.Loss,["load"]=q.Load,["users"]=q.Users,["lines"]=lines};
+        }
+        return all;
+    }
+    /// Puts saved measurements back, without replacing newer ones from this run.
+    public static void Restore(JsonObject saved) {
+        foreach(var (id,value) in saved) {
+            if(value is not JsonObject e||Recent.ContainsKey(id)) continue;
+            try {
+                IReadOnlyDictionary<string,long>? lines=e["lines"] is JsonObject l?l.ToDictionary(x=>x.Key,x=>x.Value?.GetValue<long>()??-1):null;
+                Recent[id]=new Quality(e["latency"]?.GetValue<long>(),e["jitter"]?.GetValue<long>()??0,e["loss"]?.GetValue<int>()??0,e["load"]?.GetValue<int>(),e["users"]?.GetValue<int>()??0,lines);
+                MeasuredAt[id]=DateTimeOffset.FromUnixTimeMilliseconds(e["at"]?.GetValue<long>()??0).UtcDateTime;
+            } catch {/* skip a damaged entry */}
+        }
+    }
+    public static void Forget() {Recent.Clear();MeasuredAt.Clear();}
     public static int? Load(JsonNode node)=>node["load"]?.GetValue<int>() is { } load&&load is >=0 and <=100?load:null;
     public static int Users(JsonNode node)=>node["users"]?.GetValue<int>() is { } users&&users>=0?users:0;
 
@@ -121,14 +142,15 @@ public static class Latency {
     }
     /// Best first; unmeasured nodes follow in the server's least-loaded order. A node measured within reuse keeps
     /// that result (with the current load), so connecting right after the location list does not probe again.
-    public static async Task<List<(JsonNode Node,Quality Quality)>> Rank(JsonArray nodes,int attempts=5,TimeSpan? reuse=null) {
+    /// each is called as every new measurement arrives (not for reused ones), so a list can update row by row.
+    public static async Task<List<(JsonNode Node,Quality Quality)>> Rank(JsonArray nodes,int attempts=5,TimeSpan? reuse=null,Action<string,Quality>? each=null) {
         var list=nodes.Where(n=>n is not null).Select(n=>n!).ToList();
         Quality? Known(JsonNode node)=>reuse is { } age&&node["id"]?.GetValue<string>() is { } id&&MeasuredAt.TryGetValue(id,out var at)&&DateTime.UtcNow-at<age
             &&Recent.TryGetValue(id,out var quality)?quality:null;
         var measured=await Task.WhenAll(list.Select(async node=>{
             if(Known(node) is { } known) return known with {Load=Load(node),Users=Users(node)};
             var fresh=await Measure(node,attempts);
-            if(node["id"]?.GetValue<string>() is { } id) MeasuredAt[id]=DateTime.UtcNow;
+            if(node["id"]?.GetValue<string>() is { } id) {MeasuredAt[id]=DateTime.UtcNow;Recent[id]=fresh;each?.Invoke(id,fresh);}
             return fresh;
         }));
         for(var i=0;i<list.Count;i++) if(list[i]["id"]?.GetValue<string>() is { } id) Recent[id]=measured[i];
