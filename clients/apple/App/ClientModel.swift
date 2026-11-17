@@ -105,7 +105,7 @@ import ServiceManagement
     private func saveMeasured() {if let data=Latency.snapshot() {UserDefaults.standard.set(data,forKey:"measured")}}
     /// Signing out: the saved list and measurements belonged to that account.
     func forgetNodes() {
-        nodes=[];Latency.forget();nodesLoadedAt=.distantPast
+        nodes=[];Latency.forget();nodesLoadedAt=Date.distantPast
         for key in ["nodes","nodesLoadedAt","measured"] {UserDefaults.standard.removeObject(forKey:key)}
     }
     /// Loads the list and saves it. Rows that stay keep their place, new ones go to the end, removed ones leave; the
