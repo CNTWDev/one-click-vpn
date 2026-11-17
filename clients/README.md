@@ -31,7 +31,7 @@ Portal、Console 和三类原生客户端支持中文、英文、俄语，默认
 - Android：JDK 17+、Android SDK 35、Gradle 8.14.5；`cd clients/android && ./gradlew :app:assembleDebug`。完整 wrapper 已加入并固定发行包 SHA-256。`VEILBIRD_API_ORIGIN` 在构建时内置服务地址；未设置的开发包需要填写 HTTPS 地址。APK 位于 `app/build/outputs/apk/debug/app-debug.apk`，仅用于测试。
 - Apple：完整 Xcode、XcodeGen、Go（版本见 `core/go.mod`）；执行 `bash clients/apple/scripts/build.sh ios` 或 `macos`，脚本先用 `core/build-apple.sh` 生成 `TunnelCore.xcframework`（内核未变时跳过）。iOS 使用模拟器 ad-hoc 签名；macOS 未签名。这些开发产物不能用于真机 VPN 验收或正式分发。
 - Windows：Windows + .NET 10 SDK；`pwsh clients/windows/build.ps1 -Runtime win-x64`，ARM64 使用 `win-arm64`。需要 Go（版本见 `core/go.mod`）：先交叉编译 `veilbird-core.exe`，再生成自包含 ZIP；加 `-Version -Build -Installer` 生成安装程序 `TrackNothing-<版本>-<构建号>-<runtime>-setup.exe`（未做代码签名，首次运行 SmartScreen 会提示）。
-- GitHub Actions：手动运行 `Native client development builds`。三平台独立构建，只上传开发 artifacts，不创建公开 Release。
+- GitHub Actions：手动运行 `Client build check`。三平台独立构建，只上传开发 artifacts，不创建公开 Release。
 
 ## 用户下载与正式发布
 

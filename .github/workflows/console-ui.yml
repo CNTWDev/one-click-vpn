@@ -1,4 +1,4 @@
-name: Console and Portal UI checks
+name: UI check
 on:
   workflow_dispatch:
   push:

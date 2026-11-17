@@ -1,4 +1,4 @@
-name: Native client development builds
+name: Client build check
 on:
   workflow_dispatch:
   pull_request:
