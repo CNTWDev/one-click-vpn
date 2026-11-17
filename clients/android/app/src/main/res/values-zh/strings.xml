@@ -154,6 +154,7 @@
   <string name="logs_title">诊断日志</string>
   <string name="measuring_latency">测速中…</string>
   <string name="membership_expired_hint">账号已到期，请联系管理员续期。</string>
+  <string name="menu_bar_speed">菜单栏显示网速</string>
   <string name="move_to_applications_first">请先把 TrackNothing 拖到“应用程序”文件夹，再从那里打开。</string>
   <string name="my_account">我的账号</string>
   <string name="my_veilbird">我的 TrackNothing</string>
@@ -179,6 +180,9 @@
   <string name="quality_unreachable">不可达</string>
   <string name="quit_app">退出</string>
   <string name="quota_exhausted_hint">流量已用完，请联系管理员增加流量。</string>
+  <string name="rate_unit_gbps">Gb/s</string>
+  <string name="rate_unit_kbps">Kb/s</string>
+  <string name="rate_unit_mbps">Mb/s</string>
   <string name="refresh_devices">刷新设备状态</string>
   <string name="refresh_locations">刷新节点</string>
   <string name="reset_by_email">通过邮件重置密码</string>

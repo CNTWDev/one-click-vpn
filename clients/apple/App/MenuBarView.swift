@@ -87,4 +87,46 @@ struct MenuBarView:View {
     }
     private func openMain() {openWindow(id:"main");NSApp.activate(ignoringOtherApps:true)}
 }
+/// The menu bar icon. With "Show speed in menu bar" on and the tunnel up, upload and download rates sit beside
+/// it on two short lines. A menu bar label can only hold an image and a title, so the two lines are drawn into a
+/// template image (it follows the light or dark menu bar); monospaced digits padded to four characters keep the
+/// item's width fixed while the rates change. Disconnected, it is the icon alone.
+struct MenuBarLabel:View {
+    static let preferenceKey="menuBarSpeed"
+    @ObservedObject var model:ClientModel
+    @AppStorage(MenuBarLabel.preferenceKey) private var showSpeed=false
+    var body:some View {
+        let symbol=model.connected ? "slash.circle.fill":"slash.circle"
+        if showSpeed,model.connected,model.since != nil,let image=Self.image(symbol:symbol,rx:model.rxRate,tx:model.txRate) {
+            Image(nsImage:image).accessibilityLabel("TrackNothing "+L10n.text("connection_rates",Self.mbps(model.rxRate),Self.mbps(model.txRate)))
+        } else {
+            Image(systemName:symbol).accessibilityLabel("TrackNothing")
+        }
+    }
+    /// "↑  820 Kb/s" / "↓ 12.4 Mb/s": bits per second like the rest of the app, the unit stepping up as needed.
+    static func line(_ arrow:String,_ bytes:Int)->String {
+        let bits=Double(max(bytes,0))*8
+        let number:String,unit:String
+        if bits<1e6 {number=String(Int((bits/1e3).rounded()));unit="rate_unit_kbps"}
+        else if bits<99.95e6 {number=String(format:"%.1f",locale:L10n.locale,bits/1e6);unit="rate_unit_mbps"}
+        else if bits<999.5e6 {number=String(Int((bits/1e6).rounded()));unit="rate_unit_mbps"}
+        else {number=String(format:"%.1f",locale:L10n.locale,bits/1e9);unit="rate_unit_gbps"}
+        return arrow+" "+String(repeating:" ",count:max(0,4-number.count))+number+" "+L10n.text(unit)
+    }
+    private static func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
+    @MainActor static func image(symbol:String,rx:Int,tx:Int)->NSImage? {
+        let content=HStack(spacing:4) {
+            Image(systemName:symbol).font(.system(size:14))
+            VStack(alignment:.trailing,spacing:-1) {
+                Text(verbatim:line("↑",tx))
+                Text(verbatim:line("↓",rx))
+            }.font(.system(size:9,weight:.medium,design:.monospaced)).lineLimit(1).fixedSize()
+        }.foregroundStyle(Color.black).padding(.horizontal,1)
+        let renderer=ImageRenderer(content:content)
+        renderer.scale=NSScreen.main?.backingScaleFactor ?? 2
+        guard let image=renderer.nsImage else {return nil}
+        image.isTemplate=true
+        return image
+    }
+}
 #endif

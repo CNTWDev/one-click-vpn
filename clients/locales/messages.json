@@ -1428,5 +1428,25 @@
     "zh": "还没有连接。",
     "en": "No connections yet.",
     "ru": "Пока нет соединений."
+  },
+  "menu_bar_speed": {
+    "zh": "菜单栏显示网速",
+    "en": "Show speed in menu bar",
+    "ru": "Скорость в строке меню"
+  },
+  "rate_unit_kbps": {
+    "zh": "Kb/s",
+    "en": "Kb/s",
+    "ru": "Кбит/с"
+  },
+  "rate_unit_mbps": {
+    "zh": "Mb/s",
+    "en": "Mb/s",
+    "ru": "Мбит/с"
+  },
+  "rate_unit_gbps": {
+    "zh": "Gb/s",
+    "en": "Gb/s",
+    "ru": "Гбит/с"
   }
 }

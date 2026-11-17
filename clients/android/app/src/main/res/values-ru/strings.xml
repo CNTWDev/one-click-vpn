@@ -154,6 +154,7 @@
   <string name="logs_title">Журнал диагностики</string>
   <string name="measuring_latency">Проверка…</string>
   <string name="membership_expired_hint">Срок доступа истёк. Обратитесь к администратору для продления.</string>
+  <string name="menu_bar_speed">Скорость в строке меню</string>
   <string name="move_to_applications_first">Сначала перенесите TrackNothing в папку «Программы» и откройте его оттуда.</string>
   <string name="my_account">Мой аккаунт</string>
   <string name="my_veilbird">Мой TrackNothing</string>
@@ -179,6 +180,9 @@
   <string name="quality_unreachable">Недоступен</string>
   <string name="quit_app">Выйти</string>
   <string name="quota_exhausted_hint">Трафик закончился. Обратитесь к администратору, чтобы добавить трафик.</string>
+  <string name="rate_unit_gbps">Гбит/с</string>
+  <string name="rate_unit_kbps">Кбит/с</string>
+  <string name="rate_unit_mbps">Мбит/с</string>
   <string name="refresh_devices">Обновить устройства</string>
   <string name="refresh_locations">Обновить локации</string>
   <string name="reset_by_email">Сброс пароля по email</string>

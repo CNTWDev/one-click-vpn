@@ -19,9 +19,7 @@ struct VeilbirdApp: App {
         // Signed in, it widens to hold the activity panel beside the app's column.
         Window("TrackNothing",id:"main") {ClientView().environmentObject(model).frame(width:model.signedIn ? 1040:380,height:620)}
             .windowResizability(.contentSize)
-        MenuBarExtra {MenuBarView().environmentObject(model)} label:{
-            Image(systemName:model.connected ? "slash.circle.fill":"slash.circle").accessibilityLabel("TrackNothing")
-        }.menuBarExtraStyle(.window)
+        MenuBarExtra {MenuBarView().environmentObject(model)} label:{MenuBarLabel(model:model)}.menuBarExtraStyle(.window)
         #else
         WindowGroup {ClientView().environmentObject(model)}
         #endif

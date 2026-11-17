@@ -26,6 +26,7 @@ public partial class MainWindow : Window {
     private readonly NativeApi api;
     private readonly Connection connection;
     private readonly Forms.NotifyIcon tray=new();
+    private Forms.ToolStripMenuItem? trayRates;
     private string page="connect",nodeId=Settings.Get("nodeId"),nodeName=Settings.Get("nodeName");
     private bool busy,measuring,quitting,trayHintShown,failed,showPassword;
     private string failure="";
@@ -122,7 +123,10 @@ public partial class MainWindow : Window {
     private void BuildTrayMenu() {
         var menu=tray.ContextMenuStrip!;menu.Items.Clear();
         var signedIn=api.SignedIn;
-        menu.Items.Add(new Forms.ToolStripMenuItem(L10n.Text(connection.StatusKey)+(connection.Active&&connection.NodeName.Length>0?" · "+connection.NodeName:"")) {Enabled=false});
+        menu.Items.Add(new Forms.ToolStripMenuItem(TrayStatus()) {Enabled=false});
+        // Connected, the second line carries the live rates; UpdateTray refreshes it while the menu is open.
+        trayRates=TrayConnected?new Forms.ToolStripMenuItem(TrayRates()) {Enabled=false}:null;
+        if(trayRates is not null) menu.Items.Add(trayRates);
         menu.Items.Add(new Forms.ToolStripSeparator());
         if(signedIn&&update?.Mandatory!=true||connection.Active) menu.Items.Add(L10n.Text(connection.Active?"disconnect_action":"connect_action"),null,(_,_)=>Toggle());
         if(signedIn) {
@@ -133,9 +137,25 @@ public partial class MainWindow : Window {
         menu.Items.Add(L10n.Text("open_app"),null,(_,_)=>ShowFromTray());
         menu.Items.Add(L10n.Text("quit_app"),null,(_,_)=>Quit());
     }
+    /// The tray icon's tooltip: status and location, and once connected a second line with the live rates
+    /// (a tray icon can't show text of its own). Windows caps tooltips at 127 characters.
     private void UpdateTray() {
-        var text="TrackNothing · "+L10n.Text(connection.StatusKey);
-        tray.Text=text.Length>63?text[..63]:text;
+        var first="TrackNothing · "+TrayStatus();
+        var second=TrayConnected?"\n"+TrayRates():"";
+        var room=127-second.Length;
+        tray.Text=(first.Length>room?first[..room]:first)+second;
+        if(trayRates is not null&&TrayConnected) trayRates.Text=TrayRates();
+    }
+    private bool TrayConnected=>connection.Active&&connection.Since is not null;
+    private string TrayStatus()=>L10n.Text(connection.StatusKey)+(connection.Active&&connection.NodeName.Length>0?" · "+connection.NodeName:"");
+    private string TrayRates()=>"↓ "+RateText(connection.RxRate)+"   ↑ "+RateText(connection.TxRate);
+    /// Bits per second like the rest of the app, the unit stepping up from Kb/s to Mb/s and Gb/s as needed.
+    private static string RateText(long bytesPerSecond) {
+        var bits=Math.Max(bytesPerSecond,0)*8.0;
+        if(bits<1e6) return Math.Round(bits/1e3).ToString("0",L10n.Culture)+" "+L10n.Text("rate_unit_kbps");
+        if(bits<99.95e6) return (bits/1e6).ToString("0.0",L10n.Culture)+" "+L10n.Text("rate_unit_mbps");
+        if(bits<999.5e6) return Math.Round(bits/1e6).ToString("0",L10n.Culture)+" "+L10n.Text("rate_unit_mbps");
+        return (bits/1e9).ToString("0.0",L10n.Culture)+" "+L10n.Text("rate_unit_gbps");
     }
     public void ShowFromTray() {flyout?.Hide();Show();if(WindowState==WindowState.Minimized) WindowState=WindowState.Normal;Activate();}
     private void OnClosing(object? sender,CancelEventArgs e) {

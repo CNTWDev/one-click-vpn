@@ -30,6 +30,7 @@ struct ClientView:View {
     @State private var usageRange="30d"
     #if os(macOS)
     @State private var openAtLogin=SMAppService.mainApp.status == .enabled
+    @AppStorage(MenuBarLabel.preferenceKey) private var menuBarSpeed=false
     #endif
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openURL) private var openURL
@@ -596,6 +597,9 @@ struct ClientView:View {
                     Toggle(isOn:Binding(get:{openAtLogin},set:{value in
                         do {if value {try SMAppService.mainApp.register()} else {try SMAppService.mainApp.unregister()};openAtLogin=value} catch {model.message=error.localizedDescription}
                     })) {Text(L10n.text("open_at_login")).font(.system(size:VeilbirdStyle.body))}
+                        .toggleStyle(.switch).controlSize(.small).tint(VeilbirdStyle.accent).padding(.horizontal,16).frame(minHeight:40)
+                    Hairline()
+                    Toggle(isOn:$menuBarSpeed) {Text(L10n.text("menu_bar_speed")).font(.system(size:VeilbirdStyle.body))}
                         .toggleStyle(.switch).controlSize(.small).tint(VeilbirdStyle.accent).padding(.horizontal,16).frame(minHeight:40)
                     #endif
                     Hairline()
