@@ -154,6 +154,12 @@ public sealed class NativeApi : IDisposable {
         if(Attempt is { } attempt) item["attempt"]=attempt;
         try {await Request("diagnostics",new JsonObject {["events"]=new JsonArray(item)});} catch {/* diagnostics never block connecting */}
     }
+    /// Several diagnostics in one request (the location list's per-line results); best effort.
+    public async Task ReportMany(IEnumerable<JsonObject> items) {
+        var events=new JsonArray(items.Take(20).ToArray<JsonNode?>());
+        if(events.Count==0) return;
+        try {await Request("diagnostics",new JsonObject {["events"]=events});} catch {/* diagnostics never block connecting */}
+    }
     public async Task Logout() {try {await Request("logout",new JsonObject());}finally {Save("token",null);}}
     public void Dispose()=>identity.Dispose();
 }

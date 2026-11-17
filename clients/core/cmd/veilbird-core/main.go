@@ -98,6 +98,23 @@ func main() {
 				}
 				reply("test:" + id + " " + core.Test(string(request)))
 			}()
+		case "speedstart":
+			// The connection check's speed test; the app polls speedprogress.
+			if len(fields) != 2 {
+				reply("error invalid")
+				continue
+			}
+			request, err := base64.StdEncoding.DecodeString(fields[1])
+			if err != nil {
+				reply("error invalid")
+				continue
+			}
+			reply(core.SpeedStart(string(request)))
+		case "speedprogress":
+			reply(core.SpeedProgress())
+		case "speedstop":
+			core.SpeedStop()
+			reply("ok")
 		case "download":
 			if len(fields) != 3 {
 				continue

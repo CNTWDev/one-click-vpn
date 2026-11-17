@@ -27,6 +27,12 @@ struct ClientView:View {
     @State private var checking=false
     @State private var checkRunning=false
     @State private var checkResult:[String:Int]?
+    /// The node whose per-line detail is open in the list ("" = none).
+    @State private var openNode=""
+    /// The transport carrying traffic now (for "在用") and the speed test's last status from the tunnel.
+    @State private var currentLine=""
+    @State private var speedStatus:[String:Any]=["state":"idle"]
+    @State private var speedLine=""
     @State private var usageRange="30d"
     #if os(macOS)
     @State private var openAtLogin=SMAppService.mainApp.status == .enabled
@@ -96,7 +102,7 @@ struct ClientView:View {
         } message:{Text(resetEmail.map {L10n.text(model.signedIn ? "reset_change_detail":"reset_confirm_detail",$0)} ?? "")}
         #if os(iOS)
         .sheet(isPresented:$choosingLanguage) {languageSheet.presentationDetents([.height(360)]).presentationDragIndicator(.visible)}
-        .sheet(isPresented:$checking) {checkSheet.presentationDetents([.height(560)]).presentationDragIndicator(.visible)}
+        .sheet(isPresented:$checking) {checkSheet.presentationDetents([.large]).presentationDragIndicator(.visible)}
         #else
         .sheet(isPresented:$checking) {checkSheet.frame(width:360)}
         #endif
@@ -377,7 +383,7 @@ struct ClientView:View {
             if localSlow {return L10n.text("check_local_slow")}
             return L10n.text("check_ok")
         }()
-        return VStack(alignment:.leading,spacing:0) {
+        return ScrollView {VStack(alignment:.leading,spacing:0) {
             HStack(alignment:.firstTextBaseline) {
                 Text(L10n.text("check_title")).font(.system(size:mac ? 17:20,weight:.semibold)).accessibilityAddTraits(.isHeader)
                 Spacer(minLength:12)
@@ -391,21 +397,125 @@ struct ClientView:View {
             if let region=model.connectedRegion,!region.isEmpty {
                 HStack {Text(L10n.text("check_exit")).foregroundStyle(VeilbirdStyle.secondary);Spacer();Text(region).lineLimit(1)}.font(.system(size:13)).frame(minHeight:40).padding(.horizontal,2)
             }
-            Spacer(minLength:12)
+            checkLines
+            speedCard.padding(.top,18)
+            Spacer(minLength:18)
+            Button {startSpeed()} label:{Text(L10n.text(speedRunning ? "speed_running":(speedFinished ? "speed_again":"speed_start"))).frame(maxWidth:.infinity)}
+                .buttonStyle(PrimaryButton()).disabled(speedRunning || model.since == nil).opacity(speedRunning ? 0.45:1).padding(.bottom,10)
             if !checkRunning && r != nil && !localSlow && (nodeSlow || webSlow) {
                 Button {checking=false;tab=1} label:{Text(L10n.text("change_location").replacingOccurrences(of:"›",with:"").trimmingCharacters(in:.whitespaces)).frame(maxWidth:.infinity)}
                     .buttonStyle(PrimaryButton()).padding(.bottom,10)
             }
             Button {runCheck()} label:{Text(L10n.text("check_again")).font(.system(size:VeilbirdStyle.body)).frame(maxWidth:.infinity).frame(height:mac ? 40:48)}
                 .buttonStyle(RowButton()).background(VeilbirdStyle.raised,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).disabled(checkRunning)
-        }.padding(20).background(VeilbirdStyle.surface.ignoresSafeArea()).foregroundStyle(VeilbirdStyle.text)
+        }.padding(20)}.scrollIndicators(.hidden).background(VeilbirdStyle.surface.ignoresSafeArea()).foregroundStyle(VeilbirdStyle.text)
         .environment(\.locale,L10n.locale).preferredColorScheme(.dark)
         .task {if checkResult == nil {runCheck()}}
+        .onDisappear {if speedRunning {Task {_ = await model.speed("stop")}};speedStatus=["state":"idle"]}
     }
     private func runCheck() {
         guard !checkRunning else {return}
         checkRunning=true
-        Task {let result=await model.connectionCheck();checkResult=result ?? ["local":-1,"node":-1,"web":-1];checkRunning=false}
+        Task {
+            async let line=model.currentLine()
+            let result=await model.connectionCheck();checkResult=result ?? ["local":-1,"node":-1,"web":-1]
+            currentLine=await line;checkRunning=false
+        }
+    }
+    /// This node's lines (线路 1…4) with their delay, "在用" on the one carrying traffic, and a note when one is out.
+    @ViewBuilder private var checkLines:some View {
+        if let lines=model.connectedLines,let states=lineStates(lines) {
+            Text(L10n.text("check_lines")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).padding(.top,14)
+            LazyVGrid(columns:[GridItem(.flexible(),spacing:6),GridItem(.flexible())],spacing:6) {
+                ForEach(Latency.lineOrder.indices,id:\.self) {i in
+                    let name=Latency.lineOrder[i],ms=lines[name]
+                    HStack(spacing:8) {
+                        LineCells(states:[states[i]])
+                        Text(lineName(i)).font(.system(size:13))
+                        Text(L10n.text("line_in_use")).font(.system(size:11)).foregroundStyle(VeilbirdStyle.accent).opacity(name==currentLine ? 1:0)
+                        Spacer(minLength:4)
+                        Text(lineValue(ms)).font(.system(size:12,design:.monospaced)).monospacedDigit()
+                            .foregroundStyle(ms == nil ? VeilbirdStyle.faint:((ms ?? 0)<0 ? VeilbirdStyle.danger:VeilbirdStyle.text))
+                    }.padding(.horizontal,10).frame(height:34).cardOutline(8).accessibilityElement(children:.combine)
+                }
+            }.padding(.top,8)
+            let down=Latency.lineOrder.enumerated().filter {(lines[$0.element] ?? 0)<0}
+            if let used=Latency.lineOrder.firstIndex(of:currentLine),(lines[currentLine] ?? -1)>=0,!down.isEmpty {
+                Text(L10n.text("check_lines_note",down.map {lineName($0.offset)}.joined(separator:listJoin),lineName(used)))
+                    .font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary).padding(.top,8)
+            }
+        }
+    }
+    private var speedState:String {speedStatus["state"] as? String ?? "idle"}
+    private var speedRunning:Bool {speedState=="ping" || speedState=="download"}
+    private var speedFinished:Bool {speedState=="done" || speedState=="failed"}
+    /// The speed of the current connection: Mbps in the pixel face, a 30-cell bar for the few seconds, latency,
+    /// jitter and data used. Every slot keeps its size, so nothing moves while the figures change.
+    private var speedCard:some View {
+        let state=speedState
+        let seconds=max(1,speedStatus["seconds"] as? Int ?? 6)
+        let elapsedMs=speedStatus["elapsedMs"] as? Int ?? 0
+        let measured=state=="download" || state=="done"
+        let fraction:Double=state=="done" ? 1:(state=="download" ? min(1,Double(elapsedMs)/Double(seconds*1000)):0)
+        let mbps=(speedStatus["mbps"] as? Double) ?? Double(speedStatus["mbps"] as? Int ?? 0)
+        let latency=speedStatus["latency"] as? Int ?? -1,jitter=speedStatus["jitter"] as? Int ?? -1
+        let bytes=Int64(speedStatus["bytes"] as? Int ?? 0)
+        let over=Latency.lineOrder.firstIndex(of:speedLine).map {lineName($0)}
+        let note:String={
+            switch state {
+            case "ping","download":return L10n.text("speed_downloading",over ?? model.nodeName)
+            case "done":return over.map {L10n.text("speed_done",$0,model.nodeName)} ?? model.nodeName
+            case "failed":return L10n.text("speed_failed")
+            default:return L10n.text(model.since == nil ? "speed_need_connection":"speed_hint")
+            }
+        }()
+        return VStack(alignment:.leading,spacing:12) {
+            HStack {
+                Text(L10n.text("speed_title")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary)
+                Spacer()
+                Text(verbatim:measured ? String(format:"%.1f / %.1f s",Double(min(elapsedMs,seconds*1000))/1000,Double(seconds)):"—")
+                    .font(.system(size:11,design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.secondary)
+            }
+            HStack(alignment:.lastTextBaseline,spacing:6) {
+                Text(verbatim:measured ? String(format:"%.1f",mbps):"—").font(Pixel.font(44)).monospacedDigit()
+                    .foregroundStyle(state=="done" ? VeilbirdStyle.accent:(state=="download" ? VeilbirdStyle.secondary:Color(red:58/255,green:65/255,blue:77/255)))
+                Text(verbatim:"Mbps").font(.system(size:13,design:.monospaced)).foregroundStyle(VeilbirdStyle.secondary)
+            }.frame(height:52,alignment:.bottomLeading)
+            HStack(spacing:2) {
+                ForEach(0..<30,id:\.self) {i in
+                    Rectangle().fill(Double(i)<fraction*30 ? (state=="done" ? VeilbirdStyle.accent:VeilbirdStyle.secondary):Color(red:26/255,green:31/255,blue:40/255))
+                }
+            }.frame(height:6).accessibilityHidden(true)
+            HStack(alignment:.top) {
+                speedStat(L10n.text("speed_latency"),latency>=0 ? L10n.text("latency_ms",L10n.number(latency)):"—")
+                speedStat(L10n.text("speed_jitter"),jitter>=0 ? L10n.text("latency_ms",L10n.number(jitter)):"—")
+                speedStat(L10n.text("speed_used"),bytes>0 ? ByteCountFormatter.string(fromByteCount:bytes,countStyle:.file):"—")
+            }
+            Text(note).font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1).frame(height:20,alignment:.leading)
+                .animation(reduceMotion ? nil:.easeInOut(duration:0.2),value:note)
+        }.padding(16).cardOutline(14)
+    }
+    private func speedStat(_ title:String,_ value:String)->some View {
+        VStack(alignment:.leading,spacing:2) {
+            Text(title).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary)
+            Text(verbatim:value).font(.system(size:14,design:.monospaced)).monospacedDigit().lineLimit(1)
+        }.frame(maxWidth:.infinity,alignment:.leading)
+    }
+    private func startSpeed() {
+        guard !speedRunning else {return}
+        speedStatus=["state":"ping"];speedLine=""
+        Task {
+            let request:[String:Any]=["group":Transports.group,"pingUrl":Transports.testURL,"url":Latency.speedURL,"seconds":6]
+            speedStatus=await model.speed("start",request) ?? ["state":"failed"]
+            while checking && speedRunning {
+                try? await Task.sleep(nanoseconds:200_000_000)
+                guard let status=await model.speed("progress") else {speedStatus=["state":"failed"];break}
+                speedStatus=status
+                if let line=status["line"] as? String,!line.isEmpty {speedLine=line}
+            }
+            if speedState=="done" {Journal.add("speed: \(speedLine) \(speedStatus["mbps"] ?? 0) Mbps, \(speedStatus["bytes"] ?? 0) bytes, latency \(speedStatus["latency"] ?? -1) ms, jitter \(speedStatus["jitter"] ?? -1) ms")}
+            else if speedState=="failed" {Journal.add("speed: failed \(speedStatus["error"] ?? "") over \(speedLine)")}
+        }
     }
     /// One leg: a square in the leg's color, its name over what it measures, and the time (or "No answer").
     private func checkLeg(_ title:String,_ detail:String,_ ms:Int,limit:Int)->some View {
@@ -542,29 +652,89 @@ struct ClientView:View {
             }.padding(.horizontal,16).padding(.top,mac ? 4:8).padding(.bottom,20)
         }.task {if model.nodes.isEmpty {model.work {try await model.loadNodes()}} else {await model.measure()}}
     }
+    private func lineName(_ index:Int)->String {L10n.text("line_n",L10n.number(index+1))}
+    private var listJoin:String {L10n.language.hasPrefix("zh") ? "、":", "}
+    /// Each line's cell in the order 线路 1…4; nil when this device has no line results for the node.
+    private func lineStates(_ lines:[String:Int]?)->[LineState]? {
+        guard let lines,!lines.isEmpty else {return nil}
+        return Latency.lineOrder.map {name in
+            guard let ms=lines[name] else {return .off}
+            return ms<0 ? .down:(ms>300 ? .slow:.ok)
+        }
+    }
+    /// One sentence when a line is out ("线路 2 不通，已用线路 1"); nil when every offered line works.
+    private func linesNote(_ lines:[String:Int]?)->String? {
+        guard let lines,!lines.isEmpty else {return nil}
+        let offered=Latency.lineOrder.enumerated().filter {lines[$0.element] != nil}
+        let working=offered.filter {(lines[$0.element] ?? -1)>=0}
+        let down=offered.filter {(lines[$0.element] ?? -1)<0}
+        if working.isEmpty {return L10n.text("lines_none")}
+        if down.isEmpty {return nil}
+        if working.count==1 && offered.count>2 {return L10n.text("lines_only",lineName(working[0].offset))}
+        let best=working.min {(lines[$0.element] ?? 0)<(lines[$1.element] ?? 0)}!
+        return L10n.text("lines_one_down",down.map {lineName($0.offset)}.joined(separator:listJoin),lineName(best.offset))
+    }
+    private func lineValue(_ ms:Int?)->String {
+        guard let ms else {return L10n.text("line_off")}
+        return ms<0 ? L10n.text("line_down"):L10n.text("latency_ms",L10n.number(ms))
+    }
     private func nodeRow(_ node:[String:Any])->some View {
         let id=node["id"] as? String ?? "",name=node["name"] as? String ?? ""
         let region=(node["region"] as? String).flatMap {$0.isEmpty || $0==name ? nil:$0}
         let quality=Latency.recent(id)
         let unreachable=quality != nil && quality?.latency == nil
         let selected=model.selected==id
-        return Button {choose(id,name:name)} label:{
-            HStack(spacing:14) {
-                Badge(code:model.code(id,name:name),tint:unreachable ? VeilbirdStyle.faint:VeilbirdStyle.text)
-                VStack(alignment:.leading,spacing:2) {
-                    Text(name).font(.system(size:VeilbirdStyle.body)).lineLimit(1)
-                    if let region {Text(region).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)}
-                }.foregroundStyle(unreachable ? VeilbirdStyle.faint:VeilbirdStyle.text)
-                Spacer(minLength:8)
-                if let quality {
-                    if let text=ms(quality) {
-                        Text(text).font(.system(size:VeilbirdStyle.detail+1)).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()
-                        let (level,color)=signal(quality);SignalBars(level:level,color:color)
-                    } else {Text(L10n.text("quality_unreachable")).font(.system(size:VeilbirdStyle.detail+1)).foregroundStyle(VeilbirdStyle.faint)}
-                } else if model.measuring {Text("…").foregroundStyle(VeilbirdStyle.secondary)}
-                if selected {Image(systemName:"checkmark").font(.system(size:mac ? 12:15,weight:.semibold)).foregroundStyle(VeilbirdStyle.accent).padding(.leading,4)}
-            }.padding(.horizontal,16).frame(minHeight:mac ? 44:56)
-        }.buttonStyle(RowButton()).accessibilityLabel(name+", "+(quality.map(summary) ?? "")).accessibilityAddTraits(selected ? .isSelected:[])
+        let states=lineStates(quality?.lines)
+        let note=linesNote(quality?.lines)
+        let offered=((node["test"] as? [[String:Any]]) ?? []).contains {Latency.lineOrder.contains($0["name"] as? String ?? "")}
+        let open=openNode==id && states != nil
+        return VStack(spacing:0) {
+            HStack(spacing:0) {
+                Button {choose(id,name:name)} label:{
+                    HStack(spacing:14) {
+                        Badge(code:model.code(id,name:name),tint:unreachable ? VeilbirdStyle.faint:VeilbirdStyle.text)
+                        VStack(alignment:.leading,spacing:2) {
+                            Text(name).font(.system(size:VeilbirdStyle.body)).lineLimit(1)
+                            if let detail=note ?? region {Text(detail).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)}
+                        }.foregroundStyle(unreachable ? VeilbirdStyle.faint:VeilbirdStyle.text)
+                        Spacer(minLength:8)
+                        if let quality {
+                            if let text=ms(quality) {
+                                Text(text).font(.system(size:VeilbirdStyle.detail+1)).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()
+                                if states == nil {let (level,color)=signal(quality);SignalBars(level:level,color:color)}
+                            } else {Text(L10n.text("quality_unreachable")).font(.system(size:VeilbirdStyle.detail+1)).foregroundStyle(VeilbirdStyle.danger)}
+                        } else if model.measuring {Text("…").foregroundStyle(VeilbirdStyle.secondary)}
+                        if selected {Image(systemName:"checkmark").font(.system(size:mac ? 12:15,weight:.semibold)).foregroundStyle(VeilbirdStyle.accent).padding(.leading,4)}
+                    }.padding(.leading,16).padding(.trailing,states != nil || (model.measuring && offered) ? 4:16).frame(minHeight:mac ? 44:56).contentShape(Rectangle())
+                }.buttonStyle(RowButton()).accessibilityLabel(name+", "+(quality.map(summary) ?? "")+(note.map {", "+$0} ?? "")).accessibilityAddTraits(selected ? .isSelected:[])
+                // The four line cells: tap to open each line's result.
+                if model.measuring && offered {
+                    LineCells(states:Array(repeating:.wait,count:Latency.lineOrder.count)).frame(width:44,height:44).padding(.trailing,8)
+                } else if let states {
+                    Button {withAnimation(reduceMotion ? nil:.easeInOut(duration:0.26)) {openNode=open ? "":id}} label:{
+                        LineCells(states:states).frame(width:44,height:44).contentShape(Rectangle())
+                    }.buttonStyle(.plain).padding(.trailing,8)
+                    .accessibilityLabel(L10n.text("lines_detail",name,L10n.number(states.filter {$0 != .off}.count),L10n.number(states.filter {$0 == .ok || $0 == .slow}.count)))
+                    .accessibilityAddTraits(open ? .isSelected:[])
+                }
+            }
+            if open, let lines=quality?.lines, let states {
+                // Quieter than the row: no outlines, small grey text, indented to the name.
+                LazyVGrid(columns:[GridItem(.flexible(),spacing:20),GridItem(.flexible())],spacing:0) {
+                    ForEach(Latency.lineOrder.indices,id:\.self) {i in
+                        let ms=lines[Latency.lineOrder[i]]
+                        HStack(spacing:7) {
+                            LineCells(states:[states[i]],size:4)
+                            Text(lineName(i)).foregroundStyle(VeilbirdStyle.faint)
+                            Spacer(minLength:4)
+                            Text(lineValue(ms)).font(.system(size:11,design:.monospaced)).monospacedDigit()
+                                .foregroundStyle(ms == nil ? VeilbirdStyle.faint:((ms ?? 0)<0 ? VeilbirdStyle.danger.opacity(0.75):VeilbirdStyle.secondary))
+                        }.font(.system(size:12)).frame(height:24).accessibilityElement(children:.combine)
+                    }
+                }.padding(.leading,mac ? 60:66).padding(.trailing,16).padding(.bottom,10)
+                .transition(.opacity)
+            }
+        }.background(open ? Color(red:12/255,green:15/255,blue:20/255):Color.clear)
     }
     private func choose(_ id:String,name:String) {
         if model.connected {model.message=L10n.text("disconnect_before_changing_location");return}

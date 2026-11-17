@@ -66,7 +66,8 @@ public sealed class Core : IDisposable {
         }
         return await answer.Task.WaitAsync(TimeSpan.FromSeconds(60));
     }
-    /// A request through each node's transports (core.Test), the way Clash apps measure; {"node id": ms or -1}.
+    /// A request through each node's transports (core.Test), the way Clash apps measure:
+    /// {"node id":{"ms":fastest or -1,"lines":{"transport":ms or -1}}}.
     /// Answered when done, so a slow node never holds up the other calls.
     public async Task<string> Test(string request) {
         var id=Guid.NewGuid().ToString("N")[..12];
@@ -116,6 +117,10 @@ public sealed class Core : IDisposable {
     /// Open connections, rankings, hourly split and names looked up since connecting (core.Activity), as JSON.
     public string Activity()=>Call("activity");
     public string Now(string group)=>Call("now "+group);
+    /// The connection check's speed test (core.SpeedStart): "ok", or "error <reason>"; poll SpeedProgress for the figures.
+    public string SpeedStart(string request)=>Call("speedstart "+Convert.ToBase64String(Encoding.UTF8.GetBytes(request)));
+    public string SpeedProgress()=>Call("speedprogress");
+    public void SpeedStop() {try {Call("speedstop");} catch(IOException) {/* gone */}}
     public (long Up,long Down) Rate() {
         var parts=Call("rate").Split(' ');
         return parts.Length==2&&long.TryParse(parts[0],out var up)&&long.TryParse(parts[1],out var down)?(up,down):(0,0);

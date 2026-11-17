@@ -115,7 +115,8 @@ class NativeApi(context: Context) {
      * Queues a connection failure code and a scrubbed error text (no keys, addresses or traffic)
      * and sends the queue when the service is reachable; the network is often what just failed.
      */
-    @Synchronized fun report(code: String, nodeId: String = "", detail: String = "", network: String = "", at: String? = null) {
+    /** Queues an event and sends the queue; [send] false only queues it (several events, one request). */
+    @Synchronized fun report(code: String, nodeId: String = "", detail: String = "", network: String = "", at: String? = null, send: Boolean = true) {
         val queue = try { org.json.JSONArray(prefs.getString("diagnostics", "[]")) } catch (_: Exception) { org.json.JSONArray() }
         if (code.isNotEmpty()) queue.put(JSONObject().put("code", code).put("at", at ?: java.time.Instant.now().toString()).apply {
             if (nodeId.isNotEmpty()) put("nodeId", nodeId)
@@ -125,7 +126,7 @@ class NativeApi(context: Context) {
         })
         while (queue.length() > 20) queue.remove(0)
         prefs.edit().putString("diagnostics", queue.toString()).apply()
-        if (queue.length() == 0 || secret("token") == null) return
+        if (!send || queue.length() == 0 || secret("token") == null) return
         try { request("diagnostics", JSONObject().put("events", queue)); prefs.edit().remove("diagnostics").apply() } catch (_: Exception) { }
     }
     fun login(email: String, password: String) {

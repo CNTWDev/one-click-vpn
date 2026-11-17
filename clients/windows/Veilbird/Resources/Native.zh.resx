@@ -60,6 +60,8 @@
   <data name="check_exit" xml:space="preserve"><value>出口位置</value></data>
   <data name="check_failed" xml:space="preserve"><value>没有测到结果，请稍后再试。</value></data>
   <data name="check_for_updates" xml:space="preserve"><value>检查更新</value></data>
+  <data name="check_lines" xml:space="preserve"><value>这个节点的线路</value></data>
+  <data name="check_lines_note" xml:space="preserve"><value>{0} 在这个网络不通，已自动用 {1}，不影响使用。</value></data>
   <data name="check_local" xml:space="preserve"><value>本地网络</value></data>
   <data name="check_local_detail" xml:space="preserve"><value>不经过节点</value></data>
   <data name="check_local_slow" xml:space="preserve"><value>慢在本地网络。换个 Wi‑Fi，或改用移动数据试试。</value></data>
@@ -148,6 +150,15 @@
   <data name="last_30_days" xml:space="preserve"><value>近 30 天</value></data>
   <data name="last_active" xml:space="preserve"><value>{0} · {1}</value></data>
   <data name="latency_ms" xml:space="preserve"><value>{0} ms</value></data>
+  <data name="line_down" xml:space="preserve"><value>不通</value></data>
+  <data name="line_in_use" xml:space="preserve"><value>在用</value></data>
+  <data name="line_n" xml:space="preserve"><value>线路 {0}</value></data>
+  <data name="line_off" xml:space="preserve"><value>未开放</value></data>
+  <data name="lines_all_ok" xml:space="preserve"><value>{0} 条线路都通</value></data>
+  <data name="lines_detail" xml:space="preserve"><value>{0}：{1} 条线路中 {2} 条能用，点开看每条</value></data>
+  <data name="lines_none" xml:space="preserve"><value>这个网络连不上</value></data>
+  <data name="lines_one_down" xml:space="preserve"><value>{0} 不通，已用 {1}</value></data>
+  <data name="lines_only" xml:space="preserve"><value>只有 {0} 能用</value></data>
   <data name="location" xml:space="preserve"><value>连接位置</value></data>
   <data name="location_unavailable_select_another" xml:space="preserve"><value>节点不可用，请重新选择</value></data>
   <data name="locations" xml:space="preserve"><value>节点</value></data>
@@ -224,6 +235,18 @@
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>登录 TrackNothing，无需导入或配置。</value></data>
   <data name="sign_out" xml:space="preserve"><value>退出登录</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>模拟器开发版 · 连接功能需在已签名的真机版本验证</value></data>
+  <data name="speed_again" xml:space="preserve"><value>再测一次网速</value></data>
+  <data name="speed_done" xml:space="preserve"><value>经 {0} · {1} · 刚刚</value></data>
+  <data name="speed_downloading" xml:space="preserve"><value>正在经 {0} 下载…</value></data>
+  <data name="speed_failed" xml:space="preserve"><value>这次没测出来，稍后再试</value></data>
+  <data name="speed_hint" xml:space="preserve"><value>只测当前连接，约 6 秒，用量 30–80 MB</value></data>
+  <data name="speed_jitter" xml:space="preserve"><value>抖动</value></data>
+  <data name="speed_latency" xml:space="preserve"><value>延迟</value></data>
+  <data name="speed_need_connection" xml:space="preserve"><value>连接后可测网速</value></data>
+  <data name="speed_running" xml:space="preserve"><value>测速中…</value></data>
+  <data name="speed_start" xml:space="preserve"><value>测网速</value></data>
+  <data name="speed_title" xml:space="preserve"><value>当前连接的网速</value></data>
+  <data name="speed_used" xml:space="preserve"><value>用量</value></data>
   <data name="switched_location" xml:space="preserve"><value>{0} 没有响应，已换到 {1}</value></data>
   <data name="system_extension_failed" xml:space="preserve"><value>无法启用 VPN 组件，请重新安装 TrackNothing 后再试。</value></data>
   <data name="tap_ring_to_connect" xml:space="preserve"><value>轻触圆环，一键连接</value></data>

@@ -192,6 +192,30 @@ struct SignalBars:View {
     }
 }
 
+/// One cell per line of a node (线路 1…4): filled when it answers (amber when slow), outlined red when it does
+/// not, outlined grey when the node has no such line, filled dark while measuring.
+enum LineState {case ok,slow,down,off,wait}
+struct LineCells:View {
+    let states:[LineState]
+    var size:CGFloat=6
+    var body:some View {
+        HStack(spacing:3) {
+            ForEach(states.indices,id:\.self) {i in
+                let state=states[i]
+                ZStack {
+                    switch state {
+                    case .ok:Rectangle().fill(VeilbirdStyle.accent)
+                    case .slow:Rectangle().fill(VeilbirdStyle.fair)
+                    case .wait:Rectangle().fill(Color(red:37/255,green:43/255,blue:53/255))
+                    case .down:Rectangle().strokeBorder(VeilbirdStyle.danger,lineWidth:1)
+                    case .off:Rectangle().strokeBorder(Color(red:58/255,green:65/255,blue:77/255),lineWidth:1)
+                    }
+                }.frame(width:size,height:size)
+            }
+        }.accessibilityHidden(true)
+    }
+}
+
 /// Daily usage as columns of square blocks; the last week is in full accent.
 struct UsageBars:View {
     let values:[Int64]

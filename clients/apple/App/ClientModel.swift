@@ -84,8 +84,30 @@ import ServiceManagement
     func measure() async {
         guard !measuring,!connected else {return}
         measuring=true
-        nodes=await Latency.rank(nodes).map {$0.node}
+        let ranked=await Latency.rank(nodes)
+        nodes=ranked.map {$0.node}
         measuring=false
+        if let api=try? api() {Task {await Latency.report(api,ranked)}}
+    }
+    /// The connected node's lines from the location list's last measurement (taken while disconnected, since the
+    /// app's own requests go through the tunnel while connected); nil when the device has no line results.
+    var connectedLines:[String:Int]? {Latency.recent(connectedNodeId)?.lines}
+    /// The transport carrying traffic now, for the check's "在用" mark.
+    func currentLine() async -> String {String(decoding:await providerMessage("status-line") ?? Data(),as:UTF8.self)}
+    /// The speed test, run by the tunnel through the transport carrying traffic now: "start" (with the request), then
+    /// "progress" until done; "stop" ends it. The reply is the core's status as JSON.
+    func speed(_ command:String,_ request:[String:Any]?=nil) async -> [String:Any]? {
+        var message="speed "+command
+        if let request,let data=try? JSONSerialization.data(withJSONObject:request) {message+=" "+String(decoding:data,as:UTF8.self)}
+        guard let data=await providerMessage(message) else {return nil}
+        if command=="start" {return String(decoding:data,as:UTF8.self)=="ok" ? ["state":"ping"]:["state":"failed"]}
+        return try? JSONSerialization.jsonObject(with:data) as? [String:Any]
+    }
+    private func providerMessage(_ message:String) async -> Data? {
+        guard let session=manager?.connection as? NETunnelProviderSession else {return nil}
+        return await withCheckedContinuation {(done:CheckedContinuation<Data?,Never>) in
+            do {try session.sendProviderMessage(Data(message.utf8)) {done.resume(returning:$0)}} catch {done.resume(returning:nil)}
+        }
     }
     func loadAccount() async throws {account=try await api().request("account")}
     /// The connection check's three legs in milliseconds (-1 = no answer), measured by the tunnel: "local", "node", "web".

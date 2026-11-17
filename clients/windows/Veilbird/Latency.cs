@@ -6,7 +6,8 @@ using System.Text.Json.Nodes;
 namespace Veilbird;
 
 /// One node as measured from this PC: median TCP connect time, jitter and failed attempts.
-public sealed record Quality(long? Latency,long Jitter,int Loss,int? Load,int Users=0) {
+/// Lines: each transport's result on this network (ms, -1 = no answer); null when not measured through the transports.
+public sealed record Quality(long? Latency,long Jitter,int Loss,int? Load,int Users=0,IReadOnlyDictionary<string,long>? Lines=null) {
     /// Lower is better. Jitter and loss hurt more than a few extra milliseconds. Load above half costs 4 ms per
     /// percent (a full node +200 ms) and each connected user 1 ms (at most 50), so close nodes win unless busy.
     public long Score=>Latency is { } ms?ms+2*Jitter+10L*Loss+Math.Max(0,(Load??0)-50)*4L+Math.Min(Users,50):long.MaxValue;
@@ -52,25 +53,48 @@ public static class Latency {
     public static Func<string,Task<string>>? RealTest;
     /// The wait for a request through a transport; mihomo's default, which Clash apps show.
     private const int RealTimeoutMs=5000;
+    /// The transports a node can offer, in the order the apps show them as "线路 1…4": Hysteria2 (with port hopping),
+    /// REALITY on 443, REALITY on the node's spare TCP port, XHTTP. Users only see the numbers; the transport names stay
+    /// in the hidden log. WireGuard is not listed: it cannot be tested before a lease.
+    public static readonly string[] LineOrder=["hysteria2","reality","reality-alt","xhttp"];
+    /// The file the speed test downloads through the current connection (repeated for the test's few seconds).
+    public const string SpeedUrl="https://speed.cloudflare.com/__down?bytes=100000000";
     /// A request to the test page through every transport the device has on this node (the server's "test" list,
-    /// the lines a connect would use), the fastest answer in ms; -1 when none answers, null when not measured.
-    /// This is how Clash apps measure: it sees a node reached only over UDP, and one whose port answers but whose
-    /// transport is blocked after the handshake.
-    private static async Task<long?> Real(string id,JsonArray transports) {
+    /// the lines a connect would use): the fastest answer in ms (-1 when none answers) and each transport's result;
+    /// null when not measured. This is how Clash apps measure: it sees a node reached only over UDP, and one whose
+    /// port answers but whose transport is blocked after the handshake.
+    public static async Task<(long Ms,Dictionary<string,long> Lines)?> Real(string id,JsonArray transports) {
         if(RealTest is not { } test) return null;
         try {
             var input=new JsonObject {["nodes"]=new JsonObject {[id]=transports.DeepClone()},["url"]=Transports.TestUrl,["timeoutMs"]=RealTimeoutMs};
-            return JsonNode.Parse(await test(input.ToJsonString()))?[id]?.GetValue<long>();
+            if(JsonNode.Parse(await test(input.ToJsonString()))?[id] is not JsonObject result) return null;
+            var lines=new Dictionary<string,long>();
+            if(result["lines"] is JsonObject map) foreach(var (name,value) in map) if(value is not null) lines[name]=value.GetValue<long>();
+            return (result["ms"]?.GetValue<long>()??-1,lines);
         } catch {return null;}
+    }
+    /// Tells the server which lines answered on this network (the block alerts in Console read it). A node's failures
+    /// count only when some line somewhere answered, so a PC without internet reports nothing.
+    public static async Task Report(NativeApi api,IEnumerable<(JsonNode Node,Quality Quality)> ranked) {
+        var measured=ranked.Where(item=>item.Quality.Lines is { Count: >0 }&&item.Node["id"] is not null)
+            .Select(item=>(Id:item.Node["id"]!.GetValue<string>(),Lines:item.Quality.Lines!)).ToList();
+        if(!measured.Any(item=>item.Lines.Values.Any(ms=>ms>=0))) return;
+        var network=Transports.NetworkKey();var at=DateTimeOffset.UtcNow.ToString("O");
+        await api.ReportMany(measured.Take(19).Select(item=>new JsonObject {
+            ["code"]="TRANSPORT_PROBE",["at"]=at,["nodeId"]=item.Id,["network"]=network,
+            ["detail"]=string.Join(',',item.Lines.OrderBy(pair=>pair.Key,StringComparer.Ordinal).Select(pair=>pair.Key+"="+(pair.Value>=0?"ok":"fail"))),
+        }));
     }
     /// TCP connects give jitter and loss; the request through the transports, when the device has them, decides
     /// whether the node answers and its latency. Devices that never connected (no "test" list) keep the TCP result.
     public static async Task<Quality> Measure(JsonNode node,int attempts=5) {
         var pending=node["test"] is JsonArray { Count: >0 } transports&&node["id"]?.GetValue<string>() is { } id?Real(id,transports):null;
         var tcp=await MeasureTcp(node,attempts);
-        if(pending is null||await pending is not { } delay) return tcp;
-        if(delay<0) return new(null,0,100,tcp.Load,tcp.Users);
-        return tcp.Latency is not null?tcp with {Latency=delay}:new(delay,0,0,tcp.Load,tcp.Users);
+        if(pending is null||await pending is not { } real) return tcp;
+        var (delay,lines)=real;
+        if(lines.Count>0) Journal.Add($"lines: {node["name"]?.GetValue<string>()} "+string.Join(", ",lines.Select(pair=>pair.Value>=0?$"{pair.Key} {pair.Value} ms":$"{pair.Key} no answer")));
+        if(delay<0) return new(null,0,100,tcp.Load,tcp.Users,lines);
+        return tcp.Latency is not null?tcp with {Latency=delay,Lines=lines}:new(delay,0,0,tcp.Load,tcp.Users,lines);
     }
     private static async Task<Quality> MeasureTcp(JsonNode node,int attempts) {
         var load=Load(node);var users=Users(node);

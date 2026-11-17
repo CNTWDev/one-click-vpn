@@ -246,6 +246,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         case "journal-clear":Journal.clear();completionHandler?(nil);return
         // The activity view: kept by the core in memory while connected, cleared when it stops.
         case "activity":completionHandler?(Data(CoreActivity().utf8));return
+        // The speed test ("测网速"): run by the core here, through the transport carrying traffic now; the app polls.
+        case let message where message.hasPrefix("speed start "):completionHandler?(Data(CoreSpeedStart(String(message.dropFirst(12))).utf8));return
+        case "speed progress":completionHandler?(Data(CoreSpeedProgress().utf8));return
+        case "speed stop":CoreSpeedStop();completionHandler?(nil);return
+        case "status-line":completionHandler?(Data(CoreNow(Transports.group).utf8));return
         case let message where message.hasPrefix("check "):
             // The connection check, timed from here so every leg leaves through the right path: the small page and the
             // node outside the tunnel (DIRECT), the test page through the transport carrying traffic now.
