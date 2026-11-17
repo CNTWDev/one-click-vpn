@@ -55,7 +55,7 @@ struct MenuBarView:View {
                         Spacer(minLength:8)
                         Image(systemName:"chevron.right").font(.system(size:10,weight:.semibold)).foregroundStyle(VeilbirdStyle.secondary)
                     }.padding(.horizontal,12).frame(height:52)
-                }.buttonStyle(RowButton()).background(Color(red:26/255,green:34/255,blue:28/255),in:RoundedRectangle(cornerRadius:10)).clipShape(RoundedRectangle(cornerRadius:10))
+                }.buttonStyle(RowButton()).background(Color(red:25/255,green:29/255,blue:35/255),in:RoundedRectangle(cornerRadius:10)).clipShape(RoundedRectangle(cornerRadius:10))
                 let figures=UsageFigures(model.account)
                 HStack(alignment:.top,spacing:12) {
                     cell(figures.trafficTitle,figures.traffic,figures.trafficTint)
@@ -70,7 +70,7 @@ struct MenuBarView:View {
                 menuItem(L10n.text("quit_app"),shortcut:"⌘Q") {NSApp.terminate(nil)}.keyboardShortcut("q")
             }.padding(.top,6)
         }.padding(.horizontal,12).padding(.top,14).padding(.bottom,8).frame(width:320)
-        .background(Color(red:18/255,green:25/255,blue:21/255)).foregroundStyle(VeilbirdStyle.text).preferredColorScheme(.dark)
+        .background(Color(red:17/255,green:20/255,blue:26/255)).foregroundStyle(VeilbirdStyle.text).preferredColorScheme(.dark)
         .environment(\.locale, L10n.locale).task {try? await model.loadAccount()}
     }
     private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}

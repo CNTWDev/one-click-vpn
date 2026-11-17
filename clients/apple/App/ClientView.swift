@@ -64,7 +64,7 @@ struct ClientView:View {
             .frame(width:mac && model.signedIn ? 380:nil)
             #if os(macOS)
             if model.signedIn {
-                Rectangle().fill(Color(red:26/255,green:35/255,blue:28/255)).frame(width:1)
+                Rectangle().fill(Color(red:25/255,green:29/255,blue:36/255)).frame(width:1)
                 ActivityView()
             }
             #endif
@@ -159,7 +159,7 @@ struct ClientView:View {
             tabItem(L10n.text("activity_title"),"waveform.path.ecg",5)
             tabItem(L10n.text("account"),"person",2)
         }.padding(.horizontal,12).padding(.top,7).padding(.bottom,2)
-        .background(Color(red:7/255,green:11/255,blue:9/255).opacity(0.6).ignoresSafeArea(edges:.bottom))
+        .background(Color(red:6/255,green:8/255,blue:12/255).opacity(0.6).ignoresSafeArea(edges:.bottom))
         .overlay(alignment:.top) {Rectangle().fill(VeilbirdStyle.hairline).frame(height:0.5)}
     }
     private func tabItem(_ title:String,_ icon:String,_ index:Int)->some View {
@@ -187,7 +187,7 @@ struct ClientView:View {
                         .background(selected ? VeilbirdStyle.selected:Color.clear,in:RoundedRectangle(cornerRadius:5)).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
             }
-        }.padding(2).background(Color(red:26/255,green:34/255,blue:28/255),in:RoundedRectangle(cornerRadius:7)).padding(.top,8).padding(.bottom,4)
+        }.padding(2).background(Color(red:25/255,green:29/255,blue:35/255),in:RoundedRectangle(cornerRadius:7)).padding(.top,8).padding(.bottom,4)
     }
     #endif
 
@@ -492,7 +492,7 @@ struct ClientView:View {
                                 .background(selected ? VeilbirdStyle.selected:Color.clear,in:RoundedRectangle(cornerRadius:mac ? 5:8)).contentShape(Rectangle())
                         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
                     }
-                }.padding(2).background(Color(red:26/255,green:34/255,blue:28/255),in:RoundedRectangle(cornerRadius:mac ? 7:10)).padding(.top,mac ? 8:12)
+                }.padding(2).background(Color(red:25/255,green:29/255,blue:35/255),in:RoundedRectangle(cornerRadius:mac ? 7:10)).padding(.top,mac ? 8:12)
                 caption(L10n.text(model.routing=="smart" ? "routing_smart_detail":"routing_global_detail")).padding(.top,8)
                 if model.connected {caption(L10n.text("test_after_disconnecting")).padding(.top,4)}
                 if model.nodes.count>6 {

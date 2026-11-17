@@ -22,9 +22,9 @@ namespace Veilbird;
 /// once connected, and a dark ring with the mark in red after a failure.
 public sealed class Ring:FrameworkElement {
     private static readonly (int X,int Y,double Turn)[] Cells=Look.RingCells(41,18);
-    private static readonly Brush IdleDot=Look.Hex("#243026"),FailedDot=Look.Hex("#2B2420");
+    private static readonly Brush IdleDot=Look.Hex("#222832"),FailedDot=Look.Hex("#2A2220");
     // The comet's fade, in 32 steps, so a frame allocates nothing.
-    private static readonly Brush[] Comet=Enumerable.Range(0,33).Select(i=>{var brush=new SolidColorBrush(Color.FromRgb(183,220,104)) {Opacity=i/32.0};brush.Freeze();return (Brush)brush;}).ToArray();
+    private static readonly Brush[] Comet=Enumerable.Range(0,33).Select(i=>{var brush=new SolidColorBrush(Color.FromRgb(198,242,110)) {Opacity=i/32.0};brush.Freeze();return (Brush)brush;}).ToArray();
     private readonly Stopwatch clock=Stopwatch.StartNew();
     private RingState state=RingState.Idle;
     private bool turning;
@@ -81,7 +81,7 @@ public sealed class Ring:FrameworkElement {
             for(var y=center%step;y<side;y+=step) for(var x=center%step;x<side;x+=step) {
                 var fade=1-Math.Sqrt((x-center)*(x-center)+(y-center)*(y-center))/reach;
                 if(fade<=0) continue;
-                var brush=new SolidColorBrush(Color.FromRgb(183,220,104)) {Opacity=strength*Math.Min(1,fade*1.6)};brush.Freeze();
+                var brush=new SolidColorBrush(Color.FromRgb(198,242,110)) {Opacity=strength*Math.Min(1,fade*1.6)};brush.Freeze();
                 draw.DrawEllipse(brush,null,new Point(x,y),0.9,0.9);
             }
         }
@@ -91,7 +91,7 @@ public sealed class Ring:FrameworkElement {
 
 /// 30 days of usage as columns of square blocks; the chosen range (the last Recent days) in lime.
 public sealed class UsageBlocks:FrameworkElement {
-    private static readonly Brush Older=Look.Hex("#5E7550");
+    private static readonly Brush Older=Look.Hex("#60774A");
     private readonly IReadOnlyList<long> values;
     private int recent=7;
     public int Recent {get=>recent;set {recent=value;InvalidateVisual();}}
@@ -112,7 +112,7 @@ public sealed class UsageBlocks:FrameworkElement {
 /// dimmer columns hanging below it. Both scale to the busiest sample shown, so the shape stays readable at any speed.
 public sealed class RateBars:FrameworkElement {
     public const int Count=40;
-    private static readonly Brush Up=Look.Hex("#5E7550"),Axis=Look.Hex("#26332A");
+    private static readonly Brush Up=Look.Hex("#60774A"),Axis=Look.Hex("#242A35");
     private IReadOnlyList<long> down=Array.Empty<long>(),up=Array.Empty<long>();
     public RateBars() {IsHitTestVisible=false;}
     public void Set(IReadOnlyList<long> down,IReadOnlyList<long> up) {this.down=down;this.up=up;InvalidateVisual();}

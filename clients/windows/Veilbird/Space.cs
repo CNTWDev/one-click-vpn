@@ -14,7 +14,7 @@ public sealed class Space:FrameworkElement {
     private Size laidOut;
     private List<Star> band=[],far=[];
     private List<(Rect Rect,Brush Fill)> dots=[],moon=[];
-    private static readonly Color White=Color.FromRgb(232,238,228),Mint=Color.FromRgb(191,216,204),Pale=Color.FromRgb(207,230,160),Lime=Color.FromRgb(183,220,104);
+    private static readonly Color White=Color.FromRgb(232,236,244),Mint=Color.FromRgb(191,203,230),Pale=Color.FromRgb(214,240,170),Lime=Color.FromRgb(198,242,110);
 
     public Space() {
         IsHitTestVisible=false;Focusable=false;
@@ -76,7 +76,7 @@ public sealed class Space:FrameworkElement {
             if(Math.Sqrt(Math.Pow(px+1.5-m/2,2)+Math.Pow(py+1.5-m/2,2))>m/2) continue;
             var t=Math.Min(1,Math.Sqrt(Math.Pow(px-m*0.32,2)+Math.Pow(py-m*0.30,2))/(m*0.75));
             var level=t<0.6 ? 0.79-(0.79-0.47)*t/0.6:0.47-(0.47-0.12)*(t-0.6)/0.4;
-            moon.Add((new Rect(mx+px,my+py,2.2,2.2),Solid(Color.FromRgb((byte)(level*0.92*255),(byte)(level*255),(byte)(level*0.84*255)),0.7)));
+            moon.Add((new Rect(mx+px,my+py,2.2,2.2),Solid(Color.FromRgb((byte)(level*0.86*255),(byte)(level*0.9*255),(byte)(level*255)),0.7)));
         }
     }
 
@@ -95,15 +95,15 @@ public sealed class Space:FrameworkElement {
         var time=(DateTime.UtcNow-started).TotalSeconds;
         var full=new Rect(size);
         dc.PushClip(new RectangleGeometry(full));
-        var sky=new LinearGradientBrush(new GradientStopCollection{new(Color.FromRgb(1,2,2),0),new(Color.FromRgb(3,6,5),0.5),new(Color.FromRgb(5,10,8),1)},90);
+        var sky=new LinearGradientBrush(new GradientStopCollection{new(Color.FromRgb(1,2,4),0),new(Color.FromRgb(3,5,10),0.5),new(Color.FromRgb(6,9,18),1)},90);
         sky.Freeze();dc.DrawRectangle(sky,null,full);
 
         // Nebula along the band.
         dc.PushTransform(new RotateTransform(-38,W*0.5,H*0.34));
         double bw=1.5*W,bh=0.6*H;
-        Ellipse(dc,new Point(W*0.5-0.12*bw,H*0.34),0.30*bw,0.38*bh,Color.FromRgb(46,120,112),0.30);
-        Ellipse(dc,new Point(W*0.5+0.12*bw,H*0.34-0.04*bh),0.22*bw,0.30*bh,Color.FromRgb(140,190,80),0.16);
-        Ellipse(dc,new Point(W*0.5,H*0.34),0.50*bw,0.20*bh,Color.FromRgb(150,200,180),0.07);
+        Ellipse(dc,new Point(W*0.5-0.12*bw,H*0.34),0.30*bw,0.38*bh,Color.FromRgb(64,84,190),0.30);
+        Ellipse(dc,new Point(W*0.5+0.12*bw,H*0.34-0.04*bh),0.22*bw,0.30*bh,Color.FromRgb(40,150,170),0.16);
+        Ellipse(dc,new Point(W*0.5,H*0.34),0.50*bw,0.20*bh,Color.FromRgb(160,175,230),0.07);
         dc.Pop();
 
         foreach(var s in band) dc.DrawRectangle(s.Fill,null,new Rect(s.X,s.Y,s.Size,s.Size));
@@ -117,7 +117,7 @@ public sealed class Space:FrameworkElement {
         for(var i=0;i<glints.Length;i++) {
             var (gx,gy,ga)=glints[i];
             var dim=motion && (time+i*2.3)%9>8.46;
-            var fill=Solid(Color.FromRgb(228,242,204),ga*(dim ? 0.2:1));
+            var fill=Solid(Color.FromRgb(230,236,248),ga*(dim ? 0.2:1));
             double x=W*gx,y=H*gy;
             dc.DrawRectangle(fill,null,new Rect(x-0.5,y-3.5,1,7));dc.DrawRectangle(fill,null,new Rect(x-3.5,y-0.5,7,1));dc.DrawRectangle(fill,null,new Rect(x-1.5,y-1.5,3,3));
         }
@@ -130,10 +130,10 @@ public sealed class Space:FrameworkElement {
         var p=Planet(size);var top=p.Y-p.R;var glow=p.R+70;
         var halo=new RadialGradientBrush(new GradientStopCollection{new(Colors.Transparent,p.R/glow-0.01),new(Color.FromArgb(36,90,170,150),p.R/glow),new(Colors.Transparent,1)});
         halo.Freeze();dc.DrawEllipse(halo,null,new Point(p.X,p.Y),glow,glow);
-        var body=new RadialGradientBrush(new GradientStopCollection{new(Color.FromRgb(16,29,22),0),new(Color.FromRgb(7,16,12),0.18),new(Color.FromRgb(3,6,5),0.45)}) {
+        var body=new RadialGradientBrush(new GradientStopCollection{new(Color.FromRgb(18,26,42),0),new(Color.FromRgb(9,13,23),0.18),new(Color.FromRgb(3,5,10),0.45)}) {
             MappingMode=BrushMappingMode.Absolute,Center=new Point(p.X,top),GradientOrigin=new Point(p.X,top),RadiusX=2.24*p.R,RadiusY=2.24*p.R};
         body.Freeze();
-        var rim=new Pen(Solid(Color.FromRgb(200,232,140),0.55),1);rim.Freeze();
+        var rim=new Pen(Solid(Color.FromRgb(210,244,150),0.55),1);rim.Freeze();
         dc.DrawEllipse(body,rim,new Point(p.X,p.Y),p.R,p.R);
         foreach(var (rect,fill) in dots) dc.DrawRectangle(fill,null,rect);
         dc.Pop();

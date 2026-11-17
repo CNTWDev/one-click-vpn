@@ -188,7 +188,7 @@ public partial class MainWindow : Window {
         var place=new TextBlock {FontSize=13,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap};
         var placeDetail=new TextBlock {FontSize=11,Foreground=Look.Secondary,Margin=new Thickness(0,2,0,0),TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap};
         var placeTexts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,8,0)};placeTexts.Children.Add(place);placeTexts.Children.Add(placeDetail);
-        var placeRow=new Button {Height=52,Padding=new Thickness(12,0,12,0),Background=Look.Hex("#1A221C"),Margin=new Thickness(0,14,0,0),Content=Columns(badge,placeTexts,Look.Icon("",10,Look.Secondary))};
+        var placeRow=new Button {Height=52,Padding=new Thickness(12,0,12,0),Background=Look.Hex("#191D23"),Margin=new Thickness(0,14,0,0),Content=Columns(badge,placeTexts,Look.Icon("",10,Look.Secondary))};
         placeRow.Click+=(_,_)=>{
             if(connection.Active&&connection.Since is not null) {ShowFromTray();ConnectionCheck();}
             else {page="nodes";Render();ShowFromTray();}
@@ -203,10 +203,10 @@ public partial class MainWindow : Window {
         var open=new Button {Content=L10n.Text("open_main_window"),FontSize=13,Height=32,Padding=new Thickness(10,0,10,0)};open.Click+=(_,_)=>ShowFromTray();
         var quit=new Button {Content=L10n.Text("quit_app"),FontSize=13,Height=32,Padding=new Thickness(10,0,10,0),Foreground=Look.Secondary};quit.Click+=(_,_)=>Quit();
         DockPanel.SetDock(open,Dock.Left);DockPanel.SetDock(quit,Dock.Right);footer.Children.Add(open);footer.Children.Add(quit);
-        var bottom=new Border {BorderBrush=Look.Hex("#14ECF1E8"),BorderThickness=new Thickness(0,1,0,0),Padding=new Thickness(0,10,0,0),Child=footer};
+        var bottom=new Border {BorderBrush=Look.Hex("#14EAEEF4"),BorderThickness=new Thickness(0,1,0,0),Padding=new Thickness(0,10,0,0),Child=footer};
         DockPanel.SetDock(bottom,Dock.Bottom);root.Children.Add(bottom);
 
-        window.Content=new Border {Background=Look.Hex("#121915"),BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(16),Child=root};
+        window.Content=new Border {Background=Look.Hex("#11141A"),BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(16),Child=root};
         TextElement.SetForeground(window,Look.Text);
         fly=(card,mark,title,detail,toggle,badge,place,placeDetail,usage,until);
         flyRate=rate;flyNote=note;flyNoteText=noteText;
@@ -218,7 +218,7 @@ public partial class MainWindow : Window {
         if(state!=flyState) {
             flyState=state;
             var on=state==RingState.Connected;
-            f.Card.Background=on?Look.Hex("#17221A"):Look.Surface;f.Card.BorderBrush=on?Look.Hex("#4DB7DC68"):Look.Hairline;
+            f.Card.Background=on?Look.Hex("#151B24"):Look.Surface;f.Card.BorderBrush=on?Look.Hex("#4DC6F26E"):Look.Hairline;
             f.Mark.Content=Look.Mark(34,state switch {RingState.Idle=>Look.Faint,RingState.Failed=>Look.Danger,_=>Look.Accent});
         }
         f.Title.Text=StatusTitle(state);f.Detail.Text=StatusDetail(state);
@@ -547,7 +547,7 @@ public partial class MainWindow : Window {
         var toNode=Leg(L10n.Text("check_node"),name);
         var web=Leg(L10n.Text("check_web"),L10n.Text("check_web_detail"));
         var verdict=Words("",13);verdict.TextWrapping=TextWrapping.Wrap;
-        stack.Children.Add(new Border {Background=Look.Hex("#1B241D"),CornerRadius=new CornerRadius(8),Padding=new Thickness(14,12,14,12),Margin=new Thickness(0,8,0,0),Child=verdict});
+        stack.Children.Add(new Border {Background=Look.Hex("#1A1E25"),CornerRadius=new CornerRadius(8),Padding=new Thickness(14,12,14,12),Margin=new Thickness(0,8,0,0),Child=verdict});
         if(region.Length>0) {
             var exit=Columns(Single(L10n.Text("check_exit"),12,Look.Secondary),new FrameworkElement(),Single(region,12));
             exit.Margin=new Thickness(2,12,2,0);stack.Children.Add(exit);
@@ -557,7 +557,7 @@ public partial class MainWindow : Window {
         stack.Children.Add(other);
         var again=Plain(L10n.Text("check_again"));again.Height=40;again.Margin=new Thickness(0,10,0,0);
         stack.Children.Add(again);
-        window.Content=new Border {Background=Look.Hex("#121915"),BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(20,14,14,18),Child=stack};
+        window.Content=new Border {Background=Look.Hex("#11141A"),BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(20,14,14,18),Child=stack};
         TextElement.SetForeground(window,Look.Text);
         void Paint((Rectangle Mark,TextBlock Value) leg,long ms,long limit) {
             var color=ms<0?Look.Danger:ms>limit?Look.Fair:Look.Accent;
@@ -671,7 +671,7 @@ public partial class MainWindow : Window {
         var badge=new ContentControl();
         var title=Single("",14,strong:true);var detail=Single("",12,Look.Secondary);detail.Margin=new Thickness(0,2,0,0);
         var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,8,0)};texts.Children.Add(title);texts.Children.Add(detail);
-        var row=new Button {Height=60,Background=Look.Surface,BorderBrush=Look.Hex("#0FECF1E8"),BorderThickness=new Thickness(1),Content=Columns(badge,texts,Look.Icon("",11,Look.Secondary))};
+        var row=new Button {Height=60,Background=Look.Surface,BorderBrush=Look.Hex("#0FEAEEF4"),BorderThickness=new Thickness(1),Content=Columns(badge,texts,Look.Icon("",11,Look.Secondary))};
         AutomationProperties.SetHelpText(row,L10n.Text("tap_to_change"));
         // Connected, the location row opens the connection check; otherwise the location list.
         row.Click+=(_,_)=>{if(busy) return;if(connection.Active&&connection.Since is not null) ConnectionCheck();else {page="nodes";Render();}};
@@ -782,7 +782,7 @@ public partial class MainWindow : Window {
     }
     private Button AutomaticRow() {
         var selected=nodeId.Length==0;
-        var row=new Button {Height=56,Background=Look.Surface,BorderBrush=selected?Look.Hex("#73B7DC68"):Brushes.Transparent,BorderThickness=new Thickness(1),
+        var row=new Button {Height=56,Background=Look.Surface,BorderBrush=selected?Look.Hex("#73C6F26E"):Brushes.Transparent,BorderThickness=new Thickness(1),
             Content=Columns(Look.Badge(null),TwoLines(L10n.Text("automatic"),L10n.Text("select_an_available_location_for_you"),strong:true),selected?Look.Icon("",14,Look.Accent):null)};
         AutomationProperties.SetName(row,L10n.Text("automatic")+(selected?L10n.Text("current_page"):""));
         row.Click+=(_,_)=>Select("","");

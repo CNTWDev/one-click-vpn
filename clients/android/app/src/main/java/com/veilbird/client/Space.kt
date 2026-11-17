@@ -65,9 +65,9 @@ class SpaceView(context: Context) : View(context) {
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         if (w == 0 || h == 0) return
         val W = w.toFloat(); val H = h.toFloat()
-        sky = LinearGradient(0f, 0f, 0f, H, intArrayOf(Color.rgb(1, 2, 2), Color.rgb(3, 6, 5), Color.rgb(5, 10, 8)), floatArrayOf(0f, .5f, 1f), Shader.TileMode.CLAMP)
+        sky = LinearGradient(0f, 0f, 0f, H, intArrayOf(Color.rgb(1, 2, 4), Color.rgb(3, 5, 10), Color.rgb(6, 9, 18)), floatArrayOf(0f, .5f, 1f), Shader.TileMode.CLAMP)
         val tile = Bitmap.createBitmap(max(3, (3 * d).toInt()), max(3, (3 * d).toInt()), Bitmap.Config.ARGB_8888)
-        Canvas(tile).drawCircle(tile.width / 2f, tile.height / 2f, .8f * d, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(153, 1, 3, 2) })
+        Canvas(tile).drawCircle(tile.width / 2f, tile.height / 2f, .8f * d, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(153, 1, 2, 5) })
         dither = BitmapShader(tile, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
         vignette = RadialGradient(W / 2, H * .42f, hypot(W, H) * .6f, intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(153, 0, 0, 0)), floatArrayOf(0f, .55f, 1f), Shader.TileMode.CLAMP)
 
@@ -79,7 +79,7 @@ class SpaceView(context: Context) : View(context) {
             val x = cx + along * cos(angle).toFloat() - across * sin(angle).toFloat()
             val y = cy + along * sin(angle).toFloat() + across * cos(angle).toFloat()
             val k = r(); val alpha = .12f + r() * .5f
-            if (x in 0f..W && y in 0f..H) list.add(Star(x, y, if (k < .8f) d else 2 * d, if (k < .5f) Color.rgb(191, 216, 204) else if (k < .85f) Color.rgb(232, 238, 228) else Palette.accent, alpha, false, 0))
+            if (x in 0f..W && y in 0f..H) list.add(Star(x, y, if (k < .8f) d else 2 * d, if (k < .5f) Color.rgb(191, 203, 230) else if (k < .85f) Color.rgb(232, 236, 244) else Palette.accent, alpha, false, 0))
         }
         band = list
         val f = random(7)
@@ -87,16 +87,16 @@ class SpaceView(context: Context) : View(context) {
             val k = f(); val size = if (k < .72f) 1 else if (k < .97f) 2 else 3
             val x = f() * W; val y = f().pow(1.25f) * H
             val alpha = if (size == 3) .85f else .14f + f() * .5f
-            val color = if (size == 3) Palette.accent else if (f() < .12f) Color.rgb(207, 230, 160) else Color.rgb(232, 238, 228)
+            val color = if (size == 3) Palette.accent else if (f() < .12f) Color.rgb(214, 240, 170) else Color.rgb(232, 236, 244)
             Star(x, y, size * d, color, alpha, f() < .14f, (f() * 7000).toLong())
         }
 
         // Planet: a 1400 dp disc whose top shows the bottom quarter of the window.
         planetR = 700 * d; planetX = W / 2; planetY = H - max(200 * d, H * .26f) + planetR
         val top = planetY - planetR
-        planetBody = RadialGradient(planetX, top, 2.24f * planetR, intArrayOf(Color.rgb(16, 29, 22), Color.rgb(7, 16, 12), Color.rgb(3, 6, 5)), floatArrayOf(0f, .18f, .45f), Shader.TileMode.CLAMP)
+        planetBody = RadialGradient(planetX, top, 2.24f * planetR, intArrayOf(Color.rgb(18, 26, 42), Color.rgb(9, 13, 23), Color.rgb(3, 5, 10)), floatArrayOf(0f, .18f, .45f), Shader.TileMode.CLAMP)
         val glow = planetR + 70 * d
-        planetGlow = RadialGradient(planetX, planetY, glow, intArrayOf(Color.TRANSPARENT, Color.argb(36, 90, 170, 150), Color.TRANSPARENT), floatArrayOf(planetR / glow - .01f, planetR / glow, 1f), Shader.TileMode.CLAMP)
+        planetGlow = RadialGradient(planetX, planetY, glow, intArrayOf(Color.TRANSPARENT, Color.argb(36, 80, 110, 210), Color.TRANSPARENT), floatArrayOf(planetR / glow - .01f, planetR / glow, 1f), Shader.TileMode.CLAMP)
         val step = 6 * d; val out = ArrayList<Float>()
         var y = top - .12f * planetR
         while (y < H) {
@@ -125,7 +125,7 @@ class SpaceView(context: Context) : View(context) {
             while (xx < size) {
                 if (hypot(xx + cell / 2 - size / 2, yy + cell / 2 - size / 2) <= size / 2) {
                     val t = (hypot(xx - size * .32f, yy - size * .30f) / (size * .75f)).coerceIn(0f, 1f)
-                    val c = if (t < .6f) mix(Color.rgb(201, 216, 180), Color.rgb(110, 127, 99), t / .6f) else mix(Color.rgb(110, 127, 99), Color.rgb(26, 34, 25), (t - .6f) / .4f)
+                    val c = if (t < .6f) mix(Color.rgb(211, 218, 230), Color.rgb(107, 116, 136), t / .6f) else mix(Color.rgb(107, 116, 136), Color.rgb(23, 27, 37), (t - .6f) / .4f)
                     m.add(mx + xx); m.add(my + yy); mc.add(c)
                 }
                 xx += cell
@@ -158,9 +158,9 @@ class SpaceView(context: Context) : View(context) {
         // Nebula along the band.
         canvas.save(); canvas.rotate(-38f, W * .5f, H * .34f)
         val bw = 1.5f * W; val bh = .6f * H
-        ellipse(canvas, W * .5f - .12f * bw, H * .34f, .30f * bw, .38f * bh, Color.argb(77, 46, 120, 112))
-        ellipse(canvas, W * .5f + .12f * bw, H * .34f - .04f * bh, .22f * bw, .30f * bh, Color.argb(41, 140, 190, 80))
-        ellipse(canvas, W * .5f, H * .34f, .50f * bw, .20f * bh, Color.argb(18, 150, 200, 180))
+        ellipse(canvas, W * .5f - .12f * bw, H * .34f, .30f * bw, .38f * bh, Color.argb(77, 64, 84, 190))
+        ellipse(canvas, W * .5f + .12f * bw, H * .34f - .04f * bh, .22f * bw, .30f * bh, Color.argb(41, 40, 150, 170))
+        ellipse(canvas, W * .5f, H * .34f, .50f * bw, .20f * bh, Color.argb(18, 160, 175, 230))
         canvas.restore()
         paint.shader = dither; canvas.drawRect(0f, 0f, W, H, paint); paint.shader = null
 
@@ -187,7 +187,7 @@ class SpaceView(context: Context) : View(context) {
         // Planet: glow, body, rim line, then the dithered atmosphere and lit surface.
         fill.shader = planetGlow; canvas.drawCircle(planetX, planetY, planetR + 70 * d, fill)
         fill.shader = planetBody; canvas.drawCircle(planetX, planetY, planetR, fill); fill.shader = null
-        fill.style = Paint.Style.STROKE; fill.strokeWidth = d; fill.color = Color.argb(140, 200, 232, 140)
+        fill.style = Paint.Style.STROKE; fill.strokeWidth = d; fill.color = Color.argb(140, 210, 244, 150)
         canvas.drawCircle(planetX, planetY, planetR, fill); fill.style = Paint.Style.FILL
         for (i in dots.indices step 3) { paint.color = Palette.alpha(Palette.accent, (dots[i + 2] * 255).toInt()); canvas.drawRect(dots[i], dots[i + 1], dots[i] + 1.4f * d, dots[i + 1] + 1.4f * d, paint) }
 

@@ -24,9 +24,9 @@ final class SpaceSky {
     private var dots:[(CGRect,Double)]=[]
     private var moon:[(CGRect,Color)]=[]
 
-    private static let white=Color(red:232/255,green:238/255,blue:228/255)
-    private static let mint=Color(red:191/255,green:216/255,blue:204/255)
-    private static let pale=Color(red:207/255,green:230/255,blue:160/255)
+    private static let white=Color(red:232/255,green:236/255,blue:244/255)
+    private static let mint=Color(red:191/255,green:203/255,blue:230/255)
+    private static let pale=Color(red:214/255,green:240/255,blue:170/255)
 
     private static func random(_ seed:Int32)->()->Double {
         var a=seed
@@ -87,7 +87,7 @@ final class SpaceSky {
             guard hypot(px+1.5-m/2,py+1.5-m/2)<=m/2 else {continue}
             let t=min(1,hypot(px-m*0.32,py-m*0.30)/(m*0.75))
             let level=t<0.6 ? 0.79-(0.79-0.47)*t/0.6:0.47-(0.47-0.12)*(t-0.6)/0.4
-            moon.append((CGRect(x:mx+px,y:my+py,width:2.2,height:2.2),Color(red:level*0.92,green:level,blue:level*0.84)))
+            moon.append((CGRect(x:mx+px,y:my+py,width:2.2,height:2.2),Color(red:level*0.86,green:level*0.9,blue:level)))
         }}
     }
 
@@ -99,15 +99,15 @@ final class SpaceSky {
     func draw(_ context:inout GraphicsContext,size:CGSize,time:Double?) {
         if size != laidOut {layout(size)}
         let W=size.width,H=size.height,full=Path(CGRect(origin:.zero,size:size))
-        context.fill(full,with:.linearGradient(Gradient(stops:[.init(color:Color(red:1/255,green:2/255,blue:2/255),location:0),.init(color:Color(red:3/255,green:6/255,blue:5/255),location:0.5),.init(color:Color(red:5/255,green:10/255,blue:8/255),location:1)]),startPoint:.zero,endPoint:CGPoint(x:0,y:H)))
+        context.fill(full,with:.linearGradient(Gradient(stops:[.init(color:Color(red:1/255,green:2/255,blue:4/255),location:0),.init(color:Color(red:3/255,green:5/255,blue:10/255),location:0.5),.init(color:Color(red:6/255,green:9/255,blue:18/255),location:1)]),startPoint:.zero,endPoint:CGPoint(x:0,y:H)))
 
         // Nebula along the band.
         var nebula=context
         nebula.translateBy(x:W*0.5,y:H*0.34);nebula.rotate(by:.degrees(-38))
         let bw=1.5*W,bh=0.6*H
-        ellipse(&nebula,CGPoint(x:-0.12*bw,y:0),0.30*bw,0.38*bh,Color(red:46/255,green:120/255,blue:112/255).opacity(0.30))
-        ellipse(&nebula,CGPoint(x:0.12*bw,y:-0.04*bh),0.22*bw,0.30*bh,Color(red:140/255,green:190/255,blue:80/255).opacity(0.16))
-        ellipse(&nebula,.zero,0.50*bw,0.20*bh,Color(red:150/255,green:200/255,blue:180/255).opacity(0.07))
+        ellipse(&nebula,CGPoint(x:-0.12*bw,y:0),0.30*bw,0.38*bh,Color(red:64/255,green:84/255,blue:190/255).opacity(0.30))
+        ellipse(&nebula,CGPoint(x:0.12*bw,y:-0.04*bh),0.22*bw,0.30*bh,Color(red:40/255,green:150/255,blue:170/255).opacity(0.16))
+        ellipse(&nebula,.zero,0.50*bw,0.20*bh,Color(red:160/255,green:175/255,blue:230/255).opacity(0.07))
 
         for s in band {context.fill(Path(CGRect(x:s.x,y:s.y,width:s.size,height:s.size)),with:.color(s.color.opacity(s.alpha)))}
         // Far stars drift 30 pt down and back over four minutes.
@@ -116,7 +116,7 @@ final class SpaceSky {
             let dim=time != nil && s.twinkle && (time!+s.delay).truncatingRemainder(dividingBy:7)>6.58
             context.fill(Path(CGRect(x:s.x,y:s.y+drift,width:s.size,height:s.size)),with:.color(s.color.opacity(s.alpha*(dim ? 0.2:1))))
         }
-        let glint=Color(red:228/255,green:242/255,blue:204/255)
+        let glint=Color(red:230/255,green:236/255,blue:248/255)
         for (i,g) in [(0.18,0.12,0.9),(0.84,0.38,0.7),(0.09,0.58,0.6)].enumerated() {
             let dim=time != nil && (time!+Double(i)*2.3).truncatingRemainder(dividingBy:9)>8.46
             let x=W*g.0,y=H*g.1
@@ -130,9 +130,9 @@ final class SpaceSky {
         // Planet: glow, body, rim line, then the dithered atmosphere and lit surface.
         let p=planet(size),top=p.y-p.r,glow=p.r+70
         let disc=Path(ellipseIn:CGRect(x:p.x-p.r,y:p.y-p.r,width:2*p.r,height:2*p.r))
-        context.fill(Path(ellipseIn:CGRect(x:p.x-glow,y:p.y-glow,width:2*glow,height:2*glow)),with:.radialGradient(Gradient(stops:[.init(color:.clear,location:p.r/glow-0.01),.init(color:Color(red:90/255,green:170/255,blue:150/255).opacity(0.14),location:p.r/glow),.init(color:.clear,location:1)]),center:CGPoint(x:p.x,y:p.y),startRadius:0,endRadius:glow))
-        context.fill(disc,with:.radialGradient(Gradient(stops:[.init(color:Color(red:16/255,green:29/255,blue:22/255),location:0),.init(color:Color(red:7/255,green:16/255,blue:12/255),location:0.18),.init(color:Color(red:3/255,green:6/255,blue:5/255),location:0.45)]),center:CGPoint(x:p.x,y:top),startRadius:0,endRadius:2.24*p.r))
-        context.stroke(disc,with:.color(Color(red:200/255,green:232/255,blue:140/255).opacity(0.55)),lineWidth:1)
+        context.fill(Path(ellipseIn:CGRect(x:p.x-glow,y:p.y-glow,width:2*glow,height:2*glow)),with:.radialGradient(Gradient(stops:[.init(color:.clear,location:p.r/glow-0.01),.init(color:Color(red:80/255,green:110/255,blue:210/255).opacity(0.14),location:p.r/glow),.init(color:.clear,location:1)]),center:CGPoint(x:p.x,y:p.y),startRadius:0,endRadius:glow))
+        context.fill(disc,with:.radialGradient(Gradient(stops:[.init(color:Color(red:18/255,green:26/255,blue:42/255),location:0),.init(color:Color(red:9/255,green:13/255,blue:23/255),location:0.18),.init(color:Color(red:3/255,green:5/255,blue:10/255),location:0.45)]),center:CGPoint(x:p.x,y:top),startRadius:0,endRadius:2.24*p.r))
+        context.stroke(disc,with:.color(Color(red:210/255,green:244/255,blue:150/255).opacity(0.55)),lineWidth:1)
         for (rect,alpha) in dots {context.fill(Path(rect),with:.color(VeilbirdStyle.accent.opacity(alpha)))}
     }
 }

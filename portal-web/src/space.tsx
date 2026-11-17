@@ -9,7 +9,7 @@ import { memo } from "react";
 type Star = { x: number; y: number; size: number; tone: number; alpha: number };
 
 const W = 1440, H = 900;
-const TONES = ["#e8eee4", "#bfd8cc", "#b7dc68"];
+const TONES = ["#e8ecf4", "#bfcbe6", "#c6f26e"];
 
 function random(seed: number) {
   let a = seed;
@@ -65,7 +65,7 @@ export const SpaceBackdrop = memo(function SpaceBackdrop() {
           fill={TONES[s.tone]} opacity={s.alpha} style={{ animationDelay: `${-(index * 731) % 7000}ms` }} />)}
       </g>
       {GLINTS.map(([x, y, alpha], index) => <path key={index} className="space-twinkle" d={`M${x} ${y - 3}h1v7h-1zM${x - 3} ${y}h7v1h-7zM${x - 1} ${y - 1}h3v3h-3z`}
-        fill="#e4f2cc" opacity={alpha} style={{ animationDelay: `${-index * 2300}ms`, animationDuration: "9s" }} />)}
+        fill="#e6ecf8" opacity={alpha} style={{ animationDelay: `${-index * 2300}ms`, animationDuration: "9s" }} />)}
     </svg>
     <div className="space-moon" />
     <div className="space-vignette" />

@@ -17,18 +17,18 @@ import kotlin.math.min
 
 /** The one palette of the app (dark, after the ∅ mark: lime on near-black green). */
 object Palette {
-    val ground = Color.rgb(13, 19, 16)
-    val surface = Color.rgb(21, 28, 23)
-    val raised = Color.rgb(31, 41, 34)
-    val selected = Color.rgb(38, 49, 39)
-    val text = Color.rgb(236, 241, 232)
-    val secondary = Color.rgb(147, 160, 144)
-    val faint = Color.rgb(127, 139, 124)
-    val accent = Color.rgb(183, 220, 104)
-    val onAccent = Color.rgb(17, 25, 18)
-    val danger = Color.rgb(240, 144, 122)
-    val fair = Color.rgb(226, 184, 92)
-    val hairline = Color.argb(16, 236, 241, 232)
+    val ground = Color.rgb(10, 13, 18)
+    val surface = Color.rgb(18, 22, 29)
+    val raised = Color.rgb(27, 32, 41)
+    val selected = Color.rgb(38, 44, 54)
+    val text = Color.rgb(234, 238, 244)
+    val secondary = Color.rgb(164, 173, 187)
+    val faint = Color.rgb(133, 142, 156)
+    val accent = Color.rgb(198, 242, 110)
+    val onAccent = Color.rgb(19, 33, 10)
+    val danger = Color.rgb(240, 134, 114)
+    val fair = Color.rgb(227, 178, 85)
+    val hairline = Color.argb(16, 234, 238, 244)
     fun alpha(color: Int, alpha: Int) = Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
 }
 
@@ -121,8 +121,8 @@ class ConnectRing(context: Context) : View(context) {
         val animated = sweep != null
         for ((x, y, turn) in cells) {
             paint.color = when (state) {
-                State.IDLE -> Color.rgb(36, 48, 38)
-                State.FAILED -> Color.rgb(43, 36, 32)
+                State.IDLE -> Color.rgb(34, 40, 50)
+                State.FAILED -> Color.rgb(42, 34, 32)
                 State.CONNECTED -> Palette.accent
                 // A comet: full at its head, fading over the next 38% of the turn.
                 State.CONNECTING -> if (!animated) Palette.alpha(Palette.accent, 128) else {
@@ -164,7 +164,7 @@ class DataStream(context: Context) : TextView(context) {
     private fun restart() {
         removeCallbacks(tick)
         val live = running && ValueAnimator.areAnimatorsEnabled()
-        setTextColor(if (running) Color.rgb(126, 156, 76) else Color.rgb(46, 59, 49))
+        setTextColor(if (running) Color.rgb(124, 152, 72) else Color.rgb(44, 50, 61))
         text = if (live) String(chars) else "---- ---- ---- ----"
         if (live && isAttachedToWindow) postDelayed(tick, 1000)
     }
@@ -187,7 +187,7 @@ class UsageBars(context: Context) : View(context) {
         val max = values.max().coerceAtLeast(1)
         values.forEachIndexed { i, v ->
             val lit = if (v <= 0) 1 else maxOf(1, Math.round(rows * v.toFloat() / max))
-            paint.color = if (i >= count - recent) Palette.accent else Color.rgb(94, 117, 80)
+            paint.color = if (i >= count - recent) Palette.accent else Color.rgb(96, 119, 74)
             val left = i * (w + gap)
             for (r in 0 until lit) canvas.drawRect(left, height - r * pitch - block, left + w, height - r * pitch, paint)
         }
@@ -209,7 +209,7 @@ class SignalBars(context: Context) : View(context) {
             val h = height * (5 + 3.5f * i) / 12
             val left = i * (w + gap)
             bar.set(left, height - h, left + w, height.toFloat())
-            paint.color = if (i < level) color else Color.rgb(46, 58, 48)
+            paint.color = if (i < level) color else Color.rgb(44, 50, 60)
             canvas.drawRect(bar, paint)
         }
     }
@@ -233,7 +233,7 @@ class RateBars(context: Context) : View(context) {
         val axis = height * 0.64f
         val topRows = maxOf(1, ((axis - 2 * density + pitch - block) / pitch).toInt())
         val bottomRows = maxOf(1, ((height - axis - 2 * density + pitch - block) / pitch).toInt())
-        paint.color = Color.rgb(38, 51, 42)
+        paint.color = Color.rgb(36, 42, 53)
         canvas.drawRect(0f, axis, width.toFloat(), axis + density, paint)
         val max = maxOf(1L, (down + up).maxOrNull() ?: 1L)
         // Newest on the right; an empty start before the first samples.
@@ -244,7 +244,7 @@ class RateBars(context: Context) : View(context) {
             paint.color = Palette.accent
             for (r in 0 until lit) canvas.drawRect(left, axis - 2 * density - r * pitch - block, left + w, axis - 2 * density - r * pitch, paint)
             val litUp = if (up.getOrElse(i) { 0 } <= 0) 0 else maxOf(1, Math.round(bottomRows * up[i].toFloat() / max))
-            paint.color = Color.rgb(94, 117, 80)
+            paint.color = Color.rgb(96, 119, 74)
             for (r in 0 until litUp) canvas.drawRect(left, axis + 3 * density + r * pitch, left + w, axis + 3 * density + r * pitch + block, paint)
         }
     }
@@ -260,7 +260,7 @@ class DotBar(context: Context, private val share: Double, private val color: Int
         val count = maxOf(1, ((width + pitch - block) / pitch).toInt())
         val lit = if (share <= 0) 0 else maxOf(1, Math.round(count * share.coerceAtMost(1.0)).toInt())
         for (i in 0 until count) {
-            paint.color = if (i < lit) color else Color.rgb(31, 41, 34)
+            paint.color = if (i < lit) color else Color.rgb(27, 32, 41)
             canvas.drawRect(i * pitch, 0f, i * pitch + block, minOf(block, height.toFloat()), paint)
         }
     }
@@ -285,9 +285,9 @@ class HourBars(context: Context) : View(context) {
             val total = if (p + d <= 0) 0 else maxOf(1, Math.round(rows * (p + d).toFloat() / max))
             val proxied = if (p <= 0) 0 else maxOf(1, minOf(total, Math.round(total * p.toFloat() / (p + d))))
             val bottom = height - 4 * density
-            if (total == 0) { paint.color = Color.rgb(31, 41, 34); canvas.drawRect(left, bottom - block, left + w, bottom, paint) }
+            if (total == 0) { paint.color = Color.rgb(27, 32, 41); canvas.drawRect(left, bottom - block, left + w, bottom, paint) }
             for (r in 0 until total) {
-                paint.color = if (r < proxied) Palette.accent else Color.rgb(74, 92, 64)
+                paint.color = if (r < proxied) Palette.accent else Color.rgb(84, 92, 108)
                 canvas.drawRect(left, bottom - r * pitch - block, left + w, bottom - r * pitch, paint)
             }
             if (i == now) { paint.color = Palette.secondary; canvas.drawRect(left, height - 2 * density, left + w, height.toFloat(), paint) }
