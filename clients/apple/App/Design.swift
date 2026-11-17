@@ -3,18 +3,18 @@ import CoreText
 
 /// The one palette of the app (dark, after the ∅ mark: lime on near-black green). Same values on every platform.
 enum VeilbirdStyle {
-    static let ground = Color(red:13/255,green:19/255,blue:16/255)
-    static let surface = Color(red:21/255,green:28/255,blue:23/255)
-    static let raised = Color(red:31/255,green:41/255,blue:34/255)
-    static let selected = Color(red:58/255,green:69/255,blue:60/255)
-    static let text = Color(red:236/255,green:241/255,blue:232/255)
-    static let secondary = Color(red:147/255,green:160/255,blue:144/255)
-    static let faint = Color(red:127/255,green:139/255,blue:124/255)
-    static let accent = Color(red:183/255,green:220/255,blue:104/255)
-    static let onAccent = Color(red:17/255,green:25/255,blue:18/255)
-    static let danger = Color(red:240/255,green:144/255,blue:122/255)
-    static let fair = Color(red:226/255,green:184/255,blue:92/255)
-    static let hairline = Color(red:236/255,green:241/255,blue:232/255).opacity(0.10)
+    static let ground = Color(red:10/255,green:13/255,blue:18/255)
+    static let surface = Color(red:18/255,green:22/255,blue:29/255)
+    static let raised = Color(red:27/255,green:32/255,blue:41/255)
+    static let selected = Color(red:52/255,green:58/255,blue:70/255)
+    static let text = Color(red:234/255,green:238/255,blue:244/255)
+    static let secondary = Color(red:164/255,green:173/255,blue:187/255)
+    static let faint = Color(red:133/255,green:142/255,blue:156/255)
+    static let accent = Color(red:198/255,green:242/255,blue:110/255)
+    static let onAccent = Color(red:19/255,green:33/255,blue:10/255)
+    static let danger = Color(red:240/255,green:134/255,blue:114/255)
+    static let fair = Color(red:227/255,green:178/255,blue:85/255)
+    static let hairline = Color(red:234/255,green:238/255,blue:244/255).opacity(0.10)
     #if os(macOS)
     static let mac = true
     #else
@@ -112,8 +112,8 @@ struct ConnectRing:View {
             for dot in Self.cells {
                 let color:Color
                 switch state {
-                case .idle:color=Color(red:36/255,green:48/255,blue:38/255)
-                case .failed:color=Color(red:43/255,green:36/255,blue:32/255)
+                case .idle:color=Color(red:34/255,green:40/255,blue:50/255)
+                case .failed:color=Color(red:42/255,green:34/255,blue:32/255)
                 case .connected:color=VeilbirdStyle.accent
                 case .connecting:
                     if let head {
@@ -146,7 +146,7 @@ struct DataStream:View {
     }
     private func line(_ value:String)->some View {
         Text(verbatim:value).font(Pixel.font(size)).tracking(size*0.18)
-            .foregroundStyle(running ? Color(red:126/255,green:156/255,blue:76/255):Color(red:46/255,green:59/255,blue:49/255))
+            .foregroundStyle(running ? Color(red:124/255,green:152/255,blue:72/255):Color(red:44/255,green:50/255,blue:61/255))
     }
     /// Each digit changes on its own slow beat (3–9 s), so about three change every second.
     static func digits(at date:Date)->String {
@@ -183,7 +183,7 @@ struct SignalBars:View {
     var body:some View {
         HStack(alignment:.bottom,spacing:2.5) {
             ForEach(0..<3,id:\.self) {i in
-                Rectangle().fill(i<level ? color:Color(red:46/255,green:58/255,blue:48/255)).frame(width:3,height:5+3.5*CGFloat(i))
+                Rectangle().fill(i<level ? color:Color(red:44/255,green:50/255,blue:60/255)).frame(width:3,height:5+3.5*CGFloat(i))
             }
         }.frame(width:14,height:12,alignment:.bottom).accessibilityHidden(true)
     }
@@ -201,7 +201,7 @@ struct UsageBars:View {
             let block:CGFloat=4, pitch:CGFloat=6, rows=max(1,Int((area.height+pitch-block)/pitch)), top=max(values.max() ?? 1,1)
             for (i,value) in values.enumerated() {
                 let lit=value<=0 ? 1:max(1,Int((Double(rows)*Double(value)/Double(top)).rounded()))
-                let color=i>=values.count-recent ? VeilbirdStyle.accent:Color(red:94/255,green:117/255,blue:80/255)
+                let color=i>=values.count-recent ? VeilbirdStyle.accent:Color(red:96/255,green:119/255,blue:74/255)
                 let left=CGFloat(i)*(width+gap)
                 for r in 0..<lit {context.fill(Path(CGRect(x:left,y:area.height-CGFloat(r)*pitch-block,width:width,height:block)),with:.color(color))}
             }
@@ -219,7 +219,7 @@ struct RateBars:View {
             let block:CGFloat=4, pitch:CGFloat=6, step=area.width/CGFloat(RateBars.count), width=min(block,step-1)
             let axis=(area.height*0.64).rounded()
             let topRows=max(1,Int((axis-2+pitch-block)/pitch)), bottomRows=max(1,Int((area.height-axis-2+pitch-block)/pitch))
-            context.fill(Path(CGRect(x:0,y:axis,width:area.width,height:1)),with:.color(Color(red:38/255,green:51/255,blue:42/255)))
+            context.fill(Path(CGRect(x:0,y:axis,width:area.width,height:1)),with:.color(Color(red:36/255,green:42/255,blue:53/255)))
             let top=max(1,(down+up).max() ?? 1), offset=RateBars.count-down.count
             for (i,value) in down.enumerated() {
                 let left=CGFloat(offset+i)*step+(step-width)/2
@@ -227,7 +227,7 @@ struct RateBars:View {
                 for r in 0..<lit {context.fill(Path(CGRect(x:left,y:axis-2-CGFloat(r)*pitch-block,width:width,height:block)),with:.color(VeilbirdStyle.accent))}
                 let sent=i<up.count ? up[i]:0
                 let litUp=sent<=0 ? 0:max(1,Int((Double(bottomRows)*Double(sent)/Double(top)).rounded()))
-                for r in 0..<litUp {context.fill(Path(CGRect(x:left,y:axis+3+CGFloat(r)*pitch,width:width,height:block)),with:.color(Color(red:94/255,green:117/255,blue:80/255)))}
+                for r in 0..<litUp {context.fill(Path(CGRect(x:left,y:axis+3+CGFloat(r)*pitch,width:width,height:block)),with:.color(Color(red:96/255,green:119/255,blue:74/255)))}
             }
         }.accessibilityHidden(true)
     }

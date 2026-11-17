@@ -73,6 +73,7 @@ export function UsageCard({ usage, onLogout }: { usage: Usage | null; onLogout: 
 
   const cols = usage ? columns(range, usage) : [];
   // Columns scale against every shown day (today's view keeps the other days, dimmed); the label names the range's busiest day.
+  const now = cols.reduce((last, col, index) => col.future ? last : index, -1);
   const scale = Math.max(1, ...cols.map((col) => col.bytes));
   const peak = Math.max(0, ...cols.filter((col) => col.lit && !col.future).map((col) => col.bytes));
   const height = (bytes: number) => bytes <= 0 ? 1 : Math.min(ROWS, Math.max(1, Math.round(ROWS * bytes / scale)));
@@ -95,7 +96,7 @@ export function UsageCard({ usage, onLogout }: { usage: Usage | null; onLogout: 
       </div>
       {usage && <div className="usage-chart-wrap">
         <div className="usage-chart" aria-hidden="true">
-          {cols.map((col) => <span key={col.day} className={col.future ? "future" : col.lit ? undefined : "dim"} style={{ height: `${height(col.future ? 0 : col.bytes) * 6 - 2}px` }} />)}
+          {cols.map((col, index) => <span key={col.day} className={col.future ? "future" : !col.lit ? "dim" : index === now ? "now" : undefined} style={{ height: `${height(col.future ? 0 : col.bytes) * 6 - 2}px` }} />)}
         </div>
         <div className="usage-axis" aria-hidden="true"><span>{shortDay(cols[0].day)}</span><span>{shortDay(cols[Math.floor(cols.length / 2)].day)}</span><span>{shortDay(cols[cols.length - 1].day)}</span></div>
         <p className="usage-peak mono">{t("单日最高 {0}", [formatBytes(peak)])}</p>

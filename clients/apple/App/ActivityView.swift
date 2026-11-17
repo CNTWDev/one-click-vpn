@@ -10,11 +10,11 @@ struct ActivityView:View {
     @State private var filter="all"
     @State private var query=""
     private let mac=VeilbirdStyle.mac
-    private static let direct=Color(red:74/255,green:92/255,blue:64/255)
-    private static let row=Color(red:22/255,green:30/255,blue:24/255)
-    private static let line=Color(red:31/255,green:42/255,blue:34/255)
-    private static let card=Color(red:18/255,green:25/255,blue:21/255)
-    private static let dim=Color(red:94/255,green:107/255,blue:91/255)
+    private static let direct=Color(red:84/255,green:92/255,blue:108/255)
+    private static let row=Color(red:21/255,green:25/255,blue:31/255)
+    private static let line=Color(red:29/255,green:35/255,blue:44/255)
+    private static let card=Color(red:17/255,green:20/255,blue:26/255)
+    private static let dim=Color(red:112/255,green:120/255,blue:134/255)
 
     private var data:[String:Any]? {model.since == nil ? nil:model.activity}
     private var conns:[[String:Any]] {data?["conns"] as? [[String:Any]] ?? []}
@@ -63,15 +63,15 @@ struct ActivityView:View {
                     }
                     .foregroundStyle(selected ? VeilbirdStyle.text:VeilbirdStyle.secondary)
                     .padding(.horizontal,14).frame(maxWidth:mac ? nil:.infinity).frame(height:mac ? 28:30)
-                    .background(selected ? Color(red:42/255,green:54/255,blue:44/255):Color.clear,in:RoundedRectangle(cornerRadius:mac ? 6:7))
+                    .background(selected ? Color(red:40/255,green:46/255,blue:56/255):Color.clear,in:RoundedRectangle(cornerRadius:mac ? 6:7))
                     .contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
             }
-        }.padding(2).background(Color(red:20/255,green:27/255,blue:22/255),in:RoundedRectangle(cornerRadius:mac ? 8:9))
+        }.padding(2).background(Color(red:19/255,green:22/255,blue:28/255),in:RoundedRectangle(cornerRadius:mac ? 8:9))
     }
     private var privacy:some View {
         HStack(spacing:6) {
-            Rectangle().fill(Color(red:94/255,green:117/255,blue:80/255)).frame(width:6,height:6)
+            Rectangle().fill(Color(red:96/255,green:119/255,blue:74/255)).frame(width:6,height:6)
             Text(L10n.text("activity_local_only")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.faint).lineLimit(1)
         }
     }
@@ -121,7 +121,7 @@ struct ActivityView:View {
             }
             .foregroundStyle(selected ? VeilbirdStyle.text:VeilbirdStyle.secondary)
             .padding(.horizontal,mac ? 10:12).frame(height:mac ? 26:30)
-            .overlay(RoundedRectangle(cornerRadius:mac ? 6:8).stroke(selected ? VeilbirdStyle.accent:Color(red:38/255,green:51/255,blue:42/255)))
+            .overlay(RoundedRectangle(cornerRadius:mac ? 6:8).stroke(selected ? VeilbirdStyle.accent:Color(red:36/255,green:42/255,blue:53/255)))
             .contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
     }
@@ -135,7 +135,7 @@ struct ActivityView:View {
                         Image(systemName:"magnifyingglass").font(.system(size:11)).foregroundStyle(VeilbirdStyle.faint)
                         TextField(L10n.text("activity_filter"),text:$query).textFieldStyle(.plain).font(.system(size:12))
                     }.padding(.horizontal,10).frame(width:220,height:28)
-                    .overlay(RoundedRectangle(cornerRadius:6).stroke(Color(red:38/255,green:51/255,blue:42/255)))
+                    .overlay(RoundedRectangle(cornerRadius:6).stroke(Color(red:36/255,green:42/255,blue:53/255)))
                 }
             }
             if mac {
@@ -352,7 +352,7 @@ struct DotBar:View {
         Canvas {context,size in
             let count=Int((size.width+2)/6),lit=share<=0 ? 0:max(1,Int((Double(count)*min(1,share)).rounded()))
             for i in 0..<max(0,count) {
-                context.fill(Path(CGRect(x:CGFloat(i)*6,y:0,width:4,height:size.height)),with:.color(i<lit ? color:Color(red:35/255,green:45/255,blue:37/255)))
+                context.fill(Path(CGRect(x:CGFloat(i)*6,y:0,width:4,height:size.height)),with:.color(i<lit ? color:Color(red:33/255,green:38/255,blue:47/255)))
             }
         }.accessibilityHidden(true)
     }
@@ -369,10 +369,10 @@ struct HourBars:View {
             let step=(size.width-width)/23
             let rows=max(1,Int((size.height+pitch-block)/pitch))
             let top=max(1,hours.map {$0.0+$0.1}.max() ?? 1)
-            let direct=Color(red:74/255,green:92/255,blue:64/255)
+            let direct=Color(red:84/255,green:92/255,blue:108/255)
             for i in 0..<min(24,hours.count) {
                 let left=(CGFloat(i)*step).rounded(),(p,d)=hours[i]
-                if p+d==0 {context.fill(Path(CGRect(x:left,y:size.height-block,width:width,height:block)),with:.color(Color(red:26/255,green:35/255,blue:28/255)));continue}
+                if p+d==0 {context.fill(Path(CGRect(x:left,y:size.height-block,width:width,height:block)),with:.color(Color(red:25/255,green:29/255,blue:36/255)));continue}
                 let dRows=d<=0 ? 0:max(1,Int((Double(rows)*Double(d)/Double(top)).rounded()))
                 let pRows=p<=0 ? 0:max(1,min(rows-dRows,Int((Double(rows)*Double(p)/Double(top)).rounded())))
                 for r in 0..<dRows {context.fill(Path(CGRect(x:left,y:size.height-block-CGFloat(r)*pitch,width:width,height:block)),with:.color(direct))}

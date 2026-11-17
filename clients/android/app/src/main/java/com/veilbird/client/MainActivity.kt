@@ -117,7 +117,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState); api = NativeApi(this); updater = Updater(this, api)
         val settings = getSharedPreferences("preferences", MODE_PRIVATE)
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", "")!!; selectedCode = settings.getString("nodeCode", "")!!
-        @Suppress("DEPRECATION") window.apply { statusBarColor = Color.rgb(1, 2, 2); navigationBarColor = Color.rgb(3, 6, 5); decorView.systemUiVisibility = 0 }
+        @Suppress("DEPRECATION") window.apply { statusBarColor = Color.rgb(1, 2, 4); navigationBarColor = Color.rgb(3, 5, 10); decorView.systemUiVisibility = 0 }
         render()
         executor.execute { Crash.send(this, api) }
         // The Quick Settings tile could not start the VPN from the background: connect now that the app is open.
@@ -273,7 +273,7 @@ class MainActivity : Activity() {
         handler.removeCallbacks(refresh); if (visible) handler.post(refresh)
     }
     private fun tabBar() = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(140, 7, 11, 9))
+        orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(140, 6, 8, 12))
         addView(View(this@MainActivity).apply { setBackgroundColor(Palette.hairline) }, LinearLayout.LayoutParams(-1, 1))
         val tabs = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12.dp, 6.dp, 12.dp, 6.dp) }
         for ((tab, title, res) in listOf(Triple("connect", R.string.connect_tab, R.drawable.ic_tab_connect), Triple("nodes", R.string.locations, R.drawable.ic_tab_nodes), Triple("activity", R.string.activity_title, R.drawable.ic_tab_activity), Triple("account", R.string.account, R.drawable.ic_tab_account))) {
@@ -294,21 +294,21 @@ class MainActivity : Activity() {
     }
     // ---- Activity: this connection's open connections and where its traffic went. Kept by the core in memory while
     // connected, forgotten on disconnect; nothing is stored or sent.
-    private val directColor = Color.rgb(74, 92, 64)
+    private val directColor = Color.rgb(84, 92, 108)
     private fun activity() {
         pageTitle(L10n.text(R.string.activity_title))
         add(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 0, 0)
-            addView(View(this@MainActivity).apply { setBackgroundColor(Color.rgb(94, 117, 80)) }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 8.dp })
+            addView(View(this@MainActivity).apply { setBackgroundColor(Color.rgb(96, 119, 74)) }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 8.dp })
             addView(text(L10n.text(R.string.activity_local_only), 12f, Palette.faint).apply { maxLines = 2 }, LinearLayout.LayoutParams(0, -2, 1f))
         }, top = -6, bottom = 14)
         add(LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; setPadding(2.dp, 2.dp, 2.dp, 2.dp); background = rounded(Color.rgb(20, 27, 22), 12)
+            orientation = LinearLayout.HORIZONTAL; setPadding(2.dp, 2.dp, 2.dp, 2.dp); background = rounded(Color.rgb(19, 22, 28), 12)
             for ((key, title) in listOf("conns" to R.string.activity_connections, "rank" to R.string.activity_ranking)) {
                 val selected = key == activityTab
                 addView(text(L10n.text(title), 13f, if (selected) Palette.text else Palette.secondary, 500).apply {
                     gravity = Gravity.CENTER; maxLines = 1
-                    background = if (selected) rounded(Color.rgb(42, 54, 44), 10) else pressable(Color.TRANSPARENT, 10)
+                    background = if (selected) rounded(Color.rgb(40, 46, 56), 10) else pressable(Color.TRANSPARENT, 10)
                     contentDescription = L10n.text(title) + if (selected) L10n.text(R.string.current_page) else ""
                     setOnClickListener { if (!selected) { activityTab = key; render() } }
                 }, LinearLayout.LayoutParams(0, -1, 1f))
@@ -349,7 +349,7 @@ class MainActivity : Activity() {
                 val count = when (key) { "proxy" -> proxied; "direct" -> all.size - proxied; else -> all.size }
                 addView(LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(12.dp, 0, 12.dp, 0)
-                    background = GradientDrawable().apply { cornerRadius = 8.dp.toFloat(); setStroke(1.dp, if (selected) Palette.accent else Color.rgb(38, 51, 42)) }
+                    background = GradientDrawable().apply { cornerRadius = 8.dp.toFloat(); setStroke(1.dp, if (selected) Palette.accent else Color.rgb(36, 42, 53)) }
                     if (color != null) addView(square(color).apply { (layoutParams as LinearLayout.LayoutParams).marginEnd = 6.dp })
                     addView(text(L10n.text(title), 13f, if (selected) Palette.text else Palette.secondary))
                     addView(text(L10n.number(count), 11f, if (selected) Palette.text else Palette.secondary).apply { typeface = Typeface.MONOSPACE },
@@ -374,16 +374,16 @@ class MainActivity : Activity() {
                     addView(text(c.optString("host"), 15f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.MIDDLE })
                     addView(text(route, 12f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
                 }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(text(rate(speed), 12f, if (speed > 0) Palette.text else Color.rgb(94, 107, 91)).apply { typeface = Typeface.MONOSPACE; maxLines = 1 },
+                addView(text(rate(speed), 12f, if (speed > 0) Palette.text else Color.rgb(112, 120, 134)).apply { typeface = Typeface.MONOSPACE; maxLines = 1 },
                     LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
             })
-            body.addView(View(this).apply { setBackgroundColor(Color.rgb(22, 30, 24)) }, LinearLayout.LayoutParams(-1, 1))
+            body.addView(View(this).apply { setBackgroundColor(Color.rgb(21, 25, 31)) }, LinearLayout.LayoutParams(-1, 1))
         }
         if (shown.isEmpty()) body.addView(text(L10n.text(R.string.activity_nothing), 13f, Palette.secondary), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 16.dp; marginStart = 4.dp })
     }
     private fun card() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL; setPadding(18.dp, 16.dp, 18.dp, 16.dp)
-        background = GradientDrawable().apply { setColor(Color.rgb(18, 25, 21)); cornerRadius = 16.dp.toFloat(); setStroke(1, Color.rgb(31, 42, 34)) }
+        background = GradientDrawable().apply { setColor(Color.rgb(17, 20, 26)); cornerRadius = 16.dp.toFloat(); setStroke(1, Color.rgb(29, 35, 44)) }
     }
     private fun legend(proxy: Boolean, value: Long, free: Boolean = false) = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
@@ -967,7 +967,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL; setPadding(20.dp, 10.dp, 20.dp, 28.dp)
             background = GradientDrawable().apply { setColor(Palette.surface); val r = 24.dp.toFloat(); cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f) }
         }
-        box.addView(View(this).apply { background = rounded(Color.rgb(46, 58, 48), 2) }, LinearLayout.LayoutParams(36.dp, 4.dp).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        box.addView(View(this).apply { background = rounded(Color.rgb(44, 50, 60), 2) }, LinearLayout.LayoutParams(36.dp, 4.dp).apply { gravity = Gravity.CENTER_HORIZONTAL })
         box.addView(text(title, 17f, Palette.text, 600).apply { setPadding(4.dp, 0, 0, 0); accessibilityHeading() }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 18.dp; bottomMargin = 14.dp })
         box.addView(group(options.mapIndexed { i, option ->
             row().apply {
@@ -976,7 +976,7 @@ class MainActivity : Activity() {
                 contentDescription = option + if (i == checked) L10n.text(R.string.current_page) else ""
                 setOnClickListener { dialog.dismiss(); onPick(i) }
             }
-        }, color = Color.rgb(27, 36, 29)))
+        }, color = Color.rgb(26, 30, 37)))
         dialog.setContentView(box)
         dialog.show()
         dialog.window?.apply {
@@ -999,7 +999,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL; setPadding(20.dp, 10.dp, 20.dp, 24.dp)
             background = GradientDrawable().apply { setColor(Palette.surface); val r = 24.dp.toFloat(); cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f) }
         }
-        box.addView(View(this).apply { background = rounded(Color.rgb(46, 58, 48), 2) }, LinearLayout.LayoutParams(36.dp, 4.dp).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        box.addView(View(this).apply { background = rounded(Color.rgb(44, 50, 60), 2) }, LinearLayout.LayoutParams(36.dp, 4.dp).apply { gravity = Gravity.CENTER_HORIZONTAL })
         val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
         head.addView(text(L10n.text(R.string.check_title), 19f, Palette.text, 600).apply { accessibilityHeading() }, LinearLayout.LayoutParams(0, -2, 1f))
         val status = text("", 12f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
@@ -1019,7 +1019,7 @@ class MainActivity : Activity() {
         val local = leg(L10n.text(R.string.check_local), L10n.text(R.string.check_local_detail))
         val toNode = leg(L10n.text(R.string.check_node), nodeName)
         val web = leg(L10n.text(R.string.check_web), L10n.text(R.string.check_web_detail))
-        val verdict = text("", 14f).apply { background = rounded(Color.rgb(27, 36, 29), 12); setPadding(16.dp, 14.dp, 16.dp, 14.dp) }
+        val verdict = text("", 14f).apply { background = rounded(Color.rgb(26, 30, 37), 12); setPadding(16.dp, 14.dp, 16.dp, 14.dp) }
         box.addView(verdict, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12.dp })
         Directory.regions[nodeId]?.let { region ->
             box.addView(LinearLayout(this).apply {
@@ -1033,7 +1033,7 @@ class MainActivity : Activity() {
             setOnClickListener { dialog.dismiss(); page = "nodes"; render() }
         }
         box.addView(other, LinearLayout.LayoutParams(-1, 48.dp).apply { topMargin = 12.dp })
-        val again = text(L10n.text(R.string.check_again), 15f).apply { gravity = Gravity.CENTER; background = pressable(Color.rgb(27, 36, 29), 12) }
+        val again = text(L10n.text(R.string.check_again), 15f).apply { gravity = Gravity.CENTER; background = pressable(Color.rgb(26, 30, 37), 12) }
         box.addView(again, LinearLayout.LayoutParams(-1, 48.dp).apply { topMargin = 10.dp })
         val ok = Palette.accent; val slow = Palette.fair; val bad = Palette.danger
         fun show(leg: Leg, ms: Int, limit: Int) {

@@ -23,8 +23,8 @@ public enum RingState {Idle,Connecting,Connected,Failed}
 /// shares: the ∅ mark on a 16×16 grid, rings of square dots and the Doto dot-matrix face for figures.
 public static class Look {
     public static Brush Hex(string hex) {var brush=(Brush)new BrushConverter().ConvertFromString(hex)!;brush.Freeze();return brush;}
-    public static readonly Brush Ground=Hex("#0D1310"),Surface=Hex("#151C17"),Raised=Hex("#1F2922"),Selected=Hex("#263127"),Text=Hex("#ECF1E8"),Secondary=Hex("#93A090"),Faint=Hex("#7F8B7C");
-    public static readonly Brush Accent=Hex("#B7DC68"),OnAccent=Hex("#111912"),Danger=Hex("#F0907A"),Fair=Hex("#E2B85C"),Hairline=Hex("#0FECF1E8"),Edge=Hex("#1FECF1E8"),Off=Hex("#2E3A30");
+    public static readonly Brush Ground=Hex("#0A0D12"),Surface=Hex("#12161D"),Raised=Hex("#1B2029"),Selected=Hex("#262C36"),Text=Hex("#EAEEF4"),Secondary=Hex("#A4ADBB"),Faint=Hex("#858E9C");
+    public static readonly Brush Accent=Hex("#C6F26E"),OnAccent=Hex("#13210A"),Danger=Hex("#F08672"),Fair=Hex("#E3B255"),Hairline=Hex("#0FEAEEF4"),Edge=Hex("#1FEAEEF4"),Off=Hex("#2C323C");
     public static readonly FontFamily Icons=new("Segoe Fluent Icons, Segoe MDL2 Assets");
     /// Doto Black (SIL OFL, under Assets/Fonts), Latin only: wordmark, timers, totals and country codes.
     public static readonly FontFamily Dots=new(new Uri("pack://application:,,,/"),"./Assets/Fonts/#Doto Black");
@@ -76,7 +76,7 @@ public static class Look {
         return bars;
     }
     public const string StreamIdle="---- ---- ---- ----";
-    public static readonly Brush StreamOn=Hex("#7E9C4C"),StreamOff=Hex("#2E3B31");
+    public static readonly Brush StreamOn=Hex("#7C9848"),StreamOff=Hex("#2C323D");
     /// The "data stream" under the ring: hex digits that each change on their own slow beat (3–9 s),
     /// so about three change every second.
     public static string Stream(DateTime now) {
