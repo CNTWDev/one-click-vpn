@@ -584,6 +584,115 @@ public partial class MainWindow : Window {
             var exit=Columns(Single(L10n.Text("check_exit"),12,Look.Secondary),new FrameworkElement(),Single(region,12));
             exit.Margin=new Thickness(2,12,2,0);stack.Children.Add(exit);
         }
+        // This node's lines (Line 1…4), each with its delay and the one carrying traffic marked "in use".
+        var linesLabel=Single(L10n.Text("check_lines"),12,Look.Secondary);linesLabel.Margin=new Thickness(2,14,0,0);linesLabel.Visibility=Visibility.Collapsed;
+        stack.Children.Add(linesLabel);
+        var lineGrid=new UniformGrid {Columns=2,Margin=new Thickness(0,8,0,0),Visibility=Visibility.Collapsed};
+        var lineBoxes=new List<(ContentControl Cell,TextBlock Now,TextBlock Value)>();
+        for(var i=0;i<Latency.LineOrder.Length;i++) {
+            var cellHost=new ContentControl {Focusable=false,Content=LineCells(new[]{LineState.Wait}),Margin=new Thickness(0,0,8,0),VerticalAlignment=VerticalAlignment.Center};
+            var now=Single(L10n.Text("line_in_use"),11,Look.Accent);now.Opacity=0;now.Margin=new Thickness(6,0,0,0);
+            var value=Single("—",12,Look.Faint);value.FontFamily=new FontFamily("Cascadia Mono, Consolas");
+            var left=new StackPanel {Orientation=Orientation.Horizontal};left.Children.Add(cellHost);left.Children.Add(Single(LineName(i),13));left.Children.Add(now);
+            lineGrid.Children.Add(new Border {Height=34,BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(6),Padding=new Thickness(10,0,10,0),
+                Margin=new Thickness(i%2==0?0:3,i>1?6:0,i%2==0?3:0,0),Child=Columns(left,new FrameworkElement(),value)});
+            lineBoxes.Add((cellHost,now,value));
+        }
+        stack.Children.Add(lineGrid);
+        var lineNote=Words("",12,Look.Secondary,top:8);lineNote.TextWrapping=TextWrapping.Wrap;lineNote.Visibility=Visibility.Collapsed;
+        stack.Children.Add(lineNote);
+        void ShowLines(IReadOnlyDictionary<string,long>? lines,string current) {
+            if(LineStates(lines) is not { } states||lines is null) return;
+            linesLabel.Visibility=Visibility.Visible;lineGrid.Visibility=Visibility.Visible;
+            for(var i=0;i<Latency.LineOrder.Length;i++) {
+                var name_=Latency.LineOrder[i];var box=lineBoxes[i];var has=lines.TryGetValue(name_,out var lineMs);
+                box.Cell.Content=LineCells(new[]{states[i]});
+                box.Value.Text=LineValue(lines,name_);box.Value.Foreground=!has?Look.Faint:lineMs<0?Look.Danger:Look.Text;
+                box.Now.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(name_==current?1:0,new Duration(TimeSpan.FromMilliseconds(200))));
+            }
+            var down=Latency.LineOrder.Select((n,i)=>(Name:n,Index:i)).Where(x=>lines.TryGetValue(x.Name,out var v)&&v<0).ToList();
+            var used=Array.IndexOf(Latency.LineOrder,current);
+            var text=down.Count>0&&used>=0&&lines.TryGetValue(current,out var usedMs)&&usedMs>=0?L10n.Text("check_lines_note",string.Join(ListJoin,down.Select(x=>LineName(x.Index))),LineName(used)):"";
+            lineNote.Text=text;lineNote.Visibility=text.Length>0?Visibility.Visible:Visibility.Collapsed;
+        }
+        var currentNow="";try {currentNow=core.Now(Transports.Group);} catch {/* not connected */}
+        ShowLines(Latency.Recent.TryGetValue(id,out var known_)?known_.Lines:null,currentNow);
+
+        // The speed of the current connection: a few seconds of download through the line carrying traffic now.
+        var speedStack=new StackPanel();
+        var elapsed=Single("—",11,Look.Secondary);elapsed.FontFamily=new FontFamily("Cascadia Mono, Consolas");
+        speedStack.Children.Add(Columns(Single(L10n.Text("speed_title"),12,Look.Secondary),new FrameworkElement(),elapsed));
+        var mbpsText=new TextBlock {Text="—",FontFamily=Look.Dots,FontSize=40,Foreground=OffCell,VerticalAlignment=VerticalAlignment.Bottom};
+        var figure=new StackPanel {Orientation=Orientation.Horizontal,Height=50,Margin=new Thickness(0,8,0,0)};
+        figure.Children.Add(mbpsText);
+        var unit=Single("Mbps",12,Look.Secondary);unit.VerticalAlignment=VerticalAlignment.Bottom;unit.Margin=new Thickness(6,0,0,6);figure.Children.Add(unit);
+        speedStack.Children.Add(figure);
+        var bar=new UniformGrid {Rows=1,Columns=30,Margin=new Thickness(0,10,0,0)};
+        var barEmpty=Look.Hex("#1A1F28");
+        for(var i=0;i<30;i++) bar.Children.Add(new Rectangle {Height=6,Margin=new Thickness(0,0,i<29?2:0,0),Fill=barEmpty});
+        speedStack.Children.Add(bar);
+        var stats=new UniformGrid {Columns=3,Margin=new Thickness(0,12,0,0)};
+        TextBlock Stat(string title) {
+            var value=Single("—",13);value.FontFamily=new FontFamily("Cascadia Mono, Consolas");
+            var panel=new StackPanel();panel.Children.Add(Single(title,11,Look.Secondary));value.Margin=new Thickness(0,2,0,0);panel.Children.Add(value);stats.Children.Add(panel);
+            return value;
+        }
+        var latencyText=Stat(L10n.Text("speed_latency"));var jitterText=Stat(L10n.Text("speed_jitter"));var usedText=Stat(L10n.Text("speed_used"));
+        speedStack.Children.Add(stats);
+        var speedNote=Single(L10n.Text("speed_hint"),12,Look.Secondary);speedNote.Height=18;speedNote.Margin=new Thickness(0,12,0,0);
+        speedStack.Children.Add(speedNote);
+        stack.Children.Add(new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(14),Margin=new Thickness(0,16,0,0),Child=speedStack});
+        var speedButton=Primary(L10n.Text("speed_start"));speedButton.Margin=new Thickness(0,14,0,0);
+        stack.Children.Add(speedButton);
+        var speedLine="";
+        void ShowSpeed(JsonNode? status) {
+            var state=status?["state"]?.GetValue<string>()??"idle";
+            var running=state is "ping" or "download";
+            var seconds=Math.Max(1,status?["seconds"]?.GetValue<int>()??6);
+            var elapsedMs=status?["elapsedMs"]?.GetValue<long>()??0;
+            var measured=state is "download" or "done";
+            var fraction=state=="done"?1:state=="download"?Math.Min(1,elapsedMs/(seconds*1000.0)):0;
+            for(var i=0;i<30;i++) ((Rectangle)bar.Children[i]).Fill=i<(int)(fraction*30)?(state=="done"?Look.Accent:Look.Secondary):barEmpty;
+            elapsed.Text=measured?string.Format(L10n.Culture,"{0:0.0} / {1:0.0} s",Math.Min(elapsedMs,seconds*1000L)/1000.0,(double)seconds):"—";
+            mbpsText.Text=measured?(status?["mbps"]?.GetValue<double>()??0).ToString("0.0",L10n.Culture):"—";
+            mbpsText.Foreground=state=="done"?Look.Accent:state=="download"?Look.Secondary:OffCell;
+            var latency=status?["latency"]?.GetValue<int>()??-1;var jitter=status?["jitter"]?.GetValue<int>()??-1;var bytes=status?["bytes"]?.GetValue<long>()??0;
+            latencyText.Text=latency>=0?L10n.Text("latency_ms",latency.ToString("N0",L10n.Culture)):"—";
+            jitterText.Text=jitter>=0?L10n.Text("latency_ms",jitter.ToString("N0",L10n.Culture)):"—";
+            usedText.Text=bytes>0?Bytes(bytes):"—";
+            if(status?["line"]?.GetValue<string>() is { Length: >0 } line) speedLine=line;
+            var lineIndex=Array.IndexOf(Latency.LineOrder,speedLine);var over=lineIndex>=0?LineName(lineIndex):name;
+            speedNote.Text=state switch {
+                "ping" or "download"=>L10n.Text("speed_downloading",over),
+                "done"=>lineIndex>=0?L10n.Text("speed_done",over,name):name,
+                "failed"=>L10n.Text("speed_failed"),
+                _=>L10n.Text("speed_hint"),
+            };
+            speedButton.Content=L10n.Text(running?"speed_running":state is "done" or "failed"?"speed_again":"speed_start");
+            speedButton.IsEnabled=!running;
+        }
+        var speedTimer=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(200)};
+        speedTimer.Tick+=async(_,_)=>{
+            if(!window.IsVisible) {speedTimer.Stop();return;}
+            JsonNode? status=null;
+            try {status=JsonNode.Parse(await Task.Run(core.SpeedProgress));} catch {/* keep the last figures */}
+            if(status is null) return;
+            ShowSpeed(status);
+            var state=status["state"]?.GetValue<string>();
+            if(state is "ping" or "download") return;
+            speedTimer.Stop();
+            if(state=="done") Journal.Add($"speed: {status["line"]} {status["mbps"]} Mbps, {status["bytes"]} bytes, latency {status["latency"]} ms, jitter {status["jitter"]} ms");
+            else if(state=="failed") Journal.Add($"speed: failed {status["error"]} over {status["line"]}");
+        };
+        speedButton.Click+=async(_,_)=>{
+            var request=new JsonObject {["group"]=Transports.Group,["pingUrl"]=Transports.TestUrl,["url"]=Latency.SpeedUrl,["seconds"]=6};
+            var reply="error";
+            try {reply=await Task.Run(()=>core.SpeedStart(request.ToJsonString()));} catch {/* core gone */}
+            if(reply!="ok") {ShowSpeed(new JsonObject {["state"]="failed"});return;}
+            speedLine="";ShowSpeed(new JsonObject {["state"]="ping"});speedTimer.Start();
+        };
+        window.Closed+=(_,_)=>{speedTimer.Stop();_=Task.Run(core.SpeedStop);};
+
         var other=Primary(L10n.Text("change_location").Replace("›","").Trim());other.Margin=new Thickness(0,14,0,0);other.Visibility=Visibility.Collapsed;
         other.Click+=(_,_)=>{window.Close();page="nodes";Render();};
         stack.Children.Add(other);
@@ -607,11 +716,18 @@ public partial class MainWindow : Window {
             await Task.Run(()=>{
                 try {a=core.ProbeUrl("DIRECT",Transports.LocalUrl,3000);} catch {/* no answer */}
                 try {if(address is not null) b=core.Reach(address,3000);} catch {/* no answer */}
-                try {var now=core.Now(Transports.Group);if(now.Length>0) c=core.ProbeUrl(now,Transports.TestUrl,5000);} catch {/* no answer */}
+                try {var now=core.Now(Transports.Group);currentNow=now;if(now.Length>0) c=core.ProbeUrl(now,Transports.TestUrl,5000);} catch {/* no answer */}
             });
+            // Each line again, outside the tunnel (the app is excluded from it), as the location list measures them.
+            IReadOnlyDictionary<string,long>? fresh=null;
+            if(node?["test"] is JsonArray { Count: >0 } tests&&await Latency.Real(id,tests) is { } real&&real.Lines.Count>0) {
+                fresh=real.Lines;
+                if(Latency.Recent.TryGetValue(id,out var last)) Latency.Recent[id]=last with {Lines=real.Lines};
+            }
             running=false;again.IsEnabled=true;
             if(!window.IsVisible) return;
             Paint(local,a,300);Paint(toNode,b,300);Paint(web,c,1200);
+            ShowLines(fresh??(Latency.Recent.TryGetValue(id,out var recent)?recent.Lines:null),currentNow);
             status.Text=name;
             bool localSlow=a<0||a>300,nodeSlow=b<0||b>300,webSlow=c<0||c>1200;
             verdict.Text=a<0&&b<0&&c<0?L10n.Text("check_failed")
@@ -797,7 +913,11 @@ public partial class MainWindow : Window {
             measuring=true;BusyBar.Visibility=Visibility.Visible;
             if(HeaderSlot.Content is Button refreshing) refreshing.IsEnabled=false;
             ShowNodes(list,ranked,query);
-            try {ranked=(await Latency.Rank(nodes)).Select(x=>(x.Node,(Quality?)x.Quality)).ToList();} catch {/* keep the last results */}
+            try {
+                var result=await Latency.Rank(nodes);
+                ranked=result.Select(x=>(x.Node,(Quality?)x.Quality)).ToList();
+                _=Latency.Report(api,result);
+            } catch {/* keep the last results */}
             measuring=false;if(!busy) BusyBar.Visibility=Visibility.Hidden;
             if(list.IsLoaded) {ShowNodes(list,ranked,query);if(HeaderSlot.Content is Button again) again.IsEnabled=!connection.Active;}
         }
@@ -827,29 +947,110 @@ public partial class MainWindow : Window {
         row.Click+=(_,_)=>Select("","");
         return row;
     }
+    // ---- Lines (Line 1…4) ----
+    private enum LineState {Ok,Slow,Down,Off,Wait}
+    /// The node whose per-line detail is open in the list ("" = none).
+    private string openNode="";
+    private static string LineName(int index)=>L10n.Text("line_n",(index+1).ToString(L10n.Culture));
+    private static string ListJoin=>L10n.Culture.TwoLetterISOLanguageName=="zh"?"、":", ";
+    /// Each line's cell in the order Line 1…4; null when this PC has no line results for the node.
+    private static List<LineState>? LineStates(IReadOnlyDictionary<string,long>? lines)=>lines is not { Count: >0 }?null
+        :Latency.LineOrder.Select(name=>lines.TryGetValue(name,out var ms)?ms<0?LineState.Down:ms>300?LineState.Slow:LineState.Ok:LineState.Off).ToList();
+    /// One sentence when a line is out ("Line 2 has no answer, using Line 1"); null when every offered line works.
+    private static string? LinesNote(IReadOnlyDictionary<string,long>? lines) {
+        if(lines is not { Count: >0 }) return null;
+        var offered=Latency.LineOrder.Select((name,i)=>(Name:name,Index:i)).Where(x=>lines.ContainsKey(x.Name)).ToList();
+        var working=offered.Where(x=>lines[x.Name]>=0).ToList();var down=offered.Where(x=>lines[x.Name]<0).ToList();
+        if(working.Count==0) return L10n.Text("lines_none");
+        if(down.Count==0) return null;
+        if(working.Count==1&&offered.Count>2) return L10n.Text("lines_only",LineName(working[0].Index));
+        return L10n.Text("lines_one_down",string.Join(ListJoin,down.Select(x=>LineName(x.Index))),LineName(working.MinBy(x=>lines[x.Name]).Index));
+    }
+    private static string LineValue(IReadOnlyDictionary<string,long> lines,string name)=>!lines.TryGetValue(name,out var ms)?L10n.Text("line_off")
+        :ms<0?L10n.Text("line_down"):L10n.Text("latency_ms",ms.ToString("N0",L10n.Culture));
+    private static readonly Brush WaitCell=Look.Hex("#252B35"),OffCell=Look.Hex("#3A414D");
+    private static StackPanel LineCells(IEnumerable<LineState> states,double size=6) {
+        var panel=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center};
+        foreach(var state in states) panel.Children.Add(new Rectangle {Width=size,Height=size,Margin=new Thickness(panel.Children.Count>0?3:0,0,0,0),
+            Fill=state switch {LineState.Ok=>Look.Accent,LineState.Slow=>Look.Fair,LineState.Wait=>WaitCell,_=>Brushes.Transparent},
+            Stroke=state switch {LineState.Down=>Look.Danger,LineState.Off=>OffCell,_=>null},StrokeThickness=1});
+        return panel;
+    }
     private void ShowNodes(StackPanel list,List<(JsonNode Node,Quality? Quality)> ranked,string query) {
         list.Children.Clear();
         var rows=new List<FrameworkElement>();
+        var details=new Dictionary<string,(Border Detail,Border Item)>();
         foreach(var (node,quality) in ranked) {
             var name=node["name"]!.GetValue<string>();var id=node["id"]!.GetValue<string>();var region=node["region"]?.GetValue<string>()??"";
             if(!(name+" "+region).Contains(query,StringComparison.OrdinalIgnoreCase)) continue;
             var unreachable=quality is {Latency: null};
             var selected=id==nodeId;
+            var states=LineStates(quality?.Lines);var note=LinesNote(quality?.Lines);
+            var offered=node["test"] is JsonArray tests&&tests.Any(t=>t?["name"]?.GetValue<string>() is { } n&&Latency.LineOrder.Contains(n));
             var right=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
             if(quality is null) {if(measuring) right.Children.Add(Single("…",12,Look.Secondary));}
             else if(Ms(quality) is { } ms) {
                 right.Children.Add(Single(ms,12,Look.Secondary));
-                var (level,color)=Signal(quality);var bars=Look.Signal(level,color);bars.Margin=new Thickness(8,0,0,0);right.Children.Add(bars);
-            } else right.Children.Add(Single(L10n.Text("quality_unreachable"),12,Look.Faint));
-            if(selected) {var check=Look.Icon("",13,Look.Accent);check.Margin=new Thickness(10,0,0,0);right.Children.Add(check);}
-            var label=Single(name+(region.Length>0&&region!=name?" · "+region:""),14,unreachable?Look.Faint:Look.Text);label.Margin=new Thickness(12,0,8,0);
-            var row=new Button {Height=48,Content=Columns(Look.Badge(Code(id,name),28,unreachable?Look.Faint:null),label,right)};
-            AutomationProperties.SetName(row,name+(quality is not null?", "+Summary(quality):"")+(selected?L10n.Text("current_page"):""));
+                if(states is null) {var (level,color)=Signal(quality);var bars=Look.Signal(level,color);bars.Margin=new Thickness(8,0,0,0);right.Children.Add(bars);}
+            } else right.Children.Add(Single(L10n.Text("quality_unreachable"),12,Look.Danger));
+            if(selected) {var check=Look.Icon("",13,Look.Accent);check.Margin=new Thickness(10,0,0,0);right.Children.Add(check);}
+            var label=note is null?Single(name+(region.Length>0&&region!=name?" · "+region:""),14,unreachable?Look.Faint:Look.Text):(FrameworkElement)TwoLines(name,note);
+            if(label is TextBlock single) single.Margin=new Thickness(12,0,8,0);
+            if(unreachable&&label is StackPanel two&&two.Children[0] is TextBlock title) title.Foreground=Look.Faint;
+            var row=new Button {Height=note is null?48:52,Content=Columns(Look.Badge(Code(id,name),28,unreachable?Look.Faint:null),label,right)};
+            AutomationProperties.SetName(row,name+(quality is not null?", "+Summary(quality):"")+(note is not null?", "+note:"")+(selected?L10n.Text("current_page"):""));
             row.Click+=(_,_)=>Select(id,name);
-            rows.Add(row);
+            var item=new Border {Background=Brushes.Transparent};
+            var stack=new StackPanel();item.Child=stack;
+            var head=new Grid();head.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(1,GridUnitType.Star)});head.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});
+            head.Children.Add(row);stack.Children.Add(head);
+            if(measuring&&offered) {
+                var waiting=LineCells(Enumerable.Repeat(LineState.Wait,Latency.LineOrder.Length));waiting.Width=44;waiting.Margin=new Thickness(0,0,6,0);
+                Grid.SetColumn(waiting,1);head.Children.Add(waiting);
+            } else if(states is not null&&quality?.Lines is { } lines) {
+                // Quieter than the row: no outlines, small grey text, indented to the name.
+                var grid=new UniformGrid {Columns=2,Margin=new Thickness(54,0,16,8)};
+                for(var i=0;i<Latency.LineOrder.Length;i++) {
+                    var name_=Latency.LineOrder[i];var has=lines.TryGetValue(name_,out var lineMs);
+                    var value=Single(LineValue(lines,name_),11,!has?Look.Faint:lineMs<0?Look.Hex("#BFF08672"):Look.Secondary);value.FontFamily=new FontFamily("Cascadia Mono, Consolas");
+                    var cell=LineCells(new[]{states[i]},4);cell.Margin=new Thickness(0,0,7,0);
+                    var line=Columns(cell,Single(LineName(i),12,Look.Faint),value);line.Height=24;line.Margin=new Thickness(0,0,i%2==0?20:0,0);
+                    AutomationProperties.SetName(line,LineName(i)+", "+LineValue(lines,name_));
+                    grid.Children.Add(line);
+                }
+                var open=openNode==id;
+                var detail=new Border {Child=grid,ClipToBounds=true,MaxHeight=open?double.PositiveInfinity:0,Opacity=open?1:0};
+                stack.Children.Add(detail);
+                if(open) item.Background=OpenRow;
+                details[id]=(detail,item);
+                var toggle=new Button {Style=(Style)FindResource("Bare"),Width=44,Height=44,Margin=new Thickness(0,0,6,0),Content=LineCells(states),VerticalAlignment=VerticalAlignment.Center};
+                AutomationProperties.SetName(toggle,L10n.Text("lines_detail",name,states.Count(x=>x!=LineState.Off).ToString(L10n.Culture),states.Count(x=>x is LineState.Ok or LineState.Slow).ToString(L10n.Culture)));
+                toggle.Click+=(_,_)=>{
+                    var opening=openNode!=id;
+                    if(openNode.Length>0&&openNode!=id&&details.TryGetValue(openNode,out var previous)) Expand(previous.Detail,previous.Item,false);
+                    openNode=opening?id:"";
+                    Expand(detail,item,opening);
+                };
+                Grid.SetColumn(toggle,1);head.Children.Add(toggle);
+            }
+            rows.Add(item);
         }
         if(rows.Count>0) list.Children.Add(Card(rows));
         else list.Children.Add(Caption(L10n.Text(ranked.Count==0?"no_locations_available_refresh_later_or_contact_your_administrator":"no_matching_locations_try_another_search")));
+    }
+    private static readonly Brush OpenRow=Look.Hex("#0C0F14");
+    /// Opens or closes a node's line detail by animating its height, so the rows below slide instead of jumping.
+    private static void Expand(Border detail,Border item,bool open) {
+        detail.Child.Measure(new System.Windows.Size(detail.ActualWidth>0?detail.ActualWidth:double.PositiveInfinity,double.PositiveInfinity));
+        var full=detail.Child.DesiredSize.Height;
+        var from=double.IsInfinity(detail.MaxHeight)?full:detail.MaxHeight;
+        var duration=new Duration(TimeSpan.FromMilliseconds(260));
+        var height=new DoubleAnimation(from,open?full:0,duration) {EasingFunction=new CubicEase {EasingMode=EasingMode.EaseOut}};
+        if(open) height.Completed+=(_,_)=>{detail.BeginAnimation(FrameworkElement.MaxHeightProperty,null);detail.MaxHeight=double.PositiveInfinity;};
+        else height.Completed+=(_,_)=>{detail.BeginAnimation(FrameworkElement.MaxHeightProperty,null);detail.MaxHeight=0;};
+        detail.BeginAnimation(FrameworkElement.MaxHeightProperty,height);
+        detail.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(open?1:0,duration));
+        item.Background=open?OpenRow:Brushes.Transparent;
     }
     /// Smart (mainland China direct) or global routing; applies from the next connection.
     private void RoutingChoice() {

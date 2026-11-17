@@ -12,6 +12,8 @@ struct Quality {
     let loss:Int
     var load:Int?
     var users=0
+    /// Each line's result on this network (transport name: ms, -1 = no answer); nil when not measured through the transports.
+    var lines:[String:Int]?=nil
     /// Lower is better. Jitter and loss hurt more than a few extra milliseconds. Load above half costs 4 ms per
     /// percent (a full node +200 ms) and each connected user 1 ms (at most 50), so close nodes win unless busy.
     var score:Int {guard let latency else {return Int.max};return latency+2*jitter+10*loss+max(0,(load ?? 0)-50)*4+min(users,50)}
@@ -38,19 +40,51 @@ enum Latency {
     static var realTests=false
     /// The wait for a request through a transport; mihomo's default, which Clash apps show.
     static let realTimeoutMs=5000
+    /// The transports a node can offer, in the order the apps show them as "Line 1…4": Hysteria2 (with port hopping),
+    /// REALITY on 443, REALITY on the node's spare TCP port, XHTTP. Users only see the numbers; the transport names stay
+    /// in the hidden log. WireGuard is not listed: it cannot be tested before a lease.
+    static let lineOrder=["hysteria2","reality","reality-alt","xhttp"]
+    /// The file the speed test downloads through the current connection (repeated for the test's few seconds).
+    static let speedURL="https://speed.cloudflare.com/__down?bytes=100000000"
     /// A request to the test page through every transport the device has on this node (the server's "test" list,
-    /// the lines a connect would use), the fastest answer in ms; -1 when none answers, nil when not measured.
-    /// This is how Clash apps measure: it sees a node reached only over UDP, and one whose port answers but whose
-    /// transport is blocked after the handshake.
-    private static func real(_ id:String,_ transports:[Any]) async -> Int? {
+    /// the lines a connect would use): the fastest answer in ms (-1 when none answers) and each transport's result;
+    /// nil when not measured. This is how Clash apps measure: it sees a node reached only over UDP, and one whose
+    /// port answers but whose transport is blocked after the handshake.
+    static func real(_ id:String,_ transports:[Any]) async -> (ms:Int,lines:[String:Int])? {
         #if canImport(TunnelCore)
         guard realTests,let data=try? JSONSerialization.data(withJSONObject:["nodes":[id:transports],"url":Transports.testURL,"timeoutMs":realTimeoutMs]) else {return nil}
         let input=String(decoding:data,as:UTF8.self)
         let output=await Task.detached {CoreTest(input)}.value
-        return (try? JSONSerialization.jsonObject(with:Data(output.utf8)) as? [String:Any])?[id] as? Int
+        guard let result=(try? JSONSerialization.jsonObject(with:Data(output.utf8)) as? [String:Any])?[id] as? [String:Any] else {return nil}
+        return (result["ms"] as? Int ?? -1,result["lines"] as? [String:Int] ?? [:])
         #else
         return nil
         #endif
+    }
+    /// Tells the server which lines answered on this network (the block alerts in Console read it). A node's failures
+    /// count only when some line somewhere answered, so a device without internet reports nothing.
+    static func report(_ api:NativeAPI,_ ranked:[(node:[String:Any],quality:Quality)]) async {
+        let measured=ranked.compactMap {item -> (String,[String:Int])? in
+            guard let id=item.node["id"] as? String,let lines=item.quality.lines,!lines.isEmpty else {return nil}
+            return (id,lines)
+        }
+        guard measured.contains(where:{$0.1.values.contains {$0>=0}}) else {return}
+        let network=Transports.networkKey(await currentPath())
+        let at=ISO8601DateFormatter().string(from:Date())
+        let events=measured.prefix(19).map {(id,lines) in
+            ["code":"TRANSPORT_PROBE","at":at,"nodeId":id,"network":network,"detail":lines.sorted {$0.key<$1.key}.map {"\($0.key)="+($0.value>=0 ? "ok":"fail")}.joined(separator:",")]
+        }
+        _ = try? await api.request("diagnostics",["events":Array(events)])
+    }
+    private static func currentPath() async -> NWPath? {
+        await withCheckedContinuation {(done:CheckedContinuation<NWPath?,Never>) in
+            let monitor=NWPathMonitor(),lock=NSLock()
+            var finished=false
+            func finish(_ path:NWPath?) {lock.lock();defer {lock.unlock()};guard !finished else {return};finished=true;monitor.cancel();done.resume(returning:path)}
+            monitor.pathUpdateHandler={finish($0)}
+            monitor.start(queue:.global())
+            DispatchQueue.global().asyncAfter(deadline:.now()+1) {finish(nil)}
+        }
     }
     /// TCP connects give jitter and loss; the request through the transports, when the device has them, decides
     /// whether the node answers and its latency. Devices that never connected (no "test" list) keep the TCP result.
@@ -59,10 +93,14 @@ enum Latency {
         guard !transports.isEmpty,let id=node["id"] as? String else {return await measureTcp(node,attempts:attempts)}
         async let pending=real(id,transports)
         let tcp=await measureTcp(node,attempts:attempts)
-        guard let delay=await pending else {return tcp}
-        if delay<0 {return Quality(latency:nil,jitter:0,loss:100,load:tcp.load,users:tcp.users)}
-        return tcp.latency != nil ? Quality(latency:delay,jitter:tcp.jitter,loss:tcp.loss,load:tcp.load,users:tcp.users)
-            :Quality(latency:delay,jitter:0,loss:0,load:tcp.load,users:tcp.users)
+        guard let result=await pending else {return tcp}
+        let (delay,lines)=result
+        if !lines.isEmpty {
+            Journal.add("lines: \(node["name"] as? String ?? "") "+lines.sorted {$0.key<$1.key}.map {$0.value>=0 ? "\($0.key) \($0.value) ms":"\($0.key) no answer"}.joined(separator:", "))
+        }
+        if delay<0 {return Quality(latency:nil,jitter:0,loss:100,load:tcp.load,users:tcp.users,lines:lines)}
+        return tcp.latency != nil ? Quality(latency:delay,jitter:tcp.jitter,loss:tcp.loss,load:tcp.load,users:tcp.users,lines:lines)
+            :Quality(latency:delay,jitter:0,loss:0,load:tcp.load,users:tcp.users,lines:lines)
     }
     private static func measureTcp(_ node:[String:Any],attempts:Int) async -> Quality {
         let load=load(node),users=users(node)

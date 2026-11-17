@@ -60,6 +60,8 @@
   <data name="check_exit" xml:space="preserve"><value>Точка выхода</value></data>
   <data name="check_failed" xml:space="preserve"><value>Ответа нет. Попробуйте чуть позже.</value></data>
   <data name="check_for_updates" xml:space="preserve"><value>Проверить обновления</value></data>
+  <data name="check_lines" xml:space="preserve"><value>Линии этой локации</value></data>
+  <data name="check_lines_note" xml:space="preserve"><value>{0} не отвечает в этой сети; используется {1}, на работе это не сказывается.</value></data>
   <data name="check_local" xml:space="preserve"><value>Ваша сеть</value></data>
   <data name="check_local_detail" xml:space="preserve"><value>Без туннеля</value></data>
   <data name="check_local_slow" xml:space="preserve"><value>Медленная ваша сеть. Попробуйте другой Wi‑Fi или мобильный интернет.</value></data>
@@ -148,6 +150,15 @@
   <data name="last_30_days" xml:space="preserve"><value>За 30 дней</value></data>
   <data name="last_active" xml:space="preserve"><value>{0} · {1}</value></data>
   <data name="latency_ms" xml:space="preserve"><value>{0} мс</value></data>
+  <data name="line_down" xml:space="preserve"><value>Нет ответа</value></data>
+  <data name="line_in_use" xml:space="preserve"><value>Сейчас</value></data>
+  <data name="line_n" xml:space="preserve"><value>Линия {0}</value></data>
+  <data name="line_off" xml:space="preserve"><value>Нет</value></data>
+  <data name="lines_all_ok" xml:space="preserve"><value>Все {0} линии работают</value></data>
+  <data name="lines_detail" xml:space="preserve"><value>{0}: работают {2} из {1} линий, открыть по линиям</value></data>
+  <data name="lines_none" xml:space="preserve"><value>Недоступен из этой сети</value></data>
+  <data name="lines_one_down" xml:space="preserve"><value>{0} не отвечает, используется {1}</value></data>
+  <data name="lines_only" xml:space="preserve"><value>Работает только {0}</value></data>
   <data name="location" xml:space="preserve"><value>Локация</value></data>
   <data name="location_unavailable_select_another" xml:space="preserve"><value>Локация недоступна. Выберите другую.</value></data>
   <data name="locations" xml:space="preserve"><value>Локации</value></data>
@@ -224,6 +235,18 @@
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Войдите в TrackNothing. Импорт и настройка не нужны.</value></data>
   <data name="sign_out" xml:space="preserve"><value>Выйти</value></data>
   <data name="simulator_build_verify_vpn_connections_on_a_signed_physical" xml:space="preserve"><value>Версия для симулятора · Проверяйте VPN на подписанной сборке для устройства</value></data>
+  <data name="speed_again" xml:space="preserve"><value>Измерить ещё раз</value></data>
+  <data name="speed_done" xml:space="preserve"><value>Через {0} · {1} · только что</value></data>
+  <data name="speed_downloading" xml:space="preserve"><value>Загрузка через {0}…</value></data>
+  <data name="speed_failed" xml:space="preserve"><value>Не удалось измерить, попробуйте позже</value></data>
+  <data name="speed_hint" xml:space="preserve"><value>Только это подключение, около 6 с, 30–80 МБ</value></data>
+  <data name="speed_jitter" xml:space="preserve"><value>Джиттер</value></data>
+  <data name="speed_latency" xml:space="preserve"><value>Задержка</value></data>
+  <data name="speed_need_connection" xml:space="preserve"><value>Подключитесь, чтобы измерить</value></data>
+  <data name="speed_running" xml:space="preserve"><value>Измеряем…</value></data>
+  <data name="speed_start" xml:space="preserve"><value>Измерить скорость</value></data>
+  <data name="speed_title" xml:space="preserve"><value>Скорость подключения</value></data>
+  <data name="speed_used" xml:space="preserve"><value>Трафик</value></data>
   <data name="switched_location" xml:space="preserve"><value>{0} не ответил, переключено на {1}</value></data>
   <data name="system_extension_failed" xml:space="preserve"><value>Не удалось включить VPN-компонент. Переустановите TrackNothing и попробуйте снова.</value></data>
   <data name="tap_ring_to_connect" xml:space="preserve"><value>Нажмите на кольцо, чтобы подключиться</value></data>

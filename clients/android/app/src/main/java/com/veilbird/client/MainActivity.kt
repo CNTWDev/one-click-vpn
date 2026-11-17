@@ -739,6 +739,7 @@ class MainActivity : Activity() {
                 measuring = true; retest.alpha = 0.5f; progress?.visibility = View.VISIBLE; show(list, ranked, query)
                 Thread {
                     val result = try { Latency.rank(nodes) } catch (_: Exception) { null }
+                    result?.let { Latency.report(applicationContext, api, it) }
                     runOnUiThread {
                         measuring = false
                         if (isDestroyed) return@runOnUiThread
@@ -775,6 +776,67 @@ class MainActivity : Activity() {
         add(choice)
         add(text(L10n.text(if (mode == "smart") R.string.routing_smart_detail else R.string.routing_global_detail), 12f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, top = 8)
     }
+    /** The node whose per-line detail is open in the list ("" = none); one at a time. */
+    private var openNode = ""
+    private fun lineName(index: Int) = L10n.text(R.string.line_n, L10n.number(index + 1))
+    /** Each line's cell (OK, SLOW, DOWN, OFF) in the order Line 1…4; null when this device has no line results for the node. */
+    private fun lineStates(quality: Quality?): List<Int>? = quality?.lines?.takeIf { it.isNotEmpty() }?.let { lines ->
+        Latency.lineOrder.map { name -> lines[name]?.let { ms -> when { ms < 0 -> LineCells.DOWN; ms > 300 -> LineCells.SLOW; else -> LineCells.OK } } ?: LineCells.OFF }
+    }
+    /** One sentence when a line is out ("Line 2 has no answer, using Line 1"); null when every offered line works or none was measured. */
+    private fun linesNote(quality: Quality?): String? {
+        val lines = quality?.lines?.takeIf { it.isNotEmpty() } ?: return null
+        val offered = Latency.lineOrder.withIndex().filter { lines.containsKey(it.value) }
+        val working = offered.filter { (lines[it.value] ?: -1) >= 0 }
+        val down = offered.filter { (lines[it.value] ?: -1) < 0 }
+        val join = if (L10n.locale.language == "zh") "、" else ", "
+        return when {
+            working.isEmpty() -> L10n.text(R.string.lines_none)
+            down.isEmpty() -> null
+            working.size == 1 && offered.size > 2 -> L10n.text(R.string.lines_only, lineName(working[0].index))
+            else -> L10n.text(R.string.lines_one_down, down.joinToString(join) { lineName(it.index) }, lineName(working.minBy { lines[it.value]!! }.index))
+        }
+    }
+    /** The quiet per-line grid under a node: a small cell, "Line N" and its delay, two columns, indented to the name. */
+    private fun lineDetail(quality: Quality?): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL; setPadding(66.dp, 0, 16.dp, 10.dp)
+        val lines = quality?.lines ?: emptyMap()
+        val states = lineStates(quality) ?: return@apply
+        for (pair in Latency.lineOrder.indices.chunked(2)) {
+            val r = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL }
+            for (i in pair) {
+                val ms = lines[Latency.lineOrder[i]]
+                val value = when { ms == null -> L10n.text(R.string.line_off); ms < 0 -> L10n.text(R.string.line_down); else -> L10n.text(R.string.latency_ms, L10n.number(ms)) }
+                r.addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = 24.dp
+                    addView(LineCells(this@MainActivity).apply { cell = 4f; this.states = listOf(states[i]) }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 7.dp })
+                    addView(text(lineName(i), 12f, Palette.faint), LinearLayout.LayoutParams(0, -2, 1f))
+                    addView(text(value, 11f, when { ms == null -> Palette.faint; ms < 0 -> Palette.alpha(Palette.danger, 190); else -> Palette.secondary }).apply { typeface = Typeface.MONOSPACE; maxLines = 1 })
+                    contentDescription = lineName(i) + ", " + value
+                }, LinearLayout.LayoutParams(0, -2, 1f).apply { if (i % 2 == 1) marginStart = 20.dp })
+            }
+            addView(r, LinearLayout.LayoutParams(-1, -2))
+        }
+    }
+    /** Opens or closes a node's line detail by animating its height, so the rows below slide instead of jumping. */
+    private fun expand(detail: View, open: Boolean) {
+        detail.animate().cancel()
+        (detail.getTag(R.id.fade_target) as? ValueAnimator)?.cancel()
+        val from = if (detail.visibility == View.VISIBLE) detail.height else 0
+        detail.measure(View.MeasureSpec.makeMeasureSpec((detail.parent as View).width, View.MeasureSpec.EXACTLY), View.MeasureSpec.UNSPECIFIED)
+        val to = if (open) detail.measuredHeight else 0
+        if (!ValueAnimator.areAnimatorsEnabled()) { detail.layoutParams.height = -2; detail.visibility = if (open) View.VISIBLE else View.GONE; detail.alpha = 1f; detail.requestLayout(); return }
+        detail.visibility = View.VISIBLE
+        ValueAnimator.ofInt(from, to).apply {
+            duration = 260; interpolator = DecelerateInterpolator()
+            addUpdateListener { detail.layoutParams.height = it.animatedValue as Int; detail.alpha = if (to == 0) 1f - it.animatedFraction else it.animatedFraction; detail.requestLayout() }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) { if (!open) detail.visibility = View.GONE else detail.layoutParams.height = -2; detail.requestLayout() }
+            })
+            detail.setTag(R.id.fade_target, this)
+            start()
+        }
+    }
     private fun show(list: LinearLayout, ranked: List<Pair<JSONObject, Quality?>>, query: String) {
         list.removeAllViews()
         val rows = mutableListOf<View>()
@@ -783,23 +845,51 @@ class MainActivity : Activity() {
             if (!("$name $region").contains(query, ignoreCase = true)) continue
             val id = node.getString("id"); val code = Directory.code(id, name)
             val unreachable = quality != null && quality.latency == null
-            rows.add(row(60).apply {
+            val states = lineStates(quality)
+            val note = linesNote(quality)
+            val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = ColorDrawable(Color.TRANSPARENT) }
+            val detail = lineDetail(quality).apply { visibility = if (openNode == id && states != null) View.VISIBLE else View.GONE }
+            val main = row(60).apply {
+                background = pressable(Color.TRANSPARENT, 0)
                 addView(badge(code, null, if (unreachable) Palette.faint else Palette.text))
-                addView(titles(name, region, if (unreachable) Palette.faint else Palette.text))
+                addView(titles(name, note ?: region, if (unreachable) Palette.faint else Palette.text))
                 val latency = when {
                     quality == null -> if (measuring) "…" else ""
                     unreachable -> L10n.text(R.string.quality_unreachable)
                     else -> ms(quality)!!
                 }
-                if (latency.isNotEmpty()) addView(text(latency, 13f, if (unreachable) Palette.faint else Palette.secondary).apply { typeface = Typeface.MONOSPACE }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
-                if (quality != null && !unreachable) addView(SignalBars(this@MainActivity).apply {
+                if (latency.isNotEmpty()) addView(text(latency, 13f, if (unreachable) Palette.danger else Palette.secondary).apply { typeface = Typeface.MONOSPACE }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
+                if (states == null && quality != null && !unreachable) addView(SignalBars(this@MainActivity).apply {
                     level = when (quality.grade) { R.string.quality_good -> 3; R.string.quality_fair -> 2; else -> 1 }
                     color = when (quality.grade) { R.string.quality_good -> Palette.accent; R.string.quality_fair -> Palette.fair; else -> Palette.danger }
                 }, LinearLayout.LayoutParams(14.dp, 12.dp).apply { marginStart = 8.dp })
                 if (id == selectedId) addView(icon(R.drawable.ic_check, Palette.accent, 20), LinearLayout.LayoutParams(20.dp, 20.dp).apply { marginStart = 10.dp })
-                contentDescription = name + ", " + (quality?.let { summary(it) } ?: "") + if (id == selectedId) L10n.text(R.string.current_page) else ""
+                contentDescription = name + ", " + (quality?.let { summary(it) } ?: "") + (note?.let { ", $it" } ?: "") + if (id == selectedId) L10n.text(R.string.current_page) else ""
                 setOnClickListener { if (!busy) select(id, name, code) }
-            })
+            }
+            item.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                addView(main, LinearLayout.LayoutParams(0, -2, 1f))
+                // The four line cells: tap to open each line's result. Shown once this device has line results.
+                if (states != null || (measuring && Latency.offered(node).isNotEmpty())) addView(LineCells(this@MainActivity).apply {
+                    this.states = if (measuring) List(Latency.lineOrder.size) { LineCells.WAIT } else states!!
+                    background = pressable(Color.TRANSPARENT, 8)
+                    val working = states?.count { it == LineCells.OK || it == LineCells.SLOW } ?: 0
+                    contentDescription = L10n.text(R.string.lines_detail, name, L10n.number(states?.count { it != LineCells.OFF } ?: 0), L10n.number(working))
+                    if (states != null) setOnClickListener {
+                        val open = openNode != id
+                        val previous = openNode
+                        openNode = if (open) id else ""
+                        if (previous.isNotEmpty() && previous != id) list.findViewWithTag<View>("lines:$previous")?.let { expand(it, false) }
+                        expand(detail, open)
+                        item.background = if (open) ColorDrawable(Color.rgb(12, 15, 20)) else ColorDrawable(Color.TRANSPARENT)
+                    }
+                }, LinearLayout.LayoutParams(44.dp, 44.dp).apply { marginEnd = 6.dp })
+            }, LinearLayout.LayoutParams(-1, -2))
+            detail.tag = "lines:$id"
+            item.addView(detail, LinearLayout.LayoutParams(-1, -2))
+            if (openNode == id && states != null) item.background = ColorDrawable(Color.rgb(12, 15, 20))
+            rows.add(item)
         }
         when {
             rows.isNotEmpty() -> list.addView(group(rows, inset = 66))
@@ -1020,7 +1110,7 @@ class MainActivity : Activity() {
                 setOnClickListener { dialog.dismiss(); onPick(i) }
             }
         }, color = Color.rgb(26, 30, 37)))
-        dialog.setContentView(box)
+        dialog.setContentView(android.widget.ScrollView(this).apply { isVerticalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER; addView(box) })
         dialog.show()
         dialog.window?.apply {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT)); setGravity(Gravity.BOTTOM)
@@ -1071,6 +1161,122 @@ class MainActivity : Activity() {
                 addView(text(region, 13f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp })
         }
+        // This node's lines (Line 1…4), each with its delay and the one carrying traffic marked "in use".
+        val linesLabel = text(L10n.text(R.string.check_lines), 12f, Palette.secondary).apply { visibility = View.GONE }
+        box.addView(linesLabel, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14.dp })
+        class LineBox(val cell: LineCells, val now: TextView, val value: TextView)
+        val lineGrid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        val lineBoxes = Latency.lineOrder.indices.map { i ->
+            val cell = LineCells(this).apply { states = listOf(LineCells.WAIT) }
+            val now = text(L10n.text(R.string.line_in_use), 11f, Palette.accent).apply { alpha = 0f; maxLines = 1 }
+            val value = text("—", 12f, Palette.faint).apply { typeface = Typeface.MONOSPACE; maxLines = 1 }
+            val view = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(10.dp, 0, 10.dp, 0)
+                background = rounded(Palette.surface, 8)
+                addView(cell, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 8.dp })
+                addView(text(lineName(i), 13f), LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 6.dp })
+                addView(now, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(value)
+            }
+            if (i % 2 == 0) lineGrid.addView(LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }, LinearLayout.LayoutParams(-1, 34.dp).apply { if (i > 0) topMargin = 6.dp })
+            (lineGrid.getChildAt(lineGrid.childCount - 1) as LinearLayout).addView(view, LinearLayout.LayoutParams(0, -1, 1f).apply { if (i % 2 == 1) marginStart = 6.dp })
+            LineBox(cell, now, value)
+        }
+        box.addView(lineGrid, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp })
+        val lineNote = text("", 13f, Palette.secondary).apply { visibility = View.GONE }
+        box.addView(lineNote, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp })
+        fun showLines(lines: Map<String, Long>?, current: String) {
+            if (lines.isNullOrEmpty()) return
+            linesLabel.visibility = View.VISIBLE; lineGrid.visibility = View.VISIBLE
+            val states = lineStates(Quality(0, 0, 0, null, lines = lines))!!
+            Latency.lineOrder.forEachIndexed { i, name ->
+                val ms = lines[name]; val b = lineBoxes[i]
+                b.cell.states = listOf(states[i])
+                b.value.text = when { ms == null -> L10n.text(R.string.line_off); ms < 0 -> L10n.text(R.string.line_down); else -> L10n.text(R.string.latency_ms, L10n.number(ms)) }
+                b.value.setTextColor(when { ms == null -> Palette.faint; ms < 0 -> Palette.danger; else -> Palette.text })
+                b.now.fade(name == current)
+            }
+            val down = Latency.lineOrder.withIndex().filter { (lines[it.value] ?: 0) < 0 }
+            val used = Latency.lineOrder.indexOf(current).takeIf { it >= 0 && (lines[current] ?: -1) >= 0 }
+            val note = if (down.isNotEmpty() && used != null) L10n.text(R.string.check_lines_note, down.joinToString(if (L10n.locale.language == "zh") "、" else ", ") { lineName(it.index) }, lineName(used)) else ""
+            lineNote.text = note; lineNote.visibility = if (note.isEmpty()) View.GONE else View.VISIBLE
+        }
+        showLines(Latency.recent[nodeId]?.lines, try { Core.now(Transports.GROUP) } catch (_: Exception) { "" })
+
+        // The speed of the current connection: a few seconds of download through the line carrying traffic now.
+        val speedCard = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = rounded(Palette.surface, 14); setPadding(16.dp, 16.dp, 16.dp, 16.dp) }
+        val speedHead = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        speedHead.addView(text(L10n.text(R.string.speed_title), 12f, Palette.secondary), LinearLayout.LayoutParams(0, -2, 1f))
+        val elapsed = text("—", 11f, Palette.secondary).apply { typeface = Typeface.MONOSPACE }
+        speedHead.addView(elapsed)
+        speedCard.addView(speedHead)
+        val figure = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
+        val mbpsText = text("—", 44f, Color.rgb(58, 65, 77)).apply { typeface = Pixel.font(this@MainActivity); includeFontPadding = false; maxLines = 1 }
+        figure.addView(mbpsText, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 6.dp })
+        figure.addView(text("Mbps", 13f, Palette.secondary).apply { typeface = Typeface.MONOSPACE }, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = 4.dp })
+        speedCard.addView(figure, LinearLayout.LayoutParams(-1, 56.dp).apply { topMargin = 8.dp })
+        val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val barCells = List(30) { View(this).apply { setBackgroundColor(Color.rgb(26, 31, 40)) }.also { bar.addView(it, LinearLayout.LayoutParams(0, -1, 1f).apply { if (bar.childCount > 0) marginStart = 2.dp }) } }
+        speedCard.addView(bar, LinearLayout.LayoutParams(-1, 6.dp).apply { topMargin = 12.dp })
+        val stats = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        fun stat(title: String) = text("—", 14f).apply { typeface = Typeface.MONOSPACE; maxLines = 1 }.also { value ->
+            stats.addView(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(title, 12f, Palette.secondary)); addView(value, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 2.dp }) }, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        val latencyText = stat(L10n.text(R.string.speed_latency)); val jitterText = stat(L10n.text(R.string.speed_jitter)); val usedText = stat(L10n.text(R.string.speed_used))
+        speedCard.addView(stats, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12.dp })
+        val speedNote = text(L10n.text(R.string.speed_hint), 13f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END; minHeight = sp(13f) + 6.dp }
+        speedCard.addView(speedNote, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12.dp })
+        box.addView(speedCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 18.dp })
+        val speedButton = text(L10n.text(R.string.speed_start), 15f, Palette.onAccent, 600).apply { gravity = Gravity.CENTER; background = pressable(Palette.accent, 12) }
+        box.addView(speedButton, LinearLayout.LayoutParams(-1, 48.dp).apply { topMargin = 18.dp })
+        var speedLine = ""
+        fun lineLabel(name: String) = Latency.lineOrder.indexOf(name).takeIf { it >= 0 }?.let { lineName(it) }
+        fun showSpeed(status: JSONObject) {
+            val state = status.optString("state")
+            val running = state == "ping" || state == "download"
+            val seconds = status.optInt("seconds", 6).coerceAtLeast(1)
+            val elapsedMs = status.optLong("elapsedMs")
+            val fraction = when (state) { "download" -> (elapsedMs / (seconds * 1000f)).coerceIn(0f, 1f); "done" -> 1f; else -> 0f }
+            val filled = (fraction * 30).toInt()
+            barCells.forEachIndexed { i, v -> v.setBackgroundColor(if (i < filled) (if (state == "done") Palette.accent else Palette.secondary) else Color.rgb(26, 31, 40)) }
+            elapsed.text = if (state == "download" || state == "done") String.format(L10n.locale, "%.1f / %.1f s", minOf(elapsedMs, seconds * 1000L) / 1000.0, seconds.toDouble()) else "—"
+            val mbps = status.optDouble("mbps", 0.0)
+            mbpsText.text = if (state == "download" || state == "done") String.format(L10n.locale, "%.1f", mbps) else "—"
+            mbpsText.setTextColor(when (state) { "done" -> Palette.accent; "download" -> Palette.secondary; else -> Color.rgb(58, 65, 77) })
+            val latency = status.optInt("latency", -1); val jitter = status.optInt("jitter", -1)
+            latencyText.text = if (latency >= 0) L10n.text(R.string.latency_ms, L10n.number(latency)) else "—"
+            jitterText.text = if (jitter >= 0) L10n.text(R.string.latency_ms, L10n.number(jitter)) else "—"
+            usedText.text = if (status.optLong("bytes") > 0) bytes(status.optLong("bytes")) else "—"
+            status.optString("line").takeIf { it.isNotEmpty() }?.let { speedLine = it }
+            val over = lineLabel(speedLine) ?: nodeName
+            speedNote.swap(when (state) {
+                "ping", "download" -> L10n.text(R.string.speed_downloading, over)
+                "done" -> if (lineLabel(speedLine) != null) L10n.text(R.string.speed_done, over, nodeName) else nodeName
+                "failed" -> L10n.text(R.string.speed_failed)
+                else -> L10n.text(R.string.speed_hint)
+            })
+            speedButton.text = L10n.text(when { running -> R.string.speed_running; state == "done" || state == "failed" -> R.string.speed_again; else -> R.string.speed_start })
+            speedButton.isEnabled = !running; speedButton.alpha = if (running) 0.45f else 1f
+        }
+        val speedTick = object : Runnable {
+            override fun run() {
+                if (!dialog.isShowing) return
+                val status = try { JSONObject(Core.speedProgress()) } catch (_: Exception) { return }
+                showSpeed(status)
+                if (status.optString("state") in listOf("ping", "download")) handler.postDelayed(this, 200)
+                else if (status.optString("state") == "done") Journal.add("speed: ${status.optString("line")} ${status.optDouble("mbps")} Mbps, ${status.optLong("bytes")} bytes, latency ${status.optInt("latency")} ms, jitter ${status.optInt("jitter")} ms")
+                else if (status.optString("state") == "failed") Journal.add("speed: failed ${status.optString("error")} over ${status.optString("line")}")
+            }
+        }
+        speedButton.setOnClickListener {
+            val request = JSONObject().put("group", Transports.GROUP).put("pingUrl", Transports.TEST_URL).put("url", Latency.SPEED_URL).put("seconds", 6)
+            val reply = try { Core.speedStart(request.toString()) } catch (_: Exception) { "error" }
+            if (reply != "ok") { showSpeed(JSONObject().put("state", "failed")); return@setOnClickListener }
+            handler.removeCallbacks(speedTick); handler.post(speedTick)
+        }
+        dialog.setOnDismissListener { handler.removeCallbacks(speedTick); try { Core.speedStop() } catch (_: Exception) { } }
+        showSpeed(JSONObject().put("state", "idle"))
+
         val other = text(L10n.text(R.string.change_location).replace("›", "").trim(), 15f, Palette.onAccent, 600).apply {
             gravity = Gravity.CENTER; background = pressable(Palette.accent, 12); visibility = View.GONE
             setOnClickListener { dialog.dismiss(); page = "nodes"; render() }
@@ -1097,10 +1303,14 @@ class MainActivity : Activity() {
                 val b = Directory.probes[nodeId]?.let { try { Core.reach(it, 3000).toInt() } catch (_: Exception) { -1 } } ?: -1
                 val current = try { Core.now(Transports.GROUP) } catch (_: Exception) { "" }
                 val c = if (current.isEmpty()) -1 else try { delay(Core.probe(current, Transports.TEST_URL, 5000)) } catch (_: Exception) { -1 }
+                // Each line again, outside the tunnel, as the location list measures them.
+                val lines = Directory.tests[nodeId]?.let { Latency.real(nodeId, it)?.second }?.takeIf { it.isNotEmpty() }
+                lines?.let { fresh -> Latency.recent[nodeId]?.let { Latency.recent[nodeId] = it.copy(lines = fresh) } }
                 runOnUiThread {
                     running = false
                     if (!dialog.isShowing) return@runOnUiThread
                     show(local, a, 300); show(toNode, b, 300); show(web, c, 1200)
+                    showLines(lines ?: Latency.recent[nodeId]?.lines, current)
                     status.text = nodeName
                     val nodeSlow = b < 0 || b > 300; val localSlow = a < 0 || a > 300; val webSlow = c < 0 || c > 1200
                     verdict.text = when {
@@ -1116,7 +1326,7 @@ class MainActivity : Activity() {
             }.start()
         }
         again.setOnClickListener { runCheck() }
-        dialog.setContentView(box)
+        dialog.setContentView(android.widget.ScrollView(this).apply { isVerticalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER; addView(box) })
         dialog.show()
         dialog.window?.apply {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT)); setGravity(Gravity.BOTTOM)
@@ -1282,12 +1492,15 @@ object Directory {
     /** "host:port,host:port" each node answers TCP on (the latency probes; the first answer counts), and its region name: for the connection check. */
     val probes = ConcurrentHashMap<String, String>()
     val regions = ConcurrentHashMap<String, String>()
+    /** The transports this device can test on each node (the server's "test" list): the connection check re-tests each line. */
+    val tests = ConcurrentHashMap<String, org.json.JSONArray>()
     fun remember(list: org.json.JSONArray) {
         for (i in 0 until list.length()) list.optJSONObject(i)?.let { node ->
             val id = node.getString("id")
             nodes[id] = node.getString("name") to node.optString("countryCode").takeIf { it.length == 2 }?.uppercase()
             Latency.probes(node).takeIf { it.isNotEmpty() }?.let { list -> probes[id] = list.joinToString(",") { (host, port) -> (if (host.contains(':')) "[$host]" else host) + ":" + port } }
             node.optString("region").takeIf { it.isNotBlank() && it != "null" }?.let { regions[id] = it }
+            node.optJSONArray("test")?.takeIf { it.length() > 0 }?.let { tests[id] = it }
         }
     }
     /** The country code, or the name's first letter when the location has no region. */

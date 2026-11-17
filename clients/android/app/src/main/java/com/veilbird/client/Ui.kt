@@ -218,6 +218,34 @@ class SignalBars(context: Context) : View(context) {
 }
 
 /**
+ * A node's lines (Line 1…4) as small square cells: filled when the line answered (amber when slow), an outline
+ * in the danger color when it did not, a dim outline when the node does not offer it, plain while measuring.
+ */
+class LineCells(context: Context) : View(context) {
+    companion object { const val OK = 0; const val SLOW = 1; const val DOWN = 2; const val OFF = 3; const val WAIT = 4 }
+    var states: List<Int> = emptyList()
+        set(value) { if (field != value) { field = value; invalidate() } }
+    var cell = 6f
+    var gap = 3f
+    private val density = resources.displayMetrics.density
+    private val paint = Paint()
+    override fun onDraw(canvas: Canvas) {
+        if (states.isEmpty()) return
+        val size = cell * density; val step = size + gap * density; val stroke = maxOf(1f, density)
+        var left = (width - (states.size * step - gap * density)) / 2f
+        val top = (height - size) / 2f
+        for (state in states) {
+            paint.style = if (state == OK || state == SLOW || state == WAIT) Paint.Style.FILL else Paint.Style.STROKE
+            paint.strokeWidth = stroke
+            paint.color = when (state) { OK -> Palette.accent; SLOW -> Palette.fair; DOWN -> Palette.danger; WAIT -> Color.rgb(37, 43, 53); else -> Color.rgb(58, 65, 77) }
+            val inset = if (paint.style == Paint.Style.STROKE) stroke / 2 else 0f
+            canvas.drawRect(left + inset, top + inset, left + size - inset, top + size - inset, paint)
+            left += step
+        }
+    }
+}
+
+/**
  * The last 40 seconds of the connection: download as columns of square dots rising from a hairline, upload as
  * dimmer columns hanging below it. Both scale to the busiest second shown, so the shape stays readable at any speed.
  */

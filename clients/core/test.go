@@ -14,6 +14,11 @@ import (
 // hundreds of sockets together (and a phone stays responsive while the list is measured).
 const testWorkers = 16
 
+type testResult struct {
+	Ms    int            `json:"ms"`
+	Lines map[string]int `json:"lines"`
+}
+
 type testInput struct {
 	Nodes     map[string][]map[string]any `json:"nodes"`
 	URL       string                      `json:"url"`
@@ -27,7 +32,8 @@ type testInput struct {
 //
 // input is {"nodes":{"<node id>":[<mihomo proxy>,...]},"url":"...","timeoutMs":5000}. It needs no running core:
 // each transport is built on its own and dials directly (the apps are outside their own tunnel). The reply is
-// {"<node id>":<milliseconds or -1>}, or {} when input cannot be read.
+// {"<node id>":{"ms":<fastest, or -1>,"lines":{"<transport name>":<milliseconds or -1>}}}, or {} when input
+// cannot be read. The apps show the lines as "Line N" and keep the transport names in their hidden log.
 func Test(input string) string {
 	var request testInput
 	if err := json.Unmarshal([]byte(input), &request); err != nil || request.URL == "" {
@@ -38,13 +44,14 @@ func Test(input string) string {
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}
-	results := make(map[string]int, len(request.Nodes))
+	results := make(map[string]*testResult, len(request.Nodes))
 	var mutex sync.Mutex
 	var wait sync.WaitGroup
 	slots := make(chan struct{}, testWorkers)
 	for id, proxies := range request.Nodes {
+		result := &testResult{Ms: -1, Lines: make(map[string]int, len(proxies))}
 		mutex.Lock()
-		results[id] = -1
+		results[id] = result
 		mutex.Unlock()
 		for _, mapping := range proxies {
 			wait.Add(1)
@@ -53,12 +60,14 @@ func Test(input string) string {
 				slots <- struct{}{}
 				defer func() { <-slots }()
 				delay := testOne(mapping, request.URL, timeout)
-				if delay < 0 {
-					return
-				}
+				name, _ := mapping["name"].(string)
 				mutex.Lock()
-				if best := results[id]; best < 0 || delay < best {
-					results[id] = delay
+				result := results[id]
+				if name != "" {
+					result.Lines[name] = delay
+				}
+				if delay >= 0 && (result.Ms < 0 || delay < result.Ms) {
+					result.Ms = delay
 				}
 				mutex.Unlock()
 			}(id, mapping)

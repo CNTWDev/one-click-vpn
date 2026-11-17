@@ -2,11 +2,13 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestTestUnreadableInput(t *testing.T) {
@@ -30,11 +32,11 @@ func TestTestUnreachableNode(t *testing.T) {
 			{"name": "broken", "type": "nope"},
 		},
 	}})
-	var reply map[string]int
+	var reply map[string]testResult
 	if err := json.Unmarshal([]byte(Test(string(input))), &reply); err != nil {
 		t.Fatal(err)
 	}
-	if reply["n1"] != -1 {
+	if reply["n1"].Ms != -1 || reply["n1"].Lines["reality"] != -1 || reply["n1"].Lines["broken"] != -1 {
 		t.Fatalf("got %v", reply)
 	}
 }
@@ -43,7 +45,28 @@ func TestTestUnreachableNode(t *testing.T) {
 func TestTestReachableNode(t *testing.T) {
 	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
 	defer page.Close()
-	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	proxy := connectProxy()
+	defer proxy.Close()
+	address := proxy.Listener.Addr().(*net.TCPAddr)
+	input, _ := json.Marshal(map[string]any{"url": page.URL + "/generate_204", "timeoutMs": 3000, "nodes": map[string]any{
+		"n1": []map[string]any{
+			{"name": "down", "type": "http", "server": "127.0.0.1", "port": 1},
+			{"name": "up", "type": "http", "server": "127.0.0.1", "port": address.Port},
+		},
+		"n2": []map[string]any{},
+	}})
+	var reply map[string]testResult
+	if err := json.Unmarshal([]byte(Test(string(input))), &reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply["n1"].Ms < 0 || reply["n1"].Lines["up"] != reply["n1"].Ms || reply["n1"].Lines["down"] != -1 || reply["n2"].Ms != -1 {
+		t.Fatalf("got %v", reply)
+	}
+}
+
+// connectProxy is a local HTTP CONNECT proxy: a transport mihomo can dial in tests.
+func connectProxy() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodConnect {
 			http.Error(w, "connect only", http.StatusMethodNotAllowed)
 			return
@@ -59,20 +82,47 @@ func TestTestReachableNode(t *testing.T) {
 		_, _ = io.Copy(client, upstream)
 		_ = client.Close()
 	}))
+}
+
+// The speed test downloads through the group's current transport and reports latency, bytes and Mbps.
+func TestSpeedThroughGroup(t *testing.T) {
+	if got := SpeedStart(`{"group":"Nope","pingUrl":"http://x/","url":"http://x/"}`); got != "error not connected" {
+		t.Fatalf("got %q", got)
+	}
+	chunk := make([]byte, 64<<10)
+	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/204" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		for i := 0; i < 64; i++ {
+			if _, err := w.Write(chunk); err != nil {
+				return
+			}
+		}
+	}))
+	defer page.Close()
+	proxy := connectProxy()
 	defer proxy.Close()
-	address := proxy.Listener.Addr().(*net.TCPAddr)
-	input, _ := json.Marshal(map[string]any{"url": page.URL + "/generate_204", "timeoutMs": 3000, "nodes": map[string]any{
-		"n1": []map[string]any{
-			{"name": "down", "type": "http", "server": "127.0.0.1", "port": 1},
-			{"name": "up", "type": "http", "server": "127.0.0.1", "port": address.Port},
-		},
-		"n2": []map[string]any{},
-	}})
-	var reply map[string]int
-	if err := json.Unmarshal([]byte(Test(string(input))), &reply); err != nil {
+	port := proxy.Listener.Addr().(*net.TCPAddr).Port
+	configuration := fmt.Sprintf("mode: rule\nlog-level: silent\nproxies:\n  - {name: up, type: http, server: 127.0.0.1, port: %d}\nproxy-groups:\n  - {name: Line, type: fallback, proxies: [up], url: '%s/204', interval: 300}\nrules:\n  - MATCH,Line\n", port, page.URL)
+	if err := start(t.TempDir(), configuration); err != nil {
 		t.Fatal(err)
 	}
-	if reply["n1"] < 0 || reply["n2"] != -1 {
-		t.Fatalf("got %v", reply)
+	defer Stop()
+	input, _ := json.Marshal(map[string]any{"group": "Line", "pingUrl": page.URL + "/204", "url": page.URL + "/big", "seconds": 1})
+	if got := SpeedStart(string(input)); got != "ok" {
+		t.Fatalf("got %q", got)
+	}
+	var status SpeedStatus
+	for i := 0; i < 100; i++ {
+		_ = json.Unmarshal([]byte(SpeedProgress()), &status)
+		if status.State == "done" || status.State == "failed" {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if status.State != "done" || status.Bytes <= 0 || status.Mbps <= 0 || status.Latency < 0 || status.Line != "up" {
+		t.Fatalf("got %+v", status)
 	}
 }

@@ -1448,5 +1448,120 @@
     "zh": "Gb/s",
     "en": "Gb/s",
     "ru": "Гбит/с"
+  },
+  "line_n": {
+    "zh": "线路 {0}",
+    "en": "Line {0}",
+    "ru": "Линия {0}"
+  },
+  "line_off": {
+    "zh": "未开放",
+    "en": "Not offered",
+    "ru": "Нет"
+  },
+  "line_down": {
+    "zh": "不通",
+    "en": "No answer",
+    "ru": "Нет ответа"
+  },
+  "line_in_use": {
+    "zh": "在用",
+    "en": "In use",
+    "ru": "Сейчас"
+  },
+  "lines_detail": {
+    "zh": "{0}：{1} 条线路中 {2} 条能用，点开看每条",
+    "en": "{0}: {2} of {1} lines work, open for each line",
+    "ru": "{0}: работают {2} из {1} линий, открыть по линиям"
+  },
+  "lines_one_down": {
+    "zh": "{0} 不通，已用 {1}",
+    "en": "{0} has no answer, using {1}",
+    "ru": "{0} не отвечает, используется {1}"
+  },
+  "lines_only": {
+    "zh": "只有 {0} 能用",
+    "en": "Only {0} works",
+    "ru": "Работает только {0}"
+  },
+  "lines_all_ok": {
+    "zh": "{0} 条线路都通",
+    "en": "All {0} lines work",
+    "ru": "Все {0} линии работают"
+  },
+  "lines_none": {
+    "zh": "这个网络连不上",
+    "en": "Not reachable from this network",
+    "ru": "Недоступен из этой сети"
+  },
+  "check_lines": {
+    "zh": "这个节点的线路",
+    "en": "This location's lines",
+    "ru": "Линии этой локации"
+  },
+  "check_lines_note": {
+    "zh": "{0} 在这个网络不通，已自动用 {1}，不影响使用。",
+    "en": "{0} doesn't answer on this network; {1} is used instead, so nothing changes for you.",
+    "ru": "{0} не отвечает в этой сети; используется {1}, на работе это не сказывается."
+  },
+  "speed_title": {
+    "zh": "当前连接的网速",
+    "en": "Speed of this connection",
+    "ru": "Скорость подключения"
+  },
+  "speed_start": {
+    "zh": "测网速",
+    "en": "Test speed",
+    "ru": "Измерить скорость"
+  },
+  "speed_again": {
+    "zh": "再测一次网速",
+    "en": "Test speed again",
+    "ru": "Измерить ещё раз"
+  },
+  "speed_running": {
+    "zh": "测速中…",
+    "en": "Testing…",
+    "ru": "Измеряем…"
+  },
+  "speed_need_connection": {
+    "zh": "连接后可测网速",
+    "en": "Connect to test speed",
+    "ru": "Подключитесь, чтобы измерить"
+  },
+  "speed_hint": {
+    "zh": "只测当前连接，约 6 秒，用量 30–80 MB",
+    "en": "Tests this connection only, about 6 s, 30–80 MB",
+    "ru": "Только это подключение, около 6 с, 30–80 МБ"
+  },
+  "speed_downloading": {
+    "zh": "正在经 {0} 下载…",
+    "en": "Downloading over {0}…",
+    "ru": "Загрузка через {0}…"
+  },
+  "speed_done": {
+    "zh": "经 {0} · {1} · 刚刚",
+    "en": "Over {0} · {1} · just now",
+    "ru": "Через {0} · {1} · только что"
+  },
+  "speed_failed": {
+    "zh": "这次没测出来，稍后再试",
+    "en": "Couldn't measure this time, try again later",
+    "ru": "Не удалось измерить, попробуйте позже"
+  },
+  "speed_latency": {
+    "zh": "延迟",
+    "en": "Latency",
+    "ru": "Задержка"
+  },
+  "speed_jitter": {
+    "zh": "抖动",
+    "en": "Jitter",
+    "ru": "Джиттер"
+  },
+  "speed_used": {
+    "zh": "用量",
+    "en": "Data",
+    "ru": "Трафик"
   }
 }
