@@ -42,6 +42,8 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     assert.equal((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).load,null,"no heartbeat metrics yet");
     await pool.query("UPDATE nodes SET metrics_json=$2 WHERE id=$1",[node,JSON.stringify({collectedAt:new Date().toISOString(),cpuPercent:37.6})]);
     assert.equal((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).load,38);
+    // Before its first connect a device has no secret on the nodes, so no transports to test with.
+    assert.deepEqual((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).test,[]);
     const proof=async(client,action,request)=>{const c=await call("challenge",{action,request},client.token);assert.equal(c.status,200);return {challengeId:c.data.id,request,signature:sign("sha256",Buffer.from(c.data.payload,"base64url"),{key:client.keys.privateKey,dsaEncoding:"ieee-p1363"}).toString("base64url")};};
     const input={nodeId:node,publicKey:randomBytes(32).toString("base64")};
     const payload=await proof(a,"connect",input);
@@ -54,6 +56,9 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     const fallback=result.proxies.find(p=>p.name==="reality");
     assert.match(fallback.uuid,/^[0-9a-f-]{36}$/);assert.equal(fallback.port,443);assert.equal(fallback.flow,"xtls-rprx-vision");
     assert.equal(result.proxies.some(p=>p.name==="hysteria2"),false,"no stealth service on this node");
+    // After it, the node list carries the same lines for this device only, to measure nodes the way connecting uses them.
+    assert.deepEqual((await call("nodes",undefined,winner.token)).data.nodes.find(n=>n.id===node).test,result.proxies);
+    assert.deepEqual((await call("nodes",undefined,loser.token)).data.nodes.find(n=>n.id===node).test,[]);
     const internalDevice=(await pool.query("SELECT device_id FROM native_leases WHERE id=$1",[result.leaseId])).rows[0].device_id;
     await assert.rejects(pool.query(`INSERT INTO connection_profiles(id,device_id,node_id,protocol,transport,revision,endpoint_json,issued_at,expires_at,updated_at)
       VALUES($1,$2,$3,'wireguard','udp',1,'{}',$4,$4,$4)`,[`${user}_bypass`,internalDevice,node,stamp]),/TrackNothing app/);

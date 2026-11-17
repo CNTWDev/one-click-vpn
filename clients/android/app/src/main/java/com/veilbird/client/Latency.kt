@@ -1,5 +1,6 @@
 package com.veilbird.client
 
+import com.veilbird.core.Core
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.InetSocketAddress
@@ -67,7 +68,34 @@ object Latency {
         } finally { tasks.forEach { it.cancel(true) } }
     }
 
+    /** The wait for a request through a transport; mihomo's default, which Clash apps show. */
+    private const val REAL_TIMEOUT_MS = 5000
+
+    /**
+     * A request to the test page through every transport the device has on this node (the server's "test" list,
+     * the lines a connect would use), the fastest answer in ms; -1 when none answers, null when not measured.
+     * This is how Clash apps measure: it sees a node reached only over UDP, and one whose port answers but whose
+     * transport is blocked after the handshake.
+     */
+    private fun real(id: String, transports: JSONArray): Long? = try {
+        val input = JSONObject().put("nodes", JSONObject().put(id, transports)).put("url", Transports.TEST_URL).put("timeoutMs", REAL_TIMEOUT_MS)
+        JSONObject(Core.test(input.toString())).takeIf { it.has(id) }?.optLong(id, -1)
+    } catch (_: Throwable) { null }
+
+    /**
+     * TCP connects give jitter and loss; the request through the transports, when the device has them, decides
+     * whether the node answers and its latency. Devices that never connected (no "test" list) keep the TCP result.
+     */
     fun measure(node: JSONObject, attempts: Int = 5): Quality {
+        val transports = node.optJSONArray("test")?.takeIf { it.length() > 0 }
+        val pending = transports?.let { list -> connector.submit<Long?> { real(node.optString("id"), list) } }
+        val tcp = measureTcp(node, attempts)
+        val delay = pending?.let { try { it.get(REAL_TIMEOUT_MS + 3000L, TimeUnit.MILLISECONDS) } catch (_: Exception) { null } } ?: return tcp
+        if (delay < 0) return Quality(null, 0, 100, tcp.load, tcp.users)
+        return if (tcp.latency != null) tcp.copy(latency = delay) else Quality(delay, 0, 0, tcp.load, tcp.users)
+    }
+
+    private fun measureTcp(node: JSONObject, attempts: Int): Quality {
         val load = if (node.isNull("load")) null else node.optInt("load", -1).takeIf { it in 0..100 }
         val users = users(node)
         val addresses = probes(node).mapNotNull { (host, port) ->
@@ -103,7 +131,7 @@ object Latency {
                 if (known != null && System.currentTimeMillis() - at < reuseMs) known.copy(load = load, users = users(node))
                 else measure(node, attempts).also { measuredAt[id] = System.currentTimeMillis() }
             } }
-            return list.zip(pending.map { task -> try { task.get(20, TimeUnit.SECONDS) } catch (_: Exception) { Quality(null, 0, 100, null) } })
+            return list.zip(pending.map { task -> try { task.get(25, TimeUnit.SECONDS) } catch (_: Exception) { Quality(null, 0, 100, null) } })
                 .onEach { (node, quality) -> recent[node.getString("id")] = quality }
                 .sortedBy { it.second.score }
         } finally { pool.shutdownNow() }

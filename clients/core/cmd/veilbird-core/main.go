@@ -84,6 +84,20 @@ func main() {
 				}
 				reply("fetch:" + id + " " + core.Fetch(home, string(request)))
 			}()
+		case "test":
+			// Answered when done (up to its timeout), so measuring the node list never holds up probes and rates.
+			if len(fields) != 3 {
+				continue
+			}
+			id, encoded := fields[1], fields[2]
+			go func() {
+				request, err := base64.StdEncoding.DecodeString(encoded)
+				if err != nil {
+					reply("test:" + id + " {}")
+					return
+				}
+				reply("test:" + id + " " + core.Test(string(request)))
+			}()
 		case "download":
 			if len(fields) != 3 {
 				continue

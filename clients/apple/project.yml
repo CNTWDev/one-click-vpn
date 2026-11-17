@@ -32,6 +32,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(VEILBIRD_BUNDLE_ID).ios
         PRODUCT_NAME: Veilbird
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) VEILBIRD_APP
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_CFBundleDisplayName: TrackNothing
         INFOPLIST_FILE: Config/App-Info.plist
@@ -40,6 +41,9 @@ targets:
     dependencies:
       - package: VeilbirdCore
       - target: VeilbirdTunnel-iOS
+      # The shared core, linked statically, so the app measures nodes through their transports (Latency.swift).
+      - framework: .deps/TunnelCore.xcframework
+        embed: false
     entitlements:
       path: Signing/iOS.entitlements
       properties:
@@ -54,6 +58,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(VEILBIRD_BUNDLE_ID).macos
         PRODUCT_NAME: Veilbird
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) VEILBIRD_APP
         INFOPLIST_KEY_CFBundleDisplayName: TrackNothing
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
         INFOPLIST_FILE: Config/App-Info.plist
@@ -66,6 +71,9 @@ targets:
     dependencies:
       - package: VeilbirdCore
       - target: VeilbirdTunnel-macOS
+      # The shared core, linked statically, so the app measures nodes through their transports (Latency.swift).
+      - framework: .deps/TunnelCore.xcframework
+        embed: false
     entitlements:
       path: Signing/macOS.entitlements
       properties:
