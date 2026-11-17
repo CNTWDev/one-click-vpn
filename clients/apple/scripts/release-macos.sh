@@ -24,7 +24,14 @@ command -v xcodegen >/dev/null || { echo 'Install XcodeGen and full Xcode first.
 out=artifacts/release
 rm -rf "$out"; mkdir -p "$out"
 bash ../core/build-apple.sh
-xcodegen generate
+# XcodeGen writes the name of the embedded system extension (<bundle id>.systemextension) into the project when it
+# generates it, so the registered identifier must be in the spec itself: overriding VEILBIRD_BUNDLE_ID only on the
+# xcodebuild line builds com.example.macos.tunnel.systemextension but still copies the .dev one into the app.
+spec=project.release.yml
+trap 'rm -f "$spec"' EXIT
+sed "s/com\.veilbird\.client\.dev/$bundle/g" project.yml > "$spec"
+grep -q "VEILBIRD_BUNDLE_ID: $bundle\$" "$spec" || { echo "Could not set VEILBIRD_BUNDLE_ID in $spec" >&2; exit 1; }
+xcodegen generate --spec "$spec"
 xcodebuild archive -project Veilbird.xcodeproj -scheme Veilbird-macOS -configuration Release \
   -destination 'generic/platform=macOS' -archivePath "$out/TrackNothing.xcarchive" \
   VEILBIRD_BUNDLE_ID="$bundle" DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$identity" \
