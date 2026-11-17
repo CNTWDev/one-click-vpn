@@ -156,6 +156,7 @@
   <data name="logs_title" xml:space="preserve"><value>诊断日志</value></data>
   <data name="measuring_latency" xml:space="preserve"><value>测速中…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>账号已到期，请联系管理员续期。</value></data>
+  <data name="menu_bar_speed" xml:space="preserve"><value>菜单栏显示网速</value></data>
   <data name="move_to_applications_first" xml:space="preserve"><value>请先把 TrackNothing 拖到“应用程序”文件夹，再从那里打开。</value></data>
   <data name="my_account" xml:space="preserve"><value>我的账号</value></data>
   <data name="my_veilbird" xml:space="preserve"><value>我的 TrackNothing</value></data>
@@ -181,6 +182,9 @@
   <data name="quality_unreachable" xml:space="preserve"><value>不可达</value></data>
   <data name="quit_app" xml:space="preserve"><value>退出</value></data>
   <data name="quota_exhausted_hint" xml:space="preserve"><value>流量已用完，请联系管理员增加流量。</value></data>
+  <data name="rate_unit_gbps" xml:space="preserve"><value>Gb/s</value></data>
+  <data name="rate_unit_kbps" xml:space="preserve"><value>Kb/s</value></data>
+  <data name="rate_unit_mbps" xml:space="preserve"><value>Mb/s</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>刷新设备状态</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>刷新节点</value></data>
   <data name="reset_by_email" xml:space="preserve"><value>通过邮件重置密码</value></data>

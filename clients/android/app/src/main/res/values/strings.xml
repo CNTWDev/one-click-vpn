@@ -154,6 +154,7 @@
   <string name="logs_title">Diagnostic log</string>
   <string name="measuring_latency">Testing…</string>
   <string name="membership_expired_hint">Your access has expired. Contact your administrator to renew it.</string>
+  <string name="menu_bar_speed">Show speed in menu bar</string>
   <string name="move_to_applications_first">Move TrackNothing to the Applications folder first, then open it from there.</string>
   <string name="my_account">My account</string>
   <string name="my_veilbird">My TrackNothing</string>
@@ -179,6 +180,9 @@
   <string name="quality_unreachable">Unreachable</string>
   <string name="quit_app">Quit</string>
   <string name="quota_exhausted_hint">Your traffic is used up. Contact your administrator to add more.</string>
+  <string name="rate_unit_gbps">Gb/s</string>
+  <string name="rate_unit_kbps">Kb/s</string>
+  <string name="rate_unit_mbps">Mb/s</string>
   <string name="refresh_devices">Refresh devices</string>
   <string name="refresh_locations">Refresh locations</string>
   <string name="reset_by_email">Reset password by email</string>

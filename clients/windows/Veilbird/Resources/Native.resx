@@ -156,6 +156,7 @@
   <data name="logs_title" xml:space="preserve"><value>Diagnostic log</value></data>
   <data name="measuring_latency" xml:space="preserve"><value>Testing…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>Your access has expired. Contact your administrator to renew it.</value></data>
+  <data name="menu_bar_speed" xml:space="preserve"><value>Show speed in menu bar</value></data>
   <data name="move_to_applications_first" xml:space="preserve"><value>Move TrackNothing to the Applications folder first, then open it from there.</value></data>
   <data name="my_account" xml:space="preserve"><value>My account</value></data>
   <data name="my_veilbird" xml:space="preserve"><value>My TrackNothing</value></data>
@@ -181,6 +182,9 @@
   <data name="quality_unreachable" xml:space="preserve"><value>Unreachable</value></data>
   <data name="quit_app" xml:space="preserve"><value>Quit</value></data>
   <data name="quota_exhausted_hint" xml:space="preserve"><value>Your traffic is used up. Contact your administrator to add more.</value></data>
+  <data name="rate_unit_gbps" xml:space="preserve"><value>Gb/s</value></data>
+  <data name="rate_unit_kbps" xml:space="preserve"><value>Kb/s</value></data>
+  <data name="rate_unit_mbps" xml:space="preserve"><value>Mb/s</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>Refresh devices</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Refresh locations</value></data>
   <data name="reset_by_email" xml:space="preserve"><value>Reset password by email</value></data>
