@@ -25,10 +25,18 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     const a=await login(),b=await login();
     // Latency probes need a TCP port on the same host; a WireGuard-only node has none.
     assert.equal((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).probe,null);
+    assert.deepEqual((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).probes,[]);
     await pool.query("INSERT INTO vpn_services(node_id,protocol,transport,listen_port,subnet,status,created_at,updated_at) VALUES($1,'vless','tcp',443,'',$2,$3,$3)",[node,"healthy",stamp]);
     await pool.query("INSERT INTO node_protocols(node_id,protocol,updated_at) VALUES($1,'vless',$2)",[node,stamp]);
     await pool.query("UPDATE nodes SET agent_capabilities_json=$2 WHERE id=$1",[node,JSON.stringify({nativeLeaseEnforcement:1,connectivity:{protocols:{wireguard:{runtimeActive:true,listening:true},vless:{runtimeActive:true,listening:true}}}})]);
     assert.deepEqual((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).probe,{host:"192.0.2.1",port:443});
+    // The stealth service's TCP port (XHTTP) is a second probe, so a node with 443 blocked still answers.
+    await pool.query("INSERT INTO vpn_services(node_id,protocol,transport,listen_port,subnet,status,created_at,updated_at) VALUES($1,'stealth','tcp',8443,'',$2,$3,$3)",[node,"healthy",stamp]);
+    await pool.query("INSERT INTO node_protocols(node_id,protocol,updated_at) VALUES($1,'stealth',$2)",[node,stamp]);
+    await pool.query("UPDATE nodes SET agent_capabilities_json=$2 WHERE id=$1",[node,JSON.stringify({nativeLeaseEnforcement:1,connectivity:{protocols:{wireguard:{runtimeActive:true,listening:true},vless:{runtimeActive:true,listening:true},stealth:{runtimeActive:true,listening:true}}}})]);
+    assert.deepEqual((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).probes,[{host:"192.0.2.1",port:443},{host:"192.0.2.1",port:8443}]);
+    await pool.query("DELETE FROM vpn_services WHERE node_id=$1 AND protocol='stealth'",[node]);
+    await pool.query("DELETE FROM node_protocols WHERE node_id=$1 AND protocol='stealth'",[node]);
     await pool.query("INSERT INTO secret_materials(id,kind,owner_node_id,ciphertext,iv,tag,fingerprint,created_at,updated_at) VALUES($1,'reality_server',$2,'x','x','x','x',$3,$3)",[`${node}_reality`,node,stamp]);
     await pool.query("INSERT INTO reality_settings(node_id,server_name,public_key,short_id,secret_id) VALUES($1,'www.example.com','AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','0123456789abcdef',$2)",[node,`${node}_reality`]);
     assert.equal((await call("nodes",undefined,a.token)).data.nodes.find(n=>n.id===node).load,null,"no heartbeat metrics yet");

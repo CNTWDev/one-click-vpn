@@ -1275,14 +1275,14 @@ class MainActivity : Activity() {
 /** Names and country codes of the locations seen this session, for the connect page's badge and "fastest" line. */
 object Directory {
     val nodes = ConcurrentHashMap<String, Pair<String, String?>>()
-    /** "host:port" each node answers TCP on (the latency probe), and its region name: for the connection check. */
+    /** "host:port,host:port" each node answers TCP on (the latency probes; the first answer counts), and its region name: for the connection check. */
     val probes = ConcurrentHashMap<String, String>()
     val regions = ConcurrentHashMap<String, String>()
     fun remember(list: org.json.JSONArray) {
         for (i in 0 until list.length()) list.optJSONObject(i)?.let { node ->
             val id = node.getString("id")
             nodes[id] = node.getString("name") to node.optString("countryCode").takeIf { it.length == 2 }?.uppercase()
-            node.optJSONObject("probe")?.let { probe -> if (probe.optString("host").isNotEmpty()) probes[id] = probe.optString("host").let { if (it.contains(':')) "[$it]" else it } + ":" + probe.optInt("port") }
+            Latency.probes(node).takeIf { it.isNotEmpty() }?.let { list -> probes[id] = list.joinToString(",") { (host, port) -> (if (host.contains(':')) "[$host]" else host) + ":" + port } }
             node.optString("region").takeIf { it.isNotBlank() && it != "null" }?.let { regions[id] = it }
         }
     }

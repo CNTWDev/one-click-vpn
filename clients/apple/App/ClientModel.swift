@@ -91,10 +91,8 @@ import ServiceManagement
     func connectionCheck() async -> [String:Int]? {
         if nodes.isEmpty {try? await loadNodes()}
         let node=nodes.first {$0["id"] as? String == connectedNodeId}
-        var address=""
-        if let probe=node?["probe"] as? [String:Any],let host=probe["host"] as? String,!host.isEmpty,let port=probe["port"] as? Int {
-            address=(host.contains(":") ? "[\(host)]":host)+":\(port)"
-        }
+        // Every probe port, comma-separated; the tunnel counts the first that answers.
+        let address=node.map {Latency.probes($0).map {(host,port) in (host.contains(":") ? "[\(host)]":host)+":\(port)"}.joined(separator:",")} ?? ""
         guard let session=manager?.connection as? NETunnelProviderSession else {return nil}
         let message="check "+address
         return await withCheckedContinuation {(done:CheckedContinuation<[String:Int]?,Never>) in

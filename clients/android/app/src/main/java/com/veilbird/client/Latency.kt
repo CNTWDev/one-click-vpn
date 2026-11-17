@@ -22,32 +22,64 @@ data class Quality(val latency: Long?, val jitter: Long, val loss: Int, val load
     }
 }
 
-/** "Automatic" location: the best score from TCP connects to each node's probe port, measured from this device. */
+/** "Automatic" location: the best score from TCP connects to each node's probe ports, measured from this device. */
 object Latency {
     /** Last measurement per node id, so the home screen can show it without probing again. */
     val recent = java.util.concurrent.ConcurrentHashMap<String, Quality>()
     private val measuredAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private fun users(node: JSONObject) = node.optInt("users", 0).coerceAtLeast(0)
+    /**
+     * Long enough for one lost SYN to be resent (1 s) and still answer across a long, lossy route; mihomo's own
+     * delay test (what Clash apps show) waits 5 s, so a shorter wait called slow but working nodes unreachable.
+     */
+    private const val TIMEOUT_MS = 3000
+    private val connector = Executors.newCachedThreadPool()
+
+    /** Every TCP port the node answers on (REALITY, XHTTP); older servers only send "probe". */
+    fun probes(node: JSONObject): List<Pair<String, Int>> {
+        val list = node.optJSONArray("probes")?.let { array -> (0 until array.length()).mapNotNull { array.optJSONObject(it) } }
+            ?: listOfNotNull(node.optJSONObject("probe"))
+        return list.map { it.optString("host") to it.optInt("port") }.filter { (host, port) -> host.isNotEmpty() && port in 1..65535 }.distinct()
+    }
+
+    private fun connect(address: InetSocketAddress): Long? = try {
+        Socket().use { socket ->
+            val started = System.nanoTime()
+            socket.connect(address, TIMEOUT_MS)
+            (System.nanoTime() - started) / 1_000_000
+        }
+    } catch (_: Exception) { null }
+
+    /**
+     * Connects to every port at once and takes the first answer: a network that blocks one port (often 443)
+     * still reaches the node on the other, as the app's own fallback transports would when connecting.
+     */
+    private fun race(addresses: List<InetSocketAddress>): Long? {
+        if (addresses.size == 1) return connect(addresses[0])
+        val done = java.util.concurrent.ExecutorCompletionService<Long?>(connector)
+        val tasks = addresses.map { address -> done.submit { connect(address) } }
+        try {
+            for (i in addresses.indices) {
+                val finished = done.poll(TIMEOUT_MS + 500L, TimeUnit.MILLISECONDS) ?: return null
+                finished.get()?.let { return it }
+            }
+            return null
+        } finally { tasks.forEach { it.cancel(true) } }
+    }
 
     fun measure(node: JSONObject, attempts: Int = 5): Quality {
         val load = if (node.isNull("load")) null else node.optInt("load", -1).takeIf { it in 0..100 }
         val users = users(node)
-        val probe = node.optJSONObject("probe") ?: return Quality(null, 0, 100, load, users)
-        val host = probe.optString("host"); val port = probe.optInt("port")
-        if (host.isEmpty() || port !in 1..65535) return Quality(null, 0, 100, load, users)
-        val address = try { InetSocketAddress(host, port).takeIf { !it.isUnresolved } } catch (_: Exception) { null } ?: return Quality(null, 0, 100, load, users)
+        val addresses = probes(node).mapNotNull { (host, port) ->
+            try { InetSocketAddress(host, port).takeIf { !it.isUnresolved } } catch (_: Exception) { null }
+        }
+        if (addresses.isEmpty()) return Quality(null, 0, 100, load, users)
         // DNS is resolved once above, so every attempt is a plain round trip.
         val samples = mutableListOf<Long>()
         for (attempt in 0 until attempts) {
             // Two misses in a row with nothing answered: the node is down, stop waiting on it.
             if (attempt == 2 && samples.isEmpty()) return Quality(null, 0, 100, load, users)
-            try {
-                Socket().use { socket ->
-                    val started = System.nanoTime()
-                    socket.connect(address, 1500)
-                    samples.add((System.nanoTime() - started) / 1_000_000)
-                }
-            } catch (_: Exception) { }
+            race(addresses)?.let { samples.add(it) }
         }
         val loss = (attempts - samples.size) * 100 / attempts
         if (samples.isEmpty()) return Quality(null, 0, loss, load, users)
@@ -71,7 +103,7 @@ object Latency {
                 if (known != null && System.currentTimeMillis() - at < reuseMs) known.copy(load = load, users = users(node))
                 else measure(node, attempts).also { measuredAt[id] = System.currentTimeMillis() }
             } }
-            return list.zip(pending.map { task -> try { task.get(10, TimeUnit.SECONDS) } catch (_: Exception) { Quality(null, 0, 100, null) } })
+            return list.zip(pending.map { task -> try { task.get(20, TimeUnit.SECONDS) } catch (_: Exception) { Quality(null, 0, 100, null) } })
                 .onEach { (node, quality) -> recent[node.getString("id")] = quality }
                 .sortedBy { it.second.score }
         } finally { pool.shutdownNow() }
