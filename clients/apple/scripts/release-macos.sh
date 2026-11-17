@@ -118,12 +118,16 @@ notarize_dmg() {
     submission=$(xcrun notarytool submit "$dmg" "${auth[@]}" --output-format json | plutil -extract id raw -o - -)
   fi
   echo "Notarization submission: $submission"
-  if ! xcrun notarytool wait "$submission" "${auth[@]}" --timeout 60m; then
+  # Usually minutes; a team's first submissions can take hours, so don't hold a Mac for them: the signed DMG stays
+  # as the run's artifact and 「macOS notarize」 checks back in seconds.
+  local wait=${VEILBIRD_NOTARY_WAIT:-20m}
+  if ! xcrun notarytool wait "$submission" "${auth[@]}" --timeout "$wait"; then
     status=$(notary_status "$submission" || true)
     if [[ "$status" == "In Progress" || -z "$status" ]]; then
-      echo "::warning::Apple has not finished notarization $submission after 60 min. The signed DMG is kept as this" \
-        "run's artifact. Finish it later without rebuilding: Run workflow with 平台 = macOS notarize and build =" \
+      echo "::warning::Apple is still notarizing $submission (waited $wait). The signed DMG is kept as this run's" \
+        "artifact. Check back without rebuilding: Run workflow with 平台 = macOS notarize and build =" \
         "${VEILBIRD_BUILD_NUMBER:-<this run number>}." >&2
+      [[ -n "${GITHUB_OUTPUT:-}" ]] && { echo "notarized=false" >> "$GITHUB_OUTPUT"; exit 0; }
       exit 1
     fi
   fi
@@ -134,6 +138,7 @@ notarize_dmg() {
   fi
   xcrun stapler staple "$dmg"
   spctl --assess --type open --context context:primary-signature --verbose "$dmg"
+  [[ -n "${GITHUB_OUTPUT:-}" ]] && echo "notarized=true" >> "$GITHUB_OUTPUT"
   echo "$dmg"
 }
 

@@ -72,3 +72,7 @@ tsconfig.tsbuildinfo
 # local deploy state
 /.deploy.lock/
 /.deployed/
+
+# Local Apple notarization check (scripts/apple-notary.mjs): credentials stay on this machine.
+/scripts/apple-notary.json
+*.p8

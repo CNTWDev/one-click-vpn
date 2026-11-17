@@ -96,7 +96,9 @@ VEILBIRD_RELEASE_MIRROR_PUBLIC_BASE_URL=https://<CDN 加速域名>
 之后每次运行「Client release」都会多出 `TrackNothing-macos-…`。CI 做的事：导入证书 → `scripts/apple-profiles.mjs` 取描述文件 → `clients/apple/scripts/release-macos.sh` 打包签名、生成 DMG、公证并钉订票据。本机有 Xcode 时也可以手动跑这个脚本（需要的环境变量写在脚本开头）。
 
 - 内核（mihomo）只编 Mac 需要的部分，并按内核代码缓存：内核没改的版本跳过这一步，Mac 大约 3 分钟加上公证时间。
-- 签好名的 DMG 在提交公证前就先存为运行的 Artifact，公证通过后再换成钉好票据的版本。新账号前几次公证可能要几十分钟；超过 60 分钟 CI 会停下并在运行页面给出公证编号，这时不用重编：等一段时间后 Run workflow，「平台」选 `macOS notarize`、「build」填那次的运行序号（如 `18`），运行列表显示为 `Client release · macOS notarize 18`。它取那次的 DMG，等同一个公证结果（不重新提交），钉好票据后替换 Artifact 并发布到 beta，几分钟就结束。
+- 签好名的 DMG 在提交公证前就先存为运行的 Artifact，公证通过后再换成钉好票据的版本。公证一般几分钟；新账号前几次可能要几个小时，CI 最多等 20 分钟，没出结果就先结束（黄色提示，不算失败），不用重编。
+- 之后随时查：Run workflow，「平台」选 `macOS notarize`、「build」填那次的运行序号（如 `18`），列表显示为 `Client release · macOS notarize 18`。它先用 Linux 向 Apple 查状态，几十秒出结果，并列出最近所有公证记录：还在处理就直接结束；已通过就用 Mac 钉好票据（约 2 分钟），替换 Artifact 并发布到 beta；被拒会打印 Apple 的原因。
+- 在自己电脑上查（装了 Node 18+ 即可）：把 `.p8` 放到 `scripts/` 旁边，新建 `scripts/apple-notary.json`：`{"keyPath": "AuthKey.p8", "keyId": "<Key ID>", "issuerId": "<Issuer ID>"}`（两者已在 .gitignore 里，不会提交），然后 `node scripts/apple-notary.mjs` 列出最近的公证记录，`--build 18` 只看第 18 次构建。
 
 ### 用户第一次安装
 

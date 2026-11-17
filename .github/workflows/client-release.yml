@@ -261,17 +261,18 @@ jobs:
           path: clients/apple/artifacts/release/TrackNothing-*-macos.dmg
           if-no-files-found: error
       - name: Notarize
+        id: notarize
         if: steps.ready.outputs.ready == 'true'
         run: bash clients/apple/scripts/release-macos.sh notarize
       - uses: actions/upload-artifact@v4
-        if: steps.ready.outputs.ready == 'true'
+        if: steps.notarize.outputs.notarized == 'true'
         with:
           name: TrackNothing-macos-${{ needs.prepare.outputs.version }}-${{ github.run_number }}
           path: clients/apple/artifacts/release/TrackNothing-*-macos.dmg
           if-no-files-found: error
           overwrite: true
       - name: Publish to beta
-        if: steps.ready.outputs.ready == 'true' && needs.prepare.outputs.publish == 'true'
+        if: steps.notarize.outputs.notarized == 'true' && needs.prepare.outputs.publish == 'true'
         run: >-
           node scripts/release-client.mjs --platform macos --arch universal --channel beta --publish
           --version "${{ needs.prepare.outputs.version }}" --build "$VEILBIRD_BUILD_NUMBER" --min-os "macOS 13"
@@ -282,11 +283,12 @@ jobs:
         run: |
           security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/developer-id.p12"
-  # Finishes a Mac build whose notarization outlasted its run: takes that run's signed DMG, waits for Apple's
-  # verdict on the same submission (no rebuild, no new submission), staples it and publishes it to beta.
-  macos-notarize:
+  # Finishes a Mac build whose notarization outlasted its run, without rebuilding or resubmitting. A quick Linux
+  # job asks Apple for the state of that DMG's submission (seconds): still in progress → done, run it again later;
+  # accepted → a short Mac job staples the ticket, replaces the artifact and publishes to beta.
+  notary-status:
     if: inputs.platforms == 'macOS notarize'
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       actions: read
@@ -294,12 +296,13 @@ jobs:
       VEILBIRD_BUILD_NUMBER: ${{ inputs.build }}
       VEILBIRD_APPLE_API_KEY_ID: ${{ secrets.VEILBIRD_APPLE_API_KEY_ID }}
       VEILBIRD_APPLE_API_ISSUER_ID: ${{ secrets.VEILBIRD_APPLE_API_ISSUER_ID }}
-      VEILBIRD_NOTARY_RESUME: '1'
+    outputs:
+      status: ${{ steps.status.outputs.status }}
+      run: ${{ steps.source.outputs.run }}
+      artifact: ${{ steps.source.outputs.artifact }}
+      version: ${{ steps.source.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
       - name: Find the run's DMG
         id: source
         env:
@@ -310,12 +313,47 @@ jobs:
             --jq ".workflow_runs[] | select(.run_number == $VEILBIRD_BUILD_NUMBER) | .id")
           artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/artifacts" --jq '.artifacts[] | select(.name | startswith("TrackNothing-macos-")) | .name')
           [[ -n "$run" && -n "$artifact" ]] || { echo "::error::Run $VEILBIRD_BUILD_NUMBER has no TrackNothing-macos artifact."; exit 1; }
-          echo "run=$run" >> "$GITHUB_OUTPUT"; echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
-          version=${artifact#TrackNothing-macos-}; echo "VEILBIRD_VERSION=${version%-*}" >> "$GITHUB_ENV"
+          version=${artifact#TrackNothing-macos-}; version=${version%-*}
+          { echo "run=$run"; echo "artifact=$artifact"; echo "version=$version"; } >> "$GITHUB_OUTPUT"
+      - id: status
+        env:
+          P8: ${{ secrets.VEILBIRD_APPLE_API_KEY_P8 }}
+        run: |
+          printf '%s\n' "$P8" > "$RUNNER_TEMP/AuthKey.p8"
+          VEILBIRD_APPLE_API_KEY_PATH="$RUNNER_TEMP/AuthKey.p8" node scripts/apple-notary.mjs \
+            --name "TrackNothing-${{ steps.source.outputs.version }}-$VEILBIRD_BUILD_NUMBER-macos.dmg"
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
+      - name: Result
+        env:
+          STATUS: ${{ steps.status.outputs.status }}
+        run: |
+          case "$STATUS" in
+            Accepted) echo "::notice::Accepted by Apple: stapling and publishing build $VEILBIRD_BUILD_NUMBER." ;;
+            "In Progress") echo "::notice::Apple is still notarizing build $VEILBIRD_BUILD_NUMBER. Nothing to do yet: run 「macOS notarize」 again later." ;;
+            *) echo "::error::Apple did not accept build $VEILBIRD_BUILD_NUMBER: $STATUS (log above)."; exit 1 ;;
+          esac
+  macos-notarize:
+    needs: notary-status
+    if: needs.notary-status.outputs.status == 'Accepted'
+    runs-on: macos-15
+    permissions:
+      contents: read
+      actions: read
+    env:
+      VEILBIRD_BUILD_NUMBER: ${{ inputs.build }}
+      VEILBIRD_VERSION: ${{ needs.notary-status.outputs.version }}
+      VEILBIRD_APPLE_API_KEY_ID: ${{ secrets.VEILBIRD_APPLE_API_KEY_ID }}
+      VEILBIRD_APPLE_API_ISSUER_ID: ${{ secrets.VEILBIRD_APPLE_API_ISSUER_ID }}
+      VEILBIRD_NOTARY_RESUME: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: actions/download-artifact@v4
         with:
-          name: ${{ steps.source.outputs.artifact }}
-          run-id: ${{ steps.source.outputs.run }}
+          name: ${{ needs.notary-status.outputs.artifact }}
+          run-id: ${{ needs.notary-status.outputs.run }}
           github-token: ${{ github.token }}
           path: clients/apple/artifacts/release
       - name: API key
@@ -324,11 +362,11 @@ jobs:
         run: |
           printf '%s\n' "$P8" > "$RUNNER_TEMP/AuthKey.p8"
           echo "VEILBIRD_APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
-      - name: Notarize
+      - name: Staple
         run: bash clients/apple/scripts/release-macos.sh notarize
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.source.outputs.artifact }}
+          name: ${{ needs.notary-status.outputs.artifact }}
           path: clients/apple/artifacts/release/TrackNothing-*-macos.dmg
           if-no-files-found: error
       - name: Publish to beta
