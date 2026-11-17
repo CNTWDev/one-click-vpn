@@ -54,6 +54,7 @@ import ServiceManagement
     private var ticker:AnyCancellable?
     // Status is polled here, not in the window: on the Mac the menu bar keeps working after the window is closed.
     init() {
+        Latency.realTests=true // the app measures nodes through their transports (Latency.swift)
         CrashReports.shared.start();ticker=Timer.publish(every:1,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in self?.refreshStatus()}}
         // The apps stay open for days (menu bar, background): check again once six hours have passed.
         updateTicker=Timer.publish(every:900,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in await self?.checkIfDue()}}

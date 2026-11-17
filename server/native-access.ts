@@ -5,6 +5,7 @@ import { verifyPassword } from "./password";
 import { allowLoginAttempt, recordAuthFailure } from "./rate-limit";
 import { canonical, digest, identity, NativeError, verifyNativeProof } from "./native-proof";
 import { rebuildDesiredState, selectVpnServices } from "./control-plane";
+import type { VpnService } from "./control-db";
 import { ipv4Address, ipv4Pool } from "./ipv4-pool";
 import { ensureNativeSecret, nativeProxies } from "./stealth";
 import { hopLines } from "./hop-reach";
@@ -83,30 +84,43 @@ function nodeLoad(metrics: string | null | undefined): number | null {
     return Math.max(0,Math.min(100,Math.round(value.cpuPercent)));
   } catch { return null; }
 }
-export async function nativeNodes() {
+/**
+ * The device's enrollment when nodes already accept it: active, with its secret, the account allowed and the
+ * device within its limit (the rule of nativeUserRows, which builds the nodes' user lists). Never created here.
+ */
+async function acceptedEnrollment(session: Session): Promise<string|null> {
+  return (await dbQuery<{id:string}>(`SELECT e.id FROM native_enrollments e JOIN users u ON u.id=e.user_id
+    WHERE e.user_id=$1 AND e.identity_thumbprint=$2 AND e.status='active' AND ${accessSql()} AND ${withinDeviceLimitSql("u","e.created_at","e.id")}
+      AND EXISTS (SELECT 1 FROM secret_materials s WHERE s.kind='native_secret:' || e.id AND s.owner_node_id IS NULL)`,
+    [session.user_id,session.identity_thumbprint]))[0]?.id ?? null;
+}
+export async function nativeNodes(session?: Session) {
   // WireGuard ignores unknown peers, so clients time TCP connects instead: the REALITY port and the stealth
   // service's TCP port (XHTTP). A node answers if either does, the same way a subscription's per-node fallback
   // group (Hysteria2 > REALITY > XHTTP) stays usable when one port is blocked on a network.
   // Nodes without one have no probe and keep the server's least-loaded order behind measured nodes.
-  const ports=new Map<string,number[]>();
+  const services=new Map<string,{vless?:VpnService;stealth?:VpnService}>();
   for(const protocol of ["vless","stealth"] as const) for(const {node,service} of await selectVpnServices({protocol})) {
-    const list=ports.get(node.id)||[];
-    if(!list.includes(service.listen_port)) list.push(service.listen_port);
-    // The spare REALITY port (hop-ports.ts) answers when only 443 is blocked on the device's network.
-    const spare=protocol==="vless"?(await hopLines(node)).tcpPort:null;
-    if(spare && !list.includes(spare)) list.push(spare);
-    ports.set(node.id,list);
+    services.set(node.id,{...services.get(node.id),[protocol]:service});
   }
+  // A device that connected before also gets its own transports per node ("test"), so the app can measure
+  // each node the way connecting uses it (a request through Hysteria2 / REALITY / XHTTP), as Clash apps do.
+  // These are the same lines a connect returns to this device; a new device has none until its first connect.
+  const enrollmentId=session?await acceptedEnrollment(session):null;
   // The country code labels each location in the apps (a two-letter badge).
   const regions=new Map((await listRegions()).map((region)=>[region.id,region]));
-  return {apiOrigins:await apiOrigins(),nodes:(await candidates()).map(({node})=>{
+  return {apiOrigins:await apiOrigins(),nodes:await Promise.all((await candidates()).map(async({node})=>{
     const host=node.public_endpoint||node.ip;
-    const probes=(ports.get(node.id)||[]).map((port)=>({host,port}));
+    const found=services.get(node.id)||{};
+    // The spare REALITY port (hop-ports.ts) answers when only 443 is blocked on the device's network.
+    const spare=found.vless?(await hopLines(node)).tcpPort:null;
+    const probes=[...new Set([found.vless?.listen_port,found.stealth?.listen_port,spare].filter((port):port is number=>typeof port==="number"))].map((port)=>({host,port}));
     const countryCode=node.region_id?regions.get(node.region_id)?.code?.toUpperCase()||null:null;
+    const test=enrollmentId?await nativeProxies(node,enrollmentId,found).catch(()=>[]):[];
     // load (CPU %) and users (online now) let the apps prefer a quieter node when latencies are close.
     // probe (the first of probes) stays for app builds that only read one address.
-    return {id:node.id,name:node.name,region:node.region,countryCode,protocol:"wireguard",probe:probes[0]||null,probes,load:nodeLoad(node.metrics_json),users:Math.max(0,Number(node.users)||0)};
-  })};
+    return {id:node.id,name:node.name,region:node.region,countryCode,protocol:"wireguard",probe:probes[0]||null,probes,test,load:nodeLoad(node.metrics_json),users:Math.max(0,Number(node.users)||0)};
+  }))};
 }
 export async function nativeChallenge(session: Session, body: Record<string,unknown>) {
   if (!["connect","disconnect","revoke"].includes(String(body.action)) || !body.request || typeof body.request!=="object" || Array.isArray(body.request)) throw new NativeError("INVALID_REQUEST");

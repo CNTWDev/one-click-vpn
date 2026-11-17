@@ -38,7 +38,7 @@ public sealed class Core : IDisposable {
     private void Read(Process core,BlockingCollection<string> lines) {
         try {
             while(core.StandardOutput.ReadLine() is { } line) {
-                var prefix=line.StartsWith("fetch:",StringComparison.Ordinal)?6:line.StartsWith("download:",StringComparison.Ordinal)?9:0;
+                var prefix=line.StartsWith("fetch:",StringComparison.Ordinal)?6:line.StartsWith("download:",StringComparison.Ordinal)?9:line.StartsWith("test:",StringComparison.Ordinal)?5:0;
                 if(prefix>0) {
                     var space=line.IndexOf(' ');
                     if(space>prefix&&fetches.TryRemove(line[prefix..space],out var waiting)) waiting.TrySetResult(line[(space+1)..]);
@@ -65,6 +65,18 @@ public sealed class Core : IDisposable {
             core.StandardInput.WriteLine($"fetch {id} {Convert.ToBase64String(Encoding.UTF8.GetBytes(request))}");core.StandardInput.Flush();
         }
         return await answer.Task.WaitAsync(TimeSpan.FromSeconds(60));
+    }
+    /// A request through each node's transports (core.Test), the way Clash apps measure; {"node id": ms or -1}.
+    /// Answered when done, so a slow node never holds up the other calls.
+    public async Task<string> Test(string request) {
+        var id=Guid.NewGuid().ToString("N")[..12];
+        var answer=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        fetches[id]=answer;
+        lock(writing) {
+            var core=Running();
+            core.StandardInput.WriteLine($"test {id} {Convert.ToBase64String(Encoding.UTF8.GetBytes(request))}");core.StandardInput.Flush();
+        }
+        return await answer.Task.WaitAsync(TimeSpan.FromSeconds(30));
     }
     /// An update installer (core.Download: mirror first, then every API origin, resuming); status JSON when it ends.
     public async Task<string> Download(string request) {
