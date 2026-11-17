@@ -9,12 +9,7 @@
 .home-start { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: stretch; padding-top: 36px; }
 .home-start.solo { grid-template-columns: minmax(0, 1fr); }
 .home-app, .home-third { position: relative; min-width: 0; display: flex; flex-direction: column; border-radius: var(--radius-lg); }
-.home-app { gap: 24px; padding: 36px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
-  background: radial-gradient(ellipse 60% 70% at 88% 18%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
-    radial-gradient(ellipse 70% 60% at 0% 110%, rgb(70 90 200 / .26), transparent 70%), linear-gradient(160deg, #171d28, #10141c 70%);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent), 0 30px 100px color-mix(in srgb, var(--accent) 14%, transparent); }
-.home-app::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(color-mix(in srgb, var(--accent-strong) 16%, transparent) 1px, transparent 1.5px) 0 0 / 8px 8px;
-  -webkit-mask: radial-gradient(ellipse 55% 75% at 85% 20%, #000 0, transparent 75%); mask: radial-gradient(ellipse 55% 75% at 85% 20%, #000 0, transparent 75%); }
+.home-app { gap: 24px; padding: 36px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
 .home-app > * { position: relative; }
 .home-app-head { display: flex; align-items: center; gap: 32px; min-width: 0; }
 .home-app-text { flex: 1; display: grid; gap: 14px; justify-items: start; min-width: 0; }
@@ -26,7 +21,7 @@
 .home-app-download { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 6px; }
 .home .primary.big { min-height: 52px; padding: 0 24px; font-size: 16px; border-radius: var(--radius); white-space: normal; text-align: center; }
 .home-app-meta { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: var(--text-2); }
-.home-app .hero-ring { flex: none; width: 176px; height: 176px; filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 35%, transparent)); }
+.home-app .hero-ring { flex: none; width: 176px; height: 176px; }
 .home-app-others { display: grid; gap: 4px; margin-top: auto; }
 .home-app-label { margin: 0; font-size: 13px; color: var(--text-2); }
 .home-app-rows { list-style: none; margin: 0; padding: 0; }
@@ -34,7 +29,7 @@
 .home-app-rows .primary.small, .home-app-rows .secondary.small { flex: none; }
 .home-versions-wrap { border-top: 0; margin-top: -8px; }
 .home-versions-wrap > summary { color: var(--text-2); }
-.home-third { gap: 12px; padding: 28px; background: rgb(14 17 24 / .62); border: 1px solid var(--border); }
+.home-third { gap: 12px; padding: 28px; border: 1px solid var(--border); }
 .home-third > * { margin: 0; max-width: 100%; }
 .home-third h2 { font-size: 18px; line-height: 1.3; font-weight: 650; overflow-wrap: break-word; }
 .home-third.solo { padding: 36px; }
@@ -68,8 +63,6 @@ div.import-apps { gap: 6px; padding-top: 6px; border-top: 0; }
 .import-share > input { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
 .import-reset { justify-self: start; padding-left: 0; }
 .hero-ring { position: relative; width: 300px; height: 300px; color: var(--accent); }
-.hero-ring::before { content: ""; position: absolute; inset: -14%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 32%, transparent) .9px, transparent 1.5px) 0 0 / 8px 8px;
-  -webkit-mask: radial-gradient(circle, #000 0, #000 26%, transparent 66%); mask: radial-gradient(circle, #000 0, #000 26%, transparent 66%); }
 .hero-ring svg { position: relative; width: 100%; height: 100%; fill: currentColor; }
 .hero-ring .twinkle { animation: hero-twinkle 6s steps(1) infinite; }
 @keyframes hero-twinkle { 0% { opacity: 1; } 95% { opacity: .25; } 100% { opacity: 1; } }

@@ -121,7 +121,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState); api = NativeApi(this); updater = Updater(this, api)
         val settings = getSharedPreferences("preferences", MODE_PRIVATE)
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", "")!!; selectedCode = settings.getString("nodeCode", "")!!
-        @Suppress("DEPRECATION") window.apply { statusBarColor = Color.rgb(1, 2, 4); navigationBarColor = Color.rgb(3, 5, 10); decorView.systemUiVisibility = 0 }
+        @Suppress("DEPRECATION") window.apply { statusBarColor = Palette.ground; navigationBarColor = Palette.ground; decorView.systemUiVisibility = 0 }
         render()
         executor.execute { Crash.send(this, api) }
         // The Quick Settings tile could not start the VPN from the background: connect now that the app is open.
@@ -147,7 +147,11 @@ class MainActivity : Activity() {
 
     // ---- Building blocks: one radius scale (12 controls, 16 cards), one palette, one type scale.
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
-    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply { setColor(color); cornerRadius = radius.dp.toFloat() }
+    // A "surface" block is drawn as a hairline outline on the ground (same as the Portal and Console cards).
+    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
+        if (color == Palette.surface) { setColor(Color.TRANSPARENT); setStroke(1.dp, Palette.edge) } else setColor(color)
+        cornerRadius = radius.dp.toFloat()
+    }
     private fun pressable(color: Int, radius: Int): Drawable =
         RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.text, 22)), if (color == Color.TRANSPARENT) null else rounded(color, radius), rounded(Color.WHITE, radius))
     private fun TextView.weight(value: Int) = apply {
@@ -406,7 +410,7 @@ class MainActivity : Activity() {
     }
     private fun card() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL; setPadding(18.dp, 16.dp, 18.dp, 16.dp)
-        background = GradientDrawable().apply { setColor(Color.rgb(17, 20, 26)); cornerRadius = 16.dp.toFloat(); setStroke(1, Color.rgb(29, 35, 44)) }
+        background = GradientDrawable().apply { setColor(Color.TRANSPARENT); cornerRadius = 16.dp.toFloat(); setStroke(1.dp, Palette.edge) }
     }
     private fun legend(proxy: Boolean, value: Long, free: Boolean = false) = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL

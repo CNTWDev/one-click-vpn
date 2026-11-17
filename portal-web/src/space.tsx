@@ -1,10 +1,10 @@
 import { memo } from "react";
 
 /**
- * The deep-space backdrop behind every Portal page (same look as the apps): a near-black sky, a pixel Milky Way
- * crossing it on a slant over a faint teal and lime nebula, a far star layer that drifts very slowly, a few cross
- * glints, a dithered moon and a dark planet whose lit rim sits at the bottom of the window. Stars are seeded, so every
- * visit draws the same sky; all of it is one SVG and CSS, no images. Reduced motion stops the drift and twinkles.
+ * The faint star field behind every Portal page (same as the apps): a pixel Milky Way crossing the flat ground on a
+ * slant, a far star layer that drifts very slowly and a few cross glints. No nebula, planet or texture: the page stays
+ * flat like the Console. Stars are seeded, so every visit draws the same sky; one SVG, no images. Reduced motion stops
+ * the drift and twinkles.
  */
 type Star = { x: number; y: number; size: number; tone: number; alpha: number };
 
@@ -56,8 +56,6 @@ const GLINTS = [[86, 270, 0.8], [677, 117, 0.9], [1397, 468, 0.6], [490, 630, 0.
 
 export const SpaceBackdrop = memo(function SpaceBackdrop() {
   return <div className="space" aria-hidden="true">
-    <div className="space-nebula" />
-    <div className="space-dither" />
     <svg className="space-stars" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" shapeRendering="crispEdges">
       <g className="space-far">
         {STILL.map((p, index) => <path key={index} d={p.d} fill={p.fill} opacity={p.opacity} />)}
@@ -67,8 +65,5 @@ export const SpaceBackdrop = memo(function SpaceBackdrop() {
       {GLINTS.map(([x, y, alpha], index) => <path key={index} className="space-twinkle" d={`M${x} ${y - 3}h1v7h-1zM${x - 3} ${y}h7v1h-7zM${x - 1} ${y - 1}h3v3h-3z`}
         fill="#e6ecf8" opacity={alpha} style={{ animationDelay: `${-index * 2300}ms`, animationDuration: "9s" }} />)}
     </svg>
-    <div className="space-moon" />
-    <div className="space-vignette" />
-    <div className="space-planet" />
   </div>;
 });

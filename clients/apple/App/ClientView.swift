@@ -149,7 +149,7 @@ struct ClientView:View {
         if let update=model.update {UpdateBanner(update:update)}
         if !model.announcement.isEmpty {
             Text(model.announcement).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).frame(maxWidth:.infinity,alignment:.leading)
-                .padding(14).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+                .padding(14).cardOutline(VeilbirdStyle.radius)
         }
     }
     #if os(iOS)
@@ -334,7 +334,7 @@ struct ClientView:View {
             Spacer(minLength:16)
             // Connected, the location row opens the connection check; otherwise the location list.
             Button {if state == .connected {checkResult=nil;checking=true} else {tab=1}} label:{currentLocationRow}.buttonStyle(RowButton())
-                .background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius+4)).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius+4))
+                .cardOutline(VeilbirdStyle.radius+4).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius+4))
                 .accessibilityHint(L10n.text("tap_to_change"))
             usageStrip.padding(.top,16)
         }.padding(.horizontal,mac ? 20:16).padding(.bottom,20).task {try? await model.loadAccount()}
@@ -359,7 +359,7 @@ struct ClientView:View {
                 Text(L10n.text("switched_location",from,model.nodeName)).font(.system(size:mac ? 12:13)).lineLimit(2).frame(maxWidth:.infinity,alignment:.leading)
                 Button {model.dismissedSwitch=from} label:{Image(systemName:"xmark").font(.system(size:11,weight:.semibold)).foregroundStyle(VeilbirdStyle.secondary).frame(width:36,height:36).contentShape(Rectangle())}
                     .buttonStyle(.plain).accessibilityLabel(L10n.text("close"))
-            }.padding(.leading,14).padding(.trailing,4).frame(minHeight:44).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).padding(.top,4)
+            }.padding(.leading,14).padding(.trailing,4).frame(minHeight:44).cardOutline(VeilbirdStyle.radius).padding(.top,4)
         }
     }
     /// The connection check: your network (a small page outside the tunnel), to the location (TCP outside the tunnel),
@@ -512,7 +512,7 @@ struct ClientView:View {
                     HStack(spacing:8) {
                         Image(systemName:"magnifyingglass").foregroundStyle(VeilbirdStyle.secondary)
                         TextField(L10n.text("search_locations_or_regions"),text:$search).textFieldStyle(.plain).font(.system(size:VeilbirdStyle.body))
-                    }.padding(.horizontal,12).frame(height:mac ? 30:40).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:10)).padding(.top,16)
+                    }.padding(.horizontal,12).frame(height:mac ? 30:40).cardOutline(10).padding(.top,16)
                 }
                 Button {choose("",name:"")} label:{
                     HStack(spacing:14) {
@@ -524,7 +524,7 @@ struct ClientView:View {
                         Spacer(minLength:8)
                         if model.selected.isEmpty {Image(systemName:"checkmark").font(.system(size:mac ? 12:15,weight:.semibold)).foregroundStyle(VeilbirdStyle.accent)}
                     }.padding(.horizontal,16).frame(minHeight:mac ? 52:64)
-                }.buttonStyle(RowButton()).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+                }.buttonStyle(RowButton()).cardOutline(VeilbirdStyle.radius)
                 .overlay(RoundedRectangle(cornerRadius:VeilbirdStyle.radius).stroke(model.selected.isEmpty ? VeilbirdStyle.accent.opacity(0.45):Color.clear))
                 .clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).padding(.top,16)
                 .accessibilityAddTraits(model.selected.isEmpty ? .isSelected:[])
@@ -623,7 +623,7 @@ struct ClientView:View {
                     if model.connected {model.message=L10n.text("disconnect_the_vpn_before_signing_out");return}
                     model.work {_ = try? await model.api().request("logout",[:]);try SecureStorage.write("token",nil);model.signedIn=false;model.account=[:];tab=0}
                 } label:{Text(L10n.text("sign_out")).font(.system(size:VeilbirdStyle.body)).foregroundStyle(VeilbirdStyle.danger).frame(maxWidth:.infinity).frame(height:mac ? 40:50)}
-                    .buttonStyle(RowButton()).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+                    .buttonStyle(RowButton()).cardOutline(VeilbirdStyle.radius).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
                 // The diagnostic log has no visible entry: seven taps on the version open it.
                 Text(verbatim:"TRACKNOTHING "+(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")).font(Pixel.font(mac ? 12:13)).tracking(1.5).foregroundStyle(VeilbirdStyle.faint)
                     .frame(maxWidth:.infinity).padding(.vertical,4).contentShape(Rectangle()).onTapGesture {
@@ -660,7 +660,7 @@ struct ClientView:View {
                         Text(L10n.text("download_amount",bytes(down)));Text(L10n.text("upload_amount",bytes(up)))
                     }.font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()
                 }
-            }.padding(16).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+            }.padding(16).cardOutline(VeilbirdStyle.radius)
         }
     }
     /// "143 GB": the number large, its unit small and muted.
@@ -755,13 +755,13 @@ struct ClientView:View {
                 // Newest first: the last attempt is what someone opening the log is looking for.
                 Text(log.isEmpty ? L10n.text("logs_empty"):log.split(separator:"\n").reversed().joined(separator:"\n"))
                     .font(.system(size:11,design:.monospaced)).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading).padding(12)
-                    .background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+                    .cardOutline(VeilbirdStyle.radius)
             }.padding(.horizontal,16).padding(.bottom,20)
         }.onAppear {model.loadTunnelLog()}
     }
     private func logAction(_ title:String,color:Color=VeilbirdStyle.text)->some View {
         Text(title).font(.system(size:VeilbirdStyle.detail+1,weight:.medium)).foregroundStyle(color).frame(maxWidth:.infinity).frame(height:mac ? 32:44)
-            .background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+            .cardOutline(VeilbirdStyle.radius)
     }
 }
 
@@ -833,7 +833,7 @@ struct UpdateBanner:View {
             }
             HStack(spacing:3) {ForEach(0..<30,id:\.self) {index in Rectangle().fill(index<percent*30/100 ? VeilbirdStyle.accent:VeilbirdStyle.raised).frame(height:6)}}
                 .accessibilityHidden(true)
-        }.padding(14).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+        }.padding(14).cardOutline(VeilbirdStyle.radius)
             .accessibilityElement(children:.combine).accessibilityLabel(L10n.text("update_downloading_title",update.version)+", \(percent)%")
     }
     private func row<Actions:View>(_ title:String,_ detail:String,@ViewBuilder actions:()->Actions)->some View {
@@ -844,7 +844,7 @@ struct UpdateBanner:View {
             }
             Spacer(minLength:8)
             actions()
-        }.padding(.leading,14).padding(.trailing,8).padding(.vertical,12).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+        }.padding(.leading,14).padding(.trailing,8).padding(.vertical,12).cardOutline(VeilbirdStyle.radius)
     }
     private func button(_ title:String,filled:Bool=false,action:@escaping ()->Void)->some View {
         Button(action:action) {

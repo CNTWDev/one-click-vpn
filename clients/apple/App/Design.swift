@@ -1,9 +1,10 @@
 import SwiftUI
 import CoreText
 
-/// The one palette of the app (dark, after the ∅ mark: lime on near-black green). Same values on every platform.
+/// The one palette of the app, shared with the Portal and the Console: flat cool black, hairline cards, lime only where it
+/// matters. Same values on every platform.
 enum VeilbirdStyle {
-    static let ground = Color(red:10/255,green:13/255,blue:18/255)
+    static let ground = Color(red:7/255,green:9/255,blue:13/255)
     static let surface = Color(red:18/255,green:22/255,blue:29/255)
     static let raised = Color(red:27/255,green:32/255,blue:41/255)
     static let selected = Color(red:52/255,green:58/255,blue:70/255)
@@ -15,6 +16,8 @@ enum VeilbirdStyle {
     static let danger = Color(red:240/255,green:134/255,blue:114/255)
     static let fair = Color(red:227/255,green:178/255,blue:85/255)
     static let hairline = Color(red:234/255,green:238/255,blue:244/255).opacity(0.10)
+    /// Card outline: cards are a hairline on the ground, not a filled block.
+    static let edge = Color(red:220/255,green:228/255,blue:245/255).opacity(0.09)
     #if os(macOS)
     static let mac = true
     #else
@@ -233,11 +236,18 @@ struct RateBars:View {
     }
 }
 
+extension View {
+    /// A card: a hairline outline on the ground (same as the Portal and Console), no fill.
+    func cardOutline(_ radius:CGFloat)->some View {
+        overlay(RoundedRectangle(cornerRadius:radius).strokeBorder(VeilbirdStyle.edge,lineWidth:1))
+    }
+}
+
 /// A card of rows separated by hairlines; the line starts after the badge when rows have one.
 struct CardGroup<Content:View>:View {
     @ViewBuilder var content:Content
     var body:some View {
-        VStack(spacing:0) {content}.background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+        VStack(spacing:0) {content}.cardOutline(VeilbirdStyle.radius)
             .clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
     }
 }
@@ -265,6 +275,6 @@ extension View {
     func veilbirdField()->some View {
         self.textFieldStyle(.plain).font(.system(size:VeilbirdStyle.mac ? 14:17)).foregroundStyle(VeilbirdStyle.text)
             .padding(.horizontal,16).frame(height:VeilbirdStyle.mac ? 38:50)
-            .background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+            .cardOutline(VeilbirdStyle.radius)
     }
 }

@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The deep-space backdrop behind every page, same recipe as the Portal (portal-web/src/space.tsx) and the other
-/// clients: a near-black sky, a pixel Milky Way on a slant over a faint teal and lime nebula, far stars that drift
-/// very slowly, a few cross glints, a dithered moon and a dark planet whose lit rim sits at the bottom. Stars are
+/// The faint star field behind every page, same recipe as the Portal (portal-web/src/space.tsx) and the other
+/// clients: the flat ground, a pixel Milky Way on a slant, far stars that drift very slowly and a few cross glints,
+/// all at about half strength. No nebula, planet or texture, so the app stays flat like the Console. Stars are
 /// seeded, so the sky is the same on every launch. Redrawn twice a second at most; still under Reduce Motion.
 struct SpaceView:View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -21,12 +21,11 @@ final class SpaceSky {
     private var laidOut=CGSize.zero
     private var band:[Star]=[]
     private var far:[Star]=[]
-    private var dots:[(CGRect,Double)]=[]
-    private var moon:[(CGRect,Color)]=[]
 
     private static let white=Color(red:232/255,green:236/255,blue:244/255)
     private static let mint=Color(red:191/255,green:203/255,blue:230/255)
     private static let pale=Color(red:214/255,green:240/255,blue:170/255)
+    private static let strength=0.55
 
     private static func random(_ seed:Int32)->()->Double {
         var a=seed
@@ -36,11 +35,6 @@ final class SpaceSky {
             t=(t &+ ((t ^ Int32(bitPattern:UInt32(bitPattern:t) >> 7)) &* (61 | t))) ^ t
             return Double(UInt32(bitPattern:t ^ Int32(bitPattern:UInt32(bitPattern:t) >> 14)))/4294967296
         }
-    }
-
-    private func planet(_ size:CGSize)->(x:Double,y:Double,r:Double) {
-        let r=700.0
-        return (size.width/2,size.height-max(200,size.height*0.26)+r,r)
     }
 
     private func layout(_ size:CGSize) {
@@ -63,58 +57,19 @@ final class SpaceSky {
             let color=size==3 ? VeilbirdStyle.accent:f()<0.12 ? Self.pale:Self.white
             return Star(x:x,y:y,size:size,color:color,alpha:alpha,twinkle:f()<0.14,delay:f()*7)
         }
-        // Planet rim and lit surface as dots on a 6 pt grid.
-        let p=planet(size),top=p.y-p.r
-        dots=[]
-        var y=top-0.12*p.r
-        while y<min(H,top+max(0.3*p.r,40)) {
-            var x=0.0
-            while x<W {
-                let dist=hypot(x-p.x,y-p.y)/p.r
-                let rim=dist>=0.974 && dist<=1.12 ? (dist<1.04 ? (dist-0.974)/0.066:(1.12-dist)/0.08)*0.5*0.55:0
-                let e=pow((x-p.x)/p.r,2)+pow((y-top)/(0.28*p.r),2)
-                let lit=dist<1 && e<1 ? (1-e)*0.5*0.2:0
-                if rim+lit>0.01 {dots.append((CGRect(x:x,y:y,width:1.4,height:1.4),rim+lit))}
-                x+=6
-            }
-            y+=6
-        }
-        // Moon: a 22 pt disc of 3 pt dots, lit from the top left.
-        let m=22.0,mx=W*0.76,my=H*0.09
-        moon=[]
-        for row in 0..<7 {for col in 0..<7 {
-            let px=Double(col)*3,py=Double(row)*3
-            guard hypot(px+1.5-m/2,py+1.5-m/2)<=m/2 else {continue}
-            let t=min(1,hypot(px-m*0.32,py-m*0.30)/(m*0.75))
-            let level=t<0.6 ? 0.79-(0.79-0.47)*t/0.6:0.47-(0.47-0.12)*(t-0.6)/0.4
-            moon.append((CGRect(x:mx+px,y:my+py,width:2.2,height:2.2),Color(red:level*0.86,green:level*0.9,blue:level)))
-        }}
-    }
-
-    private func ellipse(_ context:inout GraphicsContext,_ center:CGPoint,_ rx:Double,_ ry:Double,_ color:Color) {
-        let rect=CGRect(x:center.x-rx,y:center.y-ry,width:2*rx,height:2*ry)
-        context.fill(Path(ellipseIn:rect),with:.radialGradient(Gradient(stops:[.init(color:color,location:0),.init(color:color.opacity(0),location:0.7)]),center:center,startRadius:0,endRadius:max(rx,ry)))
     }
 
     func draw(_ context:inout GraphicsContext,size:CGSize,time:Double?) {
         if size != laidOut {layout(size)}
         let W=size.width,H=size.height,full=Path(CGRect(origin:.zero,size:size))
-        context.fill(full,with:.linearGradient(Gradient(stops:[.init(color:Color(red:1/255,green:2/255,blue:4/255),location:0),.init(color:Color(red:3/255,green:5/255,blue:10/255),location:0.5),.init(color:Color(red:6/255,green:9/255,blue:18/255),location:1)]),startPoint:.zero,endPoint:CGPoint(x:0,y:H)))
+        context.fill(full,with:.color(VeilbirdStyle.ground))
 
-        // Nebula along the band.
-        var nebula=context
-        nebula.translateBy(x:W*0.5,y:H*0.34);nebula.rotate(by:.degrees(-38))
-        let bw=1.5*W,bh=0.6*H
-        ellipse(&nebula,CGPoint(x:-0.12*bw,y:0),0.30*bw,0.38*bh,Color(red:64/255,green:84/255,blue:190/255).opacity(0.30))
-        ellipse(&nebula,CGPoint(x:0.12*bw,y:-0.04*bh),0.22*bw,0.30*bh,Color(red:40/255,green:150/255,blue:170/255).opacity(0.16))
-        ellipse(&nebula,.zero,0.50*bw,0.20*bh,Color(red:160/255,green:175/255,blue:230/255).opacity(0.07))
-
-        for s in band {context.fill(Path(CGRect(x:s.x,y:s.y,width:s.size,height:s.size)),with:.color(s.color.opacity(s.alpha)))}
+        for s in band {context.fill(Path(CGRect(x:s.x,y:s.y,width:s.size,height:s.size)),with:.color(s.color.opacity(s.alpha*Self.strength)))}
         // Far stars drift 30 pt down and back over four minutes.
         let drift=time.map {(1-cos($0/120*Double.pi))/2*30-30} ?? -30
         for s in far {
             let dim=time != nil && s.twinkle && (time!+s.delay).truncatingRemainder(dividingBy:7)>6.58
-            context.fill(Path(CGRect(x:s.x,y:s.y+drift,width:s.size,height:s.size)),with:.color(s.color.opacity(s.alpha*(dim ? 0.2:1))))
+            context.fill(Path(CGRect(x:s.x,y:s.y+drift,width:s.size,height:s.size)),with:.color(s.color.opacity(s.alpha*Self.strength*(dim ? 0.2:1))))
         }
         let glint=Color(red:230/255,green:236/255,blue:248/255)
         for (i,g) in [(0.18,0.12,0.9),(0.84,0.38,0.7),(0.09,0.58,0.6)].enumerated() {
@@ -122,17 +77,7 @@ final class SpaceSky {
             let x=W*g.0,y=H*g.1
             var cross=Path()
             cross.addRect(CGRect(x:x-0.5,y:y-3.5,width:1,height:7));cross.addRect(CGRect(x:x-3.5,y:y-0.5,width:7,height:1));cross.addRect(CGRect(x:x-1.5,y:y-1.5,width:3,height:3))
-            context.fill(cross,with:.color(glint.opacity(g.2*(dim ? 0.2:1))))
+            context.fill(cross,with:.color(glint.opacity(g.2*Self.strength*(dim ? 0.2:1))))
         }
-        for (rect,color) in moon {context.fill(Path(rect),with:.color(color.opacity(0.7)))}
-        context.fill(full,with:.radialGradient(Gradient(stops:[.init(color:.clear,location:0),.init(color:.clear,location:0.55),.init(color:.black.opacity(0.6),location:1)]),center:CGPoint(x:W/2,y:H*0.42),startRadius:0,endRadius:hypot(W,H)*0.6))
-
-        // Planet: glow, body, rim line, then the dithered atmosphere and lit surface.
-        let p=planet(size),top=p.y-p.r,glow=p.r+70
-        let disc=Path(ellipseIn:CGRect(x:p.x-p.r,y:p.y-p.r,width:2*p.r,height:2*p.r))
-        context.fill(Path(ellipseIn:CGRect(x:p.x-glow,y:p.y-glow,width:2*glow,height:2*glow)),with:.radialGradient(Gradient(stops:[.init(color:.clear,location:p.r/glow-0.01),.init(color:Color(red:80/255,green:110/255,blue:210/255).opacity(0.14),location:p.r/glow),.init(color:.clear,location:1)]),center:CGPoint(x:p.x,y:p.y),startRadius:0,endRadius:glow))
-        context.fill(disc,with:.radialGradient(Gradient(stops:[.init(color:Color(red:18/255,green:26/255,blue:42/255),location:0),.init(color:Color(red:9/255,green:13/255,blue:23/255),location:0.18),.init(color:Color(red:3/255,green:5/255,blue:10/255),location:0.45)]),center:CGPoint(x:p.x,y:top),startRadius:0,endRadius:2.24*p.r))
-        context.stroke(disc,with:.color(Color(red:210/255,green:244/255,blue:150/255).opacity(0.55)),lineWidth:1)
-        for (rect,alpha) in dots {context.fill(Path(rect),with:.color(VeilbirdStyle.accent.opacity(alpha)))}
     }
 }
