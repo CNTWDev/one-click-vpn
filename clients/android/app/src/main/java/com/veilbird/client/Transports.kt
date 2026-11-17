@@ -10,14 +10,15 @@ import java.security.MessageDigest
 
 /**
  * How the app reaches a node. Every node offers the same ladder as the subscriptions: Hysteria2
- * with obfuscation (UDP, hard to fingerprint, fast on lossy links), VLESS REALITY (TCP 443, looks
- * like an ordinary HTTPS site), REALITY over XHTTP (TCP, plain HTTP requests, for networks that
+ * with obfuscation (UDP, hard to fingerprint, fast on lossy links; hops between ports where the node
+ * offers it), VLESS REALITY (TCP 443, looks like an ordinary HTTPS site), the same REALITY on the node's
+ * spare port (for networks that block 443 only), REALITY over XHTTP (TCP, plain HTTP requests, for networks that
  * cut long-lived TLS streams), then WireGuard (UDP, easy to recognise, so last). All are tried at
  * once; the first one that answers in ladder order carries traffic. A transport that failed on a
  * network while another worked goes to the end of the ladder there for a week.
  */
 object Transports {
-    val ladder = listOf("hysteria2", "reality", "xhttp", "wireguard")
+    val ladder = listOf("hysteria2", "reality", "reality-alt", "xhttp", "wireguard")
     const val GROUP = "TrackNothing"
     const val TEST_URL = "https://www.gstatic.com/generate_204"
     /** Answers fast from nearly every network (mainland China and Russia too): the connection check times it outside the tunnel. */

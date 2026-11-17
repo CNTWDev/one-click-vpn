@@ -414,6 +414,27 @@ REALITY uses TCP `443`; the stealth transports for the TrackNothing apps (Hyster
 VLESS REALITY XHTTP, one mihomo process, Agent 2.12+) use UDP **and** TCP `8443`.
 Open those ports in the Edge Node firewall/security group separately from the Controller.
 
+### Port hopping and the spare REALITY port (Agent 2.19+)
+
+For networks that block or throttle one port, every node also accepts **TCP + UDP
+`20000-29999`** (the same range on every node):
+
+- UDP: the whole range is redirected (nat `PREROUTING`, `REDIRECT`) to Hysteria2 on 8443.
+  Mihomo clients and the apps hop to a random port of `8443,20000-29999` every 20-40 s.
+- TCP: one port per node in the range (fixed, derived from the node id, shown in Console →
+  node → 诊断) is redirected to REALITY on 443: an extra REALITY line after the 443 one.
+
+The redirect runs before the host firewall, so the Agent adds no INPUT rule for the range;
+only the **cloud security group** needs one inbound rule: TCP and UDP `20000-29999` from
+`0.0.0.0/0` (and `::/0` with IPv6). Rules survive reboots and firewalld reloads (the Agent
+checks them every minute). The Controller tests the range from outside every 12 hours
+(hourly while closed); a node only offers these lines once it saw them open, so a node
+without the security group rule keeps working exactly as before.
+
+Console alerts also flag a line that looks blocked at one node: in 24 hours apps on 2+
+networks (half or more of those that tried) failed on it while the same line worked to
+another node from those networks.
+
 ## TrackNothing app transports
 
 All TrackNothing apps (Android, iPhone/Mac, Windows) embed the same mihomo core and prefer WireGuard (lightest). When it is blocked they fall back, without any
@@ -444,7 +465,9 @@ A subscription contains all currently eligible, synchronized nodes. New subscrip
 are VLESS; on a node with the stealth service (Agent 2.12+, UDP+TCP 8443) each node
 carries the apps' three lines with the subscription's one UUID: Hysteria2 (Salamander,
 certificate pinned), VLESS REALITY (TCP 443) and VLESS REALITY over XHTTP (TCP 8443).
-Mihomo/Clash shows one entry per node, a hidden fallback group over its lines, plus the
+Where the node offers them (see "Port hopping" above), Hysteria2 hops ports (mihomo
+clients only; share links keep one port) and a REALITY line on the node's spare TCP port
+follows the 443 one. Mihomo/Clash shows one entry per node, a hidden fallback group over its lines, plus the
 automatic latency-selection group. Share-link clients list the lines as `Node`,
 `Node · 备用 1`, `Node · 备用 2`. Lines are sent by User-Agent: no XHTTP for mihomo older
 than 1.19.22, REALITY only for Hiddify (old imports), REALITY + XHTTP for Stash (no Hysteria2

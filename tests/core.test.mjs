@@ -739,7 +739,7 @@ test("the account subscription is made on first use, takes no device and provisi
     assert.notEqual(telemetryId,uuid,"telemetry must not reveal the VLESS authorization secret");
     await pool.query("UPDATE nodes SET agent_token_hash=$1 WHERE id=$2", [createHash("sha256").update(agentToken).digest("hex"),nodes[0]]);
     const beat = await fetch(`${base}/api/v1/agent/heartbeat`, { method: "POST", headers: json, body: JSON.stringify({
-      nodeId: nodes[0], token: agentToken, version: "agent 2.18.0",
+      nodeId: nodes[0], token: agentToken, version: "agent 2.19.0",
       capabilities: { protocols: ["wireguard", "vless"], connectivity: { protocols: { wireguard: { runtimeActive: true, listening: true }, vless: { runtimeActive: true, listening: true } } } },
       usageSnapshots: [{ protocol: "vless", identityKey: telemetryId, rxBytes: 123, txBytes: 456, counterEpoch: "process-1" }],
       // Two places use the subscription now; malformed entries are ignored.
@@ -749,7 +749,7 @@ test("the account subscription is made on first use, takes no device and provisi
     const account = await (await call("/api/v1/account")).json();
     assert.deepEqual(account.online,{ apps: 0, subscription: 2, total: 2 },"places using the subscription are counted, not stored");
     const heartbeatAgain = () => fetch(`${base}/api/v1/agent/heartbeat`, { method: "POST", headers: json, body: JSON.stringify({
-      nodeId: nodes[0], token: agentToken, version: "agent 2.18.0",
+      nodeId: nodes[0], token: agentToken, version: "agent 2.19.0",
       capabilities: { protocols: ["wireguard", "vless"], connectivity: { protocols: { wireguard: { runtimeActive: true, listening: true }, vless: { runtimeActive: true, listening: true } } } },
     }) });
     const originalSecret = (await pool.query("SELECT ciphertext,id FROM secret_materials WHERE id=(SELECT private_key_secret_id FROM subscriptions WHERE id=$1)", [sub.id])).rows[0];

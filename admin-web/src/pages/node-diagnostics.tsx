@@ -187,7 +187,8 @@ export function NodeDiagnosticsView({ node, diagnostics, outdated }: { node: Nod
                 </small>
                 {(protocol.ports || [{ transport: protocol.transport, port: protocol.port, hostFirewall: protocol.hostFirewall, cloudFirewall: protocol.cloudFirewall }]).map((port) => (
                   <small key={`${port.transport}/${port.port}`}>
-                    {port.transport.toUpperCase()} {port.port} · {t("主机防火墙：{0}", [statusLabel(port.hostFirewall)])} ·{" "}
+                    {port.transport.toUpperCase()} {port.range || port.port}
+                    {port.role && <> · {port.role === "hop" ? t("端口跳跃") : t("备用端口")}</>} · {t("主机防火墙：{0}", [statusLabel(port.hostFirewall)])} ·{" "}
                     {t("云防火墙：{0}", [statusLabel(port.cloudFirewall)])}
                     {port.checkedAt && <> · <Time value={port.checkedAt} prefix={t("检测于 ")} /></>}
                   </small>

@@ -8,6 +8,7 @@ import { rebuildDesiredState, selectVpnServices } from "./control-plane";
 import type { VpnService } from "./control-db";
 import { ipv4Address, ipv4Pool } from "./ipv4-pool";
 import { ensureNativeSecret, nativeProxies } from "./stealth";
+import { hopLines } from "./hop-reach";
 import { accessSql, accountAccess, assertDeviceSlot, DeviceLimitError, deviceSlots, withinDeviceLimitSql } from "./entitlements";
 import { writeOperationalLog } from "./operational-logs";
 import { apiOrigins } from "./api-origins";
@@ -111,7 +112,9 @@ export async function nativeNodes(session?: Session) {
   return {apiOrigins:await apiOrigins(),nodes:await Promise.all((await candidates()).map(async({node})=>{
     const host=node.public_endpoint||node.ip;
     const found=services.get(node.id)||{};
-    const probes=[...new Set([found.vless?.listen_port,found.stealth?.listen_port].filter((port):port is number=>typeof port==="number"))].map((port)=>({host,port}));
+    // The spare REALITY port (hop-ports.ts) answers when only 443 is blocked on the device's network.
+    const spare=found.vless?(await hopLines(node)).tcpPort:null;
+    const probes=[...new Set([found.vless?.listen_port,found.stealth?.listen_port,spare].filter((port):port is number=>typeof port==="number"))].map((port)=>({host,port}));
     const countryCode=node.region_id?regions.get(node.region_id)?.code?.toUpperCase()||null:null;
     const test=enrollmentId?await nativeProxies(node,enrollmentId,found).catch(()=>[]):[];
     // load (CPU %) and users (online now) let the apps prefer a quieter node when latencies are close.
@@ -211,7 +214,7 @@ export async function nativeConnect(session:Session,body:Record<string,unknown>)
     proxies:fallback.proxies};
 }
 /** The other transports, and why some are missing (logged, never sent to the app). */
-async function fallbackProxies(node:{id:string;ip:string;public_endpoint:string|null},enrollmentId:string):Promise<{proxies:Array<Record<string,unknown>>;reason:string}> {
+async function fallbackProxies(node:{id:string;ip:string;public_endpoint:string|null;capabilities?:Record<string,unknown>},enrollmentId:string):Promise<{proxies:Array<Record<string,unknown>>;reason:string}> {
   const pick=async(protocol:"vless"|"stealth")=>(await selectVpnServices({protocol,includePaused:true})).find((item)=>item.node.id===node.id)?.service;
   try {
     await ensureNativeSecret(enrollmentId);

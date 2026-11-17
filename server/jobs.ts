@@ -7,6 +7,7 @@ import { writeOperationalLog } from "./operational-logs";
 import { runAlerts } from "./alerts";
 import { syncReleaseMirrors } from "./client-releases";
 import { logAccountsOverLimit } from "./online-clients";
+import { runHopChecks } from "./hop-check";
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
@@ -33,6 +34,8 @@ export async function runMinuteJobs(): Promise<void> {
   if (refreshed || expired || boundary) markAccessChanged();
   await retryReconcileTasks();
   await runAlerts().catch((error) => console.error("Alerts failed", error instanceof Error ? error.message : error));
+  // Outside checks of each node's hop ports; a UDP check runs ~10 s in the background, so it is not awaited.
+  void runHopChecks().catch((error) => console.error("Hop port check failed", error instanceof Error ? error.message : error));
   await logAccountsOverLimit().catch((error) => console.error("Online check failed", error instanceof Error ? error.message : error));
   // Not awaited: copying an installer to the download mirror can take longer than a minute.
   void syncReleaseMirrors().catch((error) => console.error("Release mirror failed", error instanceof Error ? error.message : error));

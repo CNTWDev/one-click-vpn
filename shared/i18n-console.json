@@ -3439,9 +3439,9 @@
     "Alerts",
     "Оповещения"
   ],
-  "节点离线 3 分钟、服务异常 10 分钟、磁盘超过 85%、Agent 落后一天时发邮件，恢复时再发一封。": [
-    "Emails when a node is offline for 3 minutes, a service is failing for 10 minutes, a disk is over 85%, or an Agent is a day behind, and again on recovery.",
-    "Письмо, если узел недоступен 3 минуты, служба сбоит 10 минут, диск заполнен более чем на 85% или Agent отстаёт на сутки, и ещё одно при восстановлении."
+  "节点离线 3 分钟、服务异常 10 分钟、线路疑似被封 30 分钟、磁盘超过 85%、Agent 落后一天时发邮件，恢复时再发一封。": [
+    "Emails when a node is offline for 3 minutes, a service is failing for 10 minutes, a line looks blocked for 30 minutes, a disk is over 85%, or an Agent is a day behind, and again on recovery.",
+    "Письмо, если узел недоступен 3 минуты, служба сбоит 10 минут, линия похоже заблокирована 30 минут, диск заполнен более чем на 85% или Agent отстаёт на сутки, и ещё одно при восстановлении."
   ],
   "先在上方“邮件发送”配置发信，告警才能发出。": [
     "Set up Mail delivery above first, or alerts cannot be sent.",
@@ -3826,5 +3826,17 @@
   "节点本月流量": [
     "Server traffic this month",
     "Трафик серверов за месяц"
+  ],
+  "线路疑似被封：{0}": [
+    "Line looks blocked: {0}",
+    "Линия похоже заблокирована: {0}"
+  ],
+  "端口跳跃": [
+    "Port hopping",
+    "Смена портов"
+  ],
+  "备用端口": [
+    "Spare port",
+    "Резервный порт"
   ]
 }

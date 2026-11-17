@@ -10,6 +10,8 @@ import { lineNames, proxyName, renderSubscription, renderV2raySubscription, subs
 import { realitySettings, realityUserIdentities } from "./reality";
 import { ensureStealthServer, STEALTH_SNI, stealthAccessApplied } from "./stealth";
 import { accountAccess } from "./entitlements";
+import { withHopping } from "./hop-ports";
+import { hopLines } from "./hop-reach";
 
 type Subscription = { id: string; credential_id: string; token_hash: string; token_secret_id: string | null; private_key_secret_id: string | null; created_at: string; updated_at: string; last_fetched_at: string | null; last_fetch_client: string };
 export async function listSubscriptions(userId?: string) {
@@ -118,14 +120,14 @@ async function accessApplied(profileId: string, nodeId: string, identityKey: str
  * The node's stealth lines for a VLESS subscription, in the apps' order: Hysteria2 before REALITY, XHTTP after.
  * Same UUID as the REALITY line. Only once the node has loaded the subscription (stealthAccessApplied).
  */
-async function stealthLines(node: { id: string }, host: string, port: number, uuid: string, identityKey: string, client: SubscriptionClient) {
+async function stealthLines(node: { id: string }, host: string, port: number, uuid: string, identityKey: string, client: SubscriptionClient, udpPorts: string | null) {
   if (!client.hysteria2 && !client.xhttp) return { before: [], after: [] };
   if (!(await stealthAccessApplied(node.id, identityKey, () => rebuildDesiredState(node.id, "stealth")))) return { before: [], after: [] };
   const reality = await realitySettings(node.id);
   if (!reality) return { before: [], after: [] };
   const { server } = await ensureStealthServer(node.id);
-  const before: SubscriptionProxy[] = client.hysteria2 ? [{ name: "", type: "hysteria2", server: host, port, password: uuid, obfs: "salamander",
-    "obfs-password": server.obfsPassword, sni: STEALTH_SNI, "skip-cert-verify": true, fingerprint: server.fingerprint, alpn: ["h3"], udp: true }] : [];
+  const before: SubscriptionProxy[] = client.hysteria2 ? [withHopping({ name: "", type: "hysteria2", server: host, port, password: uuid, obfs: "salamander",
+    "obfs-password": server.obfsPassword, sni: STEALTH_SNI, "skip-cert-verify": true, fingerprint: server.fingerprint, alpn: ["h3"], udp: true }, client.hop ? udpPorts : null)] : [];
   const after: SubscriptionProxy[] = client.xhttp ? [{ name: "", type: "vless", server: host, port, uuid, network: "xhttp", tls: true, udp: true,
     servername: reality.server_name, "client-fingerprint": "chrome", "reality-opts": { "public-key": reality.public_key, "short-id": reality.short_id },
     "xhttp-opts": { path: server.xhttpPath } }] : [];
@@ -196,10 +198,13 @@ export async function downloadSubscription(token: string, options: { format?: Su
           uuid: key, network: "tcp", tls: true, udp: true, flow: "xtls-rprx-vision", servername: payload.serverName,
           "client-fingerprint": "chrome", "reality-opts": { "public-key": payload.publicKey, "short-id": payload.shortId } };
         const stealth = stealthServices.get(node.id);
+        const hop = await hopLines(node).catch(() => ({ udpPorts: null, tcpPort: null }));
         // A stealth problem on one node never costs the subscription its REALITY line there.
-        const extra = stealth ? await stealthLines(node, profile.endpoint.host, stealth.listen_port, key, credential.identity_key, client).catch(() => ({ before: [], after: [] }))
+        const extra = stealth ? await stealthLines(node, profile.endpoint.host, stealth.listen_port, key, credential.identity_key, client, hop.udpPorts).catch(() => ({ before: [], after: [] }))
           : { before: [], after: [] };
-        const lines = [...extra.before, reality, ...extra.after];
+        // The same REALITY line on the node's spare port (hop-ports.ts), for networks that block 443 only.
+        const spare: SubscriptionProxy[] = hop.tcpPort ? [{ ...reality, port: hop.tcpPort, "reality-opts": { ...(reality["reality-opts"] as object) } }] : [];
+        const lines = [...extra.before, reality, ...spare, ...extra.after];
         if (client.sni) for (const line of lines) if (line.type === "vless") line.sni = line.servername;
         const names = lineNames(name, lines.length, format);
         lines.forEach((line, index) => { line.name = names[index]; });
