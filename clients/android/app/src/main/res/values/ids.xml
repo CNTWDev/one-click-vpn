@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Where View.fade() keeps the alpha a view is heading to, so per-second refreshes don't restart it. -->
+  <item name="fade_target" type="id" />
+</resources>

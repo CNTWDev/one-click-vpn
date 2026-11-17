@@ -48,7 +48,7 @@ public partial class MainWindow : Window {
     // Live parts of the connect page and the tray flyout.
     private Ring? ring;
     private Button? ringButton;
-    private TextBlock? statusTitle,statusDetail,statusTimer,stream,usageTotal,usageUntil;
+    private TextBlock? statusTitle,statusDetail,statusTimer,statusRates,stream,usageTotal,usageUntil;
     private Rectangle? statusDot;
     private (ContentControl Badge,TextBlock Title,TextBlock Detail)? location;
     private RateBars? rateBars,flyRate;
@@ -181,7 +181,7 @@ public partial class MainWindow : Window {
         DockPanel.SetDock(card,Dock.Top);root.Children.Add(card);
         var (note,noteText)=SwitchNote(12);note.Margin=new Thickness(0,10,0,0);
         DockPanel.SetDock(note,Dock.Top);root.Children.Add(note);
-        var rate=new RateBars {Height=36,Margin=new Thickness(2,12,2,0),Visibility=Visibility.Collapsed};
+        var rate=new RateBars {Height=36,Margin=new Thickness(2,12,2,0),Opacity=0};
         DockPanel.SetDock(rate,Dock.Top);root.Children.Add(rate);
 
         var badge=new ContentControl();
@@ -490,8 +490,20 @@ public partial class MainWindow : Window {
     private void ShowRates(RateBars? bars,RingState state) {
         if(bars is null) return;
         var on=state==RingState.Connected;
-        bars.Visibility=on?Visibility.Visible:Visibility.Collapsed;
+        // The chart keeps its space and fades, so neither the window nor the tray flyout changes height.
+        Fade(bars,on);
         if(on) bars.Set(rxHistory.ToArray(),txHistory.ToArray());
+    }
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<UIElement,System.Runtime.CompilerServices.StrongBox<double>> fades=new();
+    /// Fades an element in or out; it keeps its space either way. Calls with the target it already has do nothing,
+    /// so the once-a-second refresh never restarts a fade.
+    private static void Fade(UIElement element,bool on) {
+        var target=on?1.0:0.0;
+        if(fades.TryGetValue(element,out var box)&&box.Value==target) return;
+        fades.AddOrUpdate(element,new System.Runtime.CompilerServices.StrongBox<double>(target));
+        element.Visibility=Visibility.Visible;element.IsHitTestVisible=on;
+        if(!Motion||!element.IsVisible) {element.BeginAnimation(OpacityProperty,null);element.Opacity=target;return;}
+        element.BeginAnimation(OpacityProperty,new DoubleAnimation(target,TimeSpan.FromMilliseconds(on?220:160)) {EasingFunction=new CubicEase {EasingMode=EasingMode.EaseOut}});
     }
     /// "Tokyo 03 did not answer, switched to Tokyo 05": one line with a close button, shown after automatic switching.
     private (Border Note,TextBlock Text) SwitchNote(double size) {
@@ -598,7 +610,7 @@ public partial class MainWindow : Window {
     private void Render() {
         ContentPanel.Children.Clear();FullPanel.Children.Clear();NavigationPanel.Children.Clear();HeaderSlot.Content=null;
         rateBars=null;switchNote=null;switchText=null;
-        ring=null;ringButton=null;statusTitle=statusDetail=statusTimer=stream=usageTotal=usageUntil=null;statusDot=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
+        ring=null;ringButton=null;statusTitle=statusDetail=statusTimer=statusRates=stream=usageTotal=usageUntil=null;statusDot=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
         var view=api.SignedIn?page:"login";
         var full=view=="connect";
         Scroller.Visibility=full?Visibility.Collapsed:Visibility.Visible;FullPanel.Visibility=full?Visibility.Visible:Visibility.Collapsed;
@@ -655,17 +667,24 @@ public partial class MainWindow : Window {
         ring=new Ring();
         ringButton=new Button {Style=(Style)FindResource("Bare"),Content=ring.View,HorizontalAlignment=HorizontalAlignment.Center};
         ringButton.Click+=(_,_)=>Toggle();
-        statusDot=new Rectangle {Width=8,Height=8,Fill=Look.Accent,Margin=new Thickness(0,0,10,0),VerticalAlignment=VerticalAlignment.Center};
+        // The state block has one height in every state, so the ring never moves when a connection comes up or goes
+        // down: the time, rates and chart fade in and out of space that is always reserved, the second line swaps
+        // between the time and a short message in the same slot, and the chart takes the stream's place in its slot.
+        statusDot=new Rectangle {Width=8,Height=8,Fill=Look.Accent,Margin=new Thickness(0,0,10,0),VerticalAlignment=VerticalAlignment.Center,Opacity=0};
         statusTitle=new TextBlock {FontSize=24,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.NoWrap};
         var titleRow=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,20,0,0)};
-        titleRow.Children.Add(statusDot);titleRow.Children.Add(statusTitle);
-        statusTimer=new TextBlock {FontFamily=Look.Dots,FontSize=30,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,8,0,0),Visibility=Visibility.Collapsed};
-        statusDetail=new TextBlock {FontSize=13,Foreground=Look.Secondary,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(8,6,8,0),MaxHeight=40,TextTrimming=TextTrimming.CharacterEllipsis};
-        stream=new TextBlock {FontFamily=Look.Dots,FontSize=14,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,14,0,0)};
-        // Connected, the live rate chart takes the decorative stream's place.
-        rateBars=new RateBars {Width=238,Height=44,Margin=new Thickness(0,12,0,0),HorizontalAlignment=HorizontalAlignment.Center,Visibility=Visibility.Collapsed};
+        // A matching gap on the right keeps the title itself centred whether the dot shows or not.
+        titleRow.Children.Add(statusDot);titleRow.Children.Add(statusTitle);titleRow.Children.Add(new Border {Width=18});
+        statusTimer=new TextBlock {FontFamily=Look.Dots,FontSize=30,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Opacity=0};
+        statusDetail=new TextBlock {FontSize=13,Foreground=Look.Secondary,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(8,0,8,0),MaxHeight=40,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis};
+        var slot=new Grid {Height=44,Margin=new Thickness(0,6,0,0)};slot.Children.Add(statusTimer);slot.Children.Add(statusDetail);
+        statusRates=new TextBlock {FontSize=12,Foreground=Look.Secondary,HorizontalAlignment=HorizontalAlignment.Center,Height=18,Opacity=0,TextTrimming=TextTrimming.CharacterEllipsis};
+        Typography.SetNumeralAlignment(statusRates,FontNumeralAlignment.Tabular);
+        stream=new TextBlock {FontFamily=Look.Dots,FontSize=14,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
+        rateBars=new RateBars {Width=238,Height=44,HorizontalAlignment=HorizontalAlignment.Center,Opacity=0};
+        var chart=new Grid {Height=44,Margin=new Thickness(0,8,0,0)};chart.Children.Add(stream);chart.Children.Add(rateBars);
         var center=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
-        center.Children.Add(ringButton);center.Children.Add(titleRow);center.Children.Add(statusTimer);center.Children.Add(statusDetail);center.Children.Add(rateBars);center.Children.Add(stream);
+        center.Children.Add(ringButton);center.Children.Add(titleRow);center.Children.Add(slot);center.Children.Add(statusRates);center.Children.Add(chart);
         Grid.SetRow(center,1);layout.Children.Add(center);
 
         var badge=new ContentControl();
@@ -1076,16 +1095,15 @@ public partial class MainWindow : Window {
             AutomationProperties.SetName(ringButton,L10n.Text(state switch {RingState.Idle=>"connect_action",RingState.Failed=>"retry_action",RingState.Connecting=>"cancel",_=>"disconnect_action"}));
         }
         if(statusTitle is not null) statusTitle.Text=StatusTitle(state);
-        if(statusDot is not null) statusDot.Visibility=state==RingState.Connected?Visibility.Visible:Visibility.Collapsed;
-        if(statusDetail is not null) statusDetail.Text=StatusDetail(state,false);
-        if(statusTimer is not null) {
-            var time=state==RingState.Connected?Elapsed():null;
-            statusTimer.Text=time??"";statusTimer.Visibility=time is null?Visibility.Collapsed:Visibility.Visible;
-        }
+        if(statusDot is not null) Fade(statusDot,state==RingState.Connected);
+        var time=state==RingState.Connected?Elapsed():null;
+        if(statusTimer is not null) {if(time is not null) statusTimer.Text=time;Fade(statusTimer,time is not null);}
+        if(statusDetail is not null) {if(time is null) statusDetail.Text=StatusDetail(state,false);Fade(statusDetail,time is null);}
+        if(statusRates is not null) {if(time is not null) statusRates.Text=StatusDetail(state,false);Fade(statusRates,time is not null);}
         if(stream is not null) {
             var running=state is RingState.Connecting or RingState.Connected;
             stream.Text=running&&Motion?Look.Stream(DateTime.UtcNow):Look.StreamIdle;stream.Foreground=running?Look.StreamOn:Look.StreamOff;
-            stream.Visibility=state==RingState.Connected?Visibility.Collapsed:Visibility.Visible;
+            Fade(stream,state!=RingState.Connected);
         }
         ShowRates(rateBars,state);
         ShowSwitch(switchNote,switchText,state);

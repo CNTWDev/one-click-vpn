@@ -23,23 +23,27 @@ struct MenuBarView:View {
                 PixelMark(size:16)
                 Wordmark(size:14)
                 Spacer()
-                if on {Rectangle().fill(VeilbirdStyle.accent).frame(width:6,height:6)}
+                Rectangle().fill(VeilbirdStyle.accent).frame(width:6,height:6).opacity(on ? 1:0)
                 Text(L10n.text(on ? "connected_status":(model.connected ? "connecting":(model.failed ? "connect_failed_title":"not_connected")))).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary)
             }.padding(.horizontal,4)
             if model.signedIn {
                 VStack(spacing:12) {
                     Button {model.work {try await model.toggle()}} label:{ConnectRing(state:state,size:126)}.buttonStyle(.plain)
                         .accessibilityLabel(L10n.text(model.connected ? (model.since == nil ? "cancel":"disconnect_action"):"connect_action"))
+                    // One fixed-height slot for the time and rates or a short message, so the menu keeps its size.
+                    ZStack {
                     if let since=model.since {
                         HStack(alignment:.firstTextBaseline,spacing:12) {
                             TimelineView(.periodic(from:since,by:1)) {context in
                                 Text(verbatim:Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond))).font(Pixel.font(22)).foregroundStyle(VeilbirdStyle.text)
                             }
-                            Text(L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))).font(.system(size:11,design:.monospaced)).foregroundStyle(VeilbirdStyle.secondary)
-                        }
+                            Text(L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))).font(.system(size:11)).monospacedDigit().foregroundStyle(VeilbirdStyle.secondary)
+                        }.transition(.opacity)
                     } else {
                         Text(model.failed ? model.failure:L10n.text("tap_ring_to_connect")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).lineLimit(2)
+                            .transition(.opacity)
                     }
+                    }.frame(height:34).animation(.easeInOut(duration:0.2),value:on)
                 }.frame(maxWidth:.infinity).padding(.top,20).padding(.bottom,16)
                 // The same update banner as the window, with its download progress.
                 if let update=model.update {UpdateBanner(update:update).padding(.bottom,10)}

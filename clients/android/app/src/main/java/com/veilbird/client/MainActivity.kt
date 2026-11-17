@@ -34,6 +34,8 @@ import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
+import android.animation.LayoutTransition
+import android.animation.ValueAnimator
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -82,6 +84,8 @@ class MainActivity : Activity() {
     private var stateDot: View? = null
     private var stateDetail: TextView? = null
     private var stateTimer: TextView? = null
+    private var stateRates: TextView? = null
+    private var accountDot: View? = null
     private var stream: DataStream? = null
     private var nodeTitle: TextView? = null
     private var nodeDetail: TextView? = null
@@ -167,6 +171,25 @@ class MainActivity : Activity() {
     }
     private fun add(view: View, height: Int = -2, top: Int = 0, bottom: Int = 0, width: Int = -1, gravity: Int = -1) =
         view.also { content.addView(it, LinearLayout.LayoutParams(width, height).apply { topMargin = top.dp; bottomMargin = bottom.dp; if (gravity != -1) this.gravity = gravity }) }
+    /** A height in px for [size] sp of text, so reserved slots grow with the system font size. */
+    private fun sp(size: Float) = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, size, resources.displayMetrics).toInt()
+    /** Fades a view in or out (it keeps its space either way); repeated calls with the same target do nothing. */
+    private fun View.fade(on: Boolean) {
+        val target = if (on) 1f else 0f
+        if (getTag(R.id.fade_target) == target) return
+        setTag(R.id.fade_target, target); animate().cancel()
+        if (!isAttachedToWindow || !ValueAnimator.areAnimatorsEnabled()) { alpha = target; visibility = if (on) View.VISIBLE else View.INVISIBLE; return }
+        if (on) visibility = View.VISIBLE
+        animate().alpha(target).setDuration(if (on) 220 else 160).setInterpolator(DecelerateInterpolator()).withEndAction { if (!on) visibility = View.INVISIBLE }.start()
+    }
+    /** Changes a line of text with a short cross-fade instead of a cut; the same text again does nothing. */
+    private fun TextView.swap(value: CharSequence) {
+        if (text.toString() == value.toString()) return
+        if (!isAttachedToWindow || !ValueAnimator.areAnimatorsEnabled() || text.isEmpty()) { text = value; return }
+        val shown = getTag(R.id.fade_target) != 0f
+        animate().cancel()
+        animate().alpha(0f).setDuration(90).withEndAction { text = value; if (shown) animate().alpha(1f).setDuration(160).setInterpolator(DecelerateInterpolator()).start() }.start()
+    }
     private fun spacer(weight: Float) = add(View(this), height = 0).apply { (layoutParams as LinearLayout.LayoutParams).weight = weight }
     private fun row(minHeight: Int = 54) = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = minHeight.dp; setPadding(16.dp, 8.dp, 16.dp, 8.dp)
@@ -242,7 +265,7 @@ class MainActivity : Activity() {
     // ---- Pages
     private fun render() {
         banner = null; updateRowValue = null
-        ring = null; stateTitle = null; stateDot = null; stateDetail = null; stateTimer = null; stream = null; nodeTitle = null; nodeDetail = null; nodeBadge = null
+        ring = null; stateTitle = null; stateDot = null; stateDetail = null; stateTimer = null; stateRates = null; accountDot = null; stream = null; nodeTitle = null; nodeDetail = null; nodeBadge = null
         rateBars = null; switchNote = null; switchText = null; activityBody = null
         val side = maxOf(20.dp, (resources.displayMetrics.widthPixels - 560.dp) / 2)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 4.dp, side, 20.dp) }
@@ -283,7 +306,7 @@ class MainActivity : Activity() {
                 // A small dot on the account tab while an update waits (the banner can be dismissed, the dot stays).
                 addView(FrameLayout(this@MainActivity).apply {
                     addView(icon(res, color, 22), FrameLayout.LayoutParams(22.dp, 22.dp, Gravity.CENTER))
-                    if (tab == "account" && update != null) addView(View(this@MainActivity).apply { setBackgroundColor(Palette.accent) }, FrameLayout.LayoutParams(6.dp, 6.dp, Gravity.TOP or Gravity.END))
+                    if (tab == "account") addView(View(this@MainActivity).apply { setBackgroundColor(Palette.accent); visibility = if (update != null) View.VISIBLE else View.INVISIBLE; accountDot = this }, FrameLayout.LayoutParams(6.dp, 6.dp, Gravity.TOP or Gravity.END))
                 }, LinearLayout.LayoutParams(30.dp, 22.dp))
                 addView(text(L10n.text(title), 11f, color, 500).apply { maxLines = 1 }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
                 contentDescription = L10n.text(title) + if (selected) L10n.text(R.string.current_page) else ""
@@ -468,6 +491,8 @@ class MainActivity : Activity() {
                 setOnClickListener { dismissedSwitch = ConnectionStateStore.switchedFrom; showState() }
             }, LinearLayout.LayoutParams(44.dp, 44.dp))
         }.also { add(it, top = 4) }
+        // Notes that come and go above the ring (update, location switch) slide the page smoothly instead of snapping it.
+        if (ValueAnimator.areAnimatorsEnabled()) content.layoutTransition = LayoutTransition().apply { setDuration(220); enableTransitionType(LayoutTransition.CHANGING) }
         spacer(1f)
         ring = ConnectRing(this).apply {
             isClickable = true; isFocusable = true
@@ -476,14 +501,25 @@ class MainActivity : Activity() {
                 if (!busy) toggleConnection()
             }
         }.also { add(it, height = 240.dp, width = 240.dp, gravity = Gravity.CENTER_HORIZONTAL) }
+        // The state block has one height in every state, so the ring never moves when a connection comes up or
+        // goes down: what only exists while connected (time, rates, chart) fades in and out of space that is
+        // always reserved, and the second line swaps between the time and a short message in the same slot.
         val titleRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        stateDot = View(this).apply { setBackgroundColor(Palette.accent) }
+        stateDot = View(this).apply { setBackgroundColor(Palette.accent); alpha = 0f; visibility = View.INVISIBLE }
         titleRow.addView(stateDot, LinearLayout.LayoutParams(8.dp, 8.dp).apply { marginEnd = 10.dp })
-        stateTitle = text("", 26f, Palette.text, 600).also { titleRow.addView(it) }
+        stateTitle = text("", 26f, Palette.text, 600).apply { maxLines = 1 }.also { titleRow.addView(it) }
+        // A matching gap on the right keeps the title itself centred whether the dot shows or not.
+        titleRow.addView(View(this), LinearLayout.LayoutParams(18.dp, 8.dp))
         add(titleRow, top = 28)
-        stateTimer = text("", 34f).apply { gravity = Gravity.CENTER; typeface = Pixel.font(this@MainActivity); letterSpacing = 0.02f }.also { add(it, top = 10) }
-        stateDetail = text("", 14f, Palette.secondary).apply { gravity = Gravity.CENTER; maxLines = 2 }.also { add(it, top = 8) }
-        rateBars = RateBars(this).apply { visibility = View.GONE }.also { add(it, height = 50.dp, width = 238.dp, top = 10, gravity = Gravity.CENTER_HORIZONTAL) }
+        val slot = FrameLayout(this)
+        stateTimer = text("", 34f).apply { gravity = Gravity.CENTER; typeface = Pixel.font(this@MainActivity); letterSpacing = 0.02f; maxLines = 1; alpha = 0f; visibility = View.INVISIBLE }
+            .also { slot.addView(it, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER)) }
+        stateDetail = text("", 14f, Palette.secondary).apply { gravity = Gravity.CENTER; maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
+            .also { slot.addView(it, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER)) }
+        add(slot, height = sp(48f), top = 6)
+        stateRates = text("", 13f, Palette.secondary).apply { gravity = Gravity.CENTER; maxLines = 1; ellipsize = TextUtils.TruncateAt.END; fontFeatureSettings = "tnum"; alpha = 0f; visibility = View.INVISIBLE }
+            .also { add(it, height = sp(20f), top = 2) }
+        rateBars = RateBars(this).apply { alpha = 0f; visibility = View.INVISIBLE }.also { add(it, height = 50.dp, width = 238.dp, top = 10, gravity = Gravity.CENTER_HORIZONTAL) }
         stream = DataStream(this).also { add(it, top = 18) }
         spacer(1f)
         // Connected, the location row opens the connection check; otherwise it opens the location list.
@@ -536,27 +572,30 @@ class MainActivity : Activity() {
             this.state = state
             contentDescription = L10n.text(when (state) { ConnectRing.State.IDLE -> R.string.connect_action; ConnectRing.State.FAILED -> R.string.retry_action; ConnectRing.State.CONNECTING -> R.string.cancel; else -> R.string.disconnect_action })
         }
-        stateTitle?.text = L10n.text(when (state) { ConnectRing.State.CONNECTED -> R.string.connected_status; ConnectRing.State.CONNECTING -> R.string.connecting; ConnectRing.State.FAILED -> R.string.connect_failed_title; else -> R.string.not_connected })
-        stateDot?.visibility = if (state == ConnectRing.State.CONNECTED) View.VISIBLE else View.GONE
-        val elapsed = if (state == ConnectRing.State.CONNECTED) DateUtils.formatElapsedTime((SystemClock.elapsedRealtime() - since) / 1000) else ""
-        stateTimer?.apply { text = elapsed; visibility = if (elapsed.isEmpty()) View.GONE else View.VISIBLE }
+        val connected = state == ConnectRing.State.CONNECTED
+        stateTitle?.swap(L10n.text(when (state) { ConnectRing.State.CONNECTED -> R.string.connected_status; ConnectRing.State.CONNECTING -> R.string.connecting; ConnectRing.State.FAILED -> R.string.connect_failed_title; else -> R.string.not_connected }))
+        stateDot?.fade(connected)
+        if (connected) stateTimer?.text = DateUtils.formatElapsedTime((SystemClock.elapsedRealtime() - since) / 1000)
+        stateTimer?.fade(connected); stateDetail?.fade(!connected)
         stream?.running = state == ConnectRing.State.CONNECTING || state == ConnectRing.State.CONNECTED
         if (state == ConnectRing.State.CONNECTED) {
             rxHistory.addLast(ConnectionStateStore.rxRate); txHistory.addLast(ConnectionStateStore.txRate)
             while (rxHistory.size > RateBars.COUNT) { rxHistory.removeFirst(); txHistory.removeFirst() }
         } else { rxHistory.clear(); txHistory.clear() }
-        rateBars?.apply { visibility = if (state == ConnectRing.State.CONNECTED) View.VISIBLE else View.GONE; set(rxHistory.toList(), txHistory.toList()) }
+        rateBars?.apply { fade(connected); set(rxHistory.toList(), txHistory.toList()) }
         val from = ConnectionStateStore.switchedFrom
         val noteShown = state == ConnectRing.State.CONNECTED && from.isNotEmpty() && from != dismissedSwitch && from != ConnectionStateStore.node
         switchText?.text = if (noteShown) L10n.text(R.string.switched_location, from, ConnectionStateStore.node) else ""
         switchNote?.visibility = if (noteShown) View.VISIBLE else View.GONE
-        stateDetail?.text = when (state) {
-            ConnectRing.State.CONNECTED -> if (ConnectionStateStore.messageId == R.string.confirming_connection_status) ConnectionStateStore.message
-                else L10n.text(R.string.connection_rates, mbps(ConnectionStateStore.rxRate), mbps(ConnectionStateStore.txRate))
+        // Rates change every second: set directly (fixed-width digits keep the line still); messages cross-fade.
+        if (connected) stateRates?.text = if (ConnectionStateStore.messageId == R.string.confirming_connection_status) ConnectionStateStore.message
+            else L10n.text(R.string.connection_rates, mbps(ConnectionStateStore.rxRate), mbps(ConnectionStateStore.txRate))
+        stateRates?.fade(connected)
+        if (!connected) stateDetail?.swap(when (state) {
             ConnectRing.State.CONNECTING -> L10n.text(R.string.finding_best_route)
             ConnectRing.State.FAILED -> ConnectionStateStore.message
             else -> L10n.text(if (update?.mandatory == true) R.string.update_required_detail else R.string.tap_ring_to_connect)
-        }
+        })
         showCurrentNode()
     }
     private fun showCurrentNode() {
@@ -1103,7 +1142,10 @@ class MainActivity : Activity() {
                 if (announce && found.update == null) Toast.makeText(this, L10n.text(R.string.up_to_date), Toast.LENGTH_SHORT).show()
                 if (found.update?.build != update?.build || found.announcement != announcement) {
                     if (downloading && found.update?.build != update?.build) updater.cancel()
-                    update = found.update; announcement = found.announcement; downloadError = ""; if (!busy) render()
+                    val announcementChanged = found.announcement != announcement
+                    update = found.update; announcement = found.announcement; downloadError = ""
+                    // On the connect page only the banner and the tab dot change, so the page eases instead of rebuilding.
+                    if (!busy) { if (page == "connect" && banner != null && !announcementChanged) { showUpdate(); accountDot?.visibility = if (update != null) View.VISIBLE else View.INVISIBLE } else render() }
                 }
             }
         }.start()
