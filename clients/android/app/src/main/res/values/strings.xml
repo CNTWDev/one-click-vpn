@@ -158,6 +158,7 @@
   <string name="lines_one_down">%1$s has no answer, using %2$s</string>
   <string name="lines_only">Only %1$s works</string>
   <string name="location">Location</string>
+  <string name="location_retrying">Location not answering. Retrying · you can switch</string>
   <string name="location_unavailable_select_another">Location unavailable. Select another.</string>
   <string name="locations">Locations</string>
   <string name="logs_detail">Connection steps only: no addresses, keys or browsing. Kept for 7 days, up to 512 KB.</string>
@@ -194,6 +195,7 @@
   <string name="rate_unit_gbps">Gb/s</string>
   <string name="rate_unit_kbps">Kb/s</string>
   <string name="rate_unit_mbps">Mb/s</string>
+  <string name="reconnecting_status">Connection lost. Reconnecting…</string>
   <string name="refresh_devices">Refresh devices</string>
   <string name="refresh_locations">Refresh locations</string>
   <string name="reset_by_email">Reset password by email</string>
@@ -303,6 +305,7 @@
   <string name="valid_until_label">Valid until</string>
   <string name="version_label">Version %1$s</string>
   <string name="vpn_connection">VPN connection</string>
+  <string name="waiting_for_network">Waiting for network…</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>
   <string name="working">Working…</string>

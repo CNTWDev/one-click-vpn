@@ -354,6 +354,21 @@
     "en": "Confirming connection…",
     "ru": "Проверка подключения…"
   },
+  "reconnecting_status": {
+    "zh": "连接中断，正在重连…",
+    "en": "Connection lost. Reconnecting…",
+    "ru": "Связь прервалась. Переподключение…"
+  },
+  "waiting_for_network": {
+    "zh": "等待网络恢复…",
+    "en": "Waiting for network…",
+    "ru": "Ожидание сети…"
+  },
+  "location_retrying": {
+    "zh": "该位置无响应，正在重试 · 可换位置",
+    "en": "Location not answering. Retrying · you can switch",
+    "ru": "Локация не отвечает. Повтор · можно сменить"
+  },
   "connection_authorization_expired_connect_again": {
     "zh": "连接授权已过期，请重新连接。",
     "en": "Connection authorization expired. Connect again.",

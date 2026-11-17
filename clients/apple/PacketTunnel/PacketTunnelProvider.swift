@@ -5,6 +5,12 @@ import TunnelCore
 /// The VPN: the system tun goes to the embedded mihomo core (TunnelCore, built from clients/core), which carries
 /// traffic over the first transport of the node that answers (see Transports). The provider's own connections
 /// (API, latency tests, the core's links to nodes) stay outside the tunnel.
+///
+/// Once connected it stays connected until the user disconnects or the account is refused: a lost network or a
+/// node that stops answering puts it in "reconnecting" and it retries with backoff; without any network it waits
+/// for the path monitor instead of probing. Automatic mode moves to the fastest location that answers; a location
+/// the user chose is retried. On iPhone the app turns on On Demand while the user wants the VPN, so iOS starts the
+/// tunnel again if it was killed; a refusal is remembered (Shared.refused) so those restarts stop at once.
 final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var lifecycle:Task<Void,Never>?
     private let stateLock=NSLock()
@@ -29,8 +35,21 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var transports:[String]=[]
     private var carrying=""
     private var network=""
-    private var lastProbe=Date.distantPast
+    private var nextProbe=Date.distantPast
     private var failures=0
+    /// The user left the location to the app: when it stops answering, the tunnel moves to the fastest one.
+    private var automatic=true
+    private var online=true
+    private var lastNetworkCheck=Date.distantPast
+    private var changedFlag=false
+    private var networkChanged:Bool {
+        get {stateLock.lock();defer {stateLock.unlock()};return changedFlag}
+        set {stateLock.lock();defer {stateLock.unlock()};changedFlag=newValue}
+    }
+    /// Probe interval while the connection works; the core's fallback group reacts to failed dials in between.
+    private let healthy:TimeInterval=120
+    /// Waits between retries while nothing answers; the last repeats for as long as the user leaves the VPN on.
+    private let retries:[TimeInterval]=[5,15,30,60,300]
     private var wokeFlag=false
     private var woke:Bool {
         get {stateLock.lock();defer {stateLock.unlock()};return wokeFlag}
@@ -40,24 +59,30 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var home:String {Shared.folder.appendingPathComponent("core").path}
 
     override func startTunnel(options:[String:NSObject]?,completionHandler:@escaping (Error?)->Void) {
+        monitor.pathUpdateHandler={[weak self] _ in self?.networkChanged=true}
         monitor.start(queue:.global())
+        // Started by the app (or Shortcuts); otherwise by iOS On Demand, after it killed the tunnel or at a network change.
+        let fromApp=options?["fromApp"] != nil
         lifecycle=Task {
             do {
+                if fromApp {Shared.refused=nil}
+                else if let refused=Shared.refused {throw AccessFailure.code(refused)} // the user must sign in or act in the app first
                 guard let configuration=(protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration,let origin=configuration["origin"] as? String else {throw AccessFailure.code("SERVER_REQUIRED")}
                 #if os(macOS)
                 // Handed over by the app (see SecureStorage.handed); a start from System Settings has none.
                 guard let token=options?["token"] as? Data,let identity=options?["identity"] as? Data else {throw AccessFailure.code("CONNECT_FROM_APP_FIRST")}
                 SecureStorage.handed=["token":token,"identity":identity]
                 #endif
-                api=try NativeAPI(origin:origin);nodeId=configuration["nodeId"] as? String ?? "";smart=(configuration["routing"] as? String ?? "smart") != "global"
+                api=try NativeAPI(origin:origin);nodeId=configuration["nodeId"] as? String ?? "";automatic=nodeId.isEmpty;smart=(configuration["routing"] as? String ?? "smart") != "global"
                 try await Task.sleep(nanoseconds:200_000_000) // let the path monitor report the current network
-                network=Transports.networkKey(monitor.currentPath)
+                network=Transports.networkKey(monitor.currentPath);online=Transports.online(monitor.currentPath);networkChanged=false
                 api?.attempt=String(UUID().uuidString.replacingOccurrences(of:"-",with:"").prefix(16)).lowercased()
                 // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
                 Journal.add("connect: start \(api?.attempt ?? ""), network \(network), routing \(smart ? "smart":"global")")
                 if nodeId.isEmpty {await chooseFastest()}
                 try await setTunnelNetworkSettings(networkSettings())
                 try await connectWithFallback()
+                nextProbe=Date().addingTimeInterval(healthy)
                 completionHandler(nil)
             } catch {
                 if Task.isCancelled {Journal.add("connect: cancelled");CoreStop();completionHandler(error);return}
@@ -66,7 +91,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 // Unexpected errors keep their (scrubbed) text, e.g. why the core refused its configuration.
                 else {detail=Journal.scrub(error.localizedDescription)}
                 Journal.add("connect: failed \(code)"+(detail.isEmpty ? "":" (\(detail))"));await report(code,detail)
-                CoreStop();completionHandler(error);return
+                if Shared.fatal.contains(code) {Shared.refused=code}
+                // The app reads the code (fetchLastDisconnectError) to say why and to stop keeping the VPN on.
+                CoreStop();completionHandler(NSError(domain:Shared.errorDomain,code:1,userInfo:["code":code]));return
             }
             while !Task.isCancelled {
                 do {try await Task.sleep(nanoseconds:2_000_000_000)} catch {return}
@@ -147,7 +174,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private func probe(initial:Bool=false,report shouldReport:Bool?=nil) async -> Bool {
         let names=transports.joined(separator:",")
         let results=await Task.detached {Transports.parseProbe(CoreProbe(names,Transports.testURL,5000))}.value
-        lastProbe=Date()
         let working=results.filter {$0.value>=0}.map {$0.key}
         // WireGuard cannot answer before the node has applied this device; that is not a block.
         let failed=results.filter {$0.value<0 && ($0.key != "wireguard" || leaseReady)}.map {$0.key}
@@ -175,9 +201,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         if let attempt=api?.attempt {event["attempt"]=attempt}
         _ = try? await api?.request("diagnostics",["events":[event]])
     }
+    /// Closes the tunnel for good. The app reads the code (fetchLastDisconnectError) to show why and to stop
+    /// reconnecting; a refusal also stops On Demand restarts until the user acts in the app.
     private func fail(_ code:String,_ shown:String?=nil) async {
         Journal.add("disconnect: \(code)")
-        await report(code);cancelTunnelWithError(AccessFailure.code(shown ?? code))
+        if Shared.fatal.contains(code) {Shared.refused=code}
+        await report(code);cancelTunnelWithError(NSError(domain:Shared.errorDomain,code:1,userInfo:["code":shown ?? code]))
     }
     /// A first connection with other transports does not wait for WireGuard (they carry traffic until it is ready;
     /// tick switches then); without them it waits up to 15 s. Renewals only check readiness.
@@ -204,37 +233,84 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         return lease
     }
     private func tick() async {
-        if woke {woke=false;renewAt=Date.distantPast;lastProbe=Date.distantPast}
+        if woke {woke=false;renewAt=Date.distantPast;nextProbe=Date.distantPast}
+        // The path monitor's report, with a 30 s check as a safety net.
+        if networkChanged || Date().timeIntervalSince(lastNetworkCheck)>30 {lastNetworkCheck=Date();networkChanged=false;checkNetwork()}
         // A refusal (account, device, quota) closes the tunnel. When the server cannot be reached the tunnel stays
         // while it still carries traffic, up to offlineGrace after the last renewal; probes decide.
-        if Date()>=renewAt {
+        if online && Date()>=renewAt {
             do {_ = try await acquire()}
-            catch AccessFailure.code(let code) where ["AUTH_REQUIRED","DEVICE_REVOKED","DEVICE_LIMIT_REACHED","MEMBERSHIP_EXPIRED","QUOTA_EXHAUSTED","ACCOUNT_UNAVAILABLE","MANAGED_ACCESS_REQUIRED","CLIENT_UPDATE_REQUIRED"].contains(code) {await fail(code);return}
+            catch AccessFailure.code(let code) where Shared.fatal.contains(code) {await fail(code);return}
             catch {Journal.add("lease: renewal failed, retrying");renewAt=Date().addingTimeInterval(Date().timeIntervalSince(renewedAt)<300 ? 15:60)}
-            if Date().timeIntervalSince(renewedAt)>=offlineGrace {await fail("LEASE_RENEWAL_FAILED","ACCESS_EXPIRED");return}
-        } else if !leaseReady,await status() {
+        } else if online && !leaseReady,await status() {
             // WireGuard became usable: test it now so the fallback group can count on it right away.
             leaseReady=true;Journal.add("lease: WireGuard ready");_ = await probe(report:true)
         }
-        let current=Transports.networkKey(monitor.currentPath)
-        if current != network && current != "unknown" {Journal.add("network: changed to \(current)");network=current;lastProbe=Date.distantPast}
-        if Date().timeIntervalSince(lastProbe)>30 {
-            if await probe() {failures=0}
-            else {
-                failures+=1
-                if failures>=2 {
-                    Journal.add("probe: no transport answers")
-                    guard !fallbacks.isEmpty else {await fail("HANDSHAKE_TIMEOUT","NODE_UNAVAILABLE");return}
-                    await nextNode("HANDSHAKE_TIMEOUT")
-                    do {try await connectWithFallback();failures=0}
-                    catch AccessFailure.code(let code) {await fail(code);return}
-                    catch {await fail("TUNNEL_ERROR","NODE_UNAVAILABLE");return}
-                }
-            }
-            publish {$0["status"]=self.failures==0 ? "connection_connected":"connection_confirming"}
+        if Date().timeIntervalSince(renewedAt)>=offlineGrace {await fail("LEASE_RENEWAL_FAILED","ACCESS_EXPIRED");return}
+        if !online {
+            // Nothing to reach: no probes (they would only drain the battery) until the path monitor reports a network.
+            publish {$0["status"]="waiting_for_network"}
+        } else if Date()>=nextProbe {
+            if await probe() {
+                if failures>=2 {Journal.add("reconnect: \(nodeName) answers again via \(carrying)")}
+                failures=0;nextProbe=Date().addingTimeInterval(healthy)
+            } else {await missed()}
+            let shown=message()
+            publish {$0["status"]=shown}
         } else {updateCarrying()}
         let rate=CoreRate().split(separator:" ").compactMap {Int($0)}
         if rate.count==2 {publish {$0["tx"]=rate[0];$0["rx"]=rate[1]}}
+    }
+    /// Online state, transport memory key, and a clean start on a new network: old connections would hang.
+    private func checkNetwork() {
+        let path=monitor.currentPath
+        let wasOnline=online;online=Transports.online(path)
+        let current=Transports.networkKey(path)
+        guard current != network || online != wasOnline else {return}
+        Journal.add(online ? "network: changed to \(current)":"network: none")
+        if current != "unknown" {network=current}
+        guard online else {return}
+        CoreReset()
+        // Retry right away and restart the backoff; a renewal that failed meanwhile is due now too.
+        nextProbe=Date.distantPast;failures=min(failures,1)
+        if Date().timeIntervalSince(renewedAt)>90 {renewAt=Date.distantPast}
+    }
+    /// A round where no transport answered while the device has a network.
+    private func missed() async {
+        failures+=1;nextProbe=Date().addingTimeInterval(retries[min(max(failures-1,0),retries.count-1)])
+        guard failures>=2 else {return}
+        if failures==2 {Journal.add("probe: no transport answers, reconnecting");await report("HANDSHAKE_TIMEOUT")}
+        if automatic {await moveToFastest()}
+    }
+    /// Automatic mode: measures every location now and moves to the fastest one that answers, if it is another.
+    private func moveToFastest() async {
+        guard let api,let nodes=try? await api.request("nodes")["nodes"] as? [[String:Any]] else {Journal.add("switch: no location list, retrying");return}
+        let ranked=await Latency.rank(nodes,attempts:1,reuse:0)
+        guard let best=ranked.first(where:{$0.quality.latency != nil})?.node,let id=best["id"] as? String else {Journal.add("switch: no location answers, retrying");return}
+        guard id != nodeId else {return}
+        Journal.add("switch: \(nodeName) failed (HANDSHAKE_TIMEOUT), moving to \(best["name"] as? String ?? "?")")
+        let from=nodeName,previous=nodeId
+        nodeId=id
+        do {
+            try await bringUp()
+            publish {$0["switchedFrom"]=from}
+            failures=0;nextProbe=Date().addingTimeInterval(healthy)
+        } catch AccessFailure.code(let code) where Shared.fatal.contains(code) {
+            await fail(code)
+        } catch AccessFailure.code("HANDSHAKE_TIMEOUT") {
+            Journal.add("switch: failed HANDSHAKE_TIMEOUT, retrying")
+        } catch {
+            // The lease request did not reach the server: the tunnel still runs on the previous location.
+            nodeId=previous;Journal.add("switch: failed, retrying")
+        }
+    }
+    private func message() -> String {
+        if !online {return "waiting_for_network"}
+        switch failures {
+        case 0:return "connection_connected"
+        case 1:return "connection_confirming"
+        default:return automatic ? "reconnecting_status":"location_retrying"
+        }
     }
     // Renew immediately after sleep instead of waiting out a stale refresh timer.
     override func wake() {woke=true}

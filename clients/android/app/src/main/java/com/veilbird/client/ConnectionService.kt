@@ -1,7 +1,10 @@
 package com.veilbird.client
 
 import android.app.*
+import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.VpnService
 import android.os.SystemClock
 import com.veilbird.core.Core
@@ -10,6 +13,7 @@ import org.json.JSONObject
 import java.io.File
 import java.time.Instant
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
 object ConnectionStateStore {
@@ -34,6 +38,13 @@ private class Unreachable : Exception()
  * The VPN: Android's tun goes to the embedded mihomo core, which carries traffic over the first
  * transport of the node that answers (see Transports). The app's own sockets stay outside the
  * tun, so the core's connections to nodes and the API calls use the underlying network.
+ *
+ * Once connected it stays connected until the user disconnects or the account is refused: a lost
+ * network or a node that stops answering puts it in "reconnecting" (the tun stays, so the kill switch
+ * keeps blocking) and it retries with backoff. Without any network it does not probe at all and waits
+ * for Android to report one. Automatic mode moves to the fastest location that answers; a location the
+ * user chose is retried. If Android kills the process it restarts the service (START_STICKY), which
+ * connects again when the user had left it on.
  */
 class ConnectionService : VpnService() {
     private val worker = Executors.newSingleThreadScheduledExecutor()
@@ -51,10 +62,19 @@ class ConnectionService : VpnService() {
     private var network = ""
     private var transports = listOf<String>()
     private var carrying = ""
-    private var lastProbe = 0L
+    private var nextProbe = 0L
     private var lastNetworkCheck = 0L
     private var failures = 0
     private var notified = ""
+    /** The user left the location to the app: when it stops answering, the app moves to the fastest one. */
+    private var automatic = true
+    /** Started by Android (restart after it killed the process, or always-on VPN), not by a tap. */
+    private var restored = false
+    private var started = false
+    @Volatile private var online = true
+    @Volatile private var networkChanged = false
+    private var retry: ScheduledFuture<*>? = null
+    private var callback: ConnectivityManager.NetworkCallback? = null
     private val home by lazy { File(filesDir, "core").path }
 
     override fun onCreate() {
@@ -63,32 +83,70 @@ class ConnectionService : VpnService() {
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Not queued behind the worker: a tap while still connecting cancels the attempt at once.
-        if (intent?.action == "disconnect") { Thread { stopConnection(R.string.disconnected) }.start(); return START_NOT_STICKY }
-        if (ConnectionStateStore.active) return START_NOT_STICKY
+        if (intent?.action == "disconnect") { wanted(this, false); Thread { stopConnection(R.string.disconnected) }.start(); return START_NOT_STICKY }
+        if (ConnectionStateStore.active) return START_STICKY
+        // A restart after Android killed the process comes without an intent: only if the user had left the VPN on.
+        if (intent == null && !wanted(this)) { stopSelf(); return START_NOT_STICKY }
         startForeground(1, notification(L10n.text(R.string.connecting)))
+        restored = intent == null || intent.action == VpnService.SERVICE_INTERFACE
+        wanted(this, true)
         ConnectionStateStore.active = true; ConnectionStateStore.messageId = R.string.authorizing_and_connecting
         ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L; ConnectionStateStore.switchedFrom = ""
-        // Always-on VPN starts the service without extras: use the location chosen in the app.
+        // Always-on VPN, the tile and a restart start the service without extras: use the location chosen in the app.
         nodeId = intent?.getStringExtra("nodeId") ?: getSharedPreferences("preferences", MODE_PRIVATE).getString("nodeId", "")!!
+        automatic = nodeId.isEmpty()
         api.attempt = java.util.UUID.randomUUID().toString().replace("-", "").take(16)
-        worker.execute {
-            try {
-                network = Transports.networkKey(this)
-                // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
-                Journal.add("connect: start ${api.attempt}, network ${network}, routing ${routing()}")
-                if (nodeId.isEmpty()) chooseFastest()
-                connect()
-                worker.scheduleWithFixedDelay({ tick() }, 2, 2, TimeUnit.SECONDS)
-                api.report("")
-            } catch (e: Exception) { fail(e) }
-        }
-        return START_NOT_STICKY
+        watchNetwork()
+        worker.execute { begin(0) }
+        return START_STICKY
     }
-    override fun onRevoke() { worker.execute { stopConnection(R.string.disconnected) } }
+    /**
+     * The first connection. One the user started reports its failure and stops; one Android started (the user
+     * had left the VPN on) keeps trying with backoff, and at once when a network appears.
+     */
+    private fun begin(attempt: Int) {
+        if (stopping) return
+        try {
+            network = Transports.networkKey(this); online = Transports.online(this); networkChanged = false
+            // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
+            Journal.add("connect: start ${api.attempt}, network ${network}, routing ${routing()}" + if (restored) ", restored" else "")
+            if (automatic) { nodeId = ""; chooseFastest() }
+            connect()
+            started = true; nextProbe = SystemClock.elapsedRealtime() + HEALTHY
+            worker.scheduleWithFixedDelay({ tick() }, 2, 2, TimeUnit.SECONDS)
+            api.report("")
+        } catch (e: Exception) {
+            if (!restored || stopping || fatal(e)) { fail(e); return }
+            val delay = RETRY[minOf(attempt, RETRY.size - 1)]
+            Journal.add("connect: failed ${code(e)}, retrying in ${delay / 1000} s")
+            ConnectionStateStore.messageId = if (online) R.string.reconnecting_status else R.string.waiting_for_network
+            retry = worker.schedule({ begin(attempt + 1) }, delay, TimeUnit.MILLISECONDS)
+        }
+    }
+    /** Android reports the network the app uses outside the VPN; the tick acts on it (at most every 2 s). */
+    private fun watchNetwork() {
+        if (callback != null) return
+        val watcher = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) { changed() }
+            override fun onLost(network: Network) { changed() }
+            private fun changed() {
+                networkChanged = true
+                // Still waiting for a first connection: try now instead of at the end of the backoff.
+                if (!started && !stopping && Transports.online(this@ConnectionService) && retry?.cancel(false) == true) {
+                    Journal.add("network: available, retrying now"); retry = worker.schedule({ begin(0) }, 2, TimeUnit.SECONDS)
+                }
+            }
+        }
+        try { getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(watcher); callback = watcher } catch (_: Exception) { }
+    }
+    override fun onRevoke() { wanted(this, false); worker.execute { stopConnection(R.string.disconnected) } }
     private fun routing() = getSharedPreferences("preferences", MODE_PRIVATE).getString("routing", "smart")!!
     private fun code(e: Exception) = when (e) { is ApiFailure -> e.code; is Unreachable -> "HANDSHAKE_TIMEOUT"; else -> "CONNECT_FAILED" }
+    /** Refusals that retrying cannot fix: the account, this device, or the VPN permission. */
+    private fun fatal(e: Exception) = (e as? ApiFailure)?.code in FATAL
     private fun fail(e: Exception) {
         if (stopping) { Journal.add("connect: cancelled"); return }
+        wanted(this, false)
         // Unexpected errors keep their (scrubbed) text: a class name alone like "proxyerror" says too little.
         val detail = if (e !is ApiFailure && e !is Unreachable) listOf(e.javaClass.simpleName, Journal.scrub(e.message)).filter { it.isNotEmpty() }.joinToString(": ") else ""
         Journal.add("connect: failed ${code(e)}" + if (detail.isNotEmpty()) " ($detail)" else "")
@@ -158,7 +216,6 @@ class ConnectionService : VpnService() {
     /** All transports at once; true when at least one answers. Failures are remembered only when another transport worked. */
     private fun probe(initial: Boolean = false, report: Boolean = initial): Boolean {
         val results = Transports.parseProbe(Core.probe(transports.joinToString(","), Transports.TEST_URL, 5000))
-        lastProbe = SystemClock.elapsedRealtime()
         val working = results.filterValues { it >= 0 }.keys
         // WireGuard cannot answer before the node has applied this device; that is not a block.
         val failed = results.filterValues { it < 0 }.keys.filter { it != "wireguard" || leaseReady }
@@ -205,42 +262,90 @@ class ConnectionService : VpnService() {
     }
     private fun tick() {
         if (stopping) return
+        val now = SystemClock.elapsedRealtime()
         try {
-            val now = SystemClock.elapsedRealtime()
+            // Android's network callback, with a 30 s check as a safety net (some changes keep the same default network).
+            if (networkChanged || now - lastNetworkCheck > 30000) { lastNetworkCheck = now; networkChanged = false; checkNetwork(now) }
             // A refusal (account, device, quota) closes the tunnel. When the server cannot be reached the tunnel
             // stays while it still carries traffic, up to OFFLINE_GRACE after the last renewal; probes decide.
-            if (now >= renewAt) {
-                val retry = now + if (now - renewedAt < 300000) 15000 else 60000
+            if (online && now >= renewAt) {
+                val again = now + if (now - renewedAt < 300000) 15000 else 60000
                 try { acquire() } catch (e: ApiFailure) {
-                    if (e.code in listOf("AUTH_REQUIRED", "DEVICE_REVOKED", "DEVICE_LIMIT_REACHED", "MEMBERSHIP_EXPIRED", "QUOTA_EXHAUSTED", "ACCOUNT_UNAVAILABLE", "MANAGED_ACCESS_REQUIRED", "CLIENT_UPDATE_REQUIRED")) { fail(e); return }
-                    Journal.add("lease: renewal failed (${e.code}), retrying"); renewAt = retry
-                } catch (_: Exception) { renewAt = retry }
-                if (SystemClock.elapsedRealtime() - renewedAt >= OFFLINE_GRACE) { Journal.add("lease: expired"); api.report("LEASE_RENEWAL_FAILED", nodeId); stopConnection(R.string.connection_authorization_expired_connect_again); return }
-            } else if (!leaseReady) {
+                    if (e.code in FATAL) { fail(e); return }
+                    Journal.add("lease: renewal failed (${e.code}), retrying"); renewAt = again
+                } catch (_: Exception) { renewAt = again }
+            } else if (online && !leaseReady) {
                 // WireGuard became usable: test it now so the fallback group can count on it without waiting for the next round.
                 if (status()) { leaseReady = true; Journal.add("lease: WireGuard ready"); probe(report = true) }
             }
-            if (now - lastNetworkCheck > 30000) {
-                lastNetworkCheck = now
-                val current = Transports.networkKey(this)
-                if (current != network) { Journal.add("network: changed to $current"); network = current; lastProbe = 0 }
-            }
-            if (now - lastProbe > 30000) {
-                if (probe()) failures = 0
-                else if (++failures >= 2) {
-                    Journal.add("probe: no transport answers")
-                    if (nextNode("HANDSHAKE_TIMEOUT")) { try { connect(); failures = 0 } catch (e: Exception) { fail(e) }; return }
-                    api.report("HANDSHAKE_TIMEOUT", nodeId); stopConnection(R.string.this_location_is_not_responding_try_another); return
-                }
-                ConnectionStateStore.messageId = if (failures == 0) R.string.connected_status else R.string.confirming_connection_status
+            if (SystemClock.elapsedRealtime() - renewedAt >= OFFLINE_GRACE) { Journal.add("lease: expired"); api.report("LEASE_RENEWAL_FAILED", nodeId); wanted(this, false); stopConnection(R.string.connection_authorization_expired_connect_again); return }
+            if (!online) {
+                // Nothing to reach: no probes (they would only drain the battery) until Android reports a network.
+                ConnectionStateStore.messageId = R.string.waiting_for_network
+            } else if (now >= nextProbe) {
+                if (probe()) {
+                    if (failures >= 2) Journal.add("reconnect: ${ConnectionStateStore.node} answers again via ${carrying.ifEmpty { "?" }}")
+                    failures = 0; nextProbe = SystemClock.elapsedRealtime() + HEALTHY
+                } else missed()
+                ConnectionStateStore.messageId = message()
             } else updateCarrying()
             Core.rate().split(' ').let { (up, down) -> ConnectionStateStore.txRate = up.toLong(); ConnectionStateStore.rxRate = down.toLong() }
-            val text = ConnectionStateStore.message
-            if (text != notified) { notified = text; getSystemService(NotificationManager::class.java).notify(1, notification(text)) }
         } catch (e: Exception) {
+            // Never a reason to give up: count it as a failed round and try again later.
             val detail = listOf(e.javaClass.simpleName, Journal.scrub(e.message)).filter { it.isNotEmpty() }.joinToString(": ")
-            Journal.add("tunnel: error $detail"); api.report("TUNNEL_ERROR", nodeId, detail); stopConnection(R.string.connection_interrupted_try_again)
+            Journal.add("tunnel: error $detail")
+            if (failures == 0) api.report("TUNNEL_ERROR", nodeId, detail)
+            failures++; nextProbe = SystemClock.elapsedRealtime() + backoff(); ConnectionStateStore.messageId = message()
         }
+        val text = ConnectionStateStore.message
+        if (text != notified) { notified = text; getSystemService(NotificationManager::class.java).notify(1, notification(text)) }
+    }
+    /** Online state, transport memory key, and a clean start on a new network: old connections would hang. */
+    private fun checkNetwork(now: Long) {
+        val wasOnline = online; online = Transports.online(this)
+        val current = Transports.networkKey(this)
+        if (current == network && online == wasOnline) return
+        Journal.add(if (online) "network: changed to $current" else "network: none")
+        network = current
+        if (!online) return
+        try { Core.reset() } catch (_: Exception) { }
+        // Retry right away and restart the backoff; a renewal that failed meanwhile is due now too.
+        nextProbe = 0; failures = minOf(failures, 1)
+        if (now - renewedAt > 90000) renewAt = 0
+    }
+    /** A round where no transport answered while the device has a network. */
+    private fun missed() {
+        failures++; nextProbe = SystemClock.elapsedRealtime() + backoff()
+        if (failures < 2) return
+        if (failures == 2) { Journal.add("probe: no transport answers, reconnecting"); api.report("HANDSHAKE_TIMEOUT", nodeId) }
+        if (automatic) moveToFastest()
+    }
+    /** Automatic mode: measures every location now and moves to the fastest one that answers, if it is another. */
+    private fun moveToFastest() {
+        val ranked = try { Latency.rank(api.request("nodes").getJSONArray("nodes"), attempts = 1) } catch (_: Exception) { emptyList() }
+        val best = ranked.firstOrNull { it.second.latency != null }?.first ?: run { Journal.add("switch: no location answers, retrying"); return }
+        val id = best.getString("id")
+        if (id == nodeId) return
+        Journal.add("switch: ${ConnectionStateStore.node} failed (HANDSHAKE_TIMEOUT), moving to ${best.optString("name")}")
+        val from = ConnectionStateStore.node; val previous = nodeId
+        nodeId = id
+        try {
+            bringUp(); ConnectionStateStore.switchedFrom = from
+            failures = 0; nextProbe = SystemClock.elapsedRealtime() + HEALTHY
+        } catch (e: Exception) {
+            if (fatal(e)) { fail(e); return }
+            // The lease request did not reach the server: the tunnel still runs on the previous location.
+            if (e !is Unreachable) nodeId = previous
+            Journal.add("switch: failed ${code(e)}, retrying")
+        }
+    }
+    private fun backoff() = RETRY[minOf(maxOf(failures - 1, 0), RETRY.size - 1)]
+    private fun message() = when {
+        !online -> R.string.waiting_for_network
+        failures == 0 -> R.string.connected_status
+        failures == 1 -> R.string.confirming_connection_status
+        automatic -> R.string.reconnecting_status
+        else -> R.string.location_retrying
     }
     private fun notification(text: String): Notification {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
@@ -250,6 +355,8 @@ class ConnectionService : VpnService() {
     @Synchronized private fun stopConnection(message: Int) {
         if (stopping) return
         stopping = true
+        retry?.cancel(false)
+        callback?.let { try { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it) } catch (_: Exception) { } }; callback = null
         try { Core.stop() } catch (_: Exception) { }
         Journal.add("disconnect: ${resources.getResourceEntryName(message)}")
         ConnectionStateStore.active = false; ConnectionStateStore.messageId = message
@@ -260,6 +367,16 @@ class ConnectionService : VpnService() {
     companion object {
         /** Keep a working tunnel this long when the server cannot be reached to renew the lease; the node keeps the lease as long. */
         private const val OFFLINE_GRACE = 12 * 3600 * 1000L
+        /** Probe interval while the connection works; the core's fallback group reacts to failed dials in between. */
+        private const val HEALTHY = 120000L
+        /** Waits between retries while nothing answers; the last repeats for as long as the user leaves the VPN on. */
+        private val RETRY = longArrayOf(5000, 15000, 30000, 60000, 300000)
+        private val FATAL = setOf("AUTH_REQUIRED", "DEVICE_REVOKED", "DEVICE_LIMIT_REACHED", "MEMBERSHIP_EXPIRED", "QUOTA_EXHAUSTED", "ACCOUNT_UNAVAILABLE", "MANAGED_ACCESS_REQUIRED", "CLIENT_UPDATE_REQUIRED", "VPN_PERMISSION_REQUIRED")
+        /** Status lines shown in place of the rates while connected. */
+        val NOTICES = setOf(R.string.confirming_connection_status, R.string.reconnecting_status, R.string.waiting_for_network, R.string.location_retrying)
+        /** Whether the user left the VPN on: read when Android restarts the service after killing the process. */
+        fun wanted(context: Context): Boolean = context.getSharedPreferences("preferences", Context.MODE_PRIVATE).getBoolean("vpnWanted", false)
+        fun wanted(context: Context, on: Boolean) { context.getSharedPreferences("preferences", Context.MODE_PRIVATE).edit().putBoolean("vpnWanted", on).apply() }
     }
     override fun onDestroy() {
         worker.shutdownNow()

@@ -160,6 +160,7 @@
   <data name="lines_one_down" xml:space="preserve"><value>{0} 不通，已用 {1}</value></data>
   <data name="lines_only" xml:space="preserve"><value>只有 {0} 能用</value></data>
   <data name="location" xml:space="preserve"><value>连接位置</value></data>
+  <data name="location_retrying" xml:space="preserve"><value>该位置无响应，正在重试 · 可换位置</value></data>
   <data name="location_unavailable_select_another" xml:space="preserve"><value>节点不可用，请重新选择</value></data>
   <data name="locations" xml:space="preserve"><value>节点</value></data>
   <data name="logs_detail" xml:space="preserve"><value>只记录连接过程，不含地址、密钥和访问记录。保留 7 天，最多 512 KB。</value></data>
@@ -196,6 +197,7 @@
   <data name="rate_unit_gbps" xml:space="preserve"><value>Gb/s</value></data>
   <data name="rate_unit_kbps" xml:space="preserve"><value>Kb/s</value></data>
   <data name="rate_unit_mbps" xml:space="preserve"><value>Mb/s</value></data>
+  <data name="reconnecting_status" xml:space="preserve"><value>连接中断，正在重连…</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>刷新设备状态</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>刷新节点</value></data>
   <data name="reset_by_email" xml:space="preserve"><value>通过邮件重置密码</value></data>
@@ -306,6 +308,7 @@
   <data name="valid_until_label" xml:space="preserve"><value>有效期至</value></data>
   <data name="version_label" xml:space="preserve"><value>版本 {0}</value></data>
   <data name="vpn_connection" xml:space="preserve"><value>VPN 连接</value></data>
+  <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>
   <data name="working" xml:space="preserve"><value>正在处理，请稍候…</value></data>

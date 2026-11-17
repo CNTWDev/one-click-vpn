@@ -22,6 +22,12 @@ enum Transports {
         let digest=SHA256.hash(data:Data("\(kind)|\(gateways)".utf8)).prefix(6).map {String(format:"%02x",$0)}.joined()
         return "\(kind):\(digest)"
     }
+    /// Whether the device has a network outside the VPN at all (Wi-Fi, mobile data or Ethernet); without one the
+    /// tunnel waits for the path monitor instead of probing.
+    static func online(_ path:NWPath?) -> Bool {
+        guard let path,path.status == .satisfied else {return false}
+        return path.availableInterfaces.contains {[.wifi,.cellular,.wiredEthernet].contains($0.type)}
+    }
     private static var memory:UserDefaults {Shared.defaults}
     /// Transports that failed on this network within the last week, while another one worked.
     static func blocked(_ network:String) -> Set<String> {
@@ -76,6 +82,16 @@ enum Transports {
 enum Shared {
     static let groupIdentifier=Bundle.main.object(forInfoDictionaryKey:"VeilbirdAppGroup") as? String ?? ""
     static var defaults:UserDefaults {UserDefaults(suiteName:groupIdentifier.isEmpty ? nil:groupIdentifier) ?? .standard}
+    /// Refusals that retrying cannot fix: the account or this device.
+    static let fatal:Set<String>=["AUTH_REQUIRED","DEVICE_REVOKED","DEVICE_LIMIT_REACHED","MEMBERSHIP_EXPIRED","QUOTA_EXHAUSTED","ACCOUNT_UNAVAILABLE","MANAGED_ACCESS_REQUIRED","CLIENT_UPDATE_REQUIRED"]
+    /// Error domain of a tunnel closed for good; userInfo "code" says why (the app reads it with fetchLastDisconnectError).
+    static let errorDomain="TrackNothing"
+    /// A refusal (account, device) the tunnel stopped on. iOS On Demand restarts then fail at once without asking the
+    /// server, until the app (which turns On Demand off and shows why) or a new start from the app clears it.
+    static var refused:String? {
+        get {defaults.string(forKey:"refused")}
+        set {defaults.set(newValue,forKey:"refused")}
+    }
     static var folder:URL {
         if !groupIdentifier.isEmpty,let shared=FileManager.default.containerURL(forSecurityApplicationGroupIdentifier:groupIdentifier) {return shared}
         return FileManager.default.urls(for:.cachesDirectory,in:.userDomainMask)[0]

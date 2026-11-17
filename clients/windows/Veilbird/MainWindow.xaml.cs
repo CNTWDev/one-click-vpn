@@ -101,7 +101,9 @@ public partial class MainWindow : Window {
         Render();_=Crash.Send(api);
         _=QuietNodes();
         // Installed by an update while connected: reconnect as before.
-        if(Settings.Get("reconnectAfterUpdate")=="1") {Settings.Set("reconnectAfterUpdate","0");Journal.Add("update: installed, reconnecting");if(api.SignedIn) Toggle();}
+        if(Settings.Get("reconnectAfterUpdate")=="1") {Settings.Set("reconnectAfterUpdate","0");Journal.Add("update: installed, reconnecting");Connection.Wanted=true;}
+        // The user had left the VPN on (sign-in after a restart, an update, a crash): connect again until it works.
+        if(api.SignedIn&&Connection.Wanted) _=Restore();
     }
 
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
@@ -214,7 +216,7 @@ public partial class MainWindow : Window {
         var placeTexts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,8,0)};placeTexts.Children.Add(place);placeTexts.Children.Add(placeDetail);
         var placeRow=new Button {Height=52,Padding=new Thickness(12,0,12,0),Background=Brushes.Transparent,BorderBrush=Look.Line,BorderThickness=new Thickness(1),Margin=new Thickness(0,14,0,0),Content=Columns(badge,placeTexts,Look.Icon("",10,Look.Secondary))};
         placeRow.Click+=(_,_)=>{
-            if(connection.Active&&connection.Since is not null) {ShowFromTray();ConnectionCheck();}
+            if(connection.Active&&connection.Since is not null&&connection.StatusKey!="location_retrying") {ShowFromTray();ConnectionCheck();}
             else {page="nodes";Render();ShowFromTray();}
         };
         DockPanel.SetDock(placeRow,Dock.Top);root.Children.Add(placeRow);
@@ -255,23 +257,49 @@ public partial class MainWindow : Window {
 
     // ---- Actions ----
     private void Toggle() {
-        if(connection.Active) {_=connection.Disconnect();return;}
+        restoring?.Cancel();restoring=null;
+        if(connection.Active) {Connection.Wanted=false;_=connection.Disconnect();return;}
         if(!api.SignedIn) {ShowFromTray();return;}
         if(update?.Mandatory==true) {ShowFromTray();Notify(L10n.Text("update_required_detail"));return;}
         failed=false;
         // A failed attempt shows on the ring (coral, with a retry arrow) rather than in a dialog.
         Work(async()=>{
             try {await connection.Connect(nodeId,Smart);}
-            catch(AccessFailure error) when (error.Code is not ("AUTH_REQUIRED" or "CLIENT_UPDATE_REQUIRED" or "DEVICE_LIMIT_REACHED")) {failed=true;failure=error.Message;}
+            catch(AccessFailure error) when (error.Code is not ("AUTH_REQUIRED" or "CLIENT_UPDATE_REQUIRED" or "DEVICE_LIMIT_REACHED")) {Connection.Wanted=false;failed=true;failure=error.Message;}
         });
+    }
+    private CancellationTokenSource? restoring;
+    /// Connects at launch because the user had left the VPN on. Waits for a network, then retries with backoff
+    /// until it connects, the account is refused, or the user connects or disconnects by hand.
+    private async Task Restore() {
+        var stop=new CancellationTokenSource();restoring=stop;
+        Journal.Add("connect: restoring, the VPN was on");
+        var attempt=0;
+        while(!stop.IsCancellationRequested&&Connection.Wanted&&!connection.Active&&api.SignedIn) {
+            var wait=TimeSpan.FromSeconds(5);
+            if(await Task.Run(Transports.Online)) {
+                try {failed=false;await connection.Connect(nodeId,Smart);if(connection.Active) return;}
+                catch(AccessFailure error) when (Connection.Fatal.Contains(error.Code)) {failed=true;failure=error.Message;Render();return;}
+                catch(Exception) {/* tried again below */}
+                wait=Connection.Retries[Math.Min(attempt++,Connection.Retries.Length-1)];
+            }
+            try {await Task.Delay(wait,stop.Token);} catch(OperationCanceledException) {return;}
+        }
     }
     private void ChooseRouting(string value) {
         if(connection.Active) {Notify(L10n.Text("disconnect_before_changing_routing"));return;}
         Settings.Set("routing",value);if(page=="nodes") Render();
     }
     private void Select(string id,string name) {
-        if(connection.Active) {Notify(L10n.Text("disconnect_before_selecting_another_location"));return;}
+        var reconnect=connection.Active&&id!=connection.NodeId;
         nodeId=id;nodeName=name;Settings.Set("nodeId",id);Settings.Set("nodeName",name);failed=false;page="connect";Render();
+        // Connected (or reconnecting): one click moves the VPN to the new location; the kill switch keeps blocking meanwhile.
+        if(reconnect) Work(async()=>{
+            restoring?.Cancel();restoring=null;
+            await connection.Disconnect("disconnected",unexpected:true);
+            try {await connection.Connect(nodeId,Smart);}
+            catch(AccessFailure error) when (error.Code is not ("AUTH_REQUIRED" or "CLIENT_UPDATE_REQUIRED" or "DEVICE_LIMIT_REACHED")) {Connection.Wanted=false;failed=true;failure=error.Message;}
+        });
     }
     private async void CheckForUpdate(bool announce) {
         try {
@@ -845,7 +873,7 @@ public partial class MainWindow : Window {
         var row=new Button {Height=60,Background=Brushes.Transparent,BorderBrush=Look.Line,BorderThickness=new Thickness(1),Content=Columns(badge,texts,Look.Icon("",11,Look.Secondary))};
         AutomationProperties.SetHelpText(row,L10n.Text("tap_to_change"));
         // Connected, the location row opens the connection check; otherwise the location list.
-        row.Click+=(_,_)=>{if(busy) return;if(connection.Active&&connection.Since is not null) ConnectionCheck();else {page="nodes";Render();}};
+        row.Click+=(_,_)=>{if(busy) return;if(connection.Active&&connection.Since is not null&&connection.StatusKey!="location_retrying") ConnectionCheck();else {page="nodes";Render();}};
         location=(badge,title,detail);
         usageTotal=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold};usageUntil=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold};
         var cells=Cells(("last_30_days",usageTotal,12),("valid_until_label",usageUntil,12));cells.Margin=new Thickness(4,14,4,0);
@@ -885,10 +913,10 @@ public partial class MainWindow : Window {
     }
     private string StatusTitle(RingState state)=>L10n.Text(state switch {RingState.Connected=>"connected_status",RingState.Connecting=>"connecting",RingState.Failed=>"connect_failed_title",_=>"not_connected"});
     /// Time since the connection came up, or null while it is not (yet) confirmed.
-    private string? Elapsed()=>connection.StatusKey!="confirming_connection_status"&&connection.Since is { } since?(DateTime.UtcNow-since).ToString(@"hh\:mm\:ss"):null;
+    private string? Elapsed()=>!Connection.Notices.Contains(connection.StatusKey)&&connection.Since is { } since?(DateTime.UtcNow-since).ToString(@"hh\:mm\:ss"):null;
     /// The flyout's one line keeps time and rates together; the window shows the time large above the rates.
     private string StatusDetail(RingState state,bool compact=true)=>state switch {
-        RingState.Connected=>connection.StatusKey=="confirming_connection_status"?L10n.Text("confirming_connection_status")
+        RingState.Connected=>Connection.Notices.Contains(connection.StatusKey)?L10n.Text(connection.StatusKey)
             :Elapsed() is { } time?compact?L10n.Text("connection_stats",time,Mbps(connection.RxRate),Mbps(connection.TxRate)):L10n.Text("connection_rates",Mbps(connection.RxRate),Mbps(connection.TxRate)):"",
         RingState.Connecting=>L10n.Text("finding_best_route"),
         RingState.Failed=>failure,
@@ -1269,7 +1297,7 @@ public partial class MainWindow : Window {
                 AutomationProperties.SetName(revoke,L10n.Text("revoke_access")+": "+deviceName);
                 revoke.Click+=(_,_)=>{
                     if(MessageBox.Show(this,L10n.Text("this_device_will_lose_access_revoke_authorization"),"TrackNothing",MessageBoxButton.YesNo)!=MessageBoxResult.Yes) return;
-                    Work(async()=>{await api.Action("revoke",new JsonObject {["enrollmentId"]=device["id"]!.GetValue<string>()});if(current) await connection.Disconnect();accountData=await api.Request("account");Render();});
+                    Work(async()=>{await api.Action("revoke",new JsonObject {["enrollmentId"]=device["id"]!.GetValue<string>()});if(current) {Connection.Wanted=false;await connection.Disconnect();}accountData=await api.Request("account");Render();});
                 };
                 action=revoke;
             }

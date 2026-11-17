@@ -529,9 +529,10 @@ class MainActivity : Activity() {
         rateBars = RateBars(this).apply { alpha = 0f; visibility = View.INVISIBLE }.also { add(it, height = 50.dp, width = 238.dp, top = 10, gravity = Gravity.CENTER_HORIZONTAL) }
         stream = DataStream(this).also { add(it, top = 18) }
         spacer(1f)
-        // Connected, the location row opens the connection check; otherwise it opens the location list.
+        // Connected, the location row opens the connection check; otherwise, or while the chosen location does not
+        // answer, it opens the location list (picking one there reconnects to it).
         val node = row(68).apply { background = pressable(Palette.surface, 16); contentDescription = L10n.text(R.string.tap_to_change)
-            setOnClickListener { if (busy) return@setOnClickListener; if (ConnectionStateStore.active && ConnectionStateStore.since > 0) connectionCheck() else { page = "nodes"; render() } } }
+            setOnClickListener { if (busy) return@setOnClickListener; if (ConnectionStateStore.active && ConnectionStateStore.since > 0 && ConnectionStateStore.messageId != R.string.location_retrying) connectionCheck() else { page = "nodes"; render() } } }
         nodeBadge = badge(null).also { node.addView(it) }
         val names = titles(" ", " "); node.addView(names)
         nodeTitle = names.getChildAt(0) as TextView; nodeDetail = names.getChildAt(1) as TextView
@@ -593,7 +594,7 @@ class MainActivity : Activity() {
         switchText?.text = if (noteShown) L10n.text(R.string.switched_location, from, ConnectionStateStore.node) else ""
         switchNote?.visibility = if (noteShown) View.VISIBLE else View.GONE
         // Rates change every second: set directly (fixed-width digits keep the line still); messages cross-fade.
-        if (connected) stateRates?.text = if (ConnectionStateStore.messageId == R.string.confirming_connection_status) ConnectionStateStore.message
+        if (connected) stateRates?.text = if (ConnectionStateStore.messageId in ConnectionService.NOTICES) ConnectionStateStore.message
             else L10n.text(R.string.connection_rates, mbps(ConnectionStateStore.rxRate), mbps(ConnectionStateStore.txRate))
         stateRates?.fade(connected)
         if (!connected) stateDetail?.swap(when (state) {
@@ -961,9 +962,21 @@ class MainActivity : Activity() {
         }
     }
     private fun select(id: String, name: String, code: String) {
-        if (ConnectionStateStore.active) { alert(L10n.text(R.string.disconnect_before_selecting_another_location)); return }
+        val reconnect = ConnectionStateStore.active && id != ConnectionStateStore.nodeId
         selectedId = id; selectedName = name; selectedCode = code; page = "connect"; render()
         getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("nodeId", id).putString("nodeName", name).putString("nodeCode", code).apply()
+        // Connected (or reconnecting): one tap moves the VPN to the new location.
+        if (reconnect) {
+            startService(Intent(this, ConnectionService::class.java).setAction("disconnect"))
+            val started = SystemClock.elapsedRealtime()
+            handler.post(object : Runnable {
+                override fun run() {
+                    // A moment after the old service is gone, so the new connection gets a fresh one.
+                    if (!ConnectionStateStore.active) handler.postDelayed({ startConnection() }, 600)
+                    else if (SystemClock.elapsedRealtime() - started < 10_000) handler.postDelayed(this, 200)
+                }
+            })
+        }
     }
 
     /** Builds a page from the cached account at once and refreshes it in the background. */

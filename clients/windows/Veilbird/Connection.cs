@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.NetworkInformation;
 using System.Text.Json.Nodes;
 
 namespace Veilbird;
@@ -7,6 +8,12 @@ namespace Veilbird;
 /// One VPN connection, as on the phones: a lease for this PC on a node, then the core carries traffic over the
 /// first transport that answers. Automatic mode keeps the next two fastest nodes as spares. Runs on a background
 /// loop; the window and the tray read its state and listen to Changed.
+///
+/// Once connected it stays connected until the user disconnects or the account is refused: a lost network or a
+/// node that stops answering puts it in "reconnecting" (the tunnel and the kill switch stay) and it retries with
+/// backoff; without any network it waits for Windows to report one. Automatic mode moves to the fastest location
+/// that answers; a location the user chose is retried. Wanted remembers that the user left it on, so the app
+/// connects again at its next start (sign-in, after an update or a crash).
 /// </summary>
 public sealed class Connection(NativeApi api,Core core) {
     public event Action? Changed;
@@ -32,10 +39,23 @@ public sealed class Connection(NativeApi api,Core core) {
     private (string Public,string Private) keys;
     private string leaseId="",network="",carrying="";
     private bool leaseReady;
-    private DateTime deadline,renewAt,renewedAt,lastProbe,lastNetworkCheck;
+    private DateTime deadline,renewAt,renewedAt,nextProbe,lastNetworkCheck;
     private List<string> transports=new();
     private int failures;
-    private static readonly string[] Fatal={"AUTH_REQUIRED","DEVICE_REVOKED","DEVICE_LIMIT_REACHED","MEMBERSHIP_EXPIRED","QUOTA_EXHAUSTED","ACCOUNT_UNAVAILABLE","MANAGED_ACCESS_REQUIRED","CLIENT_UPDATE_REQUIRED"};
+    /// The user left the location to the app: when it stops answering, the connection moves to the fastest one.
+    private bool automatic;
+    private bool online=true;
+    private volatile bool networkChanged;
+    public static readonly string[] Fatal={"AUTH_REQUIRED","DEVICE_REVOKED","DEVICE_LIMIT_REACHED","MEMBERSHIP_EXPIRED","QUOTA_EXHAUSTED","ACCOUNT_UNAVAILABLE","MANAGED_ACCESS_REQUIRED","CLIENT_UPDATE_REQUIRED"};
+    /// Probe interval while the connection works; the core's fallback group reacts to failed dials in between.
+    private static readonly TimeSpan Healthy=TimeSpan.FromMinutes(2);
+    /// Waits between retries while nothing answers; the last repeats for as long as the user leaves the VPN on.
+    public static readonly TimeSpan[] Retries={TimeSpan.FromSeconds(5),TimeSpan.FromSeconds(15),TimeSpan.FromSeconds(30),TimeSpan.FromMinutes(1),TimeSpan.FromMinutes(5)};
+    /// Status lines shown in place of the rates while connected.
+    public static readonly string[] Notices={"confirming_connection_status","reconnecting_status","waiting_for_network","location_retrying"};
+    /// The user left the VPN on: set by a connection, cleared by the user's disconnect or a refusal.
+    public static bool Wanted {get=>Settings.Get("vpnWanted","0")=="1";set=>Settings.Set("vpnWanted",value?"1":"0");}
+    private void OnNetworkChanged(object? sender,EventArgs e)=>networkChanged=true;
 
     private void Set(string status) {StatusKey=status;Changed?.Invoke();}
 
@@ -52,10 +72,11 @@ public sealed class Connection(NativeApi api,Core core) {
     private async Task Attempt(string nodeId,bool smart) {
         var wasBlocking=Blocking;
         Active=true;Blocking=false;Since=null;RxRate=TxRate=0;NodeId=nodeId;failures=0;SwitchedFrom="";Set("authorizing_and_connecting");
+        automatic=nodeId.Length==0;Wanted=true;
         try {
             await Task.Run(()=>core.KillSwitch(KillSwitchOn));
             keys=await Task.Run(core.NewKeypair);
-            network=await Task.Run(Transports.NetworkKey);lastNetworkCheck=DateTime.UtcNow;
+            network=await Task.Run(Transports.NetworkKey);online=network!="unknown";lastNetworkCheck=DateTime.UtcNow;networkChanged=false;
             api.Attempt=Guid.NewGuid().ToString("N")[..16];
             // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
             Journal.Add($"connect: start {api.Attempt}, network {network}, routing {(smart?"smart":"global")}");
@@ -68,6 +89,7 @@ public sealed class Connection(NativeApi api,Core core) {
             // Unexpected errors keep their (scrubbed) text, e.g. why the core refused its configuration.
             var detail=error is AccessFailure?"":$"{error.GetType().Name}: {Journal.Scrub(error.Message)}";
             Journal.Add($"connect: failed {code}"+(detail.Length>0?$" ({detail})":""));
+            if(Fatal.Contains(code)) Wanted=false;
             await api.Report(code,NodeId,detail);
             await Task.Run(core.Stop);Active=false;
             // A reconnect after a drop keeps blocking; a first attempt that failed does not.
@@ -77,6 +99,8 @@ public sealed class Connection(NativeApi api,Core core) {
         }
         // Disconnect pressed while connecting: the core may have started after Disconnect stopped it.
         if(!Active) {await Task.Run(core.Stop);return;}
+        nextProbe=DateTime.UtcNow+Healthy;
+        NetworkChange.NetworkAddressChanged+=OnNetworkChanged;
         loop=new CancellationTokenSource();
         var token=loop.Token;
         _=Task.Run(async()=>{while(!token.IsCancellationRequested) {try {await Task.Delay(2000,token);await Tick(smart);} catch(OperationCanceledException) {return;}}});
@@ -129,7 +153,6 @@ public sealed class Connection(NativeApi api,Core core) {
     /// All transports at once; true when at least one answers. Failures are remembered only when another transport worked.
     private async Task<bool> Probe(bool initial=false,bool? report=null) {
         var results=await Task.Run(()=>core.Probe(transports,5000));
-        lastProbe=DateTime.UtcNow;
         var working=results.Where(r=>r.Value>=0).Select(r=>r.Key).ToList();
         // WireGuard cannot answer before the node has applied this PC; that is not a block.
         var failed=results.Where(r=>r.Value<0&&(r.Key!="wireguard"||leaseReady)).Select(r=>r.Key).ToList();
@@ -174,46 +197,86 @@ public sealed class Connection(NativeApi api,Core core) {
         if(!Active) return;
         try {
             var now=DateTime.UtcNow;
+            // Windows reports address changes; a 30 s check is the safety net.
+            if(networkChanged||now-lastNetworkCheck>TimeSpan.FromSeconds(30)) {lastNetworkCheck=now;networkChanged=false;await CheckNetwork(now);}
             // A refusal (account, device, quota) closes the tunnel. When the server cannot be reached the tunnel
             // stays while it still carries traffic, up to OfflineGrace after the last renewal; probes decide.
-            if(now>=renewAt) {
+            if(online&&now>=renewAt) {
                 try {await Acquire();}
                 catch(AccessFailure error) when (Fatal.Contains(error.Code)) {await Fail(error.Code,"connection_authorization_expired_connect_again");return;}
                 catch(Exception error) {
                     Journal.Add($"lease: renewal failed ({(error as AccessFailure)?.Code??"network"}), retrying");
                     renewAt=now.AddSeconds(now-renewedAt<TimeSpan.FromMinutes(5)?15:60);
                 }
-                if(DateTime.UtcNow-renewedAt>=OfflineGrace) {Journal.Add("lease: expired");await Fail("LEASE_RENEWAL_FAILED","connection_authorization_expired_connect_again");return;}
-            } else if(!leaseReady&&await Status()) {
+            } else if(online&&!leaseReady&&await Status()) {
                 // WireGuard became usable: test it now so the fallback group can count on it right away.
                 leaseReady=true;Journal.Add("lease: WireGuard ready");await Probe(report:true);
             }
-            if(now-lastNetworkCheck>TimeSpan.FromSeconds(30)) {
-                lastNetworkCheck=now;
-                var current=await Task.Run(Transports.NetworkKey);
-                if(current!=network) {Journal.Add($"network: changed to {current}");network=current;lastProbe=DateTime.MinValue;}
-            }
-            if(now-lastProbe>TimeSpan.FromSeconds(30)) {
-                if(await Probe()) failures=0;
-                else if(++failures>=2) {
-                    Journal.Add("probe: no transport answers");
-                    if(fallbacks.Count>0) {
-                        await NextNode("HANDSHAKE_TIMEOUT");
-                        try {await ConnectWithFallback(smart);failures=0;} catch(Exception error) {await Fail((error as AccessFailure)?.Code??"CONNECT_FAILED","this_location_is_not_responding_try_another");}
-                        return;
-                    }
-                    await Fail("HANDSHAKE_TIMEOUT","this_location_is_not_responding_try_another");return;
-                }
-                StatusKey=failures==0?"connected_status":"confirming_connection_status";
+            if(DateTime.UtcNow-renewedAt>=OfflineGrace) {Journal.Add("lease: expired");await Fail("LEASE_RENEWAL_FAILED","connection_authorization_expired_connect_again");return;}
+            if(!online) StatusKey="waiting_for_network"; // no probes without a network: they would only fail
+            else if(now>=nextProbe) {
+                if(await Probe()) {
+                    if(failures>=2) Journal.Add($"reconnect: {NodeName} answers again via {carrying}");
+                    failures=0;nextProbe=DateTime.UtcNow+Healthy;
+                } else await Missed(smart);
+                if(!Active) return;
+                StatusKey=Message();
             } else await UpdateCarrying();
             var (up,down)=await Task.Run(core.Rate);
             TxRate=up;RxRate=down;Changed?.Invoke();
         } catch(Exception error) {
+            // Never a reason to give up: count it as a failed round and try again later.
             var detail=$"{error.GetType().Name}: {Journal.Scrub(error.Message)}";
-            Journal.Add($"tunnel: error {detail}");await api.Report("TUNNEL_ERROR",NodeId,detail);await Disconnect("connection_interrupted_try_again",unexpected:true);
+            Journal.Add($"tunnel: error {detail}");
+            if(failures==0) _=api.Report("TUNNEL_ERROR",NodeId,detail);
+            failures++;nextProbe=DateTime.UtcNow+Backoff();StatusKey=Message();Changed?.Invoke();
         }
     }
-    private async Task Fail(string code,string status) {await api.Report(code,NodeId);await Disconnect(status,unexpected:true);}
+    /// Online state, transport memory key, and a clean start on a new network: old connections would hang.
+    private async Task CheckNetwork(DateTime now) {
+        var current=await Task.Run(Transports.NetworkKey);
+        var wasOnline=online;online=current!="unknown";
+        if(current==network&&online==wasOnline) return;
+        Journal.Add(online?$"network: changed to {current}":"network: none");
+        if(online) network=current;
+        if(!online) return;
+        await Task.Run(core.Reset);
+        // Retry right away and restart the backoff; a renewal that failed meanwhile is due now too.
+        nextProbe=DateTime.MinValue;failures=Math.Min(failures,1);
+        if(now-renewedAt>TimeSpan.FromSeconds(90)) renewAt=DateTime.MinValue;
+    }
+    /// A round where no transport answered while the PC has a network.
+    private async Task Missed(bool smart) {
+        failures++;nextProbe=DateTime.UtcNow+Backoff();
+        if(failures<2) return;
+        if(failures==2) {Journal.Add("probe: no transport answers, reconnecting");_=api.Report("HANDSHAKE_TIMEOUT",NodeId);}
+        if(automatic) await MoveToFastest(smart);
+    }
+    /// Automatic mode: measures every location now and moves to the fastest one that answers, if it is another.
+    private async Task MoveToFastest(bool smart) {
+        List<(JsonNode Node,Quality Quality)> ranked;
+        try {ranked=await Latency.Rank((await api.Request("nodes"))["nodes"]!.AsArray(),attempts:1);} catch {Journal.Add("switch: no location list, retrying");return;}
+        var best=ranked.FirstOrDefault(item=>item.Quality.Latency is not null).Node;
+        if(best?["id"]?.GetValue<string>() is not { } id) {Journal.Add("switch: no location answers, retrying");return;}
+        if(id==NodeId) return;
+        Journal.Add($"switch: {NodeName} failed (HANDSHAKE_TIMEOUT), moving to {best["name"]}");
+        var from=NodeName;var previous=NodeId;
+        NodeId=id;
+        try {
+            await BringUp(smart);
+            SwitchedFrom=from;failures=0;nextProbe=DateTime.UtcNow+Healthy;
+        } catch(AccessFailure error) when (Fatal.Contains(error.Code)) {
+            await Fail(error.Code,"connection_authorization_expired_connect_again");
+        } catch(AccessFailure error) when (error.Code=="HANDSHAKE_TIMEOUT") {
+            Journal.Add("switch: failed HANDSHAKE_TIMEOUT, retrying");
+        } catch(Exception) when (Active) {
+            // The lease request did not reach the server: the tunnel still runs on the previous location.
+            NodeId=previous;Journal.Add("switch: failed, retrying");
+        }
+    }
+    private TimeSpan Backoff()=>Retries[Math.Min(Math.Max(failures-1,0),Retries.Length-1)];
+    private string Message()=>!online?"waiting_for_network":failures switch {0=>"connected_status",1=>"confirming_connection_status",_=>automatic?"reconnecting_status":"location_retrying"};
+    private async Task Fail(string code,string status) {Wanted=false;await api.Report(code,NodeId);await Disconnect(status,unexpected:true);}
     private async Task LiftKillSwitch() {
         try {await Task.Run(()=>core.KillSwitch(false));} catch(IOException) {/* the core is gone, and its rules with it */}
     }
@@ -230,6 +293,7 @@ public sealed class Connection(NativeApi api,Core core) {
             return;
         }
         Active=false;loop?.Cancel();Since=null;RxRate=TxRate=0;carrying="";
+        NetworkChange.NetworkAddressChanged-=OnNetworkChanged;
         Journal.Add("disconnect: "+status);
         await Task.Run(core.Stop);
         if(unexpected&&KillSwitchOn) {Blocking=true;status="kill_switch_blocking";Journal.Add("killswitch: blocking until connected again");}

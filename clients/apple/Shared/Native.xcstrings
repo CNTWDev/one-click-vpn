@@ -3612,6 +3612,29 @@
         }
       }
     },
+    "location_retrying": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location not answering. Retrying · you can switch"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该位置无响应，正在重试 · 可换位置"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Локация не отвечает. Повтор · можно сменить"
+          }
+        }
+      }
+    },
     "location_unavailable_select_another": {
       "extractionState": "manual",
       "localizations": {
@@ -4436,6 +4459,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Мбит/с"
+          }
+        }
+      }
+    },
+    "reconnecting_status": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection lost. Reconnecting…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接中断，正在重连…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Связь прервалась. Переподключение…"
           }
         }
       }
@@ -6943,6 +6989,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "VPN-подключение"
+          }
+        }
+      }
+    },
+    "waiting_for_network": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for network…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待网络恢复…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ожидание сети…"
           }
         }
       }

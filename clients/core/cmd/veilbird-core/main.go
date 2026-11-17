@@ -167,6 +167,9 @@ func main() {
 			reply(core.Now(fields[1]))
 		case "rate":
 			reply(core.Rate())
+		case "reset":
+			core.Reset()
+			reply("ok")
 		case "stop":
 			core.Stop()
 			reply("ok")

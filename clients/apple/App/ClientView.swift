@@ -84,7 +84,7 @@ struct ClientView:View {
         .task {await model.restore()}
         .alert(L10n.text("revoke_this_device_s_access"),isPresented:Binding(get:{revoke != nil},set:{if !$0 {revoke=nil}})) {
             Button(L10n.text("cancel"),role:.cancel) {revoke=nil}
-            Button(L10n.text("revoke_access"),role:.destructive) {if let device=revoke {model.work {_ = try await model.api().action("revoke",["enrollmentId":device["id"] as? String ?? ""]);if device["isCurrent"] as? Bool == true {model.manager?.connection.stopVPNTunnel()};try await model.loadAccount()}};revoke=nil}
+            Button(L10n.text("revoke_access"),role:.destructive) {if let device=revoke {model.work {_ = try await model.api().action("revoke",["enrollmentId":device["id"] as? String ?? ""]);if device["isCurrent"] as? Bool == true {await TunnelControl.stop(model.manager)};try await model.loadAccount()}};revoke=nil}
         } message:{Text(L10n.text("this_device_will_lose_access_the_slot_is_released"))}
         // "Forgot password" and "change password" both email the Portal's reset link; the new password is set there.
         .alert(L10n.text("reset_by_email"),isPresented:Binding(get:{resetEmail != nil},set:{if !$0 {resetEmail=nil}})) {
@@ -330,16 +330,17 @@ struct ClientView:View {
                             .lineLimit(2).id(state).transition(.opacity)
                     }
                 }.frame(height:mac ? 38:48).padding(.top,mac ? 4:6)
-                Text(model.status == "connection_confirming" ? L10n.text("connection_confirming"):L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate)))
+                Text(ClientModel.notices.contains(model.status) ? L10n.text(model.status):L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate)))
                     .font(.system(size:mac ? 12:13)).monospacedDigit().foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
                     .frame(height:mac ? 16:18).opacity(state == .connected ? 1:0)
                 RateBars(down:model.rxHistory,up:model.txHistory).frame(width:238,height:mac ? 44:50).padding(.top,mac ? 8:10)
-                    .opacity(state == .connected && model.status != "connection_confirming" ? 1:0)
+                    .opacity(state == .connected && !ClientModel.notices.contains(model.status) ? 1:0)
                 DataStream(running:state == .connecting || state == .connected,size:mac ? 14:15).padding(.top,mac ? 12:16)
             }.padding(.top,mac ? 24:28).animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:state)
             Spacer(minLength:16)
-            // Connected, the location row opens the connection check; otherwise the location list.
-            Button {if state == .connected {checkResult=nil;checking=true} else {tab=1}} label:{currentLocationRow}.buttonStyle(RowButton())
+            // Connected, the location row opens the connection check; otherwise, or while the chosen location does not
+            // answer, the location list (picking one there reconnects to it).
+            Button {if state == .connected && model.status != "location_retrying" {checkResult=nil;checking=true} else {tab=1}} label:{currentLocationRow}.buttonStyle(RowButton())
                 .cardOutline(VeilbirdStyle.radius+4).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius+4))
                 .accessibilityHint(L10n.text("tap_to_change"))
             usageStrip.padding(.top,16)
@@ -748,9 +749,11 @@ struct ClientView:View {
         }.background(selected ? VeilbirdStyle.raised:(open ? Color(red:12/255,green:15/255,blue:20/255):Color.clear))
         .animation(reduceMotion ? nil:.easeInOut(duration:0.2),value:selected)
     }
+    /// Connected (or reconnecting), one tap moves the VPN to the new location.
     private func choose(_ id:String,name:String) {
-        if model.connected {model.message=L10n.text("disconnect_before_changing_location");return}
+        let reconnect=model.connected && id != model.connectedNodeId
         model.selected=id;model.selectedName=name;tab=0
+        if reconnect {model.work {try await model.reconnect()}}
     }
 
     // MARK: Account
