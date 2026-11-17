@@ -15,9 +15,9 @@ import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.min
 
-/** The one palette of the app (dark, after the ∅ mark: lime on near-black green). */
+/** The one palette of the app, shared with the Portal and the Console: flat cool black, hairline cards, lime only where it matters. */
 object Palette {
-    val ground = Color.rgb(10, 13, 18)
+    val ground = Color.rgb(7, 9, 13)
     val surface = Color.rgb(18, 22, 29)
     val raised = Color.rgb(27, 32, 41)
     val selected = Color.rgb(38, 44, 54)
@@ -29,6 +29,8 @@ object Palette {
     val danger = Color.rgb(240, 134, 114)
     val fair = Color.rgb(227, 178, 85)
     val hairline = Color.argb(16, 234, 238, 244)
+    /** Card outline: cards are drawn as a hairline on the ground, not as a filled block. */
+    val edge = Color.argb(23, 220, 228, 245)
     fun alpha(color: Int, alpha: Int) = Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
 }
 

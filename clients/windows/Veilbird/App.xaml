@@ -1,7 +1,7 @@
 <Application x:Class="Veilbird.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" ShutdownMode="OnExplicitShutdown">
   <!-- The one dark palette of the app (lime on near-black green), the same values as on the phones and the Mac. -->
   <Application.Resources>
-    <SolidColorBrush x:Key="Ground" Color="#0A0D12"/>
+    <SolidColorBrush x:Key="Ground" Color="#07090D"/>
     <SolidColorBrush x:Key="Surface" Color="#12161D"/>
     <SolidColorBrush x:Key="Raised" Color="#1B2029"/>
     <SolidColorBrush x:Key="Selected" Color="#262C36"/>
