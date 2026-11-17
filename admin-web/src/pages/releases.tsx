@@ -95,13 +95,19 @@ const releaseKey = (meta: Installer) => `${meta.platform}:${meta.arch}:${meta.bu
  * inside are uploaded, so users download the APK / EXE / DMG itself. A ZIP without recognisable installers that is
  * itself named like an installer (older portable Windows builds) is kept as the installer.
  */
-async function collectInstallers(files: File[]): Promise<ImportItem[]> {
+async function collectInstallers(files: File[]): Promise<{ items: ImportItem[]; notes: string }> {
   const items: ImportItem[] = [];
+  let notes = "";
   for (const file of files) {
+    // The version's notes from clients/CHANGELOG.md, which CI puts next to the installers (release-notes.md).
+    if (/^release-notes\.md$/i.test(file.name)) { notes ||= (await file.text()).trim(); continue; }
     const direct = { key: `${file.name}:${file.size}:${file.lastModified}`, name: file.name, size: file.size, meta: parseInstallerName(file.name), read: async () => file };
     if (!/\.zip$/i.test(file.name)) { items.push({ ...direct, state: direct.meta ? "ready" : "unknown" }); continue; }
     try {
-      const entries = (await zipEntries(file)).map((entry) => ({ entry, name: entry.name.split("/").pop() || entry.name }))
+      const all = (await zipEntries(file)).map((entry) => ({ entry, name: entry.name.split("/").pop() || entry.name }));
+      const notesEntry = all.find(({ name }) => /^release-notes\.md$/i.test(name));
+      if (notesEntry && !notes) notes = new TextDecoder().decode(await extractEntry(file, notesEntry.entry)).trim();
+      const entries = all
         .filter(({ name }) => !/\.zip$/i.test(name) && parseInstallerName(name));
       if (!entries.length) { items.push({ ...direct, state: direct.meta ? "ready" : "unknown" }); continue; }
       for (const { entry, name } of entries) items.push({ key: `${direct.key}/${entry.name}`, name, size: entry.size, meta: parseInstallerName(name), state: "ready",
@@ -110,7 +116,7 @@ async function collectInstallers(files: File[]): Promise<ImportItem[]> {
       items.push(direct.meta ? { ...direct, state: "ready" } : { ...direct, state: "failed", error: t("无法读取压缩包：{0}", [(error as Error).message]) });
     }
   }
-  return items;
+  return { items, notes };
 }
 
 export function ReleasesPage() {
@@ -219,7 +225,9 @@ export function ReleasesPage() {
   }
   async function addImports(files: File[]) {
     if (!files.length) return;
-    const found = await collectInstallers(files);
+    const { items: found, notes } = await collectInstallers(files);
+    // 更新说明 starts from the build's changelog; whatever the operator already typed is kept.
+    if (notes) setImportNotes((current) => current.trim() ? current : notes);
     // A build already in the history is marked and skipped; a build dropped twice is listed once.
     const existing = new Set((data?.releases || []).map((release) => `${release.platform}:${release.arch}:${release.build}`));
     setImports((current) => {

@@ -7016,6 +7016,75 @@
         }
       }
     },
+    "whats_new": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's new"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本版更新"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Что нового"
+          }
+        }
+      }
+    },
+    "whats_new_notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnects automatically after a drop, no need to connect again\nNo battery-draining checks while offline; reconnects as soon as the network is back\nSwitch locations while connected\nSee what's new in each version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "断线后自动重连，不用再手动重新连接\n没网时不再耗电探测，网络恢复后立刻连上\n连接中可以直接换位置\n可以查看每个版本的更新内容"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Автоматическое переподключение после обрыва связи\nБез лишних проверок и расхода батареи без сети; подключение сразу после её появления\nСмена локации без отключения\nСписок изменений каждой версии"
+          }
+        }
+      }
+    },
+    "whats_new_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's new in %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 更新内容"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Что нового в %1$@"
+          }
+        }
+      }
+    },
     "where_would_you_like_to_connect": {
       "extractionState": "manual",
       "localizations": {

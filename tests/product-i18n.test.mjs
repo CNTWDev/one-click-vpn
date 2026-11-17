@@ -44,7 +44,8 @@ test("Native resources cover all three platforms with matching parameters", asyn
       const file = `${dir}/${name}`, source = await fs.readFile(file, "utf8");
       for (const match of source.matchAll(/(?:R\.string\.|L10n\.(?:text|Text)\(")(\w+)/g)) {
         // Variable arguments (e.g. L10n.text(model.status)) are deliberately not matched.
-        assert.ok(messages[match[1]], `${file}: missing ${match[1]}`);
+        // whats_new_notes is generated from clients/CHANGELOG.md by scripts/native-locales.mjs.
+        assert.ok(messages[match[1]] || match[1] === "whats_new_notes", `${file}: missing ${match[1]}`);
       }
       for (const line of source.split("\n")) {
         if (line.trim().startsWith("//") || line.includes("简体中文")) continue;
@@ -53,7 +54,7 @@ test("Native resources cover all three platforms with matching parameters", asyn
     }
   }
   const apple = JSON.parse(await fs.readFile("clients/apple/Shared/Native.xcstrings", "utf8"));
-  assert.deepEqual(Object.keys(apple.strings).sort(), Object.keys(messages).sort());
+  assert.deepEqual(Object.keys(apple.strings).sort(), [...Object.keys(messages), "whats_new_notes"].sort());
 });
 
 test("Language stores preserve independent preferences and work without browser storage", () => {

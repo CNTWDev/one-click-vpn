@@ -13,6 +13,24 @@ enum L10n {
         return "en"
     }
     static var locale: Locale { Locale(identifier: language) }
+    /// The items of release notes in the app's language. Notes from clients/CHANGELOG.md have "### zh/en/ru" blocks
+    /// of "- " items; notes typed in Console without blocks count for every language. English is the fallback.
+    static func notes(_ text: String) -> [String] {
+        var blocks: [String: [String]] = [:], block = ""
+        for raw in text.components(separatedBy: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("###") {
+                let code = line.dropFirst(3).trimmingCharacters(in: .whitespaces).lowercased()
+                if code.count == 2 { block = code; continue }
+            }
+            var item = line
+            for prefix in ["- ", "* ", "• "] where item.hasPrefix(prefix) { item = String(item.dropFirst(prefix.count)) }
+            item = item.trimmingCharacters(in: .whitespaces)
+            if !item.isEmpty { blocks[block, default: []].append(item) }
+        }
+        let code = String(language.prefix(2))
+        return blocks[code] ?? blocks["en"] ?? blocks[""] ?? []
+    }
     static func text(_ key: String, _ arguments: CVarArg...) -> String {
         let bundle = Bundle.main.path(forResource: language, ofType: "lproj").flatMap(Bundle.init(path:)) ?? Bundle.main
         let template = bundle.localizedString(forKey: key, value: nil, table: "Native")

@@ -1017,6 +1017,8 @@ class MainActivity : Activity() {
                 },
                 settingRow(L10n.text(R.string.check_for_updates), "") { update?.let { if (!downloading) startDownload(it) } ?: checkForUpdate(announce = true) }
                     .also { updateRowValue = it.getChildAt(1) as TextView },
+                // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).
+                settingRow(L10n.text(R.string.whats_new), BuildConfig.VERSION_NAME) { showNotes(BuildConfig.VERSION_NAME, L10n.text(R.string.whats_new_notes).lines().filter { it.isNotBlank() }) },
             )), top = 20)
             add(text(L10n.text(R.string.sign_out), 15f, Palette.danger).apply {
                 gravity = Gravity.CENTER; background = pressable(Palette.surface, 16)
@@ -1482,14 +1484,27 @@ class MainActivity : Activity() {
                 L10n.text(when (downloadError) { "digest" -> R.string.update_failed_digest; "storage" -> R.string.update_failed_storage; "package" -> R.string.update_failed_package; else -> R.string.update_failed_network }),
                 bannerButton(L10n.text(R.string.update_retry)) { startDownload(available) })
             else -> bannerRow(L10n.text(if (available.mandatory) R.string.update_required_title else R.string.update_banner_title, available.version),
-                if (available.mandatory) L10n.text(R.string.update_required_detail) else available.notes.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: L10n.text(R.string.update_available_detail),
+                if (available.mandatory) L10n.text(R.string.update_required_detail) else L10n.notes(available.notes).firstOrNull() ?: L10n.text(R.string.update_available_detail),
                 bannerButton(L10n.text(R.string.update_action)) { startDownload(available) },
                 if (available.mandatory) null else text("×", 20f, Palette.faint).apply {
                     gravity = Gravity.CENTER; background = pressable(Color.TRANSPARENT, 10); contentDescription = L10n.text(R.string.update_later)
                     layoutParams = LinearLayout.LayoutParams(40.dp, 44.dp); setOnClickListener { updater.dismiss(available); showUpdate() }
-                })
+                }).apply {
+                    // The banner shows the first improvement; a tap lists them all, with the update button.
+                    val items = L10n.notes(available.notes)
+                    if (items.size > 1) { background = pressable(Palette.surface, 16); setOnClickListener {
+                        showNotes(available.version, items, L10n.text(R.string.update_action)) { if (!downloading) startDownload(available) }
+                    } }
+                }
         }
         holder.addView(card, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4.dp; bottomMargin = 8.dp })
+    }
+    /** What's new in a version: one line per improvement, optionally with an action (update). */
+    private fun showNotes(version: String, items: List<String>, action: String? = null, onAction: (() -> Unit)? = null) {
+        val dialog = AlertDialog.Builder(this).setTitle(L10n.text(R.string.whats_new_title, version)).setMessage(items.joinToString("\n") { "· $it" })
+        if (action != null && onAction != null) dialog.setPositiveButton(action) { _, _ -> onAction() }.setNegativeButton(L10n.text(R.string.update_later), null)
+        else dialog.setPositiveButton(L10n.text(R.string.got_it), null)
+        dialog.show()
     }
     private fun bannerButton(title: String, filled: Boolean = false, onClick: () -> Unit) = text(title, 14f, if (filled) Palette.onAccent else Palette.accent, 600).apply {
         gravity = Gravity.CENTER; setPadding(if (filled) 16.dp else 12.dp, 0, if (filled) 16.dp else 12.dp, 0)

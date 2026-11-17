@@ -346,9 +346,20 @@ public partial class MainWindow : Window {
             UpdatePhase.Failed=>BannerRow(L10n.Text("update_failed_title",available.Version),
                 L10n.Text(downloadError switch {"digest"=>"update_failed_digest","storage"=>"update_failed_storage",_=>"update_failed_network"}),BannerButton(L10n.Text("update_retry"),false,()=>StartDownload(available))),
             _=>BannerRow(L10n.Text(available.Mandatory?"update_required_title":"update_banner_title",available.Version),
-                available.Mandatory?L10n.Text("update_required_detail"):available.Notes.Split('\n').FirstOrDefault(line=>line.Trim().Length>0)?.Trim()??L10n.Text("update_available_detail"),
+                available.Mandatory?L10n.Text("update_required_detail"):L10n.Notes(available.Notes).FirstOrDefault()??L10n.Text("update_available_detail"),
                 BannerButton(L10n.Text("update_action"),false,()=>StartDownload(available)),available.Mandatory?null:LaterButton(available)),
         };
+        // The banner shows the first improvement; a click lists them all, with the update button.
+        if(Phase(available)==UpdatePhase.Available&&!available.Mandatory&&L10n.Notes(available.Notes) is { Count: >1 } items&&bannerHost.Content is Border banner) {
+            banner.Cursor=Cursors.Hand;banner.Background=Brushes.Transparent;
+            banner.MouseLeftButtonUp+=(_,_)=>{if(ShowNotes(available.Version,items,true)) StartDownload(available);};
+        }
+    }
+    /// What's new in a version, one line per improvement; with offerUpdate, true when the user chose to update.
+    private bool ShowNotes(string version,List<string> items,bool offerUpdate=false) {
+        var text=string.Join("\n",items.Select(item=>"· "+item));
+        if(!offerUpdate) {MessageBox.Show(this,text,L10n.Text("whats_new_title",version),MessageBoxButton.OK);return false;}
+        return MessageBox.Show(this,text+"\n\n"+L10n.Text("update_action")+"?",L10n.Text("whats_new_title",version),MessageBoxButton.YesNo)==MessageBoxResult.Yes;
     }
     private static Button BannerButton(string title,bool filled,Action onClick) {
         var button=new Button {Content=title,FontSize=13,FontWeight=FontWeights.SemiBold,Height=32,Padding=new Thickness(12,0,12,0),Margin=new Thickness(8,0,0,0),
@@ -1194,7 +1205,10 @@ public partial class MainWindow : Window {
             else CheckForUpdate(true);
         });
         updateRowValue=((updates.Content as Grid)!.Children[2] as StackPanel)!.Children[0] as TextBlock;ShowUpdate();
-        Add(Card(new FrameworkElement[]{devices,password,language,startupRow,guardRow,updates},14));
+        // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).
+        var appVersion=System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)??"0";
+        var whatsNew=SettingRow(L10n.Text("whats_new"),appVersion,_=>ShowNotes(appVersion,L10n.Text("whats_new_notes").Split('\n').Where(line=>line.Trim().Length>0).ToList()));
+        Add(Card(new FrameworkElement[]{devices,password,language,startupRow,guardRow,updates,whatsNew},14));
 
         var signOut=new Button {Content=L10n.Text("sign_out"),Height=40,Background=Look.Surface,Foreground=Look.Danger,HorizontalContentAlignment=HorizontalAlignment.Center};
         signOut.Click+=(_,_)=>{

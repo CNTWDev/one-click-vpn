@@ -354,6 +354,16 @@
     "en": "Confirming connection…",
     "ru": "Проверка подключения…"
   },
+  "whats_new": {
+    "zh": "本版更新",
+    "en": "What's new",
+    "ru": "Что нового"
+  },
+  "whats_new_title": {
+    "zh": "{0} 更新内容",
+    "en": "What's new in {0}",
+    "ru": "Что нового в {0}"
+  },
   "reconnecting_status": {
     "zh": "连接中断，正在重连…",
     "en": "Connection lost. Reconnecting…",

@@ -34,6 +34,21 @@ object L10n {
         if (Build.VERSION.SDK_INT >= 33) app.getSystemService(LocaleManager::class.java).applicationLocales = if (value == "system") LocaleList.getEmptyLocaleList() else LocaleList.forLanguageTags(value)
         else app.getSharedPreferences("language", Context.MODE_PRIVATE).edit().putString("preference", value).apply()
     }
+    /**
+     * The items of release notes in the app's language. Notes from clients/CHANGELOG.md have "### zh/en/ru" blocks
+     * of "- " items; notes typed in Console without blocks count for every language. English is the fallback.
+     */
+    fun notes(text: String): List<String> {
+        val blocks = mutableMapOf<String, MutableList<String>>()
+        var block = ""
+        for (line in text.lines()) {
+            val heading = Regex("^###\\s*([a-zA-Z]{2})\\s*$").find(line.trim())
+            if (heading != null) { block = heading.groupValues[1].lowercase(); continue }
+            val item = line.trim().removePrefix("- ").removePrefix("* ").removePrefix("• ").trim()
+            if (item.isNotEmpty()) blocks.getOrPut(block) { mutableListOf() }.add(item)
+        }
+        return blocks[locale.language] ?: blocks["en"] ?: blocks[""] ?: emptyList()
+    }
     fun number(value: Number): String = NumberFormat.getNumberInstance(locale).format(value)
     fun date(value: String?): String {
         if (value.isNullOrBlank() || value == "null") return text(R.string.no_expiry)

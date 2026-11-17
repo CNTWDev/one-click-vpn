@@ -19,6 +19,7 @@ struct ClientView:View {
     @State private var revoke:[String:Any]?
     /// The address a reset link is about to be sent to, while the confirmation is showing.
     @State private var resetEmail:String?
+    @State private var whatsNew=false
     @State private var search=""
     @State private var tab=0
     @State private var versionTaps=0
@@ -82,6 +83,10 @@ struct ClientView:View {
         .environment(\.locale, L10n.locale).preferredColorScheme(.dark)
         .animation(reduceMotion ? nil:.easeOut(duration:0.2),value:tab).animation(reduceMotion ? nil:.easeOut(duration:0.2),value:model.signedIn)
         .task {await model.restore()}
+        // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).
+        .alert(L10n.text("whats_new_title",appVersion),isPresented:$whatsNew) {
+            Button(L10n.text("got_it"),role:.cancel) {}
+        } message:{Text(L10n.text("whats_new_notes").split(separator:"\n").map {"· "+$0}.joined(separator:"\n"))}
         .alert(L10n.text("revoke_this_device_s_access"),isPresented:Binding(get:{revoke != nil},set:{if !$0 {revoke=nil}})) {
             Button(L10n.text("cancel"),role:.cancel) {revoke=nil}
             Button(L10n.text("revoke_access"),role:.destructive) {if let device=revoke {model.work {_ = try await model.api().action("revoke",["enrollmentId":device["id"] as? String ?? ""]);if device["isCurrent"] as? Bool == true {await TunnelControl.stop(model.manager)};try await model.loadAccount()}};revoke=nil}
@@ -803,6 +808,8 @@ struct ClientView:View {
                     settingRow(L10n.text("check_for_updates"),updateValue) {
                         if let update=model.update {model.startUpdate(update) {openURL($0)}} else {Task {await model.checkForUpdate();if model.update == nil {model.message=L10n.text("up_to_date")}}}
                     }
+                    Hairline()
+                    settingRow(L10n.text("whats_new"),appVersion) {whatsNew=true}
                 }
                 Button {
                     if model.connected {model.message=L10n.text("disconnect_the_vpn_before_signing_out");return}
@@ -810,7 +817,7 @@ struct ClientView:View {
                 } label:{Text(L10n.text("sign_out")).font(.system(size:VeilbirdStyle.body)).foregroundStyle(VeilbirdStyle.danger).frame(maxWidth:.infinity).frame(height:mac ? 40:50)}
                     .buttonStyle(RowButton()).cardOutline(VeilbirdStyle.radius).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
                 // The diagnostic log has no visible entry: seven taps on the version open it.
-                Text(verbatim:"TRACKNOTHING "+(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")).font(Pixel.font(mac ? 12:13)).tracking(1.5).foregroundStyle(VeilbirdStyle.faint)
+                Text(verbatim:"TRACKNOTHING "+appVersion).font(Pixel.font(mac ? 12:13)).tracking(1.5).foregroundStyle(VeilbirdStyle.faint)
                     .frame(maxWidth:.infinity).padding(.vertical,4).contentShape(Rectangle()).onTapGesture {
                         if Date().timeIntervalSince(firstTap)>4 {versionTaps=0;firstTap=Date()}
                         versionTaps+=1
@@ -961,6 +968,7 @@ private extension View {
 }
 
 extension ClientView {
+    var appVersion:String {Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"}
     /// The account row's value: the same state as the banner.
     var updateValue:String {
         guard let update=model.update else {return L10n.text("up_to_date")}
@@ -974,6 +982,7 @@ extension ClientView {
 struct UpdateBanner:View {
     @EnvironmentObject private var model:ClientModel
     @Environment(\.openURL) private var openURL
+    @State private var notesShown=false
     let update:ReleaseUpdate
 
     static func percent(_ progress:UpdateDownloader.Progress?,_ update:ReleaseUpdate)->Int {
@@ -995,13 +1004,19 @@ struct UpdateBanner:View {
             }
         } else if !model.dismissed(update) {
             row(L10n.text(update.mandatory ? "update_required_title":"update_banner_title",update.version),
-                update.mandatory ? L10n.text("update_required_detail"):(update.notes.split(separator:"\n").first.map {String($0).trimmingCharacters(in:.whitespaces)} ?? L10n.text("update_available_detail"))) {
+                update.mandatory ? L10n.text("update_required_detail"):(L10n.notes(update.notes).first ?? L10n.text("update_available_detail"))) {
                 button(L10n.text("update_action")) {model.startUpdate(update) {openURL($0)}}
                 if !update.mandatory {
                     Button {model.dismiss(update)} label:{Image(systemName:"xmark").font(.system(size:11,weight:.semibold)).foregroundStyle(VeilbirdStyle.faint).frame(width:32,height:32).contentShape(Rectangle())}
                         .buttonStyle(.plain).accessibilityLabel(L10n.text("update_later"))
                 }
             }
+            // The banner shows the first improvement; a tap lists them all, with the update button.
+            .contentShape(Rectangle()).onTapGesture {if L10n.notes(update.notes).count>1 {notesShown=true}}
+            .alert(L10n.text("whats_new_title",update.version),isPresented:$notesShown) {
+                Button(L10n.text("update_later"),role:.cancel) {}
+                Button(L10n.text("update_action")) {model.startUpdate(update) {openURL($0)}}
+            } message:{Text(L10n.notes(update.notes).map {"· "+$0}.joined(separator:"\n"))}
         }
     }
     private var downloading:some View {
