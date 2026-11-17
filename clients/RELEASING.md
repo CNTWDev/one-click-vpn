@@ -96,7 +96,7 @@ VEILBIRD_RELEASE_MIRROR_PUBLIC_BASE_URL=https://<CDN 加速域名>
 之后每次运行「Client release」都会多出 `TrackNothing-macos-…`。CI 做的事：导入证书 → `scripts/apple-profiles.mjs` 取描述文件 → `clients/apple/scripts/release-macos.sh` 打包签名、生成 DMG、公证并钉订票据。本机有 Xcode 时也可以手动跑这个脚本（需要的环境变量写在脚本开头）。
 
 - 内核（mihomo）只编 Mac 需要的部分，并按内核代码缓存：内核没改的版本跳过这一步，Mac 大约 3 分钟加上公证时间。
-- 签好名的 DMG 在提交公证前就先存为运行的 Artifact，公证通过后再换成钉好票据的版本。新账号前几次公证可能要几十分钟；超过 60 分钟 CI 会停下并在运行页面给出公证编号，这时不用重编：等 Apple 通过（`xcrun notarytool info <编号>` 显示 Accepted），直接把这个 DMG 导入控制台即可，用户联网打开时系统会向 Apple 核验。
+- 签好名的 DMG 在提交公证前就先存为运行的 Artifact，公证通过后再换成钉好票据的版本。新账号前几次公证可能要几十分钟；超过 60 分钟 CI 会停下并在运行页面给出公证编号，这时不用重编：等一段时间后 Run workflow，「平台」选 `macOS notarize`、「build」填那次的运行序号（如 `18`），运行列表显示为 `Client release · macOS notarize 18`。它取那次的 DMG，等同一个公证结果（不重新提交），钉好票据后替换 Artifact 并发布到 beta，几分钟就结束。
 
 ### 用户第一次安装
 

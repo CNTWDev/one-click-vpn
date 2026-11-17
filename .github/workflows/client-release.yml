@@ -28,8 +28,12 @@ on:
         description: 平台 / Platforms
         type: choice
         default: All
-        options: [All, Android, Windows, macOS]
-run-name: Client release · ${{ inputs.platforms || 'All' }}
+        options: [All, Android, Windows, macOS, macOS notarize]
+      build:
+        description: 'macOS notarize: build number (run number) of the run whose DMG to finish'
+        type: string
+        required: false
+run-name: Client release · ${{ inputs.platforms || 'All' }}${{ inputs.build && format(' {0}', inputs.build) || '' }}
 permissions:
   contents: read
 concurrency:
@@ -41,6 +45,7 @@ env:
   VEILBIRD_RELEASE_TOKEN: ${{ secrets.VEILBIRD_RELEASE_TOKEN }}
 jobs:
   prepare:
+    if: inputs.platforms != 'macOS notarize'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -277,3 +282,62 @@ jobs:
         run: |
           security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/developer-id.p12"
+  # Finishes a Mac build whose notarization outlasted its run: takes that run's signed DMG, waits for Apple's
+  # verdict on the same submission (no rebuild, no new submission), staples it and publishes it to beta.
+  macos-notarize:
+    if: inputs.platforms == 'macOS notarize'
+    runs-on: macos-15
+    permissions:
+      contents: read
+      actions: read
+    env:
+      VEILBIRD_BUILD_NUMBER: ${{ inputs.build }}
+      VEILBIRD_APPLE_API_KEY_ID: ${{ secrets.VEILBIRD_APPLE_API_KEY_ID }}
+      VEILBIRD_APPLE_API_ISSUER_ID: ${{ secrets.VEILBIRD_APPLE_API_ISSUER_ID }}
+      VEILBIRD_NOTARY_RESUME: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Find the run's DMG
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$VEILBIRD_BUILD_NUMBER" =~ ^[0-9]+$ ]] || { echo "::error::Set 「build」 to the run number of the Mac build (e.g. 18)."; exit 1; }
+          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/client-release.yml/runs?per_page=100" \
+            --jq ".workflow_runs[] | select(.run_number == $VEILBIRD_BUILD_NUMBER) | .id")
+          artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/artifacts" --jq '.artifacts[] | select(.name | startswith("TrackNothing-macos-")) | .name')
+          [[ -n "$run" && -n "$artifact" ]] || { echo "::error::Run $VEILBIRD_BUILD_NUMBER has no TrackNothing-macos artifact."; exit 1; }
+          echo "run=$run" >> "$GITHUB_OUTPUT"; echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+          version=${artifact#TrackNothing-macos-}; echo "VEILBIRD_VERSION=${version%-*}" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.source.outputs.artifact }}
+          run-id: ${{ steps.source.outputs.run }}
+          github-token: ${{ github.token }}
+          path: clients/apple/artifacts/release
+      - name: API key
+        env:
+          P8: ${{ secrets.VEILBIRD_APPLE_API_KEY_P8 }}
+        run: |
+          printf '%s\n' "$P8" > "$RUNNER_TEMP/AuthKey.p8"
+          echo "VEILBIRD_APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+      - name: Notarize
+        run: bash clients/apple/scripts/release-macos.sh notarize
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.source.outputs.artifact }}
+          path: clients/apple/artifacts/release/TrackNothing-*-macos.dmg
+          if-no-files-found: error
+      - name: Publish to beta
+        if: env.VEILBIRD_RELEASE_API != '' && env.VEILBIRD_RELEASE_TOKEN != ''
+        run: >-
+          node scripts/release-client.mjs --platform macos --arch universal --channel beta --publish
+          --version "$VEILBIRD_VERSION" --build "$VEILBIRD_BUILD_NUMBER" --min-os "macOS 13"
+          --notes "${{ github.ref_name }} (${{ github.sha }}, notarized in run ${{ github.run_number }})"
+          --file "clients/apple/artifacts/release/TrackNothing-$VEILBIRD_VERSION-$VEILBIRD_BUILD_NUMBER-macos.dmg"
+      - name: Remove API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"

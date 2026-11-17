@@ -92,14 +92,26 @@ notarize_dmg() {
   [[ -f "$dmg" ]] || { echo "$dmg not found: run \"$0 build\" first." >&2; exit 1; }
   local auth=(--key "$VEILBIRD_APPLE_API_KEY_PATH" --key-id "$VEILBIRD_APPLE_API_KEY_ID" --issuer "$VEILBIRD_APPLE_API_ISSUER_ID")
   local submission status
-  submission=$(xcrun notarytool submit "$dmg" "${auth[@]}" --output-format json | plutil -extract id raw -o - -)
+  # VEILBIRD_NOTARY_RESUME=1: reuse the latest submission of this DMG (by file name) instead of submitting again.
+  if [[ -n "${VEILBIRD_NOTARY_RESUME:-}" ]]; then
+    submission=$(xcrun notarytool history "${auth[@]}" --output-format json | node -e '
+      const name = process.argv[1]; let input = "";
+      process.stdin.on("data", (chunk) => input += chunk).on("end", () => {
+        const found = JSON.parse(input).history.filter((item) => item.name === name)
+          .sort((a, b) => Date.parse(b.createdDate) - Date.parse(a.createdDate))[0];
+        process.stdout.write(found ? found.id : "");
+      });' "$(basename "$dmg")")
+    [[ -n "$submission" ]] || { echo "No earlier notarization of $(basename "$dmg") found." >&2; exit 1; }
+  else
+    submission=$(xcrun notarytool submit "$dmg" "${auth[@]}" --output-format json | plutil -extract id raw -o - -)
+  fi
   echo "Notarization submission: $submission"
   if ! xcrun notarytool wait "$submission" "${auth[@]}" --timeout 60m; then
     status=$(xcrun notarytool info "$submission" "${auth[@]}" --output-format json | plutil -extract status raw -o - - 2>/dev/null || true)
     if [[ "$status" == "In Progress" ]]; then
       echo "::warning::Apple has not finished notarization $submission after 60 min. The signed DMG is kept as this" \
-        "run's artifact. Once \"xcrun notarytool info $submission\" says Accepted, it opens normally online" \
-        "(Gatekeeper checks with Apple); import it in Console, no rebuild needed." >&2
+        "run's artifact. Finish it later without rebuilding: Run workflow with 平台 = macOS notarize and build =" \
+        "${VEILBIRD_BUILD_NUMBER:-<this run number>}." >&2
       exit 1
     fi
   fi
