@@ -91,6 +91,12 @@ class ScanLine(context: Context) : View(context) {
     private var anim: ValueAnimator? = null
     private val trailHeight get() = 70 * d
     init { importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO }
+    // An overlay: it takes the height of what it covers and never asks for more. (View's default takes all of an
+    // AT_MOST height, so on a tall screen the file grew to fill the page and pushed the action and the location off it.)
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val h = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY) MeasureSpec.getSize(heightMeasureSpec) else 0
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), h)
+    }
     fun sweep(down: Boolean, duration: Long = 1300) {
         anim?.cancel(); this.down = down
         if (!ValueAnimator.areAnimatorsEnabled() || height == 0) { y = -1f; invalidate(); return }

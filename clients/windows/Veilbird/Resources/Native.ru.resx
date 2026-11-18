@@ -40,10 +40,13 @@
   <data name="activity_title" xml:space="preserve"><value>Активность</value></data>
   <data name="activity_traffic" xml:space="preserve"><value>Трафик</value></data>
   <data name="all_locations" xml:space="preserve"><value>Все локации</value></data>
-  <data name="allow_system_extension" xml:space="preserve"><value>Разрешите системное расширение TrackNothing в «Системные настройки → Конфиденциальность и безопасность». После этого подключение продолжится.</value></data>
+  <data name="allow_system_extension" xml:space="preserve"><value>macOS должна разрешить сетевое расширение TrackNothing, иначе подключиться нельзя. Нажмите «Открыть Системные настройки» и включите TrackNothing в разделе «Основные › Объекты входа и расширения › Сетевые расширения» (macOS 14 и раньше: «Конфиденциальность и безопасность»). Подключение начнётся сразу после разрешения.</value></data>
+  <data name="allow_system_extension_short" xml:space="preserve"><value>Разрешите сетевое расширение TrackNothing в Системных настройках; подключение начнётся само</value></data>
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>При первом подключении разрешите добавление VPN. Управляйте устройствами в аккаунте.</value></data>
-  <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>Для подключения разрешите использование VPN.</value></data>
+  <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>TrackNothing нужно разрешение на VPN. Нажмите «Повторить» и выберите «ОК» в системном окне. Если окно не появляется, возможно, у другого VPN-приложения включён «Постоянный VPN»; отключите его в Настройках › VPN.</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>При первом подключении разрешите VPN</value></data>
+  <data name="allow_vpn_configuration" xml:space="preserve"><value>Для подключения система должна добавить конфигурацию VPN. Нажмите «Повторить» и выберите «Разрешить» в системном окне (может понадобиться пароль или Touch ID).</value></data>
+  <data name="allow_vpn_configuration_short" xml:space="preserve"><value>Выберите «Разрешить» в системном окне, чтобы добавить конфигурацию VPN</value></data>
   <data name="announcement" xml:space="preserve"><value>Объявление</value></data>
   <data name="appearance" xml:space="preserve"><value>Оформление</value></data>
   <data name="ask_your_administrator_to_enable_veilbird_client_access" xml:space="preserve"><value>Попросите администратора включить доступ через клиент TrackNothing.</value></data>
@@ -137,7 +140,7 @@
   <data name="enter_password" xml:space="preserve"><value>Введите пароль</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Введите почту и пароль.</value></data>
   <data name="exposed_detail" xml:space="preserve"><value>Это сейчас видно всем</value></data>
-  <data name="exposed_status" xml:space="preserve"><value>Открыто</value></data>
+  <data name="exposed_status" xml:space="preserve"><value>Видно</value></data>
   <data name="file_device" xml:space="preserve"><value>Устройство</value></data>
   <data name="file_language" xml:space="preserve"><value>Язык</value></data>
   <data name="file_public_ip" xml:space="preserve"><value>Внешний IP</value></data>
@@ -193,9 +196,12 @@
   <data name="open_app" xml:space="preserve"><value>Открыть TrackNothing</value></data>
   <data name="open_at_login" xml:space="preserve"><value>Запускать при входе</value></data>
   <data name="open_main_window" xml:space="preserve"><value>Открыть окно</value></data>
+  <data name="open_settings_short" xml:space="preserve"><value>Настройки</value></data>
+  <data name="open_system_settings" xml:space="preserve"><value>Открыть Системные настройки</value></data>
   <data name="open_vpn_settings" xml:space="preserve"><value>Открыть настройки VPN</value></data>
   <data name="password" xml:space="preserve"><value>Пароль</value></data>
   <data name="password_reset_unavailable" xml:space="preserve"><value>Сброс пароля по email сейчас недоступен. Обратитесь к администратору.</value></data>
+  <data name="permission_needed_title" xml:space="preserve"><value>Нужно ваше разрешение</value></data>
   <data name="quality_fair" xml:space="preserve"><value>Средне</value></data>
   <data name="quality_good" xml:space="preserve"><value>Хорошо</value></data>
   <data name="quality_poor" xml:space="preserve"><value>Плохо</value></data>
@@ -231,7 +237,7 @@
   <data name="running_in_tray" xml:space="preserve"><value>TrackNothing работает в трее. Нажмите на значок, чтобы переключить.</value></data>
   <data name="seal_action" xml:space="preserve"><value>Подключиться</value></data>
   <data name="sealed_status" xml:space="preserve"><value>Скрыто</value></data>
-  <data name="sealing_detail" xml:space="preserve"><value>Запечатываем…</value></data>
+  <data name="sealing_detail" xml:space="preserve"><value>Скрываем…</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>Поиск локаций или регионов</value></data>
   <data name="section_account" xml:space="preserve"><value>§04 Владелец</value></data>
   <data name="section_activity" xml:space="preserve"><value>§03 Активность</value></data>
@@ -330,7 +336,9 @@
   <data name="vpn_connection" xml:space="preserve"><value>VPN-подключение</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Кнопка подключения на главной заметнее, называется «Подключиться» / «Отключиться», а на Android всегда видна внизу экрана, даже на маленьких телефонах</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Кнопка подключения выделена фирменным цветом, её сразу видно; формулировки стали проще («Видно» / «Скрыто»)
+Если не хватает системного разрешения (сетевое расширение на Mac, конфигурация VPN, доступ к VPN на Android), главная страница подсказывает, где его дать; на Mac настройки открываются одним нажатием, а подключение начинается сразу после разрешения
+Исправление для Android: на высоких экранах нижняя часть главной (кнопка, локация, трафик) не показывалась и страница не прокручивалась</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>

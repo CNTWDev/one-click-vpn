@@ -255,9 +255,9 @@
     "ru": "Понятно"
   },
   "allow_the_system_vpn_permission_to_connect": {
-    "zh": "允许系统 VPN 权限后才能连接。",
-    "en": "Allow the system VPN permission to connect.",
-    "ru": "Для подключения разрешите использование VPN."
+    "zh": "需要允许 TrackNothing 建立 VPN 连接。点「重试」，在系统弹窗里选「确定」。如果没有弹窗，可能是其他 VPN 应用设置了「始终开启」，请到系统设置 › VPN 里关掉它。",
+    "en": "TrackNothing needs your permission to set up a VPN. Choose Try again and tap OK in the system prompt. If no prompt appears, another VPN app may be set to Always-on; turn that off in Settings › VPN.",
+    "ru": "TrackNothing нужно разрешение на VPN. Нажмите «Повторить» и выберите «ОК» в системном окне. Если окно не появляется, возможно, у другого VPN-приложения включён «Постоянный VPN»; отключите его в Настройках › VPN."
   },
   "device_limit_reached_revoke_an_old_device_in_account": {
     "zh": "设备数已达账号上限（单节点配置也算在内，订阅不算）。请到「账号」解除一台旧设备，或在门户删除不用的配置后重试。",
@@ -1160,9 +1160,9 @@
     "ru": "Введите корректный email."
   },
   "allow_system_extension": {
-    "zh": "请在“系统设置 → 隐私与安全性”中允许 TrackNothing 的系统扩展，允许后会自动连接。",
-    "en": "Allow the TrackNothing system extension in System Settings → Privacy & Security. It connects once allowed.",
-    "ru": "Разрешите системное расширение TrackNothing в «Системные настройки → Конфиденциальность и безопасность». После этого подключение продолжится."
+    "zh": "macOS 需要你允许 TrackNothing 的网络扩展才能连接。点「打开系统设置」，在「通用 › 登录项与扩展 › 网络扩展」（macOS 14 及更早：「隐私与安全性」）里打开 TrackNothing，允许后会自动连接。",
+    "en": "macOS needs you to allow the TrackNothing network extension before it can connect. Choose Open System Settings and turn TrackNothing on under General › Login Items & Extensions › Network Extensions (macOS 14 and earlier: Privacy & Security). It connects as soon as you allow it.",
+    "ru": "macOS должна разрешить сетевое расширение TrackNothing, иначе подключиться нельзя. Нажмите «Открыть Системные настройки» и включите TrackNothing в разделе «Основные › Объекты входа и расширения › Сетевые расширения» (macOS 14 и раньше: «Конфиденциальность и безопасность»). Подключение начнётся сразу после разрешения."
   },
   "move_to_applications_first": {
     "zh": "请先把 TrackNothing 拖到“应用程序”文件夹，再从那里打开。",
@@ -1590,22 +1590,22 @@
     "ru": "Трафик"
   },
   "exposed_status": {
-    "zh": "未隐匿",
-    "en": "Exposed",
-    "ru": "Открыто"
+    "zh": "未隐身",
+    "en": "Visible",
+    "ru": "Видно"
   },
   "sealed_status": {
-    "zh": "已隐匿",
+    "zh": "隐身中",
     "en": "Hidden",
     "ru": "Скрыто"
   },
   "seal_action": {
-    "zh": "连接",
+    "zh": "开始隐身",
     "en": "Connect",
     "ru": "Подключиться"
   },
   "unseal_action": {
-    "zh": "断开连接",
+    "zh": "停止隐身",
     "en": "Disconnect",
     "ru": "Отключиться"
   },
@@ -1615,9 +1615,9 @@
     "ru": "Это сейчас видно всем"
   },
   "sealing_detail": {
-    "zh": "正在封存…",
-    "en": "Sealing…",
-    "ru": "Запечатываем…"
+    "zh": "正在隐身…",
+    "en": "Hiding…",
+    "ru": "Скрываем…"
   },
   "file_public_ip": {
     "zh": "出口 IP",
@@ -1688,5 +1688,35 @@
     "zh": "月晕",
     "en": "Moon halo",
     "ru": "Лунный ореол"
+  },
+  "permission_needed_title": {
+    "zh": "需要你的许可",
+    "en": "Permission needed",
+    "ru": "Нужно ваше разрешение"
+  },
+  "allow_system_extension_short": {
+    "zh": "在系统设置里允许 TrackNothing 的网络扩展，允许后自动连接",
+    "en": "Allow the TrackNothing network extension in System Settings; it connects once allowed",
+    "ru": "Разрешите сетевое расширение TrackNothing в Системных настройках; подключение начнётся само"
+  },
+  "allow_vpn_configuration": {
+    "zh": "连接需要系统添加一项 VPN 配置。点「重试」，在系统弹窗里选「允许」（可能需要输入电脑密码或用触控 ID）。",
+    "en": "Connecting needs the system to add a VPN configuration. Choose Try again and pick Allow in the system prompt (it may ask for your password or Touch ID).",
+    "ru": "Для подключения система должна добавить конфигурацию VPN. Нажмите «Повторить» и выберите «Разрешить» в системном окне (может понадобиться пароль или Touch ID)."
+  },
+  "allow_vpn_configuration_short": {
+    "zh": "系统弹窗里选「允许」添加 VPN 配置后才能连接",
+    "en": "Pick Allow in the system prompt to add the VPN configuration",
+    "ru": "Выберите «Разрешить» в системном окне, чтобы добавить конфигурацию VPN"
+  },
+  "open_system_settings": {
+    "zh": "打开系统设置",
+    "en": "Open System Settings",
+    "ru": "Открыть Системные настройки"
+  },
+  "open_settings_short": {
+    "zh": "去设置",
+    "en": "Open Settings",
+    "ru": "Настройки"
   }
 }

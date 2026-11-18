@@ -94,6 +94,14 @@ struct ClientView:View {
         .animation(reduceMotion ? nil:.easeOut(duration:0.2),value:tab).animation(reduceMotion ? nil:.easeOut(duration:0.2),value:model.signedIn)
         .task {await model.restore()}
         // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).
+        // A system permission the connection needs (the system's own prompt is easy to miss): what to do and where.
+        .alert(L10n.text("permission_needed_title"),isPresented:$model.askPermission) {
+            #if os(macOS)
+            if model.permission == .systemExtension {Button(L10n.text("open_system_settings")) {SystemExtension.openSettings()}}
+            #endif
+            if model.permission == .vpnConfiguration {Button(L10n.text("retry_action")) {toggleConnection()}}
+            Button(L10n.text("cancel"),role:.cancel) {}
+        } message:{Text(L10n.text(model.permission == .systemExtension ? "allow_system_extension":"allow_vpn_configuration"))}
         .alert(L10n.text("whats_new_title",appVersion),isPresented:$whatsNew) {
             Button(L10n.text("got_it"),role:.cancel) {}
         } message:{Text(L10n.text("whats_new_notes").split(separator:"\n").map {"· "+$0}.joined(separator:"\n"))}
@@ -170,6 +178,7 @@ struct ClientView:View {
     }
     /// Update and announcement notes: one compact card each, only when there is something to say.
     @ViewBuilder private var notices:some View {
+        if let permission=model.permission,model.signedIn {PermissionNote(permission:permission,retry:toggleConnection)}
         if let update=model.update {UpdateBanner(update:update)}
         if !model.announcement.isEmpty {
             Text(model.announcement).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).frame(maxWidth:.infinity,alignment:.leading)
@@ -384,8 +393,8 @@ struct ClientView:View {
                     BreathingDot(on:model.connected)
                 }.padding(.horizontal,18).frame(height:mac ? 44:54).contentShape(Rectangle())
                 .foregroundStyle(state == .connected ? VeilbirdStyle.accent:VeilbirdStyle.text)
-                .background(state == .connected ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.text.opacity(0.04))
-                .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(state == .connected ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.text.opacity(0.47),lineWidth:1))
+                .background(state == .connected ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.accent.opacity(0.09))
+                .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(state == .connected ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.accent,lineWidth:1))
             }.buttonStyle(.plain)
             .accessibilityLabel(L10n.text(state == .idle ? "connect_action":(state == .failed ? "retry_action":(state == .connecting ? "cancel":"disconnect_action"))))
             // Connected, the location row opens the connection check; otherwise, or while the chosen location does not
@@ -601,6 +610,8 @@ struct ClientView:View {
     }
     private func toggleConnection() {
         if !model.connected && model.update?.mandatory == true {model.message=L10n.text("update_required_detail");return}
+        // Still waiting for the user to allow the extension: show where, instead of a tap that seems to do nothing.
+        if !model.connected && model.permission == .systemExtension {model.askPermission=true;return}
         model.work {try await model.toggle()}
     }
     private var currentLocationRow:some View {
@@ -1142,5 +1153,35 @@ struct UpdateBanner:View {
                 .padding(.horizontal,12).frame(minHeight:VeilbirdStyle.mac ? 28:36).background(filled ? VeilbirdStyle.accent.opacity(0.06):Color.clear,in:RoundedRectangle(cornerRadius:2))
                 .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(filled ? VeilbirdStyle.accent.opacity(0.7):Color.clear,lineWidth:1))
         }.buttonStyle(.plain)
+    }
+}
+
+/// The connect page's note while a system permission is missing: what it is and the one step that fixes it. It stays
+/// until the permission is granted (the system's own prompt is easy to miss or dismiss).
+struct PermissionNote:View {
+    let permission:ClientModel.Permission
+    let retry:()->Void
+    var body:some View {
+        HStack(spacing:10) {
+            Rectangle().fill(VeilbirdStyle.accent).frame(width:6,height:6).accessibilityHidden(true)
+            VStack(alignment:.leading,spacing:3) {
+                Text(L10n.text("permission_needed_title")).font(.system(size:VeilbirdStyle.body,weight:.medium)).lineLimit(1)
+                Text(L10n.text(permission == .systemExtension ? "allow_system_extension_short":"allow_vpn_configuration_short"))
+                    .font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2).fixedSize(horizontal:false,vertical:true)
+            }
+            Spacer(minLength:8)
+            Button {
+                #if os(macOS)
+                if permission == .systemExtension {SystemExtension.openSettings();return}
+                #endif
+                retry()
+            } label:{
+                Text(L10n.text(permission == .systemExtension ? "open_settings_short":"retry_action")).font(.system(size:VeilbirdStyle.detail+1,weight:.semibold)).foregroundStyle(VeilbirdStyle.accent)
+                    .lineLimit(1).padding(.horizontal,12).frame(minHeight:VeilbirdStyle.mac ? 28:36)
+                    .background(VeilbirdStyle.accent.opacity(0.06),in:RoundedRectangle(cornerRadius:2))
+                    .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(VeilbirdStyle.accent.opacity(0.7),lineWidth:1))
+            }.buttonStyle(.plain)
+        }.padding(.leading,14).padding(.trailing,8).padding(.vertical,12).cardOutline(VeilbirdStyle.radius)
+        .accessibilityElement(children:.contain)
     }
 }

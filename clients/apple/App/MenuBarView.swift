@@ -48,15 +48,20 @@ struct MenuBarView:View {
                             .transition(.opacity)
                     }
                     }.frame(maxWidth:.infinity,alignment:.leading).frame(height:30).padding(.horizontal,4).animation(.easeInOut(duration:0.2),value:on)
-                    Button {model.work {try await model.toggle()}} label:{
+                    // A missing system permission: say what and where, instead of a tap that seems to do nothing.
+                    if let permission=model.permission {PermissionNote(permission:permission) {model.work {try await model.toggle()}}.padding(.bottom,8)}
+                    Button {
+                        if !model.connected && model.permission == .systemExtension {SystemExtension.openSettings();return}
+                        model.work {try await model.toggle()}
+                    } label:{
                         HStack {
                             Text(L10n.text(on ? "unseal_action":(model.connected ? "sealing_detail":(model.failed ? "retry_action":"seal_action")))).font(.system(size:13,weight:.medium)).lineLimit(1)
                             Spacer(minLength:8)
                             BreathingDot(on:model.connected)
                         }.padding(.horizontal,14).frame(height:40).contentShape(Rectangle())
                         .foregroundStyle(on ? VeilbirdStyle.accent:VeilbirdStyle.text)
-                        .background(on ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.text.opacity(0.04))
-                        .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(on ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.text.opacity(0.47),lineWidth:1))
+                        .background(on ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.accent.opacity(0.09))
+                        .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(on ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.accent,lineWidth:1))
                     }.buttonStyle(.plain)
                     .accessibilityLabel(L10n.text(model.connected ? (model.since == nil ? "cancel":"disconnect_action"):"connect_action"))
                 }.padding(.top,16).padding(.bottom,14)
