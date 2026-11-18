@@ -138,7 +138,7 @@
   <string name="enter_password">Введите пароль</string>
   <string name="enter_your_email_and_password">Введите почту и пароль.</string>
   <string name="exposed_detail">Это сейчас видно всем</string>
-  <string name="exposed_status">Открыто</string>
+  <string name="exposed_status">Видно</string>
   <string name="file_device">Устройство</string>
   <string name="file_language">Язык</string>
   <string name="file_public_ip">Внешний IP</string>
@@ -235,7 +235,7 @@
   <string name="running_in_tray">TrackNothing работает в трее. Нажмите на значок, чтобы переключить.</string>
   <string name="seal_action">Подключиться</string>
   <string name="sealed_status">Скрыто</string>
-  <string name="sealing_detail">Запечатываем…</string>
+  <string name="sealing_detail">Скрываем…</string>
   <string name="search_locations_or_regions">Поиск локаций или регионов</string>
   <string name="section_account">§04 Владелец</string>
   <string name="section_activity">§03 Активность</string>
@@ -333,7 +333,7 @@
   <string name="vpn_connection">VPN-подключение</string>
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Кнопка подключения выделена фирменным цветом, её сразу видно\nЕсли не хватает системного разрешения (сетевое расширение на Mac, конфигурация VPN, доступ к VPN на Android), главная страница подсказывает, где его дать; на Mac настройки открываются одним нажатием, а подключение начинается сразу после разрешения</string>
+  <string name="whats_new_notes">Кнопка подключения выделена фирменным цветом, её сразу видно; формулировки стали проще («Видно» / «Скрыто»)\nЕсли не хватает системного разрешения (сетевое расширение на Mac, конфигурация VPN, доступ к VPN на Android), главная страница подсказывает, где его дать; на Mac настройки открываются одним нажатием, а подключение начинается сразу после разрешения</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Версия Windows для разработки · Интеграция VPN ещё не завершена</string>

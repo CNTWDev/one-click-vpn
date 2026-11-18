@@ -80,13 +80,13 @@ export function VisitorFile() {
   const delay = (index: number) => 120 + (sealed ? index : rows.length - 1 - index) * STEP;
   return <section className={`visitor-file${sealed ? " is-sealed" : ""}`} aria-label={t("访客档案")}>
     <div className="file-head"><span className="file-label">{t("§ 访客档案 · 此刻")}</span>
-      <b className="file-state"><span className="when-off">{t("未隐匿")}</span><span className="when-on">{t("已封存")}<span className="stamp">SEALED</span></span></b></div>
+      <b className="file-state"><span className="when-off">{t("未隐身")}</span><span className="when-on">{t("隐身中")}<span className="stamp">SEALED</span></span></b></div>
     <div className="file-rows">
       {sweep && <span className={`file-scan ${sweep}`} aria-hidden="true" />}
       {rows.map((row, index) => <div key={row.key} className="file-row"><span className="file-key">{row.label}</span><SealedText text={row.value} sealed={sealed} delay={delay(index)} /></div>)}
     </div>
     <div className="file-foot"><span className="file-label">{sealed ? t("装上客户端之后，就是这样。") : t("这些信息此刻就能被任何网站读取。")}</span>
-      <button type="button" className="file-action" onClick={toggle} aria-pressed={sealed}>{sealed ? t("解封") : t("演示封存")} →</button></div>
+      <button type="button" className="file-action" onClick={toggle} aria-pressed={sealed}>{sealed ? t("恢复可见") : t("试试隐身")} →</button></div>
   </section>;
 }
 

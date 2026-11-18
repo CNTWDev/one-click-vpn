@@ -138,7 +138,7 @@
   <string name="enter_password">Enter password</string>
   <string name="enter_your_email_and_password">Enter your email and password.</string>
   <string name="exposed_detail">Anyone can see this right now</string>
-  <string name="exposed_status">Exposed</string>
+  <string name="exposed_status">Visible</string>
   <string name="file_device">Device</string>
   <string name="file_language">Language</string>
   <string name="file_public_ip">Public IP</string>
@@ -235,7 +235,7 @@
   <string name="running_in_tray">TrackNothing keeps running in the tray. Click the icon to switch.</string>
   <string name="seal_action">Connect</string>
   <string name="sealed_status">Hidden</string>
-  <string name="sealing_detail">Sealing…</string>
+  <string name="sealing_detail">Hiding…</string>
   <string name="search_locations_or_regions">Search locations or regions</string>
   <string name="section_account">§04 Holder</string>
   <string name="section_activity">§03 Activity</string>
@@ -333,7 +333,7 @@
   <string name="vpn_connection">VPN connection</string>
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">The Connect button now wears the brand colour, so it is the first thing you see\nWhen a system permission is missing (Mac network extension, VPN configuration, Android VPN access), the home page keeps saying where to allow it; on the Mac one click opens System Settings, and it connects as soon as you allow it</string>
+  <string name="whats_new_notes">The Connect button now wears the brand colour, so it is the first thing you see; plainer wording (Visible / Hidden)\nWhen a system permission is missing (Mac network extension, VPN configuration, Android VPN access), the home page keeps saying where to allow it; on the Mac one click opens System Settings, and it connects as soon as you allow it</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

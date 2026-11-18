@@ -7,15 +7,15 @@
 ## 1.0.7
 
 ### zh
-- 连接按钮用品牌色描边，一眼就能找到
+- 连接按钮用品牌色描边，一眼就能找到；文字改得更直白：开始隐身 / 停止隐身
 - 系统权限（Mac 网络扩展、VPN 配置、安卓 VPN 授权）没允许时，首页会一直提示该去哪里打开，Mac 上一键打开系统设置，允许后自动连接
 
 ### en
-- The Connect button now wears the brand colour, so it is the first thing you see
+- The Connect button now wears the brand colour, so it is the first thing you see; plainer wording (Visible / Hidden)
 - When a system permission is missing (Mac network extension, VPN configuration, Android VPN access), the home page keeps saying where to allow it; on the Mac one click opens System Settings, and it connects as soon as you allow it
 
 ### ru
-- Кнопка подключения выделена фирменным цветом, её сразу видно
+- Кнопка подключения выделена фирменным цветом, её сразу видно; формулировки стали проще («Видно» / «Скрыто»)
 - Если не хватает системного разрешения (сетевое расширение на Mac, конфигурация VPN, доступ к VPN на Android), главная страница подсказывает, где его дать; на Mac настройки открываются одним нажатием, а подключение начинается сразу после разрешения
 
 ## 1.0.6

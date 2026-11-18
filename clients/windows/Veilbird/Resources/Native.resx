@@ -140,7 +140,7 @@
   <data name="enter_password" xml:space="preserve"><value>Enter password</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Enter your email and password.</value></data>
   <data name="exposed_detail" xml:space="preserve"><value>Anyone can see this right now</value></data>
-  <data name="exposed_status" xml:space="preserve"><value>Exposed</value></data>
+  <data name="exposed_status" xml:space="preserve"><value>Visible</value></data>
   <data name="file_device" xml:space="preserve"><value>Device</value></data>
   <data name="file_language" xml:space="preserve"><value>Language</value></data>
   <data name="file_public_ip" xml:space="preserve"><value>Public IP</value></data>
@@ -237,7 +237,7 @@
   <data name="running_in_tray" xml:space="preserve"><value>TrackNothing keeps running in the tray. Click the icon to switch.</value></data>
   <data name="seal_action" xml:space="preserve"><value>Connect</value></data>
   <data name="sealed_status" xml:space="preserve"><value>Hidden</value></data>
-  <data name="sealing_detail" xml:space="preserve"><value>Sealing…</value></data>
+  <data name="sealing_detail" xml:space="preserve"><value>Hiding…</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>Search locations or regions</value></data>
   <data name="section_account" xml:space="preserve"><value>§04 Holder</value></data>
   <data name="section_activity" xml:space="preserve"><value>§03 Activity</value></data>
@@ -336,7 +336,7 @@ Valid until · </value></data>
   <data name="vpn_connection" xml:space="preserve"><value>VPN connection</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>The Connect button now wears the brand colour, so it is the first thing you see
+  <data name="whats_new_notes" xml:space="preserve"><value>The Connect button now wears the brand colour, so it is the first thing you see; plainer wording (Visible / Hidden)
 When a system permission is missing (Mac network extension, VPN configuration, Android VPN access), the home page keeps saying where to allow it; on the Mac one click opens System Settings, and it connects as soon as you allow it</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>

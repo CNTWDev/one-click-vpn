@@ -140,7 +140,7 @@
   <data name="enter_password" xml:space="preserve"><value>Введите пароль</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Введите почту и пароль.</value></data>
   <data name="exposed_detail" xml:space="preserve"><value>Это сейчас видно всем</value></data>
-  <data name="exposed_status" xml:space="preserve"><value>Открыто</value></data>
+  <data name="exposed_status" xml:space="preserve"><value>Видно</value></data>
   <data name="file_device" xml:space="preserve"><value>Устройство</value></data>
   <data name="file_language" xml:space="preserve"><value>Язык</value></data>
   <data name="file_public_ip" xml:space="preserve"><value>Внешний IP</value></data>
@@ -237,7 +237,7 @@
   <data name="running_in_tray" xml:space="preserve"><value>TrackNothing работает в трее. Нажмите на значок, чтобы переключить.</value></data>
   <data name="seal_action" xml:space="preserve"><value>Подключиться</value></data>
   <data name="sealed_status" xml:space="preserve"><value>Скрыто</value></data>
-  <data name="sealing_detail" xml:space="preserve"><value>Запечатываем…</value></data>
+  <data name="sealing_detail" xml:space="preserve"><value>Скрываем…</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>Поиск локаций или регионов</value></data>
   <data name="section_account" xml:space="preserve"><value>§04 Владелец</value></data>
   <data name="section_activity" xml:space="preserve"><value>§03 Активность</value></data>
@@ -336,7 +336,7 @@
   <data name="vpn_connection" xml:space="preserve"><value>VPN-подключение</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Кнопка подключения выделена фирменным цветом, её сразу видно
+  <data name="whats_new_notes" xml:space="preserve"><value>Кнопка подключения выделена фирменным цветом, её сразу видно; формулировки стали проще («Видно» / «Скрыто»)
 Если не хватает системного разрешения (сетевое расширение на Mac, конфигурация VPN, доступ к VPN на Android), главная страница подсказывает, где его дать; на Mac настройки открываются одним нажатием, а подключение начинается сразу после разрешения</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>

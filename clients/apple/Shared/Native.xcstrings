@@ -3158,19 +3158,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Exposed"
+            "value": "Visible"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "未隐匿"
+            "value": "未隐身"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Открыто"
+            "value": "Видно"
           }
         }
       }
@@ -5349,7 +5349,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连接"
+            "value": "开始隐身"
           }
         },
         "ru": {
@@ -5372,7 +5372,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已隐匿"
+            "value": "隐身中"
           }
         },
         "ru": {
@@ -5389,19 +5389,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sealing…"
+            "value": "Hiding…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在封存…"
+            "value": "正在隐身…"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Запечатываем…"
+            "value": "Скрываем…"
           }
         }
       }
@@ -6752,7 +6752,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "断开连接"
+            "value": "停止隐身"
           }
         },
         "ru": {
@@ -7643,19 +7643,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The Connect button now wears the brand colour, so it is the first thing you see\nWhen a system permission is missing (Mac network extension, VPN configuration, Android VPN access), the home page keeps saying where to allow it; on the Mac one click opens System Settings, and it connects as soon as you allow it"
+            "value": "The Connect button now wears the brand colour, so it is the first thing you see; plainer wording (Visible / Hidden)\nWhen a system permission is missing (Mac network extension, VPN configuration, Android VPN access), the home page keeps saying where to allow it; on the Mac one click opens System Settings, and it connects as soon as you allow it"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连接按钮用品牌色描边，一眼就能找到\n系统权限（Mac 网络扩展、VPN 配置、安卓 VPN 授权）没允许时，首页会一直提示该去哪里打开，Mac 上一键打开系统设置，允许后自动连接"
+            "value": "连接按钮用品牌色描边，一眼就能找到；文字改得更直白：开始隐身 / 停止隐身\n系统权限（Mac 网络扩展、VPN 配置、安卓 VPN 授权）没允许时，首页会一直提示该去哪里打开，Mac 上一键打开系统设置，允许后自动连接"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Кнопка подключения выделена фирменным цветом, её сразу видно\nЕсли не хватает системного разрешения (сетевое расширение на Mac, конфигурация VPN, доступ к VPN на Android), главная страница подсказывает, где его дать; на Mac настройки открываются одним нажатием, а подключение начинается сразу после разрешения"
+            "value": "Кнопка подключения выделена фирменным цветом, её сразу видно; формулировки стали проще («Видно» / «Скрыто»)\nЕсли не хватает системного разрешения (сетевое расширение на Mac, конфигурация VPN, доступ к VPN на Android), главная страница подсказывает, где его дать; на Mac настройки открываются одним нажатием, а подключение начинается сразу после разрешения"
           }
         }
       }

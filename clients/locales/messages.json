@@ -1590,22 +1590,22 @@
     "ru": "Трафик"
   },
   "exposed_status": {
-    "zh": "未隐匿",
-    "en": "Exposed",
-    "ru": "Открыто"
+    "zh": "未隐身",
+    "en": "Visible",
+    "ru": "Видно"
   },
   "sealed_status": {
-    "zh": "已隐匿",
+    "zh": "隐身中",
     "en": "Hidden",
     "ru": "Скрыто"
   },
   "seal_action": {
-    "zh": "连接",
+    "zh": "开始隐身",
     "en": "Connect",
     "ru": "Подключиться"
   },
   "unseal_action": {
-    "zh": "断开连接",
+    "zh": "停止隐身",
     "en": "Disconnect",
     "ru": "Отключиться"
   },
@@ -1615,9 +1615,9 @@
     "ru": "Это сейчас видно всем"
   },
   "sealing_detail": {
-    "zh": "正在封存…",
-    "en": "Sealing…",
-    "ru": "Запечатываем…"
+    "zh": "正在隐身…",
+    "en": "Hiding…",
+    "ru": "Скрываем…"
   },
   "file_public_ip": {
     "zh": "出口 IP",
