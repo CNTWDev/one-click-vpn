@@ -96,7 +96,11 @@ struct MenuBarView:View {
     }
     private func toggle() {
         if !model.connected && model.permission == .systemExtension {SystemExtension.openSettings();return}
-        model.work {try await model.toggle()}
+        model.work {
+            try await model.toggle()
+            // The extension guide lives in the main window.
+            if model.extensionGuide {openMain()}
+        }
     }
     /// The home portrait in small: the sphere is the switch, and its ring holds the time and rates once hidden.
     private func menuPortrait(_ on:Bool)->some View {

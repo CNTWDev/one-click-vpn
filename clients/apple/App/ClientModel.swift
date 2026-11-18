@@ -19,6 +19,13 @@ import ServiceManagement
     @Published var permission:Permission?
     /// Shows the permission dialog (once per refusal, and again whenever the user taps connect while it is pending).
     @Published var askPermission=false
+    #if os(macOS)
+    /// Before the first system prompt for the network extension: the app's own explanation of the switch to turn on
+    /// (macOS's prompt has an "OK" that only closes it). After "Continue" the app opens System Settings itself.
+    @Published var extensionGuide=false
+    private var extensionGuideAccepted=false
+    func acceptExtensionGuide() {extensionGuide=false;extensionGuideAccepted=true;work {try await self.toggle()}}
+    #endif
     @Published var status="not_connected"
     @Published var nodeName=""
     @Published var connectedNodeId=""
@@ -324,8 +331,14 @@ import ServiceManagement
             guard let self,self.permission == .systemExtension else {return}
             self.permission=nil;self.askPermission=false;self.work {try await self.toggle()}
         }
+        if !extensionGuideAccepted && !SystemExtension.shared.awaitingApproval,!(await SystemExtension.shared.enabled()) {extensionGuide=true;return}
         do {try await SystemExtension.shared.activate()}
-        catch AccessFailure.code("SYSTEM_EXTENSION_APPROVAL") {permission = .systemExtension;askPermission=true;return}
+        catch AccessFailure.code("SYSTEM_EXTENSION_APPROVAL") {
+            permission = .systemExtension
+            // Right after the guide: straight to the switch; later taps explain again.
+            if extensionGuideAccepted {extensionGuideAccepted=false;SystemExtension.openSettings()} else {askPermission=true}
+            return
+        }
         if permission == .systemExtension {permission=nil}
         #endif
         attempt=Date()

@@ -58,6 +58,8 @@ build_dmg() {
   plist="$out/TrackNothing.xcarchive/Products/Applications/Veilbird.app/Contents/Info.plist"
   [[ "$(plutil -extract VeilbirdAPIOrigin raw -o - "$plist" 2>/dev/null)" == "${VEILBIRD_API_ORIGIN:-}" ]] \
     || { echo "VeilbirdAPIOrigin in $plist does not match VEILBIRD_API_ORIGIN" >&2; exit 1; }
+  name=$(plutil -extract CFBundleName raw -o - "$plist" 2>/dev/null || true)
+  [[ "$name" == TrackNothing ]] || echo "::warning::CFBundleName is '$name'; macOS prompts will show it instead of TrackNothing." >&2
   [[ -n "${VEILBIRD_API_ORIGIN:-}" ]] || echo 'warning: VEILBIRD_API_ORIGIN is not set; this build asks users for a server address.' >&2
 
   cat > "$out/export.plist" <<PLIST

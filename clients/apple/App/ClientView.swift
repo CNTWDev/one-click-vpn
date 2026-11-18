@@ -92,6 +92,13 @@ struct ClientView:View {
         .animation(reduceMotion ? nil:.easeOut(duration:0.2),value:tab).animation(reduceMotion ? nil:.easeOut(duration:0.2),value:model.signedIn)
         .task {await model.restore()}
         // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).
+        #if os(macOS)
+        // Before macOS's own extension prompt (its "OK" only closes it): which switch to turn on, and where.
+        .alert(L10n.text("extension_guide_title"),isPresented:$model.extensionGuide) {
+            Button(L10n.text("extension_guide_continue")) {model.acceptExtensionGuide()}
+            Button(L10n.text("cancel"),role:.cancel) {}
+        } message:{Text(L10n.text("extension_guide_detail"))}
+        #endif
         // A system permission the connection needs (the system's own prompt is easy to miss): what to do and where.
         .alert(L10n.text("permission_needed_title"),isPresented:$model.askPermission) {
             #if os(macOS)

@@ -1174,6 +1174,21 @@
     "en": "macOS needs you to allow the TrackNothing network extension before it can connect. Choose Open System Settings and turn TrackNothing on under General › Login Items & Extensions › Network Extensions (macOS 14 and earlier: Privacy & Security). It connects as soon as you allow it.",
     "ru": "macOS должна разрешить сетевое расширение TrackNothing, иначе подключиться нельзя. Нажмите «Открыть Системные настройки» и включите TrackNothing в разделе «Основные › Объекты входа и расширения › Сетевые расширения» (macOS 14 и раньше: «Конфиденциальность и безопасность»). Подключение начнётся сразу после разрешения."
   },
+  "extension_guide_title": {
+    "zh": "先打开网络扩展",
+    "en": "Turn on the network extension",
+    "ru": "Включите сетевое расширение"
+  },
+  "extension_guide_detail": {
+    "zh": "TrackNothing 用 macOS 的网络扩展建立加密连接，第一次要你亲手打开开关。\n\n点「继续」后会打开系统设置：在「通用 › 登录项与扩展 › 网络扩展」里打开 TrackNothing，打开后自动连接。\n\nmacOS 同时会弹出一个提示框，点里面的「好」只是关掉它，并不会开启。",
+    "en": "TrackNothing makes its encrypted connection through a macOS network extension, and the first time you switch it on yourself.\n\nContinue opens System Settings: turn TrackNothing on under General › Login Items & Extensions › Network Extensions, and it connects right away.\n\nmacOS also shows a prompt; its OK only closes it and does not turn anything on.",
+    "ru": "TrackNothing создаёт зашифрованное соединение через сетевое расширение macOS; в первый раз его нужно включить вручную.\n\n«Продолжить» откроет Системные настройки: включите TrackNothing в разделе «Основные › Объекты входа и расширения › Сетевые расширения», и подключение начнётся сразу.\n\nmacOS также покажет окно; кнопка OK в нём только закрывает его и ничего не включает."
+  },
+  "extension_guide_continue": {
+    "zh": "继续",
+    "en": "Continue",
+    "ru": "Продолжить"
+  },
   "move_to_applications_first": {
     "zh": "请先把 TrackNothing 拖到“应用程序”文件夹，再从那里打开。",
     "en": "Move TrackNothing to the Applications folder first, then open it from there.",
