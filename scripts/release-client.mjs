@@ -34,8 +34,23 @@ if (!api || !token) fail("Set VEILBIRD_RELEASE_API (Controller origin) and VEILB
 if (!args.platform || !args.version || !args.build || !args["min-os"] || (!args.file && !args.url)) fail("Required: --platform --version --build --min-os and --file or --url");
 const arch = args.arch || (args.platform === "windows" ? "x64" : "universal"), build = Number(args.build);
 
+/** A brief Controller restart or proxy hiccup (502/503/504, dropped connection) is retried with backoff, about 45 s in all. */
+async function fetchRetry(url, init) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const response = await fetch(url, init);
+      if (![502, 503, 504].includes(response.status) || attempt === 5) return response;
+      console.log(`${new URL(url).pathname}: HTTP ${response.status}, retrying (${attempt}/4)…`);
+    } catch (error) {
+      if (attempt === 5) throw error;
+      console.log(`${new URL(url).pathname}: ${error.message}, retrying (${attempt}/4)…`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 3000 * 2 ** (attempt - 1)));
+  }
+}
+
 async function call(pathname, body, { allow = [] } = {}) {
-  const response = await fetch(`${api}${pathname}`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const response = await fetchRetry(`${api}${pathname}`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await response.json().catch(() => ({}));
   if (!response.ok && !allow.includes(data.code)) fail(`${pathname}: HTTP ${response.status} ${data.error || data.code || ""}`);
   return data;
@@ -47,7 +62,7 @@ async function uploadChunks(bytes, fields) {
   for (let offset = 0; ; offset += chunk) {
     const final = offset + chunk >= bytes.byteLength;
     const query = new URLSearchParams({ ...fields, build: String(fields.build), upload, offset: String(offset), ...(final ? { final: "1" } : {}) });
-    const response = await fetch(`${api}/api/v1/admin/client-releases/files?${query}`, { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/octet-stream" }, body: bytes.subarray(offset, offset + chunk) });
+    const response = await fetchRetry(`${api}/api/v1/admin/client-releases/files?${query}`, { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/octet-stream" }, body: bytes.subarray(offset, offset + chunk) });
     const data = await response.json().catch(() => ({}));
     if (data.code === "RELEASE_BUILD_EXISTS") alreadyRegistered();
     if (!response.ok) fail(`Upload failed: HTTP ${response.status} ${data.error || data.code || ""}`);
@@ -63,7 +78,7 @@ if (args.file) {
   if (upload.code === "RELEASE_BUILD_EXISTS") alreadyRegistered();
   console.log(`Uploading ${fields.fileName} (${(size / 1048576).toFixed(1)} MB)…`);
   if (upload.uploadUrl) {
-    const put = await fetch(upload.uploadUrl, { method: "PUT", body: bytes });
+    const put = await fetchRetry(upload.uploadUrl, { method: "PUT", body: bytes });
     if (!put.ok) fail(`Upload failed: HTTP ${put.status} ${await put.text()}`);
     Object.assign(release, { storageKey: upload.storageKey, url: upload.publicUrl, sha256, sizeBytes: size });
   } else Object.assign(release, { storageKey: await uploadChunks(bytes, fields), sha256, sizeBytes: size });
