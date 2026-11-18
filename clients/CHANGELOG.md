@@ -9,13 +9,11 @@
 ### zh
 - 连接按钮用品牌色描边，一眼就能找到；文字改得更直白：开始隐身 / 停止隐身
 - 系统权限（Mac 网络扩展、VPN 配置、安卓 VPN 授权）没允许时，首页会一直提示该去哪里打开，Mac 上一键打开系统设置，允许后自动连接
-
 - 修复安卓：屏幕较高的手机上首页下半部分（连接按钮、线路、流量）不显示也滑不动
 
 ### en
 - The Connect button now wears the brand colour, so it is the first thing you see; plainer wording (Visible / Hidden)
 - When a system permission is missing (Mac network extension, VPN configuration, Android VPN access), the home page keeps saying where to allow it; on the Mac one click opens System Settings, and it connects as soon as you allow it
-
 - Android fix: on tall screens the lower half of the home page (Connect, location, usage) was missing and the page would not scroll
 
 ### ru
