@@ -749,6 +749,16 @@
     "en": "Open installer",
     "ru": "Открыть установщик"
   },
+  "update_install_relaunch": {
+    "zh": "安装并重启",
+    "en": "Install and Relaunch",
+    "ru": "Установить и перезапустить"
+  },
+  "update_relaunch_detail": {
+    "zh": "点击后自动退出、替换并重新打开，几秒完成。",
+    "en": "The app quits, updates itself and reopens in a few seconds.",
+    "ru": "Приложение закроется, обновится и откроется снова через несколько секунд."
+  },
   "update_failed_title": {
     "zh": "没能下载完 {0}",
     "en": "{0} did not finish downloading",

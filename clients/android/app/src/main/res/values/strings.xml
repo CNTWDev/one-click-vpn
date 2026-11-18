@@ -314,6 +314,7 @@
   <string name="update_failed_storage">Not enough storage. Free some space and try again.</string>
   <string name="update_failed_title">%1$s did not finish downloading</string>
   <string name="update_install">Install</string>
+  <string name="update_install_relaunch">Install and Relaunch</string>
   <string name="update_later">Remind me later</string>
   <string name="update_minutes">%1$s min</string>
   <string name="update_now">Update now</string>
@@ -322,6 +323,7 @@
   <string name="update_ready_detail">Installing disconnects briefly; the app reconnects afterwards.</string>
   <string name="update_ready_detail_idle">Tap Install; it takes a few seconds.</string>
   <string name="update_ready_title">%1$s is ready</string>
+  <string name="update_relaunch_detail">The app quits, updates itself and reopens in a few seconds.</string>
   <string name="update_required_detail">This version is no longer supported. Update to keep connecting.</string>
   <string name="update_required_title">Update to %1$s required</string>
   <string name="update_retry">Try again</string>

@@ -7200,6 +7200,29 @@
         }
       }
     },
+    "update_install_relaunch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install and Relaunch"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装并重启"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Установить и перезапустить"
+          }
+        }
+      }
+    },
     "update_later": {
       "extractionState": "manual",
       "localizations": {
@@ -7380,6 +7403,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Версия %1$@ загружена"
+          }
+        }
+      }
+    },
+    "update_relaunch_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The app quits, updates itself and reopens in a few seconds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击后自动退出、替换并重新打开，几秒完成。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Приложение закроется, обновится и откроется снова через несколько секунд."
           }
         }
       }
