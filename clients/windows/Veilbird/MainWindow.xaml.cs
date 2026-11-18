@@ -823,7 +823,20 @@ public partial class MainWindow : Window {
             globe.Children.Add(Look.Icon("",13,Look.Secondary));globe.Children.Add(new TextBlock {Text=LanguageName(L10n.Preference=="system"?L10n.Culture.TwoLetterISOLanguageName:L10n.Preference),FontSize=12,Foreground=Look.Secondary,Margin=new Thickness(6,0,0,0),VerticalAlignment=VerticalAlignment.Center});
             var button=new Button {Content=globe,Height=32,Padding=new Thickness(10,0,10,0)};
             AutomationProperties.SetName(button,L10n.Text("language")+": "+LanguageName(L10n.Preference));
-            button.Click+=(_,_)=>ChooseLanguage(button);HeaderSlot.Content=button;
+            button.Click+=(_,_)=>ChooseLanguage(button);
+            // Beside it, the look as two small swatches, so a new user sees the choice; afterwards it is the Appearance row.
+            var header=new StackPanel {Orientation=Orientation.Horizontal};
+            foreach(var (code,key,color) in new[]{("amber","theme_amber",Color.FromRgb(224,164,88)),("moon","theme_moon",Color.FromRgb(235,184,195))}) {
+                var chosen=Look.Theme==code;var brush=new SolidColorBrush(color);
+                var dot=new Grid {Width=20,Height=20};
+                dot.Children.Add(new Ellipse {Width=12,Height=12,Fill=brush});
+                if(chosen) dot.Children.Add(new Ellipse {Width=20,Height=20,Stroke=brush,StrokeThickness=1});
+                var swatch=new Button {Content=dot,Width=30,Height=32,Padding=new Thickness(0)};
+                AutomationProperties.SetName(swatch,L10n.Text("appearance")+": "+L10n.Text(key)+(chosen?L10n.Text("current_page"):""));
+                swatch.Click+=(_,_)=>ApplyAppearance(code);
+                header.Children.Add(swatch);
+            }
+            header.Children.Add(button);HeaderSlot.Content=header;
             Login();return;
         }
         foreach(var (id,key) in new[]{("connect","connect_tab"),("nodes","locations"),("account","account")}) {
@@ -1274,6 +1287,7 @@ public partial class MainWindow : Window {
         var devices=SettingRow(L10n.Text("authorized_devices"),$"{Number(account["used"]).ToString("N0",L10n.Culture)} / {DeviceLimit(account)}",_=>{page="devices";Render();});
         var password=SettingRow(L10n.Text("change_password"),"",_=>ResetPassword(email,L10n.Text("reset_change_detail",email),L10n.Text("reset_link_sent_to",email)));
         var language=SettingRow(L10n.Text("language"),LanguageName(L10n.Preference),ChooseLanguage);
+        var appearance=SettingRow(L10n.Text("appearance"),L10n.Text(Look.Theme=="moon"?"theme_moon":"theme_amber"),ChooseAppearance);
         var startup=new ToggleButton {Style=(Style)FindResource("Switch"),IsChecked=LoginTask.Enabled,VerticalAlignment=VerticalAlignment.Center};
         AutomationProperties.SetName(startup,L10n.Text("open_at_login"));
         startup.Click+=(_,_)=>{var on=startup.IsChecked==true;if(!LoginTask.Set(on)) {startup.IsChecked=!on;Notify(L10n.Text("unable_to_reach_the_service_check_your_network_and"));}};
@@ -1294,7 +1308,7 @@ public partial class MainWindow : Window {
         // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).
         var appVersion=System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)??"0";
         var whatsNew=SettingRow(L10n.Text("whats_new"),appVersion,_=>ShowNotes(appVersion,L10n.Text("whats_new_notes").Split('\n').Where(line=>line.Trim().Length>0).ToList()));
-        Add(Card(new FrameworkElement[]{devices,password,language,startupRow,guardRow,updates,whatsNew},14));
+        Add(Card(new FrameworkElement[]{devices,password,language,appearance,startupRow,guardRow,updates,whatsNew},14));
 
         var signOut=new Button {Content=L10n.Text("sign_out"),Height=40,Background=Look.Surface,Foreground=Look.Danger,HorizontalContentAlignment=HorizontalAlignment.Center};
         signOut.Click+=(_,_)=>{
@@ -1479,6 +1493,28 @@ public partial class MainWindow : Window {
             list.Children.Add(item);
         }
         popup.IsOpen=true;
+    }
+    /// Amber (the default) or Moon: the same file, lit in a softer pearl-to-rose light. Applies at once.
+    private void ChooseAppearance(FrameworkElement anchor) {
+        var list=new StackPanel {MinWidth=200};
+        var popup=new Popup {PlacementTarget=anchor,Placement=PlacementMode.Bottom,StaysOpen=false,AllowsTransparency=true,
+            Child=new Border {Background=Look.Raised,BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(4),Child=list,Margin=new Thickness(0,4,0,0)}};
+        if(anchor.ActualWidth>200) popup.HorizontalOffset=anchor.ActualWidth-212;
+        foreach(var (code,key) in new[]{("amber","theme_amber"),("moon","theme_moon")}) {
+            var chosen=Look.Theme==code;
+            var item=new Button {Height=34,Padding=new Thickness(10,0,10,0),Content=Columns(new FrameworkElement(),Single(L10n.Text(key),13),chosen?Look.Icon("\uE73E",12,Look.Accent):null)};
+            AutomationProperties.SetName(item,L10n.Text(key)+(chosen?L10n.Text("current_page"):""));
+            item.Click+=(_,_)=>{
+                popup.IsOpen=false;ApplyAppearance(code);
+            };
+            list.Children.Add(item);
+        }
+        popup.IsOpen=true;
+    }
+    private void ApplyAppearance(string code) {
+        if(Look.Theme==code) return;
+        Look.Apply(code);TitleLogo.Content=Look.Mark(16,Look.Accent);Backdrop.InvalidateVisual();
+        flyout?.Close();flyout=null;fly=null;activity=null;ShowActivity(api.SignedIn);Render();
     }
     /// The new page eases in: a short fade and an 8 px rise.
     private static void Enter(FrameworkElement panel) {

@@ -129,6 +129,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState); api = NativeApi(this); updater = Updater(this, api); NodeCache.restore(this)
         val settings = getSharedPreferences("preferences", MODE_PRIVATE)
+        Palette.theme = settings.getString("appearance", "amber")!!
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", "")!!; selectedCode = settings.getString("nodeCode", "")!!
         @Suppress("DEPRECATION") window.apply { statusBarColor = Palette.ground; navigationBarColor = Palette.ground; decorView.systemUiVisibility = 0 }
         render()
@@ -319,7 +320,7 @@ class MainActivity : Activity() {
         handler.removeCallbacks(refresh); if (visible) handler.post(refresh)
     }
     private fun tabBar() = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(140, 8, 8, 7))
+        orientation = LinearLayout.VERTICAL; setBackgroundColor(Palette.alpha(Palette.ground, 140))
         addView(View(this@MainActivity).apply { setBackgroundColor(Palette.hairline) }, LinearLayout.LayoutParams(-1, 1))
         val tabs = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12.dp, 6.dp, 12.dp, 6.dp) }
         for ((tab, title, res) in listOf(Triple("connect", R.string.connect_tab, R.drawable.ic_tab_connect), Triple("nodes", R.string.locations, R.drawable.ic_tab_nodes), Triple("activity", R.string.activity_title, R.drawable.ic_tab_activity), Triple("account", R.string.account, R.drawable.ic_tab_account))) {
@@ -345,7 +346,7 @@ class MainActivity : Activity() {
         pageTitle(L10n.text(R.string.activity_title), section = R.string.section_activity)
         add(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 0, 0)
-            addView(View(this@MainActivity).apply { setBackgroundColor(Color.rgb(111, 90, 63)) }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 8.dp })
+            addView(View(this@MainActivity).apply { setBackgroundColor(Palette.past) }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 8.dp })
             addView(text(L10n.text(R.string.activity_local_only), 12f, Palette.faint).apply { maxLines = 2 }, LinearLayout.LayoutParams(0, -2, 1f))
         }, top = -6, bottom = 14)
         add(LinearLayout(this).apply {
@@ -751,6 +752,28 @@ class MainActivity : Activity() {
 
     private fun login() {
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL or Gravity.END }
+        // Before sign-in the look is two small swatches (amber, moon halo) so a new user sees the choice; afterwards it
+        // is the Appearance row on the account page.
+        header.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 4.dp, 0)
+            for ((theme, label, color) in listOf(Triple("amber", R.string.theme_amber, Color.rgb(224, 164, 88)), Triple("moon", R.string.theme_moon, Color.rgb(235, 184, 195)))) {
+                val chosen = Palette.theme == theme
+                addView(FrameLayout(this@MainActivity).apply {
+                    background = pressable(Color.TRANSPARENT, 10)
+                    addView(View(this@MainActivity).apply {
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.OVAL; setColor(color)
+                            if (chosen) setStroke(2.dp, Palette.ground)
+                        }
+                    }, FrameLayout.LayoutParams(14.dp, 14.dp, Gravity.CENTER))
+                    if (chosen) addView(View(this@MainActivity).apply {
+                        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.TRANSPARENT); setStroke(1.dp, color) }
+                    }, FrameLayout.LayoutParams(20.dp, 20.dp, Gravity.CENTER))
+                    contentDescription = L10n.text(R.string.appearance) + ": " + L10n.text(label); isSelected = chosen
+                    setOnClickListener { if (!busy) applyAppearance(theme) }
+                }, LinearLayout.LayoutParams(32.dp, 40.dp))
+            }
+        }, LinearLayout.LayoutParams(-2, 40.dp))
         // Before sign-in the only language entry is this small globe; afterwards it is a row on the account page.
         header.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(10.dp, 0, 10.dp, 0); background = pressable(Color.TRANSPARENT, 10)
@@ -1135,6 +1158,7 @@ class MainActivity : Activity() {
                 settingRow(L10n.text(R.string.authorized_devices), "${L10n.number(data.optInt("used"))} / ${deviceLimit(data)}") { page = "devices"; render() },
                 settingRow(L10n.text(R.string.change_password), "") { resetPassword(email, L10n.text(R.string.reset_change_detail, email), L10n.text(R.string.reset_link_sent_to, email)) },
                 settingRow(L10n.text(R.string.language), currentLanguage().second) { chooseLanguage() },
+                settingRow(L10n.text(R.string.appearance), L10n.text(if (Palette.theme == "moon") R.string.theme_moon else R.string.theme_amber)) { chooseAppearance() },
                 // Android's own kill switch: Always-on VPN with "Block connections without VPN" in system settings.
                 settingRow(L10n.text(R.string.kill_switch), "") {
                     AlertDialog.Builder(this@MainActivity).setTitle(L10n.text(R.string.kill_switch)).setMessage(L10n.text(R.string.kill_switch_android_detail))
@@ -1297,6 +1321,17 @@ class MainActivity : Activity() {
         sheet(L10n.text(R.string.language), languages.map { it.second }, languages.indexOfFirst { it.first == current }) { which ->
             if (languages[which].first != current) { L10n.select(languages[which].first); if (Build.VERSION.SDK_INT < 33) recreate() }
         }
+    }
+    /** Amber (the default) or Moon: the same file, lit in a softer pearl-to-rose light. Applies at once. */
+    private fun chooseAppearance() {
+        val themes = listOf("amber" to R.string.theme_amber, "moon" to R.string.theme_moon)
+        sheet(L10n.text(R.string.appearance), themes.map { L10n.text(it.second) }, themes.indexOfFirst { it.first == Palette.theme }) { which -> applyAppearance(themes[which].first) }
+    }
+    private fun applyAppearance(theme: String) {
+        if (theme == Palette.theme) return
+        Palette.theme = theme; getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("appearance", theme).apply()
+        @Suppress("DEPRECATION") window.apply { statusBarColor = Palette.ground; navigationBarColor = Palette.ground }
+        space.invalidate(); render()
     }
     private fun sheet(title: String, options: List<String>, checked: Int, onPick: (Int) -> Unit) {
         val dialog = Dialog(this).apply { requestWindowFeature(Window.FEATURE_NO_TITLE) }

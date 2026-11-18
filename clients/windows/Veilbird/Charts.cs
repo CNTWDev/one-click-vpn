@@ -19,7 +19,7 @@ namespace Veilbird;
 
 /// 30 days of usage as columns of square blocks; the chosen range (the last Recent days) in amber.
 public sealed class UsageBlocks:FrameworkElement {
-    private static readonly Brush Older=Look.Hex("#6F5A3F");
+    private static Brush Older=>Look.Past;
     private readonly IReadOnlyList<long> values;
     private int recent=7;
     public int Recent {get=>recent;set {recent=value;InvalidateVisual();}}
@@ -40,7 +40,8 @@ public sealed class UsageBlocks:FrameworkElement {
 /// dimmer columns hanging below it. Both scale to the busiest sample shown, so the shape stays readable at any speed.
 public sealed class RateBars:FrameworkElement {
     public const int Count=40;
-    private static readonly Brush Up=Look.Hex("#6F5A3F"),Axis=Look.Hex("#2C2924");
+    private static Brush Up=>Look.Past;
+    private static readonly Brush Axis=Look.Hex("#2C2924");
     private IReadOnlyList<long> down=Array.Empty<long>(),up=Array.Empty<long>();
     public RateBars() {IsHitTestVisible=false;}
     public void Set(IReadOnlyList<long> down,IReadOnlyList<long> up) {this.down=down;this.up=up;InvalidateVisual();}

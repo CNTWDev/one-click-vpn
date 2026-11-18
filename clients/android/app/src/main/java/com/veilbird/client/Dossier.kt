@@ -24,7 +24,7 @@ enum class LinkState { IDLE, CONNECTING, CONNECTED, FAILED }
 class SealedText(context: Context) : TextView(context) {
     private companion object { const val GLYPHS = "01ABCDEF#%/<>*+="; const val FRAMES = 11 }
     private val d = resources.displayMetrics.density
-    private val dots = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(97, 255, 214, 160) }
+    private val dots = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.alpha(Palette.light, 97) }
     private val random = java.util.Random()
     private var dotAlpha = 0f
     private var runner: Runnable? = null

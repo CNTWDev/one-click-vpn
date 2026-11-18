@@ -15,23 +15,34 @@ import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.min
 
-/** The one palette of the app, shared with the Portal: warm near-black under one lamp, hairlines, amber only for the signal (brand, main action, scan light, "now"). */
+/**
+ * The one palette of the app, shared with the Portal: warm near-black under one lamp, hairlines, and one light colour
+ * only for the signal (brand, main action, scan light, "now"). Two looks, chosen in Account → Appearance and the same
+ * on every client: "amber" (the default) and "moon", a softer one where the light is pearl to rose.
+ */
 object Palette {
-    val ground = Color.rgb(8, 7, 6)
-    val surface = Color.rgb(23, 21, 19)
-    val raised = Color.rgb(33, 31, 28)
-    val selected = Color.rgb(46, 43, 38)
-    val text = Color.rgb(237, 231, 223)
-    val secondary = Color.rgb(163, 155, 145)
-    val faint = Color.rgb(149, 139, 124)
-    val accent = Color.rgb(224, 164, 88)
+    /** "amber" or "moon"; set before the first render and on change (MainActivity re-renders). */
+    var theme = "amber"
+    private val moon get() = theme == "moon"
+    val ground get() = if (moon) Color.rgb(10, 8, 9) else Color.rgb(8, 7, 6)
+    val surface get() = if (moon) Color.rgb(24, 20, 22) else Color.rgb(23, 21, 19)
+    val raised get() = if (moon) Color.rgb(34, 29, 31) else Color.rgb(33, 31, 28)
+    val selected get() = if (moon) Color.rgb(48, 41, 44) else Color.rgb(46, 43, 38)
+    val text get() = if (moon) Color.rgb(244, 238, 232) else Color.rgb(237, 231, 223)
+    val secondary get() = if (moon) Color.rgb(172, 160, 162) else Color.rgb(163, 155, 145)
+    val faint get() = if (moon) Color.rgb(152, 138, 142) else Color.rgb(149, 139, 124)
+    val accent get() = if (moon) Color.rgb(235, 184, 195) else Color.rgb(224, 164, 88)
     // Buttons are outlined, not filled: text on an "accent" control is the accent itself (see MainActivity.rounded).
-    val onAccent = Color.rgb(224, 164, 88)
+    val onAccent get() = accent
     val danger = Color.rgb(240, 103, 90)
-    val fair = Color.rgb(232, 134, 106)
-    val hairline = Color.argb(16, 237, 231, 223)
+    val fair get() = if (moon) Color.rgb(226, 150, 120) else Color.rgb(232, 134, 106)
+    /** The lamp, crop marks and sealed dots. */
+    val light get() = if (moon) Color.rgb(248, 226, 230) else Color.rgb(255, 214, 160)
+    /** Past figures in charts (the accent, dimmed). */
+    val past get() = if (moon) Color.rgb(112, 86, 94) else Color.rgb(111, 90, 63)
+    val hairline get() = alpha(text, 16)
     /** Card outline: cards are drawn as a hairline on the ground, not as a filled block. */
-    val edge = Color.argb(23, 255, 214, 160)
+    val edge get() = alpha(light, 23)
     fun alpha(color: Int, alpha: Int) = Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
 }
 
@@ -93,7 +104,7 @@ class UsageBars(context: Context) : View(context) {
         val max = values.max().coerceAtLeast(1)
         values.forEachIndexed { i, v ->
             val lit = if (v <= 0) 1 else maxOf(1, Math.round(rows * v.toFloat() / max))
-            paint.color = if (i >= count - recent) Palette.accent else Color.rgb(111, 90, 63)
+            paint.color = if (i >= count - recent) Palette.accent else Palette.past
             val left = i * (w + gap)
             for (r in 0 until lit) canvas.drawRect(left, height - r * pitch - block, left + w, height - r * pitch, paint)
         }
@@ -178,7 +189,7 @@ class RateBars(context: Context) : View(context) {
             paint.color = Palette.accent
             for (r in 0 until lit) canvas.drawRect(left, axis - 2 * density - r * pitch - block, left + w, axis - 2 * density - r * pitch, paint)
             val litUp = if (up.getOrElse(i) { 0 } <= 0) 0 else maxOf(1, Math.round(bottomRows * up[i].toFloat() / max))
-            paint.color = Color.rgb(111, 90, 63)
+            paint.color = Palette.past
             for (r in 0 until litUp) canvas.drawRect(left, axis + 3 * density + r * pitch, left + w, axis + 3 * density + r * pitch + block, paint)
         }
     }

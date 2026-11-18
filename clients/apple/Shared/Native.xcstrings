@@ -967,6 +967,29 @@
         }
       }
     },
+    "appearance": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外观"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Оформление"
+          }
+        }
+      }
+    },
     "ask_your_administrator_to_enable_veilbird_client_access": {
       "extractionState": "manual",
       "localizations": {
@@ -6188,6 +6211,52 @@
         }
       }
     },
+    "theme_amber": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amber"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "琥珀"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Янтарь"
+          }
+        }
+      }
+    },
+    "theme_moon": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moon halo"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "月晕"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Лунный ореол"
+          }
+        }
+      }
+    },
     "this_development_build_lacks_signing_entitlements_configure_your_developer": {
       "extractionState": "manual",
       "localizations": {
@@ -7436,19 +7505,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A new look: every page is a sheet in a file, warm black with amber light\nConnecting sends a line of light down the home page and seals your public IP, device, time zone and language line by line; disconnecting opens them again\nYour email is hidden on the account page; press and hold to see it"
+            "value": "New look, Moon halo: soft pearl to rose light; switch it on the sign-in screen (top right) or in Account › Appearance"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "全新外观：每一页都像一份档案，暖黑底色、琥珀色光\n连接时，一道光扫过首页，你的出口 IP、设备、时区和语言逐行封存；断开时再逐行解封\n「我的」里邮箱默认加密显示，按住即可查看"
+            "value": "新外观「月晕」：珍珠白到玫瑰粉的柔光，登录页右上角或「我的 › 外观」随时切换"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Новый облик: каждая страница как лист досье, тёплый чёрный и янтарный свет\nПри подключении полоса света проходит по главной и строка за строкой скрывает ваш IP, устройство, часовой пояс и язык; при отключении всё открывается снова\nПочта на странице аккаунта скрыта; удерживайте, чтобы увидеть"
+            "value": "Новое оформление «Лунный ореол»: мягкий свет от жемчужного до розового; переключается на экране входа (вверху справа) или в разделе «Аккаунт › Оформление»"
           }
         }
       }

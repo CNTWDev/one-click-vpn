@@ -1673,5 +1673,20 @@
     "zh": "按住查看",
     "en": "Hold to reveal",
     "ru": "Удерживайте, чтобы увидеть"
+  },
+  "appearance": {
+    "zh": "外观",
+    "en": "Appearance",
+    "ru": "Оформление"
+  },
+  "theme_amber": {
+    "zh": "琥珀",
+    "en": "Amber",
+    "ru": "Янтарь"
+  },
+  "theme_moon": {
+    "zh": "月晕",
+    "en": "Moon halo",
+    "ru": "Лунный ореол"
   }
 }

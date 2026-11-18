@@ -71,7 +71,7 @@ struct ActivityView:View {
     }
     private var privacy:some View {
         HStack(spacing:6) {
-            Rectangle().fill(Color(red:111/255,green:90/255,blue:63/255)).frame(width:6,height:6)
+            Rectangle().fill(VeilbirdStyle.past).frame(width:6,height:6)
             Text(L10n.text("activity_local_only")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.faint).lineLimit(1)
         }
     }
