@@ -324,7 +324,7 @@
   <string name="vpn_connection">VPN 连接</string>
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">断线后自动重连，不用再手动重新连接\n没网时不再耗电探测，网络恢复后立刻连上\n连接中可以直接换位置\n可以查看每个版本的更新内容</string>
+  <string name="whats_new_notes">全新外观：每一页都像一份档案，暖黑底色、琥珀色光\n连接时，一道光扫过首页，你的出口 IP、设备、时区和语言逐行封存；断开时再逐行解封\n「我的」里邮箱默认加密显示，按住即可查看</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>

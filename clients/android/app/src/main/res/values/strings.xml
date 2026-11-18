@@ -324,7 +324,7 @@
   <string name="vpn_connection">VPN connection</string>
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Reconnects automatically after a drop, no need to connect again\nNo battery-draining checks while offline; reconnects as soon as the network is back\nSwitch locations while connected\nSee what\'s new in each version</string>
+  <string name="whats_new_notes">A new look: every page is a sheet in a file, warm black with amber light\nConnecting sends a line of light down the home page and seals your public IP, device, time zone and language line by line; disconnecting opens them again\nYour email is hidden on the account page; press and hold to see it</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

@@ -7436,19 +7436,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reconnects automatically after a drop, no need to connect again\nNo battery-draining checks while offline; reconnects as soon as the network is back\nSwitch locations while connected\nSee what's new in each version"
+            "value": "A new look: every page is a sheet in a file, warm black with amber light\nConnecting sends a line of light down the home page and seals your public IP, device, time zone and language line by line; disconnecting opens them again\nYour email is hidden on the account page; press and hold to see it"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "断线后自动重连，不用再手动重新连接\n没网时不再耗电探测，网络恢复后立刻连上\n连接中可以直接换位置\n可以查看每个版本的更新内容"
+            "value": "全新外观：每一页都像一份档案，暖黑底色、琥珀色光\n连接时，一道光扫过首页，你的出口 IP、设备、时区和语言逐行封存；断开时再逐行解封\n「我的」里邮箱默认加密显示，按住即可查看"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Автоматическое переподключение после обрыва связи\nБез лишних проверок и расхода батареи без сети; подключение сразу после её появления\nСмена локации без отключения\nСписок изменений каждой версии"
+            "value": "Новый облик: каждая страница как лист досье, тёплый чёрный и янтарный свет\nПри подключении полоса света проходит по главной и строка за строкой скрывает ваш IP, устройство, часовой пояс и язык; при отключении всё открывается снова\nПочта на странице аккаунта скрыта; удерживайте, чтобы увидеть"
           }
         }
       }
