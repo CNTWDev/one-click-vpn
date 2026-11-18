@@ -261,8 +261,18 @@ struct ClientView:View {
     private var loginView:some View {
         ScrollView {
             VStack(spacing:0) {
-                HStack {
+                HStack(spacing:0) {
                     Spacer()
+                    // Before sign-in the look is two small swatches, so a new user sees the choice; afterwards it is the
+                    // Appearance row on the account page.
+                    ForEach([("amber","theme_amber",Color(red:224/255,green:164/255,blue:88/255)),("moon","theme_moon",Color(red:235/255,green:184/255,blue:195/255))],id:\.0) {item in
+                        Button {appearance=item.0} label:{
+                            Circle().fill(item.2).frame(width:12,height:12)
+                                .overlay(Circle().strokeBorder(item.2,lineWidth:1).frame(width:20,height:20).opacity(appearance == item.0 ? 1:0))
+                                .frame(width:30,height:36).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityLabel(L10n.text("appearance")+": "+L10n.text(item.1))
+                        .accessibilityAddTraits(appearance == item.0 ? .isSelected:[])
+                    }
                     // Before sign-in the only language entry: a small globe and the language's name, top right.
                     languageChooser(Button {choosingLanguage=true} label:{
                         HStack(spacing:6) {Image(systemName:"globe");Text(shortLanguageName)}.font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary)

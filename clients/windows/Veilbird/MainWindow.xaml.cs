@@ -823,7 +823,20 @@ public partial class MainWindow : Window {
             globe.Children.Add(Look.Icon("",13,Look.Secondary));globe.Children.Add(new TextBlock {Text=LanguageName(L10n.Preference=="system"?L10n.Culture.TwoLetterISOLanguageName:L10n.Preference),FontSize=12,Foreground=Look.Secondary,Margin=new Thickness(6,0,0,0),VerticalAlignment=VerticalAlignment.Center});
             var button=new Button {Content=globe,Height=32,Padding=new Thickness(10,0,10,0)};
             AutomationProperties.SetName(button,L10n.Text("language")+": "+LanguageName(L10n.Preference));
-            button.Click+=(_,_)=>ChooseLanguage(button);HeaderSlot.Content=button;
+            button.Click+=(_,_)=>ChooseLanguage(button);
+            // Beside it, the look as two small swatches, so a new user sees the choice; afterwards it is the Appearance row.
+            var header=new StackPanel {Orientation=Orientation.Horizontal};
+            foreach(var (code,key,color) in new[]{("amber","theme_amber",Color.FromRgb(224,164,88)),("moon","theme_moon",Color.FromRgb(235,184,195))}) {
+                var chosen=Look.Theme==code;var brush=new SolidColorBrush(color);
+                var dot=new Grid {Width=20,Height=20};
+                dot.Children.Add(new Ellipse {Width=12,Height=12,Fill=brush});
+                if(chosen) dot.Children.Add(new Ellipse {Width=20,Height=20,Stroke=brush,StrokeThickness=1});
+                var swatch=new Button {Content=dot,Width=30,Height=32,Padding=new Thickness(0)};
+                AutomationProperties.SetName(swatch,L10n.Text("appearance")+": "+L10n.Text(key)+(chosen?L10n.Text("current_page"):""));
+                swatch.Click+=(_,_)=>ApplyAppearance(code);
+                header.Children.Add(swatch);
+            }
+            header.Children.Add(button);HeaderSlot.Content=header;
             Login();return;
         }
         foreach(var (id,key) in new[]{("connect","connect_tab"),("nodes","locations"),("account","account")}) {
@@ -1492,13 +1505,16 @@ public partial class MainWindow : Window {
             var item=new Button {Height=34,Padding=new Thickness(10,0,10,0),Content=Columns(new FrameworkElement(),Single(L10n.Text(key),13),chosen?Look.Icon("\uE73E",12,Look.Accent):null)};
             AutomationProperties.SetName(item,L10n.Text(key)+(chosen?L10n.Text("current_page"):""));
             item.Click+=(_,_)=>{
-                popup.IsOpen=false;if(chosen) return;
-                Look.Apply(code);TitleLogo.Content=Look.Mark(16,Look.Accent);Backdrop.InvalidateVisual();
-                flyout?.Close();flyout=null;fly=null;activity=null;ShowActivity(api.SignedIn);Render();
+                popup.IsOpen=false;ApplyAppearance(code);
             };
             list.Children.Add(item);
         }
         popup.IsOpen=true;
+    }
+    private void ApplyAppearance(string code) {
+        if(Look.Theme==code) return;
+        Look.Apply(code);TitleLogo.Content=Look.Mark(16,Look.Accent);Backdrop.InvalidateVisual();
+        flyout?.Close();flyout=null;fly=null;activity=null;ShowActivity(api.SignedIn);Render();
     }
     /// The new page eases in: a short fade and an 8 px rise.
     private static void Enter(FrameworkElement panel) {
