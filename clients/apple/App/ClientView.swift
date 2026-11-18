@@ -41,8 +41,6 @@ struct ClientView:View {
     /// The public address the service saw before connecting, and the connect page's scan line (direction, run count).
     @State private var visitorIP:String?
     @State private var revealEmail=false
-    @State private var scanDown=true
-    @State private var scanRun=0
     #if os(macOS)
     @State private var openAtLogin=SMAppService.mainApp.status == .enabled
     @AppStorage(MenuBarLabel.preferenceKey) private var menuBarSpeed=false
@@ -336,10 +334,36 @@ struct ClientView:View {
     /// The connect page as a file: its state, four lines of what anyone can see about this device right now, one action,
     /// then the location and usage. Connecting seals the file (a line of light sweeps down and each line turns into dots,
     /// the lamp above goes out); disconnecting sweeps back up and opens it.
+    /// The portrait is smaller on a Mac and on short phones, so the page still fits without scrolling.
+    private var portraitHeight:CGFloat {
+        #if os(macOS)
+        return 220
+        #else
+        return min(300,UIScreen.main.bounds.height*0.36)
+        #endif
+    }
+    private func stateTitle(_ state:RingState)->String {
+        L10n.text(state == .connected ? "sealed_status":(state == .connecting ? "connecting":(state == .failed ? "connect_failed_title":"exposed_status")))
+    }
+    /// Under the portrait: the address in large type and the device line, both sealing into dots while hidden.
+    private func portraitFile(_ sealed:Bool)->some View {
+        VStack(alignment:.leading,spacing:mac ? 6:10) {
+            SealedText(text:visitorIP ?? "···",sealed:sealed,delay:0.3,size:mac ? 30:38,design:.serif)
+            SealedText(text:[deviceLine,zoneLine,L10n.locale.identifier.replacingOccurrences(of:"_",with:"-")].joined(separator:"   "),sealed:sealed,delay:0.9,size:11,color:VeilbirdStyle.secondary)
+        }.frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,4).accessibilityElement(children:.combine)
+    }
+    /// The state in words and one line beside it; one height in every state so nothing below moves.
+    private func stateLine(_ state:RingState)->some View {
+        HStack(alignment:.firstTextBaseline,spacing:12) {
+            Text(stateTitle(state)).font(.system(size:mac ? 22:26,weight:.light,design:.serif))
+                .foregroundStyle(state == .connected ? VeilbirdStyle.accent:VeilbirdStyle.text).lineLimit(1).fixedSize().contentTransition(.opacity)
+            stateDetail(state).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2).id(state).transition(.opacity)
+                .frame(maxWidth:.infinity,alignment:.leading)
+        }.frame(height:mac ? 34:40).padding(.horizontal,4)
+    }
     private var connectionView:some View {
         let state=ringState
         let sealed=model.connected
-        let lines:[(String,String)]=[("file_public_ip",visitorIP ?? "···"),("file_device",deviceLine),("file_time_zone",zoneLine),("file_language",L10n.locale.identifier.replacingOccurrences(of:"_",with:"-"))]
         return VStack(spacing:0) {
             #if os(iOS)
             FileHeader(number:fileNumber)
@@ -347,42 +371,16 @@ struct ClientView:View {
             notices
             switchNote(state)
             Spacer(minLength:mac ? 8:12)
-            SectionLabel(key:"section_status").padding(.bottom,mac ? 4:8)
-            // The state block has one height in every state, so nothing below it moves when a connection comes up or
-            // goes down: what only exists while connected fades in and out of space that is always reserved.
-            HStack(spacing:12) {
-                Text(L10n.text(state == .connected ? "sealed_status":(state == .connecting ? "connecting":(state == .failed ? "connect_failed_title":"exposed_status"))))
-                    .font(.system(size:mac ? 26:32,weight:.light)).lineLimit(1).minimumScaleFactor(0.7).contentTransition(.opacity)
-                Spacer(minLength:0)
-                SealStamp(shown:sealed,animated:!reduceMotion)
-            }.frame(height:mac ? 36:44).padding(.horizontal,4)
-            ZStack(alignment:.leading) {
-                if state == .connected,let since=model.since {
-                    TimelineView(.periodic(from:since,by:1)) {context in
-                        Text(verbatim:Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond)))
-                            .font(.system(size:mac ? 13:15,design:.monospaced)).monospacedDigit().tracking(0.9).foregroundStyle(VeilbirdStyle.text).lineLimit(1)
-                    }.transition(.opacity)
-                } else {
-                    stateDetail(state).font(.system(size:mac ? 12:13)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2).id(state).transition(.opacity)
-                }
-            }.frame(maxWidth:.infinity,alignment:.leading).frame(height:mac ? 30:36).padding(.horizontal,4)
-            // The file itself: what any site or app on this network can read about this device.
-            VStack(spacing:0) {
-                ForEach(Array(lines.enumerated()),id:\.offset) {index,line in
-                    Rectangle().fill(VeilbirdStyle.hairline).frame(height:1)
-                    HStack(spacing:0) {
-                        Text(L10n.text(line.0)).font(.system(size:10,design:.monospaced)).tracking(0.9).foregroundStyle(VeilbirdStyle.faint).lineLimit(1).frame(width:mac ? 84:96,alignment:.leading)
-                        SealedText(text:line.1,sealed:sealed,delay:1.3*(Double(sealed ? index:lines.count-1-index)+0.5)/Double(lines.count),size:mac ? 12:13)
-                            .frame(maxWidth:.infinity,alignment:.leading)
-                    }.padding(.horizontal,4).frame(height:mac ? 34:42).accessibilityElement(children:.combine)
-                }
-                Rectangle().fill(VeilbirdStyle.hairline).frame(height:1)
-            }.overlay(ScanLine(down:scanDown,run:scanRun)).padding(.top,mac ? 6:10)
-            Text(ClientModel.notices.contains(model.status) ? L10n.text(model.status):L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate)))
-                .font(.system(size:mac ? 11:12,design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
-                .frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,4).frame(height:mac ? 16:18).padding(.top,mac ? 8:12).opacity(state == .connected ? 1:0)
-            RateBars(down:model.rxHistory,up:model.txHistory).frame(maxWidth:.infinity).frame(height:mac ? 34:40).padding(.top,6)
-                .opacity(state == .connected && !ClientModel.notices.contains(model.status) ? 1:0)
+            SectionLabel(key:"section_portrait").padding(.bottom,mac ? 2:4)
+            // The portrait is the switch: "tap to hide" breathes in it; hidden, its ring holds the time and the rates.
+            Button {toggleConnection()} label:{
+                PortraitView(hidden:sealed,invite:L10n.text("tap_to_hide"),since:state == .connected ? model.since:nil,
+                    sub:ClientModel.notices.contains(model.status) ? L10n.text(model.status):L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate)))
+                    .frame(maxWidth:.infinity).frame(height:portraitHeight).contentShape(Circle())
+            }.buttonStyle(.plain)
+            .accessibilityLabel(L10n.text(sealed ? "disconnect_action":"connect_action"))
+            portraitFile(sealed).padding(.top,mac ? 6:10)
+            stateLine(state).padding(.top,mac ? 8:12)
             Spacer(minLength:mac ? 12:16)
             // One outlined action: quiet while exposed, amber with a breathing dot while sealed.
             Button {toggleConnection()} label:{
@@ -405,7 +403,6 @@ struct ClientView:View {
             usageStrip.padding(.top,16)
         }.padding(.horizontal,mac ? 20:16).padding(.bottom,20).task {try? await model.loadAccount()}
         .task {if visitorIP == nil && !model.connected {visitorIP=try? await model.api().visitorAddress()}}
-        .onChange(of:model.connected) {on in scanDown=on;scanRun+=1}
         .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:state)
         // Notes that come and go above the file (update, location switch) slide the page instead of snapping it.
         .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:model.update)
@@ -426,7 +423,7 @@ struct ClientView:View {
     }
     @ViewBuilder private func stateDetail(_ state:RingState)->some View {
         switch state {
-        case .connected:EmptyView()
+        case .connected:Text(L10n.text("seen_as",model.nodeName))
         case .connecting:Text(L10n.text("finding_best_route"))
         case .failed:Text(model.failure)
         case .idle:Text(L10n.text(model.update?.mandatory == true ? "update_required_detail":"exposed_detail"))

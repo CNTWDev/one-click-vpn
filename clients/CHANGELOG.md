@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.8
+
+### zh
+- 首页换成「肖像」：你此刻对外暴露的样子是一幅会呼吸的光点画，下面写着出口 IP、设备、时区和语言
+- 光点画本身就是开关，中间写着「轻触开始隐身」；隐身后变成一圈光环，环里显示已隐身的时长和网速
+
+### en
+- New home "portrait": what you show the world right now is a breathing sphere of light, with your IP, device, time zone and language under it
+- The sphere is the switch and says "Tap to hide"; once hidden it turns into a ring showing how long you have been hidden and the speed
+
+### ru
+- Новый главный экран «портрет»: то, что о вас сейчас видно, — дышащая сфера из точек света, под ней IP, устройство, часовой пояс и язык
+- Сфера и есть переключатель («Нажмите, чтобы скрыться»); после подключения она становится кольцом со временем скрытия и скоростью
+
 ## 1.0.7
 
 ### zh

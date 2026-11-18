@@ -28,32 +28,17 @@ struct MenuBarView:View {
             if model.signedIn {
                 // The connect page in small: the state with its seal, one slot for time and rates or a message, one action.
                 VStack(alignment:.leading,spacing:8) {
-                    SectionLabel(key:"section_status")
-                    HStack(spacing:10) {
-                        Text(L10n.text(on ? "sealed_status":(model.connected ? "connecting":(model.failed ? "connect_failed_title":"exposed_status")))).font(.system(size:24,weight:.light)).lineLimit(1)
-                        Spacer(minLength:0)
-                        SealStamp(shown:model.connected)
-                    }.padding(.horizontal,4)
-                    // One fixed-height slot for the time and rates or a short message, so the menu keeps its size.
-                    ZStack(alignment:.leading) {
-                    if let since=model.since {
-                        HStack(alignment:.firstTextBaseline,spacing:12) {
-                            TimelineView(.periodic(from:since,by:1)) {context in
-                                Text(verbatim:Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond))).font(.system(size:13,design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.text)
-                            }
-                            Text(L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))).font(.system(size:11,design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.secondary)
-                        }.transition(.opacity)
-                    } else {
-                        Text(model.failed ? model.failure:L10n.text("exposed_detail")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2)
-                            .transition(.opacity)
-                    }
-                    }.frame(maxWidth:.infinity,alignment:.leading).frame(height:30).padding(.horizontal,4).animation(.easeInOut(duration:0.2),value:on)
+                    SectionLabel(key:"section_portrait")
+                    menuPortrait(on)
+                    HStack(alignment:.firstTextBaseline,spacing:10) {
+                        Text(L10n.text(on ? "sealed_status":(model.connected ? "connecting":(model.failed ? "connect_failed_title":"exposed_status")))).font(.system(size:20,weight:.light,design:.serif))
+                            .foregroundStyle(on ? VeilbirdStyle.accent:VeilbirdStyle.text).lineLimit(1).fixedSize()
+                        Text(on ? L10n.text("seen_as",model.nodeName):(model.failed ? model.failure:L10n.text("exposed_detail"))).font(.system(size:11)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2)
+                            .frame(maxWidth:.infinity,alignment:.leading)
+                    }.frame(height:34).padding(.horizontal,4).animation(.easeInOut(duration:0.2),value:on)
                     // A missing system permission: say what and where, instead of a tap that seems to do nothing.
                     if let permission=model.permission {PermissionNote(permission:permission) {model.work {try await model.toggle()}}.padding(.bottom,8)}
-                    Button {
-                        if !model.connected && model.permission == .systemExtension {SystemExtension.openSettings();return}
-                        model.work {try await model.toggle()}
-                    } label:{
+                    Button {toggle()} label:{
                         HStack {
                             Text(L10n.text(on ? "unseal_action":(model.connected ? "sealing_detail":(model.failed ? "retry_action":"seal_action")))).font(.system(size:13,weight:.medium)).lineLimit(1)
                             Spacer(minLength:8)
@@ -108,6 +93,18 @@ struct MenuBarView:View {
         Button(action:action) {
             HStack {Text(title);Spacer();Text(shortcut).foregroundStyle(VeilbirdStyle.faint)}.font(.system(size:13)).padding(.horizontal,8).frame(height:26).contentShape(Rectangle())
         }.buttonStyle(RowButton()).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+    }
+    private func toggle() {
+        if !model.connected && model.permission == .systemExtension {SystemExtension.openSettings();return}
+        model.work {try await model.toggle()}
+    }
+    /// The home portrait in small: the sphere is the switch, and its ring holds the time and rates once hidden.
+    private func menuPortrait(_ on:Bool)->some View {
+        Button {toggle()} label:{
+            PortraitView(hidden:model.connected,invite:L10n.text("tap_to_hide"),since:on ? model.since:nil,
+                sub:ClientModel.notices.contains(model.status) ? L10n.text(model.status):L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate)))
+                .frame(maxWidth:.infinity).frame(height:150).contentShape(Circle())
+        }.buttonStyle(.plain).accessibilityLabel(L10n.text(model.connected ? "disconnect_action":"connect_action"))
     }
     private func openMain() {openWindow(id:"main");NSApp.activate(ignoringOtherApps:true)}
 }

@@ -47,11 +47,12 @@ public partial class MainWindow : Window {
     private JsonArray? nodesData;
     private readonly Dictionary<string,(string Name,string Code)> directory=new();
     // Live parts of the connect page and the tray flyout.
-    private TextBlock? statusTitle,statusDetail,statusTimer,statusRates,usageTotal,usageUntil,actionLabel;
+    private TextBlock? statusTitle,statusDetail,usageTotal,usageUntil,actionLabel;
     private Border? stamp;
     private Button? actionButton;
     private Ellipse? actionDot;
     private ScanLine? scan;
+    private Portrait? portrait;
     private List<SealedText>? fileLines;
     // Whether the file was last shown sealed (null before the first show on a page, which does not animate), the state
     // the action last showed, and the public address the service saw before connecting.
@@ -806,7 +807,7 @@ public partial class MainWindow : Window {
     private void Render() {
         ContentPanel.Children.Clear();FullPanel.Children.Clear();NavigationPanel.Children.Clear();HeaderSlot.Content=null;
         rateBars=null;switchNote=null;switchText=null;onNodes=null;onMeasured=null;
-        statusTitle=statusDetail=statusTimer=statusRates=usageTotal=usageUntil=actionLabel=null;stamp=null;actionButton=null;actionDot=null;scan=null;fileLines=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
+        statusTitle=statusDetail=usageTotal=usageUntil=actionLabel=null;stamp=null;actionButton=null;actionDot=null;scan=null;fileLines=null;portrait=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
         var view=api.SignedIn?page:"login";
         var full=view=="connect";
         Scroller.Visibility=full?Visibility.Collapsed:Visibility.Visible;FullPanel.Visibility=full?Visibility.Visible:Visibility.Collapsed;
@@ -881,34 +882,23 @@ public partial class MainWindow : Window {
         // The state block has one height in every state, so nothing below it moves when a connection comes up or goes
         // down: what only exists while connected fades in and out of space that is always reserved.
         var center=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
-        center.Children.Add(Dossier.Section("section_status"));
-        statusTitle=new TextBlock {FontSize=28,FontWeight=FontWeights.Light,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.NoWrap,TextTrimming=TextTrimming.CharacterEllipsis};
-        stamp=Dossier.Stamp();
-        var titleRow=new DockPanel {Height=40,Margin=new Thickness(4,6,4,0),LastChildFill=true};
-        DockPanel.SetDock(stamp,Dock.Right);titleRow.Children.Add(stamp);titleRow.Children.Add(statusTitle);
-        center.Children.Add(titleRow);
-        statusTimer=new TextBlock {FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=14,VerticalAlignment=VerticalAlignment.Center,Opacity=0};
-        statusDetail=new TextBlock {FontSize=12,Foreground=Look.Secondary,VerticalAlignment=VerticalAlignment.Center,MaxHeight=36,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis};
-        var slot=new Grid {Height=34,Margin=new Thickness(4,0,4,0)};slot.Children.Add(statusTimer);slot.Children.Add(statusDetail);
-        center.Children.Add(slot);
-        // The file itself: what any site or app on this network can read about this PC.
-        var rows=new StackPanel();
-        var values=new (string Key,string Value)[] {("file_public_ip",visitorIp??"···"),("file_device",DeviceLine()),("file_time_zone",ZoneLine()),("file_language",L10n.Culture.Name)};
-        fileLines=new List<SealedText>();
-        foreach(var (key,value) in values) {
-            var line=new SealedText(13) {Value=value,VerticalAlignment=VerticalAlignment.Center};
-            var label=Dossier.Section(key);label.FontSize=10;label.Width=92;label.Margin=new Thickness(4,0,0,0);label.VerticalAlignment=VerticalAlignment.Center;
-            var row=new DockPanel {Height=38,LastChildFill=true};DockPanel.SetDock(label,Dock.Left);row.Children.Add(label);row.Children.Add(line);
-            rows.Children.Add(new Border {BorderBrush=Look.Hairline,BorderThickness=new Thickness(0,1,0,0),Child=row});
-            fileLines.Add(line);
-        }
-        rows.Children.Add(new Border {BorderBrush=Look.Hairline,BorderThickness=new Thickness(0,1,0,0)});
-        scan=new ScanLine();
-        var file=new Grid {Margin=new Thickness(0,8,0,0)};file.Children.Add(rows);file.Children.Add(scan);
-        center.Children.Add(file);
-        statusRates=new TextBlock {FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=11,Foreground=Look.Secondary,Height=16,Margin=new Thickness(4,10,4,0),Opacity=0,TextTrimming=TextTrimming.CharacterEllipsis};
-        rateBars=new RateBars {Height=36,Margin=new Thickness(0,6,0,0),Opacity=0};
-        center.Children.Add(statusRates);center.Children.Add(rateBars);
+        center.Children.Add(Dossier.Section("section_portrait"));
+        // The portrait is the switch: "tap to hide" breathes in it; hidden, its ring holds the time and the rates.
+        portrait=new Portrait {Height=220,Margin=new Thickness(0,6,0,0)};
+        portrait.MouseLeftButtonUp+=(_,_)=>Toggle();
+        portrait.KeyDown+=(_,e)=>{if(e.Key is System.Windows.Input.Key.Enter or System.Windows.Input.Key.Space) {e.Handled=true;Toggle();}};
+        center.Children.Add(portrait);
+        // Under it, what any site can read about this PC: the address large, the device line small; both seal to dots.
+        var ip=new SealedText(34) {Value=visitorIp??"···",Face=new FontFamily("Georgia, Cambria"),Margin=new Thickness(4,8,4,0)};
+        var meta=new SealedText(11) {Value=string.Join("   ",DeviceLine(),ZoneLine(),L10n.Culture.Name),Ink=Look.Secondary,Margin=new Thickness(4,4,4,0)};
+        center.Children.Add(ip);center.Children.Add(meta);
+        fileLines=new List<SealedText> {ip,meta};
+        // The state in words and one line beside it; one height in every state so nothing below moves.
+        statusTitle=new TextBlock {FontSize=24,FontWeight=FontWeights.Light,FontFamily=new FontFamily("Georgia, Cambria"),VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.NoWrap,Margin=new Thickness(0,0,12,0)};
+        statusDetail=new TextBlock {FontSize=12,Foreground=Look.Secondary,VerticalAlignment=VerticalAlignment.Center,MaxHeight=34,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis};
+        var stateRow=new DockPanel {Height=40,Margin=new Thickness(4,8,4,0),LastChildFill=true};
+        DockPanel.SetDock(statusTitle,Dock.Left);stateRow.Children.Add(statusTitle);stateRow.Children.Add(statusDetail);
+        center.Children.Add(stateRow);
         Grid.SetRow(center,1);layout.Children.Add(center);
 
         // One outlined action: quiet while exposed, amber with a breathing dot while sealed.
@@ -967,23 +957,14 @@ public partial class MainWindow : Window {
             shownState=state;
         }
         if(actionButton is not null) actionButton.IsEnabled=!busy||connection.Active;
-        if(sealedShown==seal||fileLines is null) return;
+        if(statusTitle is not null) statusTitle.Foreground=state==RingState.Connected?Look.Accent:Look.Text;
+        if(sealedShown==seal||portrait is null||fileLines is null) return;
         var moving=sealedShown is not null&&Motion;
+        portrait.Set(seal,moving);
+        portrait.Invite=seal?"":L10n.Text("tap_to_hide");
+        AutomationProperties.SetName(portrait,L10n.Text(seal?"disconnect_action":"connect_action"));
         var n=fileLines.Count;
-        for(var i=0;i<n;i++) fileLines[i].Seal(seal,moving?(int)(1300*((seal?i:n-1-i)+0.5)/n):0,moving);
-        if(moving) scan?.Sweep(seal);
-        if(stamp is not null) {
-            var scale=(ScaleTransform)((TransformGroup)stamp.RenderTransform).Children[0];
-            stamp.BeginAnimation(OpacityProperty,null);scale.BeginAnimation(ScaleTransform.ScaleXProperty,null);scale.BeginAnimation(ScaleTransform.ScaleYProperty,null);
-            if(!moving) {stamp.Opacity=seal?1:0;}
-            else if(seal) {
-                stamp.Opacity=0;
-                var delay=TimeSpan.FromMilliseconds(1250);var ease=new CubicEase {EasingMode=EasingMode.EaseOut};
-                stamp.BeginAnimation(OpacityProperty,new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(260)) {BeginTime=delay});
-                var grow=new DoubleAnimation(1.6,1,TimeSpan.FromMilliseconds(260)) {BeginTime=delay,EasingFunction=ease};
-                scale.BeginAnimation(ScaleTransform.ScaleXProperty,grow);scale.BeginAnimation(ScaleTransform.ScaleYProperty,grow);
-            } else {var from=stamp.Opacity;stamp.Opacity=0;stamp.BeginAnimation(OpacityProperty,new DoubleAnimation(from,0,TimeSpan.FromMilliseconds(200)));}
-        }
+        for(var i=0;i<n;i++) fileLines[i].Seal(seal,moving?(int)(1200*((seal?i:n-1-i)+0.5)/n):0,moving);
         sealedShown=seal;
     }
     /// In the background: at launch, when the window comes back after six hours, and with the refresh button. Nothing
@@ -1534,9 +1515,8 @@ public partial class MainWindow : Window {
         ShowSeal(state);
         if(statusTitle is not null) statusTitle.Text=StatusTitle(state);
         var time=state==RingState.Connected?Elapsed():null;
-        if(statusTimer is not null) {if(time is not null) statusTimer.Text=time;Fade(statusTimer,time is not null);}
-        if(statusDetail is not null) {if(time is null) statusDetail.Text=StatusDetail(state,false);Fade(statusDetail,time is null);}
-        if(statusRates is not null) {if(time is not null) statusRates.Text=StatusDetail(state,false);Fade(statusRates,time is not null);}
+        if(portrait is not null) {portrait.Centre=time??"";portrait.Sub=time is null?"":StatusDetail(state,false);}
+        if(statusDetail is not null) statusDetail.Text=state==RingState.Connected?L10n.Text("seen_as",connection.NodeName):StatusDetail(state,false);
         ShowRates(rateBars,state);
         ShowSwitch(switchNote,switchText,state);
         if(location is { } place) {

@@ -1610,9 +1610,9 @@
     "ru": "Отключиться"
   },
   "exposed_detail": {
-    "zh": "这些信息此刻对外可见",
-    "en": "Anyone can see this right now",
-    "ru": "Это сейчас видно всем"
+    "zh": "任何网站此刻都能看到上面这些",
+    "en": "Any site can see all of this right now",
+    "ru": "Любой сайт сейчас видит всё это"
   },
   "sealing_detail": {
     "zh": "正在隐身…",
@@ -1718,5 +1718,20 @@
     "zh": "去设置",
     "en": "Open Settings",
     "ru": "Настройки"
+  },
+  "tap_to_hide": {
+    "zh": "轻触开始隐身",
+    "en": "Tap to hide",
+    "ru": "Нажмите, чтобы скрыться"
+  },
+  "section_portrait": {
+    "zh": "§01 你此刻的样子",
+    "en": "§01 How you look right now",
+    "ru": "§01 Как вас видят сейчас"
+  },
+  "seen_as": {
+    "zh": "网站只能看到{0}",
+    "en": "Sites only see {0}",
+    "ru": "Сайты видят только {0}"
   }
 }

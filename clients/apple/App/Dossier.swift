@@ -11,16 +11,18 @@ struct SealedText:View {
     let sealed:Bool
     var delay:Double=0
     var size:CGFloat=13
+    var design:Font.Design = .monospaced
+    var color:Color=VeilbirdStyle.text
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown:String?
     @State private var dots=false
     @State private var scrambling=false
     @State private var ready=false
     private static let glyphs=Array("01ABCDEF#%/<>*+=")
-    init(text:String,sealed:Bool,delay:Double=0,size:CGFloat=13) {self.text=text;self.sealed=sealed;self.delay=delay;self.size=size}
+    init(text:String,sealed:Bool,delay:Double=0,size:CGFloat=13,design:Font.Design = .monospaced,color:Color=VeilbirdStyle.text) {self.text=text;self.sealed=sealed;self.delay=delay;self.size=size;self.design=design;self.color=color}
     var body:some View {
-        Text(verbatim:shown ?? text).font(.system(size:size,design:.monospaced)).lineLimit(1).truncationMode(.tail)
-            .foregroundStyle(scrambling ? VeilbirdStyle.accent:(dots ? Color.clear:VeilbirdStyle.text))
+        Text(verbatim:shown ?? text).font(.system(size:size,design:design)).lineLimit(1).truncationMode(.tail)
+            .foregroundStyle(scrambling ? VeilbirdStyle.accent:(dots ? Color.clear:color))
             .overlay(DotMatrix().opacity(dots ? 1:0).animation(reduceMotion ? nil:.easeOut(duration:0.5),value:dots))
             .accessibilityLabel(Text(verbatim:dots ? "":text))
             .task(id:sealed) {
@@ -148,5 +150,72 @@ struct BreathingDot:View {
             .onAppear {low=on && !reduceMotion}
             .onChange(of:on) {value in low=value && !reduceMotion}
             .accessibilityHidden(true)
+    }
+}
+
+/// The connect page's portrait: what any site or app on this network can see of this device, drawn as a sphere of light
+/// (a halftone of amber dots lit from the upper left). It is also the switch: open, it breathes slowly and carries one
+/// line, "tap to hide"; hidden, the dots go dark and a thin amber ring takes their place, holding the time hidden and
+/// the rates. The change runs 1.2 s. Same drawing on every client (Android Portrait, Windows Portrait).
+struct PortraitView:View {
+    let hidden:Bool
+    let invite:String
+    let since:Date?
+    let sub:String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var low=true
+    var body:some View {
+        GeometryReader {geo in
+            let s=min(geo.size.width,geo.size.height)
+            ZStack {
+                ZStack {
+                    DotSphere().opacity(low ? 0.82:1)
+                    Text(verbatim:invite).font(.system(size:max(13,0.05*s))).tracking(0.8).foregroundStyle(VeilbirdStyle.accent)
+                        .lineLimit(1).minimumScaleFactor(0.6).frame(width:0.8*s).opacity(low ? 0.75:1)
+                    Circle().strokeBorder(VeilbirdStyle.text.opacity(0.07),lineWidth:1)
+                }.opacity(hidden ? 0:1)
+                DotSphere().opacity(hidden ? 0.1:0)
+                ZStack {
+                    Circle().stroke(VeilbirdStyle.accent.opacity(0.11),lineWidth:8)
+                    Circle().stroke(VeilbirdStyle.accent.opacity(0.22),lineWidth:3)
+                    Circle().stroke(VeilbirdStyle.accent,lineWidth:1)
+                }.frame(width:0.75*s,height:0.75*s).opacity(hidden ? (low ? 0.82:1):0).scaleEffect(hidden ? 1:0.92)
+                VStack(spacing:0.02*s) {
+                    if let since {
+                        TimelineView(.periodic(from:since,by:1)) {context in
+                            Text(verbatim:Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond)))
+                                .font(.system(size:0.072*s,design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.text).lineLimit(1)
+                        }
+                    }
+                    Text(verbatim:sub).font(.system(size:max(10,0.036*s),design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.secondary)
+                        .lineLimit(1).minimumScaleFactor(0.6).frame(width:0.62*s)
+                }.opacity(hidden ? 1:0)
+            }.frame(width:s,height:s).position(x:geo.size.width/2,y:geo.size.height/2)
+        }
+        .animation(reduceMotion ? nil:.timingCurve(0.65,0,0.35,1,duration:1.2),value:hidden)
+        .onAppear {if !reduceMotion {withAnimation(.easeInOut(duration:3).repeatForever(autoreverses:true)) {low=false}} else {low=false}}
+    }
+}
+
+/// The halftone sphere, drawn once and kept as one layer.
+private struct DotSphere:View {
+    var body:some View {
+        Canvas {context,area in
+            let s=Double(min(area.width,area.height)),ox=(Double(area.width)-s)/2,oy=(Double(area.height)-s)/2
+            let pitch=s*6/320,r=s*1.15/320,radius=s/2,lx=s*0.42,ly=s*0.34
+            var y=pitch/2
+            while y<s {
+                var x=pitch/2
+                while x<s {
+                    if ((x-radius)*(x-radius)+(y-radius)*(y-radius)).squareRoot()<=radius {
+                        let f=((x-lx)*(x-lx)+(y-ly)*(y-ly)).squareRoot()/(s*0.82)
+                        let a=f<0.22 ? 1-f/0.22*0.15:(f<0.48 ? 0.85-(f-0.22)/0.26*0.5:(f<0.66 ? 0.35-(f-0.48)/0.18*0.27:(f<0.72 ? 0.08-(f-0.66)/0.06*0.08:0)))
+                        if a>0 {context.fill(Path(ellipseIn:CGRect(x:ox+x-r,y:oy+y-r,width:2*r,height:2*r)),with:.color(VeilbirdStyle.light.opacity(a)))}
+                    }
+                    x+=pitch
+                }
+                y+=pitch
+            }
+        }.drawingGroup().accessibilityHidden(true)
     }
 }
