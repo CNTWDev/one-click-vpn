@@ -82,7 +82,7 @@ struct ClientView:View {
                 ActivityView()
             }
             #endif
-            }
+            }.belowTrafficLights()
         }
         // A new appearance redraws every view with the other palette.
         .id(appearance)
@@ -1061,6 +1061,18 @@ private extension View {
         self.textInputAutocapitalization(.never).autocorrectionDisabled()
         #else
         self.autocorrectionDisabled()
+        #endif
+    }
+}
+
+extension View {
+    /// Mac: the window has no title bar (VeilbirdApp, .hiddenTitleBar), so the backdrop runs to the top edge and the
+    /// content starts below the traffic lights; the strip above it still drags the window.
+    @ViewBuilder func belowTrafficLights()->some View {
+        #if os(macOS)
+        self.padding(.top,28).ignoresSafeArea(edges:.top)
+        #else
+        self
         #endif
     }
 }

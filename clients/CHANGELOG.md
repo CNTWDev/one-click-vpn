@@ -8,12 +8,15 @@
 
 ### zh
 - Mac 应用内升级：下载完点「安装并重启」，自动退出旧版、替换并重新打开，不用再打开安装包拖拽覆盖
+- Mac 窗口去掉系统灰色标题栏，整个窗口都是应用自己的背景
 
 ### en
 - Mac in-app update: once downloaded, click "Install and Relaunch"; the app quits, replaces itself and reopens, with no installer to drag
+- The Mac window drops the grey system title bar; the app's own backdrop fills the whole window
 
 ### ru
 - Обновление на Mac внутри приложения: после загрузки нажмите «Установить и перезапустить» — приложение закроется, обновится и откроется снова, без перетаскивания
+- Окно на Mac без серой системной строки заголовка: фон приложения занимает всё окно
 
 ## 1.0.9
 

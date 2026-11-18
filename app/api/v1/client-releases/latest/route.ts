@@ -5,6 +5,8 @@ import { downloadPath, updateCheck, validInstallation } from "../../../../../ser
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const LAST_SANDBOXED_MAC_BUILD = 37;
+
 /** Update check for installed clients: GET ?platform=android&arch=universal&build=12&channel=stable&installation=<random id> */
 export async function GET(request: Request) {
   const query = new URL(request.url).searchParams, headers = { "Cache-Control": "no-store" };
@@ -16,7 +18,12 @@ export async function GET(request: Request) {
   }
   try {
     const decision = await updateCheck({ platform, arch, channel, build, installation: installation || undefined });
-    return NextResponse.json({ ...decision, downloadPath: downloadPath(platform, decision.latest?.arch) }, { headers });
+    // Mac builds up to 37 (1.0.9) run in the App Sandbox: a DMG they download gets a hard quarantine flag and the
+    // installed app then refuses to launch. Without a digest they open the download page in the browser instead.
+    const latest = platform === "macos" && build !== null && build <= LAST_SANDBOXED_MAC_BUILD && decision.latest
+      ? (({ sha256: _sha, sizeBytes: _size, ...rest }) => rest)(decision.latest as Record<string, unknown> & { sha256?: string; sizeBytes?: number })
+      : decision.latest;
+    return NextResponse.json({ ...decision, latest, downloadPath: downloadPath(platform, decision.latest?.arch) }, { headers });
   } catch {
     return NextResponse.json({ code: "CLIENT_RELEASES_UNAVAILABLE" }, { status: 503, headers });
   }
