@@ -38,10 +38,13 @@
   <string name="activity_title">Активность</string>
   <string name="activity_traffic">Трафик</string>
   <string name="all_locations">Все локации</string>
-  <string name="allow_system_extension">Разрешите системное расширение TrackNothing в «Системные настройки → Конфиденциальность и безопасность». После этого подключение продолжится.</string>
+  <string name="allow_system_extension">macOS должна разрешить сетевое расширение TrackNothing, иначе подключиться нельзя. Нажмите «Открыть Системные настройки» и включите TrackNothing в разделе «Основные › Объекты входа и расширения › Сетевые расширения» (macOS 14 и раньше: «Конфиденциальность и безопасность»). Подключение начнётся сразу после разрешения.</string>
+  <string name="allow_system_extension_short">Разрешите сетевое расширение TrackNothing в Системных настройках; подключение начнётся само</string>
   <string name="allow_the_system_to_add_a_vpn_on_first">При первом подключении разрешите добавление VPN. Управляйте устройствами в аккаунте.</string>
-  <string name="allow_the_system_vpn_permission_to_connect">Для подключения разрешите использование VPN.</string>
+  <string name="allow_the_system_vpn_permission_to_connect">TrackNothing нужно разрешение на VPN. Нажмите «Повторить» и выберите «ОК» в системном окне. Если окно не появляется, возможно, у другого VPN-приложения включён «Постоянный VPN»; отключите его в Настройках › VPN.</string>
   <string name="allow_vpn_access_on_your_first_connection">При первом подключении разрешите VPN</string>
+  <string name="allow_vpn_configuration">Для подключения система должна добавить конфигурацию VPN. Нажмите «Повторить» и выберите «Разрешить» в системном окне (может понадобиться пароль или Touch ID).</string>
+  <string name="allow_vpn_configuration_short">Выберите «Разрешить» в системном окне, чтобы добавить конфигурацию VPN</string>
   <string name="announcement">Объявление</string>
   <string name="appearance">Оформление</string>
   <string name="ask_your_administrator_to_enable_veilbird_client_access">Попросите администратора включить доступ через клиент TrackNothing.</string>
@@ -191,9 +194,12 @@
   <string name="open_app">Открыть TrackNothing</string>
   <string name="open_at_login">Запускать при входе</string>
   <string name="open_main_window">Открыть окно</string>
+  <string name="open_settings_short">Настройки</string>
+  <string name="open_system_settings">Открыть Системные настройки</string>
   <string name="open_vpn_settings">Открыть настройки VPN</string>
   <string name="password">Пароль</string>
   <string name="password_reset_unavailable">Сброс пароля по email сейчас недоступен. Обратитесь к администратору.</string>
+  <string name="permission_needed_title">Нужно ваше разрешение</string>
   <string name="quality_fair">Средне</string>
   <string name="quality_good">Хорошо</string>
   <string name="quality_poor">Плохо</string>
@@ -327,7 +333,7 @@
   <string name="vpn_connection">VPN-подключение</string>
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Кнопка подключения на главной заметнее, называется «Подключиться» / «Отключиться», а на Android всегда видна внизу экрана, даже на маленьких телефонах</string>
+  <string name="whats_new_notes">Кнопка подключения выделена фирменным цветом, её сразу видно\nЕсли не хватает системного разрешения (сетевое расширение на Mac, конфигурация VPN, доступ к VPN на Android), главная страница подсказывает, где его дать; на Mac настройки открываются одним нажатием, а подключение начинается сразу после разрешения</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Версия Windows для разработки · Интеграция VPN ещё не завершена</string>

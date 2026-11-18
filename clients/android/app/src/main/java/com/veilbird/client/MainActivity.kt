@@ -660,7 +660,7 @@ class MainActivity : Activity() {
             contentDescription = L10n.text(when (state) { LinkState.IDLE -> R.string.connect_action; LinkState.FAILED -> R.string.retry_action; LinkState.CONNECTING -> R.string.cancel; else -> R.string.disconnect_action })
             background = GradientDrawable().apply {
                 cornerRadius = 2.dp.toFloat()
-                if (connected) { setColor(Palette.alpha(Palette.accent, 15)); setStroke(1.dp, Palette.alpha(Palette.accent, 180)) } else { setColor(Palette.alpha(Palette.text, 10)); setStroke(1.dp, Palette.alpha(Palette.text, 120)) }
+                if (connected) { setColor(Palette.alpha(Palette.accent, 15)); setStroke(1.dp, Palette.alpha(Palette.accent, 180)) } else { setColor(Palette.alpha(Palette.accent, 22)); setStroke(1.dp, Palette.accent) }
             }.let { RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.text, 22)), it, null) }
         }
         if (state != shownState) actionLabel?.apply {
@@ -1737,7 +1737,13 @@ class MainActivity : Activity() {
     @Deprecated("Activity result compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 10) { if (resultCode == RESULT_OK) startConnection() else alert(L10n.text(R.string.allow_the_system_vpn_permission_to_connect)) }
+        // Refused or dismissed the system's VPN prompt: say what it was for and offer it again right here.
+        if (requestCode == 10) {
+            if (resultCode == RESULT_OK) startConnection()
+            else AlertDialog.Builder(this).setTitle(L10n.text(R.string.permission_needed_title)).setMessage(L10n.text(R.string.allow_the_system_vpn_permission_to_connect))
+                .setPositiveButton(L10n.text(R.string.retry_action)) { _, _ -> if (!busy) toggleConnection() }
+                .setNegativeButton(L10n.text(R.string.cancel), null).show()
+        }
     }
 }
 

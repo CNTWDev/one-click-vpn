@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.7
+
+### zh
+- 连接按钮用品牌色描边，一眼就能找到
+- 系统权限（Mac 网络扩展、VPN 配置、安卓 VPN 授权）没允许时，首页会一直提示该去哪里打开，Mac 上一键打开系统设置，允许后自动连接
+
+### en
+- The Connect button now wears the brand colour, so it is the first thing you see
+- When a system permission is missing (Mac network extension, VPN configuration, Android VPN access), the home page keeps saying where to allow it; on the Mac one click opens System Settings, and it connects as soon as you allow it
+
+### ru
+- Кнопка подключения выделена фирменным цветом, её сразу видно
+- Если не хватает системного разрешения (сетевое расширение на Mac, конфигурация VPN, доступ к VPN на Android), главная страница подсказывает, где его дать; на Mac настройки открываются одним нажатием, а подключение начинается сразу после разрешения
+
 ## 1.0.6
 
 ### zh

@@ -38,10 +38,13 @@
   <string name="activity_title">Activity</string>
   <string name="activity_traffic">Traffic</string>
   <string name="all_locations">All locations</string>
-  <string name="allow_system_extension">Allow the TrackNothing system extension in System Settings → Privacy &amp; Security. It connects once allowed.</string>
+  <string name="allow_system_extension">macOS needs you to allow the TrackNothing network extension before it can connect. Choose Open System Settings and turn TrackNothing on under General › Login Items &amp; Extensions › Network Extensions (macOS 14 and earlier: Privacy &amp; Security). It connects as soon as you allow it.</string>
+  <string name="allow_system_extension_short">Allow the TrackNothing network extension in System Settings; it connects once allowed</string>
   <string name="allow_the_system_to_add_a_vpn_on_first">Allow the system to add a VPN on first connection. Manage authorized devices in Account.</string>
-  <string name="allow_the_system_vpn_permission_to_connect">Allow the system VPN permission to connect.</string>
+  <string name="allow_the_system_vpn_permission_to_connect">TrackNothing needs your permission to set up a VPN. Choose Try again and tap OK in the system prompt. If no prompt appears, another VPN app may be set to Always-on; turn that off in Settings › VPN.</string>
   <string name="allow_vpn_access_on_your_first_connection">Allow VPN access on your first connection</string>
+  <string name="allow_vpn_configuration">Connecting needs the system to add a VPN configuration. Choose Try again and pick Allow in the system prompt (it may ask for your password or Touch ID).</string>
+  <string name="allow_vpn_configuration_short">Pick Allow in the system prompt to add the VPN configuration</string>
   <string name="announcement">Announcement</string>
   <string name="appearance">Appearance</string>
   <string name="ask_your_administrator_to_enable_veilbird_client_access">Ask your administrator to enable TrackNothing client access.</string>
@@ -191,9 +194,12 @@
   <string name="open_app">Open TrackNothing</string>
   <string name="open_at_login">Open at login</string>
   <string name="open_main_window">Open main window</string>
+  <string name="open_settings_short">Open Settings</string>
+  <string name="open_system_settings">Open System Settings</string>
   <string name="open_vpn_settings">Open VPN settings</string>
   <string name="password">Password</string>
   <string name="password_reset_unavailable">Password reset by email isn\'t available right now. Contact your administrator.</string>
+  <string name="permission_needed_title">Permission needed</string>
   <string name="quality_fair">Fair</string>
   <string name="quality_good">Good</string>
   <string name="quality_poor">Poor</string>
@@ -327,7 +333,7 @@
   <string name="vpn_connection">VPN connection</string>
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">The Connect button on the home page is easier to see, says Connect / Disconnect, and on Android stays at the bottom of the screen on small phones too</string>
+  <string name="whats_new_notes">The Connect button now wears the brand colour, so it is the first thing you see\nWhen a system permission is missing (Mac network extension, VPN configuration, Android VPN access), the home page keeps saying where to allow it; on the Mac one click opens System Settings, and it connects as soon as you allow it</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

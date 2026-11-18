@@ -40,10 +40,13 @@
   <data name="activity_title" xml:space="preserve"><value>活动</value></data>
   <data name="activity_traffic" xml:space="preserve"><value>流量</value></data>
   <data name="all_locations" xml:space="preserve"><value>全部节点</value></data>
-  <data name="allow_system_extension" xml:space="preserve"><value>请在“系统设置 → 隐私与安全性”中允许 TrackNothing 的系统扩展，允许后会自动连接。</value></data>
+  <data name="allow_system_extension" xml:space="preserve"><value>macOS 需要你允许 TrackNothing 的网络扩展才能连接。点「打开系统设置」，在「通用 › 登录项与扩展 › 网络扩展」（macOS 14 及更早：「隐私与安全性」）里打开 TrackNothing，允许后会自动连接。</value></data>
+  <data name="allow_system_extension_short" xml:space="preserve"><value>在系统设置里允许 TrackNothing 的网络扩展，允许后自动连接</value></data>
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>首次连接时，请允许系统添加 VPN。授权设备可在「我的」中管理。</value></data>
-  <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>允许系统 VPN 权限后才能连接。</value></data>
+  <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>需要允许 TrackNothing 建立 VPN 连接。点「重试」，在系统弹窗里选「确定」。如果没有弹窗，可能是其他 VPN 应用设置了「始终开启」，请到系统设置 › VPN 里关掉它。</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>首次连接需要允许系统 VPN 权限</value></data>
+  <data name="allow_vpn_configuration" xml:space="preserve"><value>连接需要系统添加一项 VPN 配置。点「重试」，在系统弹窗里选「允许」（可能需要输入电脑密码或用触控 ID）。</value></data>
+  <data name="allow_vpn_configuration_short" xml:space="preserve"><value>系统弹窗里选「允许」添加 VPN 配置后才能连接</value></data>
   <data name="announcement" xml:space="preserve"><value>公告</value></data>
   <data name="appearance" xml:space="preserve"><value>外观</value></data>
   <data name="ask_your_administrator_to_enable_veilbird_client_access" xml:space="preserve"><value>请联系管理员开通 TrackNothing 客户端访问。</value></data>
@@ -193,9 +196,12 @@
   <data name="open_app" xml:space="preserve"><value>打开 TrackNothing</value></data>
   <data name="open_at_login" xml:space="preserve"><value>登录时启动</value></data>
   <data name="open_main_window" xml:space="preserve"><value>打开主窗口</value></data>
+  <data name="open_settings_short" xml:space="preserve"><value>去设置</value></data>
+  <data name="open_system_settings" xml:space="preserve"><value>打开系统设置</value></data>
   <data name="open_vpn_settings" xml:space="preserve"><value>打开 VPN 设置</value></data>
   <data name="password" xml:space="preserve"><value>密码</value></data>
   <data name="password_reset_unavailable" xml:space="preserve"><value>暂时无法通过邮件重置密码，请联系管理员。</value></data>
+  <data name="permission_needed_title" xml:space="preserve"><value>需要你的许可</value></data>
   <data name="quality_fair" xml:space="preserve"><value>良</value></data>
   <data name="quality_good" xml:space="preserve"><value>优</value></data>
   <data name="quality_poor" xml:space="preserve"><value>差</value></data>
@@ -330,7 +336,8 @@
   <data name="vpn_connection" xml:space="preserve"><value>VPN 连接</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>首页的连接按钮更醒目，直接写「连接」/「断开连接」，安卓上固定在底部，小屏也不用滑动</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>连接按钮用品牌色描边，一眼就能找到
+系统权限（Mac 网络扩展、VPN 配置、安卓 VPN 授权）没允许时，首页会一直提示该去哪里打开，Mac 上一键打开系统设置，允许后自动连接</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>

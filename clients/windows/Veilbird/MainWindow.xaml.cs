@@ -956,9 +956,10 @@ public partial class MainWindow : Window {
             var on=state==RingState.Connected;
             actionLabel.Text=L10n.Text(state switch {RingState.Connected=>"unseal_action",RingState.Connecting=>"sealing_detail",RingState.Failed=>"retry_action",_=>"seal_action"});
             actionButton.Foreground=on?Look.Accent:Look.Text;
-            var ink=((SolidColorBrush)Look.Text).Color;
-            actionButton.Background=on?Look.AccentWash:new SolidColorBrush(Color.FromArgb(10,ink.R,ink.G,ink.B));
-            actionButton.BorderBrush=on?Look.AccentLine:new SolidColorBrush(Color.FromArgb(120,ink.R,ink.G,ink.B));
+            // Idle, the one action wears the brand colour outright, so it is the first thing seen on the page.
+            var ink=Look.AccentColor;
+            actionButton.Background=new SolidColorBrush(Color.FromArgb(on?(byte)16:(byte)22,ink.R,ink.G,ink.B));
+            actionButton.BorderBrush=on?Look.AccentLine:Look.Accent;
             AutomationProperties.SetName(actionButton,L10n.Text(state switch {RingState.Idle=>"connect_action",RingState.Failed=>"retry_action",RingState.Connecting=>"cancel",_=>"disconnect_action"}));
             actionDot.Fill=seal?Look.Accent:Look.Hex("#59EDE7DF");
             actionDot.BeginAnimation(OpacityProperty,null);actionDot.Opacity=1;

@@ -858,19 +858,42 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Allow the TrackNothing system extension in System Settings → Privacy & Security. It connects once allowed."
+            "value": "macOS needs you to allow the TrackNothing network extension before it can connect. Choose Open System Settings and turn TrackNothing on under General › Login Items & Extensions › Network Extensions (macOS 14 and earlier: Privacy & Security). It connects as soon as you allow it."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请在“系统设置 → 隐私与安全性”中允许 TrackNothing 的系统扩展，允许后会自动连接。"
+            "value": "macOS 需要你允许 TrackNothing 的网络扩展才能连接。点「打开系统设置」，在「通用 › 登录项与扩展 › 网络扩展」（macOS 14 及更早：「隐私与安全性」）里打开 TrackNothing，允许后会自动连接。"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Разрешите системное расширение TrackNothing в «Системные настройки → Конфиденциальность и безопасность». После этого подключение продолжится."
+            "value": "macOS должна разрешить сетевое расширение TrackNothing, иначе подключиться нельзя. Нажмите «Открыть Системные настройки» и включите TrackNothing в разделе «Основные › Объекты входа и расширения › Сетевые расширения» (macOS 14 и раньше: «Конфиденциальность и безопасность»). Подключение начнётся сразу после разрешения."
+          }
+        }
+      }
+    },
+    "allow_system_extension_short": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow the TrackNothing network extension in System Settings; it connects once allowed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在系统设置里允许 TrackNothing 的网络扩展，允许后自动连接"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Разрешите сетевое расширение TrackNothing в Системных настройках; подключение начнётся само"
           }
         }
       }
@@ -904,19 +927,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Allow the system VPN permission to connect."
+            "value": "TrackNothing needs your permission to set up a VPN. Choose Try again and tap OK in the system prompt. If no prompt appears, another VPN app may be set to Always-on; turn that off in Settings › VPN."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "允许系统 VPN 权限后才能连接。"
+            "value": "需要允许 TrackNothing 建立 VPN 连接。点「重试」，在系统弹窗里选「确定」。如果没有弹窗，可能是其他 VPN 应用设置了「始终开启」，请到系统设置 › VPN 里关掉它。"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Для подключения разрешите использование VPN."
+            "value": "TrackNothing нужно разрешение на VPN. Нажмите «Повторить» и выберите «ОК» в системном окне. Если окно не появляется, возможно, у другого VPN-приложения включён «Постоянный VPN»; отключите его в Настройках › VPN."
           }
         }
       }
@@ -940,6 +963,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "При первом подключении разрешите VPN"
+          }
+        }
+      }
+    },
+    "allow_vpn_configuration": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting needs the system to add a VPN configuration. Choose Try again and pick Allow in the system prompt (it may ask for your password or Touch ID)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接需要系统添加一项 VPN 配置。点「重试」，在系统弹窗里选「允许」（可能需要输入电脑密码或用触控 ID）。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Для подключения система должна добавить конфигурацию VPN. Нажмите «Повторить» и выберите «Разрешить» в системном окне (может понадобиться пароль или Touch ID)."
+          }
+        }
+      }
+    },
+    "allow_vpn_configuration_short": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick Allow in the system prompt to add the VPN configuration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统弹窗里选「允许」添加 VPN 配置后才能连接"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите «Разрешить» в системном окне, чтобы добавить конфигурацию VPN"
           }
         }
       }
@@ -4371,6 +4440,52 @@
         }
       }
     },
+    "open_settings_short": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "去设置"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Настройки"
+          }
+        }
+      }
+    },
+    "open_system_settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open System Settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开系统设置"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть Системные настройки"
+          }
+        }
+      }
+    },
     "open_vpn_settings": {
       "extractionState": "manual",
       "localizations": {
@@ -4436,6 +4551,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Сброс пароля по email сейчас недоступен. Обратитесь к администратору."
+          }
+        }
+      }
+    },
+    "permission_needed_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permission needed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要你的许可"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нужно ваше разрешение"
           }
         }
       }
@@ -7505,19 +7643,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The Connect button on the home page is easier to see, says Connect / Disconnect, and on Android stays at the bottom of the screen on small phones too"
+            "value": "The Connect button now wears the brand colour, so it is the first thing you see\nWhen a system permission is missing (Mac network extension, VPN configuration, Android VPN access), the home page keeps saying where to allow it; on the Mac one click opens System Settings, and it connects as soon as you allow it"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "首页的连接按钮更醒目，直接写「连接」/「断开连接」，安卓上固定在底部，小屏也不用滑动"
+            "value": "连接按钮用品牌色描边，一眼就能找到\n系统权限（Mac 网络扩展、VPN 配置、安卓 VPN 授权）没允许时，首页会一直提示该去哪里打开，Mac 上一键打开系统设置，允许后自动连接"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Кнопка подключения на главной заметнее, называется «Подключиться» / «Отключиться», а на Android всегда видна внизу экрана, даже на маленьких телефонах"
+            "value": "Кнопка подключения выделена фирменным цветом, её сразу видно\nЕсли не хватает системного разрешения (сетевое расширение на Mac, конфигурация VPN, доступ к VPN на Android), главная страница подсказывает, где его дать; на Mac настройки открываются одним нажатием, а подключение начинается сразу после разрешения"
           }
         }
       }

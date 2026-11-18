@@ -14,6 +14,11 @@ import ServiceManagement
     @Published var signedIn=false
     @Published var busy=false
     @Published var message=""
+    /// A system permission the connection waits on; the connect page keeps a note about it until it is granted.
+    enum Permission {case systemExtension,vpnConfiguration}
+    @Published var permission:Permission?
+    /// Shows the permission dialog (once per refusal, and again whenever the user taps connect while it is pending).
+    @Published var askPermission=false
     @Published var status="not_connected"
     @Published var nodeName=""
     @Published var connectedNodeId=""
@@ -294,13 +299,24 @@ import ServiceManagement
         if connected {attempt=nil;reconnectTask?.cancel();reconnectTask=nil;await TunnelControl.stop(manager);return}
         failed=false
         #if os(macOS)
-        SystemExtension.shared.onApprovalNeeded={[weak self] in self?.message=L10n.text("allow_system_extension")}
-        try await SystemExtension.shared.activate()
-        message=""
+        // Once the user allows the extension in System Settings, connect without another tap.
+        SystemExtension.shared.onReady={[weak self] in
+            guard let self,self.permission == .systemExtension else {return}
+            self.permission=nil;self.askPermission=false;self.work {try await self.toggle()}
+        }
+        do {try await SystemExtension.shared.activate()}
+        catch AccessFailure.code("SYSTEM_EXTENSION_APPROVAL") {permission = .systemExtension;askPermission=true;return}
+        if permission == .systemExtension {permission=nil}
         #endif
         attempt=Date()
         Journal.add("connect: requested from the app")
-        manager=try await TunnelControl.start(origin:try api().origin,nodeId:selected,routing:routing)
+        do {manager=try await TunnelControl.start(origin:try api().origin,nodeId:selected,routing:routing)}
+        catch let error as NSError where error.domain == NEVPNErrorDomain && error.code == NEVPNError.Code.configurationReadWriteFailed.rawValue {
+            // The user chose "Don't Allow" (or missed) the system's "add VPN configuration" prompt; the next tap asks again.
+            Journal.add("connect: VPN configuration not allowed");attempt=nil;UserDefaults.standard.set(false,forKey:"vpnWanted")
+            permission = .vpnConfiguration;askPermission=true;return
+        }
+        if permission == .vpnConfiguration {permission=nil}
         #endif
     }
     /// Moves a running (or reconnecting) VPN to the selected location: stop, wait for it to go down, start again.

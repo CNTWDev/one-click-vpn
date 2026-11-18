@@ -38,10 +38,13 @@
   <string name="activity_title">活动</string>
   <string name="activity_traffic">流量</string>
   <string name="all_locations">全部节点</string>
-  <string name="allow_system_extension">请在“系统设置 → 隐私与安全性”中允许 TrackNothing 的系统扩展，允许后会自动连接。</string>
+  <string name="allow_system_extension">macOS 需要你允许 TrackNothing 的网络扩展才能连接。点「打开系统设置」，在「通用 › 登录项与扩展 › 网络扩展」（macOS 14 及更早：「隐私与安全性」）里打开 TrackNothing，允许后会自动连接。</string>
+  <string name="allow_system_extension_short">在系统设置里允许 TrackNothing 的网络扩展，允许后自动连接</string>
   <string name="allow_the_system_to_add_a_vpn_on_first">首次连接时，请允许系统添加 VPN。授权设备可在「我的」中管理。</string>
-  <string name="allow_the_system_vpn_permission_to_connect">允许系统 VPN 权限后才能连接。</string>
+  <string name="allow_the_system_vpn_permission_to_connect">需要允许 TrackNothing 建立 VPN 连接。点「重试」，在系统弹窗里选「确定」。如果没有弹窗，可能是其他 VPN 应用设置了「始终开启」，请到系统设置 › VPN 里关掉它。</string>
   <string name="allow_vpn_access_on_your_first_connection">首次连接需要允许系统 VPN 权限</string>
+  <string name="allow_vpn_configuration">连接需要系统添加一项 VPN 配置。点「重试」，在系统弹窗里选「允许」（可能需要输入电脑密码或用触控 ID）。</string>
+  <string name="allow_vpn_configuration_short">系统弹窗里选「允许」添加 VPN 配置后才能连接</string>
   <string name="announcement">公告</string>
   <string name="appearance">外观</string>
   <string name="ask_your_administrator_to_enable_veilbird_client_access">请联系管理员开通 TrackNothing 客户端访问。</string>
@@ -191,9 +194,12 @@
   <string name="open_app">打开 TrackNothing</string>
   <string name="open_at_login">登录时启动</string>
   <string name="open_main_window">打开主窗口</string>
+  <string name="open_settings_short">去设置</string>
+  <string name="open_system_settings">打开系统设置</string>
   <string name="open_vpn_settings">打开 VPN 设置</string>
   <string name="password">密码</string>
   <string name="password_reset_unavailable">暂时无法通过邮件重置密码，请联系管理员。</string>
+  <string name="permission_needed_title">需要你的许可</string>
   <string name="quality_fair">良</string>
   <string name="quality_good">优</string>
   <string name="quality_poor">差</string>
@@ -327,7 +333,7 @@
   <string name="vpn_connection">VPN 连接</string>
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">首页的连接按钮更醒目，直接写「连接」/「断开连接」，安卓上固定在底部，小屏也不用滑动</string>
+  <string name="whats_new_notes">连接按钮用品牌色描边，一眼就能找到\n系统权限（Mac 网络扩展、VPN 配置、安卓 VPN 授权）没允许时，首页会一直提示该去哪里打开，Mac 上一键打开系统设置，允许后自动连接</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>
