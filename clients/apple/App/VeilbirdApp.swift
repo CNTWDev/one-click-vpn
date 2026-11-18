@@ -13,6 +13,11 @@ import ServiceManagement
 @main
 struct VeilbirdApp: App {
     @StateObject private var model=ClientModel()
+    init() {
+        #if os(macOS)
+        MacUpdater.adoptSandboxDefaults()
+        #endif
+    }
     var body: some Scene {
         #if os(macOS)
         // A small fixed-size tool window; the menu bar icon carries the quick actions and keeps running when it is closed.

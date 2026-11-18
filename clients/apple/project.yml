@@ -76,8 +76,9 @@ targets:
         embed: false
     entitlements:
       path: Signing/macOS.entitlements
+      # No App Sandbox for the Developer ID app, so "Install and Relaunch" can replace it in place (MacUpdater).
+      # The tunnel system extension below stays sandboxed.
       properties:
-        com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.developer.networking.networkextension: [packet-tunnel-provider-systemextension]
         com.apple.developer.system-extension.install: true

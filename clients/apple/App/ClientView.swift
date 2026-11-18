@@ -1071,7 +1071,7 @@ extension ClientView {
     var updateValue:String {
         guard let update=model.update else {return L10n.text("up_to_date")}
         if model.downloading {return L10n.text("update_downloading_value","\(UpdateBanner.percent(model.downloadProgress,update))%")}
-        if update.direct && UpdateDownloader.downloaded(update) != nil {return L10n.text("update_open_installer")}
+        if update.direct && UpdateDownloader.downloaded(update) != nil {return L10n.text(ClientModel.installsInPlace ? "update_install_relaunch":"update_open_installer")}
         return L10n.text("update_banner_title",update.version)
     }
 }
@@ -1095,7 +1095,10 @@ struct UpdateBanner:View {
     var body:some View {
         if model.downloading {downloading}
         else if update.direct,let file=UpdateDownloader.downloaded(update) {
-            row(L10n.text("update_ready_title",update.version),L10n.text("update_ready_detail_idle")) {button(L10n.text("update_open_installer"),filled:true) {model.installUpdate(file)}}
+            let inPlace=ClientModel.installsInPlace
+            row(L10n.text("update_ready_title",update.version),L10n.text(inPlace ? "update_relaunch_detail":"update_ready_detail_idle")) {
+                button(L10n.text(inPlace ? "update_install_relaunch":"update_open_installer"),filled:true) {model.installUpdate(file)}
+            }
         } else if !model.downloadError.isEmpty {
             row(L10n.text("update_failed_title",update.version),L10n.text(model.downloadError=="digest" ? "update_failed_digest":model.downloadError=="storage" ? "update_failed_storage":"update_failed_network")) {
                 button(L10n.text("update_retry")) {model.startUpdate(update) {openURL($0)}}

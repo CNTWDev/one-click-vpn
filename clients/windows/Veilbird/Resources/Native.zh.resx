@@ -316,6 +316,7 @@
   <data name="update_failed_storage" xml:space="preserve"><value>存储空间不足，清理后再试。</value></data>
   <data name="update_failed_title" xml:space="preserve"><value>没能下载完 {0}</value></data>
   <data name="update_install" xml:space="preserve"><value>安装</value></data>
+  <data name="update_install_relaunch" xml:space="preserve"><value>安装并重启</value></data>
   <data name="update_later" xml:space="preserve"><value>稍后提醒</value></data>
   <data name="update_minutes" xml:space="preserve"><value>{0} 分钟</value></data>
   <data name="update_now" xml:space="preserve"><value>立即更新</value></data>
@@ -324,6 +325,7 @@
   <data name="update_ready_detail" xml:space="preserve"><value>安装时会断开连接，装好后自动重连。</value></data>
   <data name="update_ready_detail_idle" xml:space="preserve"><value>点击安装，几秒即可完成。</value></data>
   <data name="update_ready_title" xml:space="preserve"><value>{0} 已下载</value></data>
+  <data name="update_relaunch_detail" xml:space="preserve"><value>点击后自动退出、替换并重新打开，几秒完成。</value></data>
   <data name="update_required_detail" xml:space="preserve"><value>当前版本已停止支持，更新后才能继续连接。</value></data>
   <data name="update_required_title" xml:space="preserve"><value>需要升级到 {0}</value></data>
   <data name="update_retry" xml:space="preserve"><value>重试</value></data>

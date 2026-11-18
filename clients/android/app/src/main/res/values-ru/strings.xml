@@ -314,6 +314,7 @@
   <string name="update_failed_storage">Недостаточно места. Освободите место и повторите.</string>
   <string name="update_failed_title">Не удалось загрузить %1$s</string>
   <string name="update_install">Установить</string>
+  <string name="update_install_relaunch">Установить и перезапустить</string>
   <string name="update_later">Напомнить позже</string>
   <string name="update_minutes">%1$s мин</string>
   <string name="update_now">Обновить</string>
@@ -322,6 +323,7 @@
   <string name="update_ready_detail">Во время установки соединение прервётся, затем восстановится.</string>
   <string name="update_ready_detail_idle">Нажмите «Установить» — это займёт несколько секунд.</string>
   <string name="update_ready_title">Версия %1$s загружена</string>
+  <string name="update_relaunch_detail">Приложение закроется, обновится и откроется снова через несколько секунд.</string>
   <string name="update_required_detail">Эта версия больше не поддерживается. Обновите приложение, чтобы продолжить подключаться.</string>
   <string name="update_required_title">Нужна версия %1$s</string>
   <string name="update_retry">Повторить</string>

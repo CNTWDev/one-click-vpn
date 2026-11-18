@@ -42,10 +42,23 @@ enum SecureStorage {
         var q=query(name); q[kSecReturnData as String]=true; q[kSecMatchLimit as String]=kSecMatchLimitOne
         var result:CFTypeRef?
         let status=SecItemCopyMatching(q as CFDictionary,&result)
-        if status == errSecItemNotFound { return nil }
+        if status == errSecItemNotFound { return try adopt(name) }
         if status == errSecMissingEntitlement {throw AccessFailure.code("KEYCHAIN_SIGNATURE_REQUIRED")}
         guard status == errSecSuccess else { throw AccessFailure.code("KEYCHAIN_UNAVAILABLE") }
         return result as? Data
+    }
+    /// The Mac app left the App Sandbox in 1.0.10: an item the sandboxed build saved in the other macOS keychain
+    /// (data protection vs. file-based) is moved over once, so the sign-in and device key survive the update.
+    private static func adopt(_ name:String) throws -> Data? {
+        #if os(macOS)
+        var q=query(name); q[kSecUseDataProtectionKeychain as String]=true; q[kSecReturnData as String]=true; q[kSecMatchLimit as String]=kSecMatchLimitOne
+        var result:CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary,&result) == errSecSuccess,let data=result as? Data else {return nil}
+        try? write(name,data)
+        return data
+        #else
+        return nil
+        #endif
     }
     static func write(_ name:String,_ value:Data?) throws {
         if handed != nil {handed?[name]=value;return}

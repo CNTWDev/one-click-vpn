@@ -4,6 +4,17 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.10
+
+### zh
+- Mac 应用内升级：下载完点「安装并重启」，自动退出旧版、替换并重新打开，不用再打开安装包拖拽覆盖
+
+### en
+- Mac in-app update: once downloaded, click "Install and Relaunch"; the app quits, replaces itself and reopens, with no installer to drag
+
+### ru
+- Обновление на Mac внутри приложения: после загрузки нажмите «Установить и перезапустить» — приложение закроется, обновится и откроется снова, без перетаскивания
+
 ## 1.0.9
 
 ### zh

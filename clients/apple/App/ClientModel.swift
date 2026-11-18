@@ -276,7 +276,8 @@ import ServiceManagement
             do {
                 let file=try await job.run()
                 Journal.add("update: done");downloading=false;downloader=nil
-                if !connected {installUpdate(file)}
+                // The Mac waits for "Install and Relaunch" on the banner; other builds open the installer as before.
+                if !connected && !Self.installsInPlace {installUpdate(file)}
             } catch {
                 downloading=false;downloader=nil
                 let reason:String
@@ -286,9 +287,28 @@ import ServiceManagement
         }
     }
     func cancelUpdate() {downloader?.cancel()}
-    /// Opens the verified DMG: the user drags the new version over the old one.
+    /// Whether "Install and Relaunch" replaces the app in place (signed Mac build in a writable folder).
+    static var installsInPlace:Bool {
+        #if os(macOS)
+        return MacUpdater.canInstall
+        #else
+        return false
+        #endif
+    }
+    /// Mac: swaps in the verified new app and relaunches it (MacUpdater); when that is not possible (unsigned build,
+    /// read-only folder, unexpected image) it opens the DMG so the user can drag the new version over the old one.
     func installUpdate(_ file:URL) {
         #if os(macOS)
+        if Self.installsInPlace {
+            do {
+                try MacUpdater.install(dmg:file)
+                Journal.add("update: installing, relaunching")
+                NSApp.terminate(nil)
+                return
+            } catch {
+                Journal.add("update: in-place install failed (\(error)), opening the installer")
+            }
+        }
         NSWorkspace.shared.open(file)
         #endif
     }
