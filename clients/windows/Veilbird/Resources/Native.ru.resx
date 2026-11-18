@@ -135,10 +135,17 @@
   <data name="enter_email" xml:space="preserve"><value>Введите почту</value></data>
   <data name="enter_password" xml:space="preserve"><value>Введите пароль</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Введите почту и пароль.</value></data>
+  <data name="exposed_detail" xml:space="preserve"><value>Это сейчас видно всем</value></data>
+  <data name="exposed_status" xml:space="preserve"><value>Открыто</value></data>
+  <data name="file_device" xml:space="preserve"><value>Устройство</value></data>
+  <data name="file_language" xml:space="preserve"><value>Язык</value></data>
+  <data name="file_public_ip" xml:space="preserve"><value>Внешний IP</value></data>
+  <data name="file_time_zone" xml:space="preserve"><value>Часовой пояс</value></data>
   <data name="finding_best_route" xml:space="preserve"><value>Подбираем лучший маршрут · Нажмите, чтобы отменить</value></data>
   <data name="forgot_password" xml:space="preserve"><value>Забыли пароль?</value></data>
   <data name="got_it" xml:space="preserve"><value>Понятно</value></data>
   <data name="hide_password" xml:space="preserve"><value>Скрыть пароль</value></data>
+  <data name="hold_to_reveal" xml:space="preserve"><value>Удерживайте, чтобы увидеть</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Неверная почта или пароль.</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>Некорректный ответ сервера. Повторите позже.</value></data>
   <data name="kill_switch" xml:space="preserve"><value>Блокировка без VPN</value></data>
@@ -221,7 +228,16 @@
   <data name="routing_smart" xml:space="preserve"><value>Умная</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>Сайты материкового Китая напрямую, остальное через TrackNothing</value></data>
   <data name="running_in_tray" xml:space="preserve"><value>TrackNothing работает в трее. Нажмите на значок, чтобы переключить.</value></data>
+  <data name="seal_action" xml:space="preserve"><value>Нажмите, чтобы скрыть</value></data>
+  <data name="sealed_status" xml:space="preserve"><value>Скрыто</value></data>
+  <data name="sealing_detail" xml:space="preserve"><value>Запечатываем…</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>Поиск локаций или регионов</value></data>
+  <data name="section_account" xml:space="preserve"><value>§04 Владелец</value></data>
+  <data name="section_activity" xml:space="preserve"><value>§03 Активность</value></data>
+  <data name="section_check" xml:space="preserve"><value>§05 Проверка</value></data>
+  <data name="section_locations" xml:space="preserve"><value>§02 Локации</value></data>
+  <data name="section_sign_in" xml:space="preserve"><value>§00 Вход</value></data>
+  <data name="section_status" xml:space="preserve"><value>§01 Статус</value></data>
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>Защищённое хранилище недоступно. Разблокируйте устройство и повторите.</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>Самая быстрая локация, при сбое — следующая</value></data>
   <data name="send_reset_link" xml:space="preserve"><value>Отправить</value></data>
@@ -271,6 +287,7 @@
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>Не удалось подключиться. Проверьте сеть и повторите.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>Сервис недоступен. Проверьте сеть и повторите.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>Сервис недоступен. Проверьте сеть или обратитесь к администратору.</value></data>
+  <data name="unseal_action" xml:space="preserve"><value>Скрыто</value></data>
   <data name="up_to_date" xml:space="preserve"><value>Актуальная версия</value></data>
   <data name="update_action" xml:space="preserve"><value>Обновить</value></data>
   <data name="update_allow_installs" xml:space="preserve"><value>Разрешите TrackNothing устанавливать обновления, затем вернитесь и снова нажмите «Обновить».</value></data>
