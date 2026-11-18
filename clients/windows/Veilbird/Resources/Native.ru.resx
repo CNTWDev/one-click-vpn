@@ -229,7 +229,7 @@
   <data name="routing_smart" xml:space="preserve"><value>Умная</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>Сайты материкового Китая напрямую, остальное через TrackNothing</value></data>
   <data name="running_in_tray" xml:space="preserve"><value>TrackNothing работает в трее. Нажмите на значок, чтобы переключить.</value></data>
-  <data name="seal_action" xml:space="preserve"><value>Нажмите, чтобы скрыть</value></data>
+  <data name="seal_action" xml:space="preserve"><value>Подключиться</value></data>
   <data name="sealed_status" xml:space="preserve"><value>Скрыто</value></data>
   <data name="sealing_detail" xml:space="preserve"><value>Запечатываем…</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>Поиск локаций или регионов</value></data>
@@ -290,7 +290,7 @@
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>Не удалось подключиться. Проверьте сеть и повторите.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>Сервис недоступен. Проверьте сеть и повторите.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>Сервис недоступен. Проверьте сеть или обратитесь к администратору.</value></data>
-  <data name="unseal_action" xml:space="preserve"><value>Скрыто</value></data>
+  <data name="unseal_action" xml:space="preserve"><value>Отключиться</value></data>
   <data name="up_to_date" xml:space="preserve"><value>Актуальная версия</value></data>
   <data name="update_action" xml:space="preserve"><value>Обновить</value></data>
   <data name="update_allow_installs" xml:space="preserve"><value>Разрешите TrackNothing устанавливать обновления, затем вернитесь и снова нажмите «Обновить».</value></data>
@@ -330,7 +330,7 @@
   <data name="vpn_connection" xml:space="preserve"><value>VPN-подключение</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Новое оформление «Лунный ореол»: мягкий свет от жемчужного до розового; переключается на экране входа (вверху справа) или в разделе «Аккаунт › Оформление»</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Кнопка подключения на главной заметнее, называется «Подключиться» / «Отключиться», а на Android всегда видна внизу экрана, даже на маленьких телефонах</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>

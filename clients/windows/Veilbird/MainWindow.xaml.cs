@@ -956,8 +956,9 @@ public partial class MainWindow : Window {
             var on=state==RingState.Connected;
             actionLabel.Text=L10n.Text(state switch {RingState.Connected=>"unseal_action",RingState.Connecting=>"sealing_detail",RingState.Failed=>"retry_action",_=>"seal_action"});
             actionButton.Foreground=on?Look.Accent:Look.Text;
-            actionButton.Background=on?Look.AccentWash:Brushes.Transparent;
-            actionButton.BorderBrush=on?Look.AccentLine:Look.Hex("#3DEDE7DF");
+            var ink=((SolidColorBrush)Look.Text).Color;
+            actionButton.Background=on?Look.AccentWash:new SolidColorBrush(Color.FromArgb(10,ink.R,ink.G,ink.B));
+            actionButton.BorderBrush=on?Look.AccentLine:new SolidColorBrush(Color.FromArgb(120,ink.R,ink.G,ink.B));
             AutomationProperties.SetName(actionButton,L10n.Text(state switch {RingState.Idle=>"connect_action",RingState.Failed=>"retry_action",RingState.Connecting=>"cancel",_=>"disconnect_action"}));
             actionDot.Fill=seal?Look.Accent:Look.Hex("#59EDE7DF");
             actionDot.BeginAnimation(OpacityProperty,null);actionDot.Opacity=1;

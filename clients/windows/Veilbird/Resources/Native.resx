@@ -229,7 +229,7 @@
   <data name="routing_smart" xml:space="preserve"><value>Smart</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>Sites in mainland China go direct, the rest through TrackNothing</value></data>
   <data name="running_in_tray" xml:space="preserve"><value>TrackNothing keeps running in the tray. Click the icon to switch.</value></data>
-  <data name="seal_action" xml:space="preserve"><value>Tap to seal</value></data>
+  <data name="seal_action" xml:space="preserve"><value>Connect</value></data>
   <data name="sealed_status" xml:space="preserve"><value>Hidden</value></data>
   <data name="sealing_detail" xml:space="preserve"><value>Sealing…</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>Search locations or regions</value></data>
@@ -290,7 +290,7 @@
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>Unable to connect. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>Unable to reach the service. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_or" xml:space="preserve"><value>Unable to reach the service. Check your network or contact your administrator.</value></data>
-  <data name="unseal_action" xml:space="preserve"><value>Sealed</value></data>
+  <data name="unseal_action" xml:space="preserve"><value>Disconnect</value></data>
   <data name="up_to_date" xml:space="preserve"><value>Up to date</value></data>
   <data name="update_action" xml:space="preserve"><value>Update</value></data>
   <data name="update_allow_installs" xml:space="preserve"><value>Allow TrackNothing to install updates, then come back and tap Update now again.</value></data>
@@ -330,7 +330,7 @@ Valid until · </value></data>
   <data name="vpn_connection" xml:space="preserve"><value>VPN connection</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>New look, Moon halo: soft pearl to rose light; switch it on the sign-in screen (top right) or in Account › Appearance</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>The Connect button on the home page is easier to see, says Connect / Disconnect, and on Android stays at the bottom of the screen on small phones too</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows development build · VPN service integration in progress</value></data>

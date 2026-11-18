@@ -227,7 +227,7 @@
   <string name="routing_smart">Smart</string>
   <string name="routing_smart_detail">Sites in mainland China go direct, the rest through TrackNothing</string>
   <string name="running_in_tray">TrackNothing keeps running in the tray. Click the icon to switch.</string>
-  <string name="seal_action">Tap to seal</string>
+  <string name="seal_action">Connect</string>
   <string name="sealed_status">Hidden</string>
   <string name="sealing_detail">Sealing…</string>
   <string name="search_locations_or_regions">Search locations or regions</string>
@@ -288,7 +288,7 @@
   <string name="unable_to_connect_check_your_network_and_try_again">Unable to connect. Check your network and try again.</string>
   <string name="unable_to_reach_the_service_check_your_network_and">Unable to reach the service. Check your network and try again.</string>
   <string name="unable_to_reach_the_service_check_your_network_or">Unable to reach the service. Check your network or contact your administrator.</string>
-  <string name="unseal_action">Sealed</string>
+  <string name="unseal_action">Disconnect</string>
   <string name="up_to_date">Up to date</string>
   <string name="update_action">Update</string>
   <string name="update_allow_installs">Allow TrackNothing to install updates, then come back and tap Update now again.</string>
@@ -327,7 +327,7 @@
   <string name="vpn_connection">VPN connection</string>
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">New look, Moon halo: soft pearl to rose light; switch it on the sign-in screen (top right) or in Account › Appearance</string>
+  <string name="whats_new_notes">The Connect button on the home page is easier to see, says Connect / Disconnect, and on Android stays at the bottom of the screen on small phones too</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

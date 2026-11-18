@@ -384,8 +384,8 @@ struct ClientView:View {
                     BreathingDot(on:model.connected)
                 }.padding(.horizontal,18).frame(height:mac ? 44:54).contentShape(Rectangle())
                 .foregroundStyle(state == .connected ? VeilbirdStyle.accent:VeilbirdStyle.text)
-                .background(state == .connected ? VeilbirdStyle.accent.opacity(0.06):Color.clear)
-                .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(state == .connected ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.text.opacity(0.24),lineWidth:1))
+                .background(state == .connected ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.text.opacity(0.04))
+                .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(state == .connected ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.text.opacity(0.47),lineWidth:1))
             }.buttonStyle(.plain)
             .accessibilityLabel(L10n.text(state == .idle ? "connect_action":(state == .failed ? "retry_action":(state == .connecting ? "cancel":"disconnect_action"))))
             // Connected, the location row opens the connection check; otherwise, or while the chosen location does not
