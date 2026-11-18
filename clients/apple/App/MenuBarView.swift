@@ -117,11 +117,14 @@ struct MenuBarLabel:View {
     @ObservedObject var model:ClientModel
     @AppStorage(MenuBarLabel.preferenceKey) private var showSpeed=false
     var body:some View {
-        let symbol=model.connected ? "slash.circle.fill":"slash.circle"
-        if showSpeed,model.connected,model.since != nil,let image=Self.image(symbol:symbol,rx:model.rxRate,tx:model.txRate) {
+        // The ∅ mark as a template image: full strength while connected, half while not.
+        let on=model.connected
+        if showSpeed,on,model.since != nil,let image=Self.image(on:on,rx:model.rxRate,tx:model.txRate) {
             Image(nsImage:image).accessibilityLabel("TrackNothing "+L10n.text("connection_rates",Self.mbps(model.rxRate),Self.mbps(model.txRate)))
+        } else if let image=Self.mark(on:on) {
+            Image(nsImage:image).accessibilityLabel("TrackNothing")
         } else {
-            Image(systemName:symbol).accessibilityLabel("TrackNothing")
+            Image(systemName:on ? "slash.circle.fill":"slash.circle").accessibilityLabel("TrackNothing")
         }
     }
     /// "↑  820 Kb/s" / "↓ 12.4 Mb/s": bits per second like the rest of the app, the unit stepping up as needed.
@@ -135,9 +138,20 @@ struct MenuBarLabel:View {
         return arrow+" "+String(repeating:" ",count:max(0,4-number.count))+number+" "+L10n.text(unit)
     }
     private static func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
-    @MainActor static func image(symbol:String,rx:Int,tx:Int)->NSImage? {
+    private static func glyph(on:Bool)->some View {EmptySetMark().fill(Color.black.opacity(on ? 1:0.5)).frame(width:15,height:15)}
+    @MainActor private static var marks:[Bool:NSImage]=[:]
+    @MainActor static func mark(on:Bool)->NSImage? {
+        if let cached=marks[on] {return cached}
+        let renderer=ImageRenderer(content:glyph(on:on).padding(.horizontal,1))
+        renderer.scale=NSScreen.main?.backingScaleFactor ?? 2
+        guard let image=renderer.nsImage else {return nil}
+        image.isTemplate=true
+        marks[on]=image
+        return image
+    }
+    @MainActor static func image(on:Bool,rx:Int,tx:Int)->NSImage? {
         let content=HStack(spacing:4) {
-            Image(systemName:symbol).font(.system(size:14))
+            glyph(on:on)
             VStack(alignment:.trailing,spacing:-1) {
                 Text(verbatim:line("↑",tx))
                 Text(verbatim:line("↓",rx))

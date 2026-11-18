@@ -350,7 +350,7 @@ class ConnectionService : VpnService() {
     private fun notification(text: String): Notification {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val stop = PendingIntent.getService(this, 1, Intent(this, ConnectionService::class.java).setAction("disconnect"), PendingIntent.FLAG_IMMUTABLE)
-        return Notification.Builder(this, "vpn").setContentTitle("TrackNothing").setContentText(text).setSmallIcon(android.R.drawable.ic_lock_lock).setContentIntent(open).setOngoing(true).addAction(Notification.Action.Builder(null, L10n.text(R.string.disconnect_status), stop).build()).build()
+        return Notification.Builder(this, "vpn").setContentTitle("TrackNothing").setContentText(text).setSmallIcon(R.drawable.ic_stat_mark).setContentIntent(open).setOngoing(true).addAction(Notification.Action.Builder(null, L10n.text(R.string.disconnect_status), stop).build()).build()
     }
     @Synchronized private fun stopConnection(message: Int) {
         if (stopping) return

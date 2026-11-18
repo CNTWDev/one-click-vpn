@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MARK_CELLS, cellsPath } from "../../shared/brand";
+import { MARK_PATH } from "../../shared/brand";
 
 /** Cells one cell wide on a circle of `radius` in an n×n grid: the clients' connect ring (136 dots at 41/18). */
 function ringCells(n: number, radius: number) {
@@ -8,8 +8,7 @@ function ringCells(n: number, radius: number) {
   return cells;
 }
 // The mark sits in the middle of the ring at 80/246 of its width, as in the apps.
-const MARK_SCALE = 41 * 80 / 246 / 16;
-const MARK_PATH = cellsPath(MARK_CELLS);
+const MARK_SCALE = 41 * 80 / 246 / 84;
 
 const RING_CELLS = ringCells(41, 18);
 /**
@@ -21,7 +20,7 @@ export function HeroRing() {
     <svg viewBox="0 0 41 41" shapeRendering="crispEdges">
       {RING_CELLS.map(([x, y], index) => <rect key={index} x={x} y={y} width={0.75} height={0.75}
         className={index % 13 === 0 ? "twinkle" : undefined} style={index % 13 === 0 ? { animationDelay: `${-((x * 37 + y * 11) % 6000)}ms` } : undefined} />)}
-      <path d={MARK_PATH} transform={`translate(${20.5 - 8 * MARK_SCALE} ${20.5 - 8 * MARK_SCALE}) scale(${MARK_SCALE})`} />
+      <path d={MARK_PATH} shapeRendering="geometricPrecision" transform={`translate(${20.5 - 50 * MARK_SCALE} ${20.5 - 50 * MARK_SCALE}) scale(${MARK_SCALE})`} />
     </svg>
   </span>;
 }
