@@ -301,7 +301,7 @@ class MainActivity : Activity() {
         root.addView(progress, LinearLayout.LayoutParams(-1, 2.dp))
         root.addView(ScrollView(this).apply { isFillViewport = true; overScrollMode = View.OVER_SCROLL_NEVER; addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
         // Kept outside the scrolling page, so the home's one action is always on screen however short the phone is.
-        dock = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 0, side, 12.dp) }.also { root.addView(it, LinearLayout.LayoutParams(-1, -2)) }
+        dock = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 0, side, 0) }.also { root.addView(it, LinearLayout.LayoutParams(-1, -2)) }
         (space.parent as? ViewGroup)?.removeView(space)
         setContentView(FrameLayout(this).apply { setBackgroundColor(Palette.ground); addView(space, FrameLayout.LayoutParams(-1, -1)); addView(root, FrameLayout.LayoutParams(-1, -1)) })
         val signedIn = api.secret("token") != null
@@ -594,7 +594,7 @@ class MainActivity : Activity() {
             actionDot = View(this@MainActivity).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Palette.alpha(Palette.text, 90)) } }
                 .also { addView(it, LinearLayout.LayoutParams(6.dp, 6.dp)) }
             setOnClickListener { if (!busy) toggleConnection() }
-        }.also { dock?.addView(it, LinearLayout.LayoutParams(-1, 54.dp)) }
+        }.also { dock?.addView(it, LinearLayout.LayoutParams(-1, 54.dp).apply { topMargin = 4.dp; bottomMargin = 12.dp }) }
         // Connected, the location row opens the connection check; otherwise, or while the chosen location does not
         // answer, it opens the location list (picking one there reconnects to it).
         val node = row(64).apply { background = pressable(Palette.surface, 4); contentDescription = L10n.text(R.string.tap_to_change)
