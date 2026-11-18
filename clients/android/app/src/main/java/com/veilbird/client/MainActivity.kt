@@ -80,14 +80,22 @@ class MainActivity : Activity() {
     // The last account summary, so pages show usage at once and refresh it quietly.
     private var accountData: JSONObject? = null
     // Connect page views that the once-a-second refresh updates.
-    private var ring: ConnectRing? = null
+    private var stamp: View? = null
+    private var action: View? = null
+    private var actionLabel: TextView? = null
+    private var actionDot: View? = null
+    private var scan: ScanLine? = null
+    private var fileLines: List<SealedText>? = null
+    // Whether the file was last shown sealed; null before the first show on a page (which does not animate).
+    private var sealedShown: Boolean? = null
+    private var shownState: LinkState? = null
+    private var visitorIp: String? = null
     private var stateTitle: TextView? = null
     private var stateDot: View? = null
     private var stateDetail: TextView? = null
     private var stateTimer: TextView? = null
     private var stateRates: TextView? = null
     private var accountDot: View? = null
-    private var stream: DataStream? = null
     private var nodeTitle: TextView? = null
     private var nodeDetail: TextView? = null
     private var nodeBadge: FrameLayout? = null
@@ -148,12 +156,17 @@ class MainActivity : Activity() {
         }
     }
 
-    // ---- Building blocks: one radius scale (12 controls, 16 cards), one palette, one type scale.
+    // ---- Building blocks: one radius (nearly square), one palette, one type scale.
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
     // A "surface" block is drawn as a hairline outline on the ground (same as the Portal and Console cards).
+    // Corners are nearly square (at most 4dp) like the sheets of a file; an "accent" control is an amber outline.
     private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
-        if (color == Palette.surface) { setColor(Color.TRANSPARENT); setStroke(1.dp, Palette.edge) } else setColor(color)
-        cornerRadius = radius.dp.toFloat()
+        when (color) {
+            Palette.surface -> { setColor(Color.TRANSPARENT); setStroke(1.dp, Palette.edge) }
+            Palette.accent -> { setColor(Palette.alpha(Palette.accent, 15)); setStroke(1.dp, Palette.alpha(Palette.accent, 180)) }
+            else -> setColor(color)
+        }
+        cornerRadius = minOf(radius, 4).dp.toFloat()
     }
     private fun pressable(color: Int, radius: Int): Drawable =
         RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.text, 22)), if (color == Color.TRANSPARENT) null else rounded(color, radius), rounded(Color.WHITE, radius))
@@ -236,9 +249,12 @@ class MainActivity : Activity() {
         addView(chevron()); contentDescription = if (value.isEmpty()) title else "$title: $value"
         setOnClickListener { if (!busy) onClick() }
     }
-    private fun pageTitle(title: String, trailing: View? = null) {
+    /** A main page opens like a sheet of the file: the file header, its § number, then the title. */
+    private fun pageTitle(title: String, trailing: View? = null, section: Int? = null) {
+        fileHeader()
+        section?.let { add(sectionLabel(it), top = 14) }
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 0, 0) }
-        header.addView(text(title, 28f, Palette.text, 600).apply { isFocusable = true; accessibilityHeading() }, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(text(title, 30f, Palette.text, 300).apply { isFocusable = true; accessibilityHeading(); maxLines = 1; ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
         trailing?.let { header.addView(it) }
         add(header, height = 56.dp, bottom = 8)
     }
@@ -272,7 +288,7 @@ class MainActivity : Activity() {
     // ---- Pages
     private fun render() {
         banner = null; updateRowValue = null; onNodes = null; onMeasured = null
-        ring = null; stateTitle = null; stateDot = null; stateDetail = null; stateTimer = null; stateRates = null; accountDot = null; stream = null; nodeTitle = null; nodeDetail = null; nodeBadge = null
+        stamp = null; action = null; actionLabel = null; actionDot = null; scan = null; fileLines = null; stateTitle = null; stateDot = null; stateDetail = null; stateTimer = null; stateRates = null; accountDot = null; nodeTitle = null; nodeDetail = null; nodeBadge = null
         rateBars = null; switchNote = null; switchText = null; activityBody = null
         val side = maxOf(20.dp, (resources.displayMetrics.widthPixels - 560.dp) / 2)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 4.dp, side, 20.dp) }
@@ -303,7 +319,7 @@ class MainActivity : Activity() {
         handler.removeCallbacks(refresh); if (visible) handler.post(refresh)
     }
     private fun tabBar() = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(140, 6, 8, 12))
+        orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(140, 8, 8, 7))
         addView(View(this@MainActivity).apply { setBackgroundColor(Palette.hairline) }, LinearLayout.LayoutParams(-1, 1))
         val tabs = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12.dp, 6.dp, 12.dp, 6.dp) }
         for ((tab, title, res) in listOf(Triple("connect", R.string.connect_tab, R.drawable.ic_tab_connect), Triple("nodes", R.string.locations, R.drawable.ic_tab_nodes), Triple("activity", R.string.activity_title, R.drawable.ic_tab_activity), Triple("account", R.string.account, R.drawable.ic_tab_account))) {
@@ -324,21 +340,21 @@ class MainActivity : Activity() {
     }
     // ---- Activity: this connection's open connections and where its traffic went. Kept by the core in memory while
     // connected, forgotten on disconnect; nothing is stored or sent.
-    private val directColor = Color.rgb(84, 92, 108)
+    private val directColor = Color.rgb(97, 90, 80)
     private fun activity() {
-        pageTitle(L10n.text(R.string.activity_title))
+        pageTitle(L10n.text(R.string.activity_title), section = R.string.section_activity)
         add(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 0, 0)
-            addView(View(this@MainActivity).apply { setBackgroundColor(Color.rgb(96, 119, 74)) }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 8.dp })
+            addView(View(this@MainActivity).apply { setBackgroundColor(Color.rgb(111, 90, 63)) }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 8.dp })
             addView(text(L10n.text(R.string.activity_local_only), 12f, Palette.faint).apply { maxLines = 2 }, LinearLayout.LayoutParams(0, -2, 1f))
         }, top = -6, bottom = 14)
         add(LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; setPadding(2.dp, 2.dp, 2.dp, 2.dp); background = rounded(Color.rgb(19, 22, 28), 12)
+            orientation = LinearLayout.HORIZONTAL; setPadding(2.dp, 2.dp, 2.dp, 2.dp); background = rounded(Color.rgb(23, 21, 19), 12)
             for ((key, title) in listOf("conns" to R.string.activity_connections, "rank" to R.string.activity_ranking)) {
                 val selected = key == activityTab
                 addView(text(L10n.text(title), 13f, if (selected) Palette.text else Palette.secondary, 500).apply {
                     gravity = Gravity.CENTER; maxLines = 1
-                    background = if (selected) rounded(Color.rgb(40, 46, 56), 10) else pressable(Color.TRANSPARENT, 10)
+                    background = if (selected) rounded(Color.rgb(48, 45, 40), 10) else pressable(Color.TRANSPARENT, 10)
                     contentDescription = L10n.text(title) + if (selected) L10n.text(R.string.current_page) else ""
                     setOnClickListener { if (!selected) { activityTab = key; render() } }
                 }, LinearLayout.LayoutParams(0, -1, 1f))
@@ -379,7 +395,7 @@ class MainActivity : Activity() {
                 val count = when (key) { "proxy" -> proxied; "direct" -> all.size - proxied; else -> all.size }
                 addView(LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(12.dp, 0, 12.dp, 0)
-                    background = GradientDrawable().apply { cornerRadius = 8.dp.toFloat(); setStroke(1.dp, if (selected) Palette.accent else Color.rgb(36, 42, 53)) }
+                    background = GradientDrawable().apply { cornerRadius = 8.dp.toFloat(); setStroke(1.dp, if (selected) Palette.accent else Color.rgb(44, 41, 36)) }
                     if (color != null) addView(square(color).apply { (layoutParams as LinearLayout.LayoutParams).marginEnd = 6.dp })
                     addView(text(L10n.text(title), 13f, if (selected) Palette.text else Palette.secondary))
                     addView(text(L10n.number(count), 11f, if (selected) Palette.text else Palette.secondary).apply { typeface = Typeface.MONOSPACE },
@@ -404,10 +420,10 @@ class MainActivity : Activity() {
                     addView(text(c.optString("host"), 15f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.MIDDLE })
                     addView(text(route, 12f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
                 }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(text(rate(speed), 12f, if (speed > 0) Palette.text else Color.rgb(112, 120, 134)).apply { typeface = Typeface.MONOSPACE; maxLines = 1 },
+                addView(text(rate(speed), 12f, if (speed > 0) Palette.text else Color.rgb(126, 117, 105)).apply { typeface = Typeface.MONOSPACE; maxLines = 1 },
                     LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
             })
-            body.addView(View(this).apply { setBackgroundColor(Color.rgb(21, 25, 31)) }, LinearLayout.LayoutParams(-1, 1))
+            body.addView(View(this).apply { setBackgroundColor(Color.rgb(26, 24, 22)) }, LinearLayout.LayoutParams(-1, 1))
         }
         if (shown.isEmpty()) body.addView(text(L10n.text(R.string.activity_nothing), 13f, Palette.secondary), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 16.dp; marginStart = 4.dp })
     }
@@ -480,13 +496,33 @@ class MainActivity : Activity() {
         if (announcement.isNotBlank()) add(text(announcement, 14f, Palette.secondary).apply { background = rounded(Palette.surface, 16); setPadding(16.dp, 14.dp, 16.dp, 14.dp) }, top = 4, bottom = 8)
     }
 
-    /** One ring, one location row, one line of usage: everything needed to connect, on one screen. */
-    private fun home() {
+    /** The file header on every main page: mark and name on the left, the account's file number on the right. */
+    private fun fileHeader() {
         add(LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 0, 0)
-            addView(PixelMark(this@MainActivity), LinearLayout.LayoutParams(22.dp, 22.dp).apply { marginEnd = 10.dp })
-            addView(wordmark(18f))
-        }, height = 48.dp)
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 4.dp, 0)
+            addView(PixelMark(this@MainActivity), LinearLayout.LayoutParams(18.dp, 18.dp).apply { marginEnd = 10.dp })
+            addView(wordmark(14f).apply { setTextColor(Palette.secondary) }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(mono("№ " + fileNumber(), 11f, Palette.faint))
+        }, height = 44.dp)
+        add(View(this).apply { setBackgroundColor(Palette.hairline) }, height = 1, bottom = 4)
+    }
+    private fun mono(value: String, size: Float, color: Int) = text(value, size, color).apply { typeface = Typeface.MONOSPACE; letterSpacing = 0.08f; maxLines = 1 }
+    private fun sectionLabel(res: Int) = mono(L10n.text(res), 11f, Palette.faint).apply { setPadding(4.dp, 0, 0, 0) }
+    /** A short, stable file number for this account (same rule as the Portal's), not an id. */
+    private fun fileNumber(): String {
+        val seed = accountData?.optString("email").orEmpty().ifEmpty { api.secret("token")?.take(12).orEmpty() }
+        var hash = 7L
+        for (c in seed) hash = (hash * 31 + c.code) and 0xFFFFFFFFL
+        return String.format(java.util.Locale.ROOT, "%04d", hash % 10000)
+    }
+
+    /**
+     * The connect page as a file: its state, four lines of what anyone can see about this phone right now, one
+     * action, then the location and usage. Connecting seals the file (a line of light sweeps down and each line turns
+     * into dots, the lamp above goes out); disconnecting sweeps back up and opens it.
+     */
+    private fun home() {
+        fileHeader()
         notices()
         switchNote = row(48).apply {
             setPadding(16.dp, 0, 4.dp, 0); background = rounded(Palette.surface, 12); visibility = View.GONE
@@ -498,50 +534,90 @@ class MainActivity : Activity() {
                 setOnClickListener { dismissedSwitch = ConnectionStateStore.switchedFrom; showState() }
             }, LinearLayout.LayoutParams(44.dp, 44.dp))
         }.also { add(it, top = 4) }
-        // Notes that come and go above the ring (update, location switch) slide the page smoothly instead of snapping it.
+        // Notes that come and go above the file (update, location switch) slide the page smoothly instead of snapping it.
         if (ValueAnimator.areAnimatorsEnabled()) content.layoutTransition = LayoutTransition().apply { setDuration(220); enableTransitionType(LayoutTransition.CHANGING) }
+        spacer(0.6f)
+        add(sectionLabel(R.string.section_status), top = 12, bottom = 8)
+        // The state block has one height in every state, so nothing below it moves when a connection comes up or goes
+        // down: what only exists while connected fades in and out of space that is always reserved.
+        val titleRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 4.dp, 0) }
+        stateTitle = text("", 32f, Palette.text, 300).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END; letterSpacing = -0.01f }
+            .also { titleRow.addView(it, LinearLayout.LayoutParams(0, -2, 1f)) }
+        stamp = text("SEALED", 11f, Palette.accent, 600).apply {
+            typeface = Typeface.MONOSPACE; letterSpacing = 0.22f; setPadding(8.dp, 4.dp, 6.dp, 4.dp); rotation = -6f; alpha = 0f; visibility = View.INVISIBLE
+            background = GradientDrawable().apply { setStroke(1.dp, Palette.alpha(Palette.accent, 200)); cornerRadius = 2.dp.toFloat() }
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }.also { titleRow.addView(it, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 12.dp }) }
+        add(titleRow, height = sp(46f))
+        val slot = FrameLayout(this).apply { setPadding(4.dp, 0, 4.dp, 0) }
+        stateTimer = text("", 15f, Palette.text).apply { typeface = Typeface.MONOSPACE; fontFeatureSettings = "tnum"; letterSpacing = 0.06f; maxLines = 1; alpha = 0f; visibility = View.INVISIBLE }
+            .also { slot.addView(it, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL)) }
+        stateDetail = text("", 13f, Palette.secondary).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
+            .also { slot.addView(it, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL)) }
+        add(slot, height = sp(36f), top = 2)
+        // The file itself: what any site or app on this network can read about this phone.
+        val file = FrameLayout(this)
+        val lines = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val values = listOf(
+            R.string.file_public_ip to (visitorIp ?: "···"),
+            R.string.file_device to "${Build.MODEL} · Android ${Build.VERSION.RELEASE}",
+            R.string.file_time_zone to zoneLabel(),
+            R.string.file_language to L10n.locale.toLanguageTag(),
+        )
+        fileLines = values.mapIndexed { i, (label, value) ->
+            lines.addView(View(this).apply { setBackgroundColor(Palette.hairline) }, LinearLayout.LayoutParams(-1, 1))
+            val line = SealedText(this).apply { this.value = value; ellipsize = TextUtils.TruncateAt.END }
+            lines.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 4.dp, 0)
+                addView(mono(L10n.text(label), 10f, Palette.faint).apply { ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(96.dp, -2))
+                addView(line, LinearLayout.LayoutParams(0, -2, 1f))
+                contentDescription = L10n.text(label)
+            }, LinearLayout.LayoutParams(-1, 42.dp))
+            if (i == values.lastIndex) lines.addView(View(this).apply { setBackgroundColor(Palette.hairline) }, LinearLayout.LayoutParams(-1, 1))
+            line
+        }
+        file.addView(lines, FrameLayout.LayoutParams(-1, -2))
+        scan = ScanLine(this).also { file.addView(it, FrameLayout.LayoutParams(-1, -1)) }
+        add(file, top = 10)
+        stateRates = text("", 12f, Palette.secondary).apply { typeface = Typeface.MONOSPACE; maxLines = 1; ellipsize = TextUtils.TruncateAt.END; fontFeatureSettings = "tnum"; alpha = 0f; visibility = View.INVISIBLE; setPadding(4.dp, 0, 4.dp, 0) }
+            .also { add(it, height = sp(18f), top = 12) }
+        rateBars = RateBars(this).apply { alpha = 0f; visibility = View.INVISIBLE }.also { add(it, height = 40.dp, top = 6) }
         spacer(1f)
-        ring = ConnectRing(this).apply {
-            isClickable = true; isFocusable = true
-            setOnClickListener {
-                animate().scaleX(0.97f).scaleY(0.97f).setDuration(90).withEndAction { animate().scaleX(1f).scaleY(1f).setDuration(140).start() }.start()
-                if (!busy) toggleConnection()
-            }
-        }.also { add(it, height = 240.dp, width = 240.dp, gravity = Gravity.CENTER_HORIZONTAL) }
-        // The state block has one height in every state, so the ring never moves when a connection comes up or
-        // goes down: what only exists while connected (time, rates, chart) fades in and out of space that is
-        // always reserved, and the second line swaps between the time and a short message in the same slot.
-        val titleRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        stateDot = View(this).apply { setBackgroundColor(Palette.accent); alpha = 0f; visibility = View.INVISIBLE }
-        titleRow.addView(stateDot, LinearLayout.LayoutParams(8.dp, 8.dp).apply { marginEnd = 10.dp })
-        stateTitle = text("", 26f, Palette.text, 600).apply { maxLines = 1 }.also { titleRow.addView(it) }
-        // A matching gap on the right keeps the title itself centred whether the dot shows or not.
-        titleRow.addView(View(this), LinearLayout.LayoutParams(18.dp, 8.dp))
-        add(titleRow, top = 28)
-        val slot = FrameLayout(this)
-        stateTimer = text("", 34f).apply { gravity = Gravity.CENTER; typeface = Pixel.font(this@MainActivity); letterSpacing = 0.02f; maxLines = 1; alpha = 0f; visibility = View.INVISIBLE }
-            .also { slot.addView(it, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER)) }
-        stateDetail = text("", 14f, Palette.secondary).apply { gravity = Gravity.CENTER; maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
-            .also { slot.addView(it, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER)) }
-        add(slot, height = sp(48f), top = 6)
-        stateRates = text("", 13f, Palette.secondary).apply { gravity = Gravity.CENTER; maxLines = 1; ellipsize = TextUtils.TruncateAt.END; fontFeatureSettings = "tnum"; alpha = 0f; visibility = View.INVISIBLE }
-            .also { add(it, height = sp(20f), top = 2) }
-        rateBars = RateBars(this).apply { alpha = 0f; visibility = View.INVISIBLE }.also { add(it, height = 50.dp, width = 238.dp, top = 10, gravity = Gravity.CENTER_HORIZONTAL) }
-        stream = DataStream(this).also { add(it, top = 18) }
-        spacer(1f)
+        // One outlined action: grey and quiet while exposed, amber with a breathing dot while sealed.
+        action = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(18.dp, 0, 18.dp, 0); isClickable = true; isFocusable = true
+            actionLabel = text("", 15f, Palette.text, 500).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }.also { addView(it, LinearLayout.LayoutParams(0, -2, 1f)) }
+            actionDot = View(this@MainActivity).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Palette.alpha(Palette.text, 90)) } }
+                .also { addView(it, LinearLayout.LayoutParams(6.dp, 6.dp)) }
+            setOnClickListener { if (!busy) toggleConnection() }
+        }.also { add(it, height = 54.dp, top = 16) }
         // Connected, the location row opens the connection check; otherwise, or while the chosen location does not
         // answer, it opens the location list (picking one there reconnects to it).
-        val node = row(68).apply { background = pressable(Palette.surface, 16); contentDescription = L10n.text(R.string.tap_to_change)
+        val node = row(64).apply { background = pressable(Palette.surface, 4); contentDescription = L10n.text(R.string.tap_to_change)
             setOnClickListener { if (busy) return@setOnClickListener; if (ConnectionStateStore.active && ConnectionStateStore.since > 0 && ConnectionStateStore.messageId != R.string.location_retrying) connectionCheck() else { page = "nodes"; render() } } }
         nodeBadge = badge(null).also { node.addView(it) }
         val names = titles(" ", " "); node.addView(names)
         nodeTitle = names.getChildAt(0) as TextView; nodeDetail = names.getChildAt(1) as TextView
         node.addView(chevron())
-        add(node, top = 24)
+        add(node, top = 10)
         usageStrip()
+        sealedShown = null; shownState = null
         showState()
+        if (visitorIp == null) loadVisitorIp()
         // Just signed in: no saved list yet, so load it for the location's name and code.
         if (NodeCache.nodes(this) == null) refreshNodes()
+    }
+    private fun zoneLabel(): String {
+        val minutes = java.util.TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60000
+        return String.format(java.util.Locale.ROOT, "UTC%s%02d:%02d", if (minutes >= 0) "+" else "-", Math.abs(minutes) / 60, Math.abs(minutes) % 60)
+    }
+    /** The public address the service sees, read once while not connected (afterwards it would be the location's). */
+    private fun loadVisitorIp() {
+        if (ConnectionStateStore.active) return
+        Thread {
+            val ip = try { api.get("/api/v1/visitor").let { if (it.isNull("ip")) "—" else it.optString("ip") } } catch (_: Exception) { null }
+            runOnUiThread { visitorIp = ip; fileLines?.firstOrNull()?.value = ip ?: "—" }
+        }.start()
     }
     /** What this account has left (or used) and how long it runs: two quiet figures under the location. */
     private fun usageStrip() {
@@ -573,24 +649,52 @@ class MainActivity : Activity() {
     private fun failed() = !ConnectionStateStore.active && ConnectionStateStore.messageId !in listOf(R.string.not_connected, R.string.disconnected)
     private fun showState() {
         val active = ConnectionStateStore.active; val since = ConnectionStateStore.since
-        val state = when { active && since > 0 -> ConnectRing.State.CONNECTED; active -> ConnectRing.State.CONNECTING; failed() -> ConnectRing.State.FAILED; else -> ConnectRing.State.IDLE }
-        ring?.apply {
-            this.state = state
-            contentDescription = L10n.text(when (state) { ConnectRing.State.IDLE -> R.string.connect_action; ConnectRing.State.FAILED -> R.string.retry_action; ConnectRing.State.CONNECTING -> R.string.cancel; else -> R.string.disconnect_action })
+        val state = when { active && since > 0 -> LinkState.CONNECTED; active -> LinkState.CONNECTING; failed() -> LinkState.FAILED; else -> LinkState.IDLE }
+        val connected = state == LinkState.CONNECTED
+        space.lit = !active
+        if (state != shownState) action?.apply {
+            contentDescription = L10n.text(when (state) { LinkState.IDLE -> R.string.connect_action; LinkState.FAILED -> R.string.retry_action; LinkState.CONNECTING -> R.string.cancel; else -> R.string.disconnect_action })
+            background = GradientDrawable().apply {
+                cornerRadius = 2.dp.toFloat()
+                if (connected) { setColor(Palette.alpha(Palette.accent, 15)); setStroke(1.dp, Palette.alpha(Palette.accent, 180)) } else setStroke(1.dp, Palette.alpha(Palette.text, 60))
+            }.let { RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.text, 22)), it, null) }
         }
-        val connected = state == ConnectRing.State.CONNECTED
-        stateTitle?.swap(L10n.text(when (state) { ConnectRing.State.CONNECTED -> R.string.connected_status; ConnectRing.State.CONNECTING -> R.string.connecting; ConnectRing.State.FAILED -> R.string.connect_failed_title; else -> R.string.not_connected }))
-        stateDot?.fade(connected)
+        if (state != shownState) actionLabel?.apply {
+            swap(L10n.text(when (state) { LinkState.CONNECTED -> R.string.unseal_action; LinkState.CONNECTING -> R.string.sealing_detail; LinkState.FAILED -> R.string.retry_action; else -> R.string.seal_action }))
+            setTextColor(if (connected) Palette.accent else Palette.text)
+        }
+        if (state != shownState) actionDot?.apply {
+            (background as? GradientDrawable)?.setColor(if (active) Palette.accent else Palette.alpha(Palette.text, 90))
+            animate().cancel(); alpha = 1f
+            if (active && ValueAnimator.areAnimatorsEnabled()) breathe(this)
+        }
+        stateTitle?.swap(L10n.text(when (state) { LinkState.CONNECTED -> R.string.sealed_status; LinkState.CONNECTING -> R.string.connecting; LinkState.FAILED -> R.string.connect_failed_title; else -> R.string.exposed_status }))
+        // The file seals as soon as a connection starts, and opens again when it ends; the first show on a page is still.
+        val seal = active
+        if (sealedShown != seal) {
+            val moving = sealedShown != null && ValueAnimator.areAnimatorsEnabled()
+            fileLines?.let { lines ->
+                val n = lines.size
+                lines.forEachIndexed { i, line -> line.seal(seal, if (moving) (1300L * ((if (seal) i else n - 1 - i) + 0.5f) / n).toLong() else 0L, moving) }
+            }
+            if (moving) scan?.sweep(down = seal)
+            stamp?.apply {
+                animate().cancel()
+                if (!moving) { alpha = if (seal) 1f else 0f; visibility = if (seal) View.VISIBLE else View.INVISIBLE; scaleX = 1f; scaleY = 1f }
+                else if (seal) { visibility = View.VISIBLE; alpha = 0f; scaleX = 1.6f; scaleY = 1.6f; animate().alpha(1f).scaleX(1f).scaleY(1f).setStartDelay(1250).setDuration(260).setInterpolator(DecelerateInterpolator()).start() }
+                else animate().alpha(0f).setStartDelay(0).setDuration(200).withEndAction { visibility = View.INVISIBLE }.start()
+            }
+            sealedShown = seal
+        }
         if (connected) stateTimer?.text = DateUtils.formatElapsedTime((SystemClock.elapsedRealtime() - since) / 1000)
         stateTimer?.fade(connected); stateDetail?.fade(!connected)
-        stream?.running = state == ConnectRing.State.CONNECTING || state == ConnectRing.State.CONNECTED
-        if (state == ConnectRing.State.CONNECTED) {
+        if (state == LinkState.CONNECTED) {
             rxHistory.addLast(ConnectionStateStore.rxRate); txHistory.addLast(ConnectionStateStore.txRate)
             while (rxHistory.size > RateBars.COUNT) { rxHistory.removeFirst(); txHistory.removeFirst() }
         } else { rxHistory.clear(); txHistory.clear() }
         rateBars?.apply { fade(connected); set(rxHistory.toList(), txHistory.toList()) }
         val from = ConnectionStateStore.switchedFrom
-        val noteShown = state == ConnectRing.State.CONNECTED && from.isNotEmpty() && from != dismissedSwitch && from != ConnectionStateStore.node
+        val noteShown = state == LinkState.CONNECTED && from.isNotEmpty() && from != dismissedSwitch && from != ConnectionStateStore.node
         switchText?.text = if (noteShown) L10n.text(R.string.switched_location, from, ConnectionStateStore.node) else ""
         switchNote?.visibility = if (noteShown) View.VISIBLE else View.GONE
         // Rates change every second: set directly (fixed-width digits keep the line still); messages cross-fade.
@@ -598,11 +702,19 @@ class MainActivity : Activity() {
             else L10n.text(R.string.connection_rates, mbps(ConnectionStateStore.rxRate), mbps(ConnectionStateStore.txRate))
         stateRates?.fade(connected)
         if (!connected) stateDetail?.swap(when (state) {
-            ConnectRing.State.CONNECTING -> L10n.text(R.string.finding_best_route)
-            ConnectRing.State.FAILED -> ConnectionStateStore.message
-            else -> L10n.text(if (update?.mandatory == true) R.string.update_required_detail else R.string.tap_ring_to_connect)
+            LinkState.CONNECTING -> L10n.text(R.string.finding_best_route)
+            LinkState.FAILED -> ConnectionStateStore.message
+            else -> L10n.text(if (update?.mandatory == true) R.string.update_required_detail else R.string.exposed_detail)
         })
+        shownState = state
         showCurrentNode()
+    }
+    /** The action's dot breathes slowly while a connection is up; it stops when the view is gone or the state changes. */
+    private fun breathe(dot: View) {
+        if (!dot.isAttachedToWindow && dot.parent == null) return
+        dot.animate().alpha(0.35f).setDuration(1800).setInterpolator(android.view.animation.AccelerateDecelerateInterpolator()).withEndAction {
+            dot.animate().alpha(1f).setDuration(1800).withEndAction { if (ConnectionStateStore.active && actionDot === dot) breathe(dot) }.start()
+        }.start()
     }
     private fun showCurrentNode() {
         val title = nodeTitle ?: return; val badge = nodeBadge ?: return
@@ -650,7 +762,8 @@ class MainActivity : Activity() {
         notices()
         add(PixelMark(this), height = 96.dp, width = 96.dp, top = 48, gravity = Gravity.CENTER_HORIZONTAL)
         add(wordmark(30f).apply { gravity = Gravity.CENTER; accessibilityHeading() }, top = 22)
-        add(text(L10n.text(R.string.sign_in_tagline), 14f, Palette.secondary).apply { gravity = Gravity.CENTER }, top = 8, bottom = 44)
+        add(text(L10n.text(R.string.sign_in_tagline), 14f, Palette.secondary).apply { gravity = Gravity.CENTER }, top = 8, bottom = 36)
+        add(sectionLabel(R.string.section_sign_in), bottom = 12)
         val server = if (BuildConfig.API_ORIGIN.isEmpty()) {
             fieldLabel(L10n.text(R.string.server_address))
             add(field(L10n.text(R.string.server_address_url), api.origin, InputType.TYPE_TEXT_VARIATION_URI), height = 50.dp, bottom = 14) as EditText
@@ -704,11 +817,11 @@ class MainActivity : Activity() {
             addView(icon(R.drawable.ic_refresh, Palette.secondary, 20), FrameLayout.LayoutParams(20.dp, 20.dp, Gravity.CENTER))
             layoutParams = LinearLayout.LayoutParams(44.dp, 44.dp)
         }
-        pageTitle(L10n.text(R.string.locations), retest)
+        pageTitle(L10n.text(R.string.locations), retest, R.string.section_locations)
         routingChoice()
         val search = FrameLayout(this).also { add(it) }
         val automatic = selectedId.isEmpty()
-        // Selected = a lifted row and a lime tile; nothing is added, so the rows keep their layout.
+        // Selected = a lifted row and a amber tile; nothing is added, so the rows keep their layout.
         add(row(68).apply {
             background = pressable(if (automatic) Palette.raised else Palette.surface, 16)
             addView(badge(null, R.drawable.ic_sparkle, if (automatic) Palette.onAccent else Palette.accent).apply { if (automatic) background = rounded(Palette.accent, 8) })
@@ -898,7 +1011,7 @@ class MainActivity : Activity() {
             val states = lineStates(quality)
             val note = linesNote(quality)
             val selected = id == selectedId
-            // Selected = a lifted row, a lime tile and a bolder name; opened = a darker row (unless selected).
+            // Selected = a lifted row, a amber tile and a bolder name; opened = a darker row (unless selected).
             val rest = if (selected) Palette.raised else Color.TRANSPARENT
             val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = ColorDrawable(rest) }
             val detail = lineDetail(quality).apply { visibility = if (openNode == id && states != null) View.VISIBLE else View.GONE }
@@ -938,7 +1051,7 @@ class MainActivity : Activity() {
                             openNode = if (open) id else ""
                             if (previous.isNotEmpty() && previous != id) list.findViewWithTag<View>("lines:$previous")?.let { expand(it, false) }
                             expand(detail, open)
-                            item.background = ColorDrawable(if (open && !selected) Color.rgb(12, 15, 20) else rest)
+                            item.background = ColorDrawable(if (open && !selected) Color.rgb(16, 14, 13) else rest)
                         }
                     }, slot)
                     quality != null && !unreachable -> addView(FrameLayout(this@MainActivity).apply {
@@ -952,7 +1065,7 @@ class MainActivity : Activity() {
             }, LinearLayout.LayoutParams(-1, -2))
             detail.tag = "lines:$id"
             item.addView(detail, LinearLayout.LayoutParams(-1, -2))
-            if (openNode == id && states != null && !selected) item.background = ColorDrawable(Color.rgb(12, 15, 20))
+            if (openNode == id && states != null && !selected) item.background = ColorDrawable(Color.rgb(16, 14, 13))
             rows.add(item)
         }
         when {
@@ -990,17 +1103,30 @@ class MainActivity : Activity() {
         }.start()
     }
     private fun account() {
-        pageTitle(L10n.text(R.string.account))
+        pageTitle(L10n.text(R.string.account), section = R.string.section_account)
         withAccount { data ->
             val email = data.optString("email"); val name = data.optString("name").ifBlank { email }
             add(LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 4.dp, 0)
                 addView(text(name.take(1).uppercase(L10n.locale), 18f, Palette.accent, 600).apply {
-                    gravity = Gravity.CENTER; background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Palette.raised) }
+                    gravity = Gravity.CENTER; background = rounded(Palette.raised, 4)
                 }, LinearLayout.LayoutParams(48.dp, 48.dp).apply { marginEnd = 14.dp })
                 addView(LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.VERTICAL
-                    addView(text(email, 16f, Palette.text, 500).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
+                    // The address is sealed on screen; pressing and holding opens it for as long as the finger stays.
+                    addView(SealedText(this@MainActivity).apply {
+                        value = email; textSize = 15f; ellipsize = TextUtils.TruncateAt.END; seal(true, animate = false)
+                        contentDescription = email; isClickable = true
+                        @Suppress("ClickableViewAccessibility")
+                        setOnTouchListener { _, e ->
+                            when (e.actionMasked) {
+                                android.view.MotionEvent.ACTION_DOWN -> seal(false)
+                                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> seal(true)
+                            }
+                            false
+                        }
+                    }, LinearLayout.LayoutParams(-1, sp(22f)))
+                    addView(mono(L10n.text(R.string.hold_to_reveal), 10f, Palette.faint), LinearLayout.LayoutParams(-2, -2).apply { topMargin = 2.dp })
                     addView(text(L10n.text(R.string.account_valid_until, L10n.date(data.optString("expiresAt"))), 13f, Palette.secondary), LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
                 }, LinearLayout.LayoutParams(0, -2, 1f))
             }, top = 4)
@@ -1178,7 +1304,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL; setPadding(20.dp, 10.dp, 20.dp, 28.dp)
             background = GradientDrawable().apply { setColor(Palette.surface); val r = 24.dp.toFloat(); cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f) }
         }
-        box.addView(View(this).apply { background = rounded(Color.rgb(44, 50, 60), 2) }, LinearLayout.LayoutParams(36.dp, 4.dp).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        box.addView(View(this).apply { background = rounded(Color.rgb(52, 49, 43), 2) }, LinearLayout.LayoutParams(36.dp, 4.dp).apply { gravity = Gravity.CENTER_HORIZONTAL })
         box.addView(text(title, 17f, Palette.text, 600).apply { setPadding(4.dp, 0, 0, 0); accessibilityHeading() }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 18.dp; bottomMargin = 14.dp })
         box.addView(group(options.mapIndexed { i, option ->
             row().apply {
@@ -1187,7 +1313,7 @@ class MainActivity : Activity() {
                 contentDescription = option + if (i == checked) L10n.text(R.string.current_page) else ""
                 setOnClickListener { dialog.dismiss(); onPick(i) }
             }
-        }, color = Color.rgb(26, 30, 37)))
+        }, color = Color.rgb(31, 29, 26)))
         dialog.setContentView(android.widget.ScrollView(this).apply { isVerticalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER; addView(box) })
         dialog.show()
         dialog.window?.apply {
@@ -1210,7 +1336,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL; setPadding(20.dp, 10.dp, 20.dp, 24.dp)
             background = GradientDrawable().apply { setColor(Palette.surface); val r = 24.dp.toFloat(); cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f) }
         }
-        box.addView(View(this).apply { background = rounded(Color.rgb(44, 50, 60), 2) }, LinearLayout.LayoutParams(36.dp, 4.dp).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        box.addView(View(this).apply { background = rounded(Color.rgb(52, 49, 43), 2) }, LinearLayout.LayoutParams(36.dp, 4.dp).apply { gravity = Gravity.CENTER_HORIZONTAL })
         val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
         head.addView(text(L10n.text(R.string.check_title), 19f, Palette.text, 600).apply { accessibilityHeading() }, LinearLayout.LayoutParams(0, -2, 1f))
         val status = text("", 12f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
@@ -1230,7 +1356,7 @@ class MainActivity : Activity() {
         val local = leg(L10n.text(R.string.check_local), L10n.text(R.string.check_local_detail))
         val toNode = leg(L10n.text(R.string.check_node), nodeName)
         val web = leg(L10n.text(R.string.check_web), L10n.text(R.string.check_web_detail))
-        val verdict = text("", 14f).apply { background = rounded(Color.rgb(26, 30, 37), 12); setPadding(16.dp, 14.dp, 16.dp, 14.dp) }
+        val verdict = text("", 14f).apply { background = rounded(Color.rgb(31, 29, 26), 12); setPadding(16.dp, 14.dp, 16.dp, 14.dp) }
         box.addView(verdict, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12.dp })
         Directory.regions[nodeId]?.let { region ->
             box.addView(LinearLayout(this).apply {
@@ -1289,12 +1415,12 @@ class MainActivity : Activity() {
         speedHead.addView(elapsed)
         speedCard.addView(speedHead)
         val figure = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
-        val mbpsText = text("—", 44f, Color.rgb(58, 65, 77)).apply { typeface = Pixel.font(this@MainActivity); includeFontPadding = false; maxLines = 1 }
+        val mbpsText = text("—", 44f, Color.rgb(68, 63, 57)).apply { typeface = Pixel.font(this@MainActivity); includeFontPadding = false; maxLines = 1 }
         figure.addView(mbpsText, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 6.dp })
         figure.addView(text("Mbps", 13f, Palette.secondary).apply { typeface = Typeface.MONOSPACE }, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = 4.dp })
         speedCard.addView(figure, LinearLayout.LayoutParams(-1, 56.dp).apply { topMargin = 8.dp })
         val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val barCells = List(30) { View(this).apply { setBackgroundColor(Color.rgb(26, 31, 40)) }.also { bar.addView(it, LinearLayout.LayoutParams(0, -1, 1f).apply { if (bar.childCount > 0) marginStart = 2.dp }) } }
+        val barCells = List(30) { View(this).apply { setBackgroundColor(Color.rgb(32, 30, 27)) }.also { bar.addView(it, LinearLayout.LayoutParams(0, -1, 1f).apply { if (bar.childCount > 0) marginStart = 2.dp }) } }
         speedCard.addView(bar, LinearLayout.LayoutParams(-1, 6.dp).apply { topMargin = 12.dp })
         val stats = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         fun stat(title: String) = text("—", 14f).apply { typeface = Typeface.MONOSPACE; maxLines = 1 }.also { value ->
@@ -1316,11 +1442,11 @@ class MainActivity : Activity() {
             val elapsedMs = status.optLong("elapsedMs")
             val fraction = when (state) { "download" -> (elapsedMs / (seconds * 1000f)).coerceIn(0f, 1f); "done" -> 1f; else -> 0f }
             val filled = (fraction * 30).toInt()
-            barCells.forEachIndexed { i, v -> v.setBackgroundColor(if (i < filled) (if (state == "done") Palette.accent else Palette.secondary) else Color.rgb(26, 31, 40)) }
+            barCells.forEachIndexed { i, v -> v.setBackgroundColor(if (i < filled) (if (state == "done") Palette.accent else Palette.secondary) else Color.rgb(32, 30, 27)) }
             elapsed.text = if (state == "download" || state == "done") String.format(L10n.locale, "%.1f / %.1f s", minOf(elapsedMs, seconds * 1000L) / 1000.0, seconds.toDouble()) else "—"
             val mbps = status.optDouble("mbps", 0.0)
             mbpsText.text = if (state == "download" || state == "done") String.format(L10n.locale, "%.1f", mbps) else "—"
-            mbpsText.setTextColor(when (state) { "done" -> Palette.accent; "download" -> Palette.secondary; else -> Color.rgb(58, 65, 77) })
+            mbpsText.setTextColor(when (state) { "done" -> Palette.accent; "download" -> Palette.secondary; else -> Color.rgb(68, 63, 57) })
             val latency = status.optInt("latency", -1); val jitter = status.optInt("jitter", -1)
             latencyText.text = if (latency >= 0) L10n.text(R.string.latency_ms, L10n.number(latency)) else "—"
             jitterText.text = if (jitter >= 0) L10n.text(R.string.latency_ms, L10n.number(jitter)) else "—"
@@ -1360,7 +1486,7 @@ class MainActivity : Activity() {
             setOnClickListener { dialog.dismiss(); page = "nodes"; render() }
         }
         box.addView(other, LinearLayout.LayoutParams(-1, 48.dp).apply { topMargin = 12.dp })
-        val again = text(L10n.text(R.string.check_again), 15f).apply { gravity = Gravity.CENTER; background = pressable(Color.rgb(26, 30, 37), 12) }
+        val again = text(L10n.text(R.string.check_again), 15f).apply { gravity = Gravity.CENTER; background = pressable(Color.rgb(31, 29, 26), 12) }
         box.addView(again, LinearLayout.LayoutParams(-1, 48.dp).apply { topMargin = 10.dp })
         val ok = Palette.accent; val slow = Palette.fair; val bad = Palette.danger
         fun show(leg: Leg, ms: Int, limit: Int) {

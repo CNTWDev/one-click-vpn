@@ -1588,5 +1588,90 @@
     "zh": "用量",
     "en": "Data",
     "ru": "Трафик"
+  },
+  "exposed_status": {
+    "zh": "未隐匿",
+    "en": "Exposed",
+    "ru": "Открыто"
+  },
+  "sealed_status": {
+    "zh": "已隐匿",
+    "en": "Hidden",
+    "ru": "Скрыто"
+  },
+  "seal_action": {
+    "zh": "轻触封存",
+    "en": "Tap to seal",
+    "ru": "Нажмите, чтобы скрыть"
+  },
+  "unseal_action": {
+    "zh": "已封存",
+    "en": "Sealed",
+    "ru": "Скрыто"
+  },
+  "exposed_detail": {
+    "zh": "这些信息此刻对外可见",
+    "en": "Anyone can see this right now",
+    "ru": "Это сейчас видно всем"
+  },
+  "sealing_detail": {
+    "zh": "正在封存…",
+    "en": "Sealing…",
+    "ru": "Запечатываем…"
+  },
+  "file_public_ip": {
+    "zh": "出口 IP",
+    "en": "Public IP",
+    "ru": "Внешний IP"
+  },
+  "file_device": {
+    "zh": "设备",
+    "en": "Device",
+    "ru": "Устройство"
+  },
+  "file_time_zone": {
+    "zh": "时区",
+    "en": "Time zone",
+    "ru": "Часовой пояс"
+  },
+  "file_language": {
+    "zh": "语言",
+    "en": "Language",
+    "ru": "Язык"
+  },
+  "section_status": {
+    "zh": "§01 状态",
+    "en": "§01 Status",
+    "ru": "§01 Статус"
+  },
+  "section_locations": {
+    "zh": "§02 线路",
+    "en": "§02 Locations",
+    "ru": "§02 Локации"
+  },
+  "section_activity": {
+    "zh": "§03 活动",
+    "en": "§03 Activity",
+    "ru": "§03 Активность"
+  },
+  "section_account": {
+    "zh": "§04 持有人",
+    "en": "§04 Holder",
+    "ru": "§04 Владелец"
+  },
+  "section_check": {
+    "zh": "§05 体检",
+    "en": "§05 Check",
+    "ru": "§05 Проверка"
+  },
+  "section_sign_in": {
+    "zh": "§00 身份验证",
+    "en": "§00 Identify",
+    "ru": "§00 Вход"
+  },
+  "hold_to_reveal": {
+    "zh": "按住查看",
+    "en": "Hold to reveal",
+    "ru": "Удерживайте, чтобы увидеть"
   }
 }

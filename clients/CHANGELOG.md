@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.4
+
+### zh
+- 全新外观：每一页都像一份档案，暖黑底色、琥珀色光
+- 连接时，一道光扫过首页，你的出口 IP、设备、时区和语言逐行封存；断开时再逐行解封
+- 「我的」里邮箱默认加密显示，按住即可查看
+
+### en
+- A new look: every page is a sheet in a file, warm black with amber light
+- Connecting sends a line of light down the home page and seals your public IP, device, time zone and language line by line; disconnecting opens them again
+- Your email is hidden on the account page; press and hold to see it
+
+### ru
+- Новый облик: каждая страница как лист досье, тёплый чёрный и янтарный свет
+- При подключении полоса света проходит по главной и строка за строкой скрывает ваш IP, устройство, часовой пояс и язык; при отключении всё открывается снова
+- Почта на странице аккаунта скрыта; удерживайте, чтобы увидеть
+
 ## 1.0.3
 
 ### zh

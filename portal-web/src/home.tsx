@@ -13,6 +13,7 @@ import { QuotaBlocks, UsageCard, type Usage } from "./usage-card";
 import { AccountSubscription, useAccountSubscription } from "./account-subscription";
 import { OwnApps, platformNames } from "./own-apps";
 import { InlineError, Skeleton, Time, useToasts } from "./ui";
+import { fileNumber } from "./dossier";
 import "./home.css";
 
 type User = { email: string; displayName: string };
@@ -98,6 +99,7 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
   return <main className="dashboard home">
     {dialog}{toasts}
     <Topbar user={user} onLogout={onLogout} />
+    <p className="file-label home-sec home-sec-first">{t("§01 客户端")}</p>
     <section className={`home-start${ownApps ? "" : " solo"}`}>
       {ownApps && <OwnApps />}
       <AccountSubscription state={subscription} nodes={nodes} notify={notify} onLogout={onLogout} solo={!ownApps} />
@@ -106,6 +108,7 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
     {paused && <p className="callout warning home-access-notice" role="status">{access.state === "exhausted" ? t("流量已用完，暂时无法连接。请联系管理员增加流量。") : access.state === "expired" ? t("账号已到期，暂时无法连接。请联系管理员续期。") : t("账号暂未开通使用权限，请联系管理员。")}</p>}
     {!paused && tight ? <p className="callout warning home-access-notice" role="status">{runsOut !== null ? t("流量还剩 {0}%，按最近 7 天的用量大约 {1} 天后用完。", [share, runsOut]) : t("流量还剩 {0}%。", [share])}</p>
       : !paused && ending && <p className="callout warning home-access-notice" role="status">{t("账号还剩 {0} 天到期，到期后无法连接。请联系管理员续期。", [left ?? 0])}</p>}
+    <p className="file-label home-sec">{t("§02 账号")}</p>
     <section className="card home-stats" aria-label={t("账号概况")}>
       <div><small>{access?.state === "expired" ? t("已到期") : t("有效期至")}</small>{account ? account.expiresAt ? <strong className={`pixel-figure${ending ? " warning-text" : ""}`}>{isoDate(account.expiresAt)}</strong> : <strong>{t("长期有效")}</strong> : <Skeleton height={30} width="60%" />}
         {account?.expiresAt && <span className={`home-stat-note${ending ? " warning-text" : ""}`}>{ending ? t("还剩 {0} 天", [left ?? 0]) : date(account.expiresAt)}</span>}</div>
@@ -118,8 +121,10 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
           : account && <span className={`home-stat-note${crowded ? " warning-text" : ""}`}>{t("现在在线 {0} 处", [account.online.total])}</span>}</div>
     </section>
     {accountError && <InlineError message={accountError} onRetry={() => void loadAccount()} />}
+    <p className="file-label home-sec">{t("§03 用量")}</p>
     <UsageCard usage={usage} onLogout={onLogout} />
 
+    <p className="file-label home-sec">{t("§04 设备")}</p>
     <section className="card home-list" aria-labelledby="devices-title">
       <h2 id="devices-title">{t("我的设备")}</h2>
       {!account ? <ul><li><Skeleton height={36} /></li><li><Skeleton height={36} /></li></ul>
@@ -150,5 +155,5 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
 
 export function Topbar({ user, onLogout }: { user: User; onLogout: () => void }) {
   const { t } = useI18n();
-  return <header className="topbar"><Brand /><div className="topbar-tools"><PortalLanguagePicker /><div className="account" title={user.email}><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b></div><button type="button" className="ghost small" onClick={onLogout}>{t("退出")}</button></div></div></header>;
+  return <header className="topbar"><div className="topbar-file"><Brand /><span className="file-no">№ {fileNumber(user.email)}</span></div><div className="topbar-tools"><PortalLanguagePicker /><div className="account" title={user.email}><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><div><b>{user.displayName}</b></div><button type="button" className="ghost small" onClick={onLogout}>{t("退出")}</button></div></div></header>;
 }

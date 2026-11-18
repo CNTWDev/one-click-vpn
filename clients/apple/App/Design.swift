@@ -1,23 +1,27 @@
 import SwiftUI
 import CoreText
 
-/// The one palette of the app, shared with the Portal and the Console: flat cool black, hairline cards, lime only where it
-/// matters. Same values on every platform.
+/// The one palette of the app, shared with the Portal and the other clients: a warm near-black ground lit by one lamp,
+/// hairline sheets, and amber only for the light of the connect moment (scan line, seal, live state). Same values on
+/// every platform.
 enum VeilbirdStyle {
-    static let ground = Color(red:7/255,green:9/255,blue:13/255)
-    static let surface = Color(red:18/255,green:22/255,blue:29/255)
-    static let raised = Color(red:27/255,green:32/255,blue:41/255)
-    static let selected = Color(red:52/255,green:58/255,blue:70/255)
-    static let text = Color(red:234/255,green:238/255,blue:244/255)
-    static let secondary = Color(red:164/255,green:173/255,blue:187/255)
-    static let faint = Color(red:133/255,green:142/255,blue:156/255)
-    static let accent = Color(red:198/255,green:242/255,blue:110/255)
-    static let onAccent = Color(red:19/255,green:33/255,blue:10/255)
-    static let danger = Color(red:240/255,green:134/255,blue:114/255)
-    static let fair = Color(red:227/255,green:178/255,blue:85/255)
-    static let hairline = Color(red:234/255,green:238/255,blue:244/255).opacity(0.10)
-    /// Card outline: cards are a hairline on the ground, not a filled block.
-    static let edge = Color(red:220/255,green:228/255,blue:245/255).opacity(0.09)
+    static let ground = Color(red:8/255,green:7/255,blue:6/255)
+    static let surface = Color(red:23/255,green:21/255,blue:19/255)
+    static let raised = Color(red:33/255,green:31/255,blue:28/255)
+    static let selected = Color(red:46/255,green:43/255,blue:38/255)
+    static let text = Color(red:237/255,green:231/255,blue:223/255)
+    static let secondary = Color(red:163/255,green:155/255,blue:145/255)
+    static let faint = Color(red:149/255,green:139/255,blue:124/255)
+    static let accent = Color(red:224/255,green:164/255,blue:88/255)
+    /// Buttons are outlined, not filled: text on an "accent" control is the accent itself.
+    static let onAccent = Color(red:224/255,green:164/255,blue:88/255)
+    static let danger = Color(red:240/255,green:103/255,blue:90/255)
+    static let fair = Color(red:232/255,green:134/255,blue:106/255)
+    static let hairline = Color(red:237/255,green:231/255,blue:223/255).opacity(0.063)
+    /// Sheet outline: blocks are a hairline on the ground, not a filled card.
+    static let edge = Color(red:255/255,green:214/255,blue:160/255).opacity(0.09)
+    /// Lamp light and sealed dots.
+    static let light = Color(red:255/255,green:214/255,blue:160/255)
     #if os(macOS)
     static let mac = true
     #else
@@ -26,7 +30,8 @@ enum VeilbirdStyle {
     /// Body sizes: the Mac's controls are denser than the phone's.
     static let body:CGFloat = mac ? 13:17
     static let detail:CGFloat = mac ? 12:13
-    static let radius:CGFloat = 12
+    /// Nearly square, like the sheets of a file.
+    static let radius:CGFloat = 3
 }
 
 /// The pixel language shared by every TrackNothing client: the ∅ mark on a 16×16 grid, rings of square dots
@@ -64,7 +69,7 @@ struct EmptySetMark:Shape {
     func path(in rect:CGRect) -> Path {Pixel.markPath(in:rect)}
 }
 
-/// The mark alone, in lime: headers, the menu bar panel and sign-in.
+/// The mark alone, in amber: headers, the menu bar panel and sign-in.
 struct PixelMark:View {
     var size:CGFloat
     var color:Color=VeilbirdStyle.accent
@@ -77,92 +82,8 @@ struct Wordmark:View {
     var body:some View {Text(verbatim:"TRACKNOTHING").font(Pixel.font(size)).tracking(size*0.04).foregroundStyle(VeilbirdStyle.text).accessibilityLabel(Text(verbatim:"TrackNothing"))}
 }
 
+/// The connect page's four states.
 enum RingState {case idle,connecting,connected,failed}
-
-/// The connect button: a ring of square dots around the ∅ mark, over a faint halftone glow. Dim when idle,
-/// a comet of lit dots turning while connecting (held still under Reduce Motion), every dot lit once connected,
-/// and a dark ring with the mark in red after a failure.
-struct ConnectRing:View {
-    let state:RingState
-    var size:CGFloat=216
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private static let cells=Pixel.ring(41,radius:18)
-    var body:some View {
-        Group {
-            if state == .connecting && !reduceMotion {
-                TimelineView(.animation) {context in dots(head:context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy:1.6)/1.6)}
-            } else {dots(head:nil)}
-        }.frame(width:size,height:size).contentShape(Circle())
-    }
-    private func dots(head:Double?)->some View {
-        Canvas {context,area in
-            let side=min(area.width,area.height), left=(area.width-side)/2, top=(area.height-side)/2
-            let glow:Double={switch state {case .idle:return 0.06;case .connecting:return 0.13;case .connected:return 0.22;case .failed:return 0}}()
-            if glow>0 {
-                let step:CGFloat=6, cx=area.width/2, cy=area.height/2, reach=side*0.62
-                var y=cy.truncatingRemainder(dividingBy:step)
-                while y<area.height {
-                    var x=cx.truncatingRemainder(dividingBy:step)
-                    while x<area.width {
-                        let fade=1-hypot(x-cx,y-cy)/reach
-                        if fade>0 {context.fill(Path(ellipseIn:CGRect(x:x-0.9,y:y-0.9,width:1.8,height:1.8)),with:.color(VeilbirdStyle.accent.opacity(glow*min(1,fade*1.6))))}
-                        x+=step
-                    }
-                    y+=step
-                }
-            }
-            let cell=side/41, square=cell*0.83
-            for dot in Self.cells {
-                let color:Color
-                switch state {
-                case .idle:color=Color(red:34/255,green:40/255,blue:50/255)
-                case .failed:color=Color(red:42/255,green:34/255,blue:32/255)
-                case .connected:color=VeilbirdStyle.accent
-                case .connecting:
-                    if let head {
-                        // A comet: full at its head, fading over the next 38% of the turn.
-                        let behind=(head-dot.turn+1).truncatingRemainder(dividingBy:1)
-                        color=VeilbirdStyle.accent.opacity(behind<0.38 ? 1-0.88*behind/0.38:0.12)
-                    } else {color=VeilbirdStyle.accent.opacity(0.5)}
-                }
-                context.fill(Path(CGRect(x:left+CGFloat(dot.x)*cell,y:top+CGFloat(dot.y)*cell,width:square,height:square)),with:.color(color))
-            }
-            let mark=side*80/246
-            let markColor:Color={switch state {case .idle:return VeilbirdStyle.faint;case .failed:return VeilbirdStyle.danger;default:return VeilbirdStyle.accent}}()
-            context.fill(Pixel.markPath(in:CGRect(x:area.width/2-mark/2,y:area.height/2-mark/2,width:mark,height:mark)),with:.color(markColor))
-        }
-    }
-}
-
-/// A line of hex digits that changes a few characters a second while a connection is coming up or carrying
-/// traffic: the "data stream" under the ring. Dashes when idle and under Reduce Motion.
-struct DataStream:View {
-    let running:Bool
-    var size:CGFloat=15
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    var body:some View {
-        Group {
-            if running && !reduceMotion {
-                TimelineView(.periodic(from:.now,by:1)) {context in line(Self.digits(at:context.date))}
-            } else {line("---- ---- ---- ----")}
-        }.accessibilityHidden(true)
-    }
-    private func line(_ value:String)->some View {
-        Text(verbatim:value).font(Pixel.font(size)).tracking(size*0.18)
-            .foregroundStyle(running ? Color(red:124/255,green:152/255,blue:72/255):Color(red:44/255,green:50/255,blue:61/255))
-    }
-    /// Each digit changes on its own slow beat (3–9 s), so about three change every second.
-    static func digits(at date:Date)->String {
-        let seconds=Int(date.timeIntervalSince1970), hex=Array("0123456789ABCDEF")
-        return String((0..<16).map {i->String in
-            let beat=seconds/(3+i%7)
-            let mixed:UInt64=UInt64(truncatingIfNeeded:beat) &* 0x9E3779B97F4A7C15
-            var h:UInt64=mixed ^ (UInt64(i) &* 0xBF58476D1CE4E5B9)
-            h^=h>>31
-            return String(hex[Int(h%16)])+(i%4==3 && i<15 ? " ":"")
-        }.joined())
-    }
-}
 
 /// A 36pt (32pt on the Mac) tile with a two-letter country code or an icon.
 struct Badge:View {
@@ -170,11 +91,12 @@ struct Badge:View {
     var icon:String?=nil
     var tint:Color=VeilbirdStyle.text
     var size:CGFloat=VeilbirdStyle.mac ? 30:36
-    /// The selected location's tile: lime with dark text, so the row needs no extra mark.
+    /// The selected location's tile: an amber outline and code, so the row needs no extra mark.
     var selected=false
     var body:some View {
         ZStack {
-            RoundedRectangle(cornerRadius:size*0.22).fill(selected ? VeilbirdStyle.accent:VeilbirdStyle.raised)
+            RoundedRectangle(cornerRadius:2).fill(selected ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.raised)
+                .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(selected ? VeilbirdStyle.accent.opacity(0.7):Color.clear,lineWidth:1))
             if let icon {Image(systemName:icon).font(.system(size:size*0.44,weight:.medium)).foregroundStyle(selected ? VeilbirdStyle.onAccent:tint)}
             else {Text(code ?? "").font(Pixel.font(size*0.42)).foregroundStyle(selected ? VeilbirdStyle.onAccent:(tint == VeilbirdStyle.text ? VeilbirdStyle.accent:tint))}
         }.frame(width:size,height:size).accessibilityHidden(true)
@@ -188,7 +110,7 @@ struct SignalBars:View {
     var body:some View {
         HStack(alignment:.bottom,spacing:2.5) {
             ForEach(0..<3,id:\.self) {i in
-                Rectangle().fill(i<level ? color:Color(red:44/255,green:50/255,blue:60/255)).frame(width:3,height:5+3.5*CGFloat(i))
+                Rectangle().fill(i<level ? color:Color(red:52/255,green:49/255,blue:43/255)).frame(width:3,height:5+3.5*CGFloat(i))
             }
         }.frame(width:14,height:12,alignment:.bottom).accessibilityHidden(true)
     }
@@ -208,9 +130,9 @@ struct LineCells:View {
                     switch state {
                     case .ok:Rectangle().fill(VeilbirdStyle.accent)
                     case .slow:Rectangle().fill(VeilbirdStyle.fair)
-                    case .wait:Rectangle().fill(Color(red:37/255,green:43/255,blue:53/255))
+                    case .wait:Rectangle().fill(Color(red:45/255,green:42/255,blue:37/255))
                     case .down:Rectangle().strokeBorder(VeilbirdStyle.danger,lineWidth:1)
-                    case .off:Rectangle().strokeBorder(Color(red:58/255,green:65/255,blue:77/255),lineWidth:1)
+                    case .off:Rectangle().strokeBorder(Color(red:68/255,green:63/255,blue:57/255),lineWidth:1)
                     }
                 }.frame(width:size,height:size)
             }
@@ -230,7 +152,7 @@ struct UsageBars:View {
             let block:CGFloat=4, pitch:CGFloat=6, rows=max(1,Int((area.height+pitch-block)/pitch)), top=max(values.max() ?? 1,1)
             for (i,value) in values.enumerated() {
                 let lit=value<=0 ? 1:max(1,Int((Double(rows)*Double(value)/Double(top)).rounded()))
-                let color=i>=values.count-recent ? VeilbirdStyle.accent:Color(red:96/255,green:119/255,blue:74/255)
+                let color=i>=values.count-recent ? VeilbirdStyle.accent:Color(red:111/255,green:90/255,blue:63/255)
                 let left=CGFloat(i)*(width+gap)
                 for r in 0..<lit {context.fill(Path(CGRect(x:left,y:area.height-CGFloat(r)*pitch-block,width:width,height:block)),with:.color(color))}
             }
@@ -248,7 +170,7 @@ struct RateBars:View {
             let block:CGFloat=4, pitch:CGFloat=6, step=area.width/CGFloat(RateBars.count), width=min(block,step-1)
             let axis=(area.height*0.64).rounded()
             let topRows=max(1,Int((axis-2+pitch-block)/pitch)), bottomRows=max(1,Int((area.height-axis-2+pitch-block)/pitch))
-            context.fill(Path(CGRect(x:0,y:axis,width:area.width,height:1)),with:.color(Color(red:36/255,green:42/255,blue:53/255)))
+            context.fill(Path(CGRect(x:0,y:axis,width:area.width,height:1)),with:.color(Color(red:44/255,green:41/255,blue:36/255)))
             let top=max(1,(down+up).max() ?? 1), offset=RateBars.count-down.count
             for (i,value) in down.enumerated() {
                 let left=CGFloat(offset+i)*step+(step-width)/2
@@ -256,7 +178,7 @@ struct RateBars:View {
                 for r in 0..<lit {context.fill(Path(CGRect(x:left,y:axis-2-CGFloat(r)*pitch-block,width:width,height:block)),with:.color(VeilbirdStyle.accent))}
                 let sent=i<up.count ? up[i]:0
                 let litUp=sent<=0 ? 0:max(1,Int((Double(bottomRows)*Double(sent)/Double(top)).rounded()))
-                for r in 0..<litUp {context.fill(Path(CGRect(x:left,y:axis+3+CGFloat(r)*pitch,width:width,height:block)),with:.color(Color(red:96/255,green:119/255,blue:74/255)))}
+                for r in 0..<litUp {context.fill(Path(CGRect(x:left,y:axis+3+CGFloat(r)*pitch,width:width,height:block)),with:.color(Color(red:111/255,green:90/255,blue:63/255)))}
             }
         }.accessibilityHidden(true)
     }
@@ -292,8 +214,10 @@ struct PrimaryButton:ButtonStyle {
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration:Configuration)->some View {
         configuration.label.font(.system(size:VeilbirdStyle.mac ? 14:17,weight:.semibold)).frame(maxWidth:.infinity).frame(height:VeilbirdStyle.mac ? 40:52)
-            .foregroundStyle(VeilbirdStyle.onAccent).background(VeilbirdStyle.accent,in:RoundedRectangle(cornerRadius:VeilbirdStyle.mac ? 10:14))
-            .opacity(enabled ? (configuration.isPressed ? 0.8:1):0.45)
+            // Outlined, not filled: the accent is light, not paint.
+            .foregroundStyle(VeilbirdStyle.accent).background(VeilbirdStyle.accent.opacity(configuration.isPressed ? 0.14:0.06),in:RoundedRectangle(cornerRadius:2))
+            .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(VeilbirdStyle.accent.opacity(0.7),lineWidth:1))
+            .opacity(enabled ? 1:0.45)
     }
 }
 

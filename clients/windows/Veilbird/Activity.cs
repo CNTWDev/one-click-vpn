@@ -14,7 +14,7 @@ namespace Veilbird;
 /// memory while connected and forgets it on disconnect; nothing is stored or sent.
 /// </summary>
 public sealed class ActivityPanel:Border {
-    private static readonly Brush Direct=Look.Hex("#545C6C"),Row=Look.Hex("#15191F"),Line=Look.Hex("#1D232C"),Card=Look.Hex("#11141A"),Dim=Look.Hex("#707886");
+    private static readonly Brush Direct=Look.Hex("#615A50"),Row=Look.Hex("#1A1816"),Line=Look.Hex("#24221E"),Card=Look.Hex("#151311"),Dim=Look.Hex("#7E7569");
     private string tab="conns",filter="all",query="";
     private JsonNode? data;
     private string node="";
@@ -25,11 +25,11 @@ public sealed class ActivityPanel:Border {
     private readonly TextBox search=new() {Width=220,Height=28,FontSize=12,Padding=new Thickness(26,0,8,0),VerticalContentAlignment=VerticalAlignment.Center};
 
     public ActivityPanel() {
-        BorderBrush=Look.Hex("#191D24");BorderThickness=new Thickness(1,0,0,0);
+        BorderBrush=Look.Hex("#1E1C19");BorderThickness=new Thickness(1,0,0,0);
         var title=new TextBlock {Text=L10n.Text("activity_title"),FontSize=17,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,16,0)};
-        var tabsBox=new Border {Background=Look.Hex("#13161C"),CornerRadius=new CornerRadius(6),Padding=new Thickness(2),Child=tabs,VerticalAlignment=VerticalAlignment.Center};
+        var tabsBox=new Border {Background=Look.Hex("#171513"),CornerRadius=new CornerRadius(3),Padding=new Thickness(2),Child=tabs,VerticalAlignment=VerticalAlignment.Center};
         var note=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
-        note.Children.Add(new Rectangle {Width=6,Height=6,Fill=Look.Hex("#60774A"),Margin=new Thickness(0,0,6,0),VerticalAlignment=VerticalAlignment.Center});
+        note.Children.Add(new Rectangle {Width=6,Height=6,Fill=Look.Hex("#6F5A3F"),Margin=new Thickness(0,0,6,0),VerticalAlignment=VerticalAlignment.Center});
         note.Children.Add(new TextBlock {Text=L10n.Text("activity_local_only"),FontSize=12,Foreground=Look.Faint,TextWrapping=TextWrapping.NoWrap,TextTrimming=TextTrimming.CharacterEllipsis});
         var head=new Grid();
         head.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});head.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});head.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(1,GridUnitType.Star)});
@@ -64,7 +64,7 @@ public sealed class ActivityPanel:Border {
             var content=new StackPanel {Orientation=Orientation.Horizontal};
             content.Children.Add(new TextBlock {Text=L10n.Text(label),FontSize=13,Foreground=on?Look.Text:Look.Secondary,VerticalAlignment=VerticalAlignment.Center});
             if(key=="conns"&&data is not null) content.Children.Add(new TextBlock {Text=count.ToString(L10n.Culture),FontFamily=Mono,FontSize=11,Foreground=Look.Secondary,Margin=new Thickness(6,0,0,0),VerticalAlignment=VerticalAlignment.Center});
-            var button=new Button {Content=content,Height=28,Padding=new Thickness(14,0,14,0),Background=on?Look.Hex("#282E38"):Brushes.Transparent,HorizontalContentAlignment=HorizontalAlignment.Center};
+            var button=new Button {Content=content,Height=28,Padding=new Thickness(14,0,14,0),Background=on?Look.Hex("#302D28"):Brushes.Transparent,HorizontalContentAlignment=HorizontalAlignment.Center};
             AutomationProperties.SetName(button,L10n.Text(label)+(on?L10n.Text("current_page"):""));
             button.Click+=(_,_)=>{tab=key;Fill();};
             tabs.Children.Add(button);
@@ -118,7 +118,7 @@ public sealed class ActivityPanel:Border {
             if(brush is not null) content.Children.Add(new Rectangle {Width=6,Height=6,Fill=brush,Margin=new Thickness(0,0,6,0),VerticalAlignment=VerticalAlignment.Center});
             content.Children.Add(new TextBlock {Text=L10n.Text(label),FontSize=12,Foreground=on?Look.Text:Look.Secondary,VerticalAlignment=VerticalAlignment.Center});
             content.Children.Add(new TextBlock {Text=number.ToString(L10n.Culture),FontFamily=Mono,FontSize=11,Foreground=on?Look.Text:Look.Secondary,Margin=new Thickness(6,0,0,0),VerticalAlignment=VerticalAlignment.Center});
-            var chip=new Button {Content=content,Height=26,Padding=new Thickness(10,0,10,0),Margin=new Thickness(0,0,6,0),BorderThickness=new Thickness(1),BorderBrush=on?Look.Accent:Look.Hex("#242A35")};
+            var chip=new Button {Content=content,Height=26,Padding=new Thickness(10,0,10,0),Margin=new Thickness(0,0,6,0),BorderThickness=new Thickness(1),BorderBrush=on?Look.Accent:Look.Hex("#2C2924")};
             chip.Click+=(_,_)=>{filter=key;Fill();};
             chips.Children.Add(chip);
         }
@@ -147,7 +147,7 @@ public sealed class ActivityPanel:Border {
     }
 
     private (long Proxy,long Direct) Split()=>(Num(data?["proxy"]),Num(data?["direct"]));
-    private static Border CardOf(UIElement child,Thickness? margin=null)=>new() {Background=Card,BorderBrush=Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(6),Padding=new Thickness(18,16,18,16),Child=child,Margin=margin??new Thickness(0)};
+    private static Border CardOf(UIElement child,Thickness? margin=null)=>new() {Background=Card,BorderBrush=Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(18,16,18,16),Child=child,Margin=margin??new Thickness(0)};
     private static FrameworkElement Legend(bool proxy,long bytes,bool free=false) {
         var line=new TextBlock {FontSize=12,Foreground=proxy?Look.Text:Look.Secondary,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.NoWrap};
         line.Inlines.Add(new Run("■ ") {Foreground=proxy?Look.Accent:Direct});
@@ -258,17 +258,17 @@ public sealed class ActivityPanel:Border {
 
 /// A track of square dots, the lit share in color: the rankings' bars.
 public sealed class DotBar(double share,Brush color):FrameworkElement {
-    private static readonly Brush Track=Look.Hex("#21262F");
+    private static readonly Brush Track=Look.Hex("#282521");
     protected override void OnRender(DrawingContext dc) {
         var count=(int)((ActualWidth+2)/6);var lit=share<=0?0:Math.Max(1,(int)Math.Round(count*Math.Min(1,share)));
         for(var i=0;i<count;i++) dc.DrawRectangle(i<lit?color:Track,null,new Rect(i*6,0,4,ActualHeight));
     }
 }
 
-/// 24 columns of square dots, proxied (lime) stacked on direct (dark green); the current hour is outlined.
+/// 24 columns of square dots, proxied (amber) stacked on direct (dark green); the current hour is outlined.
 public sealed class HourBars(IReadOnlyList<(long Proxy,long Direct)> hours,int now):FrameworkElement {
-    private static readonly Brush Direct=Look.Hex("#545C6C"),Empty=Look.Hex("#191D24");
-    private static readonly Pen Now=new(Look.Hex("#80EAEEF4"),1) {DashStyle=DashStyles.Dash};
+    private static readonly Brush Direct=Look.Hex("#615A50"),Empty=Look.Hex("#1E1C19");
+    private static readonly Pen Now=new(Look.Hex("#80EDE7DF"),1) {DashStyle=DashStyles.Dash};
     protected override void OnRender(DrawingContext dc) {
         double pitch=6,block=4,width=12,step=(ActualWidth-width)/23;
         var rows=Math.Max(1,(int)((ActualHeight+pitch-block)/pitch));

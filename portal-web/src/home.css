@@ -4,9 +4,15 @@
 .home .topbar { padding-bottom: 18px; border-bottom: 1px solid var(--border); }
 .home .topbar .brand { font-size: 19px; }
 .home .topbar + * { margin-top: 0; }
+/* Section numbers: the page reads as one file, §01 to §04, each a mono label over a hairline. */
+.home > .home-sec { margin-top: 40px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.home > .home-sec + * { margin-top: 16px; }
+.home > .home-sec-first { margin-top: 32px; }
+.topbar-file { display: flex; align-items: center; gap: 20px; min-width: 0; }
+@media (max-width: 600px) { .topbar-file .file-no { display: none; } }
 /* First section: our own app on the left (the recommended way, the page's focal point: lit card, big ring, big
    download) and third-party apps on the right (quieter list, QR code in a dialog). Stacks with our app first. */
-.home-start { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: stretch; padding-top: 36px; }
+.home-start { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: stretch; padding-top: 0; }
 .home-start.solo { grid-template-columns: minmax(0, 1fr); }
 .home-app, .home-third { position: relative; min-width: 0; display: flex; flex-direction: column; border-radius: var(--radius-lg); }
 .home-app { gap: 24px; padding: 36px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
@@ -15,7 +21,7 @@
 .home-app-text { flex: 1; display: grid; gap: 14px; justify-items: start; min-width: 0; }
 .home-app-text > * { margin: 0; max-width: 100%; }
 .home-tagline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.home-badge { padding: 4px 8px; font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .06em; color: var(--accent-contrast); background: var(--accent); border-radius: 4px; white-space: nowrap; }
+.home-badge { padding: 4px 8px; font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .06em; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 2px; white-space: nowrap; }
 .home-app h1 { font-size: 40px; line-height: 1.15; font-weight: 700; letter-spacing: -.01em; overflow-wrap: break-word; }
 .home-app .home-lead { color: color-mix(in srgb, var(--text) 78%, var(--text-2)); }
 .home-app-download { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 6px; }
@@ -110,11 +116,11 @@ a.home-stat-note { color: var(--accent); justify-self: start; }
   .home-app .hero-ring { width: 128px; height: 128px; }
 }
 @media (max-width: 900px) {
-  .home-start { grid-template-columns: minmax(0, 1fr); padding-top: 24px; }
+  .home-start { grid-template-columns: minmax(0, 1fr); }
   .home-third.solo .import-apps { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 640px) {
-  .home-start { padding-top: 16px; gap: 16px; }
+  .home-start { gap: 16px; }
   .home-app, .home-third, .home-third.solo { padding: 22px 20px; }
   .home-app { gap: 18px; }
   .home-app-head { flex-direction: column-reverse; align-items: flex-start; gap: 20px; }

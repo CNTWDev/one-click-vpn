@@ -3037,6 +3037,144 @@
         }
       }
     },
+    "exposed_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anyone can see this right now"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这些信息此刻对外可见"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Это сейчас видно всем"
+          }
+        }
+      }
+    },
+    "exposed_status": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exposed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未隐匿"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыто"
+          }
+        }
+      }
+    },
+    "file_device": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Устройство"
+          }
+        }
+      }
+    },
+    "file_language": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语言"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Язык"
+          }
+        }
+      }
+    },
+    "file_public_ip": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Public IP"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出口 IP"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Внешний IP"
+          }
+        }
+      }
+    },
+    "file_time_zone": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time zone"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时区"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Часовой пояс"
+          }
+        }
+      }
+    },
     "finding_best_route": {
       "extractionState": "manual",
       "localizations": {
@@ -3125,6 +3263,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Скрыть пароль"
+          }
+        }
+      }
+    },
+    "hold_to_reveal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold to reveal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住查看"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удерживайте, чтобы увидеть"
           }
         }
       }
@@ -5015,6 +5176,75 @@
         }
       }
     },
+    "seal_action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap to seal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "轻触封存"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нажмите, чтобы скрыть"
+          }
+        }
+      }
+    },
+    "sealed_status": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hidden"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已隐匿"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скрыто"
+          }
+        }
+      }
+    },
+    "sealing_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sealing…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在封存…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Запечатываем…"
+          }
+        }
+      }
+    },
     "search_locations_or_regions": {
       "extractionState": "manual",
       "localizations": {
@@ -5034,6 +5264,144 @@
           "stringUnit": {
             "state": "translated",
             "value": "Поиск локаций или регионов"
+          }
+        }
+      }
+    },
+    "section_account": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§04 Holder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§04 持有人"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§04 Владелец"
+          }
+        }
+      }
+    },
+    "section_activity": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§03 Activity"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§03 活动"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§03 Активность"
+          }
+        }
+      }
+    },
+    "section_check": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§05 Check"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§05 体检"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§05 Проверка"
+          }
+        }
+      }
+    },
+    "section_locations": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§02 Locations"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§02 线路"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§02 Локации"
+          }
+        }
+      }
+    },
+    "section_sign_in": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§00 Identify"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§00 身份验证"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§00 Вход"
+          }
+        }
+      }
+    },
+    "section_status": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§01 Status"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§01 状态"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§01 Статус"
           }
         }
       }
@@ -6165,6 +6533,29 @@
         }
       }
     },
+    "unseal_action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sealed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已封存"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скрыто"
+          }
+        }
+      }
+    },
     "up_to_date": {
       "extractionState": "manual",
       "localizations": {
@@ -7045,19 +7436,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reconnects automatically after a drop, no need to connect again\nNo battery-draining checks while offline; reconnects as soon as the network is back\nSwitch locations while connected\nSee what's new in each version"
+            "value": "A new look: every page is a sheet in a file, warm black with amber light\nConnecting sends a line of light down the home page and seals your public IP, device, time zone and language line by line; disconnecting opens them again\nYour email is hidden on the account page; press and hold to see it"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "断线后自动重连，不用再手动重新连接\n没网时不再耗电探测，网络恢复后立刻连上\n连接中可以直接换位置\n可以查看每个版本的更新内容"
+            "value": "全新外观：每一页都像一份档案，暖黑底色、琥珀色光\n连接时，一道光扫过首页，你的出口 IP、设备、时区和语言逐行封存；断开时再逐行解封\n「我的」里邮箱默认加密显示，按住即可查看"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Автоматическое переподключение после обрыва связи\nБез лишних проверок и расхода батареи без сети; подключение сразу после её появления\nСмена локации без отключения\nСписок изменений каждой версии"
+            "value": "Новый облик: каждая страница как лист досье, тёплый чёрный и янтарный свет\nПри подключении полоса света проходит по главной и строка за строкой скрывает ваш IP, устройство, часовой пояс и язык; при отключении всё открывается снова\nПочта на странице аккаунта скрыта; удерживайте, чтобы увидеть"
           }
         }
       }

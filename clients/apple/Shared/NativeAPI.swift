@@ -131,6 +131,12 @@ final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         if let offered=json["apiOrigins"] as? [String] {remember(answered:nil,offered:offered)}
         return json
     }
+    /// The public address the service sees for this device ("—" when it is a private one). Nothing is stored.
+    func visitorAddress() async throws -> String {
+        let (status,data)=try await send("GET","/api/v1/visitor",body:nil,headers:[:])
+        guard status==200,data.count<=4096,let json=try JSONSerialization.jsonObject(with:data) as? [String:Any] else {throw AccessFailure.code("SERVICE_UNAVAILABLE")}
+        return json["ip"] as? String ?? "—"
+    }
     /// Public release catalog: whether a newer build (or a required one) exists for this install.
     func latestRelease(installation:String) async throws -> [String:Any] {
         let info=Bundle.main.infoDictionary ?? [:],build=Int(info["CFBundleVersion"] as? String ?? "") ?? 0

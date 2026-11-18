@@ -44,6 +44,7 @@ const soon = new Date(Date.now() + 5 * 86400000).toISOString();
 export function portalApi({ signedIn = true, empty = false, site = null } = {}) {
   let session = signedIn;
   return (pathname, method) => {
+    if (pathname === "/api/v1/visitor") return [200, { ip: "203.0.113.48" }];
     if (pathname === "/api/v1/site") return site ? [200, site] : [404, { error: "Not found" }];
     if (pathname === "/api/v1/auth/me") return session ? [200, { user }] : [401, { error: "Authentication required" }];
     if (pathname === "/api/v1/auth/web-login") { session = true; return [200, { user }]; }

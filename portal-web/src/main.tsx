@@ -1,7 +1,7 @@
 import { useI18n } from "../../shared/i18n";
-import { SpaceBackdrop } from "./space";
+import { Backdrop } from "./space";
+import { VisitorFile } from "./dossier";
 import { Brand } from "./brand";
-import { BrandMark } from "../../shared/brand";
 import { PasswordInput } from "../../shared/password-input";
 import { applySiteToDocument, loadSite, useSite } from "../../shared/site";
 import { PRODUCT_NAME } from "../../shared/brand-name";
@@ -11,7 +11,6 @@ import { errorText } from "../../shared/i18n-errors";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { api } from "./api";
-import { DataStream } from "./pixel";
 import "./styles.css";
 
 // Signed-in pages load on demand, so the sign-in screen does not wait for them (or for the QR code library).
@@ -87,15 +86,13 @@ function Auth({ mode, onMode, onUser, notice }: {
 
   return <main className="auth-layout">
     <section className="auth-intro">
-      <Brand />
-      {/* The approved sign-in art: the mark large over a halftone field, the data stream under it. */}
-      <div className="auth-art" aria-hidden="true">
-        <span className="auth-mark"><BrandMark size={176} logoSvg={site?.logoSvg} /></span>
-        <span className="home-stream"><DataStream /><DataStream count={12} salt={1} className="dim" /></span>
-      </div>
-      <p className="intro-copy">{t("审核通过后，一键导入常用客户端，或扫码在手机上使用。")}</p>
+      <header className="file-top"><Brand /><span className="file-no">№ ————</span></header>
+      <h1 className="cover-title"><CoverTitle name={siteName} /></h1>
+      <p className="cover-sub">{t("每个网站都有一份关于你的档案。")}<br /><b>{t("连接之后，它是空的。")}</b></p>
+      <VisitorFile />
     </section>
     <form className="auth-panel" onSubmit={submit}>
+      <span className="file-label">{mode === "login" ? t("§00 身份验证") : mode === "register" ? t("§00 申请调阅") : t("§00 找回密码")}</span>
       <h2>{title}</h2>
       <p className="muted" aria-live="polite">{subtitle}</p>
       {notice && mode === "login" && <p className="inline-success" role="status">{notice}</p>}
@@ -111,6 +108,12 @@ function Auth({ mode, onMode, onUser, notice }: {
         : <button type="button" className="ghost wide" onClick={() => switchMode(mode === "login" ? "register" : "login")}>{mode === "login" ? t("还没有账号？申请使用") : t("已有账号？返回登录")}</button>}
     </form>
   </main>;
+}
+
+/** The cover's big name: the first word solid, the rest in outline (TRACK / NOTHING for the default site). */
+function CoverTitle({ name }: { name: string }) {
+  const words = /^track\s*nothing$/i.test(name.trim()) ? ["TRACK", "NOTHING"] : name.trim().toUpperCase().split(/\s+/);
+  return <>{words.map((word, index) => <span key={index} className={index ? "outline" : undefined}>{word}</span>)}</>;
 }
 
 /** Opened from a reset link (/#reset=…). The token stays in the fragment so it never reaches server logs. */
@@ -209,4 +212,4 @@ export default function App() {
     : !user ? <Auth mode={mode} onMode={setMode} onUser={setUser} notice={notice} /> : <Pending user={user} onLogout={() => void logout()} />}</>;
 }
 
-createRoot(document.getElementById("root")!).render(<PortalLanguage><SpaceBackdrop /><App /></PortalLanguage>);
+createRoot(document.getElementById("root")!).render(<PortalLanguage><Backdrop /><App /></PortalLanguage>);

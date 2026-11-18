@@ -17,34 +17,48 @@ struct MenuBarView:View {
     @Environment(\.openWindow) private var openWindow
     var body:some View {
         let on=model.connected && model.since != nil
-        let state:RingState=model.connected ? (on ? .connected:.connecting):(model.failed ? .failed:.idle)
         VStack(alignment:.leading,spacing:0) {
             HStack(spacing:8) {
                 PixelMark(size:16)
                 Wordmark(size:14)
                 Spacer()
-                Rectangle().fill(VeilbirdStyle.accent).frame(width:6,height:6).opacity(on ? 1:0)
-                Text(L10n.text(on ? "connected_status":(model.connected ? "connecting":(model.failed ? "connect_failed_title":"not_connected")))).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary)
+                Text(verbatim:"№ "+FileHeader.number(model.account["email"] as? String ?? "")).font(.system(size:11,design:.monospaced)).tracking(0.9).foregroundStyle(VeilbirdStyle.faint)
             }.padding(.horizontal,4)
             if model.signedIn {
-                VStack(spacing:12) {
-                    Button {model.work {try await model.toggle()}} label:{ConnectRing(state:state,size:126)}.buttonStyle(.plain)
-                        .accessibilityLabel(L10n.text(model.connected ? (model.since == nil ? "cancel":"disconnect_action"):"connect_action"))
+                // The connect page in small: the state with its seal, one slot for time and rates or a message, one action.
+                VStack(alignment:.leading,spacing:8) {
+                    SectionLabel(key:"section_status")
+                    HStack(spacing:10) {
+                        Text(L10n.text(on ? "sealed_status":(model.connected ? "connecting":(model.failed ? "connect_failed_title":"exposed_status")))).font(.system(size:24,weight:.light)).lineLimit(1)
+                        Spacer(minLength:0)
+                        SealStamp(shown:model.connected)
+                    }.padding(.horizontal,4)
                     // One fixed-height slot for the time and rates or a short message, so the menu keeps its size.
-                    ZStack {
+                    ZStack(alignment:.leading) {
                     if let since=model.since {
                         HStack(alignment:.firstTextBaseline,spacing:12) {
                             TimelineView(.periodic(from:since,by:1)) {context in
-                                Text(verbatim:Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond))).font(Pixel.font(22)).foregroundStyle(VeilbirdStyle.text)
+                                Text(verbatim:Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond))).font(.system(size:13,design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.text)
                             }
-                            Text(L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))).font(.system(size:11)).monospacedDigit().foregroundStyle(VeilbirdStyle.secondary)
+                            Text(L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))).font(.system(size:11,design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.secondary)
                         }.transition(.opacity)
                     } else {
-                        Text(model.failed ? model.failure:L10n.text("tap_ring_to_connect")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).lineLimit(2)
+                        Text(model.failed ? model.failure:L10n.text("exposed_detail")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2)
                             .transition(.opacity)
                     }
-                    }.frame(height:34).animation(.easeInOut(duration:0.2),value:on)
-                }.frame(maxWidth:.infinity).padding(.top,20).padding(.bottom,16)
+                    }.frame(maxWidth:.infinity,alignment:.leading).frame(height:30).padding(.horizontal,4).animation(.easeInOut(duration:0.2),value:on)
+                    Button {model.work {try await model.toggle()}} label:{
+                        HStack {
+                            Text(L10n.text(on ? "unseal_action":(model.connected ? "sealing_detail":(model.failed ? "retry_action":"seal_action")))).font(.system(size:13,weight:.medium)).lineLimit(1)
+                            Spacer(minLength:8)
+                            BreathingDot(on:model.connected)
+                        }.padding(.horizontal,14).frame(height:40).contentShape(Rectangle())
+                        .foregroundStyle(on ? VeilbirdStyle.accent:VeilbirdStyle.text)
+                        .background(on ? VeilbirdStyle.accent.opacity(0.06):Color.clear)
+                        .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(on ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.text.opacity(0.24),lineWidth:1))
+                    }.buttonStyle(.plain)
+                    .accessibilityLabel(L10n.text(model.connected ? (model.since == nil ? "cancel":"disconnect_action"):"connect_action"))
+                }.padding(.top,16).padding(.bottom,14)
                 // The same update banner as the window, with its download progress.
                 if let update=model.update {UpdateBanner(update:update).padding(.bottom,10)}
                 Button {openMain()} label:{
@@ -59,7 +73,7 @@ struct MenuBarView:View {
                         Spacer(minLength:8)
                         Image(systemName:"chevron.right").font(.system(size:10,weight:.semibold)).foregroundStyle(VeilbirdStyle.secondary)
                     }.padding(.horizontal,12).frame(height:52)
-                }.buttonStyle(RowButton()).background(Color(red:25/255,green:29/255,blue:35/255),in:RoundedRectangle(cornerRadius:10)).clipShape(RoundedRectangle(cornerRadius:10))
+                }.buttonStyle(RowButton()).cardOutline(VeilbirdStyle.radius).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
                 let figures=UsageFigures(model.account)
                 HStack(alignment:.top,spacing:12) {
                     cell(figures.trafficTitle,figures.traffic,figures.trafficTint)
@@ -74,7 +88,7 @@ struct MenuBarView:View {
                 menuItem(L10n.text("quit_app"),shortcut:"⌘Q") {NSApp.terminate(nil)}.keyboardShortcut("q")
             }.padding(.top,6)
         }.padding(.horizontal,12).padding(.top,14).padding(.bottom,8).frame(width:320)
-        .background(Color(red:17/255,green:20/255,blue:26/255)).foregroundStyle(VeilbirdStyle.text).preferredColorScheme(.dark)
+        .background(VeilbirdStyle.ground).foregroundStyle(VeilbirdStyle.text).preferredColorScheme(.dark)
         .environment(\.locale, L10n.locale).task {try? await model.loadAccount()}
     }
     private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
@@ -87,7 +101,7 @@ struct MenuBarView:View {
     private func menuItem(_ title:String,shortcut:String,action:@escaping ()->Void)->some View {
         Button(action:action) {
             HStack {Text(title);Spacer();Text(shortcut).foregroundStyle(VeilbirdStyle.faint)}.font(.system(size:13)).padding(.horizontal,8).frame(height:26).contentShape(Rectangle())
-        }.buttonStyle(RowButton()).clipShape(RoundedRectangle(cornerRadius:6))
+        }.buttonStyle(RowButton()).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
     }
     private func openMain() {openWindow(id:"main");NSApp.activate(ignoringOtherApps:true)}
 }
