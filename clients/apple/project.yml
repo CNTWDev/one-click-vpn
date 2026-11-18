@@ -68,6 +68,14 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         VEILBIRD_APP_GROUP: $(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)
         PROVISIONING_PROFILE_SPECIFIER: $(VEILBIRD_MACOS_APP_PROFILE)
+        # The script below edits the built Info.plist in place.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    # macOS names the app by CFBundleName in its own prompts ("... would like to use a new network extension"); the
+    # generated Info.plist sets it to PRODUCT_NAME (Veilbird, the technical name), so it is set here before signing.
+    postBuildScripts:
+      - name: Product name for macOS prompts
+        basedOnDependencyAnalysis: false
+        script: /usr/bin/plutil -replace CFBundleName -string TrackNothing "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
     dependencies:
       - package: VeilbirdCore
       - target: VeilbirdTunnel-macOS
