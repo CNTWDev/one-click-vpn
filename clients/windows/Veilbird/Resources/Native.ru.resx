@@ -141,6 +141,13 @@
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Введите почту и пароль.</value></data>
   <data name="exposed_detail" xml:space="preserve"><value>Любой сайт сейчас видит всё это</value></data>
   <data name="exposed_status" xml:space="preserve"><value>Видно</value></data>
+  <data name="extension_guide_continue" xml:space="preserve"><value>Продолжить</value></data>
+  <data name="extension_guide_detail" xml:space="preserve"><value>TrackNothing создаёт зашифрованное соединение через сетевое расширение macOS; в первый раз его нужно включить вручную.
+
+«Продолжить» откроет Системные настройки: включите TrackNothing в разделе «Основные › Объекты входа и расширения › Сетевые расширения», и подключение начнётся сразу.
+
+macOS также покажет окно; кнопка OK в нём только закрывает его и ничего не включает.</value></data>
+  <data name="extension_guide_title" xml:space="preserve"><value>Включите сетевое расширение</value></data>
   <data name="file_device" xml:space="preserve"><value>Устройство</value></data>
   <data name="file_language" xml:space="preserve"><value>Язык</value></data>
   <data name="file_public_ip" xml:space="preserve"><value>Внешний IP</value></data>
@@ -342,7 +349,8 @@
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
   <data name="whats_new_notes" xml:space="preserve"><value>Обновление на Mac внутри приложения: после загрузки нажмите «Установить и перезапустить» — приложение закроется, обновится и откроется снова, без перетаскивания
-Окно на Mac без серой системной строки заголовка: фон приложения занимает всё окно</value></data>
+Окно на Mac без серой системной строки заголовка: фон приложения занимает всё окно
+При первом подключении приложение объясняет, где включить сетевое расширение, и сразу открывает этот переключатель; в окнах macOS теперь название TrackNothing</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>

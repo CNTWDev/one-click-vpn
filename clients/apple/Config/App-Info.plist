@@ -4,6 +4,10 @@
      keys Xcode knows, so custom ones live here, filled from build settings (project.yml). -->
 <plist version="1.0">
 <dict>
+	<!-- The name macOS shows in its own prompts ("... would like to use a new network extension"); the bundle and
+	     executable keep the technical name Veilbird. -->
+	<key>CFBundleName</key>
+	<string>TrackNothing</string>
 	<key>VeilbirdAPIOrigin</key>
 	<string>$(VEILBIRD_API_ORIGIN)</string>
 	<key>VeilbirdAppGroup</key>

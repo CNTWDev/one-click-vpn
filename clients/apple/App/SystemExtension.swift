@@ -52,6 +52,18 @@ import SystemExtensions
             self.finish(AccessFailure.code(code == .unsupportedParentBundleLocation ? "MOVE_TO_APPLICATIONS":"SYSTEM_EXTENSION_FAILED"))
         }
     }
+    /// Whether the extension is already installed and switched on (then connecting brings no system prompt). An
+    /// unanswered query counts as on, so the app never blocks on it.
+    func enabled() async -> Bool {
+        if active {return true}
+        return await withCheckedContinuation {(continuation:CheckedContinuation<Bool,Never>) in
+            let probe=PropertiesProbe(continuation)
+            let request=OSSystemExtensionRequest.propertiesRequest(forExtensionWithIdentifier:(Bundle.main.bundleIdentifier ?? "")+".tunnel",queue:.main)
+            request.delegate=probe
+            OSSystemExtensionManager.shared.submitRequest(request)
+            DispatchQueue.main.asyncAfter(deadline:.now()+3) {probe.resume(true)}
+        }
+    }
     /// Where macOS lists extensions waiting to be allowed: General → Login Items & Extensions from macOS 15, Privacy &
     /// Security before.
     static func openSettings() {
@@ -59,5 +71,24 @@ import SystemExtensions
             ? "x-apple.systempreferences:com.apple.LoginItems-Settings.extension":"x-apple.systempreferences:com.apple.preference.security?General"
         if let url=URL(string:page) {NSWorkspace.shared.open(url)}
     }
+}
+
+/// Answers one properties request; keeps itself alive until it has answered (the request holds its delegate weakly).
+private final class PropertiesProbe:NSObject,OSSystemExtensionRequestDelegate,@unchecked Sendable {
+    private var continuation:CheckedContinuation<Bool,Never>?
+    private var keep:PropertiesProbe?
+    private let lock=NSLock()
+    init(_ continuation:CheckedContinuation<Bool,Never>) {self.continuation=continuation;super.init();keep=self}
+    func resume(_ value:Bool) {
+        lock.lock();let pending=continuation;continuation=nil;keep=nil;lock.unlock()
+        pending?.resume(returning:value)
+    }
+    func request(_ request:OSSystemExtensionRequest,foundProperties properties:[OSSystemExtensionProperties]) {
+        resume(properties.contains {$0.isEnabled && !$0.isAwaitingUserApproval && !$0.isUninstalling})
+    }
+    func request(_ request:OSSystemExtensionRequest,actionForReplacingExtension existing:OSSystemExtensionProperties,withExtension ext:OSSystemExtensionProperties)->OSSystemExtensionRequest.ReplacementAction {.cancel}
+    func requestNeedsUserApproval(_ request:OSSystemExtensionRequest) {}
+    func request(_ request:OSSystemExtensionRequest,didFinishWithResult result:OSSystemExtensionRequest.Result) {resume(false)}
+    func request(_ request:OSSystemExtensionRequest,didFailWithError error:Error) {resume(false)}
 }
 #endif

@@ -142,6 +142,7 @@ targets:
       path: Signing/macOSTunnel.plist
       properties:
         NSSystemExtensionUsageDescription: TrackNothing uses this extension to create its VPN connection.
+        CFBundleDisplayName: TrackNothing
         VeilbirdKeychainGroup: $(VEILBIRD_KEYCHAIN_GROUP)
         VeilbirdAppGroup: $(VEILBIRD_APP_GROUP)
         NetworkExtension:

@@ -141,6 +141,13 @@
   <data name="enter_your_email_and_password" xml:space="preserve"><value>请填写邮箱和密码。</value></data>
   <data name="exposed_detail" xml:space="preserve"><value>任何网站此刻都能看到上面这些</value></data>
   <data name="exposed_status" xml:space="preserve"><value>未隐身</value></data>
+  <data name="extension_guide_continue" xml:space="preserve"><value>继续</value></data>
+  <data name="extension_guide_detail" xml:space="preserve"><value>TrackNothing 用 macOS 的网络扩展建立加密连接，第一次要你亲手打开开关。
+
+点「继续」后会打开系统设置：在「通用 › 登录项与扩展 › 网络扩展」里打开 TrackNothing，打开后自动连接。
+
+macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，并不会开启。</value></data>
+  <data name="extension_guide_title" xml:space="preserve"><value>先打开网络扩展</value></data>
   <data name="file_device" xml:space="preserve"><value>设备</value></data>
   <data name="file_language" xml:space="preserve"><value>语言</value></data>
   <data name="file_public_ip" xml:space="preserve"><value>出口 IP</value></data>
@@ -342,7 +349,8 @@
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
   <data name="whats_new_notes" xml:space="preserve"><value>Mac 应用内升级：下载完点「安装并重启」，自动退出旧版、替换并重新打开，不用再打开安装包拖拽覆盖
-Mac 窗口去掉系统灰色标题栏，整个窗口都是应用自己的背景</value></data>
+Mac 窗口去掉系统灰色标题栏，整个窗口都是应用自己的背景
+第一次连接时先说明要在系统设置里打开网络扩展，并直接带你到那个开关；系统提示里显示的名字改为 TrackNothing</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>

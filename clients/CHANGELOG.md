@@ -9,14 +9,17 @@
 ### zh
 - Mac 应用内升级：下载完点「安装并重启」，自动退出旧版、替换并重新打开，不用再打开安装包拖拽覆盖
 - Mac 窗口去掉系统灰色标题栏，整个窗口都是应用自己的背景
+- 第一次连接时先说明要在系统设置里打开网络扩展，并直接带你到那个开关；系统提示里显示的名字改为 TrackNothing
 
 ### en
 - Mac in-app update: once downloaded, click "Install and Relaunch"; the app quits, replaces itself and reopens, with no installer to drag
 - The Mac window drops the grey system title bar; the app's own backdrop fills the whole window
+- The first connection explains the network extension switch and takes you straight to it; macOS prompts now say TrackNothing
 
 ### ru
 - Обновление на Mac внутри приложения: после загрузки нажмите «Установить и перезапустить» — приложение закроется, обновится и откроется снова, без перетаскивания
 - Окно на Mac без серой системной строки заголовка: фон приложения занимает всё окно
+- При первом подключении приложение объясняет, где включить сетевое расширение, и сразу открывает этот переключатель; в окнах macOS теперь название TrackNothing
 
 ## 1.0.9
 
