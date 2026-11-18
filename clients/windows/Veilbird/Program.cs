@@ -9,7 +9,7 @@ public static class Program {
         using var show=new EventWaitHandle(false,EventResetMode.AutoReset,@"Global\TrackNothing.Show");
         if(!first) {show.Set();return 0;}
         StopLegacyTunnel();
-        var app=new App();app.InitializeComponent();
+        var app=new App();app.InitializeComponent();Look.Apply(Look.Theme);
         Crash.Watch(app.Dispatcher);
         // Started by the "open at login" task with --background: only the tray icon appears.
         var window=new MainWindow();app.MainWindow=window;

@@ -25,6 +25,9 @@ struct ClientView:View {
     @State private var versionTaps=0
     @State private var firstTap=Date.distantPast
     @State private var choosingLanguage=false
+    @State private var choosingAppearance=false
+    /// Amber or Moon (VeilbirdStyle reads it); the whole window re-renders on change.
+    @AppStorage(VeilbirdStyle.themeKey) private var appearance="amber"
     @State private var checking=false
     @State private var checkRunning=false
     @State private var checkResult:[String:Int]?
@@ -83,6 +86,8 @@ struct ClientView:View {
             #endif
             }
         }
+        // A new appearance redraws every view with the other palette.
+        .id(appearance)
         .overlay(alignment:.bottom) {messageBanner}
         .foregroundStyle(VeilbirdStyle.text).tint(VeilbirdStyle.accent)
         .environment(\.locale, L10n.locale).preferredColorScheme(.dark)
@@ -853,6 +858,13 @@ struct ClientView:View {
                     settingRow(L10n.text("change_password"),"") {if !email.isEmpty {resetEmail=email}}
                     Hairline()
                     languageChooser(settingRow(L10n.text("language"),currentLanguage.name) {choosingLanguage=true})
+                    Hairline()
+                    settingRow(L10n.text("appearance"),L10n.text(appearance == "moon" ? "theme_moon":"theme_amber")) {choosingAppearance=true}
+                        .confirmationDialog(L10n.text("appearance"),isPresented:$choosingAppearance,titleVisibility:.visible) {
+                            Button(L10n.text("theme_amber")) {appearance="amber"}
+                            Button(L10n.text("theme_moon")) {appearance="moon"}
+                            Button(L10n.text("cancel"),role:.cancel) {}
+                        }
                     Hairline()
                     Toggle(isOn:$model.killSwitch) {
                         VStack(alignment:.leading,spacing:2) {

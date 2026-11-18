@@ -5,23 +5,31 @@ import CoreText
 /// hairline sheets, and amber only for the light of the connect moment (scan line, seal, live state). Same values on
 /// every platform.
 enum VeilbirdStyle {
-    static let ground = Color(red:8/255,green:7/255,blue:6/255)
-    static let surface = Color(red:23/255,green:21/255,blue:19/255)
-    static let raised = Color(red:33/255,green:31/255,blue:28/255)
-    static let selected = Color(red:46/255,green:43/255,blue:38/255)
-    static let text = Color(red:237/255,green:231/255,blue:223/255)
-    static let secondary = Color(red:163/255,green:155/255,blue:145/255)
-    static let faint = Color(red:149/255,green:139/255,blue:124/255)
-    static let accent = Color(red:224/255,green:164/255,blue:88/255)
+    /// "amber" (the default) or "moon", a softer look where the light is pearl to rose; chosen in Account → Appearance.
+    /// Views that should follow a change read `@AppStorage(VeilbirdStyle.themeKey)` and re-render (see ClientView).
+    static let themeKey = "appearance"
+    static var theme:String {UserDefaults.standard.string(forKey:themeKey) ?? "amber"}
+    private static var moon:Bool {theme == "moon"}
+    private static func rgb(_ r:Double,_ g:Double,_ b:Double)->Color {Color(red:r/255,green:g/255,blue:b/255)}
+    static var ground:Color {moon ? rgb(10,8,9):rgb(8,7,6)}
+    static var surface:Color {moon ? rgb(24,20,22):rgb(23,21,19)}
+    static var raised:Color {moon ? rgb(34,29,31):rgb(33,31,28)}
+    static var selected:Color {moon ? rgb(48,41,44):rgb(46,43,38)}
+    static var text:Color {moon ? rgb(244,238,232):rgb(237,231,223)}
+    static var secondary:Color {moon ? rgb(172,160,162):rgb(163,155,145)}
+    static var faint:Color {moon ? rgb(152,138,142):rgb(149,139,124)}
+    static var accent:Color {moon ? rgb(235,184,195):rgb(224,164,88)}
     /// Buttons are outlined, not filled: text on an "accent" control is the accent itself.
-    static let onAccent = Color(red:224/255,green:164/255,blue:88/255)
+    static var onAccent:Color {accent}
     static let danger = Color(red:240/255,green:103/255,blue:90/255)
-    static let fair = Color(red:232/255,green:134/255,blue:106/255)
-    static let hairline = Color(red:237/255,green:231/255,blue:223/255).opacity(0.063)
+    static var fair:Color {moon ? rgb(226,150,120):rgb(232,134,106)}
+    static var hairline:Color {text.opacity(0.063)}
     /// Sheet outline: blocks are a hairline on the ground, not a filled card.
-    static let edge = Color(red:255/255,green:214/255,blue:160/255).opacity(0.09)
+    static var edge:Color {light.opacity(0.09)}
     /// Lamp light and sealed dots.
-    static let light = Color(red:255/255,green:214/255,blue:160/255)
+    static var light:Color {moon ? rgb(248,226,230):rgb(255,214,160)}
+    /// Past figures in charts (the accent, dimmed).
+    static var past:Color {moon ? rgb(112,86,94):rgb(111,90,63)}
     #if os(macOS)
     static let mac = true
     #else
@@ -152,7 +160,7 @@ struct UsageBars:View {
             let block:CGFloat=4, pitch:CGFloat=6, rows=max(1,Int((area.height+pitch-block)/pitch)), top=max(values.max() ?? 1,1)
             for (i,value) in values.enumerated() {
                 let lit=value<=0 ? 1:max(1,Int((Double(rows)*Double(value)/Double(top)).rounded()))
-                let color=i>=values.count-recent ? VeilbirdStyle.accent:Color(red:111/255,green:90/255,blue:63/255)
+                let color=i>=values.count-recent ? VeilbirdStyle.accent:VeilbirdStyle.past
                 let left=CGFloat(i)*(width+gap)
                 for r in 0..<lit {context.fill(Path(CGRect(x:left,y:area.height-CGFloat(r)*pitch-block,width:width,height:block)),with:.color(color))}
             }
@@ -178,7 +186,7 @@ struct RateBars:View {
                 for r in 0..<lit {context.fill(Path(CGRect(x:left,y:axis-2-CGFloat(r)*pitch-block,width:width,height:block)),with:.color(VeilbirdStyle.accent))}
                 let sent=i<up.count ? up[i]:0
                 let litUp=sent<=0 ? 0:max(1,Int((Double(bottomRows)*Double(sent)/Double(top)).rounded()))
-                for r in 0..<litUp {context.fill(Path(CGRect(x:left,y:axis+3+CGFloat(r)*pitch,width:width,height:block)),with:.color(Color(red:111/255,green:90/255,blue:63/255)))}
+                for r in 0..<litUp {context.fill(Path(CGRect(x:left,y:axis+3+CGFloat(r)*pitch,width:width,height:block)),with:.color(VeilbirdStyle.past))}
             }
         }.accessibilityHidden(true)
     }

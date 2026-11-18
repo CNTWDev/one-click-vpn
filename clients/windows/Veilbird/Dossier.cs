@@ -13,7 +13,8 @@ namespace Veilbird;
 /// animations off it switches at once.
 public sealed class SealedText:Grid {
     private const string Glyphs="01ABCDEF#%/<>*+=";
-    private static readonly Brush DotBrush=MakeDots();
+    private static readonly Dictionary<string,Brush> dotBrushes=new();
+    private static Brush DotBrush=>dotBrushes.TryGetValue(Look.Theme,out var brush)?brush:dotBrushes[Look.Theme]=MakeDots();
     private readonly TextBlock text=new() {FontFamily=new FontFamily("Cascadia Mono, Consolas"),TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap,VerticalAlignment=VerticalAlignment.Center};
     private readonly Rectangle dots=new() {Fill=DotBrush,Opacity=0,IsHitTestVisible=false,HorizontalAlignment=HorizontalAlignment.Left};
     private readonly DispatcherTimer timer=new() {Interval=TimeSpan.FromMilliseconds(42)};
@@ -56,7 +57,7 @@ public sealed class SealedText:Grid {
         text.Text=new string(value.Select(c=>c is ' ' or '·'?c:Glyphs[random.Next(Glyphs.Length)]).ToArray());
     }
     private static Brush MakeDots() {
-        var dot=new GeometryDrawing(new SolidColorBrush(Color.FromArgb(97,255,214,160)),null,new EllipseGeometry(new Point(2,2),0.85,0.85));
+        var dot=new GeometryDrawing(new SolidColorBrush(Color.FromArgb(97,Look.LightColor.R,Look.LightColor.G,Look.LightColor.B)),null,new EllipseGeometry(new Point(2,2),0.85,0.85));
         var brush=new DrawingBrush(new DrawingGroup {Children={new GeometryDrawing(Brushes.Transparent,null,new RectangleGeometry(new Rect(0,0,4,4))),dot}}) {
             TileMode=TileMode.Tile,Viewport=new Rect(0,0,4,4),ViewportUnits=BrushMappingMode.Absolute,Viewbox=new Rect(0,0,4,4),ViewboxUnits=BrushMappingMode.Absolute};
         brush.Freeze();return brush;
@@ -66,7 +67,7 @@ public sealed class SealedText:Grid {
 /// The connect moment's light: a thin amber line with a soft trail that sweeps down the file when it is sealed and
 /// back up when it is opened. Invisible at rest.
 public sealed class ScanLine:Canvas {
-    private readonly Rectangle trail=new() {Height=70},glow=new() {Height=6,Fill=new SolidColorBrush(Color.FromArgb(60,224,164,88))},line=new() {Height=1,Fill=Look.Accent};
+    private readonly Rectangle trail=new() {Height=70},glow=new() {Height=6},line=new() {Height=1,Fill=Look.Accent};
     private readonly TranslateTransform move=new();
     private readonly Canvas band=new() {Opacity=0};
     public ScanLine() {
@@ -78,8 +79,9 @@ public sealed class ScanLine:Canvas {
     }
     public void Sweep(bool down,int duration=1300) {
         if(!SystemParameters.ClientAreaAnimation||ActualHeight<=0) return;
-        var h=ActualHeight;
-        trail.Fill=new LinearGradientBrush(Color.FromArgb(0,224,164,88),Color.FromArgb(28,224,164,88),down?90:270);
+        var h=ActualHeight;var c=Look.AccentColor;
+        trail.Fill=new LinearGradientBrush(Color.FromArgb(0,c.R,c.G,c.B),Color.FromArgb(28,c.R,c.G,c.B),down?90:270);
+        glow.Fill=new SolidColorBrush(Color.FromArgb(60,c.R,c.G,c.B));line.Fill=Look.Accent;
         Canvas.SetTop(trail,down?-70:0);Canvas.SetTop(glow,-3);Canvas.SetTop(line,0);
         var time=TimeSpan.FromMilliseconds(duration);
         move.BeginAnimation(TranslateTransform.YProperty,new DoubleAnimation(down?0:h,down?h:0,time));

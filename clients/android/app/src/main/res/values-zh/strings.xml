@@ -43,6 +43,7 @@
   <string name="allow_the_system_vpn_permission_to_connect">允许系统 VPN 权限后才能连接。</string>
   <string name="allow_vpn_access_on_your_first_connection">首次连接需要允许系统 VPN 权限</string>
   <string name="announcement">公告</string>
+  <string name="appearance">外观</string>
   <string name="ask_your_administrator_to_enable_veilbird_client_access">请联系管理员开通 TrackNothing 客户端访问。</string>
   <string name="authorized_devices">授权设备</string>
   <string name="authorizing_and_connecting">正在授权并连接…</string>
@@ -270,6 +271,8 @@
   <string name="tap_to_check">轻点体检</string>
   <string name="test_after_disconnecting">连接中无法测速，显示的是上次结果。</string>
   <string name="the_simulator_is_for_ui_testing_only_test_the">模拟器仅用于界面测试，请使用已签名的真机版本测试 VPN。</string>
+  <string name="theme_amber">琥珀</string>
+  <string name="theme_moon">月晕</string>
   <string name="this_development_build_lacks_signing_entitlements_configure_your_developer">当前开发包缺少签名授权，需配置开发者团队并签名后使用。</string>
   <string name="this_device"> · 本机</string>
   <string name="this_device_will_lose_access_revoke_authorization">该设备将不能继续连接。确认解除授权？</string>

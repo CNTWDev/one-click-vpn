@@ -23,10 +23,44 @@ public enum RingState {Idle,Connecting,Connected,Failed}
 /// (warm near-black, amber only for light, nearly square corners) with the ∅ mark on a 16×16 grid, rings of square dots and the Doto dot-matrix face for figures.
 public static class Look {
     public static Brush Hex(string hex) {var brush=(Brush)new BrushConverter().ConvertFromString(hex)!;brush.Freeze();return brush;}
-    public static readonly Brush Ground=Hex("#080706"),Surface=Hex("#171513"),Raised=Hex("#211F1C"),Selected=Hex("#2E2B26"),Text=Hex("#EDE7DF"),Secondary=Hex("#A39B91"),Faint=Hex("#958B7C");
-    public static readonly Brush Accent=Hex("#E0A458"),OnAccent=Hex("#E0A458"),Danger=Hex("#F0675A"),Fair=Hex("#E8866A"),Hairline=Hex("#0FEDE7DF"),Edge=Hex("#17FFD6A0"),Line=Hex("#17FFD6A0"),Off=Hex("#34312B");
-    /// An "accent" control is outlined, not filled: a faint amber wash inside an amber line (OnAccent is the accent itself).
-    public static readonly Brush AccentWash=Hex("#10E0A458"),AccentLine=Hex("#B3E0A458"),Light=Hex("#FFD6A0");
+    /// "amber" (the default) or "moon", a softer look where the light is pearl to rose; chosen in Account → Appearance.
+    /// Pages are rebuilt on change, and the window's own chrome follows through dynamic resources (Apply).
+    public static string Theme {get;private set;}=Settings.Get("appearance","amber")=="moon"?"moon":"amber";
+    private sealed record Set(Brush Ground,Brush Surface,Brush Raised,Brush Selected,Brush Text,Brush Secondary,Brush Faint,Brush Accent,Brush Fair,Brush Hairline,Brush Edge,Brush AccentWash,Brush AccentLine,Brush Light,Brush Past,Color AccentColor,Color LightColor);
+    private static readonly Set Amber=new(Hex("#080706"),Hex("#171513"),Hex("#211F1C"),Hex("#2E2B26"),Hex("#EDE7DF"),Hex("#A39B91"),Hex("#958B7C"),Hex("#E0A458"),Hex("#E8866A"),Hex("#0FEDE7DF"),Hex("#17FFD6A0"),Hex("#10E0A458"),Hex("#B3E0A458"),Hex("#FFD6A0"),Hex("#6F5A3F"),Color.FromRgb(224,164,88),Color.FromRgb(255,214,160));
+    private static readonly Set Moon=new(Hex("#0A0809"),Hex("#181416"),Hex("#221D1F"),Hex("#30292C"),Hex("#F4EEE8"),Hex("#ACA0A2"),Hex("#988A8E"),Hex("#EBB8C3"),Hex("#E29678"),Hex("#0FF4EEE8"),Hex("#17F8E2E6"),Hex("#10EBB8C3"),Hex("#B3EBB8C3"),Hex("#F8E2E6"),Hex("#70565E"),Color.FromRgb(235,184,195),Color.FromRgb(248,226,230));
+    private static Set Current=>Theme=="moon"?Moon:Amber;
+    public static Brush Ground=>Current.Ground;
+    public static Brush Surface=>Current.Surface;
+    public static Brush Raised=>Current.Raised;
+    public static Brush Selected=>Current.Selected;
+    public static Brush Text=>Current.Text;
+    public static Brush Secondary=>Current.Secondary;
+    public static Brush Faint=>Current.Faint;
+    public static Brush Accent=>Current.Accent;
+    /// An "accent" control is outlined, not filled: OnAccent is the accent itself.
+    public static Brush OnAccent=>Current.Accent;
+    public static Brush Fair=>Current.Fair;
+    public static Brush Hairline=>Current.Hairline;
+    public static Brush Edge=>Current.Edge;
+    public static Brush Line=>Current.Edge;
+    /// A faint wash inside a line of the accent: the outlined "accent" control.
+    public static Brush AccentWash=>Current.AccentWash;
+    public static Brush AccentLine=>Current.AccentLine;
+    /// The lamp, crop marks and sealed dots.
+    public static Brush Light=>Current.Light;
+    /// Past figures in charts (the accent, dimmed).
+    public static Brush Past=>Current.Past;
+    public static Color AccentColor=>Current.AccentColor;
+    public static Color LightColor=>Current.LightColor;
+    public static readonly Brush Danger=Hex("#F0675A"),Off=Hex("#34312B");
+    /// Switches the look, saves it, and updates the application resources the XAML reads dynamically.
+    public static void Apply(string theme) {
+        Theme=theme=="moon"?"moon":"amber";Settings.Set("appearance",Theme);
+        var resources=Application.Current.Resources;
+        resources["Ground"]=Ground;resources["Surface"]=Surface;resources["Raised"]=Raised;resources["Selected"]=Selected;resources["Text"]=Text;
+        resources["Secondary"]=Secondary;resources["Faint"]=Faint;resources["Accent"]=Accent;resources["OnAccent"]=Accent;resources["AccentWash"]=AccentWash;resources["Hairline"]=Hairline;
+    }
     public static readonly FontFamily Icons=new("Segoe Fluent Icons, Segoe MDL2 Assets");
     /// Doto Black (SIL OFL, under Assets/Fonts), Latin only: wordmark, timers, totals and country codes.
     public static readonly FontFamily Dots=new(new Uri("pack://application:,,,/"),"./Assets/Fonts/#Doto Black");

@@ -18,7 +18,7 @@ import android.view.animation.DecelerateInterpolator
 class SpaceView(context: Context) : View(context) {
     private val d = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val marks = Paint().apply { color = Color.argb(66, 255, 214, 160); strokeWidth = maxOf(1f, d) }
+    private val marks = Paint().apply { strokeWidth = maxOf(1f, d) }
     private var lamp = 1f
     private var fade: ValueAnimator? = null
     var lit = true
@@ -41,10 +41,11 @@ class SpaceView(context: Context) : View(context) {
         if (lamp > 0.01f) {
             val radius = maxOf(w, h * 0.6f)
             paint.shader = RadialGradient(w / 2, -h * 0.06f, radius,
-                intArrayOf(Color.argb((41 * lamp).toInt(), 255, 214, 160), Color.argb((10 * lamp).toInt(), 255, 214, 160), Color.argb(0, 255, 214, 160)),
+                intArrayOf(Palette.alpha(Palette.light, (41 * lamp).toInt()), Palette.alpha(Palette.light, (10 * lamp).toInt()), Palette.alpha(Palette.light, 0)),
                 floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
             canvas.drawRect(0f, 0f, w, h * 0.7f, paint); paint.shader = null
         }
+        marks.color = Palette.alpha(Palette.light, 66)
         // Crop marks clear of the status and navigation bars.
         val insets = rootWindowInsets
         @Suppress("DEPRECATION") val top = (insets?.systemWindowInsetTop ?: 0) + 10 * d

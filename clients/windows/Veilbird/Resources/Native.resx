@@ -45,6 +45,7 @@
   <data name="allow_the_system_vpn_permission_to_connect" xml:space="preserve"><value>Allow the system VPN permission to connect.</value></data>
   <data name="allow_vpn_access_on_your_first_connection" xml:space="preserve"><value>Allow VPN access on your first connection</value></data>
   <data name="announcement" xml:space="preserve"><value>Announcement</value></data>
+  <data name="appearance" xml:space="preserve"><value>Appearance</value></data>
   <data name="ask_your_administrator_to_enable_veilbird_client_access" xml:space="preserve"><value>Ask your administrator to enable TrackNothing client access.</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>Authorized devices</value></data>
   <data name="authorizing_and_connecting" xml:space="preserve"><value>Authorizing and connecting…</value></data>
@@ -272,6 +273,8 @@
   <data name="tap_to_check" xml:space="preserve"><value>Tap to check</value></data>
   <data name="test_after_disconnecting" xml:space="preserve"><value>Latency is tested while disconnected. Showing the last results.</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>The simulator is for UI testing only. Test the VPN on a signed physical-device build.</value></data>
+  <data name="theme_amber" xml:space="preserve"><value>Amber</value></data>
+  <data name="theme_moon" xml:space="preserve"><value>Moon halo</value></data>
   <data name="this_development_build_lacks_signing_entitlements_configure_your_developer" xml:space="preserve"><value>This development build lacks signing entitlements. Configure your developer team and sign it first.</value></data>
   <data name="this_device" xml:space="preserve"><value> · This device</value></data>
   <data name="this_device_will_lose_access_revoke_authorization" xml:space="preserve"><value>This device will lose access. Revoke authorization?</value></data>

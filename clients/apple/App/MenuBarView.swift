@@ -15,6 +15,7 @@ import ServiceManagement
 struct MenuBarView:View {
     @EnvironmentObject private var model:ClientModel
     @Environment(\.openWindow) private var openWindow
+    @AppStorage(VeilbirdStyle.themeKey) private var appearance="amber"
     var body:some View {
         let on=model.connected && model.since != nil
         VStack(alignment:.leading,spacing:0) {
@@ -89,7 +90,7 @@ struct MenuBarView:View {
             }.padding(.top,6)
         }.padding(.horizontal,12).padding(.top,14).padding(.bottom,8).frame(width:320)
         .background(VeilbirdStyle.ground).foregroundStyle(VeilbirdStyle.text).preferredColorScheme(.dark)
-        .environment(\.locale, L10n.locale).task {try? await model.loadAccount()}
+        .environment(\.locale, L10n.locale).id(appearance).task {try? await model.loadAccount()}
     }
     private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
     private func cell(_ title:String,_ value:String,_ tint:Color)->some View {

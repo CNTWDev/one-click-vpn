@@ -1,7 +1,7 @@
-<Window x:Class="Veilbird.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:Veilbird" Title="TrackNothing" Icon="Assets/Veilbird.ico" Width="380" Height="672" ResizeMode="CanMinimize" WindowStyle="None" Background="{StaticResource Ground}" Foreground="{StaticResource Text}" FontFamily="Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI" FontSize="14" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" WindowStartupLocation="CenterScreen">
+<Window x:Class="Veilbird.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:Veilbird" Title="TrackNothing" Icon="Assets/Veilbird.ico" Width="380" Height="672" ResizeMode="CanMinimize" WindowStyle="None" Background="{DynamicResource Ground}" Foreground="{DynamicResource Text}" FontFamily="Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI" FontSize="14" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" WindowStartupLocation="CenterScreen">
   <!-- A small fixed-size tool window with its own dark title bar; the tray icon carries the quick actions. -->
   <WindowChrome.WindowChrome><WindowChrome CaptionHeight="32" ResizeBorderThickness="0" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/></WindowChrome.WindowChrome>
-  <Border BorderBrush="#1FEDE7DF" BorderThickness="1">
+  <Border BorderBrush="{DynamicResource Hairline}" BorderThickness="1">
     <Grid>
       <Grid.RowDefinitions><RowDefinition Height="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
       <!-- The lamp-lit backdrop (Space.cs) behind the title bar, pages and activity panel. -->
@@ -28,10 +28,10 @@
             <StackPanel x:Name="NavigationPanel" DockPanel.Dock="Left" Orientation="Horizontal"/>
             <ContentControl x:Name="HeaderSlot" DockPanel.Dock="Right" VerticalAlignment="Center"/>
           </DockPanel>
-          <ProgressBar x:Name="BusyBar" Grid.Row="1" Height="2" Margin="16,0" IsIndeterminate="True" Foreground="{StaticResource Accent}" Background="Transparent" BorderThickness="0" Visibility="Hidden"/>
+          <ProgressBar x:Name="BusyBar" Grid.Row="1" Height="2" Margin="16,0" IsIndeterminate="True" Foreground="{DynamicResource Accent}" Background="Transparent" BorderThickness="0" Visibility="Hidden"/>
           <ScrollViewer x:Name="Scroller" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False"><StackPanel x:Name="ContentPanel" Margin="16,8,16,16"/></ScrollViewer>
           <Grid x:Name="FullPanel" Grid.Row="2" Visibility="Collapsed"/>
-          <Border x:Name="Toast" Grid.Row="2" VerticalAlignment="Bottom" Margin="16,0,16,16" Padding="14,10" CornerRadius="3" Background="{StaticResource Raised}" BorderBrush="#66F0675A" BorderThickness="1" Visibility="Collapsed" Cursor="Hand">
+          <Border x:Name="Toast" Grid.Row="2" VerticalAlignment="Bottom" Margin="16,0,16,16" Padding="14,10" CornerRadius="3" Background="{DynamicResource Raised}" BorderBrush="#66F0675A" BorderThickness="1" Visibility="Collapsed" Cursor="Hand">
             <TextBlock x:Name="ToastText" FontSize="13"/>
           </Border>
         </Grid>

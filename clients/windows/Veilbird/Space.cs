@@ -22,9 +22,7 @@ public sealed class Space:FrameworkElement {
             BeginAnimation(LampProperty,new DoubleAnimation(target,TimeSpan.FromMilliseconds(1600)) {EasingFunction=new CubicEase {EasingMode=EasingMode.EaseOut}});
         }
     }
-    private static readonly Color Light=Color.FromRgb(255,214,160);
-    private static readonly Pen Marks=Freeze(new Pen(new SolidColorBrush(Color.FromArgb(66,255,214,160)),1));
-    private static Pen Freeze(Pen pen) {pen.Freeze();return pen;}
+    private static Color Light=>Look.LightColor;
 
     public Space() {IsHitTestVisible=false;Focusable=false;}
 
@@ -42,10 +40,11 @@ public sealed class Space:FrameworkElement {
             dc.DrawRectangle(lamp,null,new Rect(0,0,W,H*0.7));
         }
         // Crop marks, 12 px long, 10 px in from each corner; pixel-snapped so the hairlines stay crisp.
+        var marks=new Pen(new SolidColorBrush(Color.FromArgb(66,Light.R,Light.G,Light.B)),1);marks.Freeze();
         double l=10.5,t=10.5,r=W-10.5,b=H-10.5,len=12;
         foreach(var (x,y,dx,dy) in new[]{(l,t,1,1),(r,t,-1,1),(l,b,1,-1),(r,b,-1,-1)}) {
-            dc.DrawLine(Marks,new Point(x,y),new Point(x+len*dx,y));
-            dc.DrawLine(Marks,new Point(x,y),new Point(x,y+len*dy));
+            dc.DrawLine(marks,new Point(x,y),new Point(x+len*dx,y));
+            dc.DrawLine(marks,new Point(x,y),new Point(x,y+len*dy));
         }
     }
 }
