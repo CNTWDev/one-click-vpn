@@ -330,9 +330,7 @@
   <data name="vpn_connection" xml:space="preserve"><value>VPN-подключение</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Новый облик: каждая страница как лист досье, тёплый чёрный и янтарный свет
-При подключении полоса света проходит по главной и строка за строкой скрывает ваш IP, устройство, часовой пояс и язык; при отключении всё открывается снова
-Почта на странице аккаунта скрыта; удерживайте, чтобы увидеть</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Новое оформление «Лунный ореол»: мягкий свет от жемчужного до розового; переключается на экране входа (вверху справа) или в разделе «Аккаунт › Оформление»</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>
