@@ -7758,19 +7758,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New logo: a bolder ∅ ring and bar, filled with the same dots as the home page on large icons; the menu bar, tray and notification icons use it too"
+            "value": "Mac in-app update: once downloaded, click \"Install and Relaunch\"; the app quits, replaces itself and reopens, with no installer to drag\nThe Mac window drops the grey system title bar; the app's own backdrop fills the whole window"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "新 Logo：更粗的 ∅ 圆环和斜杠，大图标用和首页一样的光点填出来；菜单栏、托盘和通知栏也换成新标志"
+            "value": "Mac 应用内升级：下载完点「安装并重启」，自动退出旧版、替换并重新打开，不用再打开安装包拖拽覆盖\nMac 窗口去掉系统灰色标题栏，整个窗口都是应用自己的背景"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Новый логотип: более толстые кольцо и черта ∅, на больших значках — из тех же точек, что на главном экране; значки в строке меню, трее и уведомлениях тоже новые"
+            "value": "Обновление на Mac внутри приложения: после загрузки нажмите «Установить и перезапустить» — приложение закроется, обновится и откроется снова, без перетаскивания\nОкно на Mac без серой системной строки заголовка: фон приложения занимает всё окно"
           }
         }
       }

@@ -22,8 +22,9 @@ struct VeilbirdApp: App {
         #if os(macOS)
         // A small fixed-size tool window; the menu bar icon carries the quick actions and keeps running when it is closed.
         // Signed in, it widens to hold the activity panel beside the app's column.
-        Window("TrackNothing",id:"main") {ClientView().environmentObject(model).frame(width:model.signedIn ? 1040:380,height:620)}
-            .windowResizability(.contentSize)
+        // No system title bar: the app's own backdrop fills the whole window, traffic lights float over it (28 pt strip).
+        Window("TrackNothing",id:"main") {ClientView().environmentObject(model).frame(width:model.signedIn ? 1040:380,height:648)}
+            .windowStyle(.hiddenTitleBar).windowResizability(.contentSize)
         MenuBarExtra {MenuBarView().environmentObject(model)} label:{MenuBarLabel(model:model)}.menuBarExtraStyle(.window)
         #else
         WindowGroup {ClientView().environmentObject(model)}
