@@ -1600,14 +1600,14 @@
     "ru": "Скрыто"
   },
   "seal_action": {
-    "zh": "轻触封存",
-    "en": "Tap to seal",
-    "ru": "Нажмите, чтобы скрыть"
+    "zh": "连接",
+    "en": "Connect",
+    "ru": "Подключиться"
   },
   "unseal_action": {
-    "zh": "已封存",
-    "en": "Sealed",
-    "ru": "Скрыто"
+    "zh": "断开连接",
+    "en": "Disconnect",
+    "ru": "Отключиться"
   },
   "exposed_detail": {
     "zh": "这些信息此刻对外可见",

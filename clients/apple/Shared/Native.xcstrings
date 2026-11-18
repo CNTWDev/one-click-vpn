@@ -5205,19 +5205,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tap to seal"
+            "value": "Connect"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "轻触封存"
+            "value": "连接"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Нажмите, чтобы скрыть"
+            "value": "Подключиться"
           }
         }
       }
@@ -6608,19 +6608,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sealed"
+            "value": "Disconnect"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已封存"
+            "value": "断开连接"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Скрыто"
+            "value": "Отключиться"
           }
         }
       }
@@ -7505,19 +7505,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New look, Moon halo: soft pearl to rose light; switch it on the sign-in screen (top right) or in Account › Appearance"
+            "value": "The Connect button on the home page is easier to see and now says Connect / Disconnect"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "新外观「月晕」：珍珠白到玫瑰粉的柔光，登录页右上角或「我的 › 外观」随时切换"
+            "value": "首页的连接按钮更醒目，直接写「连接」/「断开连接」"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Новое оформление «Лунный ореол»: мягкий свет от жемчужного до розового; переключается на экране входа (вверху справа) или в разделе «Аккаунт › Оформление»"
+            "value": "Кнопка подключения на главной заметнее и теперь называется «Подключиться» / «Отключиться»"
           }
         }
       }

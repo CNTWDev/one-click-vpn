@@ -657,7 +657,7 @@ class MainActivity : Activity() {
             contentDescription = L10n.text(when (state) { LinkState.IDLE -> R.string.connect_action; LinkState.FAILED -> R.string.retry_action; LinkState.CONNECTING -> R.string.cancel; else -> R.string.disconnect_action })
             background = GradientDrawable().apply {
                 cornerRadius = 2.dp.toFloat()
-                if (connected) { setColor(Palette.alpha(Palette.accent, 15)); setStroke(1.dp, Palette.alpha(Palette.accent, 180)) } else setStroke(1.dp, Palette.alpha(Palette.text, 60))
+                if (connected) { setColor(Palette.alpha(Palette.accent, 15)); setStroke(1.dp, Palette.alpha(Palette.accent, 180)) } else { setColor(Palette.alpha(Palette.text, 10)); setStroke(1.dp, Palette.alpha(Palette.text, 120)) }
             }.let { RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.text, 22)), it, null) }
         }
         if (state != shownState) actionLabel?.apply {
