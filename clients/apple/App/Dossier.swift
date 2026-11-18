@@ -17,6 +17,7 @@ struct SealedText:View {
     @State private var scrambling=false
     @State private var ready=false
     private static let glyphs=Array("01ABCDEF#%/<>*+=")
+    init(text:String,sealed:Bool,delay:Double=0,size:CGFloat=13) {self.text=text;self.sealed=sealed;self.delay=delay;self.size=size}
     var body:some View {
         Text(verbatim:shown ?? text).font(.system(size:size,design:.monospaced)).lineLimit(1).truncationMode(.tail)
             .foregroundStyle(scrambling ? VeilbirdStyle.accent:(dots ? Color.clear:VeilbirdStyle.text))
@@ -61,6 +62,7 @@ struct ScanLine:View {
     var duration:Double=1.3
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var start:Date?
+    init(down:Bool,run:Int,duration:Double=1.3) {self.down=down;self.run=run;self.duration=duration}
     var body:some View {
         GeometryReader {geo in
             if let start,!reduceMotion {
@@ -137,6 +139,7 @@ struct BreathingDot:View {
     let on:Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var low=false
+    init(on:Bool) {self.on=on}
     var body:some View {
         Circle().fill(on ? VeilbirdStyle.accent:VeilbirdStyle.text.opacity(0.35)).frame(width:6,height:6)
             .shadow(color:on ? VeilbirdStyle.accent.opacity(0.8):.clear,radius:4)
