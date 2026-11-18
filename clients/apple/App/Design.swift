@@ -45,20 +45,43 @@ enum VeilbirdStyle {
 /// The pixel language shared by every TrackNothing client: the ∅ mark, rings of square dots and the Doto dot-matrix
 /// face for figures. The mark's geometry matches scripts/brand-icons.py and the other clients.
 enum Pixel {
-    /// The dot form's dots (x, y, radius) in the mark's 100×100 box: lit from the upper left, size carries the light.
-    static let markDots:[(Double,Double,Double)]={
+    /// How lit a point of the mark is (0…1): light falls from the upper left, as on the home page's portrait.
+    private static func markLight(_ x:Double,_ y:Double)->Double {
+        let dx:Double=x-42
+        let dy:Double=y-34
+        let f:Double=(dx*dx+dy*dy).squareRoot()/82
+        if f<0.22 {return 1-f/0.22*0.15}
+        if f<0.48 {return 0.85-(f-0.22)/0.26*0.5}
+        if f<0.66 {return 0.35-(f-0.48)/0.18*0.27}
+        return 0.08
+    }
+    /// Whether a point of the 100×100 box is inside the mark: the ring (cut either side of the bar) or the bar.
+    private static func inMark(_ x:Double,_ y:Double)->Bool {
+        let cx:Double=x-50
+        let cy:Double=y-50
+        let d:Double=(cx*cx+cy*cy).squareRoot()
+        let across:Double=abs(cx+cy)/2.0.squareRoot()
+        let along:Double=abs(cx-cy)/2.0.squareRoot()
+        if d>=25 && d<=37 && across>11 {return true}
+        return across<=5.6 && along<=46
+    }
+    /// The dot form's dots (x, y, radius) in the mark's 100×100 box; dot size carries the light.
+    static let markDots:[(Double,Double,Double)]=buildMarkDots()
+    private static func buildMarkDots()->[(Double,Double,Double)] {
         var out:[(Double,Double,Double)]=[]
-        let pitch=3.4,root2=2.0.squareRoot()
-        for j in 0..<31 {for i in 0..<31 {
-            let x=pitch/2+Double(i)*pitch+(j%2==1 ? pitch/2:0),y=pitch/2+Double(j)*pitch*0.866
-            let d=((x-50)*(x-50)+(y-50)*(y-50)).squareRoot(),across=abs((x-50)+(y-50))/root2,along=abs((x-50)-(y-50))/root2
-            guard (d>=25 && d<=37 && across>11) || (across<=5.6 && along<=46) else {continue}
-            let f=((x-42)*(x-42)+(y-34)*(y-34)).squareRoot()/82
-            let light=f<0.22 ? 1-f/0.22*0.15:(f<0.48 ? 0.85-(f-0.22)/0.26*0.5:(f<0.66 ? 0.35-(f-0.48)/0.18*0.27:0.08))
-            out.append((x,y,1.65*max(0.5,light).squareRoot()))
-        }}
+        let pitch:Double=3.4
+        for j in 0..<31 {
+            let shift:Double=j%2==1 ? pitch/2:0
+            let y:Double=pitch/2+Double(j)*pitch*0.866
+            for i in 0..<31 {
+                let x:Double=pitch/2+Double(i)*pitch+shift
+                if !inMark(x,y) {continue}
+                let r:Double=1.65*max(0.5,markLight(x,y)).squareRoot()
+                out.append((x,y,r))
+            }
+        }
         return out
-    }()
+    }
     /// Cells one cell wide on a circle of `radius` in an n×n grid, each with its clockwise position from the top (0…1).
     static func ring(_ n:Int,radius:Double)->[(x:Int,y:Int,turn:Double)] {
         let c=Double(n-1)/2
@@ -78,27 +101,36 @@ enum Pixel {
     /// The ∅ mark: a heavy ring and bar with a gap where the bar crosses; the shape's 8…92 span of its 100 box fills
     /// the rect. From 40 pt up it is a halftone of dots, smaller it is solid.
     static func markPath(in rect:CGRect)->Path {
-        let size=min(rect.width,rect.height),k=size/84
-        let x0=rect.midX-50*k,y0=rect.midY-50*k
+        let size:Double=Double(min(rect.width,rect.height))
+        let k:Double=size/84
+        let x0:Double=Double(rect.midX)-50*k
+        let y0:Double=Double(rect.midY)-50*k
+        func point(_ x:Double,_ y:Double)->CGPoint {CGPoint(x:x0+x*k,y:y0+y*k)}
         var path=Path()
         if size>=40 {
-            for (x,y,r) in markDots {path.addEllipse(in:CGRect(x:x0+(x-r)*k,y:y0+(y-r)*k,width:2*r*k,height:2*r*k))}
+            for (x,y,r) in markDots {
+                let corner=point(x-r,y-r)
+                let side:Double=2*r*k
+                path.addEllipse(in:CGRect(x:corner.x,y:corner.y,width:side,height:side))
+            }
             return path
         }
-        let centre=CGPoint(x:x0+50*k,y:y0+50*k)
-        let ao=asin(13/37.5)*180/Double.pi,ai=asin(13/22.5)*180/Double.pi
+        let centre=point(50,50)
+        let ao:Double=asin(13.0/37.5)*180/Double.pi
+        let ai:Double=asin(13.0/22.5)*180/Double.pi
         for turn in [0.0,180.0] {
-            let start=(turn+ao-45)*Double.pi/180
-            path.move(to:CGPoint(x:centre.x+37.5*k*cos(start),y:centre.y+37.5*k*sin(start)))
-            path.addArc(center:centre,radius:37.5*k,startAngle:.degrees(turn+ao-45),endAngle:.degrees(turn+135-ao),clockwise:false)
-            path.addArc(center:centre,radius:22.5*k,startAngle:.degrees(turn+135-ai),endAngle:.degrees(turn+ai-45),clockwise:true)
+            let start:Double=(turn+ao-45)*Double.pi/180
+            path.move(to:point(50+37.5*cos(start),50+37.5*sin(start)))
+            path.addArc(center:centre,radius:CGFloat(37.5*k),startAngle:.degrees(turn+ao-45),endAngle:.degrees(turn+135-ao),clockwise:false)
+            path.addArc(center:centre,radius:CGFloat(22.5*k),startAngle:.degrees(turn+135-ai),endAngle:.degrees(turn+ai-45),clockwise:true)
             path.closeSubpath()
         }
-        let h=47/2.0.squareRoot(),w=7/2.0.squareRoot()
-        path.move(to:CGPoint(x:x0+(50-h-w)*k,y:y0+(50+h-w)*k))
-        path.addLine(to:CGPoint(x:x0+(50+h-w)*k,y:y0+(50-h-w)*k))
-        path.addLine(to:CGPoint(x:x0+(50+h+w)*k,y:y0+(50-h+w)*k))
-        path.addLine(to:CGPoint(x:x0+(50-h+w)*k,y:y0+(50+h+w)*k))
+        let h:Double=47/2.0.squareRoot()
+        let w:Double=7/2.0.squareRoot()
+        path.move(to:point(50-h-w,50+h-w))
+        path.addLine(to:point(50+h-w,50-h-w))
+        path.addLine(to:point(50+h+w,50-h+w))
+        path.addLine(to:point(50-h+w,50+h+w))
         path.closeSubpath()
         return path
     }
