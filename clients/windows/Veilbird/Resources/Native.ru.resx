@@ -139,7 +139,7 @@
   <data name="enter_email" xml:space="preserve"><value>Введите почту</value></data>
   <data name="enter_password" xml:space="preserve"><value>Введите пароль</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Введите почту и пароль.</value></data>
-  <data name="exposed_detail" xml:space="preserve"><value>Это сейчас видно всем</value></data>
+  <data name="exposed_detail" xml:space="preserve"><value>Любой сайт сейчас видит всё это</value></data>
   <data name="exposed_status" xml:space="preserve"><value>Видно</value></data>
   <data name="file_device" xml:space="preserve"><value>Устройство</value></data>
   <data name="file_language" xml:space="preserve"><value>Язык</value></data>
@@ -243,9 +243,11 @@
   <data name="section_activity" xml:space="preserve"><value>§03 Активность</value></data>
   <data name="section_check" xml:space="preserve"><value>§05 Проверка</value></data>
   <data name="section_locations" xml:space="preserve"><value>§02 Локации</value></data>
+  <data name="section_portrait" xml:space="preserve"><value>§01 Как вас видят сейчас</value></data>
   <data name="section_sign_in" xml:space="preserve"><value>§00 Вход</value></data>
   <data name="section_status" xml:space="preserve"><value>§01 Статус</value></data>
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>Защищённое хранилище недоступно. Разблокируйте устройство и повторите.</value></data>
+  <data name="seen_as" xml:space="preserve"><value>Сайты видят только {0}</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>Самая быстрая локация, при сбое — следующая</value></data>
   <data name="send_reset_link" xml:space="preserve"><value>Отправить</value></data>
   <data name="server_address" xml:space="preserve"><value>Адрес сервера</value></data>
@@ -277,6 +279,7 @@
   <data name="tap_ring_to_connect" xml:space="preserve"><value>Нажмите на кольцо, чтобы подключиться</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>Нажмите, чтобы сменить</value></data>
   <data name="tap_to_check" xml:space="preserve"><value>Нажмите для проверки</value></data>
+  <data name="tap_to_hide" xml:space="preserve"><value>Нажмите, чтобы скрыться</value></data>
   <data name="test_after_disconnecting" xml:space="preserve"><value>Задержка проверяется без подключения. Показаны последние результаты.</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>Симулятор предназначен только для интерфейса. Проверяйте VPN на подписанной сборке для устройства.</value></data>
   <data name="theme_amber" xml:space="preserve"><value>Янтарь</value></data>
@@ -336,9 +339,8 @@
   <data name="vpn_connection" xml:space="preserve"><value>VPN-подключение</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Кнопка подключения выделена фирменным цветом, её сразу видно; формулировки стали проще («Видно» / «Скрыто»)
-Если не хватает системного разрешения (сетевое расширение на Mac, конфигурация VPN, доступ к VPN на Android), главная страница подсказывает, где его дать; на Mac настройки открываются одним нажатием, а подключение начинается сразу после разрешения
-Исправление для Android: на высоких экранах нижняя часть главной (кнопка, локация, трафик) не показывалась и страница не прокручивалась</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Новый главный экран «портрет»: то, что о вас сейчас видно, — дышащая сфера из точек света, под ней IP, устройство, часовой пояс и язык
+Сфера и есть переключатель («Нажмите, чтобы скрыться»); после подключения она становится кольцом со временем скрытия и скоростью</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>

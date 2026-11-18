@@ -119,3 +119,119 @@ class ScanLine(context: Context) : View(context) {
         canvas.drawRect(0f, y, w, y + maxOf(1f, d), line)
     }
 }
+
+/**
+ * The connect page's portrait: what any site can see of this phone, drawn as a sphere of warm light dots (the
+ * address, device, time zone and language are written under it). The sphere is the switch: open it carries one
+ * line, "tap to hide", and breathes slowly. When the connection starts the dots go dark and a thin amber ring
+ * lights in their place, holding the time hidden and the rates; it opens again on disconnect. The same drawing on
+ * every client (Apple PortraitView, Windows Portrait).
+ */
+class Portrait(context: Context) : View(context) {
+    private val d = resources.displayMetrics.density
+    /** The line in the open sphere (tap_to_hide). */
+    var invite: String = ""
+        set(value) { if (field != value) { field = value; invalidate() } }
+    /** In the ring once hidden: the time hidden, and the rates under it. */
+    var centre: String = ""
+        set(value) { if (field != value) { field = value; invalidate() } }
+    var sub: String = ""
+        set(value) { if (field != value) { field = value; invalidate() } }
+    private var t = 0f
+    private var anim: ValueAnimator? = null
+    private var pulse: ValueAnimator? = null
+    private var phase = 0f
+    private var dots: android.graphics.Bitmap? = null
+    private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val label = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+    init { importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES }
+    /** Hides (connected or connecting) or shows the portrait; [moving] runs the 1.2 s change. */
+    fun set(hidden: Boolean, moving: Boolean) {
+        val target = if (hidden) 1f else 0f
+        anim?.cancel()
+        if (!moving || !ValueAnimator.areAnimatorsEnabled()) { t = target; invalidate(); return }
+        anim = ValueAnimator.ofFloat(t, target).apply {
+            duration = 1200; interpolator = android.view.animation.PathInterpolator(0.65f, 0f, 0.35f, 1f)
+            addUpdateListener { t = it.animatedValue as Float; invalidate() }
+            start()
+        }
+    }
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (!ValueAnimator.areAnimatorsEnabled()) return
+        pulse = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 3000; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.REVERSE
+            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+            addUpdateListener { phase = it.animatedValue as Float; invalidate() }
+            start()
+        }
+    }
+    override fun onDetachedFromWindow() { anim?.cancel(); pulse?.cancel(); pulse = null; super.onDetachedFromWindow() }
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val w = MeasureSpec.getSize(widthMeasureSpec)
+        // Short phones get a smaller sphere so the page still fits without scrolling.
+        val side = minOf(w, (300 * d).toInt(), (resources.displayMetrics.heightPixels * 0.36f).toInt())
+        setMeasuredDimension(w, side)
+    }
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { dots?.recycle(); dots = null }
+    /** The dot sphere, drawn once per size: a halftone of light falling from the upper left. */
+    private fun sphere(s: Int): android.graphics.Bitmap {
+        dots?.let { return it }
+        val bitmap = android.graphics.Bitmap.createBitmap(s, s, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap); val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val pitch = s * 6f / 320f; val r = s * 1.15f / 320f; val radius = s / 2f
+        val lx = s * 0.42f; val ly = s * 0.34f
+        var y = pitch / 2
+        while (y < s) {
+            var x = pitch / 2
+            while (x < s) {
+                val inside = Math.hypot((x - radius).toDouble(), (y - radius).toDouble()) <= radius
+                if (inside) {
+                    val f = (Math.hypot((x - lx).toDouble(), (y - ly).toDouble()) / (s * 0.82)).toFloat()
+                    val a = when { f < 0.22f -> 1f - f / 0.22f * 0.15f; f < 0.48f -> 0.85f - (f - 0.22f) / 0.26f * 0.5f; f < 0.66f -> 0.35f - (f - 0.48f) / 0.18f * 0.27f; f < 0.72f -> 0.08f - (f - 0.66f) / 0.06f * 0.08f; else -> 0f }
+                    if (a > 0) { paint.color = Palette.alpha(Palette.light, (255 * a).toInt()); canvas.drawCircle(x, y, r, paint) }
+                }
+                x += pitch
+            }
+            y += pitch
+        }
+        dots = bitmap
+        return bitmap
+    }
+    override fun onDraw(canvas: Canvas) {
+        val s = height; if (s <= 0) return
+        val cx = width / 2f; val cy = height / 2f
+        val left = cx - s / 2f
+        // The sphere: bright and breathing while visible, nearly dark once hidden.
+        bitmapPaint.alpha = (255 * ((0.82f + 0.18f * phase) * (1 - t) + 0.1f * t)).toInt()
+        canvas.drawBitmap(sphere(s), left, 0f, bitmapPaint)
+        ring.strokeWidth = 1 * d; ring.color = Palette.alpha(Palette.text, (18 * (1 - t)).toInt())
+        canvas.drawCircle(cx, cy, s / 2f - d, ring)
+        val accent = Palette.accent
+        if (invite.isNotEmpty() && t < 1f) {
+            label.typeface = Typeface.DEFAULT; label.textSize = 0.05f * s
+            label.color = Palette.alpha(accent, (255 * (1 - t) * (0.75f + 0.25f * phase)).toInt())
+            val wide = label.measureText(invite); if (wide > 0.8f * s) label.textSize *= 0.8f * s / wide
+            canvas.drawText(invite, cx, cy + label.textSize * 0.35f, label)
+        }
+        if (t > 0f) {
+            // The ring that takes the sphere's place, with a soft glow; the time hidden and the rates inside.
+            val rr = 0.375f * s; val glow = (0.82f + 0.18f * phase) * t
+            ring.strokeWidth = 8 * d; ring.color = Palette.alpha(accent, (28 * glow).toInt()); canvas.drawCircle(cx, cy, rr, ring)
+            ring.strokeWidth = 3 * d; ring.color = Palette.alpha(accent, (55 * glow).toInt()); canvas.drawCircle(cx, cy, rr, ring)
+            ring.strokeWidth = 1 * d; ring.color = Palette.alpha(accent, (255 * glow).toInt()); canvas.drawCircle(cx, cy, rr, ring)
+            if (centre.isNotEmpty()) {
+                label.typeface = Typeface.MONOSPACE; label.textSize = 0.072f * s; label.color = Palette.alpha(Palette.text, (255 * t).toInt())
+                canvas.drawText(centre, cx, cy, label)
+            }
+            if (sub.isNotEmpty()) {
+                label.typeface = Typeface.MONOSPACE; label.textSize = 0.036f * s; label.color = Palette.alpha(Palette.secondary, (255 * t).toInt())
+                // Long notices (ru) shrink to stay inside the ring.
+                val room = 0.62f * s; val wide = label.measureText(sub)
+                if (wide > room) label.textSize *= room / wide
+                canvas.drawText(sub, cx, cy + 0.08f * s, label)
+            }
+        }
+    }
+}

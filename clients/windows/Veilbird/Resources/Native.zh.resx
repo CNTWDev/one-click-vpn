@@ -139,7 +139,7 @@
   <data name="enter_email" xml:space="preserve"><value>输入邮箱</value></data>
   <data name="enter_password" xml:space="preserve"><value>输入密码</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>请填写邮箱和密码。</value></data>
-  <data name="exposed_detail" xml:space="preserve"><value>这些信息此刻对外可见</value></data>
+  <data name="exposed_detail" xml:space="preserve"><value>任何网站此刻都能看到上面这些</value></data>
   <data name="exposed_status" xml:space="preserve"><value>未隐身</value></data>
   <data name="file_device" xml:space="preserve"><value>设备</value></data>
   <data name="file_language" xml:space="preserve"><value>语言</value></data>
@@ -243,9 +243,11 @@
   <data name="section_activity" xml:space="preserve"><value>§03 活动</value></data>
   <data name="section_check" xml:space="preserve"><value>§05 体检</value></data>
   <data name="section_locations" xml:space="preserve"><value>§02 线路</value></data>
+  <data name="section_portrait" xml:space="preserve"><value>§01 你此刻的样子</value></data>
   <data name="section_sign_in" xml:space="preserve"><value>§00 身份验证</value></data>
   <data name="section_status" xml:space="preserve"><value>§01 状态</value></data>
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>无法访问安全存储，请解锁设备后重试。</value></data>
+  <data name="seen_as" xml:space="preserve"><value>网站只能看到{0}</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>选延迟最低的节点，连不上自动换</value></data>
   <data name="send_reset_link" xml:space="preserve"><value>发送</value></data>
   <data name="server_address" xml:space="preserve"><value>服务地址</value></data>
@@ -277,6 +279,7 @@
   <data name="tap_ring_to_connect" xml:space="preserve"><value>轻触圆环，一键连接</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>点击更换节点</value></data>
   <data name="tap_to_check" xml:space="preserve"><value>轻点体检</value></data>
+  <data name="tap_to_hide" xml:space="preserve"><value>轻触开始隐身</value></data>
   <data name="test_after_disconnecting" xml:space="preserve"><value>连接中无法测速，显示的是上次结果。</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>模拟器仅用于界面测试，请使用已签名的真机版本测试 VPN。</value></data>
   <data name="theme_amber" xml:space="preserve"><value>琥珀</value></data>
@@ -336,9 +339,8 @@
   <data name="vpn_connection" xml:space="preserve"><value>VPN 连接</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>连接按钮用品牌色描边，一眼就能找到；文字改得更直白：开始隐身 / 停止隐身
-系统权限（Mac 网络扩展、VPN 配置、安卓 VPN 授权）没允许时，首页会一直提示该去哪里打开，Mac 上一键打开系统设置，允许后自动连接
-修复安卓：屏幕较高的手机上首页下半部分（连接按钮、线路、流量）不显示也滑不动</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>首页换成「肖像」：你此刻对外暴露的样子是一幅会呼吸的光点画，下面写着出口 IP、设备、时区和语言
+光点画本身就是开关，中间写着「轻触开始隐身」；隐身后变成一圈光环，环里显示已隐身的时长和网速</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>

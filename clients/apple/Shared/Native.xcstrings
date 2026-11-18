@@ -3135,19 +3135,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Anyone can see this right now"
+            "value": "Any site can see all of this right now"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这些信息此刻对外可见"
+            "value": "任何网站此刻都能看到上面这些"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Это сейчас видно всем"
+            "value": "Любой сайт сейчас видит всё это"
           }
         }
       }
@@ -5521,6 +5521,29 @@
         }
       }
     },
+    "section_portrait": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§01 How you look right now"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§01 你此刻的样子"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "§01 Как вас видят сейчас"
+          }
+        }
+      }
+    },
     "section_sign_in": {
       "extractionState": "manual",
       "localizations": {
@@ -5586,6 +5609,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Защищённое хранилище недоступно. Разблокируйте устройство и повторите."
+          }
+        }
+      }
+    },
+    "seen_as": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sites only see %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网站只能看到%1$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сайты видят только %1$@"
           }
         }
       }
@@ -6299,6 +6345,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Нажмите для проверки"
+          }
+        }
+      }
+    },
+    "tap_to_hide": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap to hide"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "轻触开始隐身"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нажмите, чтобы скрыться"
           }
         }
       }
@@ -7643,19 +7712,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The Connect button now wears the brand colour, so it is the first thing you see; plainer wording (Visible / Hidden)\nWhen a system permission is missing (Mac network extension, VPN configuration, Android VPN access), the home page keeps saying where to allow it; on the Mac one click opens System Settings, and it connects as soon as you allow it\nAndroid fix: on tall screens the lower half of the home page (Connect, location, usage) was missing and the page would not scroll"
+            "value": "New home \"portrait\": what you show the world right now is a breathing sphere of light, with your IP, device, time zone and language under it\nThe sphere is the switch and says \"Tap to hide\"; once hidden it turns into a ring showing how long you have been hidden and the speed"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连接按钮用品牌色描边，一眼就能找到；文字改得更直白：开始隐身 / 停止隐身\n系统权限（Mac 网络扩展、VPN 配置、安卓 VPN 授权）没允许时，首页会一直提示该去哪里打开，Mac 上一键打开系统设置，允许后自动连接\n修复安卓：屏幕较高的手机上首页下半部分（连接按钮、线路、流量）不显示也滑不动"
+            "value": "首页换成「肖像」：你此刻对外暴露的样子是一幅会呼吸的光点画，下面写着出口 IP、设备、时区和语言\n光点画本身就是开关，中间写着「轻触开始隐身」；隐身后变成一圈光环，环里显示已隐身的时长和网速"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Кнопка подключения выделена фирменным цветом, её сразу видно; формулировки стали проще («Видно» / «Скрыто»)\nЕсли не хватает системного разрешения (сетевое расширение на Mac, конфигурация VPN, доступ к VPN на Android), главная страница подсказывает, где его дать; на Mac настройки открываются одним нажатием, а подключение начинается сразу после разрешения\nИсправление для Android: на высоких экранах нижняя часть главной (кнопка, локация, трафик) не показывалась и страница не прокручивалась"
+            "value": "Новый главный экран «портрет»: то, что о вас сейчас видно, — дышащая сфера из точек света, под ней IP, устройство, часовой пояс и язык\nСфера и есть переключатель («Нажмите, чтобы скрыться»); после подключения она становится кольцом со временем скрытия и скоростью"
           }
         }
       }

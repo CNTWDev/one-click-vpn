@@ -86,6 +86,7 @@ class MainActivity : Activity() {
     private var actionLabel: TextView? = null
     private var actionDot: View? = null
     private var scan: ScanLine? = null
+    private var portrait: Portrait? = null
     private var fileLines: List<SealedText>? = null
     // Whether the file was last shown sealed; null before the first show on a page (which does not animate).
     private var sealedShown: Boolean? = null
@@ -94,8 +95,6 @@ class MainActivity : Activity() {
     private var stateTitle: TextView? = null
     private var stateDot: View? = null
     private var stateDetail: TextView? = null
-    private var stateTimer: TextView? = null
-    private var stateRates: TextView? = null
     private var accountDot: View? = null
     private var nodeTitle: TextView? = null
     private var nodeDetail: TextView? = null
@@ -290,7 +289,7 @@ class MainActivity : Activity() {
     // ---- Pages
     private fun render() {
         banner = null; updateRowValue = null; onNodes = null; onMeasured = null
-        stamp = null; action = null; actionLabel = null; actionDot = null; scan = null; fileLines = null; stateTitle = null; stateDot = null; stateDetail = null; stateTimer = null; stateRates = null; accountDot = null; nodeTitle = null; nodeDetail = null; nodeBadge = null
+        stamp = null; portrait = null; action = null; actionLabel = null; actionDot = null; scan = null; fileLines = null; stateTitle = null; stateDot = null; stateDetail = null; accountDot = null; nodeTitle = null; nodeDetail = null; nodeBadge = null
         rateBars = null; switchNote = null; switchText = null; activityBody = null
         val side = maxOf(20.dp, (resources.displayMetrics.widthPixels - 560.dp) / 2)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(side, 4.dp, side, 20.dp) }
@@ -541,51 +540,25 @@ class MainActivity : Activity() {
         // Notes that come and go above the file (update, location switch) slide the page smoothly instead of snapping it.
         if (ValueAnimator.areAnimatorsEnabled()) content.layoutTransition = LayoutTransition().apply { setDuration(220); enableTransitionType(LayoutTransition.CHANGING) }
         spacer(0.6f)
-        add(sectionLabel(R.string.section_status), top = 12, bottom = 8)
-        // The state block has one height in every state, so nothing below it moves when a connection comes up or goes
-        // down: what only exists while connected fades in and out of space that is always reserved.
+        add(sectionLabel(R.string.section_portrait), top = 12, bottom = 4)
+        // The portrait: what any site or app on this network can see of this phone, as a sphere of light. It is the
+        // switch: a tap starts (or stops) hiding; hidden, a ring holds the time hidden and the rates.
+        portrait = Portrait(this).apply {
+            isClickable = true; isFocusable = true
+            setOnClickListener { if (!busy) toggleConnection() }
+        }.also { add(it, top = 4) }
+        // Under it, the same facts in words; they turn to a dim dot matrix while hidden.
+        val ip = SealedText(this).apply { value = visitorIp ?: "···"; typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL); textSize = 38f; letterSpacing = -0.01f; ellipsize = TextUtils.TruncateAt.END; setPadding(4.dp, 0, 4.dp, 0) }
+        add(ip, top = 14)
+        val meta = SealedText(this).apply { value = metaLine(); textSize = 11f; setTextColor(Palette.secondary); ellipsize = TextUtils.TruncateAt.END; setPadding(4.dp, 0, 4.dp, 0) }
+        add(meta, top = 8)
+        fileLines = listOf(ip, meta)
+        // The state line has one height in every state, so nothing below it moves when a connection comes up or goes down.
         val titleRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 4.dp, 0) }
-        stateTitle = text("", 32f, Palette.text, 300).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END; letterSpacing = -0.01f }
-            .also { titleRow.addView(it, LinearLayout.LayoutParams(0, -2, 1f)) }
-        stamp = text("SEALED", 11f, Palette.accent, 600).apply {
-            typeface = Typeface.MONOSPACE; letterSpacing = 0.22f; setPadding(8.dp, 4.dp, 6.dp, 4.dp); rotation = -6f; alpha = 0f; visibility = View.INVISIBLE
-            background = GradientDrawable().apply { setStroke(1.dp, Palette.alpha(Palette.accent, 200)); cornerRadius = 2.dp.toFloat() }
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        }.also { titleRow.addView(it, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 12.dp }) }
-        add(titleRow, height = sp(46f))
-        val slot = FrameLayout(this).apply { setPadding(4.dp, 0, 4.dp, 0) }
-        stateTimer = text("", 15f, Palette.text).apply { typeface = Typeface.MONOSPACE; fontFeatureSettings = "tnum"; letterSpacing = 0.06f; maxLines = 1; alpha = 0f; visibility = View.INVISIBLE }
-            .also { slot.addView(it, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL)) }
-        stateDetail = text("", 13f, Palette.secondary).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
-            .also { slot.addView(it, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL)) }
-        add(slot, height = sp(36f), top = 2)
-        // The file itself: what any site or app on this network can read about this phone.
-        val file = FrameLayout(this)
-        val lines = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val values = listOf(
-            R.string.file_public_ip to (visitorIp ?: "···"),
-            R.string.file_device to "${Build.MODEL} · Android ${Build.VERSION.RELEASE}",
-            R.string.file_time_zone to zoneLabel(),
-            R.string.file_language to L10n.locale.toLanguageTag(),
-        )
-        fileLines = values.mapIndexed { i, (label, value) ->
-            lines.addView(View(this).apply { setBackgroundColor(Palette.hairline) }, LinearLayout.LayoutParams(-1, 1))
-            val line = SealedText(this).apply { this.value = value; ellipsize = TextUtils.TruncateAt.END }
-            lines.addView(LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 4.dp, 0)
-                addView(mono(L10n.text(label), 10f, Palette.faint).apply { ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(96.dp, -2))
-                addView(line, LinearLayout.LayoutParams(0, -2, 1f))
-                contentDescription = L10n.text(label)
-            }, LinearLayout.LayoutParams(-1, 42.dp))
-            if (i == values.lastIndex) lines.addView(View(this).apply { setBackgroundColor(Palette.hairline) }, LinearLayout.LayoutParams(-1, 1))
-            line
-        }
-        file.addView(lines, FrameLayout.LayoutParams(-1, -2))
-        scan = ScanLine(this).also { file.addView(it, FrameLayout.LayoutParams(-1, -1)) }
-        add(file, top = 10)
-        stateRates = text("", 12f, Palette.secondary).apply { typeface = Typeface.MONOSPACE; maxLines = 1; ellipsize = TextUtils.TruncateAt.END; fontFeatureSettings = "tnum"; alpha = 0f; visibility = View.INVISIBLE; setPadding(4.dp, 0, 4.dp, 0) }
-            .also { add(it, height = sp(18f), top = 12) }
-        rateBars = RateBars(this).apply { alpha = 0f; visibility = View.INVISIBLE }.also { add(it, height = 40.dp, top = 6) }
+        stateTitle = text("", 24f, Palette.text, 300).apply { maxLines = 1 }.also { titleRow.addView(it, LinearLayout.LayoutParams(-2, -2)) }
+        stateDetail = text("", 12f, Palette.secondary).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
+            .also { titleRow.addView(it, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = 12.dp }) }
+        add(titleRow, height = sp(44f), top = 12)
         spacer(1f)
         // One outlined action: grey and quiet while exposed, amber with a breathing dot while sealed.
         action = LinearLayout(this).apply {
@@ -611,6 +584,8 @@ class MainActivity : Activity() {
         // Just signed in: no saved list yet, so load it for the location's name and code.
         if (NodeCache.nodes(this) == null) refreshNodes()
     }
+    /** Under the address: device, time zone and language, what any site can also read right now. */
+    private fun metaLine() = listOf("${Build.MODEL} · Android ${Build.VERSION.RELEASE}", zoneLabel(), L10n.locale.toLanguageTag()).joinToString("   ")
     private fun zoneLabel(): String {
         val minutes = java.util.TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60000
         return String.format(java.util.Locale.ROOT, "UTC%s%02d:%02d", if (minutes >= 0) "+" else "-", Math.abs(minutes) / 60, Math.abs(minutes) % 60)
@@ -679,9 +654,11 @@ class MainActivity : Activity() {
             val moving = sealedShown != null && ValueAnimator.areAnimatorsEnabled()
             fileLines?.let { lines ->
                 val n = lines.size
-                lines.forEachIndexed { i, line -> line.seal(seal, if (moving) (1300L * ((if (seal) i else n - 1 - i) + 0.5f) / n).toLong() else 0L, moving) }
+                lines.forEachIndexed { i, line -> line.seal(seal, if (moving) (1200L * ((if (seal) i else n - 1 - i) + 0.5f) / n).toLong() else 0L, moving) }
             }
-            if (moving) scan?.sweep(down = seal)
+            portrait?.set(seal, moving)
+            portrait?.invite = if (seal) "" else L10n.text(R.string.tap_to_hide)
+            portrait?.contentDescription = L10n.text(if (seal) R.string.disconnect_action else R.string.connect_action)
             stamp?.apply {
                 animate().cancel()
                 if (!moving) { alpha = if (seal) 1f else 0f; visibility = if (seal) View.VISIBLE else View.INVISIBLE; scaleX = 1f; scaleY = 1f }
@@ -690,8 +667,8 @@ class MainActivity : Activity() {
             }
             sealedShown = seal
         }
-        if (connected) stateTimer?.text = DateUtils.formatElapsedTime((SystemClock.elapsedRealtime() - since) / 1000)
-        stateTimer?.fade(connected); stateDetail?.fade(!connected)
+        // Hidden: the ring in the portrait carries the time and the rates; the line under the title names what sites see now.
+        portrait?.centre = if (connected) DateUtils.formatElapsedTime((SystemClock.elapsedRealtime() - since) / 1000) else ""
         if (state == LinkState.CONNECTED) {
             rxHistory.addLast(ConnectionStateStore.rxRate); txHistory.addLast(ConnectionStateStore.txRate)
             while (rxHistory.size > RateBars.COUNT) { rxHistory.removeFirst(); txHistory.removeFirst() }
@@ -702,10 +679,10 @@ class MainActivity : Activity() {
         switchText?.text = if (noteShown) L10n.text(R.string.switched_location, from, ConnectionStateStore.node) else ""
         switchNote?.visibility = if (noteShown) View.VISIBLE else View.GONE
         // Rates change every second: set directly (fixed-width digits keep the line still); messages cross-fade.
-        if (connected) stateRates?.text = if (ConnectionStateStore.messageId in ConnectionService.NOTICES) ConnectionStateStore.message
+        portrait?.sub = if (!connected) "" else if (ConnectionStateStore.messageId in ConnectionService.NOTICES) ConnectionStateStore.message
             else L10n.text(R.string.connection_rates, mbps(ConnectionStateStore.rxRate), mbps(ConnectionStateStore.txRate))
-        stateRates?.fade(connected)
-        if (!connected) stateDetail?.swap(when (state) {
+        stateDetail?.swap(when (state) {
+            LinkState.CONNECTED -> L10n.text(R.string.seen_as, ConnectionStateStore.node)
             LinkState.CONNECTING -> L10n.text(R.string.finding_best_route)
             LinkState.FAILED -> ConnectionStateStore.message
             else -> L10n.text(if (update?.mandatory == true) R.string.update_required_detail else R.string.exposed_detail)
