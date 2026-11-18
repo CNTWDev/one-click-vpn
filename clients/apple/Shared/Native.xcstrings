@@ -7712,19 +7712,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New home \"portrait\": what you show the world right now is a breathing sphere of light, with your IP, device, time zone and language under it\nThe sphere is the switch and says \"Tap to hide\"; once hidden it turns into a ring showing how long you have been hidden and the speed"
+            "value": "New logo: a bolder ∅ ring and bar, filled with the same dots as the home page on large icons; the menu bar, tray and notification icons use it too"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "首页换成「肖像」：你此刻对外暴露的样子是一幅会呼吸的光点画，下面写着出口 IP、设备、时区和语言\n光点画本身就是开关，中间写着「轻触开始隐身」；隐身后变成一圈光环，环里显示已隐身的时长和网速"
+            "value": "新 Logo：更粗的 ∅ 圆环和斜杠，大图标用和首页一样的光点填出来；菜单栏、托盘和通知栏也换成新标志"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Новый главный экран «портрет»: то, что о вас сейчас видно, — дышащая сфера из точек света, под ней IP, устройство, часовой пояс и язык\nСфера и есть переключатель («Нажмите, чтобы скрыться»); после подключения она становится кольцом со временем скрытия и скоростью"
+            "value": "Новый логотип: более толстые кольцо и черта ∅, на больших значках — из тех же точек, что на главном экране; значки в строке меню, трее и уведомлениях тоже новые"
           }
         }
       }

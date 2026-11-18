@@ -64,11 +64,26 @@ public static class Look {
     public static readonly FontFamily Icons=new("Segoe Fluent Icons, Segoe MDL2 Assets");
     /// Doto Black (SIL OFL, under Assets/Fonts), Latin only: wordmark, timers, totals and country codes.
     public static readonly FontFamily Dots=new(new Uri("pack://application:,,,/"),"./Assets/Fonts/#Doto Black");
-    /// Same cells as scripts/brand-icons.py and the other clients.
-    public static readonly (int X,int Y)[] MarkCells="14,1 5,2 6,2 7,2 8,2 9,2 10,2 13,2 3,3 4,3 11,3 12,3 2,4 11,4 13,4 2,5 10,5 13,5 1,6 9,6 14,6 1,7 8,7 14,7 1,8 7,8 14,8 1,9 6,9 14,9 2,10 5,10 13,10 2,11 4,11 13,11 3,12 4,12 11,12 12,12 2,13 5,13 6,13 7,13 8,13 9,13 10,13 1,14"
-        .Split(' ').Select(cell=>{var xy=cell.Split(',');return (int.Parse(xy[0]),int.Parse(xy[1]));}).ToArray();
-    /// The mark as squares in a 16-unit box.
-    public static readonly Geometry MarkShape=Squares(MarkCells,0.86);
+    /// The ∅ mark in its 100×100 box, solid form: a heavy ring and bar with a gap where the bar crosses. Same geometry as
+    /// scripts/brand-icons.py, shared/brand.tsx and the other clients.
+    public static readonly Geometry MarkShape=Frozen(Geometry.Parse("M84.06,34.32A37.5,37.5 0 0,1 34.32,84.06L46.21,72.18A22.5,22.5 0 0,0 72.18,46.21ZM15.94,65.68A37.5,37.5 0 0,1 65.68,15.94L53.79,27.82A22.5,22.5 0 0,0 27.82,53.79ZM11.82,78.28L78.28,11.82L88.18,21.72L21.72,88.18Z"));
+    /// The same shape as a halftone of dots lit from the upper left (dot size carries the light), for 40 px and up.
+    public static readonly Geometry MarkDots=Frozen(BuildMarkDots());
+    private static Geometry Frozen(Geometry geometry) {geometry.Freeze();return geometry;}
+    private static Geometry BuildMarkDots() {
+        var group=new GeometryGroup {FillRule=FillRule.Nonzero};
+        double pitch=3.4,root2=Math.Sqrt(2);
+        for(var j=0;j<31;j++) for(var i=0;i<31;i++) {
+            double x=pitch/2+i*pitch+(j%2==1?pitch/2:0),y=pitch/2+j*pitch*0.866;
+            double d=Math.Sqrt((x-50)*(x-50)+(y-50)*(y-50)),across=Math.Abs((x-50)+(y-50))/root2,along=Math.Abs((x-50)-(y-50))/root2;
+            if(!((d>=25&&d<=37&&across>11)||(across<=5.6&&along<=46))) continue;
+            var f=Math.Sqrt((x-42)*(x-42)+(y-34)*(y-34))/82;
+            var light=f<0.22?1-f/0.22*0.15:f<0.48?0.85-(f-0.22)/0.26*0.5:f<0.66?0.35-(f-0.48)/0.18*0.27:0.08;
+            var r=1.65*Math.Sqrt(Math.Max(0.5,light));
+            group.Children.Add(new EllipseGeometry(new Point(x,y),r,r));
+        }
+        return group;
+    }
     public static Geometry Squares(IEnumerable<(int X,int Y)> cells,double square) {
         var geometry=new StreamGeometry();
         using(var draw=geometry.Open())
@@ -85,10 +100,11 @@ public static class Look {
         }
         return cells.ToArray();
     }
-    /// The ∅ mark: an empty set drawn in square pixels.
+    /// The ∅ mark; the shape's 8…92 span of its 100 box fills `size`. Dots from 40 px up, solid below.
     public static FrameworkElement Mark(double size,Brush color) {
-        var canvas=new Canvas {Width=16,Height=16};
-        canvas.Children.Add(new System.Windows.Shapes.Path {Data=MarkShape,Fill=color});
+        var canvas=new Canvas {Width=84,Height=84};
+        var shape=new System.Windows.Shapes.Path {Data=size>=40?MarkDots:MarkShape,Fill=color};
+        Canvas.SetLeft(shape,-8);Canvas.SetTop(shape,-8);canvas.Children.Add(shape);
         return new Viewbox {Width=size,Height=size,Child=canvas,IsHitTestVisible=false};
     }
     /// "TRACKNOTHING" in the dot-matrix face, shown once per screen next to the mark.

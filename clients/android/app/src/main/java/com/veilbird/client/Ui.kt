@@ -11,9 +11,11 @@ import android.view.View
 import android.view.animation.LinearInterpolator
 import android.widget.TextView
 import kotlin.math.abs
+import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.min
+import kotlin.math.sqrt
 
 /**
  * The one palette of the app, shared with the Portal: warm near-black under one lamp, hairlines, and one light colour
@@ -51,9 +53,6 @@ object Palette {
  * and the Doto dot-matrix face for figures. Same cells as scripts/brand-icons.py and the other clients.
  */
 object Pixel {
-    val mark: List<Pair<Int, Int>> = ("14,1 5,2 6,2 7,2 8,2 9,2 10,2 13,2 3,3 4,3 11,3 12,3 2,4 11,4 13,4 2,5 10,5 13,5 1,6 9,6 14,6 1,7 8,7 14,7 " +
-        "1,8 7,8 14,8 1,9 6,9 14,9 2,10 5,10 13,10 2,11 4,11 13,11 3,12 4,12 11,12 12,12 2,13 5,13 6,13 7,13 8,13 9,13 10,13 1,14")
-        .split(' ').map { cell -> cell.split(',').let { it[0].toInt() to it[1].toInt() } }
     private var face: Typeface? = null
     /** Doto Black (SIL OFL), Latin only: wordmark, timers, totals and country codes. */
     fun font(context: Context): Typeface = face ?: context.resources.getFont(R.font.doto_black).also { face = it }
@@ -68,10 +67,46 @@ object Pixel {
         }
         return cells
     }
+    /**
+     * The ∅ mark (a 100×100 box whose 8…92 span fills [size]): a heavy ring and bar, a gap where the bar crosses. From 40 dp up it
+     * is filled with a halftone of dots lit from the upper left (dot size carries the light); smaller it is solid.
+     * Same geometry as scripts/brand-icons.py and the other clients.
+     */
     fun drawMark(canvas: Canvas, paint: Paint, left: Float, top: Float, size: Float, color: Int) {
-        val cell = size / 16; val square = cell * 0.86f
-        paint.style = Paint.Style.FILL; paint.color = color
-        for ((x, y) in mark) canvas.drawRect(left + x * cell, top + y * cell, left + x * cell + square, top + y * cell + square, paint)
+        paint.style = Paint.Style.FILL; paint.color = color; paint.isAntiAlias = true
+        // The shape spans 8…92 of its box; that span fills [size], like the web's viewBox.
+        val k = size / 84f; val left = left - 8 * k; val top = top - 8 * k
+        if (size >= 40 * android.content.res.Resources.getSystem().displayMetrics.density) {
+            for ((x, y, r) in markDots) canvas.drawCircle(left + x * k, top + y * k, r * k, paint)
+            return
+        }
+        val path = android.graphics.Path()
+        val ao = Math.toDegrees(asin(13.0 / 37.5)).toFloat(); val ai = Math.toDegrees(asin(13.0 / 22.5)).toFloat()
+        for (turn in floatArrayOf(0f, 180f)) {
+            val outer = android.graphics.RectF(left + 12.5f * k, top + 12.5f * k, left + 87.5f * k, top + 87.5f * k)
+            val inner = android.graphics.RectF(left + 27.5f * k, top + 27.5f * k, left + 72.5f * k, top + 72.5f * k)
+            path.arcTo(outer, turn + ao - 45, 180 - 2 * ao, true)
+            path.arcTo(inner, turn + 135 - ai, -(180 - 2 * ai), false)
+            path.close()
+        }
+        val h = 47f / sqrt(2f); val w = 7f / sqrt(2f)
+        path.moveTo(left + (50 - h - w) * k, top + (50 + h - w) * k); path.lineTo(left + (50 + h - w) * k, top + (50 - h - w) * k)
+        path.lineTo(left + (50 + h + w) * k, top + (50 - h + w) * k); path.lineTo(left + (50 - h + w) * k, top + (50 + h + w) * k); path.close()
+        canvas.drawPath(path, paint)
+    }
+    /** The dot form's dots (x, y, radius) in the 100 box. */
+    private val markDots: List<Triple<Float, Float, Float>> by lazy {
+        val out = ArrayList<Triple<Float, Float, Float>>(); val pitch = 3.4f; val root2 = sqrt(2f)
+        for (j in 0 until 31) for (i in 0 until 31) {
+            val x = pitch / 2 + i * pitch + (if (j % 2 == 1) pitch / 2 else 0f); val y = pitch / 2 + j * pitch * 0.866f
+            val d = hypot(x - 50, y - 50); val across = abs((x - 50) + (y - 50)) / root2; val along = abs((x - 50) - (y - 50)) / root2
+            if ((d in 25f..37f && across > 11) || (across <= 5.6f && along <= 46)) {
+                val f = hypot(x - 42, y - 34) / 82
+                val light = when { f < 0.22f -> 1 - f / 0.22f * 0.15f; f < 0.48f -> 0.85f - (f - 0.22f) / 0.26f * 0.5f; f < 0.66f -> 0.35f - (f - 0.48f) / 0.18f * 0.27f; else -> 0.08f }
+                out.add(Triple(x, y, 1.65f * sqrt(maxOf(0.5f, light))))
+            }
+        }
+        out
     }
 }
 

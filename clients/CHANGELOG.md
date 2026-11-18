@@ -4,6 +4,17 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.9
+
+### zh
+- 新 Logo：更粗的 ∅ 圆环和斜杠，大图标用和首页一样的光点填出来；菜单栏、托盘和通知栏也换成新标志
+
+### en
+- New logo: a bolder ∅ ring and bar, filled with the same dots as the home page on large icons; the menu bar, tray and notification icons use it too
+
+### ru
+- Новый логотип: более толстые кольцо и черта ∅, на больших значках — из тех же точек, что на главном экране; значки в строке меню, трее и уведомлениях тоже новые
+
 ## 1.0.8
 
 ### zh

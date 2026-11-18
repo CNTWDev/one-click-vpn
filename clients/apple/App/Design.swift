@@ -42,11 +42,23 @@ enum VeilbirdStyle {
     static let radius:CGFloat = 3
 }
 
-/// The pixel language shared by every TrackNothing client: the ∅ mark on a 16×16 grid, rings of square dots
-/// and the Doto dot-matrix face for figures. Same cells as scripts/brand-icons.py and the other clients.
+/// The pixel language shared by every TrackNothing client: the ∅ mark, rings of square dots and the Doto dot-matrix
+/// face for figures. The mark's geometry matches scripts/brand-icons.py and the other clients.
 enum Pixel {
-    static let mark:[(Int,Int)]="14,1 5,2 6,2 7,2 8,2 9,2 10,2 13,2 3,3 4,3 11,3 12,3 2,4 11,4 13,4 2,5 10,5 13,5 1,6 9,6 14,6 1,7 8,7 14,7 1,8 7,8 14,8 1,9 6,9 14,9 2,10 5,10 13,10 2,11 4,11 13,11 3,12 4,12 11,12 12,12 2,13 5,13 6,13 7,13 8,13 9,13 10,13 1,14"
-        .split(separator:" ").map {cell in let xy=cell.split(separator:",").map {Int($0)!};return (xy[0],xy[1])}
+    /// The dot form's dots (x, y, radius) in the mark's 100×100 box: lit from the upper left, size carries the light.
+    static let markDots:[(Double,Double,Double)]={
+        var out:[(Double,Double,Double)]=[]
+        let pitch=3.4,root2=2.0.squareRoot()
+        for j in 0..<31 {for i in 0..<31 {
+            let x=pitch/2+Double(i)*pitch+(j%2==1 ? pitch/2:0),y=pitch/2+Double(j)*pitch*0.866
+            let d=((x-50)*(x-50)+(y-50)*(y-50)).squareRoot(),across=abs((x-50)+(y-50))/root2,along=abs((x-50)-(y-50))/root2
+            guard (d>=25 && d<=37 && across>11) || (across<=5.6 && along<=46) else {continue}
+            let f=((x-42)*(x-42)+(y-34)*(y-34)).squareRoot()/82
+            let light=f<0.22 ? 1-f/0.22*0.15:(f<0.48 ? 0.85-(f-0.22)/0.26*0.5:(f<0.66 ? 0.35-(f-0.48)/0.18*0.27:0.08))
+            out.append((x,y,1.65*max(0.5,light).squareRoot()))
+        }}
+        return out
+    }()
     /// Cells one cell wide on a circle of `radius` in an n×n grid, each with its clockwise position from the top (0…1).
     static func ring(_ n:Int,radius:Double)->[(x:Int,y:Int,turn:Double)] {
         let c=Double(n-1)/2
@@ -63,16 +75,36 @@ enum Pixel {
         guard let url=Bundle.main.url(forResource:"Doto-Black",withExtension:"ttf") else {return false}
         return CTFontManagerRegisterFontsForURL(url as CFURL,.process,nil)
     }()
+    /// The ∅ mark: a heavy ring and bar with a gap where the bar crosses; the shape's 8…92 span of its 100 box fills
+    /// the rect. From 40 pt up it is a halftone of dots, smaller it is solid.
     static func markPath(in rect:CGRect)->Path {
-        let size=min(rect.width,rect.height), cell=size/16, square=cell*0.86
-        let x0=rect.midX-size/2, y0=rect.midY-size/2
+        let size=min(rect.width,rect.height),k=size/84
+        let x0=rect.midX-50*k,y0=rect.midY-50*k
         var path=Path()
-        for (x,y) in mark {path.addRect(CGRect(x:x0+CGFloat(x)*cell,y:y0+CGFloat(y)*cell,width:square,height:square))}
+        if size>=40 {
+            for (x,y,r) in markDots {path.addEllipse(in:CGRect(x:x0+(x-r)*k,y:y0+(y-r)*k,width:2*r*k,height:2*r*k))}
+            return path
+        }
+        let centre=CGPoint(x:x0+50*k,y:y0+50*k)
+        let ao=asin(13/37.5)*180/Double.pi,ai=asin(13/22.5)*180/Double.pi
+        for turn in [0.0,180.0] {
+            let start=(turn+ao-45)*Double.pi/180
+            path.move(to:CGPoint(x:centre.x+37.5*k*cos(start),y:centre.y+37.5*k*sin(start)))
+            path.addArc(center:centre,radius:37.5*k,startAngle:.degrees(turn+ao-45),endAngle:.degrees(turn+135-ao),clockwise:false)
+            path.addArc(center:centre,radius:22.5*k,startAngle:.degrees(turn+135-ai),endAngle:.degrees(turn+ai-45),clockwise:true)
+            path.closeSubpath()
+        }
+        let h=47/2.0.squareRoot(),w=7/2.0.squareRoot()
+        path.move(to:CGPoint(x:x0+(50-h-w)*k,y:y0+(50+h-w)*k))
+        path.addLine(to:CGPoint(x:x0+(50+h-w)*k,y:y0+(50-h-w)*k))
+        path.addLine(to:CGPoint(x:x0+(50+h+w)*k,y:y0+(50-h+w)*k))
+        path.addLine(to:CGPoint(x:x0+(50-h+w)*k,y:y0+(50+h+w)*k))
+        path.closeSubpath()
         return path
     }
 }
 
-/// The ∅ mark: an empty set drawn in square pixels.
+/// The ∅ mark as a shape.
 struct EmptySetMark:Shape {
     func path(in rect:CGRect) -> Path {Pixel.markPath(in:rect)}
 }
