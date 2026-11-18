@@ -69,7 +69,7 @@ struct EmptySetMark:Shape {
     func path(in rect:CGRect) -> Path {Pixel.markPath(in:rect)}
 }
 
-/// The mark alone, in lime: headers, the menu bar panel and sign-in.
+/// The mark alone, in amber: headers, the menu bar panel and sign-in.
 struct PixelMark:View {
     var size:CGFloat
     var color:Color=VeilbirdStyle.accent

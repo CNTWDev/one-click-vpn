@@ -688,7 +688,7 @@ struct ClientView:View {
                         }
                         Spacer(minLength:8)
                     }.padding(.horizontal,16).frame(minHeight:mac ? 52:64)
-                    // Selected = a lifted row and a lime tile; nothing is added, so the layout never moves.
+                    // Selected = a lifted row and a amber tile; nothing is added, so the layout never moves.
                     .background(model.selected.isEmpty ? VeilbirdStyle.raised:Color.clear)
                 }.buttonStyle(RowButton()).cardOutline(VeilbirdStyle.radius)
                 .clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).padding(.top,16)

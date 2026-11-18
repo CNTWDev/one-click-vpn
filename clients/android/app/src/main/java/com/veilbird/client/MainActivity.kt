@@ -821,7 +821,7 @@ class MainActivity : Activity() {
         routingChoice()
         val search = FrameLayout(this).also { add(it) }
         val automatic = selectedId.isEmpty()
-        // Selected = a lifted row and a lime tile; nothing is added, so the rows keep their layout.
+        // Selected = a lifted row and a amber tile; nothing is added, so the rows keep their layout.
         add(row(68).apply {
             background = pressable(if (automatic) Palette.raised else Palette.surface, 16)
             addView(badge(null, R.drawable.ic_sparkle, if (automatic) Palette.onAccent else Palette.accent).apply { if (automatic) background = rounded(Palette.accent, 8) })
@@ -1011,7 +1011,7 @@ class MainActivity : Activity() {
             val states = lineStates(quality)
             val note = linesNote(quality)
             val selected = id == selectedId
-            // Selected = a lifted row, a lime tile and a bolder name; opened = a darker row (unless selected).
+            // Selected = a lifted row, a amber tile and a bolder name; opened = a darker row (unless selected).
             val rest = if (selected) Palette.raised else Color.TRANSPARENT
             val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = ColorDrawable(rest) }
             val detail = lineDetail(quality).apply { visibility = if (openNode == id && states != null) View.VISIBLE else View.GONE }

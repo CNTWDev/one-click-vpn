@@ -359,7 +359,7 @@ struct DotBar:View {
     }
 }
 
-/// 24 columns of square dots, proxied (lime) stacked on direct (dark green); the current hour is outlined.
+/// 24 columns of square dots, proxied (amber) stacked on direct (dark green); the current hour is outlined.
 struct HourBars:View {
     let hours:[(Int,Int)]
     let now:Int

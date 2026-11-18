@@ -99,6 +99,12 @@ public sealed class NativeApi : IDisposable {
         if(json["apiOrigins"] is JsonArray offered) Remember(null,offered);
         return json;
     }
+    /// The public address the service sees for this PC ("—" when it is a private one). Nothing is stored.
+    public async Task<string> VisitorAddress() {
+        var (status,body)=await Send("GET","/api/v1/visitor",null,new());
+        if(status is <200 or >=300) throw new AccessFailure("SERVICE_UNAVAILABLE");
+        return (JsonNode.Parse(body) as JsonObject)?["ip"]?.GetValue<string>() ?? "—";
+    }
     /// Public release catalog: the operator's announcement, and a newer build for this install if one is published.
     public async Task<(string Announcement,ReleaseUpdate? Update)?> LatestRelease() {
         if(!ValidOrigin(Entered+"/")) return null;

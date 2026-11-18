@@ -47,10 +47,17 @@ public partial class MainWindow : Window {
     private JsonArray? nodesData;
     private readonly Dictionary<string,(string Name,string Code)> directory=new();
     // Live parts of the connect page and the tray flyout.
-    private Ring? ring;
-    private Button? ringButton;
-    private TextBlock? statusTitle,statusDetail,statusTimer,statusRates,stream,usageTotal,usageUntil;
-    private Rectangle? statusDot;
+    private TextBlock? statusTitle,statusDetail,statusTimer,statusRates,usageTotal,usageUntil,actionLabel;
+    private Border? stamp;
+    private Button? actionButton;
+    private Ellipse? actionDot;
+    private ScanLine? scan;
+    private List<SealedText>? fileLines;
+    // Whether the file was last shown sealed (null before the first show on a page, which does not animate), the state
+    // the action last showed, and the public address the service saw before connecting.
+    private bool? sealedShown;
+    private RingState? shownState;
+    private string? visitorIp;
     private (ContentControl Badge,TextBlock Title,TextBlock Detail)? location;
     private RateBars? rateBars,flyRate;
     private Border? switchNote,flyNote;
@@ -203,7 +210,7 @@ public partial class MainWindow : Window {
         var toggle=new ToggleButton {Style=(Style)FindResource("Switch"),VerticalAlignment=VerticalAlignment.Center};
         toggle.Click+=(_,_)=>{Toggle();toggle.IsChecked=connection.Active;};
         var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(14,0,12,0)};texts.Children.Add(title);texts.Children.Add(detail);
-        var card=new Border {CornerRadius=new CornerRadius(8),Padding=new Thickness(16),BorderThickness=new Thickness(1),Child=Columns(mark,texts,toggle)};
+        var card=new Border {CornerRadius=new CornerRadius(3),Padding=new Thickness(16),BorderThickness=new Thickness(1),Child=Columns(mark,texts,toggle)};
         DockPanel.SetDock(card,Dock.Top);root.Children.Add(card);
         var (note,noteText)=SwitchNote(12);note.Margin=new Thickness(0,10,0,0);
         DockPanel.SetDock(note,Dock.Top);root.Children.Add(note);
@@ -229,10 +236,10 @@ public partial class MainWindow : Window {
         var open=new Button {Content=L10n.Text("open_main_window"),FontSize=13,Height=32,Padding=new Thickness(10,0,10,0)};open.Click+=(_,_)=>ShowFromTray();
         var quit=new Button {Content=L10n.Text("quit_app"),FontSize=13,Height=32,Padding=new Thickness(10,0,10,0),Foreground=Look.Secondary};quit.Click+=(_,_)=>Quit();
         DockPanel.SetDock(open,Dock.Left);DockPanel.SetDock(quit,Dock.Right);footer.Children.Add(open);footer.Children.Add(quit);
-        var bottom=new Border {BorderBrush=Look.Hex("#14EAEEF4"),BorderThickness=new Thickness(0,1,0,0),Padding=new Thickness(0,10,0,0),Child=footer};
+        var bottom=new Border {BorderBrush=Look.Hex("#14EDE7DF"),BorderThickness=new Thickness(0,1,0,0),Padding=new Thickness(0,10,0,0),Child=footer};
         DockPanel.SetDock(bottom,Dock.Bottom);root.Children.Add(bottom);
 
-        window.Content=new Border {Background=Look.Hex("#0B0E13"),BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(16),Child=root};
+        window.Content=new Border {Background=Look.Hex("#0E0D0C"),BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(16),Child=root};
         TextElement.SetForeground(window,Look.Text);
         fly=(card,mark,title,detail,toggle,badge,place,placeDetail,usage,until);
         flyRate=rate;flyNote=note;flyNoteText=noteText;
@@ -244,7 +251,7 @@ public partial class MainWindow : Window {
         if(state!=flyState) {
             flyState=state;
             var on=state==RingState.Connected;
-            f.Card.Background=Brushes.Transparent;f.Card.BorderBrush=on?Look.Hex("#4DC6F26E"):Look.Line;
+            f.Card.Background=Brushes.Transparent;f.Card.BorderBrush=on?Look.Hex("#4DE0A458"):Look.Line;
             f.Mark.Content=Look.Mark(34,state switch {RingState.Idle=>Look.Faint,RingState.Failed=>Look.Danger,_=>Look.Accent});
         }
         f.Title.Text=StatusTitle(state);f.Detail.Text=StatusDetail(state);
@@ -363,7 +370,7 @@ public partial class MainWindow : Window {
     }
     private static Button BannerButton(string title,bool filled,Action onClick) {
         var button=new Button {Content=title,FontSize=13,FontWeight=FontWeights.SemiBold,Height=32,Padding=new Thickness(12,0,12,0),Margin=new Thickness(8,0,0,0),
-            Foreground=filled?Look.OnAccent:Look.Accent,Background=filled?Look.Accent:Brushes.Transparent,VerticalAlignment=VerticalAlignment.Center};
+            Foreground=Look.Accent,Background=filled?Look.AccentWash:Brushes.Transparent,BorderBrush=Look.AccentLine,BorderThickness=new Thickness(filled?1:0),VerticalAlignment=VerticalAlignment.Center};
         button.Click+=(_,_)=>onClick();
         return button;
     }
@@ -377,7 +384,7 @@ public partial class MainWindow : Window {
         var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
         texts.Children.Add(Words(title,13,strong:true));texts.Children.Add(Words(detail,12,Look.Secondary,top:2));
         var actions=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};actions.Children.Add(action);if(later is not null) actions.Children.Add(later);
-        return new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(14,10,later is null?10:4,10),Child=Columns(new FrameworkElement(),texts,actions),Margin=new Thickness(0,0,0,8)};
+        return new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(14,10,later is null?10:4,10),Child=Columns(new FrameworkElement(),texts,actions),Margin=new Thickness(0,0,0,8)};
     }
     /// Title, size and time left, a big percentage, and a bar of square blocks (the brand's pixel accent).
     private Border ProgressCard(ReleaseUpdate available) {
@@ -393,7 +400,7 @@ public partial class MainWindow : Window {
         for(var i=0;i<40;i++) blocks.Children.Add(new Rectangle {Height=6,Margin=new Thickness(0,0,i<39?3:0,0),Fill=i<percent*40/100?Look.Accent:Look.Raised});
         AutomationProperties.SetName(blocks,percent+"%");
         var stack=new StackPanel();stack.Children.Add(Columns(new FrameworkElement(),texts,right));stack.Children.Add(blocks);
-        return new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(14,12,6,12),Child=stack,Margin=new Thickness(0,0,0,8)};
+        return new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(14,12,6,12),Child=stack,Margin=new Thickness(0,0,0,8)};
     }
     private async void StartDownload(ReleaseUpdate available) {
         if(downloading) return;
@@ -496,9 +503,9 @@ public partial class MainWindow : Window {
             if(!first) stack.Children.Add(new Border {Height=1,Background=Look.Hairline,Margin=new Thickness(inset,0,0,0)});
             stack.Children.Add(row);first=false;
         }
-        return new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Child=stack};
+        return new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Child=stack};
     }
-    private static Button Primary(string title)=>new() {Content=title,Height=40,Background=Look.Accent,Foreground=Look.OnAccent,FontWeight=FontWeights.SemiBold,HorizontalContentAlignment=HorizontalAlignment.Center};
+    private static Button Primary(string title)=>new() {Content=title,Height=40,Background=Look.AccentWash,BorderBrush=Look.AccentLine,BorderThickness=new Thickness(1),Foreground=Look.Accent,FontWeight=FontWeights.SemiBold,HorizontalContentAlignment=HorizontalAlignment.Center};
     private static Button Plain(string title,Brush? color=null)=>new() {Content=title,Height=36,Background=Look.Surface,Foreground=color??Look.Text,FontSize=13,HorizontalContentAlignment=HorizontalAlignment.Center};
     /// Label-over-value cells side by side.
     private static Grid Cells(params (string Key,TextBlock Value,double Size)[] cells) {
@@ -585,7 +592,7 @@ public partial class MainWindow : Window {
         AutomationProperties.SetName(close,L10n.Text("close"));
         close.Click+=(_,_)=>{dismissedSwitch=connection.SwitchedFrom;UpdateLive();};
         var dot=new Rectangle {Width=6,Height=6,Fill=Look.Accent,VerticalAlignment=VerticalAlignment.Center};
-        var note=new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(14,4,4,4),Child=Columns(dot,text,close),Visibility=Visibility.Collapsed};
+        var note=new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(14,4,4,4),Child=Columns(dot,text,close),Visibility=Visibility.Collapsed};
         return (note,text);
     }
     private void ShowSwitch(Border? note,TextBlock? text,RingState state) {
@@ -632,7 +639,7 @@ public partial class MainWindow : Window {
         var toNode=Leg(L10n.Text("check_node"),name);
         var web=Leg(L10n.Text("check_web"),L10n.Text("check_web_detail"));
         var verdict=Words("",13);verdict.TextWrapping=TextWrapping.Wrap;
-        stack.Children.Add(new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(14,12,14,12),Margin=new Thickness(0,8,0,0),Child=verdict});
+        stack.Children.Add(new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(14,12,14,12),Margin=new Thickness(0,8,0,0),Child=verdict});
         if(region.Length>0) {
             var exit=Columns(Single(L10n.Text("check_exit"),12,Look.Secondary),new FrameworkElement(),Single(region,12));
             exit.Margin=new Thickness(2,12,2,0);stack.Children.Add(exit);
@@ -647,7 +654,7 @@ public partial class MainWindow : Window {
             var now=Single(L10n.Text("line_in_use"),11,Look.Accent);now.Opacity=0;now.Margin=new Thickness(6,0,0,0);
             var value=Single("—",12,Look.Faint);value.FontFamily=new FontFamily("Cascadia Mono, Consolas");
             var left=new StackPanel {Orientation=Orientation.Horizontal};left.Children.Add(cellHost);left.Children.Add(Single(LineName(i),13));left.Children.Add(now);
-            lineGrid.Children.Add(new Border {Height=34,BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(6),Padding=new Thickness(10,0,10,0),
+            lineGrid.Children.Add(new Border {Height=34,BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(10,0,10,0),
                 Margin=new Thickness(i%2==0?0:3,i>1?6:0,i%2==0?3:0,0),Child=Columns(left,new FrameworkElement(),value)});
             lineBoxes.Add((cellHost,now,value));
         }
@@ -681,7 +688,7 @@ public partial class MainWindow : Window {
         var unit=Single("Mbps",12,Look.Secondary);unit.VerticalAlignment=VerticalAlignment.Bottom;unit.Margin=new Thickness(6,0,0,6);figure.Children.Add(unit);
         speedStack.Children.Add(figure);
         var bar=new UniformGrid {Rows=1,Columns=30,Margin=new Thickness(0,10,0,0)};
-        var barEmpty=Look.Hex("#1A1F28");
+        var barEmpty=Look.Hex("#201E1B");
         for(var i=0;i<30;i++) bar.Children.Add(new Rectangle {Height=6,Margin=new Thickness(0,0,i<29?2:0,0),Fill=barEmpty});
         speedStack.Children.Add(bar);
         var stats=new UniformGrid {Columns=3,Margin=new Thickness(0,12,0,0)};
@@ -694,7 +701,7 @@ public partial class MainWindow : Window {
         speedStack.Children.Add(stats);
         var speedNote=Single(L10n.Text("speed_hint"),12,Look.Secondary);speedNote.Height=18;speedNote.Margin=new Thickness(0,12,0,0);
         speedStack.Children.Add(speedNote);
-        stack.Children.Add(new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(14),Margin=new Thickness(0,16,0,0),Child=speedStack});
+        stack.Children.Add(new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(14),Margin=new Thickness(0,16,0,0),Child=speedStack});
         var speedButton=Primary(L10n.Text("speed_start"));speedButton.Margin=new Thickness(0,14,0,0);
         stack.Children.Add(speedButton);
         var speedLine="";
@@ -751,7 +758,7 @@ public partial class MainWindow : Window {
         stack.Children.Add(other);
         var again=Plain(L10n.Text("check_again"));again.Height=40;again.Margin=new Thickness(0,10,0,0);
         stack.Children.Add(again);
-        window.Content=new Border {Background=Look.Hex("#0B0E13"),BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(20,14,14,18),Child=stack};
+        window.Content=new Border {Background=Look.Hex("#0E0D0C"),BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(20,14,14,18),Child=stack};
         TextElement.SetForeground(window,Look.Text);
         void Paint((Rectangle Mark,TextBlock Value) leg,long ms,long limit) {
             var color=ms<0?Look.Danger:ms>limit?Look.Fair:Look.Accent;
@@ -799,7 +806,7 @@ public partial class MainWindow : Window {
     private void Render() {
         ContentPanel.Children.Clear();FullPanel.Children.Clear();NavigationPanel.Children.Clear();HeaderSlot.Content=null;
         rateBars=null;switchNote=null;switchText=null;onNodes=null;onMeasured=null;
-        ring=null;ringButton=null;statusTitle=statusDetail=statusTimer=statusRates=stream=usageTotal=usageUntil=null;statusDot=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
+        statusTitle=statusDetail=statusTimer=statusRates=usageTotal=usageUntil=actionLabel=null;stamp=null;actionButton=null;actionDot=null;scan=null;fileLines=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
         var view=api.SignedIn?page:"login";
         var full=view=="connect";
         Scroller.Visibility=full?Visibility.Collapsed:Visibility.Visible;FullPanel.Visibility=full?Visibility.Visible:Visibility.Collapsed;
@@ -842,58 +849,127 @@ public partial class MainWindow : Window {
         if(update is null&&announcement.Length==0) return null;
         var stack=new StackPanel();
         if(update is not null) {bannerHost=new ContentControl {Focusable=false};stack.Children.Add(bannerHost);ShowUpdate();}
-        if(announcement.Length>0) stack.Children.Add(new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(14,10,14,10),Child=Words(announcement,12,Look.Secondary),Margin=new Thickness(0,0,0,8)});
+        if(announcement.Length>0) stack.Children.Add(new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(14,10,14,10),Child=Words(announcement,12,Look.Secondary),Margin=new Thickness(0,0,0,8)});
         return stack;
     }
-    /// Everything needed to connect fits in the window: the ring, the state, the location, and usage.
+    /// The connect page as a file: its state, four lines of what anyone can see about this PC right now, one action,
+    /// then the location and usage. Connecting seals the file (a line of light sweeps down and each line turns into
+    /// dots, the lamp above goes out); disconnecting sweeps back up and opens it.
     private void Home() {
-        var layout=new Grid {Margin=new Thickness(16,8,16,16)};
+        var layout=new Grid {Margin=new Thickness(16,4,16,16)};
         layout.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});layout.RowDefinitions.Add(new RowDefinition {Height=new GridLength(1,GridUnitType.Star)});layout.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});
         var top=new StackPanel();
         if(Notices() is { } notes) top.Children.Add(notes);
         var (homeNote,homeText)=SwitchNote(13);homeNote.Margin=new Thickness(0,0,0,8);top.Children.Add(homeNote);
         switchNote=homeNote;switchText=homeText;
         layout.Children.Add(top);
+        HeaderSlot.Content=new TextBlock {Text="№ "+FileNumber(),FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=11,Foreground=Look.Faint,VerticalAlignment=VerticalAlignment.Center};
 
-        ring=new Ring();
-        ringButton=new Button {Style=(Style)FindResource("Bare"),Content=ring.View,HorizontalAlignment=HorizontalAlignment.Center};
-        ringButton.Click+=(_,_)=>Toggle();
-        // The state block has one height in every state, so the ring never moves when a connection comes up or goes
-        // down: the time, rates and chart fade in and out of space that is always reserved, the second line swaps
-        // between the time and a short message in the same slot, and the chart takes the stream's place in its slot.
-        statusDot=new Rectangle {Width=8,Height=8,Fill=Look.Accent,Margin=new Thickness(0,0,10,0),VerticalAlignment=VerticalAlignment.Center,Opacity=0};
-        statusTitle=new TextBlock {FontSize=24,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.NoWrap};
-        var titleRow=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,20,0,0)};
-        // A matching gap on the right keeps the title itself centred whether the dot shows or not.
-        titleRow.Children.Add(statusDot);titleRow.Children.Add(statusTitle);titleRow.Children.Add(new Border {Width=18});
-        statusTimer=new TextBlock {FontFamily=Look.Dots,FontSize=30,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Opacity=0};
-        statusDetail=new TextBlock {FontSize=13,Foreground=Look.Secondary,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(8,0,8,0),MaxHeight=40,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis};
-        var slot=new Grid {Height=44,Margin=new Thickness(0,6,0,0)};slot.Children.Add(statusTimer);slot.Children.Add(statusDetail);
-        statusRates=new TextBlock {FontSize=12,Foreground=Look.Secondary,HorizontalAlignment=HorizontalAlignment.Center,Height=18,Opacity=0,TextTrimming=TextTrimming.CharacterEllipsis};
-        Typography.SetNumeralAlignment(statusRates,FontNumeralAlignment.Tabular);
-        stream=new TextBlock {FontFamily=Look.Dots,FontSize=14,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
-        rateBars=new RateBars {Width=238,Height=44,HorizontalAlignment=HorizontalAlignment.Center,Opacity=0};
-        var chart=new Grid {Height=44,Margin=new Thickness(0,8,0,0)};chart.Children.Add(stream);chart.Children.Add(rateBars);
+        // The state block has one height in every state, so nothing below it moves when a connection comes up or goes
+        // down: what only exists while connected fades in and out of space that is always reserved.
         var center=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
-        center.Children.Add(ringButton);center.Children.Add(titleRow);center.Children.Add(slot);center.Children.Add(statusRates);center.Children.Add(chart);
+        center.Children.Add(Dossier.Section("section_status"));
+        statusTitle=new TextBlock {FontSize=28,FontWeight=FontWeights.Light,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.NoWrap,TextTrimming=TextTrimming.CharacterEllipsis};
+        stamp=Dossier.Stamp();
+        var titleRow=new DockPanel {Height=40,Margin=new Thickness(4,6,4,0),LastChildFill=true};
+        DockPanel.SetDock(stamp,Dock.Right);titleRow.Children.Add(stamp);titleRow.Children.Add(statusTitle);
+        center.Children.Add(titleRow);
+        statusTimer=new TextBlock {FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=14,VerticalAlignment=VerticalAlignment.Center,Opacity=0};
+        statusDetail=new TextBlock {FontSize=12,Foreground=Look.Secondary,VerticalAlignment=VerticalAlignment.Center,MaxHeight=36,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis};
+        var slot=new Grid {Height=34,Margin=new Thickness(4,0,4,0)};slot.Children.Add(statusTimer);slot.Children.Add(statusDetail);
+        center.Children.Add(slot);
+        // The file itself: what any site or app on this network can read about this PC.
+        var rows=new StackPanel();
+        var values=new (string Key,string Value)[] {("file_public_ip",visitorIp??"···"),("file_device",DeviceLine()),("file_time_zone",ZoneLine()),("file_language",L10n.Culture.Name)};
+        fileLines=new List<SealedText>();
+        foreach(var (key,value) in values) {
+            var line=new SealedText(13) {Value=value,VerticalAlignment=VerticalAlignment.Center};
+            var label=Dossier.Section(key);label.FontSize=10;label.Width=92;label.Margin=new Thickness(4,0,0,0);label.VerticalAlignment=VerticalAlignment.Center;
+            var row=new DockPanel {Height=38,LastChildFill=true};DockPanel.SetDock(label,Dock.Left);row.Children.Add(label);row.Children.Add(line);
+            rows.Children.Add(new Border {BorderBrush=Look.Hairline,BorderThickness=new Thickness(0,1,0,0),Child=row});
+            fileLines.Add(line);
+        }
+        rows.Children.Add(new Border {BorderBrush=Look.Hairline,BorderThickness=new Thickness(0,1,0,0)});
+        scan=new ScanLine();
+        var file=new Grid {Margin=new Thickness(0,8,0,0)};file.Children.Add(rows);file.Children.Add(scan);
+        center.Children.Add(file);
+        statusRates=new TextBlock {FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=11,Foreground=Look.Secondary,Height=16,Margin=new Thickness(4,10,4,0),Opacity=0,TextTrimming=TextTrimming.CharacterEllipsis};
+        rateBars=new RateBars {Height=36,Margin=new Thickness(0,6,0,0),Opacity=0};
+        center.Children.Add(statusRates);center.Children.Add(rateBars);
         Grid.SetRow(center,1);layout.Children.Add(center);
+
+        // One outlined action: quiet while exposed, amber with a breathing dot while sealed.
+        actionLabel=new TextBlock {FontSize=14,FontWeight=FontWeights.Medium,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.NoWrap,TextTrimming=TextTrimming.CharacterEllipsis};
+        actionDot=new Ellipse {Width=6,Height=6,VerticalAlignment=VerticalAlignment.Center};
+        var actionRow=new DockPanel {LastChildFill=true};DockPanel.SetDock(actionDot,Dock.Right);actionRow.Children.Add(actionDot);actionRow.Children.Add(actionLabel);
+        actionButton=new Button {Height=48,Padding=new Thickness(16,0,16,0),BorderThickness=new Thickness(1),Content=actionRow};
+        actionButton.Click+=(_,_)=>Toggle();
 
         var badge=new ContentControl();
         var title=Single("",14,strong:true);var detail=Single("",12,Look.Secondary);detail.Margin=new Thickness(0,2,0,0);
         var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,8,0)};texts.Children.Add(title);texts.Children.Add(detail);
-        var row=new Button {Height=60,Background=Brushes.Transparent,BorderBrush=Look.Line,BorderThickness=new Thickness(1),Content=Columns(badge,texts,Look.Icon("",11,Look.Secondary))};
-        AutomationProperties.SetHelpText(row,L10n.Text("tap_to_change"));
+        var place=new Button {Height=58,Margin=new Thickness(0,10,0,0),Background=Brushes.Transparent,BorderBrush=Look.Line,BorderThickness=new Thickness(1),Content=Columns(badge,texts,Look.Icon("",11,Look.Secondary))};
+        AutomationProperties.SetHelpText(place,L10n.Text("tap_to_change"));
         // Connected, the location row opens the connection check; otherwise the location list.
-        row.Click+=(_,_)=>{if(busy) return;if(connection.Active&&connection.Since is not null&&connection.StatusKey!="location_retrying") ConnectionCheck();else {page="nodes";Render();}};
+        place.Click+=(_,_)=>{if(busy) return;if(connection.Active&&connection.Since is not null&&connection.StatusKey!="location_retrying") ConnectionCheck();else {page="nodes";Render();}};
         location=(badge,title,detail);
         usageTotal=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold};usageUntil=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold};
         var cells=Cells(("last_30_days",usageTotal,12),("valid_until_label",usageUntil,12));cells.Margin=new Thickness(4,14,4,0);
-        var bottom=new StackPanel();bottom.Children.Add(row);bottom.Children.Add(cells);
+        var bottom=new StackPanel();bottom.Children.Add(actionButton);bottom.Children.Add(place);bottom.Children.Add(cells);
         Grid.SetRow(bottom,2);layout.Children.Add(bottom);
         FullPanel.Children.Add(layout);
+        sealedShown=null;shownState=null;
         ShowUsage();
         _=RefreshAccount();
+        if(visitorIp is null&&!connection.Active) _=LoadVisitor();
         if(nodesData is null) _=QuietNodes();
+    }
+    private static string DeviceLine()=>"Windows "+(Environment.OSVersion.Version.Build>=22000?"11":"10")+" · "+(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture==System.Runtime.InteropServices.Architecture.Arm64?"ARM64":"x64");
+    private static string ZoneLine() {
+        var offset=TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
+        return "UTC"+(offset<TimeSpan.Zero?"-":"+")+offset.Duration().ToString(@"hh\:mm");
+    }
+    /// The public address the service sees, read once while not connected (afterwards it would be the location's).
+    private async Task LoadVisitor() {
+        try {visitorIp=await api.VisitorAddress();} catch {return;}
+        if(fileLines is { Count: >0 } lines) lines[0].Value=visitorIp;
+    }
+    private string FileNumber()=>Dossier.FileNumber(accountData?["email"]?.GetValue<string>()??"");
+    /// Seals or opens the connect page's file when the connection starts or ends; the first show on a page is still.
+    private void ShowSeal(RingState state) {
+        var seal=connection.Active;
+        Backdrop.Lit=!seal;
+        if(state!=shownState&&actionButton is not null&&actionLabel is not null&&actionDot is not null) {
+            var on=state==RingState.Connected;
+            actionLabel.Text=L10n.Text(state switch {RingState.Connected=>"unseal_action",RingState.Connecting=>"sealing_detail",RingState.Failed=>"retry_action",_=>"seal_action"});
+            actionButton.Foreground=on?Look.Accent:Look.Text;
+            actionButton.Background=on?Look.AccentWash:Brushes.Transparent;
+            actionButton.BorderBrush=on?Look.AccentLine:Look.Hex("#3DEDE7DF");
+            AutomationProperties.SetName(actionButton,L10n.Text(state switch {RingState.Idle=>"connect_action",RingState.Failed=>"retry_action",RingState.Connecting=>"cancel",_=>"disconnect_action"}));
+            actionDot.Fill=seal?Look.Accent:Look.Hex("#59EDE7DF");
+            actionDot.BeginAnimation(OpacityProperty,null);actionDot.Opacity=1;
+            if(seal&&Motion) actionDot.BeginAnimation(OpacityProperty,new DoubleAnimation(1,0.35,TimeSpan.FromMilliseconds(1800)) {AutoReverse=true,RepeatBehavior=RepeatBehavior.Forever,EasingFunction=new SineEase {EasingMode=EasingMode.EaseInOut}});
+            shownState=state;
+        }
+        if(actionButton is not null) actionButton.IsEnabled=!busy||connection.Active;
+        if(sealedShown==seal||fileLines is null) return;
+        var moving=sealedShown is not null&&Motion;
+        var n=fileLines.Count;
+        for(var i=0;i<n;i++) fileLines[i].Seal(seal,moving?(int)(1300*((seal?i:n-1-i)+0.5)/n):0,moving);
+        if(moving) scan?.Sweep(seal);
+        if(stamp is not null) {
+            var scale=(ScaleTransform)((TransformGroup)stamp.RenderTransform).Children[0];
+            stamp.BeginAnimation(OpacityProperty,null);scale.BeginAnimation(ScaleTransform.ScaleXProperty,null);scale.BeginAnimation(ScaleTransform.ScaleYProperty,null);
+            if(!moving) {stamp.Opacity=seal?1:0;}
+            else if(seal) {
+                stamp.Opacity=0;
+                var delay=TimeSpan.FromMilliseconds(1250);var ease=new CubicEase {EasingMode=EasingMode.EaseOut};
+                stamp.BeginAnimation(OpacityProperty,new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(260)) {BeginTime=delay});
+                var grow=new DoubleAnimation(1.6,1,TimeSpan.FromMilliseconds(260)) {BeginTime=delay,EasingFunction=ease};
+                scale.BeginAnimation(ScaleTransform.ScaleXProperty,grow);scale.BeginAnimation(ScaleTransform.ScaleYProperty,grow);
+            } else {var from=stamp.Opacity;stamp.Opacity=0;stamp.BeginAnimation(OpacityProperty,new DoubleAnimation(from,0,TimeSpan.FromMilliseconds(200)));}
+        }
+        sealedShown=seal;
     }
     /// In the background: at launch, when the window comes back after six hours, and with the refresh button. Nothing
     /// changes on screen if it fails.
@@ -922,7 +998,7 @@ public partial class MainWindow : Window {
         if(active) return connection.Since is not null?RingState.Connected:RingState.Connecting;
         return failed?RingState.Failed:RingState.Idle;
     }
-    private string StatusTitle(RingState state)=>L10n.Text(state switch {RingState.Connected=>"connected_status",RingState.Connecting=>"connecting",RingState.Failed=>"connect_failed_title",_=>"not_connected"});
+    private string StatusTitle(RingState state)=>L10n.Text(state switch {RingState.Connected=>"sealed_status",RingState.Connecting=>"connecting",RingState.Failed=>"connect_failed_title",_=>"exposed_status"});
     /// Time since the connection came up, or null while it is not (yet) confirmed.
     private string? Elapsed()=>!Connection.Notices.Contains(connection.StatusKey)&&connection.Since is { } since?(DateTime.UtcNow-since).ToString(@"hh\:mm\:ss"):null;
     /// The flyout's one line keeps time and rates together; the window shows the time large above the rates.
@@ -931,7 +1007,7 @@ public partial class MainWindow : Window {
             :Elapsed() is { } time?compact?L10n.Text("connection_stats",time,Mbps(connection.RxRate),Mbps(connection.TxRate)):L10n.Text("connection_rates",Mbps(connection.RxRate),Mbps(connection.TxRate)):"",
         RingState.Connecting=>L10n.Text("finding_best_route"),
         RingState.Failed=>failure,
-        _=>L10n.Text(update?.Mandatory==true?"update_required_detail":connection.Blocking?"kill_switch_blocking":"tap_ring_to_connect"),
+        _=>L10n.Text(update?.Mandatory==true?"update_required_detail":connection.Blocking?"kill_switch_blocking":"exposed_detail"),
     };
     /// The location the next (or current) connection uses, as title, detail and tile code (null: automatic).
     private (string Title,string Detail,string? Code) Location() {
@@ -1027,9 +1103,9 @@ public partial class MainWindow : Window {
     }
     private Button AutomaticRow() {
         var selected=nodeId.Length==0;
-        // Selected = a lifted row and a lime tile; no outline or check, so nothing moves.
+        // Selected = a lifted row and a amber tile; no outline or check, so nothing moves.
         var badge=Look.Badge(null);
-        if(selected) {badge.Background=Look.Accent;if(badge.Child is TextBlock star) star.Foreground=Look.OnAccent;}
+        if(selected) {badge.Background=Look.AccentWash;badge.BorderBrush=Look.AccentLine;badge.BorderThickness=new Thickness(1);if(badge.Child is TextBlock star) star.Foreground=Look.OnAccent;}
         var row=new Button {Height=56,Background=selected?Look.Raised:Brushes.Transparent,BorderBrush=Look.Line,BorderThickness=new Thickness(1),
             Content=Columns(badge,TwoLines(L10n.Text("automatic"),L10n.Text("select_an_available_location_for_you"),strong:true))};
         AutomationProperties.SetName(row,L10n.Text("automatic")+(selected?L10n.Text("current_page"):""));
@@ -1057,7 +1133,7 @@ public partial class MainWindow : Window {
     }
     private static string LineValue(IReadOnlyDictionary<string,long> lines,string name)=>!lines.TryGetValue(name,out var ms)?L10n.Text("line_off")
         :ms<0?L10n.Text("line_down"):L10n.Text("latency_ms",ms.ToString("N0",L10n.Culture));
-    private static readonly Brush WaitCell=Look.Hex("#252B35"),OffCell=Look.Hex("#3A414D");
+    private static readonly Brush WaitCell=Look.Hex("#2D2A25"),OffCell=Look.Hex("#443F39");
     private static StackPanel LineCells(IEnumerable<LineState> states,double size=6) {
         var panel=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center};
         foreach(var state in states) panel.Children.Add(new Rectangle {Width=size,Height=size,Margin=new Thickness(panel.Children.Count>0?3:0,0,0,0),
@@ -1077,7 +1153,7 @@ public partial class MainWindow : Window {
             var states=LineStates(quality?.Lines);var note=LinesNote(quality?.Lines);
             var offered=node["test"] is JsonArray tests&&tests.Any(t=>t?["name"]?.GetValue<string>() is { } n&&Latency.LineOrder.Contains(n));
             // Fixed columns on every row: tile, name, delay (fixed width, right-aligned), cell slot (always 44 wide).
-            // Selected = a lifted row, a lime tile and a bolder name; nothing is added, so the columns never move.
+            // Selected = a lifted row, a amber tile and a bolder name; nothing is added, so the columns never move.
             var latency=quality is null?(measuring?"…":""):Ms(quality) ?? L10n.Text("quality_unreachable");
             var digits=new TextBlock {Text=latency,FontSize=12,Foreground=unreachable?Look.Danger:Look.Secondary,TextAlignment=TextAlignment.Right,VerticalAlignment=VerticalAlignment.Center};
             if(!unreachable) Typography.SetNumeralAlignment(digits,FontNumeralAlignment.Tabular);
@@ -1087,7 +1163,7 @@ public partial class MainWindow : Window {
             if(label is TextBlock single) single.Margin=new Thickness(12,0,8,0);
             if(unreachable&&!selected&&label is StackPanel two&&two.Children[0] is TextBlock title) title.Foreground=Look.Faint;
             var badge=Look.Badge(Code(id,name),28,selected?Look.OnAccent:unreachable?Look.Faint:null);
-            if(selected) badge.Background=Look.Accent;
+            if(selected) {badge.Background=Look.AccentWash;badge.BorderBrush=Look.AccentLine;badge.BorderThickness=new Thickness(1);}
             var row=new Button {Height=note is null?48:52,Content=Columns(badge,label,right)};
             var item=new Border {Background=selected?Look.Raised:Brushes.Transparent,Tag=selected};
             var stack=new StackPanel();item.Child=stack;
@@ -1106,7 +1182,7 @@ public partial class MainWindow : Window {
                 var grid=new UniformGrid {Columns=2,Margin=new Thickness(54,0,16,8)};
                 for(var i=0;i<Latency.LineOrder.Length;i++) {
                     var name_=Latency.LineOrder[i];var has=lines.TryGetValue(name_,out var lineMs);
-                    var value=Single(LineValue(lines,name_),11,!has?Look.Faint:lineMs<0?Look.Hex("#BFF08672"):Look.Secondary);value.FontFamily=new FontFamily("Cascadia Mono, Consolas");
+                    var value=Single(LineValue(lines,name_),11,!has?Look.Faint:lineMs<0?Look.Hex("#BFF0675A"):Look.Secondary);value.FontFamily=new FontFamily("Cascadia Mono, Consolas");
                     var cell=LineCells(new[]{states[i]},4);cell.Margin=new Thickness(0,0,7,0);
                     var line=Columns(cell,Single(LineName(i),12,Look.Faint),value);line.Height=24;line.Margin=new Thickness(0,0,i%2==0?20:0,0);
                     AutomationProperties.SetName(line,LineName(i)+", "+LineValue(lines,name_));
@@ -1132,7 +1208,7 @@ public partial class MainWindow : Window {
         if(rows.Count>0) list.Children.Add(Card(rows));
         else list.Children.Add(Caption(L10n.Text(ranked.Count==0?"no_locations_available_refresh_later_or_contact_your_administrator":"no_matching_locations_try_another_search")));
     }
-    private static readonly Brush OpenRow=Look.Hex("#0C0F14");
+    private static readonly Brush OpenRow=Look.Hex("#100E0D");
     /// Opens or closes a node's line detail by animating its height, so the rows below slide instead of jumping.
     private static void Expand(Border detail,Border item,bool open) {
         detail.Child.Measure(new System.Windows.Size(detail.ActualWidth>0?detail.ActualWidth:double.PositiveInfinity,double.PositiveInfinity));
@@ -1158,7 +1234,7 @@ public partial class MainWindow : Window {
             button.Click+=(_,_)=>{if(!busy&&!selected) ChooseRouting(value);};
             choice.Children.Add(button);
         }
-        Add(new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(1,3,1,3),Child=choice},4,6);
+        Add(new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(1,3,1,3),Child=choice},4,6);
         Add(Caption(L10n.Text(mode=="smart"?"routing_smart_detail":"routing_global_detail")));
         if(connection.Active) Add(Caption(L10n.Text("test_after_disconnecting")),4,0);
     }
@@ -1179,9 +1255,19 @@ public partial class MainWindow : Window {
     private void AccountPage(JsonNode account) {
         var email=account["email"]?.GetValue<string>()??"";
         var name=account["name"]?.GetValue<string>() is { Length: >0 } given?given:email;
-        var avatar=new Border {Width=40,Height=40,CornerRadius=new CornerRadius(20),Background=Look.Raised,VerticalAlignment=VerticalAlignment.Center,
+        var avatar=new Border {Width=40,Height=40,CornerRadius=new CornerRadius(3),Background=Look.Raised,VerticalAlignment=VerticalAlignment.Center,
             Child=new TextBlock {Text=name.Length>0?name[..1].ToUpperInvariant():"",FontSize=16,FontWeight=FontWeights.SemiBold,Foreground=Look.Accent,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};
-        var identity=Columns(avatar,TwoLines(email,L10n.Text("account_valid_until",L10n.Date(account["expiresAt"]?.GetValue<string>())),strong:true));
+        // The address is sealed on screen; pressing and holding opens it for as long as the button stays down.
+        var sealedEmail=new SealedText(14) {Value=email,Cursor=Cursors.Hand,Background=Brushes.Transparent};sealedEmail.Seal(true,animate:false);
+        AutomationProperties.SetName(sealedEmail,email);
+        sealedEmail.MouseLeftButtonDown+=(_,_)=>{sealedEmail.CaptureMouse();sealedEmail.Seal(false);};
+        sealedEmail.MouseLeftButtonUp+=(_,_)=>{sealedEmail.ReleaseMouseCapture();sealedEmail.Seal(true);};
+        sealedEmail.LostMouseCapture+=(_,_)=>{if(!sealedEmail.Sealed) sealedEmail.Seal(true);};
+        var who=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,0,0)};
+        who.Children.Add(sealedEmail);
+        var hint=Dossier.Section("hold_to_reveal");hint.FontSize=10;hint.Margin=new Thickness(0,2,0,0);who.Children.Add(hint);
+        who.Children.Add(Single(L10n.Text("account_valid_until",L10n.Date(account["expiresAt"]?.GetValue<string>())),12,Look.Secondary));
+        var identity=Columns(avatar,who);
         identity.Margin=new Thickness(4,0,4,0);Add(identity,4,16);
         if(account["traffic"] is { } traffic) Add(UsageCard(traffic),0,16);
 
@@ -1271,12 +1357,12 @@ public partial class MainWindow : Window {
             var choice=new Button {Content=L10n.Text(title),FontSize=12,Height=28,Padding=new Thickness(10,0,10,0),HorizontalContentAlignment=HorizontalAlignment.Center};
             choice.Click+=(_,_)=>Pick(key);switcher.Children.Add(choice);
         }
-        stack.Children.Add(new Border {Background=Look.Ground,CornerRadius=new CornerRadius(9),Padding=new Thickness(2),HorizontalAlignment=HorizontalAlignment.Left,Child=switcher});
+        stack.Children.Add(new Border {Background=Look.Ground,CornerRadius=new CornerRadius(3),Padding=new Thickness(2),HorizontalAlignment=HorizontalAlignment.Left,Child=switcher});
         stack.Children.Add(figure);
         if(blocks is not null) stack.Children.Add(blocks);
         stack.Children.Add(split);
         Pick(usageRange);
-        return new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(16),Child=stack};
+        return new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(16),Child=stack};
     }
     private FrameworkElement SubHeader(string title) {
         var back=IconButton("",L10n.Text("back_action"),()=>{page="account";Render();});back.HorizontalAlignment=HorizontalAlignment.Left;
@@ -1334,7 +1420,7 @@ public partial class MainWindow : Window {
         var clear=Plain(L10n.Text("clear_action"),Look.Danger);clear.Click+=(_,_)=>{Journal.Clear();Render();};clear.Margin=new Thickness(6,0,0,0);
         actions.Children.Add(copy);actions.Children.Add(clear);Add(actions,0,10);
         // Newest first: the last attempt is what someone opening the log is looking for.
-        Add(new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(10,8,10,8),Child=new TextBox {
+        Add(new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(10,8,10,8),Child=new TextBox {
             Text=log.Length==0?L10n.Text("logs_empty"):string.Join("\n",log.Split('\n').Reverse()),IsReadOnly=true,BorderBrush=Brushes.Transparent,Background=Brushes.Transparent,Height=double.NaN,VerticalContentAlignment=VerticalAlignment.Top,
             FontFamily=new FontFamily("Consolas"),FontSize=11,TextWrapping=TextWrapping.Wrap,Padding=new Thickness(0)}});
     }
@@ -1383,7 +1469,7 @@ public partial class MainWindow : Window {
     private void ChooseLanguage(FrameworkElement anchor) {
         var list=new StackPanel {MinWidth=200};
         var popup=new Popup {PlacementTarget=anchor,Placement=PlacementMode.Bottom,StaysOpen=false,AllowsTransparency=true,
-            Child=new Border {Background=Look.Raised,BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(4),Child=list,Margin=new Thickness(0,4,0,0)}};
+            Child=new Border {Background=Look.Raised,BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(4),Child=list,Margin=new Thickness(0,4,0,0)}};
         if(anchor.ActualWidth>200) popup.HorizontalOffset=anchor.ActualWidth-212;
         foreach(var (code,_) in Languages) {
             var chosen=L10n.Preference==code;
@@ -1407,22 +1493,12 @@ public partial class MainWindow : Window {
     private void UpdateLive() {
         if(connection.Active) failed=false;
         var state=State();
-        if(ring is not null&&ringButton is not null) {
-            ring.Set(state,Motion);
-            ringButton.IsEnabled=!busy||connection.Active;
-            AutomationProperties.SetName(ringButton,L10n.Text(state switch {RingState.Idle=>"connect_action",RingState.Failed=>"retry_action",RingState.Connecting=>"cancel",_=>"disconnect_action"}));
-        }
+        ShowSeal(state);
         if(statusTitle is not null) statusTitle.Text=StatusTitle(state);
-        if(statusDot is not null) Fade(statusDot,state==RingState.Connected);
         var time=state==RingState.Connected?Elapsed():null;
         if(statusTimer is not null) {if(time is not null) statusTimer.Text=time;Fade(statusTimer,time is not null);}
         if(statusDetail is not null) {if(time is null) statusDetail.Text=StatusDetail(state,false);Fade(statusDetail,time is null);}
         if(statusRates is not null) {if(time is not null) statusRates.Text=StatusDetail(state,false);Fade(statusRates,time is not null);}
-        if(stream is not null) {
-            var running=state is RingState.Connecting or RingState.Connected;
-            stream.Text=running&&Motion?Look.Stream(DateTime.UtcNow):Look.StreamIdle;stream.Foreground=running?Look.StreamOn:Look.StreamOff;
-            Fade(stream,state!=RingState.Connected);
-        }
         ShowRates(rateBars,state);
         ShowSwitch(switchNote,switchText,state);
         if(location is { } place) {

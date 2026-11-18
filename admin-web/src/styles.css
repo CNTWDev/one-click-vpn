@@ -3,37 +3,37 @@
    --border --text --text-2 --success --warning --danger. */
 :root {
   color-scheme: dark;
-  /* Same palette as the Portal and the apps: cool blue-black, one lime; "healthy" uses the accent, no second green. */
-  --bg: #07090d;
-  --surface: #10141a;
-  --surface-2: #161b23;
-  --surface-3: #0b0e13;
-  --input: #0b0e13;
-  --hover: rgba(234, 238, 244, .04);
-  --border: rgba(220, 228, 245, .09);
-  --border-strong: rgba(220, 228, 245, .17);
-  --text: #eaeef4;
-  --text-2: #a4adbb;
-  --text-3: #858e9c;
-  --accent: #c6f26e;
-  --accent-strong: #d9f89c;
-  --accent-soft: rgba(198, 242, 110, .12);
-  --accent-contrast: #13210a;
-  --success: #c6f26e;
-  --success-soft: rgba(198, 242, 110, .12);
+  /* Same palette as the Portal and the apps: warm near-black, one amber; "healthy" uses the accent, no second colour. */
+  --bg: #080706;
+  --surface: #12100e;
+  --surface-2: #191714;
+  --surface-3: #0c0b09;
+  --input: #0c0b09;
+  --hover: rgba(237, 231, 223, .04);
+  --border: rgba(255, 214, 160, .09);
+  --border-strong: rgba(255, 214, 160, .17);
+  --text: #ede7df;
+  --text-2: #a39b91;
+  --text-3: #958b7c;
+  --accent: #e0a458;
+  --accent-strong: #ecbf85;
+  --accent-soft: rgba(224, 164, 88, .12);
+  --accent-contrast: #1c1206;
+  --success: #e0a458;
+  --success-soft: rgba(224, 164, 88, .12);
   --progress: #7aa7ff;
   --progress-soft: rgba(122, 167, 255, .12);
-  --warning: #e3b255;
-  --warning-soft: rgba(227, 178, 85, .12);
-  --danger: #f08672;
-  --danger-soft: rgba(240, 134, 114, .12);
-  --neutral: #9aa3b2;
-  --neutral-soft: rgba(154, 163, 178, .12);
-  /* Past figures in charts and rankings; lime itself is kept for the brand, the main action and "now". */
+  --warning: #e8866a;
+  --warning-soft: rgba(232, 134, 106, .12);
+  --danger: #f0675a;
+  --danger-soft: rgba(240, 103, 90, .12);
+  --neutral: #a39b91;
+  --neutral-soft: rgba(163, 155, 145, .12);
+  /* Past figures in charts and rankings; amber itself is kept for the brand, the main action and "now". */
   --data: color-mix(in srgb, var(--accent) 45%, var(--surface));
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 14px;
+  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-lg: 6px;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
   --shadow: 0 10px 30px rgba(0, 0, 0, .28);
   --shadow-lg: 0 24px 80px rgba(0, 0, 0, .55);
@@ -52,24 +52,24 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     color-scheme: light;
-    --bg: #f3f5f8; --surface: #ffffff; --surface-2: #f7f8fb; --surface-3: #eef1f5; --input: #ffffff; --hover: rgba(15, 25, 45, .04);
+    --bg: #f5f2ee; --surface: #ffffff; --surface-2: #faf8f5; --surface-3: #efebe5; --input: #ffffff; --hover: rgba(15, 25, 45, .04);
     --border: rgba(16, 24, 40, .1); --border-strong: rgba(16, 24, 40, .18);
-    --text: #151a22; --text-2: #4a5363; --text-3: #697284;
-    --accent: #4a7d0c; --accent-strong: #3b6608; --accent-soft: rgba(74, 125, 12, .1); --accent-contrast: #ffffff;
-    --success: #4a7d0c; --success-soft: rgba(74, 125, 12, .1); --progress: #2463c7; --progress-soft: rgba(36, 99, 199, .09);
-    --warning: #a96800; --warning-soft: rgba(214, 140, 0, .12); --danger: #cf3a24; --danger-soft: rgba(207, 58, 36, .09);
+    --text: #1c1915; --text-2: #5a5249; --text-3: #7a7065;
+    --accent: #9a5d12; --accent-strong: #7d4a0c; --accent-soft: rgba(154, 93, 18, .1); --accent-contrast: #ffffff;
+    --success: #9a5d12; --success-soft: rgba(154, 93, 18, .1); --progress: #2463c7; --progress-soft: rgba(36, 99, 199, .09);
+    --warning: #b4532f; --warning-soft: rgba(180, 83, 47, .1); --danger: #cf3a24; --danger-soft: rgba(207, 58, 36, .09);
     --neutral: #687182; --neutral-soft: rgba(104, 113, 130, .1); --data: color-mix(in srgb, var(--accent) 55%, #ffffff);
     --shadow-sm: 0 1px 2px rgba(15, 25, 45, .06); --shadow: 0 8px 24px rgba(15, 25, 45, .08); --shadow-lg: 0 24px 70px rgba(15, 25, 45, .18);
   }
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f3f5f8; --surface: #ffffff; --surface-2: #f7f8fb; --surface-3: #eef1f5; --input: #ffffff; --hover: rgba(15, 25, 45, .04);
+  --bg: #f5f2ee; --surface: #ffffff; --surface-2: #faf8f5; --surface-3: #efebe5; --input: #ffffff; --hover: rgba(15, 25, 45, .04);
   --border: rgba(16, 24, 40, .1); --border-strong: rgba(16, 24, 40, .18);
-  --text: #151a22; --text-2: #4a5363; --text-3: #697284;
-  --accent: #4a7d0c; --accent-strong: #3b6608; --accent-soft: rgba(74, 125, 12, .1); --accent-contrast: #ffffff;
-  --success: #4a7d0c; --success-soft: rgba(74, 125, 12, .1); --progress: #2463c7; --progress-soft: rgba(36, 99, 199, .09);
-  --warning: #a96800; --warning-soft: rgba(214, 140, 0, .12); --danger: #cf3a24; --danger-soft: rgba(207, 58, 36, .09);
+  --text: #1c1915; --text-2: #5a5249; --text-3: #7a7065;
+  --accent: #9a5d12; --accent-strong: #7d4a0c; --accent-soft: rgba(154, 93, 18, .1); --accent-contrast: #ffffff;
+  --success: #9a5d12; --success-soft: rgba(154, 93, 18, .1); --progress: #2463c7; --progress-soft: rgba(36, 99, 199, .09);
+  --warning: #b4532f; --warning-soft: rgba(180, 83, 47, .1); --danger: #cf3a24; --danger-soft: rgba(207, 58, 36, .09);
   --neutral: #687182; --neutral-soft: rgba(104, 113, 130, .1); --data: color-mix(in srgb, var(--accent) 55%, #ffffff);
   --shadow-sm: 0 1px 2px rgba(15, 25, 45, .06); --shadow: 0 8px 24px rgba(15, 25, 45, .08); --shadow-lg: 0 24px 70px rgba(15, 25, 45, .18);
 }
@@ -287,7 +287,7 @@ td .row-actions { flex-wrap: wrap; }
 .fleet-map-stats { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; justify-content: flex-end; }
 .fleet-map-stats span { max-width: 170px; color: var(--text-2); font-size: 12px; white-space: nowrap; }
 .fleet-map-stats b { display: block; overflow: hidden; color: var(--text); font-size: 16px; text-overflow: ellipsis; }
-.fleet-map-stage { height: clamp(330px, 40vw, 520px); position: relative; overflow: hidden; isolation: isolate; background: radial-gradient(circle at 68% 38%, rgba(95, 131, 255, .08), transparent 25%), radial-gradient(circle at 22% 70%, rgba(198, 242, 110, .06), transparent 28%), #080b12; }
+.fleet-map-stage { height: clamp(330px, 40vw, 520px); position: relative; overflow: hidden; isolation: isolate; background: radial-gradient(circle at 68% 38%, rgba(95, 131, 255, .08), transparent 25%), radial-gradient(circle at 22% 70%, rgba(224, 164, 88, .06), transparent 28%), #0a0907; }
 .fleet-map-stage::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: .35; background-image: linear-gradient(rgba(150, 170, 220, .08) 1px, transparent 1px), linear-gradient(90deg, rgba(150, 170, 220, .08) 1px, transparent 1px); background-size: 42px 42px; mask-image: linear-gradient(to bottom, transparent, black 18%, black 84%, transparent); }
 .fleet-map-stage svg { width: 100%; height: 100%; display: block; position: relative; z-index: 2; }
 .fleet-map-ocean { fill: transparent; }

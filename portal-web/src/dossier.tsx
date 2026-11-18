@@ -10,29 +10,26 @@ const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(pre
  * through a few frames of random glyphs (amber), so the change is seen, then settles. Width never changes.
  */
 export function SealedText({ text, sealed, delay = 0, className = "" }: { text: string; sealed: boolean; delay?: number; className?: string }) {
-  const [shown, setShown] = useState(text);
-  const [dots, setDots] = useState(sealed);
-  const [busy, setBusy] = useState(false);
-  const first = useRef(true);
+  // The state the line last settled in; while it differs from `sealed` the line waits for its turn, then scrambles.
+  const [settled, setSettled] = useState(sealed);
+  const [scramble, setScramble] = useState<string | null>(null);
   useEffect(() => {
-    if (first.current) { first.current = false; setShown(text); setDots(sealed); return; }
-    if (reduced()) { setShown(text); setDots(sealed); return; }
+    if (settled === sealed) return;
     let frame = 0, interval = 0;
     const start = window.setTimeout(() => {
-      if (!sealed) setDots(false);
-      setBusy(true);
+      if (reduced()) { setSettled(sealed); return; }
       interval = window.setInterval(() => {
         frame += 1;
-        if (frame >= 11) {
-          window.clearInterval(interval); setShown(text); setBusy(false); if (sealed) setDots(true);
-          return;
-        }
-        setShown([...text].map((c) => (c === " " || c === "·") ? c : GLYPHS[Math.floor(Math.random() * GLYPHS.length)]).join(""));
+        if (frame >= 11) { window.clearInterval(interval); setScramble(null); setSettled(sealed); return; }
+        setScramble([...text].map((c) => (c === " " || c === "·") ? c : GLYPHS[Math.floor(Math.random() * GLYPHS.length)]).join(""));
       }, 42);
-    }, delay);
-    return () => { window.clearTimeout(start); window.clearInterval(interval); };
-  }, [sealed, text, delay]);
-  return <span className={`sealed-text${dots ? " sealed" : ""}${busy ? " scrambling" : ""} ${className}`} aria-hidden={dots || undefined}>{shown}</span>;
+    }, reduced() ? 0 : delay);
+    // Toggled back mid-way: drop the scramble, the line shows the state it last settled in.
+    return () => { window.clearTimeout(start); window.clearInterval(interval); if (frame > 0) setScramble(null); };
+  }, [sealed, settled, text, delay]);
+  const busy = scramble !== null;
+  const dots = !busy && settled;
+  return <span className={`sealed-text${dots ? " sealed" : ""}${busy ? " scrambling" : ""} ${className}`} aria-hidden={dots || undefined}>{scramble ?? text}</span>;
 }
 
 type Row = { key: string; label: string; value: string };

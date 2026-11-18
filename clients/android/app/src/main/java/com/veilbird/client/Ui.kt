@@ -200,7 +200,7 @@ class DotBar(context: Context, private val share: Double, private val color: Int
     }
 }
 
-/** Traffic per hour of the day, proxied (lime) under direct (dim green), in pixel blocks; the current hour is marked. */
+/** Traffic per hour of the day, proxied (amber) under direct (dim green), in pixel blocks; the current hour is marked. */
 class HourBars(context: Context) : View(context) {
     private var hours: List<Pair<Long, Long>> = emptyList()
     private var now = 0
