@@ -7505,19 +7505,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The Connect button on the home page is easier to see and now says Connect / Disconnect"
+            "value": "The Connect button on the home page is easier to see, says Connect / Disconnect, and on Android stays at the bottom of the screen on small phones too"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "首页的连接按钮更醒目，直接写「连接」/「断开连接」"
+            "value": "首页的连接按钮更醒目，直接写「连接」/「断开连接」，安卓上固定在底部，小屏也不用滑动"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Кнопка подключения на главной заметнее и теперь называется «Подключиться» / «Отключиться»"
+            "value": "Кнопка подключения на главной заметнее, называется «Подключиться» / «Отключиться», а на Android всегда видна внизу экрана, даже на маленьких телефонах"
           }
         }
       }

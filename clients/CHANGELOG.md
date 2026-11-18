@@ -7,13 +7,13 @@
 ## 1.0.6
 
 ### zh
-- 首页的连接按钮更醒目，直接写「连接」/「断开连接」
+- 首页的连接按钮更醒目，直接写「连接」/「断开连接」，安卓上固定在底部，小屏也不用滑动
 
 ### en
-- The Connect button on the home page is easier to see and now says Connect / Disconnect
+- The Connect button on the home page is easier to see, says Connect / Disconnect, and on Android stays at the bottom of the screen on small phones too
 
 ### ru
-- Кнопка подключения на главной заметнее и теперь называется «Подключиться» / «Отключиться»
+- Кнопка подключения на главной заметнее, называется «Подключиться» / «Отключиться», а на Android всегда видна внизу экрана, даже на маленьких телефонах
 
 ## 1.0.5
 
