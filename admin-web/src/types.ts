@@ -239,7 +239,8 @@ export type OperationalLogLine = {
 };
 
 /** Accounts per status, sent with every user list. */
-export type UserCounts = Record<AdminUser["status"], number>;
+/** Accounts per Console filter chip: every status plus access ending soon / ended. */
+export type UserListCounts = Record<"all" | AdminUser["status"] | "ending" | "ended", number>;
 
 /** Console overview figures the node list cannot give: who is online now, last month and accounts about to run out. */
 export type OverviewAccount = { userId: string; displayName: string; email: string; expiresAt: string | null; usedBytes: number; quotaBytes: number };

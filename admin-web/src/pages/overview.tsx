@@ -7,14 +7,15 @@ import type { AdminUser, NodeRecord, OverviewStats } from "../types";
 import { Empty, formatBytes, formatRate, PageHeader, Pill, StateDot, Time } from "./shared";
 
 
-export function OverviewPage({ pendingUsers: pending, activeUsers, nodes, onRefresh }: {
-  pendingUsers: AdminUser[]; activeUsers: number; nodes: NodeRecord[]; onRefresh: () => Promise<void>;
+/** pendingUsers is the newest few; pendingCount counts them all. */
+export function OverviewPage({ pendingUsers: pending, pendingCount, activeUsers, nodes, onRefresh }: {
+  pendingUsers: AdminUser[]; pendingCount: number; activeUsers: number; nodes: NodeRecord[]; onRefresh: () => Promise<void>;
 }) {
   useConsoleLanguage();
   const attention = nodes.filter((node) => node.status !== "online");
   const online = nodes.length - attention.length;
   const [stats, setStats] = useState<OverviewStats | null>(null);
-  const loadStats = () => api<OverviewStats>("/api/v1/admin/overview-stats").then(setStats).catch(() => undefined);
+  const loadStats = (fresh = false) => api<OverviewStats>(`/api/v1/admin/overview-stats${fresh ? "?fresh=1" : ""}`).then(setStats).catch(() => undefined);
   useEffect(() => { void loadStats(); }, []);
   // Month totals and live speed come from the node list (Agent 2.11+); older agents simply do not count.
   const tracked = nodes.filter((node) => node.monthlyTraffic);
@@ -27,9 +28,9 @@ export function OverviewPage({ pendingUsers: pending, activeUsers, nodes, onRefr
   const topTx = byTraffic[0]?.monthlyTraffic?.txBytes || 0;
   const expiring = stats?.expiring ?? [];
   const nearQuota = stats?.nearQuota ?? [];
-  const todo = pending.length + attention.length + expiring.length + nearQuota.length;
+  const todo = Math.max(pendingCount, pending.length) + attention.length + expiring.length + nearQuota.length;
   return <>
-    <PageHeader title={t("运维总览")} description={t("从账号准入到边缘节点，集中查看当前需要处理的事项。")} actions={<button className="button ghost" onClick={() => { void onRefresh(); void loadStats(); }}><Icon name="refresh" size={16} />{t("刷新")}</button>} />
+    <PageHeader title={t("运维总览")} description={t("从账号准入到边缘节点，集中查看当前需要处理的事项。")} actions={<button className="button ghost" onClick={() => { void onRefresh(); void loadStats(true); }}><Icon name="refresh" size={16} />{t("刷新")}</button>} />
     <section className="metric-grid">
       <a href={href("nodes", { filter: attention.length ? "attention" : "online" })} ><small>{t("在线节点")}</small><b>{online}<em> / {nodes.length}</em></b><span className={attention.length ? "danger" : ""}>{attention.length ? t("{0} 个需关注 →", [attention.length]) : t("查看节点 →")}</span></a>
       <a href={href("users", { filter: "active" })}><small>{t("当前在线")}</small><b>{stats ? stats.online.users : "—"}</b><span>{stats ? t("{0} 台设备 · 共 {1} 个账号", [stats.online.devices, activeUsers]) : t("共 {0} 个账号", [activeUsers])}</span></a>

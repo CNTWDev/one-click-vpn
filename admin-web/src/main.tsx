@@ -10,7 +10,7 @@ import { Icon, type IconName } from "./icons";
 import { href, useRoute } from "./router";
 import { applyTheme, type ThemeChoice, useTheme } from "./theme";
 import { ToastProvider } from "./toast";
-import type { AdminUser, ControllerInfo, NodeRecord, Region, UserCounts } from "./types";
+import type { AdminUser, ControllerInfo, NodeRecord, Region, UserListCounts } from "./types";
 import "./styles.css";
 import "./credential-usage.css";
 import { PasswordInput } from "../../shared/password-input";
@@ -80,9 +80,9 @@ function App() {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
-  // Pending accounts and per-status counts only: the navigation badge and the overview need no more.
+  // The newest pending accounts and the counts only: the navigation badge and the overview need no more.
   const [pendingUsers, setPendingUsers] = useState<AdminUser[]>([]);
-  const [userCounts, setUserCounts] = useState<UserCounts | null>(null);
+  const [userCounts, setUserCounts] = useState<UserListCounts | null>(null);
   const [nodes, setNodes] = useState<NodeRecord[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
   const [controllerSettings, setControllerSettings] = useState<ControllerInfo["settings"] | null>(null);
@@ -96,7 +96,7 @@ function App() {
     setDataLoading(true); setError("");
     try {
       const [userResult, nodeResult, regionResult, controllerResult] = await Promise.all([
-        api<{ users: AdminUser[]; counts?: UserCounts }>("/api/v1/admin/users?status=pending"),
+        api<{ users: AdminUser[]; counts?: UserListCounts }>("/api/v1/admin/users?filter=pending&limit=5"),
         api<{ nodes: NodeRecord[] }>("/api/nodes"),
         api<{ regions: Region[] }>("/api/regions"),
         api<ControllerInfo>("/api/controller"),
@@ -156,7 +156,7 @@ function App() {
       <div className="content">
         {error && <div className="inline-notice error" role="alert"><span>{error}</span><button className="text-button" onClick={() => void refreshCore()}>{t("重试")}</button></div>}
         <Suspense fallback={<div className="page-loading" role="status"><i /><i /><i /></div>}>
-          {page === "overview" && <OverviewPage pendingUsers={pendingUsers} activeUsers={userCounts?.active ?? 0} nodes={nodes} onRefresh={refreshCore} />}
+          {page === "overview" && <OverviewPage pendingUsers={pendingUsers} pendingCount={pendingCount} activeUsers={userCounts?.active ?? 0} nodes={nodes} onRefresh={refreshCore} />}
           {page === "topology" && <TopologyPage nodes={nodes} regions={regions} controllerSettings={controllerSettings} onRefresh={refreshCore} />}
           {page === "users" && <UsersPage onChanged={() => void refreshCore()} />}
           {page === "plans" && <PlansPage />}
