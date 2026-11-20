@@ -14,7 +14,7 @@ import TunnelCore
 final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var lifecycle:Task<Void,Never>?
     private let stateLock=NSLock()
-    private var snapshot:[String:Any]=["status":"connection_confirming"]
+    private var snapshot:[String:Any]=["status":"connection_confirming","phase":0]
     private func publish(_ change:(inout [String:Any])->Void) {stateLock.lock();change(&snapshot);stateLock.unlock()}
     private var api:NativeAPI?
     private var nodeId=""
@@ -146,10 +146,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         let failed=nodeName
         await report(code);nodeId=fallbacks.removeFirst()
         // The app shows one line about the switch ("Tokyo 03 did not answer, switched to Tokyo 05").
-        publish {$0["status"]="connection_confirming";$0["since"]=nil;$0["switchedFrom"]=failed}
+        publish {$0["status"]="connection_confirming";$0["since"]=nil;$0["switchedFrom"]=failed;$0["phase"]=0}
     }
     private func bringUp() async throws {
         let started=Date()
+        // The app shows where connecting is: finding the route (0), opening the tunnel (1), confirming (2).
+        publish {$0["phase"]=0}
         let lease=try await acquire(initial:true)
         guard let wireguard=Transports.wireguard(lease,privateKey:keys.privateKey) else {throw AccessFailure.code("INVALID_RESPONSE")}
         let offered=(lease["proxies"] as? [[String:Any]] ?? []).filter {Transports.ladder.contains($0["name"] as? String ?? "")}
@@ -157,6 +159,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         let blocked=Transports.blocked(network)
         transports=Transports.order(proxies.compactMap {$0["name"] as? String},blocked:blocked)
         Journal.add("node: \(nodeName), transports \(transports.joined(separator:" > "))"+(blocked.isEmpty ? "":" (blocked here before: \(blocked.sorted().joined(separator:", ")))"))
+        let lines=transports.count
+        publish {$0["phase"]=1;$0["lines"]=lines}
         guard let fd=tunnelDescriptor() else {throw AccessFailure.code("TUNNEL_ERROR")}
         CoreStop()
         let options=try Transports.options(proxies:proxies,order:transports,fd:fd,smart:smart)
@@ -166,6 +170,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         _ = CoreRun(home,options,&failure)
         if Task.isCancelled {CoreStop();throw CancellationError()}
         if failure != nil {throw AccessFailure.code("TUNNEL_ERROR")}
+        publish {$0["phase"]=2}
         if !(await probe(initial:true)) {
             // WireGuard waits for the node to add this device; give it the rest of the readiness window.
             while !leaseReady && Date().timeIntervalSince(started)<15 {try await Task.sleep(nanoseconds:1_000_000_000);leaseReady=await status()}
@@ -266,7 +271,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 failures=0;nextProbe=Date().addingTimeInterval(healthy)
             } else {await missed()}
             let shown=message()
-            publish {$0["status"]=shown}
+            // While reconnecting: which attempt this is and when the next one starts.
+            let attempt=failures,next=failures>0 ? nextProbe.timeIntervalSince1970:nil
+            publish {$0["status"]=shown;$0["attempt"]=attempt;$0["retryAt"]=next}
         } else {updateCarrying()}
         let rate=CoreRate().split(separator:" ").compactMap {Int($0)}
         if rate.count==2 {publish {$0["tx"]=rate[0];$0["rx"]=rate[1]}}

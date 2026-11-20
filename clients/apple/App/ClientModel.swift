@@ -69,6 +69,19 @@ import ServiceManagement
     /// Set when a connection attempt ended without connecting; the ring then offers a retry.
     @Published var failed=false
     @Published var failure=""
+    /// Why the last connection ended (an API code, HANDSHAKE_TIMEOUT, VPN_CONFIGURATION, SYSTEM_EXTENSION…): see Guidance.
+    @Published var failureCode=""
+    /// From the tunnel: 0 picking a route, 1 opening the tunnel, 2 confirming; how many lines the location has; the next
+    /// try and how many rounds failed while reconnecting.
+    @Published var phase=0
+    @Published var lines=4
+    @Published var retryAt:Date?
+    @Published var retries=0
+    /// False on a new install until its first connection: sign-in, location and connect then show "n/3".
+    @Published var onboarded=UserDefaults.standard.object(forKey:"onboarded") as? Bool ?? true {didSet {UserDefaults.standard.set(onboarded,forKey:"onboarded")}}
+    @Published var onboardPicked=UserDefaults.standard.bool(forKey:"onboardPicked") {didSet {UserDefaults.standard.set(onboardPicked,forKey:"onboardPicked")}}
+    /// Mac: when the app starts the dropped tunnel again (nil when it is not waiting to).
+    @Published var reconnectAt:Date?
     private var attempt:Date?
     /// The service address release builds carry (VEILBIRD_API_ORIGIN): users never type one. Development builds are
     /// empty and ask for it on the sign-in page.
@@ -94,6 +107,23 @@ import ServiceManagement
     }
     var connected:Bool {[.connected,.connecting,.reasserting].contains(manager?.connection.status)}
     /// Tunnel status lines shown in place of the rates while connected.
+    /// The state the connect page, the menu bar and the widgets show (see RingState).
+    var ringState:RingState {
+        if reconnectAt != nil && !connected {return .reconnecting}
+        guard connected else {return failed ? .failed:.idle}
+        if manager?.connection.status == .reasserting {return .reconnecting}
+        if manager?.connection.status != .connected {return .connecting}
+        switch status {
+        case "waiting_for_network":return .waiting
+        case "reconnecting_status","location_retrying":return .reconnecting
+        case "connection_confirming":return since != nil ? .switching:.connecting
+        default:return since != nil ? .connected:.connecting
+        }
+    }
+    var trouble:Trouble? {ringState == .failed ? Guidance.trouble(failureCode,node:nodeName.isEmpty ? selectedName:nodeName,automatic:selected.isEmpty,fallback:failure):nil}
+    /// Seconds until the next try while reconnecting.
+    func countdown(_ now:Date)->Int {max(0,Int(((reconnectAt ?? retryAt)?.timeIntervalSince(now) ?? 0).rounded(.up)))}
+    var phaseText:String {L10n.text(phase == 0 ? "phase_route":(phase == 1 ? "phase_tunnel":"phase_confirm"))}
     static let notices:Set<String>=["connection_confirming","reconnecting_status","waiting_for_network","location_retrying"]
     private var lastVPNStatus:NEVPNStatus = .invalid
     private var reconnectTask:Task<Void,Never>?
@@ -217,12 +247,14 @@ import ServiceManagement
     func restore() async {
         do {
             signedIn=try SecureStorage.read("token") != nil
+            // Someone already signed in when this version arrives is not new: only a fresh install gets the three steps.
+            if UserDefaults.standard.object(forKey:"onboarded") == nil {onboarded=signedIn}
             #if !targetEnvironment(simulator)
             manager=try await TunnelControl.saved()
             if let refused=Shared.refused {
                 // The tunnel stopped on a refusal while the app was closed: no more On Demand restarts, and say why.
                 await TunnelControl.stop(manager);Shared.refused=nil
-                failed=true;failure=AccessFailure.code(refused).localizedDescription
+                failed=true;failure=AccessFailure.code(refused).localizedDescription;failureCode=refused
             }
             #if os(macOS)
             // The user had left the VPN on when the Mac restarted or the app quit: connect again.
@@ -323,8 +355,8 @@ import ServiceManagement
         #if targetEnvironment(simulator)
         throw AccessFailure.code("SIMULATOR_UNSUPPORTED")
         #else
-        if connected {attempt=nil;reconnectTask?.cancel();reconnectTask=nil;await TunnelControl.stop(manager);return}
-        failed=false
+        if connected || reconnectTask != nil {attempt=nil;reconnectTask?.cancel();reconnectTask=nil;reconnectAt=nil;await TunnelControl.stop(manager);return}
+        failed=false;failureCode="";phase=0
         #if os(macOS)
         // Once the user allows the extension in System Settings, connect without another tap.
         SystemExtension.shared.onReady={[weak self] in
@@ -336,7 +368,9 @@ import ServiceManagement
         catch AccessFailure.code("SYSTEM_EXTENSION_APPROVAL") {
             permission = .systemExtension
             // Right after the guide: straight to the switch; later taps explain again.
-            if extensionGuideAccepted {extensionGuideAccepted=false;SystemExtension.openSettings()} else {askPermission=true}
+            // The connect page says so ("network extension is off", with the button to System Settings).
+            failed=true;failureCode="SYSTEM_EXTENSION";failure=L10n.text("allow_system_extension_short")
+            if extensionGuideAccepted {extensionGuideAccepted=false;SystemExtension.openSettings()}
             return
         }
         if permission == .systemExtension {permission=nil}
@@ -347,7 +381,7 @@ import ServiceManagement
         catch let error as NSError where error.domain == NEVPNErrorDomain && error.code == NEVPNError.Code.configurationReadWriteFailed.rawValue {
             // The user chose "Don't Allow" (or missed) the system's "add VPN configuration" prompt; the next tap asks again.
             Journal.add("connect: VPN configuration not allowed");attempt=nil;UserDefaults.standard.set(false,forKey:"vpnWanted")
-            permission = .vpnConfiguration;askPermission=true;return
+            permission = .vpnConfiguration;failed=true;failureCode="VPN_CONFIGURATION";failure=L10n.text("allow_vpn_configuration_short");return
         }
         if permission == .vpnConfiguration {permission=nil}
         #endif
@@ -372,7 +406,7 @@ import ServiceManagement
                 if duringAttempt || code == "ACCESS_EXPIRED" || Shared.fatal.contains(code ?? "") {
                     Journal.add("disconnect: tunnel closed (\(code ?? "unknown")), not reconnecting")
                     await TunnelControl.stop(self.manager);Shared.refused=nil
-                    if let code {self.failed=true;self.failure=AccessFailure.code(code).localizedDescription}
+                    if let code {self.failed=true;self.failure=AccessFailure.code(code).localizedDescription;self.failureCode=code}
                     if code == "AUTH_REQUIRED" {self.signedIn=false}
                     return
                 }
@@ -387,10 +421,11 @@ import ServiceManagement
         guard reconnectTask == nil else {return}
         let delays:[Double]=[5,15,30,60,300]
         let delay=delays[min(reconnects,delays.count-1)];reconnects+=1
+        reconnectAt=Date().addingTimeInterval(delay);retries=reconnects
         Journal.add("reconnect: tunnel dropped, starting again in \(Int(delay)) s")
         reconnectTask=Task {
             try? await Task.sleep(nanoseconds:UInt64(delay*1_000_000_000))
-            reconnectTask=nil
+            reconnectTask=nil;reconnectAt=nil
             guard !Task.isCancelled,TunnelControl.wanted,signedIn,!connected,let manager else {return}
             do {try await TunnelControl.resume(manager)} catch {Journal.add("reconnect: failed to start (\(Journal.scrub(error.localizedDescription)))");reconnectLater()}
         }
@@ -415,7 +450,7 @@ import ServiceManagement
         let current=manager?.connection.status ?? .invalid
         if current != lastVPNStatus {
             let previous=lastVPNStatus;lastVPNStatus=current
-            if current == .connected {reconnects=0}
+            if current == .connected {reconnects=0;reconnectAt=nil}
             if current == .disconnected && [.connected,.connecting,.reasserting,.disconnecting].contains(previous) {dropped(duringAttempt:attempt != nil)}
         }
         switch manager?.connection.status {
@@ -426,11 +461,12 @@ import ServiceManagement
             status="not_connected";since=nil;rxRate=0;txRate=0;rxHistory=[];txHistory=[];switchedFrom="";activity=nil
             // The tunnel went down on its own shortly after a requested start: show it as a failed attempt.
             if let attempt,Date().timeIntervalSince(attempt)>2 {
-                self.attempt=nil;failed=true;failure=L10n.text("unable_to_connect_check_your_network_and_try_again")
+                self.attempt=nil;failed=true;failure=L10n.text("unable_to_connect_check_your_network_and_try_again");failureCode="CONNECT_FAILED"
             }
         }
         if manager?.connection.status == .connected {attempt=nil}
-        guard manager?.connection.status == .connected,let session=manager?.connection as? NETunnelProviderSession else {return}
+        // While connecting too: the tunnel tells its phase and lines (the call simply fails until it runs).
+        guard [.connected,.connecting,.reasserting].contains(manager?.connection.status),let session=manager?.connection as? NETunnelProviderSession else {return}
         try? session.sendProviderMessage(Data("status".utf8)) {data in
             guard let data,let state=try? JSONSerialization.jsonObject(with:data) as? [String:Any] else {return}
             Task {@MainActor in
@@ -439,6 +475,10 @@ import ServiceManagement
                 self.since=(state["since"] as? Double).map {Date(timeIntervalSince1970:$0)}
                 self.rxRate=state["rx"] as? Int ?? 0;self.txRate=state["tx"] as? Int ?? 0
                 self.switchedFrom=state["switchedFrom"] as? String ?? ""
+                self.phase=state["phase"] as? Int ?? self.phase;self.lines=state["lines"] as? Int ?? self.lines
+                self.retries=state["attempt"] as? Int ?? 0;self.retryAt=(state["retryAt"] as? Double).map {Date(timeIntervalSince1970:$0)}
+                // The first connection ends the three steps.
+                if self.since != nil && !self.onboarded {self.onboarded=true}
                 if self.since != nil {
                     self.rxHistory=Array((self.rxHistory+[self.rxRate]).suffix(RateBars.count));self.txHistory=Array((self.txHistory+[self.txRate]).suffix(RateBars.count))
                 }
