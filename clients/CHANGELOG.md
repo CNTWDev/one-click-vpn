@@ -4,6 +4,26 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.16
+
+### zh
+- 第一次打开分三步：登录、选位置（默认自动选择，并列出离你最快的 3 个）、连接；连上之前不显示底部标签栏，每页右上角标着第几步
+- 连接状态在安卓、Mac、Windows 上一个样：连接中光弧绕圈、换线路时逐段尝试、断线重连时显示倒计时和第几次、没网时安静等待
+- 连不上时直接说原因和下一步，按钮就是解决办法：设备已满去管理设备、位置没响应改用自动、登录过期重新登录、需要更新就立即更新
+- Mac 菜单栏和 Windows 托盘图标只有三档：未连接（半亮）、处理中（闪烁）、已连接（全亮）
+
+### en
+- First launch takes three steps: sign in, pick a location (Automatic is preselected, with the three fastest for you listed), connect; the tab bar stays hidden until you connect, and each page shows which step you are on
+- Connection states look the same on Android, Mac and Windows: an arc circles while connecting, lines are tried one by one when switching, reconnecting shows a countdown and the attempt, and without a network the app waits quietly
+- When a connection fails, the app says why and what to do next, and the button does it: manage devices when the device limit is reached, switch to Automatic when a location does not answer, sign in again when the session expired, update when an update is required
+- The Mac menu bar and Windows tray icon have three levels: off (half), working (blinking), connected (full)
+
+### ru
+- Первый запуск в три шага: вход, выбор локации (по умолчанию «Автоматически», плюс три самые быстрые для вас), подключение; нижние вкладки появляются после подключения, а на каждой странице видно, какой это шаг
+- Состояния подключения одинаковы на Android, Mac и Windows: при подключении по кругу бежит дуга, при смене линии они пробуются по очереди, при переподключении видны обратный отсчёт и номер попытки, без сети приложение спокойно ждёт
+- Если подключиться не удалось, приложение говорит причину и что делать, а кнопка делает это: управлять устройствами при лимите, перейти на «Автоматически», если локация не отвечает, войти снова, если сессия истекла, обновиться, если требуется обновление
+- Значок в строке меню Mac и в трее Windows в трёх видах: не подключено (приглушён), идёт работа (мигает), подключено (ярко)
+
 ## 1.0.15
 
 ### zh

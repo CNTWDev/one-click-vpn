@@ -1758,5 +1758,270 @@
     "zh": "网站只能看到{0}",
     "en": "Sites only see {0}",
     "ru": "Сайты видят только {0}"
+  },
+  "onboarding_ready": {
+    "zh": "已就绪",
+    "en": "Ready",
+    "ru": "Готово"
+  },
+  "pick_location_sub": {
+    "zh": "默认帮你选最快的，之后随时能换。",
+    "en": "We pick the fastest one for you. You can change it any time.",
+    "ru": "Мы выберем самую быструю. Сменить можно в любой момент."
+  },
+  "automatic_now": {
+    "zh": "现在会选 {0} · {1}",
+    "en": "Right now: {0} · {1}",
+    "ru": "Сейчас: {0} · {1}"
+  },
+  "or_choose_one": {
+    "zh": "或者指定一个",
+    "en": "Or choose one",
+    "ru": "Или выберите сами"
+  },
+  "all_locations_count": {
+    "zh": "全部 {0} 个位置",
+    "en": "All {0} locations",
+    "ru": "Все локации: {0}"
+  },
+  "continue_action": {
+    "zh": "下一步",
+    "en": "Continue",
+    "ru": "Далее"
+  },
+  "first_connect_android": {
+    "zh": "第一次连接，系统会问能否添加 VPN",
+    "en": "The first time, Android asks to add a VPN",
+    "ru": "В первый раз Android спросит про VPN"
+  },
+  "first_connect_android_detail": {
+    "zh": "弹窗里点「确定」就行，以后不再问。",
+    "en": "Tap OK in the prompt. It won't ask again.",
+    "ru": "Нажмите «ОК» в окне. Больше не спросит."
+  },
+  "first_connect_mac": {
+    "zh": "第一次连接，要打开一个系统开关",
+    "en": "The first time, turn on one switch in macOS",
+    "ru": "В первый раз включите один переключатель"
+  },
+  "first_connect_mac_detail": {
+    "zh": "系统设置 › 通用 › 登录项与扩展 › 网络扩展，打开 TrackNothing，打开后自动连接。",
+    "en": "System Settings › General › Login Items & Extensions › Network Extensions: turn on TrackNothing. It connects right away.",
+    "ru": "Системные настройки › Основные › Объекты входа и расширения › Сетевые расширения: включите TrackNothing."
+  },
+  "hiding_status": {
+    "zh": "正在隐身",
+    "en": "Hiding",
+    "ru": "Скрываем"
+  },
+  "phase_route": {
+    "zh": "选择线路",
+    "en": "Picking route",
+    "ru": "Выбор маршрута"
+  },
+  "phase_tunnel": {
+    "zh": "建立连接",
+    "en": "Opening tunnel",
+    "ru": "Соединение"
+  },
+  "phase_confirm": {
+    "zh": "确认中",
+    "en": "Confirming",
+    "ru": "Проверка"
+  },
+  "switching_detail": {
+    "zh": "网络受限，正在换线路，不用操作",
+    "en": "This network blocks some lines. Trying the next one for you.",
+    "ru": "Сеть блокирует часть линий. Пробуем следующую сами."
+  },
+  "switching_centre": {
+    "zh": "换线路 {0}/{1}",
+    "en": "Line {0} of {1}",
+    "ru": "Линия {0} из {1}"
+  },
+  "reconnecting_title": {
+    "zh": "重连中",
+    "en": "Reconnecting",
+    "ru": "Переподключение"
+  },
+  "reconnecting_detail": {
+    "zh": "连接断了，正在自动接回，不用操作",
+    "en": "The connection dropped. Reconnecting on its own.",
+    "ru": "Связь прервалась. Переподключаемся сами."
+  },
+  "attempt_n": {
+    "zh": "第 {0} 次",
+    "en": "Attempt {0}",
+    "ru": "Попытка {0}"
+  },
+  "waiting_title": {
+    "zh": "等待网络",
+    "en": "No network",
+    "ru": "Нет сети"
+  },
+  "waiting_detail": {
+    "zh": "没有网络，恢复后自动接上",
+    "en": "Offline. Reconnects when the network is back.",
+    "ru": "Нет сети. Подключимся, когда она появится."
+  },
+  "offline_centre": {
+    "zh": "等网络",
+    "en": "Offline",
+    "ru": "Офлайн"
+  },
+  "tap_to_retry": {
+    "zh": "轻触重试",
+    "en": "Tap to try again",
+    "ru": "Нажмите, чтобы повторить"
+  },
+  "error_device_title": {
+    "zh": "设备已满",
+    "en": "Device limit reached",
+    "ru": "Лимит устройств"
+  },
+  "error_device_detail": {
+    "zh": "解除一台不用的设备，这台就能连上。",
+    "en": "Remove a device you no longer use, and this one can connect.",
+    "ru": "Отвяжите ненужное устройство, и это сможет подключиться."
+  },
+  "manage_devices_action": {
+    "zh": "管理设备",
+    "en": "Manage devices",
+    "ru": "Устройства"
+  },
+  "error_node_title": {
+    "zh": "{0}没有响应",
+    "en": "{0} isn't answering",
+    "ru": "{0} не отвечает"
+  },
+  "error_node_detail": {
+    "zh": "换个位置，或者交给自动选择。",
+    "en": "Pick another location, or let Automatic choose.",
+    "ru": "Выберите другую локацию или режим «Авто»."
+  },
+  "error_node_auto_detail": {
+    "zh": "所有位置暂时都没响应，稍后重试或换个网络。",
+    "en": "No location is answering right now. Try again later or on another network.",
+    "ru": "Сейчас не отвечает ни одна локация. Повторите позже или в другой сети."
+  },
+  "use_automatic_action": {
+    "zh": "改用自动",
+    "en": "Use Automatic",
+    "ru": "Авто"
+  },
+  "change_location_action": {
+    "zh": "换位置",
+    "en": "Change",
+    "ru": "Сменить"
+  },
+  "error_expired_title": {
+    "zh": "账号已到期",
+    "en": "Access expired",
+    "ru": "Доступ истёк"
+  },
+  "error_expired_detail": {
+    "zh": "请管理员续期，续好后轻触重试。",
+    "en": "Ask your administrator to renew it, then try again.",
+    "ru": "Попросите администратора продлить доступ и повторите."
+  },
+  "error_quota_title": {
+    "zh": "流量用完了",
+    "en": "Traffic used up",
+    "ru": "Трафик закончился"
+  },
+  "error_quota_detail": {
+    "zh": "本期流量已全部用完。请管理员加流量后重试。",
+    "en": "This period's traffic is used up. Ask your administrator to add more.",
+    "ru": "Трафик за период израсходован. Попросите администратора добавить."
+  },
+  "error_session_title": {
+    "zh": "登录已过期",
+    "en": "Signed out",
+    "ru": "Сеанс истёк"
+  },
+  "error_session_detail": {
+    "zh": "重新登录一次就好，选好的位置会保留。",
+    "en": "Sign in again. Your chosen location stays.",
+    "ru": "Войдите снова, выбранная локация сохранится."
+  },
+  "sign_in_again_action": {
+    "zh": "重新登录",
+    "en": "Sign in",
+    "ru": "Войти"
+  },
+  "error_service_title": {
+    "zh": "连不上服务",
+    "en": "Can't reach the service",
+    "ru": "Сервис недоступен"
+  },
+  "error_service_detail": {
+    "zh": "可能是当前网络在拦截。换个网络（Wi-Fi 或流量）再试。",
+    "en": "This network may be blocking it. Switch between Wi-Fi and mobile data, then try again.",
+    "ru": "Возможно, сеть его блокирует. Смените Wi-Fi или мобильную сеть и повторите."
+  },
+  "error_service_detail_desktop": {
+    "zh": "可能是当前网络在拦截。换个网络再试。",
+    "en": "This network may be blocking it. Try another network.",
+    "ru": "Возможно, сеть его блокирует. Попробуйте другую сеть."
+  },
+  "error_permission_detail": {
+    "zh": "系统没允许添加 VPN。重试后在弹窗里点「确定」。",
+    "en": "The VPN wasn't allowed. Try again and tap OK in the prompt.",
+    "ru": "VPN не разрешён. Повторите и нажмите «ОК» в окне."
+  },
+  "error_extension_title": {
+    "zh": "网络扩展没打开",
+    "en": "Network extension is off",
+    "ru": "Расширение выключено"
+  },
+  "error_extension_detail": {
+    "zh": "在系统设置里打开 TrackNothing 的网络扩展，打开后自动连接。",
+    "en": "Turn on the TrackNothing network extension in System Settings. It connects right away.",
+    "ru": "Включите сетевое расширение TrackNothing в настройках, и оно подключится."
+  },
+  "error_revoked_title": {
+    "zh": "这台设备被解除了",
+    "en": "This device was removed",
+    "ru": "Устройство отвязано"
+  },
+  "error_revoked_detail": {
+    "zh": "它的授权已被收回。请管理员重新开通。",
+    "en": "Its access was revoked. Ask your administrator to restore it.",
+    "ru": "Доступ отозван. Попросите администратора вернуть его."
+  },
+  "view_account_action": {
+    "zh": "查看账号",
+    "en": "Account",
+    "ru": "Аккаунт"
+  },
+  "error_update_title": {
+    "zh": "需要更新",
+    "en": "Update needed",
+    "ru": "Нужно обновление"
+  },
+  "error_update_detail": {
+    "zh": "这个版本已停止支持，更新后就能继续连接。",
+    "en": "This version is no longer supported. Update to keep connecting.",
+    "ru": "Эта версия больше не поддерживается. Обновите приложение."
+  },
+  "error_lease_title": {
+    "zh": "连接授权过期",
+    "en": "Authorization expired",
+    "ru": "Доступ устарел"
+  },
+  "error_lease_detail": {
+    "zh": "离线太久，授权过期了。重新连接一次就好。",
+    "en": "You were offline too long. Connect again to renew it.",
+    "ru": "Вы долго были офлайн. Подключитесь снова."
+  },
+  "connect_again_action": {
+    "zh": "重新连接",
+    "en": "Connect again",
+    "ru": "Подключиться"
+  },
+  "error_account_title": {
+    "zh": "账号暂不可用",
+    "en": "Account unavailable",
+    "ru": "Аккаунт недоступен"
   }
 }

@@ -852,6 +852,29 @@
         }
       }
     },
+    "all_locations_count": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All %1$@ locations"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部 %1$@ 个位置"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Все локации: %1$@"
+          }
+        }
+      }
+    },
     "allow_system_extension": {
       "extractionState": "manual",
       "localizations": {
@@ -1082,6 +1105,29 @@
         }
       }
     },
+    "attempt_n": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attempt %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$@ 次"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Попытка %1$@"
+          }
+        }
+      }
+    },
     "authorized_devices": {
       "extractionState": "manual",
       "localizations": {
@@ -1170,6 +1216,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Автоматически"
+          }
+        }
+      }
+    },
+    "automatic_now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right now: %1$@ · %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "现在会选 %1$@ · %2$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сейчас: %1$@ · %2$@"
           }
         }
       }
@@ -1285,6 +1354,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Изменить локацию  ›"
+          }
+        }
+      }
+    },
+    "change_location_action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "换位置"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сменить"
           }
         }
       }
@@ -1979,6 +2071,29 @@
         }
       }
     },
+    "connect_again_action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect again"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新连接"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Подключиться"
+          }
+        }
+      }
+    },
     "connect_automatically_or_choose_your_own_location": {
       "extractionState": "manual",
       "localizations": {
@@ -2389,6 +2504,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Подключение недоступно"
+          }
+        }
+      }
+    },
+    "continue_action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一步"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Далее"
           }
         }
       }
@@ -3129,6 +3267,558 @@
         }
       }
     },
+    "error_account_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "账号暂不可用"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Аккаунт недоступен"
+          }
+        }
+      }
+    },
+    "error_device_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove a device you no longer use, and this one can connect."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解除一台不用的设备，这台就能连上。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отвяжите ненужное устройство, и это сможет подключиться."
+          }
+        }
+      }
+    },
+    "error_device_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device limit reached"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备已满"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Лимит устройств"
+          }
+        }
+      }
+    },
+    "error_expired_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask your administrator to renew it, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请管理员续期，续好后轻触重试。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Попросите администратора продлить доступ и повторите."
+          }
+        }
+      }
+    },
+    "error_expired_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Access expired"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "账号已到期"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Доступ истёк"
+          }
+        }
+      }
+    },
+    "error_extension_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on the TrackNothing network extension in System Settings. It connects right away."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在系统设置里打开 TrackNothing 的网络扩展，打开后自动连接。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Включите сетевое расширение TrackNothing в настройках, и оно подключится."
+          }
+        }
+      }
+    },
+    "error_extension_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Network extension is off"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网络扩展没打开"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Расширение выключено"
+          }
+        }
+      }
+    },
+    "error_lease_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You were offline too long. Connect again to renew it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "离线太久，授权过期了。重新连接一次就好。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вы долго были офлайн. Подключитесь снова."
+          }
+        }
+      }
+    },
+    "error_lease_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authorization expired"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接授权过期"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Доступ устарел"
+          }
+        }
+      }
+    },
+    "error_node_auto_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No location is answering right now. Try again later or on another network."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有位置暂时都没响应，稍后重试或换个网络。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сейчас не отвечает ни одна локация. Повторите позже или в другой сети."
+          }
+        }
+      }
+    },
+    "error_node_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick another location, or let Automatic choose."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "换个位置，或者交给自动选择。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите другую локацию или режим «Авто»."
+          }
+        }
+      }
+    },
+    "error_node_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ isn't answering"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@没有响应"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ не отвечает"
+          }
+        }
+      }
+    },
+    "error_permission_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The VPN wasn't allowed. Try again and tap OK in the prompt."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统没允许添加 VPN。重试后在弹窗里点「确定」。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VPN не разрешён. Повторите и нажмите «ОК» в окне."
+          }
+        }
+      }
+    },
+    "error_quota_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This period's traffic is used up. Ask your administrator to add more."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本期流量已全部用完。请管理员加流量后重试。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Трафик за период израсходован. Попросите администратора добавить."
+          }
+        }
+      }
+    },
+    "error_quota_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traffic used up"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流量用完了"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Трафик закончился"
+          }
+        }
+      }
+    },
+    "error_revoked_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its access was revoked. Ask your administrator to restore it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "它的授权已被收回。请管理员重新开通。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Доступ отозван. Попросите администратора вернуть его."
+          }
+        }
+      }
+    },
+    "error_revoked_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device was removed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台设备被解除了"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Устройство отвязано"
+          }
+        }
+      }
+    },
+    "error_service_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This network may be blocking it. Switch between Wi-Fi and mobile data, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可能是当前网络在拦截。换个网络（Wi-Fi 或流量）再试。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Возможно, сеть его блокирует. Смените Wi-Fi или мобильную сеть и повторите."
+          }
+        }
+      }
+    },
+    "error_service_detail_desktop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This network may be blocking it. Try another network."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可能是当前网络在拦截。换个网络再试。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Возможно, сеть его блокирует. Попробуйте другую сеть."
+          }
+        }
+      }
+    },
+    "error_service_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't reach the service"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连不上服务"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сервис недоступен"
+          }
+        }
+      }
+    },
+    "error_session_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in again. Your chosen location stays."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新登录一次就好，选好的位置会保留。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Войдите снова, выбранная локация сохранится."
+          }
+        }
+      }
+    },
+    "error_session_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Signed out"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录已过期"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сеанс истёк"
+          }
+        }
+      }
+    },
+    "error_update_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This version is no longer supported. Update to keep connecting."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个版本已停止支持，更新后就能继续连接。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Эта версия больше не поддерживается. Обновите приложение."
+          }
+        }
+      }
+    },
+    "error_update_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update needed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要更新"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нужно обновление"
+          }
+        }
+      }
+    },
     "exposed_detail": {
       "extractionState": "manual",
       "localizations": {
@@ -3359,6 +4049,98 @@
         }
       }
     },
+    "first_connect_android": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The first time, Android asks to add a VPN"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第一次连接，系统会问能否添加 VPN"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В первый раз Android спросит про VPN"
+          }
+        }
+      }
+    },
+    "first_connect_android_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap OK in the prompt. It won't ask again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "弹窗里点「确定」就行，以后不再问。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нажмите «ОК» в окне. Больше не спросит."
+          }
+        }
+      }
+    },
+    "first_connect_mac": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The first time, turn on one switch in macOS"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第一次连接，要打开一个系统开关"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В первый раз включите один переключатель"
+          }
+        }
+      }
+    },
+    "first_connect_mac_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Settings › General › Login Items & Extensions › Network Extensions: turn on TrackNothing. It connects right away."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统设置 › 通用 › 登录项与扩展 › 网络扩展，打开 TrackNothing，打开后自动连接。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Системные настройки › Основные › Объекты входа и расширения › Сетевые расширения: включите TrackNothing."
+          }
+        }
+      }
+    },
     "forgot_password": {
       "extractionState": "manual",
       "localizations": {
@@ -3424,6 +4206,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Скрыть пароль"
+          }
+        }
+      }
+    },
+    "hiding_status": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiding"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在隐身"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скрываем"
           }
         }
       }
@@ -4072,6 +4877,29 @@
         }
       }
     },
+    "manage_devices_action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage devices"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "管理设备"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Устройства"
+          }
+        }
+      }
+    },
     "measuring_latency": {
       "extractionState": "manual",
       "localizations": {
@@ -4440,6 +5268,52 @@
         }
       }
     },
+    "offline_centre": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offline"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等网络"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Офлайн"
+          }
+        }
+      }
+    },
+    "onboarding_ready": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已就绪"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Готово"
+          }
+        }
+      }
+    },
     "open_app": {
       "extractionState": "manual",
       "localizations": {
@@ -4578,6 +5452,29 @@
         }
       }
     },
+    "or_choose_one": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Or choose one"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "或者指定一个"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Или выберите сами"
+          }
+        }
+      }
+    },
     "password": {
       "extractionState": "manual",
       "localizations": {
@@ -4643,6 +5540,98 @@
           "stringUnit": {
             "state": "translated",
             "value": "Нужно ваше разрешение"
+          }
+        }
+      }
+    },
+    "phase_confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirming"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确认中"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Проверка"
+          }
+        }
+      }
+    },
+    "phase_route": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picking route"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择线路"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выбор маршрута"
+          }
+        }
+      }
+    },
+    "phase_tunnel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening tunnel"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建立连接"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Соединение"
+          }
+        }
+      }
+    },
+    "pick_location_sub": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We pick the fastest one for you. You can change it any time."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认帮你选最快的，之后随时能换。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Мы выберем самую быструю. Сменить можно в любой момент."
           }
         }
       }
@@ -4854,6 +5843,29 @@
         }
       }
     },
+    "reconnecting_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The connection dropped. Reconnecting on its own."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接断了，正在自动接回，不用操作"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Связь прервалась. Переподключаемся сами."
+          }
+        }
+      }
+    },
     "reconnecting_status": {
       "extractionState": "manual",
       "localizations": {
@@ -4873,6 +5885,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Связь прервалась. Переподключение…"
+          }
+        }
+      }
+    },
+    "reconnecting_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnecting"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重连中"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Переподключение"
           }
         }
       }
@@ -5912,6 +6947,29 @@
         }
       }
     },
+    "sign_in_again_action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新登录"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Войти"
+          }
+        }
+      }
+    },
     "sign_in_and_start": {
       "extractionState": "manual",
       "localizations": {
@@ -6326,6 +7384,52 @@
         }
       }
     },
+    "switching_centre": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line %1$@ of %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "换线路 %1$@/%2$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Линия %1$@ из %2$@"
+          }
+        }
+      }
+    },
+    "switching_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This network blocks some lines. Trying the next one for you."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网络受限，正在换线路，不用操作"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сеть блокирует часть линий. Пробуем следующую сами."
+          }
+        }
+      }
+    },
     "system_extension_failed": {
       "extractionState": "manual",
       "localizations": {
@@ -6437,6 +7541,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Нажмите, чтобы скрыться"
+          }
+        }
+      }
+    },
+    "tap_to_retry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap to try again"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "轻触重试"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нажмите, чтобы повторить"
           }
         }
       }
@@ -7683,6 +8810,29 @@
         }
       }
     },
+    "use_automatic_action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use Automatic"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改用自动"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Авто"
+          }
+        }
+      }
+    },
     "valid_until": {
       "extractionState": "manual",
       "localizations": {
@@ -7752,6 +8902,29 @@
         }
       }
     },
+    "view_account_action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看账号"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Аккаунт"
+          }
+        }
+      }
+    },
     "vpn_connection": {
       "extractionState": "manual",
       "localizations": {
@@ -7775,6 +8948,29 @@
         }
       }
     },
+    "waiting_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offline. Reconnects when the network is back."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有网络，恢复后自动接上"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нет сети. Подключимся, когда она появится."
+          }
+        }
+      }
+    },
     "waiting_for_network": {
       "extractionState": "manual",
       "localizations": {
@@ -7794,6 +8990,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ожидание сети…"
+          }
+        }
+      }
+    },
+    "waiting_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No network"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待网络"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нет сети"
           }
         }
       }
@@ -7827,19 +9046,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lighter in the background: closed to the Windows tray, minimised, or in the Mac menu bar only, the app pauses its animations and per-second updates, and Windows hands idle memory back\nFaster start: Android no longer looks up the system language for every line on a page, and the Windows app is precompiled for a quicker cold start"
+            "value": "First launch takes three steps: sign in, pick a location (Automatic is preselected, with the three fastest for you listed), connect; the tab bar stays hidden until you connect, and each page shows which step you are on\nConnection states look the same on Android, Mac and Windows: an arc circles while connecting, lines are tried one by one when switching, reconnecting shows a countdown and the attempt, and without a network the app waits quietly\nWhen a connection fails, the app says why and what to do next, and the button does it: manage devices when the device limit is reached, switch to Automatic when a location does not answer, sign in again when the session expired, update when an update is required\nThe Mac menu bar and Windows tray icon have three levels: off (half), working (blinking), connected (full)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "更省电省内存：Windows 关到托盘、最小化或 Mac 只留菜单栏时，界面动画暂停、不再每秒刷新，Windows 会把闲置内存还给系统\n启动更快：安卓打开页面时不再反复查询系统语言；Windows 版改为预编译，冷启动更快"
+            "value": "第一次打开分三步：登录、选位置（默认自动选择，并列出离你最快的 3 个）、连接；连上之前不显示底部标签栏，每页右上角标着第几步\n连接状态在安卓、Mac、Windows 上一个样：连接中光弧绕圈、换线路时逐段尝试、断线重连时显示倒计时和第几次、没网时安静等待\n连不上时直接说原因和下一步，按钮就是解决办法：设备已满去管理设备、位置没响应改用自动、登录过期重新登录、需要更新就立即更新\nMac 菜单栏和 Windows 托盘图标只有三档：未连接（半亮）、处理中（闪烁）、已连接（全亮）"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Экономнее в фоне: в трее Windows, свёрнутым или только в строке меню Mac приложение останавливает анимации и ежесекундные обновления, а Windows возвращает простаивающую память\nБыстрее запуск: Android больше не запрашивает язык системы для каждой строки на странице, а приложение Windows заранее скомпилировано для более быстрого холодного старта"
+            "value": "Первый запуск в три шага: вход, выбор локации (по умолчанию «Автоматически», плюс три самые быстрые для вас), подключение; нижние вкладки появляются после подключения, а на каждой странице видно, какой это шаг\nСостояния подключения одинаковы на Android, Mac и Windows: при подключении по кругу бежит дуга, при смене линии они пробуются по очереди, при переподключении видны обратный отсчёт и номер попытки, без сети приложение спокойно ждёт\nЕсли подключиться не удалось, приложение говорит причину и что делать, а кнопка делает это: управлять устройствами при лимите, перейти на «Автоматически», если локация не отвечает, войти снова, если сессия истекла, обновиться, если требуется обновление\nЗначок в строке меню Mac и в трее Windows в трёх видах: не подключено (приглушён), идёт работа (мигает), подключено (ярко)"
           }
         }
       }

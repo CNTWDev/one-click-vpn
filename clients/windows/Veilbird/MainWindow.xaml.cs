@@ -28,8 +28,7 @@ public partial class MainWindow : Window {
     private readonly Forms.NotifyIcon tray=new();
     private Forms.ToolStripMenuItem? trayRates;
     private string page="connect",nodeId=Settings.Get("nodeId"),nodeName=Settings.Get("nodeName");
-    private bool busy,measuring,quitting,trayHintShown,failed,showPassword;
-    private string failure="";
+    private bool busy,measuring,quitting,trayHintShown,showPassword;
     private ReleaseUpdate? update;
     // The update banner and the account row follow one state: available, downloading, ready, failed.
     private bool downloading;
@@ -51,7 +50,11 @@ public partial class MainWindow : Window {
     // Live parts of the connect page and the tray flyout.
     private TextBlock? statusTitle,statusDetail,usageTotal,usageUntil,actionLabel;
     private Border? stamp;
-    private Button? actionButton;
+    private Button? actionButton,secondaryButton;
+    private ContentControl? stepsHost;
+    // The first run: sign in (1), pick a location (2), connect (3); the tabs show once the first connection is up.
+    private static bool Onboarded {get=>Settings.Get("onboarded")=="1";set=>Settings.Set("onboarded",value?"1":"0");}
+    private static bool Picked=>Settings.Get("onboardPicked")=="1";
     private Ellipse? actionDot;
     private ScanLine? scan;
     private Portrait? portrait;
@@ -59,7 +62,7 @@ public partial class MainWindow : Window {
     // Whether the file was last shown sealed (null before the first show on a page, which does not animate), the state
     // the action last showed, and the public address the service saw before connecting.
     private bool? sealedShown;
-    private RingState? shownState;
+    private string? shownState;
     private string? visitorIp;
     private (ContentControl Badge,TextBlock Title,TextBlock Detail)? location;
     private RateBars? rateBars,flyRate;
@@ -77,7 +80,7 @@ public partial class MainWindow : Window {
     private Window? flyout;
     private DateTime flyoutHidden=DateTime.MinValue;
     private (Border Card,ContentControl Mark,TextBlock Title,TextBlock Detail,ToggleButton Switch,ContentControl Badge,TextBlock Location,TextBlock LocationDetail,TextBlock Usage,TextBlock Until)? fly;
-    private RingState? flyState;
+    private LinkState? flyState;
     // Follows the Windows "Show animations" setting.
     private static bool Motion=>SystemParameters.ClientAreaAnimation;
     private static bool Smart=>Settings.Get("routing","smart")=="smart";
@@ -113,6 +116,9 @@ public partial class MainWindow : Window {
         // The saved list shows at once; it is loaded again at launch and when the window comes back after six hours.
         if(api.SignedIn&&NodeStore.Restore() is { } saved) Remember(saved);
         Activated+=(_,_)=>{if(DateTime.UtcNow-NodeStore.LoadedAt>NodeStore.RefreshAfter) _=QuietNodes();};
+        // Signed in when this version arrives: already past the first run.
+        if(Settings.Get("onboarded").Length==0) Onboarded=api.SignedIn;
+        trayBlink.Tick+=(_,_)=>{blinkOn=!blinkOn;ShowTrayIcon();};
         Render();_=Crash.Send(api);
         _=QuietNodes();
         // Installed by an update while connected: reconnect as before.
@@ -146,11 +152,32 @@ public partial class MainWindow : Window {
 
     // ---- Tray ----
     private void SetupTray() {
-        using(var stream=Application.GetResourceStream(new Uri("pack://application:,,,/Assets/Veilbird.ico")).Stream) tray.Icon=new System.Drawing.Icon(stream);
+        using(var stream=Application.GetResourceStream(new Uri("pack://application:,,,/Assets/Veilbird.ico")).Stream) iconOn=new System.Drawing.Icon(stream,Forms.SystemInformation.SmallIconSize);
+        iconOff=Dimmed(iconOn);tray.Icon=iconOff;
         tray.Visible=true;tray.ContextMenuStrip=new Forms.ContextMenuStrip();
         tray.ContextMenuStrip.Opening+=(_,_)=>BuildTrayMenu();
         tray.MouseClick+=(_,e)=>{if(e.Button==Forms.MouseButtons.Left) ToggleFlyout();};
         UpdateTray();
+    }
+    // The tray icon in three levels, as the Mac menu bar: off (half), busy (blinking: connecting, switching lines,
+    // reconnecting, waiting for a network) and on (full). With Windows animations off, busy stays on.
+    private System.Drawing.Icon? iconOn,iconOff;
+    private readonly DispatcherTimer trayBlink=new() {Interval=TimeSpan.FromMilliseconds(600)};
+    private bool blinkOn;
+    private static System.Drawing.Icon Dimmed(System.Drawing.Icon icon) {
+        using var bitmap=icon.ToBitmap();
+        for(var y=0;y<bitmap.Height;y++) for(var x=0;x<bitmap.Width;x++) {
+            var c=bitmap.GetPixel(x,y);bitmap.SetPixel(x,y,System.Drawing.Color.FromArgb(c.A/2,c.R,c.G,c.B));
+        }
+        return System.Drawing.Icon.FromHandle(bitmap.GetHicon());
+    }
+    private void ShowTrayIcon() {
+        if(iconOn is null||iconOff is null) return;
+        var state=State();
+        var working=state is LinkState.Connecting or LinkState.Switching or LinkState.Reconnecting or LinkState.Waiting;
+        if(working&&Motion) {if(!trayBlink.IsEnabled) trayBlink.Start();} else {trayBlink.Stop();blinkOn=false;}
+        var icon=state==LinkState.Connected||(working&&(blinkOn||!Motion))?iconOn:iconOff;
+        if(!ReferenceEquals(tray.Icon,icon)) tray.Icon=icon;
     }
     private void BuildTrayMenu() {
         var menu=tray.ContextMenuStrip!;menu.Items.Clear();
@@ -187,9 +214,10 @@ public partial class MainWindow : Window {
         var room=127-second.Length;
         tray.Text=(first.Length>room?first[..room]:first)+second;
         if(trayRates is not null&&TrayConnected) trayRates.Text=TrayRates();
+        ShowTrayIcon();
     }
     private bool TrayConnected=>connection.Active&&connection.Since is not null;
-    private string TrayStatus()=>L10n.Text(connection.StatusKey)+(connection.Active&&connection.NodeName.Length>0?" · "+connection.NodeName:"");
+    private string TrayStatus()=>StatusTitle(State())+(connection.Active&&connection.NodeName.Length>0?" · "+connection.NodeName:"");
     private string TrayRates()=>"↓ "+RateText(connection.RxRate)+"   ↑ "+RateText(connection.TxRate);
     /// Bits per second like the rest of the app, the unit stepping up from Kb/s to Mb/s and Gb/s as needed.
     private static string RateText(long bytesPerSecond) {
@@ -339,9 +367,9 @@ public partial class MainWindow : Window {
         var state=State();
         if(state!=flyState) {
             flyState=state;
-            var on=state==RingState.Connected;
+            var on=state==LinkState.Connected;
             f.Card.Background=Brushes.Transparent;f.Card.BorderBrush=on?Look.Hex("#4DE0A458"):Look.Line;
-            f.Mark.Content=Look.Mark(34,state switch {RingState.Idle=>Look.Faint,RingState.Failed=>Look.Danger,_=>Look.Accent});
+            f.Mark.Content=Look.Mark(34,state switch {LinkState.Idle=>Look.Faint,LinkState.Failed=>Look.Danger,_=>Look.Accent});
         }
         f.Title.Text=StatusTitle(state);f.Detail.Text=StatusDetail(state);
         f.Switch.IsChecked=connection.Active;f.Switch.IsEnabled=!busy||connection.Active;
@@ -358,11 +386,10 @@ public partial class MainWindow : Window {
         if(connection.Active) {Connection.Wanted=false;_=connection.Disconnect();return;}
         if(!api.SignedIn) {ShowFromTray();return;}
         if(update?.Mandatory==true) {ShowFromTray();Notify(L10n.Text("update_required_detail"));return;}
-        failed=false;
-        // A failed attempt shows on the ring (coral, with a retry arrow) rather than in a dialog.
+        // A failed attempt shows as its cause and the button that fixes it, rather than in a dialog.
         Work(async()=>{
             try {await connection.Connect(nodeId,Smart);}
-            catch(AccessFailure error) when (error.Code is not ("AUTH_REQUIRED" or "CLIENT_UPDATE_REQUIRED" or "DEVICE_LIMIT_REACHED")) {Connection.Wanted=false;failed=true;failure=error.Message;}
+            catch(AccessFailure error) {Connection.Wanted=false;if(error.Code=="CLIENT_UPDATE_REQUIRED") CheckForUpdate(false);}
         });
     }
     private CancellationTokenSource? restoring;
@@ -375,9 +402,9 @@ public partial class MainWindow : Window {
         while(!stop.IsCancellationRequested&&Connection.Wanted&&!connection.Active&&api.SignedIn) {
             var wait=TimeSpan.FromSeconds(5);
             if(await Task.Run(Transports.Online)) {
-                try {failed=false;await connection.Connect(nodeId,Smart);if(connection.Active) return;}
-                catch(AccessFailure error) when (Connection.Fatal.Contains(error.Code)) {failed=true;failure=error.Message;Render();return;}
-                catch(Exception) {/* tried again below */}
+                try {await connection.Connect(nodeId,Smart);if(connection.Active) return;}
+                catch(AccessFailure error) when (Connection.Fatal.Contains(error.Code)) {Render();return;}
+                catch(Exception) {connection.ClearError();/* tried again below */}
                 wait=Connection.Retries[Math.Min(attempt++,Connection.Retries.Length-1)];
             }
             try {await Task.Delay(wait,stop.Token);} catch(OperationCanceledException) {return;}
@@ -389,7 +416,8 @@ public partial class MainWindow : Window {
     }
     private void Select(string id,string name,bool showConnect=true) {
         var reconnect=connection.Active&&id!=connection.NodeId;
-        nodeId=id;nodeName=name;Settings.Set("nodeId",id);Settings.Set("nodeName",name);failed=false;
+        nodeId=id;nodeName=name;Settings.Set("nodeId",id);Settings.Set("nodeName",name);Settings.Set("onboardPicked","1");
+        if(!connection.Active&&connection.ErrorCode.Length>0) connection.ClearError();
         if(showConnect) page="connect";
         if(showConnect||page is "connect" or "nodes") Render();
         // Connected (or reconnecting): one click moves the VPN to the new location; the kill switch keeps blocking meanwhile.
@@ -397,8 +425,18 @@ public partial class MainWindow : Window {
             restoring?.Cancel();restoring=null;
             await connection.Disconnect("disconnected",unexpected:true);
             try {await connection.Connect(nodeId,Smart);}
-            catch(AccessFailure error) when (error.Code is not ("AUTH_REQUIRED" or "CLIENT_UPDATE_REQUIRED" or "DEVICE_LIMIT_REACHED")) {Connection.Wanted=false;failed=true;failure=error.Message;}
+            catch(AccessFailure) {Connection.Wanted=false;}
         });
+    }
+    /// What a failure's button does: try again, or go where the cause is fixed.
+    private void Act(string? what) {
+        switch(what) {
+            case "devices" or "nodes" or "account":ShowFromTray();page=what!;Render();break;
+            case "automatic":Select("","",showConnect:false);Toggle();break;
+            case "update":ShowFromTray();CheckForUpdate(true);break;
+            case "signin":connection.ClearError();Work(async()=>{await api.Logout();accountData=null;page="connect";Render();});break;
+            default:Toggle();break;
+        }
     }
     private async void CheckForUpdate(bool announce) {
         try {
@@ -659,9 +697,9 @@ public partial class MainWindow : Window {
             if(rxHistory.Count>RateBars.Count) {rxHistory.RemoveAt(0);txHistory.RemoveAt(0);}
         } else {rxHistory.Clear();txHistory.Clear();}
     }
-    private void ShowRates(RateBars? bars,RingState state) {
+    private void ShowRates(RateBars? bars,LinkState state) {
         if(bars is null) return;
-        var on=state==RingState.Connected;
+        var on=state==LinkState.Connected;
         // The chart keeps its space and fades, so neither the window nor the tray flyout changes height.
         Fade(bars,on);
         if(on) bars.Set(rxHistory.ToArray(),txHistory.ToArray());
@@ -687,10 +725,10 @@ public partial class MainWindow : Window {
         var note=new Border {BorderBrush=Look.Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(14,4,4,4),Child=Columns(dot,text,close),Visibility=Visibility.Collapsed};
         return (note,text);
     }
-    private void ShowSwitch(Border? note,TextBlock? text,RingState state) {
+    private void ShowSwitch(Border? note,TextBlock? text,LinkState state) {
         if(note is null||text is null) return;
         var from=connection.SwitchedFrom;
-        var shown=state==RingState.Connected&&from.Length>0&&from!=dismissedSwitch&&from!=connection.NodeName&&connection.NodeName.Length>0;
+        var shown=state==LinkState.Connected&&from.Length>0&&from!=dismissedSwitch&&from!=connection.NodeName&&connection.NodeName.Length>0;
         text.Text=shown?L10n.Text("switched_location",from,connection.NodeName):"";
         note.Visibility=shown?Visibility.Visible:Visibility.Collapsed;
         if(shown) AutomationProperties.SetName(note,text.Text);
@@ -898,8 +936,8 @@ public partial class MainWindow : Window {
     private void Render() {
         ContentPanel.Children.Clear();FullPanel.Children.Clear();NavigationPanel.Children.Clear();HeaderSlot.Content=null;
         rateBars=null;switchNote=null;switchText=null;onNodes=null;onMeasured=null;
-        statusTitle=statusDetail=usageTotal=usageUntil=actionLabel=null;stamp=null;actionButton=null;actionDot=null;scan=null;fileLines=null;portrait=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
-        var view=api.SignedIn?page:"login";
+        statusTitle=statusDetail=usageTotal=usageUntil=actionLabel=null;stamp=null;actionButton=secondaryButton=null;stepsHost=null;actionDot=null;scan=null;fileLines=null;portrait=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
+        var view=!api.SignedIn?"login":page=="connect"&&!Onboarded&&!Picked?"pick":page;
         var full=view=="connect";
         Scroller.Visibility=full?Visibility.Collapsed:Visibility.Visible;FullPanel.Visibility=full?Visibility.Visible:Visibility.Collapsed;
         if(view!=lastView) {Scroller.ScrollToTop();Enter(full?FullPanel:ContentPanel);}
@@ -931,7 +969,7 @@ public partial class MainWindow : Window {
             header.Children.Add(button);HeaderSlot.Content=header;
             Login();return;
         }
-        foreach(var (id,key) in new[]{("connect","connect_tab"),("nodes","locations"),("account","account")}) {
+        if(Onboarded) foreach(var (id,key) in new[]{("connect","connect_tab"),("nodes","locations"),("account","account")}) {
             var selected=page==id||(page is "logs" or "devices"&&id=="account");
             var label=new TextBlock {Text=L10n.Text(key),FontSize=14,FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal,Foreground=selected?Look.Text:Look.Secondary,VerticalAlignment=VerticalAlignment.Center};
             var tab=new Grid {Height=44};tab.Children.Add(label);
@@ -940,7 +978,8 @@ public partial class MainWindow : Window {
             AutomationProperties.SetName(button,L10n.Text(key)+(selected?L10n.Text("current_page"):""));
             button.Click+=(_,_)=>{if(!busy) {page=id;Render();}};NavigationPanel.Children.Add(button);
         }
-        switch(page) {
+        switch(view) {
+            case "pick":Pick();break;
             case "connect":Home();break;
             case "nodes":Nodes();break;
             case "devices":Devices();break;
@@ -973,9 +1012,11 @@ public partial class MainWindow : Window {
         // The state block has one height in every state, so nothing below it moves when a connection comes up or goes
         // down: what only exists while connected fades in and out of space that is always reserved.
         var center=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
-        center.Children.Add(Dossier.Section("section_portrait"));
-        // The portrait is the switch: "tap to hide" breathes in it; hidden, its ring holds the time and the rates.
-        portrait=new Portrait {Height=220,Margin=new Thickness(0,6,0,0)};
+        stepsHost=new ContentControl {Focusable=false,Content=SectionRow("section_portrait",Onboarded?null:3)};
+        center.Children.Add(stepsHost);
+        // The portrait is the switch: "tap to hide" breathes in it; hidden, its ring draws the state and holds the
+        // time and the rates (or the phase, the countdown).
+        portrait=new Portrait {Height=192,Margin=new Thickness(0,6,0,0)};
         portrait.MouseLeftButtonUp+=(_,_)=>Toggle();
         portrait.KeyDown+=(_,e)=>{if(e.Key is System.Windows.Input.Key.Enter or System.Windows.Input.Key.Space) {e.Handled=true;Toggle();}};
         center.Children.Add(portrait);
@@ -984,12 +1025,13 @@ public partial class MainWindow : Window {
         var meta=new SealedText(11) {Value=string.Join("   ",DeviceLine(),ZoneLine(),L10n.Culture.Name),Ink=Look.Secondary,Margin=new Thickness(4,4,4,0)};
         center.Children.Add(ip);center.Children.Add(meta);
         fileLines=new List<SealedText> {ip,meta};
-        // The state in words and one line beside it; one height in every state so nothing below moves.
-        statusTitle=new TextBlock {FontSize=24,FontWeight=FontWeights.Light,FontFamily=new FontFamily("Georgia, Cambria"),VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.NoWrap,Margin=new Thickness(0,0,12,0)};
-        statusDetail=new TextBlock {FontSize=12,Foreground=Look.Secondary,VerticalAlignment=VerticalAlignment.Center,MaxHeight=34,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis};
-        var stateRow=new DockPanel {Height=40,Margin=new Thickness(4,8,4,0),LastChildFill=true};
-        DockPanel.SetDock(statusTitle,Dock.Left);stateRow.Children.Add(statusTitle);stateRow.Children.Add(statusDetail);
-        center.Children.Add(stateRow);
+        // The state (or the cause of a failure) and two lines held for its detail (or the next step): one height in
+        // every state, so nothing below moves when a connection comes up, drops or fails.
+        statusTitle=new TextBlock {FontSize=24,FontWeight=FontWeights.Light,FontFamily=new FontFamily("Georgia, Cambria"),TextWrapping=TextWrapping.NoWrap,TextTrimming=TextTrimming.CharacterEllipsis};
+        statusDetail=new TextBlock {FontSize=12,Foreground=Look.Secondary,Height=34,Margin=new Thickness(0,2,0,0),TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis};
+        var stateBlock=new StackPanel {Margin=new Thickness(4,8,4,0)};
+        stateBlock.Children.Add(statusTitle);stateBlock.Children.Add(statusDetail);
+        center.Children.Add(stateBlock);
         Grid.SetRow(center,1);layout.Children.Add(center);
 
         // One outlined action: quiet while exposed, amber with a breathing dot while sealed.
@@ -997,7 +1039,13 @@ public partial class MainWindow : Window {
         actionDot=new Ellipse {Width=6,Height=6,VerticalAlignment=VerticalAlignment.Center};
         var actionRow=new DockPanel {LastChildFill=true};DockPanel.SetDock(actionDot,Dock.Right);actionRow.Children.Add(actionDot);actionRow.Children.Add(actionLabel);
         actionButton=new Button {Height=48,Padding=new Thickness(16,0,16,0),BorderThickness=new Thickness(1),Content=actionRow};
-        actionButton.Click+=(_,_)=>Toggle();
+        actionButton.Click+=(_,_)=>{if(CurrentTrouble() is { } trouble) Act(trouble.PrimaryDo);else Toggle();};
+        // After a failure, the way out of it beside the action: "try again" or "change location".
+        secondaryButton=new Button {Height=48,Padding=new Thickness(16,0,16,0),Margin=new Thickness(10,0,0,0),Background=Brushes.Transparent,BorderBrush=Look.Line,BorderThickness=new Thickness(1),Foreground=Look.Secondary,FontSize=14,Visibility=Visibility.Collapsed};
+        secondaryButton.Click+=(_,_)=>Act(CurrentTrouble()?.SecondaryDo);
+        var actions=new Grid();
+        actions.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(1,GridUnitType.Star)});actions.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});
+        actions.Children.Add(actionButton);Grid.SetColumn(secondaryButton,1);actions.Children.Add(secondaryButton);
 
         var badge=new ContentControl();
         var title=Single("",14,strong:true);var detail=Single("",12,Look.Secondary);detail.Margin=new Thickness(0,2,0,0);
@@ -1009,7 +1057,7 @@ public partial class MainWindow : Window {
         location=(badge,title,detail);
         usageTotal=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold};usageUntil=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold};
         var cells=Cells(("last_30_days",usageTotal,12),("valid_until_label",usageUntil,12));cells.Margin=new Thickness(4,14,4,0);
-        var bottom=new StackPanel();bottom.Children.Add(actionButton);bottom.Children.Add(place);bottom.Children.Add(cells);
+        var bottom=new StackPanel();bottom.Children.Add(actions);bottom.Children.Add(place);bottom.Children.Add(cells);
         Grid.SetRow(bottom,2);layout.Children.Add(bottom);
         FullPanel.Children.Add(layout);
         sealedShown=null;shownState=null;
@@ -1017,6 +1065,71 @@ public partial class MainWindow : Window {
         _=RefreshAccount();
         if(visitorIp is null&&!connection.Active) _=LoadVisitor();
         if(nodesData is null) _=QuietNodes();
+    }
+    /// A page's § label, with the first-run step on the right: three squares (done, current, to come) and "n/3";
+    /// 4 is "Ready".
+    private static FrameworkElement SectionRow(string key,int? step) {
+        var label=Dossier.Section(key);
+        if(step is not { } n) return label;
+        var marks=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(8,0,4,0)};
+        var text=((SolidColorBrush)Look.Text).Color;
+        for(var i=1;i<=3;i++) marks.Children.Add(new Rectangle {Width=6,Height=6,Margin=new Thickness(0,0,3,0),VerticalAlignment=VerticalAlignment.Center,
+            Fill=i<n?new SolidColorBrush(Color.FromArgb(191,text.R,text.G,text.B)):i==n?Look.Accent:Brushes.Transparent,
+            Stroke=i>n?Look.Faint:null,StrokeThickness=1,Opacity=i>n?0.6:1});
+        var words=n>3?L10n.Text("onboarding_ready"):n.ToString(L10n.Culture)+"/3";
+        marks.Children.Add(new TextBlock {Text=words,FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=11,Foreground=n>3?Look.Accent:Look.Secondary,Margin=new Thickness(4,0,0,0),VerticalAlignment=VerticalAlignment.Center});
+        AutomationProperties.SetName(marks,words);
+        var row=new DockPanel {LastChildFill=true};
+        DockPanel.SetDock(marks,Dock.Right);row.Children.Add(marks);row.Children.Add(label);
+        return row;
+    }
+    /// The first run's second page: Automatic preselected, the three fastest from this PC, the whole list, Continue.
+    private void Pick() {
+        HeaderSlot.Content=new TextBlock {Text="№ "+FileNumber(),FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=11,Foreground=Look.Faint,VerticalAlignment=VerticalAlignment.Center};
+        Add(SectionRow("section_locations",2),4,0);
+        Add(new TextBlock {Text=L10n.Text("where_would_you_like_to_connect"),FontSize=24,FontWeight=FontWeights.Light,FontFamily=new FontFamily("Georgia, Cambria"),TextWrapping=TextWrapping.Wrap,Margin=new Thickness(4,0,4,0)},14,0);
+        Add(Words(L10n.Text("pick_location_sub"),13,Look.Secondary),6,16).Margin=new Thickness(4,6,4,16);
+        var options=Add(new StackPanel());
+        var asked=false;
+        Button Option(string id,string name,string? code,string detail) {
+            var chosen=nodeId==id;
+            var badge=Look.Badge(code);
+            if(chosen) {badge.Background=Look.AccentWash;badge.BorderBrush=Look.AccentLine;badge.BorderThickness=new Thickness(1);if(code is null&&badge.Child is TextBlock star) star.Foreground=Look.OnAccent;}
+            var radio=new Grid {Width=16,Height=16,VerticalAlignment=VerticalAlignment.Center};
+            radio.Children.Add(new Ellipse {Stroke=chosen?Look.Accent:Look.Faint,StrokeThickness=1.5});
+            if(chosen) radio.Children.Add(new Ellipse {Width=8,Height=8,Fill=Look.Accent});
+            var row=new Button {Height=56,Margin=new Thickness(0,0,0,8),Background=chosen?Look.Raised:Brushes.Transparent,BorderBrush=chosen?Look.AccentLine:Look.Line,BorderThickness=new Thickness(1),
+                Content=Columns(badge,TwoLines(name,detail,strong:chosen),radio)};
+            AutomationProperties.SetName(row,name+(chosen?L10n.Text("current_page"):""));
+            row.Click+=(_,_)=>{nodeId=id;nodeName=id.Length==0?"":name;Settings.Set("nodeId",nodeId);Settings.Set("nodeName",nodeName);Show();};
+            return row;
+        }
+        async void Measure(JsonArray list) {
+            try {await Latency.Rank(list,attempts:1,reuse:TimeSpan.FromMinutes(1),settle:TimeSpan.FromSeconds(1.5));} catch {/* Automatic needs no figures */}
+            if(options.IsLoaded) Show();
+        }
+        void Show() {
+            options.Children.Clear();
+            var ranked=PickerNodes().Where(x=>x.Quality?.Latency is not null).ToList();
+            var best=ranked.FirstOrDefault();
+            options.Children.Add(Option("",L10n.Text("automatic_recommended"),null,best.Quality is { } q?L10n.Text("automatic_now",best.Name,Ms(q)??""):L10n.Text("select_an_available_location_for_you")));
+            if(ranked.Count>0) options.Children.Add(new TextBlock {Text=L10n.Text("or_choose_one"),FontSize=13,Foreground=Look.Secondary,Margin=new Thickness(4,10,4,8)});
+            foreach(var (id,name,quality) in ranked.Take(3)) options.Children.Add(Option(id,name,Code(id,name),Ms(quality)??""));
+            if(nodesData is { Count: >0 } all) {
+                var more=new Button {Height=44,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(4,0,4,0),
+                    Content=Columns(new Border(),Single(L10n.Text("all_locations_count",all.Count.ToString("N0",L10n.Culture)),13,Look.Secondary),Look.Icon("\uE76C",11,Look.Secondary))};
+                more.Click+=(_,_)=>{if(!busy) {page="nodes";Render();}};
+                options.Children.Add(more);
+                // Nothing measured on this PC yet: measure once, quietly, and show the fastest when it is done.
+                if(ranked.Count==0&&!asked&&!connection.Active) {asked=true;Measure(all);}
+            }
+        }
+        onNodes=_=>{if(options.IsLoaded) Show();};
+        Show();
+        if(nodesData is null) _=QuietNodes();
+        // Continue: the choice is already saved; step 3 is the connect page itself.
+        var next=Add(Primary(L10n.Text("continue_action")),10,0);next.Height=48;
+        next.Click+=(_,_)=>{if(busy) return;Settings.Set("onboardPicked","1");Render();};
     }
     private static string DeviceLine()=>"Windows "+(Environment.OSVersion.Version.Build>=22000?"11":"10")+" · "+(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture==System.Runtime.InteropServices.Architecture.Arm64?"ARM64":"x64");
     private static string ZoneLine() {
@@ -1052,27 +1165,33 @@ public partial class MainWindow : Window {
         else {trimTimer.Stop();trimTimer.Start();}
     }
     /// Seals or opens the connect page's file when the connection starts or ends; the first show on a page is still.
-    private void ShowSeal(RingState state) {
+    private void ShowSeal(LinkState state) {
         var seal=connection.Active;
         Backdrop.Lit=!seal;
-        if(state!=shownState&&actionButton is not null&&actionLabel is not null&&actionDot is not null) {
-            var on=state==RingState.Connected;
-            actionLabel.Text=L10n.Text(state switch {RingState.Connected=>"unseal_action",RingState.Connecting=>"sealing_detail",RingState.Failed=>"retry_action",_=>"seal_action"});
+        var trouble=CurrentTrouble();
+        var key=state+"|"+connection.ErrorCode;
+        if(key!=shownState&&actionButton is not null&&actionLabel is not null&&actionDot is not null) {
+            var on=seal&&state!=LinkState.Connecting;
+            actionLabel.Text=trouble?.Primary??L10n.Text(state switch {LinkState.Idle=>"seal_action",LinkState.Connecting=>"cancel",_=>"unseal_action"});
             actionButton.Foreground=on?Look.Accent:Look.Text;
             // Idle, the one action wears the brand colour outright, so it is the first thing seen on the page.
             var ink=Look.AccentColor;
             actionButton.Background=new SolidColorBrush(Color.FromArgb(on?(byte)16:(byte)22,ink.R,ink.G,ink.B));
             actionButton.BorderBrush=on?Look.AccentLine:Look.Accent;
-            AutomationProperties.SetName(actionButton,L10n.Text(state switch {RingState.Idle=>"connect_action",RingState.Failed=>"retry_action",RingState.Connecting=>"cancel",_=>"disconnect_action"}));
+            AutomationProperties.SetName(actionButton,trouble?.Primary??L10n.Text(state switch {LinkState.Idle=>"connect_action",LinkState.Connecting=>"cancel",_=>"disconnect_action"}));
+            if(secondaryButton is not null) {
+                secondaryButton.Content=trouble?.Secondary??"";
+                secondaryButton.Visibility=trouble?.Secondary is null?Visibility.Collapsed:Visibility.Visible;
+            }
             actionDot.Fill=seal?Look.Accent:Look.Hex("#59EDE7DF");
-            shownState=state;dotBreathing=null;BreatheDot();
+            shownState=key;dotBreathing=null;BreatheDot();
         }
         if(actionButton is not null) actionButton.IsEnabled=!busy||connection.Active;
-        if(statusTitle is not null) statusTitle.Foreground=state==RingState.Connected?Look.Accent:Look.Text;
+        if(statusTitle is not null) statusTitle.Foreground=state switch {LinkState.Connected=>Look.Accent,LinkState.Failed=>Look.Fair,_=>Look.Text};
+        if(portrait is not null) portrait.Invite=seal?"":L10n.Text(state==LinkState.Failed?"tap_to_retry":"tap_to_hide");
         if(sealedShown==seal||portrait is null||fileLines is null) return;
         var moving=sealedShown is not null&&Motion;
         portrait.Set(seal,moving);
-        portrait.Invite=seal?"":L10n.Text("tap_to_hide");
         AutomationProperties.SetName(portrait,L10n.Text(seal?"disconnect_action":"connect_action"));
         var n=fileLines.Count;
         for(var i=0;i<n;i++) fileLines[i].Seal(seal,moving?(int)(1200*((seal?i:n-1-i)+0.5)/n):0,moving);
@@ -1100,20 +1219,31 @@ public partial class MainWindow : Window {
         var soon=access?["until"]?.GetValue<string>() is { } end&&DateTimeOffset.TryParse(end,System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out var date)&&date-DateTimeOffset.UtcNow<=TimeSpan.FromDays(7);
         until.Foreground=state=="expired"?Look.Danger:state=="active"&&soon?Look.Fair:Look.Text;
     }
-    private RingState State() {
-        var active=connection.Active;
-        if(active) return connection.Since is not null?RingState.Connected:RingState.Connecting;
-        return failed?RingState.Failed:RingState.Idle;
+    private LinkState State()=>connection.Active?Guidance.State(connection):connection.ErrorCode.Length>0?LinkState.Failed:LinkState.Idle;
+    /// The cause of the last failure and the way out of it; null unless the connection failed.
+    private Trouble? CurrentTrouble() {
+        if(connection.Active||connection.ErrorCode is not { Length: >0 } code) return null;
+        var node=connection.NodeName.Length>0?connection.NodeName:nodeName.Length>0?nodeName:L10n.Text("location");
+        return Guidance.For(code,node,nodeId.Length==0,new AccessFailure(code).Message);
     }
-    private string StatusTitle(RingState state)=>L10n.Text(state switch {RingState.Connected=>"sealed_status",RingState.Connecting=>"connecting",RingState.Failed=>"connect_failed_title",_=>"exposed_status"});
+    private string StatusTitle(LinkState state)=>state switch {
+        LinkState.Connected=>L10n.Text("sealed_status"),
+        LinkState.Connecting or LinkState.Switching=>L10n.Text("hiding_status"),
+        LinkState.Reconnecting=>L10n.Text("reconnecting_title"),
+        LinkState.Waiting=>L10n.Text("waiting_title"),
+        LinkState.Failed=>CurrentTrouble()?.Title??L10n.Text("connect_failed_title"),
+        _=>L10n.Text("exposed_status"),
+    };
     /// Time since the connection came up, or null while it is not (yet) confirmed.
     private string? Elapsed()=>!Connection.Notices.Contains(connection.StatusKey)&&connection.Since is { } since?(DateTime.UtcNow-since).ToString(@"hh\:mm\:ss"):null;
     /// The flyout's one line keeps time and rates together; the window shows the time large above the rates.
-    private string StatusDetail(RingState state,bool compact=true)=>state switch {
-        RingState.Connected=>Connection.Notices.Contains(connection.StatusKey)?L10n.Text(connection.StatusKey)
-            :Elapsed() is { } time?compact?L10n.Text("connection_stats",time,Mbps(connection.RxRate),Mbps(connection.TxRate)):L10n.Text("connection_rates",Mbps(connection.RxRate),Mbps(connection.TxRate)):"",
-        RingState.Connecting=>L10n.Text("finding_best_route"),
-        RingState.Failed=>failure,
+    private string StatusDetail(LinkState state,bool compact=true)=>state switch {
+        LinkState.Connected=>compact&&Elapsed() is { } time?L10n.Text("connection_stats",time,Mbps(connection.RxRate),Mbps(connection.TxRate)):L10n.Text("seen_as",connection.NodeName),
+        LinkState.Connecting=>L10n.Text("finding_best_route"),
+        LinkState.Switching=>L10n.Text("switching_detail"),
+        LinkState.Reconnecting=>L10n.Text(connection.StatusKey=="location_retrying"?"location_retrying":"reconnecting_detail"),
+        LinkState.Waiting=>L10n.Text("waiting_detail"),
+        LinkState.Failed=>CurrentTrouble()?.Detail??"",
         _=>L10n.Text(update?.Mandatory==true?"update_required_detail":connection.Blocking?"kill_switch_blocking":"exposed_detail"),
     };
     /// The location the next (or current) connection uses, as title, detail and tile code (null: automatic).
@@ -1537,6 +1667,7 @@ public partial class MainWindow : Window {
         var word=Look.Wordmark(26);word.HorizontalAlignment=HorizontalAlignment.Center;Add(word,18,0);
         Add(new TextBlock {Text=L10n.Text("sign_in_tagline"),FontSize=13,Foreground=Look.Secondary,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center},6,24);
         if(Notices() is { } notes) Add(notes,0,8);
+        if(!Onboarded) Add(SectionRow("section_sign_in",1),0,10);
         TextBox? origin=null;
         if(NativeApi.BuiltInOrigin.Length==0) {Add(Caption(L10n.Text("server_address")),0,6);origin=Add(new TextBox {Text=api.Origin},0,12);AutomationProperties.SetName(origin,L10n.Text("server_address"));}
         Add(Caption(L10n.Text("email")),0,6);var email=Add(new TextBox(),0,12);
@@ -1563,7 +1694,7 @@ public partial class MainWindow : Window {
         login.Click+=(_,_)=>{
             var password=showPassword?shown.Text:hidden.Password;
             if(string.IsNullOrWhiteSpace(email.Text)||password.Length==0) {Notify(L10n.Text("enter_your_email_and_password"));return;}
-            Work(async()=>{if(origin is not null) api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password);hidden.Clear();shown.Clear();page="connect";Render();CheckForUpdate(false);});
+            Work(async()=>{if(origin is not null) api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password);connection.ClearError();hidden.Clear();shown.Clear();page="connect";Render();CheckForUpdate(false);});
         };
     }
     /// Both "forgot password" and "change password" email the Portal's reset link; the new password is set there.
@@ -1621,13 +1752,31 @@ public partial class MainWindow : Window {
 
     /// Live parts of the connect page and the flyout, refreshed every second without rebuilding them.
     private void UpdateLive() {
-        if(connection.Active) failed=false;
         var state=State();
         ShowSeal(state);
         if(statusTitle is not null) statusTitle.Text=StatusTitle(state);
-        var time=state==RingState.Connected?Elapsed():null;
-        if(portrait is not null) {portrait.Centre=time??"";portrait.Sub=time is null?"":StatusDetail(state,false);}
-        if(statusDetail is not null) statusDetail.Text=state==RingState.Connected?L10n.Text("seen_as",connection.NodeName):StatusDetail(state,false);
+        if(portrait is not null) {
+            portrait.State=state;portrait.Lines=connection.Lines;
+            portrait.Centre=state switch {
+                LinkState.Connected=>Elapsed()??"",
+                LinkState.Connecting=>Guidance.Phase(connection),
+                LinkState.Reconnecting=>TimeSpan.FromSeconds(Guidance.Countdown(connection)).ToString(@"mm\:ss"),
+                LinkState.Waiting=>"—",
+                _=>""};
+            portrait.Sub=state switch {
+                LinkState.Connected=>L10n.Text("connection_rates",Mbps(connection.RxRate),Mbps(connection.TxRate)),
+                LinkState.Reconnecting=>connection.Retry>0?L10n.Text("attempt_n",connection.Retry):"",
+                LinkState.Waiting=>L10n.Text("offline_centre"),
+                _=>""};
+        }
+        if(statusDetail is not null) statusDetail.Text=StatusDetail(state,false);
+        // The first connection ends the first run: "Ready" for a moment, then the tabs.
+        if(!Onboarded&&state==LinkState.Connected) {
+            Onboarded=true;
+            if(stepsHost is not null) stepsHost.Content=SectionRow("section_portrait",4);
+            var later=new DispatcherTimer {Interval=TimeSpan.FromSeconds(3)};
+            later.Tick+=(_,_)=>{later.Stop();if(!busy) Render();};later.Start();
+        }
         ShowRates(rateBars,state);
         ShowSwitch(switchNote,switchText,state);
         if(location is { } place) {

@@ -154,8 +154,9 @@ struct Wordmark:View {
     var body:some View {Text(verbatim:"TRACKNOTHING").font(Pixel.font(size)).tracking(size*0.04).foregroundStyle(VeilbirdStyle.text).accessibilityLabel(Text(verbatim:"TrackNothing"))}
 }
 
-/// The connect page's four states.
-enum RingState {case idle,connecting,connected,failed}
+/// The connection as the person sees it, the same seven states on every client (Android LinkState, Windows Link):
+/// each has one drawing of the portrait, one title, one detail and one action.
+enum RingState {case idle,connecting,switching,connected,reconnecting,waiting,failed}
 
 /// A 36pt (32pt on the Mac) tile with a two-letter country code or an icon.
 struct Badge:View {

@@ -162,38 +162,60 @@ struct PortraitView:View {
     let invite:String
     let since:Date?
     let sub:String
+    /// Which drawing (see StateRing); failed dims the sphere and stops its breathing.
+    var state:RingState = .idle
+    var lines=4
+    /// Inside the ring instead of the time: the phase while connecting, the countdown while reconnecting.
+    var centre=""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var low=true
     var body:some View {
         GeometryReader {geo in
             let s=min(geo.size.width,geo.size.height)
+            let failed=state == .failed
             ZStack {
                 ZStack {
-                    DotSphere().opacity(low ? 0.82:1)
-                    Text(verbatim:invite).font(.system(size:max(13,0.05*s))).tracking(0.8).foregroundStyle(VeilbirdStyle.accent)
-                        .lineLimit(1).minimumScaleFactor(0.6).frame(width:0.8*s).opacity(low ? 0.75:1)
+                    DotSphere().opacity(failed ? 0.42:(low ? 0.82:1))
+                    Text(verbatim:invite).font(.system(size:max(13,0.05*s))).tracking(0.8).foregroundStyle(failed ? VeilbirdStyle.text.opacity(0.7):VeilbirdStyle.accent)
+                        .lineLimit(1).minimumScaleFactor(0.6).frame(width:0.8*s).opacity(failed || !low ? 1:0.75)
                     Circle().strokeBorder(VeilbirdStyle.text.opacity(0.07),lineWidth:1)
                 }.opacity(hidden ? 0:1)
                 DotSphere().opacity(hidden ? 0.1:0)
-                ZStack {
-                    Circle().stroke(VeilbirdStyle.accent.opacity(0.11),lineWidth:8)
-                    Circle().stroke(VeilbirdStyle.accent.opacity(0.22),lineWidth:3)
-                    Circle().stroke(VeilbirdStyle.accent,lineWidth:1)
-                }.frame(width:0.75*s,height:0.75*s).opacity(hidden ? (low ? 0.82:1):0).scaleEffect(hidden ? 1:0.92)
-                VStack(spacing:0.02*s) {
-                    if let since {
-                        TimelineView(.periodic(from:since,by:1)) {context in
-                            Text(verbatim:Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond)))
-                                .font(.system(size:0.072*s,design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.text).lineLimit(1)
-                        }
-                    }
-                    Text(verbatim:sub).font(.system(size:max(10,0.036*s),design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.secondary)
-                        .lineLimit(1).minimumScaleFactor(0.6).frame(width:0.62*s)
-                }.opacity(hidden ? 1:0)
+                StateRing(state:state,lines:lines,glow:low ? 0.82:1)
+                    .frame(width:0.75*s,height:0.75*s).opacity(hidden ? 1:0).scaleEffect(hidden ? 1:0.92)
+                inside(s).opacity(hidden ? 1:0)
             }.frame(width:s,height:s).position(x:geo.size.width/2,y:geo.size.height/2)
         }
         .animation(reduceMotion ? nil:.timingCurve(0.65,0,0.35,1,duration:1.2),value:hidden)
         .onAppear {if !reduceMotion {withAnimation(.easeInOut(duration:3).repeatForever(autoreverses:true)) {low=false}} else {low=false}}
+    }
+    /// The time hidden and the rates; the line being tried while switching; one short line while connecting.
+    @ViewBuilder private func inside(_ s:CGFloat)->some View {
+        if state == .switching {
+            TimelineView(.periodic(from:.now,by:0.6)) {context in
+                let n=max(lines,2)
+                small(L10n.text("switching_centre",L10n.number(StateRing.current(lines:n,at:context.date,still:reduceMotion)+1),L10n.number(n)),s)
+            }
+        } else if state == .connecting {
+            small(centre,s)
+        } else {
+            VStack(spacing:0.02*s) {
+                if let since,state == .connected {
+                    TimelineView(.periodic(from:since,by:1)) {context in
+                        Text(verbatim:Duration.seconds(Int(context.date.timeIntervalSince(since))).formatted(.time(pattern:.hourMinuteSecond)))
+                            .font(.system(size:0.072*s,design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.text).lineLimit(1)
+                    }
+                } else if !centre.isEmpty {
+                    Text(verbatim:centre).font(.system(size:0.072*s,design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.text).lineLimit(1)
+                }
+                Text(verbatim:sub).font(.system(size:max(10,0.036*s),design:.monospaced)).monospacedDigit().foregroundStyle(VeilbirdStyle.secondary)
+                    .lineLimit(1).minimumScaleFactor(0.6).frame(width:0.62*s)
+            }
+        }
+    }
+    private func small(_ text:String,_ s:CGFloat)->some View {
+        Text(verbatim:text).font(.system(size:max(11,0.044*s),design:.monospaced)).foregroundStyle(VeilbirdStyle.secondary)
+            .lineLimit(1).minimumScaleFactor(0.6).frame(width:0.62*s)
     }
 }
 
