@@ -50,13 +50,19 @@ async function accounts(ids: string[]) {
   return new Map(rows.map((row) => [row.id, row]));
 }
 
-export async function overviewStats() {
+/** Accounts that may be near their quota: a total at or past the notice ratio needs at least one grant past it. */
+async function quotaCandidates(): Promise<string[]> {
+  return (await dbQuery<{ user_id: string }>(`SELECT DISTINCT g.user_id FROM access_grants g INNER JOIN users u ON u.id = g.user_id
+    WHERE ${accessSql("u")} AND g.status = 'active' AND g.quota_bytes IS NOT NULL AND g.used_bytes >= g.quota_bytes * $1::numeric`, [QUOTA_NOTICE_RATIO])).map((row) => row.user_id);
+}
+
+async function computeOverviewStats() {
   const [online, previous, expiringRows, access] = await Promise.all([
     onlineNow(), lastMonth(),
     dbQuery<{ id: string; display_name: string; email: string; access_until: Date }>(`SELECT id, display_name, email, access_until FROM users u
       WHERE ${accessSql("u")} AND u.access_until IS NOT NULL AND u.access_until <= now() + make_interval(days => $1)
       ORDER BY u.access_until LIMIT ${LIST_LIMIT}`, [EXPIRY_NOTICE_DAYS]),
-    accessByUser(),
+    quotaCandidates().then(accessByUser),
   ]);
   const full = nearQuota(access);
   const names = await accounts(full.map((item) => item.userId));
@@ -67,4 +73,19 @@ export async function overviewStats() {
     nearQuota: full.filter((item) => names.has(item.userId)).map((item): OverviewAccount => ({ userId: item.userId,
       displayName: names.get(item.userId)!.display_name, email: names.get(item.userId)!.email, expiresAt: null, usedBytes: item.usedBytes, quotaBytes: item.quotaBytes })),
   };
+}
+
+/** Every open Console asks for these figures; within this window they share one computation. */
+export const OVERVIEW_CACHE_MS = 15_000;
+type OverviewStats = Awaited<ReturnType<typeof computeOverviewStats>>;
+let cached: { at: number; value: Promise<OverviewStats> } | null = null;
+
+/** Overview figures, at most {@link OVERVIEW_CACHE_MS} old; `fresh` (the Console's refresh button) recomputes them. */
+export function overviewStats({ fresh = false } = {}): Promise<OverviewStats> {
+  if (!fresh && cached && Date.now() - cached.at < OVERVIEW_CACHE_MS) return cached.value;
+  const entry = { at: Date.now(), value: computeOverviewStats() };
+  cached = entry;
+  // A failed computation is not kept: the next request tries again.
+  entry.value.catch(() => { if (cached === entry) cached = null; });
+  return entry.value;
 }

@@ -191,12 +191,13 @@ export function publicNode(node: DbNode): Record<string, unknown> {
   const hidden = new Set(["credential_ciphertext", "credential_iv", "credential_tag", "agent_token_hash", "metrics_json"]);
   const heartbeatAt = node.last_heartbeat_at || (node.status === "online" ? node.updated_at : null);
   const stale = node.status === "online" && heartbeatAt && Date.now() - new Date(heartbeatAt).getTime() > 90_000;
+  const metrics = parseMetrics(node.metrics_json);
   return {
     ...Object.fromEntries(Object.entries(node).filter(([key]) => !hidden.has(key))),
     // False for nodes added by install command or whose credential was cleared: SSH actions need it again.
     has_ssh_credential: node.credential_type !== "none" && Boolean(node.credential_ciphertext),
-    metrics: parseMetrics(node.metrics_json),
-    metricsCollectedAt: parseMetrics(node.metrics_json)?.collectedAt || null,
+    metrics,
+    metricsCollectedAt: metrics?.collectedAt || null,
     ...(stale ? { status: "attention", latency: "no heartbeat", last_seen: "heartbeat expired" } : {}),
   };
 }
@@ -218,20 +219,6 @@ export async function createPendingUser(input: { email: string; displayName: str
     (id, email, display_name, password_hash, role, status, created_at, updated_at)
     VALUES ($1, $2, $3, $4, 'member', 'pending', $5, $5)`, [id, input.email.toLowerCase(), input.displayName, input.passwordHash, timestamp]);
   return (await findUserById(id))!;
-}
-
-/** How many accounts are in each status; cheap enough for the Console's navigation badge. */
-export async function countUsersByStatus(): Promise<Record<DbUser["status"], number>> {
-  const counts = { pending: 0, active: 0, rejected: 0, suspended: 0 } as Record<DbUser["status"], number>;
-  for (const row of await dbQuery<{ status: DbUser["status"]; count: string }>("SELECT status, COUNT(*)::text AS count FROM users GROUP BY status")) counts[row.status] = Number(row.count);
-  return counts;
-}
-
-export async function listUsers(status?: DbUser["status"]): Promise<DbUser[]> {
-  const rows = status
-    ? await dbQuery<DbUser>("SELECT id, email, display_name, role, status, approved_at, approved_by, rejection_reason, created_at, updated_at FROM users WHERE status = $1 ORDER BY created_at DESC", [status])
-    : await dbQuery<DbUser>("SELECT id, email, display_name, role, status, approved_at, approved_by, rejection_reason, created_at, updated_at FROM users ORDER BY created_at DESC");
-  return rows;
 }
 
 export async function updateUserStatus(id: string, status: DbUser["status"], actorUserId: string, rejectionReason?: string): Promise<DbUser | undefined> {

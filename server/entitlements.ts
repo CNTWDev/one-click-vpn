@@ -281,11 +281,12 @@ export async function chargeTraffic(bytesByUser: Map<string, number>): Promise<s
   return ended;
 }
 
-/** Access of every account at once, for the Console account list. */
-export async function accessByUser() {
-  const grants = await dbQuery<Grant>("SELECT * FROM access_grants ORDER BY created_at");
+/** Access of the given accounts at once, for Console lists (which only ever show a page of accounts). */
+export async function accessByUser(userIds: string[]) {
+  if (!userIds.length) return new Map<string, ReturnType<typeof describe>>();
+  const grants = await dbQuery<Grant>("SELECT * FROM access_grants WHERE user_id = ANY($1) ORDER BY created_at", [userIds]);
   const byUser = new Map<string, Grant[]>();
-  for (const grant of grants) byUser.set(grant.user_id, [...(byUser.get(grant.user_id) || []), grant]);
+  for (const grant of grants) { const items = byUser.get(grant.user_id); if (items) items.push(grant); else byUser.set(grant.user_id, [grant]); }
   return new Map([...byUser].map(([userId, items]) => [userId, describe(items)]));
 }
 

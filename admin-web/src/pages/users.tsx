@@ -1,6 +1,5 @@
-import { consoleLanguage, t, useConsoleLanguage } from "../i18n";
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useState } from "react";
+import { t, useConsoleLanguage } from "../i18n";
+import { useEffect, useRef, useState } from "react";
 import { accessSummary } from "./account-access";
 import { UserAccessDialog } from "./user-access";
 import { api } from "../api";
@@ -8,14 +7,21 @@ import { useConfirm } from "../confirm-dialog";
 import { Icon } from "../icons";
 import { useQueryParam } from "../router";
 import { useToast } from "../toast";
-import type { AdminUser } from "../types";
-import { BatchBar, Empty, formatBytes, includesText, InlineNotice, Menu, type MenuItem, Modal, type Notice, PageHeader, Pill, TableToolbar, Time } from "./shared";
+import type { AdminUser, UserListCounts } from "../types";
+import { BatchBar, Empty, formatBytes, InlineNotice, Menu, type MenuItem, Modal, type Notice, PageHeader, Pagination, Pill, TableToolbar, Time, useCursorPages } from "./shared";
 
-/** Accounts: review, status, password reset and the access detail. Loads its own list; onChanged refreshes the navigation badge. */
+const PAGE_SIZE = 50;
+type UserPage = { users: AdminUser[]; total: number; counts: UserListCounts };
+
+/**
+ * Accounts: review, status, password reset and the access detail. The Controller filters, searches, sorts and pages
+ * the list (50 at a time), so it stays quick with any number of accounts. onChanged refreshes the navigation badge.
+ */
 export function UsersPage({ onChanged }: { onChanged: () => void }) {
   useConsoleLanguage();
-  const [loaded, setLoaded] = useState<AdminUser[] | null>(null);
-  const users = loaded || [];
+  const [loaded, setLoaded] = useState<UserPage | null>(null);
+  const users = loaded?.users || [];
+  const counts = loaded?.counts;
   const [filter, setFilter] = useQueryParam("filter", "all");
   const [search, setSearch] = useQueryParam("q");
   const [sort, setSort] = useQueryParam("sort", "created");
@@ -24,28 +30,41 @@ export function UsersPage({ onChanged }: { onChanged: () => void }) {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [accessUser, setAccessUser] = useState<AdminUser | null>(null);
   const [resetLink, setResetLink] = useState<{ user: AdminUser; url: string } | null>(null);
-  const time = (value?: string | null) => value ? new Date(value).getTime() || 0 : 0;
-  const accessEnded = (user: AdminUser) => user.status === "active" && user.access?.state !== "active";
-  const accessEnding = (user: AdminUser) => user.status === "active" && accessSummary(user.access).tone === "warning";
-  const matches = (user: AdminUser) => filter === "all" || (filter === "ending" ? accessEnding(user) : filter === "ended" ? accessEnded(user) : user.status === filter);
-  const until = (user: AdminUser) => user.access?.state === "active" ? user.access.until ? time(user.access.until) : Number.MAX_SAFE_INTEGER : 0;
-  const visible = users.filter((user) => matches(user) && includesText(search, user.displayName, user.email))
-    .sort((left, right) => sort === "name" ? left.displayName.localeCompare(right.displayName, consoleLanguage.locale())
-      : sort === "traffic" ? (right.accessSummary?.totalBytes || 0) - (left.accessSummary?.totalBytes || 0)
-        : sort === "until" ? until(left) - until(right)
-        : sort === "activity" ? time(right.accessSummary?.lastActivityAt) - time(left.accessSummary?.lastActivityAt)
-          : time(right.createdAt) - time(left.createdAt));
-  const pending = users.filter((user) => user.status === "pending");
+  const pages = useCursorPages(JSON.stringify([filter, search.trim(), sort]));
+  const offset = Number(pages.cursor || 0);
+  const visible = users;
   const selectablePending = visible.filter((user) => user.status === "pending");
   const selectedPending = selectablePending.filter((user) => selected.has(user.id));
   const confirm = useConfirm();
   const toast = useToast();
-  async function refresh() {
-    try { setLoaded((await api<{ users: AdminUser[] }>("/api/v1/admin/users")).users || []); }
-    catch (error) { setLoaded((current) => current || []); setNotice({ tone: "error", message: (error as Error).message }); }
-    onChanged();
-  }
-  useEffect(() => { void refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const panel = useRef<HTMLElement>(null);
+  // Bumped to load the same page again after a change.
+  const [version, setVersion] = useState(0);
+  const loadedOnce = loaded !== null;
+  useEffect(() => {
+    let current = true;
+    // Filters apply on their own; typing in the search box waits for a pause.
+    const timer = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ filter, sort, offset: String(offset), limit: String(PAGE_SIZE) });
+        if (search.trim()) params.set("q", search.trim());
+        const result = await api<UserPage>(`/api/v1/admin/users?${params}`);
+        if (current) setLoaded({ users: result.users || [], total: result.total || 0, counts: result.counts });
+      } catch (error) {
+        if (!current) return;
+        setLoaded((previous) => previous || { users: [], total: 0, counts: { all: 0, pending: 0, active: 0, suspended: 0, rejected: 0, ending: 0, ended: 0 } });
+        setNotice({ tone: "error", message: (error as Error).message });
+      }
+    }, loadedOnce ? 250 : 0);
+    return () => { current = false; window.clearTimeout(timer); };
+  }, [filter, search, sort, offset, version]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A new page starts at its first row, not wherever the previous page was scrolled to.
+  const firstPage = useRef(true);
+  useEffect(() => {
+    if (firstPage.current) { firstPage.current = false; return; }
+    panel.current?.scrollIntoView({ block: "start" });
+  }, [pages.page]);
+  function reload() { setVersion((value) => value + 1); onChanged(); }
 
   async function update(user: AdminUser, status: "active" | "rejected" | "suspended") {
     let reason = "";
@@ -71,7 +90,7 @@ export function UsersPage({ onChanged }: { onChanged: () => void }) {
       await api(`/api/v1/admin/users/${user.id}/status`, { method: "POST", body: JSON.stringify({ status, reason }) });
       toast(status === "active" ? t("{0} 已启用。", [user.email]) : status === "rejected" ? t("已拒绝 {0} 的申请。", [user.email]) : t("{0} 已停用。", [user.email]));
       setSelected((current) => { const next = new Set(current); next.delete(user.id); return next; });
-      await refresh();
+      reload();
     } catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
     finally { setBusy(""); }
   }
@@ -94,7 +113,7 @@ export function UsersPage({ onChanged }: { onChanged: () => void }) {
     }
     if (failures.length) setNotice({ tone: "error", message: t("{0} 个账号处理失败：{1}", [failures.length, failures.join("；")]) });
     if (targets.length > failures.length) toast(t("已{0} {1} 个账号申请。", [status === "active" ? t("通过") : t("拒绝"), targets.length - failures.length]));
-    setSelected(new Set()); setBusy(""); await refresh();
+    setSelected(new Set()); setBusy(""); reload();
   }
 
   // The administrator only hands over a one-time link; the user picks the new password themselves.
@@ -114,8 +133,9 @@ export function UsersPage({ onChanged }: { onChanged: () => void }) {
   }
 
   const statusLabels: Record<string, string> = { active: t("已启用"), pending: t("待审核"), suspended: t("已停用"), rejected: t("已拒绝") };
-  const chips = [["all", t("全部")], ["pending", t("待审核")], ["active", t("已启用")], ["suspended", t("已停用")], ["rejected", t("已拒绝")], ["ending", t("即将到期")], ["ended", t("已失效")]].map(([value, label]) => ({ value, label, count: value === "all" ? users.length : users.filter((user) => value === "ending" ? accessEnding(user) : value === "ended" ? accessEnded(user) : user.status === value).length }))
-    .filter((chip) => chip.count > 0 || !["ending", "ended"].includes(chip.value) || chip.value === filter);
+  const chips = [["all", t("全部")], ["pending", t("待审核")], ["active", t("已启用")], ["suspended", t("已停用")], ["rejected", t("已拒绝")], ["ending", t("即将到期")], ["ended", t("已失效")]]
+    .map(([value, label]) => ({ value, label, count: counts?.[value as keyof UserListCounts] }))
+    .filter((chip) => (chip.count ?? 0) > 0 || !["ending", "ended"].includes(chip.value) || chip.value === filter);
   const allPendingSelected = selectablePending.length > 0 && selectablePending.every((user) => selected.has(user.id));
   function rowActions(user: AdminUser) {
     const items: MenuItem[] = [];
@@ -133,10 +153,10 @@ export function UsersPage({ onChanged }: { onChanged: () => void }) {
   }
 
   return <>
-    <PageHeader title={t("账号管理")} description={t("账号能否连接由权益决定：有效期和流量按全部节点合计。停用账号或撤销凭据会立即终止使用。")} actions={<button className="button ghost" onClick={() => void refresh()}><Icon name="refresh" size={16} />{t("刷新")}</button>} />
+    <PageHeader title={t("账号管理")} description={t("账号能否连接由权益决定：有效期和流量按全部节点合计。停用账号或撤销凭据会立即终止使用。")} actions={<button className="button ghost" onClick={() => reload()}><Icon name="refresh" size={16} />{t("刷新")}</button>} />
     <InlineNotice notice={notice} />
-    {pending.length > 0 && filter !== "pending" && <div className="inline-notice warning"><span><b>{t("{0} 个账号等待审核。", [pending.length])}</b> {t("可勾选后批量通过或拒绝。")}</span><button className="button ghost small" onClick={() => setFilter("pending")}>{t("查看待审核")}</button></div>}
-    <section className="panel flush table-panel">
+    {(counts?.pending ?? 0) > 0 && filter !== "pending" && <div className="inline-notice warning"><span><b>{t("{0} 个账号等待审核。", [counts!.pending])}</b> {t("可勾选后批量通过或拒绝。")}</span><button className="button ghost small" onClick={() => setFilter("pending")}>{t("查看待审核")}</button></div>}
+    <section ref={panel} className="panel flush table-panel">
       <TableToolbar search={search} onSearch={setSearch} placeholder={t("搜索名称或邮箱")} chips={chips} chip={filter} onChip={setFilter} sort={sort} onSort={setSort} sortOptions={[["created", t("注册时间（最新）")], ["name", t("名称")], ["until", t("到期时间（最近）")], ["traffic", t("近 30 天流量")], ["activity", t("最近活动")]]} />
       <BatchBar count={selectedPending.length} unit={t("个待审核账号")} onClear={() => setSelected(new Set())}>
         <button className="button primary small" disabled={Boolean(busy)} onClick={() => void batchReview("active")}>{t("批量通过")}</button>
@@ -151,11 +171,12 @@ export function UsersPage({ onChanged }: { onChanged: () => void }) {
         <td className="m-hide"><Time value={user.createdAt} /></td>
         <td className="align-right cell-actions">{rowActions(user)}</td>
       </tr>)}</tbody></table></div>
-      {!visible.length && (loaded === null ? <div className="skeleton-block" role="status" aria-label={t("正在加载账号")}><i /><i /><i /></div> : <Empty action={search || filter !== "all" ? <button className="button ghost" onClick={() => { setSearch(""); setFilter("all"); }}>{t("清除筛选")}</button> : undefined}>{users.length ? t("没有符合条件的账号。") : t("还没有账号。")}</Empty>)}
+      {!visible.length && (loaded === null ? <div className="skeleton-block" role="status" aria-label={t("正在加载账号")}><i /><i /><i /></div> : <Empty action={search || filter !== "all" ? <button className="button ghost" onClick={() => { setSearch(""); setFilter("all"); }}>{t("清除筛选")}</button> : undefined}>{counts?.all ? t("没有符合条件的账号。") : t("还没有账号。")}</Empty>)}
+      <Pagination {...pages.pagination(visible.length, loaded && offset + visible.length < loaded.total ? String(offset + visible.length) : undefined, loaded?.total)} />
     </section>
     {resetLink && <Modal title={t("重置密码链接")} description={t("发给 {0}，对方打开后自己设置新密码。24 小时内有效，只能使用一次。", [resetLink.user.email])} onClose={() => setResetLink(null)} footer={<div className="form-actions"><button className="button primary" onClick={() => void copyResetLink()}>{t("复制链接")}</button></div>}>
       <input readOnly value={resetLink.url} aria-label={t("重置密码链接")} onFocus={(event) => event.currentTarget.select()} />
     </Modal>}
-    {accessUser && <UserAccessDialog user={accessUser} onClose={() => setAccessUser(null)} onChanged={() => void refresh()} />}
+    {accessUser && <UserAccessDialog user={accessUser} onClose={() => setAccessUser(null)} onChanged={() => reload()} />}
   </>;
 }

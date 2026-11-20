@@ -214,7 +214,7 @@ after(async () => {
 });
 
 async function userIdFor(email, adminToken) {
-  const response = await fetch(`${base}/api/v1/admin/users`, { headers: { Authorization: `Bearer ${adminToken}` } });
+  const response = await fetch(`${base}/api/v1/admin/users?q=${encodeURIComponent(email)}`, { headers: { Authorization: `Bearer ${adminToken}` } });
   assert.equal(response.status, 200);
   const user = (await response.json()).users.find((item) => item.email === email);
   assert.ok(user, `registered user ${email} not found`);
@@ -258,6 +258,56 @@ test("Agent operations expose release, recover expired tasks and preserve live t
   }
 });
 
+test("Console account list pages, filters, searches and sorts in the database", integrationOptions, async () => {
+  const pool = new pg.Pool({ connectionString: databaseUrl });
+  const day = 86_400_000, tag = `pg${Date.now()}`;
+  const owner = `list-owner-${tag}`, stamp = new Date().toISOString(), later = new Date(Date.now() + day).toISOString();
+  await pool.query(`INSERT INTO device_sessions (id,user_id,access_token_hash,refresh_token_hash,access_expires_at,refresh_expires_at,created_at)
+    SELECT $1,id,$2,$3,$4,$4,$5 FROM users WHERE email='owner@example.com'`, [owner, createHash("sha256").update(owner).digest("hex"), createHash("sha256").update(`${owner}-r`).digest("hex"), later, stamp]);
+  const list = async (query) => {
+    const response = await fetch(`${base}/api/v1/admin/users?${new URLSearchParams({ q: tag, ...query })}`, { headers: { Authorization: `Bearer ${owner}` } });
+    assert.equal(response.status, 200, await response.clone().text());
+    return response.json();
+  };
+  // 7 accounts: 3 pending, an active one ending in 2 days, one whose metered grant is 95% used, one without access, one suspended.
+  const accounts = [["a", "pending"], ["b", "pending"], ["c", "pending"], ["d", "active", 2], ["e", "active"], ["f", "active", -1], ["g", "suspended"]];
+  const ids = accounts.map(([name]) => `${tag}_${name}`);
+  try {
+    for (const [index, [name, status, days]] of accounts.entries()) {
+      const id = `${tag}_${name}`;
+      await pool.query(`INSERT INTO users (id,email,display_name,password_hash,role,status,created_at,updated_at,access_ok,access_until)
+        VALUES ($1,$2,$3,'x','member',$4,$5,$5,$6,$7)`, [id, `${id}@example.com`, `${name.toUpperCase()} ${tag}`, status, new Date(Date.now() - index * 60_000).toISOString(),
+        days === undefined || days > 0, days === undefined ? null : new Date(Date.now() + days * day).toISOString()]);
+    }
+    await pool.query(`INSERT INTO access_grants (id,user_id,source,starts_at,quota_bytes,used_bytes) VALUES ($1,$2,'admin',now() - interval '1 day',1000,950)`, [`grant_${tag}`, `${tag}_e`]);
+    const first = await list({ limit: "2" });
+    assert.equal(first.total, 7);
+    assert.deepEqual(first.users.map((user) => user.id), [ids[0], ids[1]], "newest first by default");
+    assert.ok(first.counts.all >= 7 && first.counts.pending >= 3, "chips count every account");
+    const third = await list({ limit: "2", offset: "6" });
+    assert.deepEqual([third.total, third.users.map((user) => user.id)], [7, [ids[6]]]);
+    assert.deepEqual([(await list({ limit: "2", offset: "40" })).total, (await list({ limit: "2", offset: "40" })).users.length], [7, 0], "past the end still reports the total");
+    assert.deepEqual((await list({ filter: "pending" })).users.map((user) => user.id), ids.slice(0, 3));
+    assert.deepEqual((await list({ status: "suspended" })).users.map((user) => user.id), [ids[6]], "the older status parameter still filters");
+    assert.deepEqual((await list({ filter: "ending" })).users.map((user) => user.id).sort(), [ids[3], ids[4]], "ending soon: 2 days left, or 5% of the data left");
+    assert.deepEqual((await list({ filter: "ended" })).users.map((user) => user.id), [ids[5]]);
+    assert.deepEqual((await list({ sort: "name", limit: "3" })).users.map((user) => user.id), ids.slice(0, 3));
+    const until = (await list({ sort: "until", filter: "active" })).users.map((user) => user.id);
+    assert.deepEqual(until, [ids[5], ids[3], ids[4]], "no access first, then the soonest end, unlimited last");
+    assert.deepEqual((await list({ q: `${tag}_d@` })).users.map((user) => user.id), [ids[3]], "search matches the email");
+    assert.equal((await list({ q: `${tag}%` })).total, 0, "wildcards in the search are literal");
+    const page = await list({ limit: "1", filter: "ending", sort: "name" });
+    assert.equal(page.users[0].accessSummary.totalBytes, 0);
+    assert.equal(page.users[0].access, null, "access is described per page; no grants means none");
+    assert.equal((await list({ q: `${tag}_e@` })).users[0].access.quotaBytes, 1000);
+  } finally {
+    await pool.query("DELETE FROM access_grants WHERE user_id = ANY($1)", [ids]);
+    await pool.query("DELETE FROM users WHERE id = ANY($1)", [ids]);
+    await pool.query("DELETE FROM device_sessions WHERE id=$1", [owner]);
+    await pool.end();
+  }
+});
+
 test("account access: welcome traffic, metering, exhaustion, stacked grants and plans", integrationOptions, async () => {
   const pool = new pg.Pool({ connectionString: databaseUrl });
   const json = { "Content-Type": "application/json" };
@@ -297,7 +347,7 @@ test("account access: welcome traffic, metering, exhaustion, stacked grants and 
     assert.equal(view.access.usedBytes, 5000, "both directions count against the quota");
     // Leave 1 KB of the 10 GB and send 2 KB: the account runs out and the overrun stays recorded.
     await pool.query("UPDATE access_grants SET used_bytes=quota_bytes-1024 WHERE user_id=$1 AND source='welcome'", [userId]);
-    const overview = async () => (await (await fetch(`${base}/api/v1/admin/overview-stats`, { headers: admin })).json());
+    const overview = async () => (await (await fetch(`${base}/api/v1/admin/overview-stats?fresh=1`, { headers: admin })).json());
     let stats = await overview();
     assert.ok(stats.online.users >= 1 && stats.online.devices >= 1, "a fresh WireGuard handshake counts as online");
     assert.equal(stats.nearQuota.find((item) => item.userId === userId)?.quotaBytes, 10 * GB, "an account with 1 KB left is listed as nearly used up");
@@ -347,7 +397,8 @@ test("account access: welcome traffic, metering, exhaustion, stacked grants and 
     const legacy = await act({ action: "switch", planId: "legacy" });
     assert.deepEqual([legacy.access.until, legacy.access.quotaBytes, legacy.access.deviceLimit], [null, null, null], "the legacy plan has no limits");
     await fetch(`${base}/api/v1/admin/plans`, { method: "POST", headers: admin, body: JSON.stringify({ id: "welcome", name: "新用户赠送", quotaBytes: 10 * GB, deviceLimit: 2, isWelcome: true }) });
-    const users = (await (await fetch(`${base}/api/v1/admin/users`, { headers: admin })).json()).users;
+    const users = [...(await (await fetch(`${base}/api/v1/admin/users?q=${encodeURIComponent(email)}`, { headers: admin })).json()).users,
+      ...(await (await fetch(`${base}/api/v1/admin/users?q=owner%40example.com`, { headers: admin })).json()).users];
     assert.equal(users.find((user) => user.id === userId).access.state, "active");
     assert.equal(users.find((user) => user.email === "owner@example.com").access.until, null);
     const ownerId = users.find((user) => user.email === "owner@example.com").id;
