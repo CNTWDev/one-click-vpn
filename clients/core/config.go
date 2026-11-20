@@ -105,7 +105,9 @@ func Build(o Options) (string, error) {
 		"unified-delay": true, "tcp-concurrent": true, "geo-auto-update": false,
 		"profile": map[string]any{"store-selected": false, "store-fake-ip": false},
 		"dns":     dns, "tun": tun, "proxies": o.Proxies,
-		"proxy-groups": []map[string]any{{"name": group, "type": "fallback", "proxies": o.Order, "url": testURL, "interval": 300, "lazy": false}}}
+		// lazy: the group's own health check runs only while it carries traffic; the apps probe on their own schedule,
+		// so an idle phone or laptop is not woken every 5 minutes to test every transport.
+		"proxy-groups": []map[string]any{{"name": group, "type": "fallback", "proxies": o.Order, "url": testURL, "interval": 300, "lazy": true}}}
 	if o.Smart {
 		// Same small rule sets as the subscription profiles (server/mihomo-config.mjs), fetched through the tunnel.
 		providers := map[string]any{}

@@ -207,6 +207,9 @@ function range(input: { from?: string; to?: string }): { from: string; to: strin
   return from <= to ? { from, to } : { from: to, to: from };
 }
 
+/** The window the Console account list sums traffic over (the last 30 days, as day strings). */
+export const recentUsageWindow = () => range({});
+
 function numbers(row: { upload_bytes: string | number; download_bytes: string | number }) {
   const uploadBytes = Number(row.upload_bytes || 0);
   const downloadBytes = Number(row.download_bytes || 0);
