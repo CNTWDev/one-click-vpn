@@ -134,10 +134,18 @@ public sealed class Portrait:FrameworkElement {
     private DrawingGroup? dots;private double dotsSize;private Color dotsColor;
     public Portrait() {
         Cursor=System.Windows.Input.Cursors.Hand;Focusable=true;
-        Loaded+=(_,_)=>Breathe();Unloaded+=(_,_)=>BeginAnimation(PhaseProperty,null);
+        // Breathes only while it can be seen: the window closed to the tray (hidden, not unloaded) or minimised
+        // would otherwise keep redrawing the sphere every frame.
+        IsVisibleChanged+=(_,_)=>Breathe();
     }
+    private bool breathing,resting;
+    /// Set while the window is minimised: still "visible" to WPF, but nobody sees it breathe.
+    public bool Resting {set {if(resting!=value) {resting=value;Breathe();}}}
     private void Breathe() {
-        if(!SystemParameters.ClientAreaAnimation) {BeginAnimation(PhaseProperty,null);Phase=1;return;}
+        var on=IsVisible&&!resting&&SystemParameters.ClientAreaAnimation;
+        if(on==breathing) return;
+        breathing=on;
+        if(!on) {BeginAnimation(PhaseProperty,null);Phase=1;return;}
         BeginAnimation(PhaseProperty,new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(3000)) {AutoReverse=true,RepeatBehavior=RepeatBehavior.Forever,EasingFunction=new SineEase {EasingMode=EasingMode.EaseInOut}});
     }
     public void Set(bool hidden,bool moving) {

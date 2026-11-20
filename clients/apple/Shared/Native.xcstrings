@@ -7827,19 +7827,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Switch locations right from the Mac menu bar and the Windows tray: the location row opens the list with delays in place, and a pick switches at once (moving a running connection) without opening the main window\nThe Windows tray menu has a Location submenu: choose Automatic or a location in one step"
+            "value": "Lighter in the background: closed to the Windows tray, minimised, or in the Mac menu bar only, the app pauses its animations and per-second updates, and Windows hands idle memory back\nFaster start: Android no longer looks up the system language for every line on a page, and the Windows app is precompiled for a quicker cold start"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac 菜单栏和 Windows 托盘里直接切换节点：点「连接位置」就地展开节点列表（带延迟），选一个即切换，已连接时自动改连过去，不再打开主窗口\nWindows 托盘右键菜单新增「连接位置」子菜单，自动选择或指定节点一步完成"
+            "value": "更省电省内存：Windows 关到托盘、最小化或 Mac 只留菜单栏时，界面动画暂停、不再每秒刷新，Windows 会把闲置内存还给系统\n启动更快：安卓打开页面时不再反复查询系统语言；Windows 版改为预编译，冷启动更快"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Смена локации прямо из строки меню Mac и трея Windows: строка локации открывает список с задержками на месте, выбор сразу переключает (и переносит текущее подключение), без открытия главного окна\nВ меню трея Windows появилось подменю «Локация»: автовыбор или конкретная локация в один шаг"
+            "value": "Экономнее в фоне: в трее Windows, свёрнутым или только в строке меню Mac приложение останавливает анимации и ежесекундные обновления, а Windows возвращает простаивающую память\nБыстрее запуск: Android больше не запрашивает язык системы для каждой строки на странице, а приложение Windows заранее скомпилировано для более быстрого холодного старта"
           }
         }
       }
