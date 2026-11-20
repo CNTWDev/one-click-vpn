@@ -39,7 +39,9 @@ struct ActivityView:View {
         .padding(.horizontal,mac ? 24:16).padding(.top,mac ? 16:8).padding(.bottom,mac ? 16:0)
         .frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.top)
         .task(id:model.since) {
-            // Once a second while connected; the view going away stops it.
+            // Once a second while connected; the view going away stops it. Not connected there is nothing to ask
+            // (the task starts again when the connection is confirmed).
+            if model.since == nil {await model.loadActivity();return}
             while !Task.isCancelled {
                 await model.loadActivity()
                 try? await Task.sleep(nanoseconds:1_000_000_000)

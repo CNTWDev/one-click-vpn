@@ -15,24 +15,38 @@ import java.util.Locale
 
 class VeilbirdApplication : Application() {
     override fun onCreate() { super.onCreate(); L10n.initialize(this); Journal.initialize(this); Crash.watch(this) }
+    // The system language or the app's own (Android 13+) changed: look the language up again.
+    override fun onConfigurationChanged(newConfig: Configuration) { super.onConfigurationChanged(newConfig); L10n.forget() }
 }
 object L10n {
     private lateinit var app: Context
     fun initialize(context: Context) { app = context.applicationContext }
     val preference: String get() = if (Build.VERSION.SDK_INT >= 33) app.getSystemService(LocaleManager::class.java).applicationLocales.toLanguageTags().ifEmpty { "system" } else app.getSharedPreferences("language", Context.MODE_PRIVATE).getString("preference", "system")!!
-    val locale: Locale get() {
+    /**
+     * The language and a context for it, looked up once and kept: the lookup asks the system (LocaleManager) and
+     * builds a configuration context, and pages read a few hundred strings. Cleared by [select] and on configuration
+     * changes (the system language or, on Android 13+, the app's own).
+     */
+    @Volatile private var cached: Pair<Locale, Context>? = null
+    fun forget() { cached = null }
+    private fun current(): Pair<Locale, Context> = cached ?: resolve().let { chosen ->
+        (chosen to app.createConfigurationContext(Configuration(app.resources.configuration).apply { setLocale(chosen) })).also { cached = it }
+    }
+    val locale: Locale get() = current().first
+    private fun resolve(): Locale {
         val chosen = preference
         if (chosen != "system") return Locale.forLanguageTag(chosen)
         val system = if (Build.VERSION.SDK_INT >= 33) app.getSystemService(LocaleManager::class.java).systemLocales else android.content.res.Resources.getSystem().configuration.locales
         for (i in 0 until system.size()) if (system[i].language in listOf("en", "zh", "ru")) return system[i]
         return Locale.ENGLISH
     }
-    private val localized: Context get() = app.createConfigurationContext(Configuration(app.resources.configuration).apply { setLocale(L10n.locale) })
+    private val localized: Context get() = current().second
     fun text(id: Int, vararg args: Any): String = localized.getString(id, *args)
     fun select(value: String) {
         require(value in listOf("system", "en", "zh", "ru"))
         if (Build.VERSION.SDK_INT >= 33) app.getSystemService(LocaleManager::class.java).applicationLocales = if (value == "system") LocaleList.getEmptyLocaleList() else LocaleList.forLanguageTags(value)
         else app.getSharedPreferences("language", Context.MODE_PRIVATE).edit().putString("preference", value).apply()
+        forget()
     }
     /**
      * The items of release notes in the app's language. Notes from clients/CHANGELOG.md have "### zh/en/ru" blocks

@@ -341,7 +341,7 @@
   <string name="vpn_connection">VPN connection</string>
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Lower battery use on Android: far fewer background checks with the screen off, only the line in use is tested while the connection works, and authorization renews less often; losing or changing the network and turning the screen on still check and reconnect at once</string>
+  <string name="whats_new_notes">Lighter in the background: closed to the Windows tray, minimised, or in the Mac menu bar only, the app pauses its animations and per-second updates, and Windows hands idle memory back\nFaster start: Android no longer looks up the system language for every line on a page, and the Windows app is precompiled for a quicker cold start</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

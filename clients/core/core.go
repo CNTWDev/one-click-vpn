@@ -106,6 +106,9 @@ func Stop() {
 		executor.ApplyConfig(cfg, true)
 	}
 	statistic.DefaultManager.ResetStatistic()
+	// The desktop apps keep the core running between connections (it also carries API calls): hand the
+	// connection's buffers back to the system instead of holding the peak until the next one.
+	go debug.FreeOSMemory()
 }
 
 // Reset closes every open connection but keeps the tunnel and proxies. The apps call it when the device's
