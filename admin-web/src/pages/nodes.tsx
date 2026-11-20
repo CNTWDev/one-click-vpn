@@ -9,7 +9,7 @@ import { protocolName, statusLabel, statusTone } from "../status";
 import { useToast } from "../toast";
 import type { NodeDiagnostics, NodeRecord, Region } from "../types";
 import { liveRate, NodeDiagnosticsView } from "./node-diagnostics";
-import { BatchBar, Empty, formatBytes, formatRate, formatTime, includesText, InlineNotice, Menu, Meter, Modal, type Notice, PageHeader, Pill, StateDot, TableToolbar, Time } from "./shared";
+import { BatchBar, Empty, formatBytes, formatRate, formatTime, includesText, InlineNotice, Menu, Meter, Modal, type Notice, PageHeader, Pagination, Pill, StateDot, TableToolbar, Time, usePagedItems } from "./shared";
 
 /** Numeric dotted-version compare ("2.7.1" < "2.10.0"); non-numeric parts are ignored. */
 function compareVersions(left: string, right: string): number {
@@ -30,6 +30,8 @@ type NodeAction = "status-agent" | "restart-agent" | "upgrade-agent" | "bootstra
 /** Public-interface rate from the latest heartbeat; hidden once the heartbeat goes stale. */
 
 const blankNodeForm: NodeForm = { name: "", ip: "", regionId: "", sshUser: "root", sshPort: "22", secret: "", credentialType: "password", sshPrivilegeMode: "root", deploymentTemplate: "standard", method: "command", forgetCredential: true };
+/** Rows per page: a large fleet stays quick to render and to refresh every 15 s. */
+const PAGE_SIZE = 50;
 const statusRank = { danger: 0, warning: 1, progress: 2, neutral: 3, success: 4 };
 
 
@@ -84,6 +86,16 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
         : sort === "traffic" ? (right.monthlyTraffic?.txBytes ?? -1) - (left.monthlyTraffic?.txBytes ?? -1)
         : sort === "region" ? (regionName.get(left.region_id) || "").localeCompare(regionName.get(right.region_id) || "") || left.name.localeCompare(right.name)
           : left.name.localeCompare(right.name, consoleLanguage.locale()));
+  const paged = usePagedItems(visible, PAGE_SIZE, JSON.stringify([filter, search.trim(), sort]));
+  // Turning a page starts at its first row, not wherever the previous page was scrolled to.
+  const tablePanel = useRef<HTMLElement>(null);
+  const pageStart = useRef(paged.pagination.from);
+  useEffect(() => {
+    if (pageStart.current === paged.pagination.from) return;
+    const turned = pageStart.current > 0 && paged.pagination.from > 0;
+    pageStart.current = paged.pagination.from;
+    if (turned) tablePanel.current?.scrollIntoView({ block: "start" });
+  }, [paged.pagination.from]);
   const visibleIds = new Set(visible.map((node) => node.id));
   const selectedIds = [...selected].filter((id) => visibleIds.has(id));
   // Results for nodes that no longer exist (deleted) are dropped instead of showing raw ids.
@@ -311,7 +323,8 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
     ].filter(Boolean).join("\n") || undefined;
   }
 
-  const allSelected = visible.length > 0 && visible.every((node) => selected.has(node.id));
+  // The header checkbox selects the rows on this page; selections on other pages stay.
+  const allSelected = paged.items.length > 0 && paged.items.every((node) => selected.has(node.id));
   const formDirty = showForm && JSON.stringify(form) !== JSON.stringify(initialForm);
   const byCommand = !editing && form.method === "command";
   return <>
@@ -319,7 +332,7 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
     {!regions.length && <InlineNotice notice={{ tone: "info", message: t("添加节点前，请先在“区域管理”中创建至少一个区域。") }} />}
     <InlineNotice notice={notice} />
     {shownResults.length > 0 && <section className="panel result-panel"><div className="panel-head"><h2>{t("逐台提交结果")}</h2><button className="text-button" onClick={() => setBatchResults([])}>{t("关闭")}</button></div><div className="compact-list">{shownResults.map((result) => { const node = nodes.find((item) => item.id === result.nodeId)!; return <div key={result.nodeId}><StateDot value={result.reason ? "attention" : "queued"} /><span><b>{node.name}</b><small>{result.reason || t("已排队，不代表执行完成；请在详情中查看进度。")}</small></span><button className="button ghost small" onClick={() => openDetail(node)}>{t("查看进度")}</button></div>; })}</div></section>}
-    <section className="panel flush table-panel">
+    <section ref={tablePanel} className="panel flush table-panel">
       <TableToolbar search={search} onSearch={setSearch} placeholder={t("搜索名称、IP 或区域")} chips={chips} chip={filter} onChip={setFilter} sort={sort} onSort={setSort} sortOptions={[["name", t("名称")], ["status", t("状态（异常优先）")], ["cpu", t("CPU 负载")], ["rate", t("实时出站网速")], ["traffic", t("本月出站流量")], ["region", t("区域")]]} />
       <BatchBar count={selectedIds.length} unit={t("个节点")} onClear={() => setSelected(new Set())}>
         <button className="button primary small" disabled={Boolean(busy) || !targetVersion} onClick={() => void batch("upgrade-agent")}>{t("升级 Agent")}</button>
@@ -328,7 +341,7 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
         <button className="button ghost small" disabled={Boolean(busy)} onClick={() => void batch("bootstrap")}>{t("重新安装 / 修复")}</button>
         <button className="button danger small" disabled={Boolean(busy)} onClick={() => void batchDelete()}>{t("删除")}</button>
       </BatchBar>
-      <div className="table-wrap"><table className="data-table cards node-table"><thead><tr><th className="check"><input type="checkbox" aria-label={t("选择全部节点")} checked={allSelected} onChange={(event) => setSelected(event.target.checked ? new Set(visible.map((node) => node.id)) : new Set())} /></th><th>{t("节点")}</th><th>{t("状态")}</th><th>Agent</th><th>{t("负载")}</th><th>{t("流量")}</th><th>{t("策略")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{visible.map((node) => <tr key={node.id} className={selected.has(node.id) ? "selected" : ""}>
+      <div className="table-wrap"><table className="data-table cards node-table"><thead><tr><th className="check"><input type="checkbox" aria-label={t("选择全部节点")} checked={allSelected} onChange={(event) => setSelected((current) => { const next = new Set(current); for (const node of paged.items) { if (event.target.checked) next.add(node.id); else next.delete(node.id); } return next; })} /></th><th>{t("节点")}</th><th>{t("状态")}</th><th>Agent</th><th>{t("负载")}</th><th>{t("流量")}</th><th>{t("策略")}</th><th className="align-right">{t("操作")}</th></tr></thead><tbody>{paged.items.map((node) => <tr key={node.id} className={selected.has(node.id) ? "selected" : ""}>
         <td className="check"><input type="checkbox" aria-label={t("选择 {0}", [node.name])} checked={selected.has(node.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(node.id); else next.delete(node.id); return next; })} /></td>
         <td className="cell-main"><button className="node-detail-trigger" onClick={() => openDetail(node)}><StateDot value={node.status} /><span><b>{breakAfterAt(node.name)}</b><small>{node.ip} · {node.place}</small></span></button></td>
         <td className="cell-status">{node.paused_at && node.status === "online" ? <><Pill value="paused" /><small>{statusLabel(node.status)} · {node.latency}</small></> : <><Pill value={node.status} /><small>{node.latency} · {node.last_seen}</small></>}</td>
@@ -339,6 +352,7 @@ export function NodesPage({ nodes, regions, loading, onRefresh }: { nodes: NodeR
         <td className="align-right cell-actions"><div className="row-actions"><button className="button ghost small" onClick={() => openDetail(node)}>{node.status === "provisioning" ? t("部署进度") : t("详情")}</button>{rowMenu(node)}</div></td>
       </tr>)}</tbody></table></div>
       {!visible.length && (loading && !nodes.length ? <div className="skeleton-block" role="status" aria-label={t("正在加载节点")}><i /><i /><i /></div> : nodes.length ? <Empty action={<button className="button ghost" onClick={() => { setSearch(""); setFilter("all"); }}>{t("清除筛选")}</button>}>{t("没有符合条件的节点。")}</Empty> : <Empty action={regions.length ? <button className="button primary" onClick={openCreate}>{t("添加第一台节点")}</button> : <a className="button primary" href="#/regions">{t("先创建区域")}</a>}>{t("尚未部署节点。")}</Empty>)}
+      <Pagination {...paged.pagination} />
     </section>
 
     {showForm && <Modal title={editing ? t("编辑 {0}", [editing.name]) : t("添加节点")} description={editing ? t("留空凭据表示保持当前 SSH 凭据。") : byCommand ? t("在服务器上以 root 运行一行命令即可接入，Controller 不保存任何 SSH 凭据。") : t("节点会先验证 SSH 主机，再加入安全部署队列。")} onClose={() => setShowForm(false)} dirty={formDirty}
