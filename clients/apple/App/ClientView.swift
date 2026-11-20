@@ -55,12 +55,13 @@ struct ClientView:View {
             VStack(spacing:0) {
                 if model.signedIn {
                     #if os(macOS)
-                    if tab<3 {macNavigation}
+                    // The page switcher waits for the first connection, so a new person sees only the step in front of them.
+                    if tab<3 && model.onboarded {macNavigation}
                     #endif
                     // A new page eases in with a short fade and rise.
                     Group {
                         switch tab {
-                        case 0:connectionView
+                        case 0:if model.onboarded || model.onboardPicked {connectionView} else {pickView}
                         case 1:nodesView
                         case 2:accountView
                         case 3:logsView
@@ -70,7 +71,7 @@ struct ClientView:View {
                     }.id(tab).transition(.asymmetric(insertion:.opacity.combined(with:.offset(y:8)),removal:.identity))
                     .frame(maxWidth:560,maxHeight:.infinity).frame(maxWidth:.infinity)
                     #if os(iOS)
-                    if tab<3 || tab==5 {tabBar}
+                    if (tab<3 || tab==5) && model.onboarded {tabBar}
                     #endif
                 } else {loginView}
             }
@@ -187,7 +188,8 @@ struct ClientView:View {
     }
     /// Update and announcement notes: one compact card each, only when there is something to say.
     @ViewBuilder private var notices:some View {
-        if let permission=model.permission,model.signedIn {PermissionNote(permission:permission,retry:toggleConnection)}
+        // A missing permission is said on the connect page itself once a tap ran into it (see Guidance).
+        if let permission=model.permission,model.signedIn,!model.failed {PermissionNote(permission:permission,retry:toggleConnection)}
         if let update=model.update {UpdateBanner(update:update)}
         if !model.announcement.isEmpty {
             Text(model.announcement).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).frame(maxWidth:.infinity,alignment:.leading)
@@ -302,6 +304,7 @@ struct ClientView:View {
                 Wordmark(size:mac ? 24:30).padding(.top,mac ? 16:22).accessibilityAddTraits(.isHeader)
                 Text(L10n.text("sign_in_tagline")).font(.system(size:mac ? 13:15)).foregroundStyle(VeilbirdStyle.secondary).multilineTextAlignment(.center).padding(.top,6)
                 VStack(alignment:.leading,spacing:8) {
+                    if !model.onboarded {SectionRow(key:"section_sign_in",step:1).padding(.bottom,4)}
                     if ClientModel.builtInOrigin.isEmpty {
                         caption(L10n.text("development_server_address"));TextField("https://…",text:$model.origin).literalInput().veilbirdField().padding(.bottom,6)
                     }
@@ -331,17 +334,13 @@ struct ClientView:View {
     }
     private func login() {
         guard !email.trimmingCharacters(in:.whitespaces).isEmpty,!password.isEmpty else {return}
-        model.work {try await model.api().login(email:email.trimmingCharacters(in:.whitespaces),password:password);UserDefaults.standard.set(model.origin,forKey:"origin");password="";tab=0;model.forgetNodes();model.signedIn=true;try await model.loadNodes();await model.checkForUpdate()}
+        model.work {try await model.api().login(email:email.trimmingCharacters(in:.whitespaces),password:password);UserDefaults.standard.set(model.origin,forKey:"origin");password="";tab=0;model.forgetNodes();if !model.connected {model.failed=false;model.failureCode=""};model.signedIn=true;try await model.loadNodes();await model.checkForUpdate()}
     }
 
     // MARK: Connect
     private func summary(_ quality:Quality)->String {quality.latency.map {L10n.text("latency_ms",L10n.number($0))+" · "+L10n.text(quality.grade)} ?? L10n.text(quality.grade)}
     private func ms(_ quality:Quality?)->String? {quality?.latency.map {L10n.text("latency_ms",L10n.number($0))}}
     private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
-    private var ringState:RingState {
-        if model.connected {return model.since != nil ? .connected:.connecting}
-        return model.failed ? .failed:.idle
-    }
     /// The connect page as a file: its state, four lines of what anyone can see about this device right now, one action,
     /// then the location and usage. Connecting seals the file (a line of light sweeps down and each line turns into dots,
     /// the lamp above goes out); disconnecting sweeps back up and opens it.
@@ -353,9 +352,7 @@ struct ClientView:View {
         return min(300,UIScreen.main.bounds.height*0.36)
         #endif
     }
-    private func stateTitle(_ state:RingState)->String {
-        L10n.text(state == .connected ? "sealed_status":(state == .connecting ? "connecting":(state == .failed ? "connect_failed_title":"exposed_status")))
-    }
+    private func titleTint(_ state:RingState)->Color {state == .failed ? VeilbirdStyle.fair:(state == .connected ? VeilbirdStyle.accent:VeilbirdStyle.text)}
     /// Under the portrait: the address in large type and the device line, both sealing into dots while hidden.
     private func portraitFile(_ sealed:Bool)->some View {
         VStack(alignment:.leading,spacing:mac ? 6:10) {
@@ -363,18 +360,69 @@ struct ClientView:View {
             SealedText(text:[deviceLine,zoneLine,L10n.locale.identifier.replacingOccurrences(of:"_",with:"-")].joined(separator:"   "),sealed:sealed,delay:0.9,size:11,color:VeilbirdStyle.secondary)
         }.frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,4).accessibilityElement(children:.combine)
     }
-    /// The state in words and one line beside it; one height in every state so nothing below moves.
+    /// The state (or the cause of a failure) and two lines held for its detail (or the next step): one height in every
+    /// state, so nothing below moves when a connection comes up, drops or fails.
     private func stateLine(_ state:RingState)->some View {
-        HStack(alignment:.firstTextBaseline,spacing:12) {
-            Text(stateTitle(state)).font(.system(size:mac ? 22:26,weight:.light,design:.serif))
-                .foregroundStyle(state == .connected ? VeilbirdStyle.accent:VeilbirdStyle.text).lineLimit(1).fixedSize().contentTransition(.opacity)
-            stateDetail(state).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2).id(state).transition(.opacity)
-                .frame(maxWidth:.infinity,alignment:.leading)
-        }.frame(height:mac ? 34:40).padding(.horizontal,4)
+        VStack(alignment:.leading,spacing:4) {
+            Text(model.stateTitle).font(.system(size:mac ? 22:26,weight:.light,design:.serif))
+                .foregroundStyle(titleTint(state)).lineLimit(1).contentTransition(.opacity)
+            Text(model.stateDetail).font(.system(size:mac ? 12:13)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2, reservesSpace:true)
+                .id(stateDetailKey(state)).transition(.opacity)
+        }.frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,4)
+    }
+    private func stateDetailKey(_ state:RingState)->String {"\(state)|\(model.trouble?.detail ?? "")|\(model.status)"}
+    /// What a failure's button does: try again, or go where the cause is fixed.
+    private func act(_ what:String?) {
+        switch what {
+        case "devices":tab=4
+        case "nodes":tab=1
+        case "account":tab=2
+        case "automatic":model.selected="";model.selectedName="";toggleConnection()
+        case "settings":
+            #if os(macOS)
+            SystemExtension.openSettings()
+            #endif
+        case "update":Task {await model.checkForUpdate()}
+        case "signin":model.work {try SecureStorage.write("token",nil);model.failed=false;model.failureCode="";model.signedIn=false}
+        default:toggleConnection()
+        }
+    }
+    /// The one action, and after a failure the way out of it with "try again" (or "change") beside it.
+    private func actions(_ state:RingState)->some View {
+        let on=model.connected && state != .connecting
+        return HStack(spacing:10) {
+            Button {act(state == .failed ? model.trouble?.primaryDo:nil)} label:{
+                HStack {
+                    Text(model.actionLabel).font(.system(size:mac ? 13:15,weight:.medium)).lineLimit(1).contentTransition(.opacity)
+                    Spacer(minLength:8)
+                    BreathingDot(on:model.connected)
+                }.padding(.horizontal,18).frame(height:mac ? 44:54).contentShape(Rectangle())
+                .foregroundStyle(on ? VeilbirdStyle.accent:VeilbirdStyle.text)
+                .background(on ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.accent.opacity(0.09))
+                .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(on ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.accent,lineWidth:1))
+            }.buttonStyle(.plain)
+            .accessibilityLabel(state == .idle ? L10n.text("connect_action"):(state == .failed ? model.actionLabel:L10n.text(state == .connecting ? "cancel":"disconnect_action")))
+            if let trouble=model.trouble,let second=trouble.secondary {
+                Button {act(trouble.secondaryDo)} label:{
+                    Text(second).font(.system(size:mac ? 13:15)).lineLimit(1).fixedSize().foregroundStyle(VeilbirdStyle.secondary)
+                        .padding(.horizontal,16).frame(height:mac ? 44:54).contentShape(Rectangle())
+                        .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(VeilbirdStyle.hairline,lineWidth:1))
+                }.buttonStyle(.plain).transition(.opacity)
+            }
+        }
+    }
+    /// Inside the hidden portrait: the rates under the time, the phase while connecting, the countdown while reconnecting.
+    private func portrait(_ state:RingState,height:CGFloat)->some View {
+        TimelineView(.periodic(from:.now,by:1)) {context in
+            PortraitView(hidden:model.connected || state == .reconnecting,invite:L10n.text(state == .failed ? "tap_to_retry":"tap_to_hide"),since:state == .connected ? model.since:nil,
+                sub:model.portraitSub(state,rates:L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))),state:state,lines:model.lines,
+                centre:model.portraitCentre(state,now:context.date))
+        }.frame(maxWidth:.infinity).frame(height:height).contentShape(Circle())
     }
     private var connectionView:some View {
-        let state=ringState
-        let sealed=model.connected
+        let state=model.ringState
+        let sealed=model.connected || state == .reconnecting
+        let firstRun = !model.onboarded
         return VStack(spacing:0) {
             #if os(iOS)
             FileHeader(number:fileNumber)
@@ -382,42 +430,88 @@ struct ClientView:View {
             notices
             switchNote(state)
             Spacer(minLength:mac ? 8:12)
-            SectionLabel(key:"section_portrait").padding(.bottom,mac ? 2:4)
-            // The portrait is the switch: "tap to hide" breathes in it; hidden, its ring holds the time and the rates.
-            Button {toggleConnection()} label:{
-                PortraitView(hidden:sealed,invite:L10n.text("tap_to_hide"),since:state == .connected ? model.since:nil,
-                    sub:ClientModel.notices.contains(model.status) ? L10n.text(model.status):L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate)))
-                    .frame(maxWidth:.infinity).frame(height:portraitHeight).contentShape(Circle())
-            }.buttonStyle(.plain)
+            SectionRow(key:"section_portrait",step:firstRun ? (model.since != nil ? 4:3):nil).padding(.bottom,mac ? 2:4)
+            // The portrait is the switch: "tap to hide" breathes in it; hidden, its ring draws the state (see StateRing).
+            Button {toggleConnection()} label:{portrait(state,height:firstRun ? portraitHeight-30:portraitHeight)}.buttonStyle(.plain)
             .accessibilityLabel(L10n.text(sealed ? "disconnect_action":"connect_action"))
             portraitFile(sealed).padding(.top,mac ? 6:10)
             stateLine(state).padding(.top,mac ? 8:12)
             Spacer(minLength:mac ? 12:16)
-            // One outlined action: quiet while exposed, amber with a breathing dot while sealed.
-            Button {toggleConnection()} label:{
-                HStack {
-                    Text(L10n.text(state == .connected ? "unseal_action":(state == .connecting ? "sealing_detail":(state == .failed ? "retry_action":"seal_action"))))
-                        .font(.system(size:mac ? 13:15,weight:.medium)).lineLimit(1).contentTransition(.opacity)
-                    Spacer(minLength:8)
-                    BreathingDot(on:model.connected)
-                }.padding(.horizontal,18).frame(height:mac ? 44:54).contentShape(Rectangle())
-                .foregroundStyle(state == .connected ? VeilbirdStyle.accent:VeilbirdStyle.text)
-                .background(state == .connected ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.accent.opacity(0.09))
-                .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(state == .connected ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.accent,lineWidth:1))
-            }.buttonStyle(.plain)
-            .accessibilityLabel(L10n.text(state == .idle ? "connect_action":(state == .failed ? "retry_action":(state == .connecting ? "cancel":"disconnect_action"))))
+            // First run: before the first tap, what the system is about to ask and where.
+            if firstRun && model.since == nil {
+                #if os(macOS)
+                FirstNote(title:L10n.text("first_connect_mac"),detail:L10n.text("first_connect_mac_detail")).padding(.bottom,10).opacity(model.connected ? 0:1)
+                #endif
+            }
+            actions(state)
             // Connected, the location row opens the connection check; otherwise, or while the chosen location does not
             // answer, the location list (picking one there reconnects to it).
-            Button {if state == .connected && model.status != "location_retrying" {checkResult=nil;checking=true} else {tab=1}} label:{currentLocationRow}.buttonStyle(RowButton())
+            Button {if (state == .connected || state == .switching) && model.status != "location_retrying" {checkResult=nil;checking=true} else {tab=1}} label:{currentLocationRow}.buttonStyle(RowButton())
                 .cardOutline(VeilbirdStyle.radius).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
                 .accessibilityHint(L10n.text("tap_to_change")).padding(.top,10)
             usageStrip.padding(.top,16)
         }.padding(.horizontal,mac ? 20:16).padding(.bottom,20).task {try? await model.loadAccount()}
         .task {if visitorIP == nil && !model.connected {visitorIP=try? await model.api().visitorAddress()}}
         .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:state)
+        .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:model.trouble)
         // Notes that come and go above the file (update, location switch) slide the page instead of snapping it.
         .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:model.update)
         .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:model.switchedFrom+"|"+model.dismissedSwitch)
+    }
+    /// First run, step 2: where to connect from. Automatic is chosen already, so one tap goes on; under it the three
+    /// fastest locations this device measured, and the whole list.
+    private var pickView:some View {
+        let ranked=pickRanked
+        return VStack(alignment:.leading,spacing:0) {
+            #if os(iOS)
+            FileHeader(number:fileNumber)
+            #endif
+            SectionRow(key:"section_locations",step:2).padding(.top,mac ? 10:14)
+            Text(L10n.text("where_would_you_like_to_connect")).font(.system(size:mac ? 24:28,weight:.light,design:.serif)).padding(.horizontal,4).padding(.top,12)
+                .fixedSize(horizontal:false,vertical:true).accessibilityAddTraits(.isHeader)
+            Text(L10n.text("pick_location_sub")).font(.system(size:mac ? 13:14)).foregroundStyle(VeilbirdStyle.secondary).padding(.horizontal,4).padding(.top,6)
+                .fixedSize(horizontal:false,vertical:true)
+            pickOption(id:"",name:L10n.text("automatic_recommended"),code:nil,
+                detail:ranked.first.map {L10n.text("automatic_now",$0.name,ms($0.quality) ?? "")} ?? L10n.text("auto_detail")).padding(.top,18)
+            if !ranked.isEmpty {caption(L10n.text("or_choose_one")).padding(.top,16).padding(.bottom,8)}
+            ForEach(Array(ranked.prefix(3).enumerated()),id:\.offset) {item in
+                pickOption(id:item.element.id,name:item.element.name,code:model.code(item.element.id,name:item.element.name),detail:ms(item.element.quality) ?? "").padding(.top,item.offset>0 ? 8:0)
+            }
+            if !model.nodes.isEmpty {
+                Button {tab=1} label:{
+                    HStack {Text(L10n.text("all_locations_count",L10n.number(model.nodes.count)));Spacer();Image(systemName:"chevron.right").font(.system(size:11,weight:.semibold))}
+                        .font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary).padding(.horizontal,4).frame(height:44).contentShape(Rectangle())
+                }.buttonStyle(.plain).padding(.top,6)
+            }
+            Spacer(minLength:12)
+            Button {model.onboardPicked=true} label:{Text(L10n.text("continue_action"))}.buttonStyle(PrimaryButton())
+        }.padding(.horizontal,mac ? 20:16).padding(.bottom,20)
+        .task {if model.nodes.isEmpty {await model.refreshNodes()};if model.unmeasured {await model.measure()}}
+    }
+    private var pickRanked:[(id:String,name:String,quality:Quality)] {
+        model.nodes.compactMap {node -> (id:String,name:String,quality:Quality)? in
+            guard let id=node["id"] as? String,let q=Latency.recent(id),q.latency != nil else {return nil}
+            return (id,node["name"] as? String ?? "",q)
+        }.sorted {$0.quality.score<$1.quality.score}
+    }
+    private func pickOption(id:String,name:String,code:String?,detail:String)->some View {
+        let chosen=model.selected == id
+        return Button {model.selected=id;model.selectedName=name} label:{
+            HStack(spacing:14) {
+                if let code {Badge(code:code)} else {Badge(icon:"sparkles",tint:VeilbirdStyle.accent)}
+                VStack(alignment:.leading,spacing:3) {
+                    Text(name).font(.system(size:VeilbirdStyle.body,weight:.medium)).lineLimit(1)
+                    Text(detail).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
+                }
+                Spacer(minLength:8)
+                ZStack {
+                    Circle().strokeBorder(chosen ? VeilbirdStyle.accent:VeilbirdStyle.faint,lineWidth:1.5)
+                    if chosen {Circle().fill(VeilbirdStyle.accent).frame(width:8,height:8)}
+                }.frame(width:16,height:16)
+            }.padding(.horizontal,14).frame(height:mac ? 56:64).contentShape(Rectangle())
+            .background(chosen ? VeilbirdStyle.accent.opacity(0.06):Color.clear,in:RoundedRectangle(cornerRadius:4))
+            .overlay(RoundedRectangle(cornerRadius:4).strokeBorder(chosen ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.edge,lineWidth:1))
+        }.buttonStyle(.plain).accessibilityAddTraits(chosen ? .isSelected:[])
     }
     private var fileNumber:String {FileHeader.number(model.account["email"] as? String ?? "")}
     private var deviceLine:String {
@@ -431,14 +525,6 @@ struct ClientView:View {
     private var zoneLine:String {
         let minutes=TimeZone.current.secondsFromGMT()/60
         return String(format:"UTC%@%02d:%02d",minutes>=0 ? "+":"-",abs(minutes)/60,abs(minutes)%60)
-    }
-    @ViewBuilder private func stateDetail(_ state:RingState)->some View {
-        switch state {
-        case .connected:Text(L10n.text("seen_as",model.nodeName))
-        case .connecting:Text(L10n.text("finding_best_route"))
-        case .failed:Text(model.failure)
-        case .idle:Text(L10n.text(model.update?.mandatory == true ? "update_required_detail":"exposed_detail"))
-        }
     }
     /// One line when automatic mode switched location during this connection; closed per switch.
     @ViewBuilder private func switchNote(_ state:RingState)->some View {
@@ -619,7 +705,12 @@ struct ClientView:View {
     private func toggleConnection() {
         if !model.connected && model.update?.mandatory == true {model.message=L10n.text("update_required_detail");return}
         // Still waiting for the user to allow the extension: show where, instead of a tap that seems to do nothing.
-        if !model.connected && model.permission == .systemExtension {model.askPermission=true;return}
+        if !model.connected && model.permission == .systemExtension {
+            #if os(macOS)
+            SystemExtension.openSettings()
+            #endif
+            return
+        }
         model.work {try await model.toggle()}
     }
     private var currentLocationRow:some View {
@@ -854,7 +945,7 @@ struct ClientView:View {
     /// Connected (or reconnecting), one tap moves the VPN to the new location.
     private func choose(_ id:String,name:String) {
         let reconnect=model.connected && id != model.connectedNodeId
-        model.selected=id;model.selectedName=name;tab=0
+        model.selected=id;model.selectedName=name;model.onboardPicked=true;tab=0
         if reconnect {model.work {try await model.reconnect()}}
     }
 

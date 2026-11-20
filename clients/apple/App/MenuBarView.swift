@@ -31,27 +31,35 @@ struct MenuBarView:View {
             if model.signedIn {
                 // The connect page in small: the state with its seal, one slot for time and rates or a message, one action.
                 VStack(alignment:.leading,spacing:8) {
-                    SectionLabel(key:"section_portrait")
+                    SectionRow(key:"section_portrait",step:model.onboarded ? nil:3)
                     menuPortrait(on)
-                    HStack(alignment:.firstTextBaseline,spacing:10) {
-                        Text(L10n.text(on ? "sealed_status":(model.connected ? "connecting":(model.failed ? "connect_failed_title":"exposed_status")))).font(.system(size:20,weight:.light,design:.serif))
-                            .foregroundStyle(on ? VeilbirdStyle.accent:VeilbirdStyle.text).lineLimit(1).fixedSize()
-                        Text(on ? L10n.text("seen_as",model.nodeName):(model.failed ? model.failure:L10n.text("exposed_detail"))).font(.system(size:11)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2)
+                    // The state (or the cause of a failure) and two lines held for its detail: one height in every state.
+                    VStack(alignment:.leading,spacing:3) {
+                        Text(model.stateTitle).font(.system(size:20,weight:.light,design:.serif))
+                            .foregroundStyle(model.ringState == .failed ? VeilbirdStyle.fair:(on ? VeilbirdStyle.accent:VeilbirdStyle.text)).lineLimit(1)
+                        Text(model.stateDetail).font(.system(size:11)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2,reservesSpace:true)
                             .frame(maxWidth:.infinity,alignment:.leading)
-                    }.frame(height:34).padding(.horizontal,4).animation(.easeInOut(duration:0.2),value:on)
-                    // A missing system permission: say what and where, instead of a tap that seems to do nothing.
-                    if let permission=model.permission {PermissionNote(permission:permission) {model.work {try await model.toggle()}}.padding(.bottom,8)}
-                    Button {toggle()} label:{
-                        HStack {
-                            Text(L10n.text(on ? "unseal_action":(model.connected ? "sealing_detail":(model.failed ? "retry_action":"seal_action")))).font(.system(size:13,weight:.medium)).lineLimit(1)
-                            Spacer(minLength:8)
-                            BreathingDot(on:model.connected)
-                        }.padding(.horizontal,14).frame(height:40).contentShape(Rectangle())
-                        .foregroundStyle(on ? VeilbirdStyle.accent:VeilbirdStyle.text)
-                        .background(on ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.accent.opacity(0.09))
-                        .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(on ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.accent,lineWidth:1))
-                    }.buttonStyle(.plain)
-                    .accessibilityLabel(L10n.text(model.connected ? (model.since == nil ? "cancel":"disconnect_action"):"connect_action"))
+                    }.padding(.horizontal,4).animation(.easeInOut(duration:0.2),value:model.ringState)
+                    HStack(spacing:8) {
+                        Button {act(model.trouble?.primaryDo)} label:{
+                            HStack {
+                                Text(model.actionLabel).font(.system(size:13,weight:.medium)).lineLimit(1)
+                                Spacer(minLength:8)
+                                BreathingDot(on:model.connected)
+                            }.padding(.horizontal,14).frame(height:40).contentShape(Rectangle())
+                            .foregroundStyle(on ? VeilbirdStyle.accent:VeilbirdStyle.text)
+                            .background(on ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.accent.opacity(0.09))
+                            .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(on ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.accent,lineWidth:1))
+                        }.buttonStyle(.plain)
+                        .accessibilityLabel(model.ringState == .failed ? model.actionLabel:L10n.text(model.connected ? (model.since == nil ? "cancel":"disconnect_action"):"connect_action"))
+                        if let trouble=model.trouble,let second=trouble.secondary {
+                            Button {act(trouble.secondaryDo)} label:{
+                                Text(second).font(.system(size:13)).lineLimit(1).fixedSize().foregroundStyle(VeilbirdStyle.secondary)
+                                    .padding(.horizontal,12).frame(height:40).contentShape(Rectangle())
+                                    .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(VeilbirdStyle.hairline,lineWidth:1))
+                            }.buttonStyle(.plain)
+                        }
+                    }
                 }.opacity(picking ? 0:1).allowsHitTesting(!picking).accessibilityHidden(picking)
                 // The list takes the portrait's place at the same size: the panel keeps its height, nothing moves.
                 .overlay(alignment:.top) {if picking {locationPicker.transition(.opacity)}}
@@ -173,13 +181,25 @@ struct MenuBarView:View {
             if model.extensionGuide {openMain()}
         }
     }
-    /// The home portrait in small: the sphere is the switch, and its ring holds the time and rates once hidden.
+    /// The home portrait in small: the sphere is the switch, and its ring draws the state once hidden.
     private func menuPortrait(_ on:Bool)->some View {
         Button {toggle()} label:{
-            PortraitView(hidden:model.connected,invite:L10n.text("tap_to_hide"),since:on ? model.since:nil,
-                sub:ClientModel.notices.contains(model.status) ? L10n.text(model.status):L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate)))
-                .frame(maxWidth:.infinity).frame(height:150).contentShape(Circle())
+            TimelineView(.periodic(from:.now,by:1)) {context in
+                let state=model.ringState
+                PortraitView(hidden:model.connected || state == .reconnecting,invite:L10n.text(state == .failed ? "tap_to_retry":"tap_to_hide"),since:on ? model.since:nil,
+                    sub:model.portraitSub(state,rates:L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))),state:state,lines:model.lines,centre:model.portraitCentre(state,now:context.date))
+            }.frame(maxWidth:.infinity).frame(height:150).contentShape(Circle())
         }.buttonStyle(.plain).accessibilityLabel(L10n.text(model.connected ? "disconnect_action":"connect_action"))
+    }
+    /// What a failure's button does here; a page of the app (devices, account, locations) opens the window.
+    private func act(_ what:String?) {
+        switch what {
+        case "automatic":model.selected="";model.selectedName="";toggle()
+        case "settings":SystemExtension.openSettings()
+        case "signin":try? SecureStorage.write("token",nil);model.failed=false;model.failureCode="";model.signedIn=false;openMain()
+        case "devices","account","nodes","update":openMain()
+        default:toggle()
+        }
     }
     private func openMain() {DockPresence.show(true);openWindow(id:"main");NSApp.activate(ignoringOtherApps:true)}
 }
@@ -191,9 +211,16 @@ struct MenuBarLabel:View {
     static let preferenceKey="menuBarSpeed"
     @ObservedObject var model:ClientModel
     @AppStorage(MenuBarLabel.preferenceKey) private var showSpeed=false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var blink=false
+    private let ticker=Timer.publish(every:0.6,on:.main,in:.common).autoconnect()
     var body:some View {
-        // The ∅ mark as a template image: full strength while connected, half while not.
-        let on=model.connected
+        // The ∅ mark as a template image, in three levels: off (half), busy (blinking: connecting, switching lines,
+        // reconnecting, waiting for a network) and on (full).
+        let state=model.ringState
+        let busy=[RingState.connecting,.switching,.reconnecting,.waiting].contains(state)
+        let on=state == .connected || (busy && (blink || reduceMotion))
+        Group {
         if showSpeed,on,model.since != nil,let image=Self.image(on:on,rx:model.rxRate,tx:model.txRate) {
             Image(nsImage:image).accessibilityLabel("TrackNothing "+L10n.text("connection_rates",Self.mbps(model.rxRate),Self.mbps(model.txRate)))
         } else if let image=Self.mark(on:on) {
@@ -201,6 +228,7 @@ struct MenuBarLabel:View {
         } else {
             Image(systemName:on ? "slash.circle.fill":"slash.circle").accessibilityLabel("TrackNothing")
         }
+        }.onReceive(ticker) {_ in if busy {blink.toggle()} else if blink {blink=false}}
     }
     /// "↑  820 Kb/s" / "↓ 12.4 Mb/s": bits per second like the rest of the app, the unit stepping up as needed.
     static func line(_ arrow:String,_ bytes:Int)->String {

@@ -30,6 +30,15 @@ public sealed class Connection(NativeApi api,Core core) {
     /// The connection dropped with the kill switch on: traffic stays blocked until the user connects again or
     /// turns the kill switch off.
     public bool Blocking {get;private set;}
+    /// Where connecting is: finding the route (0), opening the tunnel (1), confirming (2); and how many lines this location has.
+    public int Phase {get;private set;}
+    public int Lines {get;private set;}
+    /// While reconnecting: which attempt this is and when (UTC) the next one starts.
+    public int Retry {get;private set;}
+    public DateTime? RetryAt {get;private set;}
+    /// Why the last connection ended (an API code, HANDSHAKE_TIMEOUT, CONNECT_FAILED…); empty when it did not fail.
+    public string ErrorCode {get;private set;}="";
+    public void ClearError() {ErrorCode="";Changed?.Invoke();}
     public static bool KillSwitchOn=>Settings.Get("killSwitch","off")=="on";
     /// Keep a working tunnel this long when the server cannot be reached to renew the lease (it is down or
     /// blocked); the node keeps the lease alive on its side for as long (Agent offline grace).
@@ -77,7 +86,7 @@ public sealed class Connection(NativeApi api,Core core) {
     }
     private async Task Attempt(string nodeId,bool smart) {
         var wasBlocking=Blocking;
-        Active=true;Blocking=false;Since=null;RxRate=TxRate=0;NodeId=nodeId;failures=0;SwitchedFrom="";Set("authorizing_and_connecting");
+        Active=true;Blocking=false;Since=null;RxRate=TxRate=0;NodeId=nodeId;failures=0;SwitchedFrom="";Phase=0;Retry=0;RetryAt=null;ErrorCode="";Set("authorizing_and_connecting");
         automatic=nodeId.Length==0;Wanted=true;
         try {
             await Task.Run(()=>core.KillSwitch(KillSwitchOn));
@@ -96,6 +105,7 @@ public sealed class Connection(NativeApi api,Core core) {
             var detail=error is AccessFailure?"":$"{error.GetType().Name}: {Journal.Scrub(error.Message)}";
             Journal.Add($"connect: failed {code}"+(detail.Length>0?$" ({detail})":""));
             if(Fatal.Contains(code)) Wanted=false;
+            ErrorCode=code;
             await api.Report(code,NodeId,detail);
             await Task.Run(core.Stop);Active=false;
             // A reconnect after a drop keeps blocking; a first attempt that failed does not.
@@ -129,16 +139,18 @@ public sealed class Connection(NativeApi api,Core core) {
         Journal.Add($"switch: {NodeName} failed ({code}), trying the next location");
         await api.Report(code,NodeId);
         if(NodeName.Length>0) SwitchedFrom=NodeName;
-        NodeId=fallbacks[0];fallbacks.RemoveAt(0);Since=null;Set("authorizing_and_connecting");
+        NodeId=fallbacks[0];fallbacks.RemoveAt(0);Since=null;Phase=0;Set("authorizing_and_connecting");
     }
     private async Task BringUp(bool smart) {
         var started=DateTime.UtcNow;
+        if(Since is null) {Phase=0;Changed?.Invoke();}
         var lease=await Acquire(initial:true);
         var proxies=new List<JsonObject> {Transports.WireGuard(lease,keys.Private)};
         if(lease["proxies"] is JsonArray offered) proxies.AddRange(offered.OfType<JsonObject>().Where(p=>Transports.Ladder.Contains(p["name"]?.GetValue<string>())));
         var blocked=Transports.Blocked(network);
         transports=Transports.Order(proxies.Select(p=>p["name"]!.GetValue<string>()),blocked);
         Journal.Add($"node: {NodeName}, transports {string.Join(" > ",transports)}"+(blocked.Count>0?$" (blocked here before: {string.Join(", ",blocked)})":""));
+        if(Since is null) {Lines=transports.Count;Phase=1;Changed?.Invoke();}
         // Disconnect pressed while connecting cancels the attempt here, before the tunnel stays up.
         if(!Active) throw new OperationCanceledException();
         if(await Task.Run(()=>core.Run(Transports.Options(proxies,transports,smart))) is { } killSwitchError) {
@@ -146,6 +158,7 @@ public sealed class Connection(NativeApi api,Core core) {
             _=api.Report("KILL_SWITCH_FAILED",NodeId,Journal.Scrub(killSwitchError));
         }
         if(!Active) throw new OperationCanceledException();
+        if(Since is null) {Phase=2;Changed?.Invoke();}
         if(!await Probe(initial:true)) {
             // WireGuard waits for the node to add this PC; give it the rest of the readiness window.
             while(!leaseReady&&DateTime.UtcNow-started<TimeSpan.FromSeconds(15)) {await Task.Delay(1000);if(!Active) throw new OperationCanceledException();leaseReady=await Status();}
@@ -230,7 +243,7 @@ public sealed class Connection(NativeApi api,Core core) {
                     failures=0;nextProbe=DateTime.UtcNow+Healthy;
                 } else await Missed(smart);
                 if(!Active) return;
-                StatusKey=Message();
+                StatusKey=Message();Retry=failures;RetryAt=failures>0?nextProbe:null;
             } else await UpdateCarrying();
             var (up,down)=await Task.Run(core.Rate);
             TxRate=up;RxRate=down;Changed?.Invoke();
@@ -239,7 +252,7 @@ public sealed class Connection(NativeApi api,Core core) {
             var detail=$"{error.GetType().Name}: {Journal.Scrub(error.Message)}";
             Journal.Add($"tunnel: error {detail}");
             if(failures==0) _=api.Report("TUNNEL_ERROR",NodeId,detail);
-            failures++;nextProbe=DateTime.UtcNow+Backoff();StatusKey=Message();Changed?.Invoke();
+            failures++;nextProbe=DateTime.UtcNow+Backoff();StatusKey=Message();Retry=failures;RetryAt=nextProbe;Changed?.Invoke();
         }
     }
     /// Online state, transport memory key, and a clean start on a new network: old connections would hang.
@@ -286,7 +299,7 @@ public sealed class Connection(NativeApi api,Core core) {
     }
     private TimeSpan Backoff()=>Retries[Math.Min(Math.Max(failures-1,0),Retries.Length-1)];
     private string Message()=>!online?"waiting_for_network":failures switch {0=>"connected_status",1=>"confirming_connection_status",_=>automatic?"reconnecting_status":"location_retrying"};
-    private async Task Fail(string code,string status) {Wanted=false;await api.Report(code,NodeId);await Disconnect(status,unexpected:true);}
+    private async Task Fail(string code,string status) {Wanted=false;ErrorCode=code;await api.Report(code,NodeId);await Disconnect(status,unexpected:true);}
     private async Task LiftKillSwitch() {
         try {await Task.Run(()=>core.KillSwitch(false));} catch(IOException) {/* the core is gone, and its rules with it */}
     }
