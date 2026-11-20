@@ -7827,19 +7827,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac in-app update: once downloaded, click \"Install and Relaunch\"; the app quits, replaces itself and reopens, with no installer to drag\nThe Mac window drops the grey system title bar; the app's own backdrop fills the whole window\nThe first connection explains the network extension switch and takes you straight to it; macOS prompts now say TrackNothing"
+            "value": "On the Mac, closing the window takes TrackNothing out of the Dock: it keeps running in the menu bar, and \"Open TrackNothing\" there brings back the window and the Dock icon; choose Quit to exit"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac 应用内升级：下载完点「安装并重启」，自动退出旧版、替换并重新打开，不用再打开安装包拖拽覆盖\nMac 窗口去掉系统灰色标题栏，整个窗口都是应用自己的背景\n第一次连接时先说明要在系统设置里打开网络扩展，并直接带你到那个开关；系统提示里显示的名字改为 TrackNothing"
+            "value": "Mac 关闭窗口后不再占着程序坞：应用继续在菜单栏运行，点菜单栏图标「打开 TrackNothing」窗口和程序坞图标一起回来；要彻底退出请选「退出」"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Обновление на Mac внутри приложения: после загрузки нажмите «Установить и перезапустить» — приложение закроется, обновится и откроется снова, без перетаскивания\nОкно на Mac без серой системной строки заголовка: фон приложения занимает всё окно\nПри первом подключении приложение объясняет, где включить сетевое расширение, и сразу открывает этот переключатель; в окнах macOS теперь название TrackNothing"
+            "value": "На Mac после закрытия окна TrackNothing пропадает из Dock и продолжает работать в строке меню; «Открыть TrackNothing» там возвращает окно и значок в Dock, для выхода выберите «Выйти»"
           }
         }
       }

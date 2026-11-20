@@ -13,6 +13,9 @@ import ServiceManagement
 @main
 struct VeilbirdApp: App {
     @StateObject private var model=ClientModel()
+    #if os(macOS)
+    @NSApplicationDelegateAdaptor(DockPresence.self) private var dock
+    #endif
     init() {
         #if os(macOS)
         MacUpdater.adoptSandboxDefaults()
@@ -31,6 +34,38 @@ struct VeilbirdApp: App {
         #endif
     }
 }
+
+#if os(macOS)
+/// Closing the window (not quitting) takes TrackNothing out of the Dock and the ⌘-Tab switcher; the menu bar icon
+/// stays and opens the window again, which brings the Dock icon back. Quit (menu bar panel or ⌘Q) exits.
+final class DockPresence:NSObject,NSApplicationDelegate {
+    private var observers:[NSObjectProtocol]=[]
+    func applicationDidFinishLaunching(_ notification:Notification) {
+        let center=NotificationCenter.default
+        observers.append(center.addObserver(forName:NSWindow.willCloseNotification,object:nil,queue:.main) {note in
+            let closing=note.object as? NSWindow
+            // After the close has gone through: hide from the Dock once no app window is left on screen.
+            DispatchQueue.main.async {if !Self.hasAppWindow(except:closing) {Self.show(false)}}
+        })
+        observers.append(center.addObserver(forName:NSWindow.didBecomeKeyNotification,object:nil,queue:.main) {note in
+            if let window=note.object as? NSWindow,Self.isAppWindow(window) {Self.show(true)}
+        })
+    }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender:NSApplication)->Bool {false}
+    /// The main window, not the menu bar panel, sheets or system panels.
+    static func isAppWindow(_ window:NSWindow)->Bool {!(window is NSPanel) && window.canBecomeMain && window.styleMask.contains(.titled)}
+    static func hasAppWindow(except closing:NSWindow?)->Bool {
+        NSApp.windows.contains {$0 !== closing && $0.isVisible && isAppWindow($0)}
+    }
+    /// Dock icon on (regular app) or off (menu bar only).
+    static func show(_ inDock:Bool) {
+        let policy:NSApplication.ActivationPolicy=inDock ? .regular:.accessory
+        guard NSApp.activationPolicy() != policy else {return}
+        NSApp.setActivationPolicy(policy)
+        if inDock {NSApp.activate(ignoringOtherApps:true)}
+    }
+}
+#endif
 
 /// Starts and stops the saved VPN configuration; shared by the app, the menu bar and Shortcuts.
 enum TunnelControl {

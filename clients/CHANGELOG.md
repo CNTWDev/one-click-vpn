@@ -4,6 +4,17 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.11
+
+### zh
+- Mac 关闭窗口后不再占着程序坞：应用继续在菜单栏运行，点菜单栏图标「打开 TrackNothing」窗口和程序坞图标一起回来；要彻底退出请选「退出」
+
+### en
+- On the Mac, closing the window takes TrackNothing out of the Dock: it keeps running in the menu bar, and "Open TrackNothing" there brings back the window and the Dock icon; choose Quit to exit
+
+### ru
+- На Mac после закрытия окна TrackNothing пропадает из Dock и продолжает работать в строке меню; «Открыть TrackNothing» там возвращает окно и значок в Dock, для выхода выберите «Выйти»
+
 ## 1.0.10
 
 ### zh
