@@ -151,7 +151,7 @@ class MainActivity : Activity() {
     @Deprecated("Back handling for API 26+")
     override fun onBackPressed() {
         when (page) {
-            "devices", "logs" -> { page = "account"; render() }
+            "devices", "logs", "apps" -> { page = "account"; render() }
             "nodes", "account", "activity" -> { page = "connect"; render() }
             else -> super.onBackPressed()
         }
@@ -313,6 +313,7 @@ class MainActivity : Activity() {
             "connect" -> home()
             "nodes" -> nodes()
             "devices" -> devices()
+            "apps" -> appsPage()
             "logs" -> logs()
             "activity" -> activity()
             else -> account()
@@ -1145,6 +1146,7 @@ class MainActivity : Activity() {
                         .setPositiveButton(L10n.text(R.string.open_vpn_settings)) { _, _ -> try { startActivity(Intent(android.provider.Settings.ACTION_VPN_SETTINGS)) } catch (_: Exception) { } }
                         .setNegativeButton(L10n.text(R.string.cancel), null).show()
                 },
+                settingRow(L10n.text(R.string.per_app_routing), appsValue()) { page = "apps"; render() },
                 settingRow(L10n.text(R.string.check_for_updates), "") { update?.let { if (!downloading) startDownload(it) } ?: checkForUpdate(announce = true) }
                     .also { updateRowValue = it.getChildAt(1) as TextView },
                 // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).
@@ -1254,6 +1256,118 @@ class MainActivity : Activity() {
             if (data.optInt("configs") > 0) add(text(L10n.text(R.string.devices_configs_note, L10n.number(data.optInt("configs"))), 12f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, top = 12)
             add(text(L10n.text(R.string.revoke_release_hint), 12f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, top = 12)
         }
+    }
+    // ---- Per-app routing (AppRouting): three modes and, for the two that name apps, the list of launcher apps.
+    /** Loaded once per run, off the UI thread (the package manager is slow with many apps). */
+    private var launchable: List<AppRouting.App>? = null
+    private fun appsValue(): String {
+        val mode = AppRouting.mode(this); val count = AppRouting.apps(this).size
+        return when {
+            mode == AppRouting.ALL || count == 0 -> L10n.text(R.string.apps_all_value)
+            mode == AppRouting.ONLY -> L10n.text(R.string.apps_only_value, L10n.number(count))
+            else -> L10n.text(R.string.apps_except_value, L10n.number(count))
+        }
+    }
+    private fun radio(on: Boolean) = FrameLayout(this).apply {
+        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setStroke((1.5f * resources.displayMetrics.density).toInt(), if (on) Palette.accent else Palette.faint) }
+        if (on) addView(View(this@MainActivity).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Palette.accent) } }, FrameLayout.LayoutParams(9.dp, 9.dp, Gravity.CENTER))
+    }
+    private fun checkbox(box: FrameLayout, on: Boolean) {
+        box.removeAllViews()
+        box.background = GradientDrawable().apply { cornerRadius = 4.dp.toFloat(); setColor(if (on) Palette.alpha(Palette.accent, 30) else Color.TRANSPARENT); setStroke((1.5f * resources.displayMetrics.density).toInt(), if (on) Palette.accent else Palette.faint) }
+        if (on) box.addView(icon(R.drawable.ic_check, Palette.accent, 14), FrameLayout.LayoutParams(14.dp, 14.dp, Gravity.CENTER))
+    }
+    private fun appsPage() {
+        subPageTitle(L10n.text(R.string.per_app_routing)) { page = "account"; render() }
+        val mode = AppRouting.mode(this)
+        val modes = listOf(
+            Triple(AppRouting.ALL, R.string.apps_mode_all, R.string.apps_mode_all_detail),
+            Triple(AppRouting.ONLY, R.string.apps_mode_only, R.string.apps_mode_only_detail),
+            Triple(AppRouting.EXCEPT, R.string.apps_mode_except, R.string.apps_mode_except_detail))
+        add(group(modes.map { (value, title, detail) ->
+            val on = value == mode
+            LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; minimumHeight = 62.dp; setPadding(16.dp, 14.dp, 16.dp, 14.dp)
+                addView(radio(on), LinearLayout.LayoutParams(18.dp, 18.dp).apply { marginEnd = 14.dp; topMargin = 2.dp })
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(text(L10n.text(title), 15f, Palette.text, if (on) 600 else 400))
+                    addView(text(L10n.text(detail), 12.5f, Palette.secondary), LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+                contentDescription = L10n.text(title) + ", " + L10n.text(detail) + if (on) L10n.text(R.string.current_page) else ""
+                setOnClickListener { if (!on) { AppRouting.setMode(this@MainActivity, value); render() } }
+            }
+        }))
+        val note = L10n.text(R.string.apps_apply_next) + if (mode != AppRouting.ALL) " " + L10n.text(R.string.apps_lockdown_note) else ""
+        add(text(note, 12f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, top = 8)
+        if (mode == AppRouting.ALL) return
+
+        val selected = AppRouting.apps(this).toMutableSet()
+        val count = text("", 12f, Palette.accent).apply { gravity = Gravity.END; if (L10n.locale.language != "zh") { typeface = Typeface.MONOSPACE; letterSpacing = 0.08f } }
+        fun showCount() { count.text = L10n.text(R.string.apps_selected, L10n.number(selected.size)) }
+        showCount()
+        add(count, top = 20, bottom = 8).setPadding(4.dp, 0, 4.dp, 0)
+        var query = ""
+        var redraw: () -> Unit = {}
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        add(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; background = rounded(Palette.surface, 12); setPadding(14.dp, 0, 4.dp, 0)
+            addView(icon(R.drawable.ic_search, Palette.secondary, 16))
+            addView(field(L10n.text(R.string.search_apps), kind = InputType.TYPE_TEXT_VARIATION_NORMAL).apply {
+                background = null; setPadding(10.dp, 0, 10.dp, 0)
+                addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { query = s.toString().trim(); redraw() }
+                    override fun afterTextChanged(s: Editable?) {}
+                })
+            }, LinearLayout.LayoutParams(0, -1, 1f))
+        }, height = 44.dp, bottom = 10)
+        add(list)
+        fun show(apps: List<AppRouting.App>) {
+            // Selected apps first, in the order this page opened with: ticking a box never moves a row.
+            val opened = AppRouting.apps(this)
+            val ordered = apps.filter { it.packageName in opened } + apps.filter { it.packageName !in opened }
+            val draw = {
+                list.removeAllViews()
+                val shown = ordered.filter { query.isEmpty() || it.label.contains(query, true) || it.packageName.contains(query, true) }
+                if (shown.isNotEmpty()) list.addView(group(shown.map { app ->
+                    val box = FrameLayout(this)
+                    row(58).apply {
+                        addView(ImageView(this@MainActivity).apply { setImageDrawable(app.icon); scaleType = ImageView.ScaleType.FIT_CENTER }, LinearLayout.LayoutParams(34.dp, 34.dp).apply { marginEnd = 14.dp })
+                        addView(LinearLayout(this@MainActivity).apply {
+                            orientation = LinearLayout.VERTICAL
+                            addView(text(app.label, 15f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
+                            addView(text(app.packageName, 11f, Palette.faint).apply { typeface = Typeface.MONOSPACE; maxLines = 1; ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 2.dp })
+                        }, LinearLayout.LayoutParams(0, -2, 1f))
+                        checkbox(box, app.packageName in selected)
+                        addView(box, LinearLayout.LayoutParams(20.dp, 20.dp).apply { marginStart = 12.dp })
+                        // Announced as a checkbox with its state, like the system's own app lists.
+                        contentDescription = app.label; isSelected = app.packageName in selected
+                        accessibilityDelegate = object : View.AccessibilityDelegate() {
+                            override fun onInitializeAccessibilityNodeInfo(host: View, info: android.view.accessibility.AccessibilityNodeInfo) {
+                                super.onInitializeAccessibilityNodeInfo(host, info)
+                                info.className = android.widget.CheckBox::class.java.name; info.isCheckable = true; info.isChecked = app.packageName in selected
+                            }
+                        }
+                        setOnClickListener {
+                            if (!selected.remove(app.packageName)) selected.add(app.packageName)
+                            AppRouting.setApps(this@MainActivity, selected); checkbox(box, app.packageName in selected); showCount(); isSelected = app.packageName in selected
+                        }
+                    }
+                }, inset = 64), LinearLayout.LayoutParams(-1, -2))
+            }
+            redraw = draw; draw()
+        }
+        launchable?.let { show(it); return }
+        progress?.visibility = View.VISIBLE
+        Thread {
+            val apps = try { AppRouting.launchable(applicationContext) } catch (_: Exception) { emptyList() }
+            runOnUiThread {
+                launchable = apps
+                if (!busy) progress?.visibility = View.INVISIBLE
+                if (!isDestroyed && page == "apps" && list.isAttachedToWindow) show(apps)
+            }
+        }.start()
     }
     private fun platformName(value: String) = when (value.lowercase()) { "android" -> "Android"; "ios" -> "iOS"; "ipados" -> "iPadOS"; "macos" -> "macOS"; "windows" -> "Windows"; "" -> null; else -> value }
     private fun revoke(device: JSONObject) {

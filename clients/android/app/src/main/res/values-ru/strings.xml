@@ -37,6 +37,7 @@
   <string name="activity_time">Время</string>
   <string name="activity_title">Активность</string>
   <string name="activity_traffic">Трафик</string>
+  <string name="add_program">Добавить программу…</string>
   <string name="all_locations">Все локации</string>
   <string name="allow_system_extension">macOS должна разрешить сетевое расширение TrackNothing, иначе подключиться нельзя. Нажмите «Открыть Системные настройки» и включите TrackNothing в разделе «Основные › Объекты входа и расширения › Сетевые расширения» (macOS 14 и раньше: «Конфиденциальность и безопасность»). Подключение начнётся сразу после разрешения.</string>
   <string name="allow_system_extension_short">Разрешите сетевое расширение TrackNothing в Системных настройках; подключение начнётся само</string>
@@ -47,6 +48,18 @@
   <string name="allow_vpn_configuration_short">Выберите «Разрешить» в системном окне, чтобы добавить конфигурацию VPN</string>
   <string name="announcement">Объявление</string>
   <string name="appearance">Оформление</string>
+  <string name="apps_all_value">Все</string>
+  <string name="apps_apply_next">Изменения вступят в силу при следующем подключении.</string>
+  <string name="apps_except_value">Кроме %1$s</string>
+  <string name="apps_lockdown_note">Если в системе включено «Блокировать соединения без VPN», приложения напрямую не смогут выйти в сеть.</string>
+  <string name="apps_mode_all">Все приложения через VPN</string>
+  <string name="apps_mode_all_detail">По умолчанию. Защищены все приложения на устройстве.</string>
+  <string name="apps_mode_except">Кроме выбранных</string>
+  <string name="apps_mode_except_detail">Для банков и местных сервисов, которым нужно прямое подключение.</string>
+  <string name="apps_mode_only">Только выбранные</string>
+  <string name="apps_mode_only_detail">Остальные приложения подключаются напрямую, без TrackNothing.</string>
+  <string name="apps_only_value">Только %1$s</string>
+  <string name="apps_selected">ВЫБРАНО: %1$s</string>
   <string name="ask_your_administrator_to_enable_veilbird_client_access">Попросите администратора включить доступ через клиент TrackNothing.</string>
   <string name="authorized_devices">Авторизованные устройства</string>
   <string name="authorizing_and_connecting">Авторизация и подключение…</string>
@@ -202,6 +215,7 @@
   <string name="open_vpn_settings">Открыть настройки VPN</string>
   <string name="password">Пароль</string>
   <string name="password_reset_unavailable">Сброс пароля по email сейчас недоступен. Обратитесь к администратору.</string>
+  <string name="per_app_routing">Приложения в VPN</string>
   <string name="permission_needed_title">Нужно ваше разрешение</string>
   <string name="quality_fair">Средне</string>
   <string name="quality_good">Хорошо</string>
@@ -235,10 +249,12 @@
   <string name="routing_global_detail">Весь трафик через TrackNothing</string>
   <string name="routing_smart">Умная</string>
   <string name="routing_smart_detail">Сайты материкового Китая напрямую, остальное через TrackNothing</string>
+  <string name="running_apps">Запущенные программы</string>
   <string name="running_in_tray">TrackNothing работает в трее. Нажмите на значок, чтобы переключить.</string>
   <string name="seal_action">Подключиться</string>
   <string name="sealed_status">Скрыто</string>
   <string name="sealing_detail">Скрываем…</string>
+  <string name="search_apps">Поиск приложений</string>
   <string name="search_locations_or_regions">Поиск локаций или регионов</string>
   <string name="section_account">§04 Владелец</string>
   <string name="section_activity">§03 Активность</string>
@@ -250,6 +266,7 @@
   <string name="secure_storage_is_unavailable_unlock_your_device_and_try">Защищённое хранилище недоступно. Разблокируйте устройство и повторите.</string>
   <string name="seen_as">Сайты видят только %1$s</string>
   <string name="select_an_available_location_for_you">Самая быстрая локация, при сбое — следующая</string>
+  <string name="selected_state">выбрано</string>
   <string name="send_reset_link">Отправить</string>
   <string name="server_address">Адрес сервера</string>
   <string name="server_address_url">Адрес сервера https://…</string>
@@ -341,7 +358,7 @@
   <string name="vpn_connection">VPN-подключение</string>
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Смена локации прямо из строки меню Mac и трея Windows: строка локации открывает список с задержками на месте, выбор сразу переключает (и переносит текущее подключение), без открытия главного окна\nВ меню трея Windows появилось подменю «Локация»: автовыбор или конкретная локация в один шаг</string>
+  <string name="whats_new_notes">Выбор приложений на Android и Windows: в «Аккаунт → Приложения в VPN» можно пустить через TrackNothing только некоторые приложения или, наоборот, исключить их</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Версия Windows для разработки · Интеграция VPN ещё не завершена</string>

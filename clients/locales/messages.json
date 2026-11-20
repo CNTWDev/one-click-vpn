@@ -1758,5 +1758,90 @@
     "zh": "网站只能看到{0}",
     "en": "Sites only see {0}",
     "ru": "Сайты видят только {0}"
+  },
+  "per_app_routing": {
+    "zh": "按应用分流",
+    "en": "Per-app routing",
+    "ru": "Приложения в VPN"
+  },
+  "apps_all_value": {
+    "zh": "全部应用",
+    "en": "All apps",
+    "ru": "Все"
+  },
+  "apps_only_value": {
+    "zh": "{0} 个应用走代理",
+    "en": "Only {0}",
+    "ru": "Только {0}"
+  },
+  "apps_except_value": {
+    "zh": "{0} 个应用不走代理",
+    "en": "Bypass {0}",
+    "ru": "Кроме {0}"
+  },
+  "apps_mode_all": {
+    "zh": "全部应用走代理",
+    "en": "All apps use the VPN",
+    "ru": "Все приложения через VPN"
+  },
+  "apps_mode_all_detail": {
+    "zh": "默认。这台设备上的所有应用都受保护。",
+    "en": "Default. Every app on this device is protected.",
+    "ru": "По умолчанию. Защищены все приложения на устройстве."
+  },
+  "apps_mode_only": {
+    "zh": "仅选中的应用走代理",
+    "en": "Only selected apps",
+    "ru": "Только выбранные"
+  },
+  "apps_mode_only_detail": {
+    "zh": "其他应用直接上网，不经过 TrackNothing。",
+    "en": "Other apps connect directly, outside TrackNothing.",
+    "ru": "Остальные приложения подключаются напрямую, без TrackNothing."
+  },
+  "apps_mode_except": {
+    "zh": "选中的应用不走代理",
+    "en": "Bypass selected apps",
+    "ru": "Кроме выбранных"
+  },
+  "apps_mode_except_detail": {
+    "zh": "适合银行、本地服务这类需要直连的应用。",
+    "en": "For banking or local apps that need a direct connection.",
+    "ru": "Для банков и местных сервисов, которым нужно прямое подключение."
+  },
+  "apps_apply_next": {
+    "zh": "改动在下次连接时生效。",
+    "en": "Changes apply the next time you connect.",
+    "ru": "Изменения вступят в силу при следующем подключении."
+  },
+  "apps_lockdown_note": {
+    "zh": "如果系统开启了「屏蔽无 VPN 连接」，直连的应用将无法上网。",
+    "en": "If “Block connections without VPN” is on in system settings, direct apps cannot go online.",
+    "ru": "Если в системе включено «Блокировать соединения без VPN», приложения напрямую не смогут выйти в сеть."
+  },
+  "apps_selected": {
+    "zh": "已选 {0} 个",
+    "en": "{0} SELECTED",
+    "ru": "ВЫБРАНО: {0}"
+  },
+  "search_apps": {
+    "zh": "搜索应用",
+    "en": "Search apps",
+    "ru": "Поиск приложений"
+  },
+  "running_apps": {
+    "zh": "正在运行的应用",
+    "en": "Running apps",
+    "ru": "Запущенные программы"
+  },
+  "add_program": {
+    "zh": "添加程序…",
+    "en": "Add a program…",
+    "ru": "Добавить программу…"
+  },
+  "selected_state": {
+    "zh": "已选中",
+    "en": "selected",
+    "ru": "выбрано"
   }
 }

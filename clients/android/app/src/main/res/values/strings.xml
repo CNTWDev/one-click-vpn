@@ -37,6 +37,7 @@
   <string name="activity_time">Time</string>
   <string name="activity_title">Activity</string>
   <string name="activity_traffic">Traffic</string>
+  <string name="add_program">Add a program…</string>
   <string name="all_locations">All locations</string>
   <string name="allow_system_extension">macOS needs you to allow the TrackNothing network extension before it can connect. Choose Open System Settings and turn TrackNothing on under General › Login Items &amp; Extensions › Network Extensions (macOS 14 and earlier: Privacy &amp; Security). It connects as soon as you allow it.</string>
   <string name="allow_system_extension_short">Allow the TrackNothing network extension in System Settings; it connects once allowed</string>
@@ -47,6 +48,18 @@
   <string name="allow_vpn_configuration_short">Pick Allow in the system prompt to add the VPN configuration</string>
   <string name="announcement">Announcement</string>
   <string name="appearance">Appearance</string>
+  <string name="apps_all_value">All apps</string>
+  <string name="apps_apply_next">Changes apply the next time you connect.</string>
+  <string name="apps_except_value">Bypass %1$s</string>
+  <string name="apps_lockdown_note">If “Block connections without VPN” is on in system settings, direct apps cannot go online.</string>
+  <string name="apps_mode_all">All apps use the VPN</string>
+  <string name="apps_mode_all_detail">Default. Every app on this device is protected.</string>
+  <string name="apps_mode_except">Bypass selected apps</string>
+  <string name="apps_mode_except_detail">For banking or local apps that need a direct connection.</string>
+  <string name="apps_mode_only">Only selected apps</string>
+  <string name="apps_mode_only_detail">Other apps connect directly, outside TrackNothing.</string>
+  <string name="apps_only_value">Only %1$s</string>
+  <string name="apps_selected">%1$s SELECTED</string>
   <string name="ask_your_administrator_to_enable_veilbird_client_access">Ask your administrator to enable TrackNothing client access.</string>
   <string name="authorized_devices">Authorized devices</string>
   <string name="authorizing_and_connecting">Authorizing and connecting…</string>
@@ -202,6 +215,7 @@
   <string name="open_vpn_settings">Open VPN settings</string>
   <string name="password">Password</string>
   <string name="password_reset_unavailable">Password reset by email isn\'t available right now. Contact your administrator.</string>
+  <string name="per_app_routing">Per-app routing</string>
   <string name="permission_needed_title">Permission needed</string>
   <string name="quality_fair">Fair</string>
   <string name="quality_good">Good</string>
@@ -235,10 +249,12 @@
   <string name="routing_global_detail">All traffic goes through TrackNothing</string>
   <string name="routing_smart">Smart</string>
   <string name="routing_smart_detail">Sites in mainland China go direct, the rest through TrackNothing</string>
+  <string name="running_apps">Running apps</string>
   <string name="running_in_tray">TrackNothing keeps running in the tray. Click the icon to switch.</string>
   <string name="seal_action">Connect</string>
   <string name="sealed_status">Hidden</string>
   <string name="sealing_detail">Hiding…</string>
+  <string name="search_apps">Search apps</string>
   <string name="search_locations_or_regions">Search locations or regions</string>
   <string name="section_account">§04 Holder</string>
   <string name="section_activity">§03 Activity</string>
@@ -250,6 +266,7 @@
   <string name="secure_storage_is_unavailable_unlock_your_device_and_try">Secure storage is unavailable. Unlock your device and try again.</string>
   <string name="seen_as">Sites only see %1$s</string>
   <string name="select_an_available_location_for_you">Fastest location, switches if one fails</string>
+  <string name="selected_state">selected</string>
   <string name="send_reset_link">Send link</string>
   <string name="server_address">Server address</string>
   <string name="server_address_url">Server address https://…</string>
@@ -341,7 +358,7 @@
   <string name="vpn_connection">VPN connection</string>
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Switch locations right from the Mac menu bar and the Windows tray: the location row opens the list with delays in place, and a pick switches at once (moving a running connection) without opening the main window\nThe Windows tray menu has a Location submenu: choose Automatic or a location in one step</string>
+  <string name="whats_new_notes">Per-app routing on Android and Windows: in Account → Per-app routing, send only some apps through TrackNothing, or let some apps connect directly</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

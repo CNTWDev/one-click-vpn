@@ -80,11 +80,17 @@ public static class Transports {
         };
     }
     /// What the core needs to build the configuration (clients/core/config.go): the same on every app.
-    public static string Options(IEnumerable<JsonObject> proxies,IEnumerable<string> order,bool smart)=>new JsonObject {
+    public static string Options(IEnumerable<JsonObject> proxies,IEnumerable<string> order,bool smart) {
+        var (appMode,apps)=AppRouting.Effective;
+        return new JsonObject {
         ["platform"]="windows",["smart"]=smart,
+        // Per-app routing (AppRouting): program names the core turns into process rules.
+        ["appMode"]=appMode==AppRouting.All?"":appMode,
+        ["apps"]=new JsonArray(apps.Select(n=>(JsonNode?)JsonValue.Create(n)).ToArray()),
         ["proxies"]=new JsonArray(proxies.Select(p=>(JsonNode?)p.DeepClone()).ToArray()),
         ["order"]=new JsonArray(order.Select(n=>(JsonNode?)JsonValue.Create(n)).ToArray()),
-    }.ToJsonString();
+        }.ToJsonString();
+    }
     /// "name=delay,..." from the core; -1 means no answer.
     public static Dictionary<string,long> ParseProbe(string result)=>result.Split(',',StringSplitOptions.RemoveEmptyEntries).Where(p=>p.Contains('='))
         .ToDictionary(p=>p[..p.IndexOf('=')],p=>long.TryParse(p[(p.IndexOf('=')+1)..],out var ms)?ms:-1);

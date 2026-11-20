@@ -85,7 +85,7 @@ public sealed class Connection(NativeApi api,Core core) {
             network=await Task.Run(Transports.NetworkKey);online=network!="unknown";lastNetworkCheck=DateTime.UtcNow;networkChanged=false;
             api.Attempt=Guid.NewGuid().ToString("N")[..16];
             // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
-            Journal.Add($"connect: start {api.Attempt}, network {network}, routing {(smart?"smart":"global")}");
+            Journal.Add($"connect: start {api.Attempt}, network {network}, routing {(smart?"smart":"global")}, apps {AppRouting.Effective.Mode} {AppRouting.Effective.Apps.Count}");
             if(NodeId.Length==0) await ChooseFastest();
             await ConnectWithFallback(smart);
         } catch(Exception) when (!Active) {

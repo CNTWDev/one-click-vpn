@@ -4,6 +4,17 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.14
+
+### zh
+- 安卓和 Windows 支持按应用分流：在「账户 → 按应用分流」里选择只让部分应用走代理，或让部分应用直连
+
+### en
+- Per-app routing on Android and Windows: in Account → Per-app routing, send only some apps through TrackNothing, or let some apps connect directly
+
+### ru
+- Выбор приложений на Android и Windows: в «Аккаунт → Приложения в VPN» можно пустить через TrackNothing только некоторые приложения или, наоборот, исключить их
+
 ## 1.0.13
 
 ### zh
