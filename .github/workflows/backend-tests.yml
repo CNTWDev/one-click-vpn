@@ -28,7 +28,7 @@ jobs:
           POSTGRES_DB: veilbird_test
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U veilbird" --health-interval 5s --health-timeout 5s --health-retries 20
+          --health-cmd "pg_isready -U veilbird -d veilbird_test" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       # Separate databases: the automation and REALITY tests reset tables the main suite relies on.
       VEILBIRD_TEST_DATABASE_URL: postgres://veilbird:veilbird@127.0.0.1:5432/veilbird_test
