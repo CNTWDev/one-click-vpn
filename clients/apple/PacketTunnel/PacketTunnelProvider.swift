@@ -14,7 +14,7 @@ import TunnelCore
 final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var lifecycle:Task<Void,Never>?
     private let stateLock=NSLock()
-    private var snapshot:[String:Any]=["status":"connection_confirming","phase":0]
+    private var snapshot:[String:Any]=["status":"connection_confirming"]
     private func publish(_ change:(inout [String:Any])->Void) {stateLock.lock();change(&snapshot);stateLock.unlock()}
     private var api:NativeAPI?
     private var nodeId=""
