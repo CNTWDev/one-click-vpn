@@ -422,7 +422,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">流量快用完或账号快到期时提前提醒：首页、Mac 菜单栏和 Windows 托盘里的小标题会直接显示“流量快用完”或“即将到期”\n到期前 7 天、前 1 天和流量剩 10%% 时各发一条系统通知；Mac 菜单栏和 Windows 托盘图标上出现一个琥珀色小点，安卓连接中的通知也会显示提醒</string>
+  <string name="whats_new_notes">这一版汇总了最近的改进：第一次使用三步上手，连接状态三端统一，连不上时直接说原因并给出解决按钮\n流量快用完或账号快到期时提前提醒；安卓和 Windows 支持按应用分流\n更省电、更省内存，启动更快</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>

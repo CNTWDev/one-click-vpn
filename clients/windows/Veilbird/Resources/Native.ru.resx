@@ -429,8 +429,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Напоминания, когда трафик или срок подходят к концу: подписи на главном экране, в строке меню Mac и в трее Windows показывают «Трафик заканчивается» или «Скоро закончится»
-Системное уведомление за 7 дней и за 1 день до конца и при остатке 10% трафика; янтарная точка на значке в строке меню Mac и в трее Windows, строка в уведомлении Android при подключении</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>В этой версии собраны последние улучшения: первый запуск в три шага, одинаковые состояния подключения на всех устройствах и ошибки, которые называют причину и предлагают кнопку для её устранения
+Напоминания, когда трафик или срок подходят к концу; выбор приложений для VPN на Android и Windows
+Меньше расход батареи и памяти, быстрее запуск</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>
