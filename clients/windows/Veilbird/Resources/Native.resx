@@ -348,9 +348,7 @@ Valid until · </value></data>
   <data name="vpn_connection" xml:space="preserve"><value>VPN connection</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac in-app update: once downloaded, click &quot;Install and Relaunch&quot;; the app quits, replaces itself and reopens, with no installer to drag
-The Mac window drops the grey system title bar; the app's own backdrop fills the whole window
-The first connection explains the network extension switch and takes you straight to it; macOS prompts now say TrackNothing</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>On the Mac, closing the window takes TrackNothing out of the Dock: it keeps running in the menu bar, and &quot;Open TrackNothing&quot; there brings back the window and the Dock icon; choose Quit to exit</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows development build · VPN service integration in progress</value></data>
