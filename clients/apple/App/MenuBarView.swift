@@ -91,7 +91,8 @@ struct MenuBarView:View {
         .background(VeilbirdStyle.ground).foregroundStyle(VeilbirdStyle.text).preferredColorScheme(.dark)
         .environment(\.locale, L10n.locale).id(appearance).task {try? await model.loadAccount()}
         .onExitCommand {if picking {setPicking(false)}}
-        .onDisappear {picking=false}
+        .onAppear {model.showing(true)}
+        .onDisappear {picking=false;model.showing(false)}
     }
     private func setPicking(_ open:Bool) {
         withAnimation(reduceMotion ? nil:.easeInOut(duration:0.2)) {picking=open}
@@ -202,7 +203,7 @@ struct MenuBarLabel:View {
         let reminder=AccountAccess(model.account).line
         let suffix=reminder.map {" · "+$0} ?? ""
         if showSpeed,on,model.since != nil,let image=Self.image(on:on,rx:model.rxRate,tx:model.txRate) {
-            Image(nsImage:reminder == nil ? image:Self.dotted(image)).accessibilityLabel("TrackNothing "+L10n.text("connection_rates",Self.mbps(model.rxRate),Self.mbps(model.txRate))+suffix)
+            Image(nsImage:reminder == nil ? image:Self.dottedRates(image)).accessibilityLabel("TrackNothing "+L10n.text("connection_rates",Self.mbps(model.rxRate),Self.mbps(model.txRate))+suffix)
         } else if let image=Self.mark(on:on) {
             Image(nsImage:reminder == nil ? image:Self.dottedMark(on:on,image)).accessibilityLabel("TrackNothing"+suffix)
         } else {
@@ -255,10 +256,26 @@ struct MenuBarLabel:View {
         let image=dotted(base);dottedMarks[on]=image
         return image
     }
+    /// The rates image changes only when the rates do; so does its dotted copy.
+    @MainActor private static var lastDotted:(base:NSImage,image:NSImage)?
+    @MainActor static func dottedRates(_ base:NSImage)->NSImage {
+        if let last=lastDotted,last.base === base {return last.image}
+        let image=dotted(base);lastDotted=(base,image)
+        return image
+    }
     private static func dotRect(_ center:CGPoint,radius:CGFloat)->CGRect {
         CGRect(x:center.x-radius,y:center.y-radius,width:radius*2,height:radius*2)
     }
+    /// The last rates image and its two lines: the label is redrawn whenever the model changes, the rates mostly not.
+    @MainActor private static var lastRates:(key:String,image:NSImage)?
     @MainActor static func image(on:Bool,rx:Int,tx:Int)->NSImage? {
+        let key=line("↑",tx)+"\n"+line("↓",rx)+(on ? "1":"0")
+        if let last=lastRates,last.key == key {return last.image}
+        guard let image=renderRates(on:on,rx:rx,tx:tx) else {return nil}
+        lastRates=(key,image)
+        return image
+    }
+    @MainActor private static func renderRates(on:Bool,rx:Int,tx:Int)->NSImage? {
         let content=HStack(spacing:4) {
             glyph(on:on)
             VStack(alignment:.trailing,spacing:-1) {

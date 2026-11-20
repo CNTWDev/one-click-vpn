@@ -91,6 +91,10 @@ struct ClientView:View {
         .environment(\.locale, L10n.locale).preferredColorScheme(.dark)
         .animation(reduceMotion ? nil:.easeOut(duration:0.2),value:tab).animation(reduceMotion ? nil:.easeOut(duration:0.2),value:model.signedIn)
         .task {await model.restore()}
+        #if os(macOS)
+        // While the window is open the live figures are fetched every second (ClientModel.refreshStatus).
+        .onAppear {model.showing(true)}.onDisappear {model.showing(false)}
+        #endif
         // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).
         #if os(macOS)
         // Before macOS's own extension prompt (its "OK" only closes it): which switch to turn on, and where.
