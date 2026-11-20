@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	P "github.com/metacubex/mihomo/constant/provider"
@@ -38,6 +39,10 @@ type Options struct {
 	Smart    bool             `json:"smart"`    // mainland China sites go direct
 	Proxies  []map[string]any `json:"proxies"`
 	Order    []string         `json:"order"`
+	// Per-app routing on Windows (Android leaves apps out of its tun itself): "" for every app, "only" to send
+	// just Apps through the tunnel, "except" to send Apps direct. Apps are program names such as chrome.exe.
+	AppMode string   `json:"appMode,omitempty"`
+	Apps    []string `json:"apps,omitempty"`
 }
 
 // Run builds the configuration from options (JSON) and applies it with home as the data directory.
@@ -114,9 +119,45 @@ func Build(o Options) (string, error) {
 		dns["nameserver-policy"] = map[string]any{"rule-set:private_domain,cn_domain": []string{"https://doh.pub/dns-query", "https://dns.alidns.com/dns-query"}}
 		config["rule-providers"] = providers
 	}
-	config["rules"] = append(rules, "MATCH,"+group)
+	final := group
+	o.Apps = programNames(o.Apps)
+	if o.Platform == "windows" && len(o.Apps) > 0 {
+		switch o.AppMode {
+		case "except":
+			// Ahead of the smart rules, so a bypassed program never reaches the tunnel.
+			bypass := []string{}
+			for _, app := range o.Apps {
+				bypass = append(bypass, "PROCESS-NAME,"+app+",DIRECT")
+			}
+			rules = append(rules[:1], append(bypass, rules[1:]...)...)
+		case "only":
+			// Selected programs follow the routing mode; everything else, and the core's own DNS, goes direct.
+			for _, app := range o.Apps {
+				rules = append(rules, "PROCESS-NAME,"+app+","+group)
+			}
+			final = "DIRECT"
+			// The overseas resolvers may be blocked without the tunnel; direct traffic resolves locally.
+			dns["nameserver"] = []string{"https://doh.pub/dns-query", "https://dns.alidns.com/dns-query"}
+		}
+	}
+	config["rules"] = append(rules, "MATCH,"+final)
 	out, err := json.Marshal(config)
 	return string(out), err
+}
+
+// programNames keeps the names a rule can hold (no separators that would split it), once each.
+func programNames(apps []string) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, app := range apps {
+		app = strings.TrimSpace(app)
+		if app == "" || strings.ContainsAny(app, ",()\r\n/\\") || seen[strings.ToLower(app)] {
+			continue
+		}
+		seen[strings.ToLower(app)] = true
+		out = append(out, app)
+	}
+	return out
 }
 
 // seedRuleSets keeps the first smart connection from waiting for the rule sets. mihomo downloads a rule set

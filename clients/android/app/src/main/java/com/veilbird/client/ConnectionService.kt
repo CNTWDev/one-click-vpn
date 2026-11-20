@@ -270,8 +270,9 @@ class ConnectionService : VpnService() {
         val tun = Builder().setSession("TrackNothing").setMtu(1500)
             .addAddress("198.18.0.1", 30).addAddress("fdfe:dcba:9876::1", 126)
             .addRoute("0.0.0.0", 0).addRoute("::", 0).addDnsServer("198.18.0.2")
-            .addDisallowedApplication(packageName)
             .apply { if (android.os.Build.VERSION.SDK_INT >= 29) setMetered(false) }
+            // This app stays outside the tun (its own API calls and the core's dials); per-app routing may leave out more.
+            .also { Journal.add("apps: " + AppRouting.apply(this, it)) }
             .establish() ?: throw ApiFailure("VPN_PERMISSION_REQUIRED")
         // mihomo owns the descriptor from here and closes it on stop.
         Core.run(home, Transports.options(proxies, transports, tun.detachFd(), routing() == "smart"))

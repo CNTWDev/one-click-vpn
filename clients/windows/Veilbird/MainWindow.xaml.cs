@@ -989,7 +989,7 @@ public partial class MainWindow : Window {
             Login();return;
         }
         if(Onboarded) foreach(var (id,key) in new[]{("connect","connect_tab"),("nodes","locations"),("account","account")}) {
-            var selected=page==id||(page is "logs" or "devices"&&id=="account");
+            var selected=page==id||(page is "logs" or "devices" or "apps"&&id=="account");
             var label=new TextBlock {Text=L10n.Text(key),FontSize=14,FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal,Foreground=selected?Look.Text:Look.Secondary,VerticalAlignment=VerticalAlignment.Center};
             var tab=new Grid {Height=44};tab.Children.Add(label);
             if(selected) tab.Children.Add(new Border {Height=3,Width=16,CornerRadius=new CornerRadius(1.5),Background=Look.Accent,VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,0,6)});
@@ -1002,6 +1002,7 @@ public partial class MainWindow : Window {
             case "connect":Home();break;
             case "nodes":Nodes();break;
             case "devices":Devices();break;
+            case "apps":AppsPage();break;
             case "logs":Logs();break;
             default:Account();break;
         }
@@ -1350,10 +1351,10 @@ public partial class MainWindow : Window {
         // First time on this PC: nothing to show yet, so this one load shows progress and errors.
         else Work(async()=>Apply(await LoadNodes(),true));
     }
-    private FrameworkElement Search(Action<string> changed) {
+    private FrameworkElement Search(Action<string> changed,string hintKey="search_locations_or_regions") {
         var box=new TextBox {Padding=new Thickness(30,0,10,0)};
-        AutomationProperties.SetName(box,L10n.Text("search_locations_or_regions"));
-        var hint=new TextBlock {Text=L10n.Text("search_locations_or_regions"),FontSize=14,Foreground=Look.Faint,Margin=new Thickness(31,0,10,0),VerticalAlignment=VerticalAlignment.Center,IsHitTestVisible=false,TextWrapping=TextWrapping.NoWrap};
+        AutomationProperties.SetName(box,L10n.Text(hintKey));
+        var hint=new TextBlock {Text=L10n.Text(hintKey),FontSize=14,Foreground=Look.Faint,Margin=new Thickness(31,0,10,0),VerticalAlignment=VerticalAlignment.Center,IsHitTestVisible=false,TextWrapping=TextWrapping.NoWrap};
         var glass=Look.Icon("",13,Look.Secondary);glass.HorizontalAlignment=HorizontalAlignment.Left;glass.Margin=new Thickness(10,0,0,0);glass.IsHitTestVisible=false;
         box.TextChanged+=(_,_)=>{hint.Visibility=box.Text.Length==0?Visibility.Visible:Visibility.Collapsed;changed(box.Text);};
         var grid=new Grid {Margin=new Thickness(0,14,0,0)};grid.Children.Add(box);grid.Children.Add(hint);grid.Children.Add(glass);
@@ -1553,7 +1554,8 @@ public partial class MainWindow : Window {
         // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).
         var appVersion=System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)??"0";
         var whatsNew=SettingRow(L10n.Text("whats_new"),appVersion,_=>ShowNotes(appVersion,L10n.Text("whats_new_notes").Split('\n').Where(line=>line.Trim().Length>0).ToList()));
-        Add(Card(new FrameworkElement[]{devices,password,language,appearance,startupRow,guardRow,updates,whatsNew},14));
+        var apps=SettingRow(L10n.Text("per_app_routing"),AppsValue(),_=>{page="apps";Render();});
+        Add(Card(new FrameworkElement[]{devices,password,language,appearance,startupRow,guardRow,apps,updates,whatsNew},14));
 
         var signOut=new Button {Content=L10n.Text("sign_out"),Height=40,Background=Look.Surface,Foreground=Look.Danger,HorizontalContentAlignment=HorizontalAlignment.Center};
         signOut.Click+=(_,_)=>{
@@ -1629,6 +1631,92 @@ public partial class MainWindow : Window {
         grid.Children.Add(new TextBlock {Text=title,FontSize=14,FontWeight=FontWeights.SemiBold,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});
         grid.Children.Add(back);
         return grid;
+    }
+    // ---- Per-app routing (AppRouting): three modes and, for the two that name programs, the programs to pick from.
+    private static string AppsValue() {
+        var (mode,apps)=AppRouting.Effective;
+        return mode==AppRouting.All?L10n.Text("apps_all_value"):L10n.Text(mode==AppRouting.Only?"apps_only_value":"apps_except_value",apps.Count.ToString("N0",L10n.Culture));
+    }
+    /// Programs picked with "Add a program…" this run, so they stay listed while not running.
+    private readonly Dictionary<string,AppRouting.Entry> addedPrograms=new(StringComparer.OrdinalIgnoreCase);
+    private static FrameworkElement Radio(bool on) {
+        var grid=new Grid {Width=16,Height=16,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,2,0,0)};
+        grid.Children.Add(new Ellipse {Stroke=on?Look.Accent:Look.Faint,StrokeThickness=1.5});
+        if(on) grid.Children.Add(new Ellipse {Width=8,Height=8,Fill=Look.Accent});
+        return grid;
+    }
+    private static void Tick(Border box,bool on) {
+        box.BorderBrush=on?Look.Accent:Look.Faint;box.Background=on?Look.AccentWash:Brushes.Transparent;
+        box.Child=on?Look.Icon("\uE73E",11,Look.Accent):null;
+    }
+    private void AppsPage() {
+        Add(SubHeader(L10n.Text("per_app_routing")),0,8);
+        var mode=AppRouting.Mode;
+        var rows=new List<FrameworkElement>();
+        foreach(var (value,title,detail) in new[]{(AppRouting.All,"apps_mode_all","apps_mode_all_detail"),(AppRouting.Only,"apps_mode_only","apps_mode_only_detail"),(AppRouting.Except,"apps_mode_except","apps_mode_except_detail")}) {
+            var on=value==mode;
+            var texts=new StackPanel {Margin=new Thickness(12,0,0,0)};
+            texts.Children.Add(new TextBlock {Text=L10n.Text(title),FontSize=14,FontWeight=on?FontWeights.SemiBold:FontWeights.Normal,TextWrapping=TextWrapping.Wrap});
+            texts.Children.Add(new TextBlock {Text=L10n.Text(detail),FontSize=12,Foreground=Look.Secondary,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,2,0,0)});
+            var row=new Button {Padding=new Thickness(14,11,14,11),HorizontalContentAlignment=HorizontalAlignment.Stretch,Content=Columns(Radio(on),texts)};
+            AutomationProperties.SetName(row,L10n.Text(title)+(on?L10n.Text("current_page"):""));
+            row.Click+=(_,_)=>{if(!on) {AppRouting.SetMode(value);Render();}};
+            rows.Add(row);
+        }
+        Add(Card(rows,14));
+        Add(new TextBlock {Text=L10n.Text("apps_apply_next"),FontSize=12,Foreground=Look.Secondary,Margin=new Thickness(4,0,4,0),TextWrapping=TextWrapping.Wrap},8,0);
+        if(mode==AppRouting.All) return;
+
+        var selected=new HashSet<string>(AppRouting.Apps,StringComparer.OrdinalIgnoreCase);
+        var count=new TextBlock {FontSize=11,Foreground=Look.Accent,VerticalAlignment=VerticalAlignment.Center};
+        if(L10n.Culture.TwoLetterISOLanguageName!="zh") count.FontFamily=new FontFamily("Cascadia Mono, Consolas");
+        void ShowCount()=>count.Text=L10n.Text("apps_selected",selected.Count.ToString("N0",L10n.Culture));
+        ShowCount();
+        var header=new DockPanel {Margin=new Thickness(4,0,4,0)};
+        DockPanel.SetDock(count,Dock.Right);header.Children.Add(count);header.Children.Add(Single(L10n.Text("running_apps"),13,Look.Secondary));
+        Add(header,16,0);
+        var query="";
+        List<AppRouting.Entry> programs=new();
+        var list=new ContentControl {Focusable=false,Margin=new Thickness(0,8,0,0)};
+        Add(Search(text=>{query=text.Trim();Draw();},"search_apps"),8,0);
+        Add(list);
+        var add=Primary(L10n.Text("add_program"));
+        Add(add,10,0);
+        void Draw() {
+            // Selected programs first, in the order this page opened with: ticking a box never moves a row.
+            var opened=AppRouting.Apps.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var known=programs.Concat(addedPrograms.Values).GroupBy(p=>p.Name,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).ToList();
+            // Selected programs that are not running are still listed (by file name) so they can be cleared.
+            foreach(var name in opened) if(!known.Any(p=>p.Name.Equals(name,StringComparison.OrdinalIgnoreCase))) known.Add(new AppRouting.Entry(name,System.IO.Path.GetFileNameWithoutExtension(name),null));
+            var shown=known.OrderBy(p=>opened.Contains(p.Name)?0:1)
+                .Where(p=>query.Length==0||p.Title.Contains(query,StringComparison.CurrentCultureIgnoreCase)||p.Name.Contains(query,StringComparison.OrdinalIgnoreCase)).ToList();
+            var items=new List<FrameworkElement>();
+            foreach(var program in shown) {
+                FrameworkElement icon=program.Icon is { } image?new Image {Source=image,Width=24,Height=24}:Look.Badge(program.Title.Length>0?program.Title[..1].ToUpperInvariant():"?",24);
+                var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,8,0)};
+                texts.Children.Add(Single(program.Title,14));
+                var file=Single(program.Name,11,Look.Faint);file.FontFamily=new FontFamily("Cascadia Mono, Consolas");texts.Children.Add(file);
+                var box=new Border {Width=18,Height=18,CornerRadius=new CornerRadius(3),BorderThickness=new Thickness(1.5),VerticalAlignment=VerticalAlignment.Center};
+                Tick(box,selected.Contains(program.Name));
+                var row=new Button {Height=46,Padding=new Thickness(14,0,14,0),HorizontalContentAlignment=HorizontalAlignment.Stretch,Content=Columns(icon,texts,box)};
+                void Describe()=>AutomationProperties.SetName(row,program.Title+(selected.Contains(program.Name)?", "+L10n.Text("selected_state"):""));
+                Describe();
+                row.Click+=(_,_)=>{
+                    if(!selected.Remove(program.Name)) selected.Add(program.Name);
+                    AppRouting.SetApps(selected);Tick(box,selected.Contains(program.Name));Describe();ShowCount();
+                };
+                items.Add(row);
+            }
+            list.Content=items.Count>0?Card(items,50):null;
+        }
+        add.Click+=(_,_)=>{
+            var dialog=new Microsoft.Win32.OpenFileDialog {Filter="*.exe|*.exe",CheckFileExists=true};
+            if(dialog.ShowDialog(this)!=true) return;
+            var program=AppRouting.Describe(dialog.FileName);
+            addedPrograms[program.Name]=program;selected.Add(program.Name);AppRouting.SetApps(selected);ShowCount();Draw();
+        };
+        Draw();
+        Work(async()=>{programs=await Task.Run(AppRouting.Running);if(page=="apps") Draw();});
     }
     private void Devices() {
         Add(SubHeader(L10n.Text("authorized_devices")),0,8);
