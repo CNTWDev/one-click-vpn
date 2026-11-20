@@ -348,8 +348,7 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="vpn_connection" xml:space="preserve"><value>VPN 连接</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac 菜单栏和 Windows 托盘里直接切换节点：点「连接位置」就地展开节点列表（带延迟），选一个即切换，已连接时自动改连过去，不再打开主窗口
-Windows 托盘右键菜单新增「连接位置」子菜单，自动选择或指定节点一步完成</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>安卓更省电：锁屏后后台检查大幅减少，连接正常时只测正在用的线路，授权续期也更少，断网、换网络和亮屏时仍会立即检查和重连</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>

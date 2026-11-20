@@ -7827,19 +7827,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Switch locations right from the Mac menu bar and the Windows tray: the location row opens the list with delays in place, and a pick switches at once (moving a running connection) without opening the main window\nThe Windows tray menu has a Location submenu: choose Automatic or a location in one step"
+            "value": "Lower battery use on Android: far fewer background checks with the screen off, only the line in use is tested while the connection works, and authorization renews less often; losing or changing the network and turning the screen on still check and reconnect at once"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac 菜单栏和 Windows 托盘里直接切换节点：点「连接位置」就地展开节点列表（带延迟），选一个即切换，已连接时自动改连过去，不再打开主窗口\nWindows 托盘右键菜单新增「连接位置」子菜单，自动选择或指定节点一步完成"
+            "value": "安卓更省电：锁屏后后台检查大幅减少，连接正常时只测正在用的线路，授权续期也更少，断网、换网络和亮屏时仍会立即检查和重连"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Смена локации прямо из строки меню Mac и трея Windows: строка локации открывает список с задержками на месте, выбор сразу переключает (и переносит текущее подключение), без открытия главного окна\nВ меню трея Windows появилось подменю «Локация»: автовыбор или конкретная локация в один шаг"
+            "value": "Меньше расход батареи на Android: при выключенном экране фоновых проверок намного меньше, при рабочем подключении проверяется только используемая линия, авторизация продлевается реже; при потере или смене сети и включении экрана проверка и переподключение по-прежнему сразу"
           }
         }
       }

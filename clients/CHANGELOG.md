@@ -4,6 +4,17 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.14
+
+### zh
+- 安卓更省电：锁屏后后台检查大幅减少，连接正常时只测正在用的线路，授权续期也更少，断网、换网络和亮屏时仍会立即检查和重连
+
+### en
+- Lower battery use on Android: far fewer background checks with the screen off, only the line in use is tested while the connection works, and authorization renews less often; losing or changing the network and turning the screen on still check and reconnect at once
+
+### ru
+- Меньше расход батареи на Android: при выключенном экране фоновых проверок намного меньше, при рабочем подключении проверяется только используемая линия, авторизация продлевается реже; при потере или смене сети и включении экрана проверка и переподключение по-прежнему сразу
+
 ## 1.0.13
 
 ### zh
