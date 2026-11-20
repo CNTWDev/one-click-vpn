@@ -27,6 +27,11 @@ public partial class MainWindow : Window {
     private readonly Connection connection;
     private readonly Forms.NotifyIcon tray=new();
     private Forms.ToolStripMenuItem? trayRates;
+    // The tray icon as shipped, and with the amber dot that says traffic or time is running out.
+    private System.Drawing.Icon? trayIcon,trayDotted;
+    private bool reminderBalloon;
+    // The app stays in the tray for days and traffic runs down meanwhile: the account is read again every few hours.
+    private readonly DispatcherTimer accountTimer=new() {Interval=TimeSpan.FromHours(3)};
     private string page="connect",nodeId=Settings.Get("nodeId"),nodeName=Settings.Get("nodeName");
     private bool busy,measuring,quitting,trayHintShown,failed,showPassword;
     private string failure="";
@@ -98,6 +103,7 @@ public partial class MainWindow : Window {
             updateTimer.Interval=TimeSpan.FromHours(6);CheckForUpdate(false);
         };
         updateTimer.Start();
+        accountTimer.Tick+=(_,_)=>{if(api.SignedIn) _=RefreshAccount();};accountTimer.Start();
         downloadTimer.Tick+=async(_,_)=>{
             if(!downloading) {downloadTimer.Stop();return;}
             try {download=JsonNode.Parse(await Task.Run(core.Progress)) as JsonObject;} catch {/* next tick */}
@@ -128,7 +134,10 @@ public partial class MainWindow : Window {
 
     // ---- Tray ----
     private void SetupTray() {
-        using(var stream=Application.GetResourceStream(new Uri("pack://application:,,,/Assets/Veilbird.ico")).Stream) tray.Icon=new System.Drawing.Icon(stream);
+        using(var stream=Application.GetResourceStream(new Uri("pack://application:,,,/Assets/Veilbird.ico")).Stream) tray.Icon=trayIcon=new System.Drawing.Icon(stream);
+        // A click on a reminder opens the window, where the figures say what is running out.
+        tray.BalloonTipClicked+=(_,_)=>{if(reminderBalloon) ShowFromTray();};
+        tray.BalloonTipClosed+=(_,_)=>reminderBalloon=false;
         tray.Visible=true;tray.ContextMenuStrip=new Forms.ContextMenuStrip();
         tray.ContextMenuStrip.Opening+=(_,_)=>BuildTrayMenu();
         tray.MouseClick+=(_,e)=>{if(e.Button==Forms.MouseButtons.Left) ToggleFlyout();};
@@ -161,13 +170,19 @@ public partial class MainWindow : Window {
         menu.Items.Add(L10n.Text("open_app"),null,(_,_)=>ShowFromTray());
         menu.Items.Add(L10n.Text("quit_app"),null,(_,_)=>Quit());
     }
-    /// The tray icon's tooltip: status and location, and once connected a second line with the live rates
-    /// (a tray icon can't show text of its own). Windows caps tooltips at 127 characters.
+    /// The tray icon's tooltip: status and location, once connected a second line with the live rates (a tray icon
+    /// can't show text of its own), and a last line when traffic or time is running out, which also puts an amber dot
+    /// on the icon. Windows caps tooltips at 127 characters.
     private void UpdateTray() {
+        var reminder=api.SignedIn?AccountAccess.From(accountData).Line(Bytes):null;
         var first="TrackNothing · "+TrayStatus();
-        var second=TrayConnected?"\n"+TrayRates():"";
-        var room=127-second.Length;
+        var second=(TrayConnected?"\n"+TrayRates():"")+(reminder is null?"":"\n"+reminder);
+        var room=Math.Max(0,127-second.Length);
         tray.Text=(first.Length>room?first[..room]:first)+second;
+        if(trayIcon is not null) {
+            var icon=reminder is null?trayIcon:(trayDotted??=AccessReminders.Dotted(trayIcon));
+            if(!ReferenceEquals(tray.Icon,icon)) tray.Icon=icon;
+        }
         if(trayRates is not null&&TrayConnected) trayRates.Text=TrayRates();
     }
     private bool TrayConnected=>connection.Active&&connection.Since is not null;
@@ -544,8 +559,13 @@ public partial class MainWindow : Window {
         }
     }
     private async Task RefreshAccount() {
-        try {var data=await api.Request("account");accountData=data;ShowUsage();UpdateFlyout();}
+        try {var data=await api.Request("account");accountData=data;ShowUsage();UpdateFlyout();UpdateTray();Remind();}
         catch {/* usage is a nicety; the next visit retries */}
+    }
+    /// The once-per-step reminder as a tray balloon (Windows shows it as a notification).
+    private void Remind() {
+        if(AccessReminders.Due(AccountAccess.From(accountData),Bytes) is not { } due) return;
+        reminderBalloon=true;tray.ShowBalloonTip(8000,due.Title,due.Text,Forms.ToolTipIcon.None);
     }
 
     // ---- Building blocks ----
@@ -1049,18 +1069,20 @@ public partial class MainWindow : Window {
     }
     private string UsageText()=>accountData?["traffic"] is { } traffic?Bytes(Number(traffic["uploadBytes"])+Number(traffic["downloadBytes"])):"—";
     private void ShowUsage() {if(usageTotal is not null&&usageUntil is not null) ShowFigures(usageTotal,usageUntil);}
-    /// Traffic left (or used in the last 30 days) and the end of the access period, tinted when either is running
-    /// out or has run out. Traffic quotas count all nodes together.
+    /// Traffic left (or used in the last 30 days) and the end of the access period. Running out, the small title above
+    /// a figure becomes the reminder and both turn amber; run out, red. The titles swap in place: nothing moves.
+    /// Traffic quotas count all nodes together.
     private void ShowFigures(TextBlock traffic,TextBlock until) {
-        var access=accountData?["access"];var state=access?["state"]?.GetValue<string>()??"active";
-        long? quota=access?["quotaBytes"] is { } q?Number(q):null;
-        if(traffic.Parent is StackPanel cell&&cell.Children[0] is TextBlock title) title.Text=L10n.Text(quota is null?"last_30_days":"traffic_left");
-        if(quota is { } total) {var left=Number(access?["remainingBytes"]);traffic.Text=Bytes(left);traffic.Foreground=state=="exhausted"?Look.Danger:state=="active"&&left<=total/10?Look.Fair:Look.Text;}
-        else {traffic.Text=UsageText();traffic.Foreground=Look.Text;}
+        var access=AccountAccess.From(accountData);
+        var trafficTint=Tint(access.State=="exhausted",access.Low);var untilTint=Tint(access.State=="expired",access.Ending);
+        if(traffic.Parent is StackPanel cell&&cell.Children[0] is TextBlock title) {title.Text=L10n.Text(access.TrafficTitle);title.Foreground=trafficTint??Look.Secondary;}
+        if(until.Parent is StackPanel untilCell&&untilCell.Children[0] is TextBlock untilTitle) {untilTitle.Text=L10n.Text(access.UntilTitle);untilTitle.Foreground=untilTint??Look.Secondary;}
+        traffic.Text=access.Quota is not null?Bytes(access.Remaining):UsageText();traffic.Foreground=trafficTint??Look.Text;
         until.Text=accountData is null?"—":L10n.Date(accountData["expiresAt"]?.GetValue<string>());
-        var soon=access?["until"]?.GetValue<string>() is { } end&&DateTimeOffset.TryParse(end,System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out var date)&&date-DateTimeOffset.UtcNow<=TimeSpan.FromDays(7);
-        until.Foreground=state=="expired"?Look.Danger:state=="active"&&soon?Look.Fair:Look.Text;
+        until.Foreground=untilTint??Look.Text;
     }
+    /// Run out: red; running out: amber; otherwise the usual colour (null).
+    private static Brush? Tint(bool over,bool low)=>over?Look.Danger:low?Look.Fair:null;
     private RingState State() {
         var active=connection.Active;
         if(active) return connection.Since is not null?RingState.Connected:RingState.Connecting;

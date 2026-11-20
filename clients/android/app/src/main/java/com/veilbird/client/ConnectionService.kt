@@ -68,6 +68,10 @@ class ConnectionService : VpnService() {
     /** The next full probe reports to the server (the connect probe did not test every transport). */
     private var reportNext = false
     private var notified = ""
+    /** The account is read again while connected (traffic runs down): soon after connecting, then every few hours. */
+    private var accountAt = 0L
+    /** "Traffic running low · 0.8 GB left" under the status in the ongoing notification, or empty. */
+    @Volatile private var reminder = ""
     /** The user left the location to the app: when it stops answering, the app moves to the fastest one. */
     private var automatic = true
     /** Started by Android (restart after it killed the process, or always-on VPN), not by a tap. */
@@ -115,6 +119,7 @@ class ConnectionService : VpnService() {
             if (automatic) { nodeId = ""; chooseFastest() }
             connect()
             started = true
+            accountAt = SystemClock.elapsedRealtime() + 20000
             worker.scheduleWithFixedDelay({ tick() }, 2, 2, TimeUnit.SECONDS)
             api.report("")
         } catch (e: Exception) {
@@ -307,8 +312,9 @@ class ConnectionService : VpnService() {
             if (failures == 0) api.report("TUNNEL_ERROR", nodeId, detail)
             failures++; nextProbe = SystemClock.elapsedRealtime() + backoff(); ConnectionStateStore.messageId = message()
         }
+        if (online && SystemClock.elapsedRealtime() >= accountAt) checkAccount()
         val text = ConnectionStateStore.message
-        if (text != notified) { notified = text; getSystemService(NotificationManager::class.java).notify(1, notification(text)) }
+        if (text + reminder != notified) { notified = text + reminder; getSystemService(NotificationManager::class.java).notify(1, notification(text)) }
     }
     /** Online state, transport memory key, and a clean start on a new network: old connections would hang. */
     private fun checkNetwork(now: Long) {
@@ -357,10 +363,22 @@ class ConnectionService : VpnService() {
         automatic -> R.string.reconnecting_status
         else -> R.string.location_retrying
     }
+    /** Traffic left and the end date, for the reminder line and the once-per-step notifications. */
+    private fun checkAccount() {
+        accountAt = SystemClock.elapsedRealtime() + try {
+            val access = AccountAccess.from(api.request("account"))
+            reminder = access.line { android.text.format.Formatter.formatShortFileSize(this, it) } ?: ""
+            AccessReminders.check(this, access)
+            ACCOUNT_CHECK
+        } catch (_: Exception) { 600000L }
+    }
     private fun notification(text: String): Notification {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val stop = PendingIntent.getService(this, 1, Intent(this, ConnectionService::class.java).setAction("disconnect"), PendingIntent.FLAG_IMMUTABLE)
-        return Notification.Builder(this, "vpn").setContentTitle("TrackNothing").setContentText(text).setSmallIcon(R.drawable.ic_stat_mark).setContentIntent(open).setOngoing(true).addAction(Notification.Action.Builder(null, L10n.text(R.string.disconnect_status), stop).build()).build()
+        // Something is running out: the status becomes the title and the reminder the line under it, in amber.
+        val line = reminder
+        val (title, body) = if (line.isEmpty()) "TrackNothing" to text else text to android.text.SpannableString(line).apply { setSpan(android.text.style.ForegroundColorSpan(Palette.fair), 0, length, 0) }
+        return Notification.Builder(this, "vpn").setContentTitle(title).setContentText(body).setSmallIcon(R.drawable.ic_stat_mark).setContentIntent(open).setOngoing(true).addAction(Notification.Action.Builder(null, L10n.text(R.string.disconnect_status), stop).build()).build()
     }
     @Synchronized private fun stopConnection(message: Int) {
         if (stopping) return
@@ -379,6 +397,8 @@ class ConnectionService : VpnService() {
         private const val OFFLINE_GRACE = 12 * 3600 * 1000L
         /** Probe interval while the connection works; the core's fallback group reacts to failed dials in between. */
         private const val HEALTHY = 120000L
+        /** How often the account is read again while connected. */
+        private const val ACCOUNT_CHECK = 3 * 3600 * 1000L
         /** After connecting, when every transport is tested (the connect probe stops at the first that works). */
         private const val FULL_PROBE = 10000L
         /** Connecting in automatic mode stops measuring locations this long after the first one answered. */

@@ -146,6 +146,10 @@ class MainActivity : Activity() {
         launched = true
         if (due && !downloading) { handler.removeCallbacks(updateCheck); handler.postDelayed(updateCheck, 3000) }
     }
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 7 && grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) accountData?.let { AccessReminders.check(this, AccountAccess.from(it)) }
+    }
     override fun onPause() { visible = false; handler.removeCallbacks(refresh); super.onPause() }
     override fun onDestroy() { handler.removeCallbacks(updateCheck); handler.removeCallbacks(downloadTick); executor.shutdown(); super.onDestroy() }
     @Deprecated("Back handling for API 26+")
@@ -602,8 +606,10 @@ class MainActivity : Activity() {
     private fun usageStrip() {
         val trafficTitle = text(L10n.text(R.string.last_30_days), 12f, Palette.secondary).apply { maxLines = 1 }
         val traffic = text("—", 15f, Palette.text, 500); val until = text("—", 15f, Palette.text, 500)
+        val untilTitle = text(L10n.text(R.string.valid_until_label), 12f, Palette.secondary).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
+        trafficTitle.ellipsize = android.text.TextUtils.TruncateAt.END
         val strip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(4.dp, 0, 4.dp, 0) }
-        for ((title, value) in listOf(trafficTitle to traffic, text(L10n.text(R.string.valid_until_label), 12f, Palette.secondary).apply { maxLines = 1 } to until)) strip.addView(LinearLayout(this).apply {
+        for ((title, value) in listOf(trafficTitle to traffic, untilTitle to until)) strip.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(title)
             addView(value.apply { maxLines = 1 }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
@@ -611,17 +617,35 @@ class MainActivity : Activity() {
         add(strip, top = 16)
         fun show(data: JSONObject) {
             val access = AccountAccess.from(data)
-            trafficTitle.text = L10n.text(if (access.metered) R.string.traffic_left else R.string.last_30_days)
+            trafficTitle.text = L10n.text(access.trafficTitle()); untilTitle.text = L10n.text(access.untilTitle())
+            trafficTitle.setTextColor(tint(access.state == "exhausted", access.low, Palette.secondary))
+            untilTitle.setTextColor(tint(access.state == "expired", access.ending, Palette.secondary))
             traffic.text = if (access.metered) bytes(access.remainingBytes) else totalTraffic(data)?.let { bytes(it) } ?: "—"
-            traffic.setTextColor(when { access.state == "exhausted" -> Palette.danger; access.low -> Palette.fair; else -> Palette.text })
+            traffic.setTextColor(tint(access.state == "exhausted", access.low, Palette.text))
             until.text = L10n.date(data.optString("expiresAt"))
-            until.setTextColor(when { access.state == "expired" -> Palette.danger; access.ending -> Palette.fair; else -> Palette.text })
+            until.setTextColor(tint(access.state == "expired", access.ending, Palette.text))
         }
         accountData?.let { show(it) }
         Thread {
             val data = try { api.request("account") } catch (_: Exception) { null } ?: return@Thread
-            runOnUiThread { accountData = data; if (!isDestroyed && traffic.isAttachedToWindow) show(data) }
+            runOnUiThread { accountData = data; remind(data); if (!isDestroyed && traffic.isAttachedToWindow) show(data) }
         }.start()
+    }
+    /** Running out: amber; run out: red. */
+    private fun tint(over: Boolean, low: Boolean, usual: Int) = when { over -> Palette.danger; low -> Palette.fair; else -> usual }
+    /**
+     * The once-per-step system notification. Android 13 asks for permission to notify: asked here, the first time
+     * there is something to say, so the request comes with its reason on screen.
+     */
+    private fun remind(data: JSONObject) {
+        val access = AccountAccess.from(data)
+        if (!access.low && !access.ending) return
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            val prefs = getSharedPreferences("reminders", MODE_PRIVATE)
+            if (!prefs.getBoolean("asked", false)) { prefs.edit().putBoolean("asked", true).apply(); requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 7) }
+            return
+        }
+        AccessReminders.check(this, access)
     }
     private fun deviceLimit(data: JSONObject) = if (data.isNull("limit")) L10n.text(R.string.devices_unlimited) else L10n.number(data.optInt("limit"))
     private fun totalTraffic(data: JSONObject) = data.optJSONObject("traffic")?.let { (it.optString("uploadBytes", "0").toLongOrNull() ?: 0) + (it.optString("downloadBytes", "0").toLongOrNull() ?: 0) }

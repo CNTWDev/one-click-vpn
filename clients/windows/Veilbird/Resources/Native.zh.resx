@@ -4,7 +4,11 @@
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
   <data name="a_location_is_selected_automatically_allow_the_system_vpn" xml:space="preserve"><value>默认自动选择延迟最低的节点。第一次连接需要允许系统 VPN 权限。</value></data>
+  <data name="access_expired_title" xml:space="preserve"><value>已到期</value></data>
   <data name="access_for_this_device_has_been_revoked_contact_your" xml:space="preserve"><value>这台设备的授权已解除，请联系管理员。</value></data>
+  <data name="access_low_title" xml:space="preserve"><value>流量快用完</value></data>
+  <data name="access_soon_title" xml:space="preserve"><value>即将到期</value></data>
+  <data name="access_used_title" xml:space="preserve"><value>流量已用完</value></data>
   <data name="account" xml:space="preserve"><value>我的</value></data>
   <data name="account_device_quota" xml:space="preserve"><value>授权设备   {0} / {1}</value></data>
   <data name="account_valid_until" xml:space="preserve"><value>有效期 · {0}</value></data>
@@ -221,6 +225,13 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="reconnecting_status" xml:space="preserve"><value>连接中断，正在重连…</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>刷新设备状态</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>刷新节点</value></data>
+  <data name="reminder_channel" xml:space="preserve"><value>账号提醒</value></data>
+  <data name="reminder_low_body" xml:space="preserve"><value>只剩 {0}，共 {1}。用完后将无法连接。</value></data>
+  <data name="reminder_low_line" xml:space="preserve"><value>流量快用完 · 剩 {0}</value></data>
+  <data name="reminder_low_title" xml:space="preserve"><value>流量快用完了</value></data>
+  <data name="reminder_soon_body" xml:space="preserve"><value>{0} 到期，到期后将无法连接。请联系管理员续期。</value></data>
+  <data name="reminder_soon_line" xml:space="preserve"><value>即将到期 · {0}</value></data>
+  <data name="reminder_soon_title" xml:space="preserve"><value>账号即将到期</value></data>
   <data name="reset_by_email" xml:space="preserve"><value>通过邮件重置密码</value></data>
   <data name="reset_change_detail" xml:space="preserve"><value>我们会把修改密码的链接发到 {0}，1 小时内有效。改完后，所有设备都需要用新密码重新登录。</value></data>
   <data name="reset_confirm_detail" xml:space="preserve"><value>我们会把重置链接发到 {0}，1 小时内有效。</value></data>
@@ -348,8 +359,8 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="vpn_connection" xml:space="preserve"><value>VPN 连接</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac 菜单栏和 Windows 托盘里直接切换节点：点「连接位置」就地展开节点列表（带延迟），选一个即切换，已连接时自动改连过去，不再打开主窗口
-Windows 托盘右键菜单新增「连接位置」子菜单，自动选择或指定节点一步完成</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>流量快用完或账号快到期时提前提醒：首页、Mac 菜单栏和 Windows 托盘里的小标题会直接显示“流量快用完”或“即将到期”
+到期前 7 天、前 1 天和流量剩 10% 时各发一条系统通知；Mac 菜单栏和 Windows 托盘图标上出现一个琥珀色小点，安卓连接中的通知也会显示提醒</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>

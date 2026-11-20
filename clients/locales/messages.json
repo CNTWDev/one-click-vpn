@@ -1758,5 +1758,60 @@
     "zh": "网站只能看到{0}",
     "en": "Sites only see {0}",
     "ru": "Сайты видят только {0}"
+  },
+  "access_low_title": {
+    "zh": "流量快用完",
+    "en": "Traffic running low",
+    "ru": "Трафик заканчивается"
+  },
+  "access_soon_title": {
+    "zh": "即将到期",
+    "en": "Ends soon",
+    "ru": "Скоро закончится"
+  },
+  "access_used_title": {
+    "zh": "流量已用完",
+    "en": "Traffic used up",
+    "ru": "Трафик закончился"
+  },
+  "access_expired_title": {
+    "zh": "已到期",
+    "en": "Expired",
+    "ru": "Срок истёк"
+  },
+  "reminder_soon_title": {
+    "zh": "账号即将到期",
+    "en": "Your access ends soon",
+    "ru": "Доступ скоро закончится"
+  },
+  "reminder_soon_body": {
+    "zh": "{0} 到期，到期后将无法连接。请联系管理员续期。",
+    "en": "It ends on {0}; after that you can't connect. Contact your administrator to renew.",
+    "ru": "Доступ закончится {0}, после этого подключиться будет нельзя. Обратитесь к администратору, чтобы продлить."
+  },
+  "reminder_low_title": {
+    "zh": "流量快用完了",
+    "en": "Traffic running low",
+    "ru": "Трафик заканчивается"
+  },
+  "reminder_low_body": {
+    "zh": "只剩 {0}，共 {1}。用完后将无法连接。",
+    "en": "{0} of {1} left. When it runs out you can't connect.",
+    "ru": "Осталось {0} из {1}. Когда он закончится, подключиться будет нельзя."
+  },
+  "reminder_low_line": {
+    "zh": "流量快用完 · 剩 {0}",
+    "en": "Traffic running low · {0} left",
+    "ru": "Трафик заканчивается · осталось {0}"
+  },
+  "reminder_soon_line": {
+    "zh": "即将到期 · {0}",
+    "en": "Ends soon · {0}",
+    "ru": "Скоро закончится · {0}"
+  },
+  "reminder_channel": {
+    "zh": "账号提醒",
+    "en": "Account reminders",
+    "ru": "Напоминания об аккаунте"
   }
 }

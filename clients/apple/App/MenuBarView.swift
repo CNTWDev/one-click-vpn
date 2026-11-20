@@ -76,8 +76,8 @@ struct MenuBarView:View {
                 .accessibilityAddTraits(picking ? .isSelected:[]).accessibilityHint(L10n.text("tap_to_change"))
                 let figures=UsageFigures(model.account)
                 HStack(alignment:.top,spacing:12) {
-                    cell(figures.trafficTitle,figures.traffic,figures.trafficTint)
-                    cell(L10n.text("valid_until_label"),figures.until,figures.untilTint)
+                    cell(figures.trafficTitle,figures.traffic,figures.trafficTint,figures.trafficTitleTint)
+                    cell(figures.untilTitle,figures.until,figures.untilTint,figures.untilTitleTint)
                 }.padding(.horizontal,6).padding(.vertical,12)
             } else {
                 Text(L10n.text("sign_in_tagline")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).padding(.vertical,16).padding(.horizontal,4)
@@ -153,9 +153,9 @@ struct MenuBarView:View {
         if reconnect {model.work {try await model.reconnect()}}
     }
     private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
-    private func cell(_ title:String,_ value:String,_ tint:Color)->some View {
+    private func cell(_ title:String,_ value:String,_ tint:Color,_ titleTint:Color)->some View {
         VStack(alignment:.leading,spacing:2) {
-            Text(title).font(.system(size:11)).foregroundStyle(VeilbirdStyle.secondary)
+            Text(title).font(.system(size:11)).foregroundStyle(titleTint).lineLimit(1)
             Text(value).font(.system(size:13,weight:.medium)).foregroundStyle(tint).monospacedDigit().lineLimit(1)
         }.frame(maxWidth:.infinity,alignment:.leading)
     }
@@ -190,13 +190,21 @@ struct MenuBarLabel:View {
     static let preferenceKey="menuBarSpeed"
     @ObservedObject var model:ClientModel
     @AppStorage(MenuBarLabel.preferenceKey) private var showSpeed=false
+    @Environment(\.openWindow) private var openWindow
     var body:some View {
+        // Always on screen, so it lends the window opener to a click on a reminder notification.
+        icon.onAppear {let open=openWindow;DockPresence.openMain={open(id:"main")}}
+    }
+    @ViewBuilder private var icon:some View {
         // The ∅ mark as a template image: full strength while connected, half while not.
         let on=model.connected
+        // Traffic or time running out: a small amber dot on the mark, and the reminder for VoiceOver.
+        let reminder=AccountAccess(model.account).line
+        let suffix=reminder.map {" · "+$0} ?? ""
         if showSpeed,on,model.since != nil,let image=Self.image(on:on,rx:model.rxRate,tx:model.txRate) {
-            Image(nsImage:image).accessibilityLabel("TrackNothing "+L10n.text("connection_rates",Self.mbps(model.rxRate),Self.mbps(model.txRate)))
+            Image(nsImage:reminder == nil ? image:Self.dotted(image)).accessibilityLabel("TrackNothing "+L10n.text("connection_rates",Self.mbps(model.rxRate),Self.mbps(model.txRate))+suffix)
         } else if let image=Self.mark(on:on) {
-            Image(nsImage:image).accessibilityLabel("TrackNothing")
+            Image(nsImage:reminder == nil ? image:Self.dottedMark(on:on,image)).accessibilityLabel("TrackNothing"+suffix)
         } else {
             Image(systemName:on ? "slash.circle.fill":"slash.circle").accessibilityLabel("TrackNothing")
         }
@@ -222,6 +230,33 @@ struct MenuBarLabel:View {
         image.isTemplate=true
         marks[on]=image
         return image
+    }
+    /// The image with an amber dot at the mark's top right, cut out of the mark by a thin clear ring. A template
+    /// image can only be one colour, so this one is not: the mark is filled with the menu bar's text colour at draw
+    /// time (light or dark menu bar), then the dot goes on top.
+    @MainActor static func dotted(_ base:NSImage)->NSImage {
+        let image=NSImage(size:base.size,flipped:false) {rect in
+            base.draw(in:rect)
+            NSColor.labelColor.set();rect.fill(using:.sourceAtop)
+            guard let context=NSGraphicsContext.current?.cgContext else {return true}
+            // The mark is 15 pt square, 1 pt from the left edge and centred vertically.
+            let center=CGPoint(x:15,y:(rect.height+15)/2-3)
+            context.setBlendMode(.clear);context.fillEllipse(in:MenuBarLabel.dotRect(center,radius:4))
+            context.setBlendMode(.normal);context.setFillColor(red:224/255,green:164/255,blue:88/255,alpha:1)
+            context.fillEllipse(in:MenuBarLabel.dotRect(center,radius:2.75))
+            return true
+        }
+        image.isTemplate=false
+        return image
+    }
+    @MainActor private static var dottedMarks:[Bool:NSImage]=[:]
+    @MainActor static func dottedMark(on:Bool,_ base:NSImage)->NSImage {
+        if let cached=dottedMarks[on] {return cached}
+        let image=dotted(base);dottedMarks[on]=image
+        return image
+    }
+    private static func dotRect(_ center:CGPoint,radius:CGFloat)->CGRect {
+        CGRect(x:center.x-radius,y:center.y-radius,width:radius*2,height:radius*2)
     }
     @MainActor static func image(on:Bool,rx:Int,tx:Int)->NSImage? {
         let content=HStack(spacing:4) {
