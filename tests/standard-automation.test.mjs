@@ -35,12 +35,12 @@ test("automatic deployment is idempotent, preserves custom templates and keys, r
     await symlink(path.join(root,"node_modules"),path.join(directory,"node_modules"),"dir");
     const entry = "virtual:automation-test";
     const output = path.join(directory,"automation.mjs");
-    await build({ input: entry, platform:"node", external:["pg"], output:{file:output,format:"esm"}, plugins:[{
+    await build({ input: entry, platform:"node", external:["pg"], output:{file:output,format:"esm",codeSplitting:false}, plugins:[{
       name:"automation-test-entry",resolveId(id){ if(id===entry)return id; },
       load(id){ if(id===entry)return ["vpn-services","db","control-plane","deployment-policy","control-db"].map((name)=>`export * from ${JSON.stringify(path.join(root,"server",name+".ts"))};`).join("\n"); },
     }] });
     api = await import(pathToFileURL(output).href);
-    assert.deepEqual(api.protocolsForTemplate("standard").sort(),["openvpn","vless","wireguard"]);
+    assert.deepEqual(api.protocolsForTemplate("standard").sort(),["openvpn","stealth","vless","wireguard"]);
     assert.deepEqual(api.protocolsForTemplate("agent-only"),[]);
     const timestamp = new Date().toISOString();
     for (const id of nodeIds) {
@@ -50,7 +50,7 @@ test("automatic deployment is idempotent, preserves custom templates and keys, r
     }
     const [fresh,old,custom,agentOnly,rollout,probed] = nodeIds;
     await api.initializeVpnServices(fresh);
-    assert.equal((await api.listVpnServices(fresh)).length,3);
+    assert.equal((await api.listVpnServices(fresh)).length,4);
     await api.reconcileEnabledVpnServices(fresh);
     assert.equal((await api.findVpnService(fresh,"vless")).status,"attention");
     // Auto target mode waits for the node's own probe; nothing to configure by hand.
@@ -77,7 +77,7 @@ test("automatic deployment is idempotent, preserves custom templates and keys, r
     await api.setNodeDeploymentPolicy(old,"standard",1);
     await api.upsertVpnService({nodeId:old,protocol:"wireguard",enabled:true,listenPort:51821,status:"healthy"});
     await api.ensureStandardVpnServices(old);
-    assert.equal((await api.listVpnServices(old)).length,3);
+    assert.equal((await api.listVpnServices(old)).length,4);
     assert.equal((await api.findVpnService(old,"wireguard")).listen_port,51821);
     await api.initializeVpnServices(custom,"wireguard");
     await api.ensureStandardVpnServices(custom);
@@ -97,7 +97,7 @@ test("automatic deployment is idempotent, preserves custom templates and keys, r
     const result = await api.rolloutStandardPolicy({actorUserId:actor,mode:"batch",nodeIds:[rollout]});
     assert.equal(result.queuedTargets,1);
     assert.equal(result.failedTargets,0);
-    assert.equal((await api.listVpnServices(rollout)).length,3);
+    assert.equal((await api.listVpnServices(rollout)).length,4);
     assert.ok(await api.findDesiredConfig(rollout,"vless"));
     assert.equal((await pool.query("SELECT server_name FROM reality_settings WHERE node_id=$1",[rollout])).rows[0].server_name,"changed.example.com");
 

@@ -565,7 +565,10 @@ profiles also export a single share link (`/api/v1/profiles/{id}/download?format
 For validation, `npm test` covers unit and integration hooks. Supply a disposable
 `VEILBIRD_TEST_DATABASE_URL` to run PostgreSQL/API tests, and optionally
 `VEILBIRD_TEST_XRAY` / `VEILBIRD_TEST_MIHOMO` paths to validate generated configs
-with real binaries (both routing modes must load offline). These checks do not replace iPhone/Android and live-node acceptance tests.
+with real binaries (both routing modes must load offline). `VEILBIRD_TEST_AUTOMATION_DATABASE_URL` and
+`VEILBIRD_TEST_REALITY_DATABASE_URL` (separate disposable databases) enable two more suites.
+CI runs all of this on every push and pull request (`.github/workflows/backend-tests.yml`).
+These checks do not replace iPhone/Android and live-node acceptance tests.
 
 ## Local development setup
 

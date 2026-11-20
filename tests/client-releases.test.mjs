@@ -32,7 +32,7 @@ test("native builds do not publish artifacts or fake a connected tunnel", async 
   // The tunnels report "connected" only after a transport answered through the core; until then they confirm.
   const apple = await readFile("clients/apple/PacketTunnel/PacketTunnelProvider.swift", "utf8");
   assert.match(apple, /\["status":"connection_confirming"\]/);
-  assert.match(apple, /failures==0 \? "connection_connected":"connection_confirming"/);
+  assert.match(apple, /case 0:return "connection_connected"\s+case 1:return "connection_confirming"/);
   const android = (await Promise.all((await readdir("clients/android/app/src/main/java/com/veilbird/client")).map((name) => readFile(`clients/android/app/src/main/java/com/veilbird/client/${name}`, "utf8")))).join("\n");
   assert.match(android, /VpnService\.prepare\(this\)/);
   const workflow = await readFile(".github/workflows/native-clients.yml", "utf8");
