@@ -40,6 +40,7 @@
   <data name="activity_title" xml:space="preserve"><value>Activity</value></data>
   <data name="activity_traffic" xml:space="preserve"><value>Traffic</value></data>
   <data name="all_locations" xml:space="preserve"><value>All locations</value></data>
+  <data name="all_locations_count" xml:space="preserve"><value>All {0} locations</value></data>
   <data name="allow_system_extension" xml:space="preserve"><value>macOS needs you to allow the TrackNothing network extension before it can connect. Choose Open System Settings and turn TrackNothing on under General › Login Items &amp; Extensions › Network Extensions (macOS 14 and earlier: Privacy &amp; Security). It connects as soon as you allow it.</value></data>
   <data name="allow_system_extension_short" xml:space="preserve"><value>Allow the TrackNothing network extension in System Settings; it connects once allowed</value></data>
   <data name="allow_the_system_to_add_a_vpn_on_first" xml:space="preserve"><value>Allow the system to add a VPN on first connection. Manage authorized devices in Account.</value></data>
@@ -50,15 +51,18 @@
   <data name="announcement" xml:space="preserve"><value>Announcement</value></data>
   <data name="appearance" xml:space="preserve"><value>Appearance</value></data>
   <data name="ask_your_administrator_to_enable_veilbird_client_access" xml:space="preserve"><value>Ask your administrator to enable TrackNothing client access.</value></data>
+  <data name="attempt_n" xml:space="preserve"><value>Attempt {0}</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>Authorized devices</value></data>
   <data name="authorizing_and_connecting" xml:space="preserve"><value>Authorizing and connecting…</value></data>
   <data name="auto_detail" xml:space="preserve"><value>Picked by latency, stability and load</value></data>
   <data name="automatic" xml:space="preserve"><value>Automatic</value></data>
+  <data name="automatic_now" xml:space="preserve"><value>Right now: {0} · {1}</value></data>
   <data name="automatic_recommended" xml:space="preserve"><value>Automatic · Recommended</value></data>
   <data name="available_location" xml:space="preserve"><value>Available location</value></data>
   <data name="back_action" xml:space="preserve"><value>Back</value></data>
   <data name="cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="change_location" xml:space="preserve"><value>Change location  ›</value></data>
+  <data name="change_location_action" xml:space="preserve"><value>Change</value></data>
   <data name="change_password" xml:space="preserve"><value>Change password</value></data>
   <data name="check_again" xml:space="preserve"><value>Check again</value></data>
   <data name="check_exit" xml:space="preserve"><value>Exit location</value></data>
@@ -89,6 +93,7 @@
   <data name="close" xml:space="preserve"><value>Close</value></data>
   <data name="confirming_connection_status" xml:space="preserve"><value>Confirming connection…</value></data>
   <data name="connect_action" xml:space="preserve"><value>Connect</value></data>
+  <data name="connect_again_action" xml:space="preserve"><value>Connect again</value></data>
   <data name="connect_automatically_or_choose_your_own_location" xml:space="preserve"><value>Connect automatically or choose your own location.</value></data>
   <data name="connect_automatically_or_pick_a_location" xml:space="preserve"><value>Connect automatically or pick a location</value></data>
   <data name="connect_failed_title" xml:space="preserve"><value>Couldn't connect</value></data>
@@ -107,6 +112,7 @@
   <data name="connection_rates" xml:space="preserve"><value>↓ {0}  ↑ {1} Mbps</value></data>
   <data name="connection_stats" xml:space="preserve"><value>{0}  ·  ↓ {1}  ↑ {2} Mbps</value></data>
   <data name="connection_unavailable" xml:space="preserve"><value>Connection unavailable</value></data>
+  <data name="continue_action" xml:space="preserve"><value>Continue</value></data>
   <data name="copied" xml:space="preserve"><value>Copied</value></data>
   <data name="copy_action" xml:space="preserve"><value>Copy</value></data>
   <data name="current_page" xml:space="preserve"><value>, current page</value></data>
@@ -139,6 +145,30 @@
   <data name="enter_email" xml:space="preserve"><value>Enter email</value></data>
   <data name="enter_password" xml:space="preserve"><value>Enter password</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Enter your email and password.</value></data>
+  <data name="error_account_title" xml:space="preserve"><value>Account unavailable</value></data>
+  <data name="error_device_detail" xml:space="preserve"><value>Remove a device you no longer use, and this one can connect.</value></data>
+  <data name="error_device_title" xml:space="preserve"><value>Device limit reached</value></data>
+  <data name="error_expired_detail" xml:space="preserve"><value>Ask your administrator to renew it, then try again.</value></data>
+  <data name="error_expired_title" xml:space="preserve"><value>Access expired</value></data>
+  <data name="error_extension_detail" xml:space="preserve"><value>Turn on the TrackNothing network extension in System Settings. It connects right away.</value></data>
+  <data name="error_extension_title" xml:space="preserve"><value>Network extension is off</value></data>
+  <data name="error_lease_detail" xml:space="preserve"><value>You were offline too long. Connect again to renew it.</value></data>
+  <data name="error_lease_title" xml:space="preserve"><value>Authorization expired</value></data>
+  <data name="error_node_auto_detail" xml:space="preserve"><value>No location is answering right now. Try again later or on another network.</value></data>
+  <data name="error_node_detail" xml:space="preserve"><value>Pick another location, or let Automatic choose.</value></data>
+  <data name="error_node_title" xml:space="preserve"><value>{0} isn't answering</value></data>
+  <data name="error_permission_detail" xml:space="preserve"><value>The VPN wasn't allowed. Try again and tap OK in the prompt.</value></data>
+  <data name="error_quota_detail" xml:space="preserve"><value>This period's traffic is used up. Ask your administrator to add more.</value></data>
+  <data name="error_quota_title" xml:space="preserve"><value>Traffic used up</value></data>
+  <data name="error_revoked_detail" xml:space="preserve"><value>Its access was revoked. Ask your administrator to restore it.</value></data>
+  <data name="error_revoked_title" xml:space="preserve"><value>This device was removed</value></data>
+  <data name="error_service_detail" xml:space="preserve"><value>This network may be blocking it. Switch between Wi-Fi and mobile data, then try again.</value></data>
+  <data name="error_service_detail_desktop" xml:space="preserve"><value>This network may be blocking it. Try another network.</value></data>
+  <data name="error_service_title" xml:space="preserve"><value>Can't reach the service</value></data>
+  <data name="error_session_detail" xml:space="preserve"><value>Sign in again. Your chosen location stays.</value></data>
+  <data name="error_session_title" xml:space="preserve"><value>Signed out</value></data>
+  <data name="error_update_detail" xml:space="preserve"><value>This version is no longer supported. Update to keep connecting.</value></data>
+  <data name="error_update_title" xml:space="preserve"><value>Update needed</value></data>
   <data name="exposed_detail" xml:space="preserve"><value>Any site can see all of this right now</value></data>
   <data name="exposed_status" xml:space="preserve"><value>Visible</value></data>
   <data name="extension_guide_continue" xml:space="preserve"><value>Continue</value></data>
@@ -153,9 +183,14 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="file_public_ip" xml:space="preserve"><value>Public IP</value></data>
   <data name="file_time_zone" xml:space="preserve"><value>Time zone</value></data>
   <data name="finding_best_route" xml:space="preserve"><value>Finding the best route · Tap to cancel</value></data>
+  <data name="first_connect_android" xml:space="preserve"><value>The first time, Android asks to add a VPN</value></data>
+  <data name="first_connect_android_detail" xml:space="preserve"><value>Tap OK in the prompt. It won't ask again.</value></data>
+  <data name="first_connect_mac" xml:space="preserve"><value>The first time, turn on one switch in macOS</value></data>
+  <data name="first_connect_mac_detail" xml:space="preserve"><value>System Settings › General › Login Items &amp; Extensions › Network Extensions: turn on TrackNothing. It connects right away.</value></data>
   <data name="forgot_password" xml:space="preserve"><value>Forgot password?</value></data>
   <data name="got_it" xml:space="preserve"><value>Got it</value></data>
   <data name="hide_password" xml:space="preserve"><value>Hide password</value></data>
+  <data name="hiding_status" xml:space="preserve"><value>Hiding</value></data>
   <data name="hold_to_reveal" xml:space="preserve"><value>Hold to reveal</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Incorrect email or password.</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>Invalid server response. Try again later.</value></data>
@@ -184,6 +219,7 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="logs_detail" xml:space="preserve"><value>Connection steps only: no addresses, keys or browsing. Kept for 7 days, up to 512 KB.</value></data>
   <data name="logs_empty" xml:space="preserve"><value>No entries yet.</value></data>
   <data name="logs_title" xml:space="preserve"><value>Diagnostic log</value></data>
+  <data name="manage_devices_action" xml:space="preserve"><value>Manage devices</value></data>
   <data name="measuring_latency" xml:space="preserve"><value>Testing…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>Your access has expired. Contact your administrator to renew it.</value></data>
   <data name="menu_bar_speed" xml:space="preserve"><value>Show speed in menu bar</value></data>
@@ -200,15 +236,22 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="node_load" xml:space="preserve"><value>Load {0}%</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>Jitter {0} ms · Loss {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="offline_centre" xml:space="preserve"><value>Offline</value></data>
+  <data name="onboarding_ready" xml:space="preserve"><value>Ready</value></data>
   <data name="open_app" xml:space="preserve"><value>Open TrackNothing</value></data>
   <data name="open_at_login" xml:space="preserve"><value>Open at login</value></data>
   <data name="open_main_window" xml:space="preserve"><value>Open main window</value></data>
   <data name="open_settings_short" xml:space="preserve"><value>Open Settings</value></data>
   <data name="open_system_settings" xml:space="preserve"><value>Open System Settings</value></data>
   <data name="open_vpn_settings" xml:space="preserve"><value>Open VPN settings</value></data>
+  <data name="or_choose_one" xml:space="preserve"><value>Or choose one</value></data>
   <data name="password" xml:space="preserve"><value>Password</value></data>
   <data name="password_reset_unavailable" xml:space="preserve"><value>Password reset by email isn't available right now. Contact your administrator.</value></data>
   <data name="permission_needed_title" xml:space="preserve"><value>Permission needed</value></data>
+  <data name="phase_confirm" xml:space="preserve"><value>Confirming</value></data>
+  <data name="phase_route" xml:space="preserve"><value>Picking route</value></data>
+  <data name="phase_tunnel" xml:space="preserve"><value>Opening tunnel</value></data>
+  <data name="pick_location_sub" xml:space="preserve"><value>We pick the fastest one for you. You can change it any time.</value></data>
   <data name="quality_fair" xml:space="preserve"><value>Fair</value></data>
   <data name="quality_good" xml:space="preserve"><value>Good</value></data>
   <data name="quality_poor" xml:space="preserve"><value>Poor</value></data>
@@ -218,7 +261,9 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="rate_unit_gbps" xml:space="preserve"><value>Gb/s</value></data>
   <data name="rate_unit_kbps" xml:space="preserve"><value>Kb/s</value></data>
   <data name="rate_unit_mbps" xml:space="preserve"><value>Mb/s</value></data>
+  <data name="reconnecting_detail" xml:space="preserve"><value>The connection dropped. Reconnecting on its own.</value></data>
   <data name="reconnecting_status" xml:space="preserve"><value>Connection lost. Reconnecting…</value></data>
+  <data name="reconnecting_title" xml:space="preserve"><value>Reconnecting</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>Refresh devices</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Refresh locations</value></data>
   <data name="reset_by_email" xml:space="preserve"><value>Reset password by email</value></data>
@@ -264,6 +309,7 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="shortcuts_detail" xml:space="preserve"><value>Connect / Disconnect</value></data>
   <data name="show_password" xml:space="preserve"><value>Show password</value></data>
   <data name="sign_in_action" xml:space="preserve"><value>Sign in</value></data>
+  <data name="sign_in_again_action" xml:space="preserve"><value>Sign in</value></data>
   <data name="sign_in_and_start" xml:space="preserve"><value>Sign in and start</value></data>
   <data name="sign_in_tagline" xml:space="preserve"><value>Sign in and go. Nothing to set up.</value></data>
   <data name="sign_in_to_veilbird_no_imports_or_configuration_needed" xml:space="preserve"><value>Sign in to TrackNothing. No imports or configuration needed.</value></data>
@@ -282,11 +328,14 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="speed_title" xml:space="preserve"><value>Speed of this connection</value></data>
   <data name="speed_used" xml:space="preserve"><value>Data</value></data>
   <data name="switched_location" xml:space="preserve"><value>{0} did not answer, switched to {1}</value></data>
+  <data name="switching_centre" xml:space="preserve"><value>Line {0} of {1}</value></data>
+  <data name="switching_detail" xml:space="preserve"><value>This network blocks some lines. Trying the next one for you.</value></data>
   <data name="system_extension_failed" xml:space="preserve"><value>Couldn't enable the VPN component. Reinstall TrackNothing and try again.</value></data>
   <data name="tap_ring_to_connect" xml:space="preserve"><value>Tap the ring to connect</value></data>
   <data name="tap_to_change" xml:space="preserve"><value>Tap to change location</value></data>
   <data name="tap_to_check" xml:space="preserve"><value>Tap to check</value></data>
   <data name="tap_to_hide" xml:space="preserve"><value>Tap to hide</value></data>
+  <data name="tap_to_retry" xml:space="preserve"><value>Tap to try again</value></data>
   <data name="test_after_disconnecting" xml:space="preserve"><value>Latency is tested while disconnected. Showing the last results.</value></data>
   <data name="the_simulator_is_for_ui_testing_only_test_the" xml:space="preserve"><value>The simulator is for UI testing only. Test the VPN on a signed physical-device build.</value></data>
   <data name="theme_amber" xml:space="preserve"><value>Amber</value></data>
@@ -341,12 +390,16 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="upload_amount" xml:space="preserve"><value>↑ Up {0}</value></data>
   <data name="usage_this_month" xml:space="preserve"><value>This month</value></data>
   <data name="usage_today" xml:space="preserve"><value>Today</value></data>
+  <data name="use_automatic_action" xml:space="preserve"><value>Use Automatic</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 Valid until · </value></data>
   <data name="valid_until_label" xml:space="preserve"><value>Valid until</value></data>
   <data name="version_label" xml:space="preserve"><value>Version {0}</value></data>
+  <data name="view_account_action" xml:space="preserve"><value>Account</value></data>
   <data name="vpn_connection" xml:space="preserve"><value>VPN connection</value></data>
+  <data name="waiting_detail" xml:space="preserve"><value>Offline. Reconnects when the network is back.</value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
+  <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
   <data name="whats_new_notes" xml:space="preserve"><value>Lower battery use on Android: far fewer background checks with the screen off, only the line in use is tested while the connection works, and authorization renews less often; losing or changing the network and turning the screen on still check and reconnect at once</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>

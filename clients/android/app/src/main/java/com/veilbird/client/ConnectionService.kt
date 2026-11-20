@@ -32,6 +32,17 @@ object ConnectionStateStore {
     @Volatile var txRate = 0L
     /** The location automatic mode gave up on during this connection, for the one-line note on the connect page. */
     @Volatile var switchedFrom = ""
+    /** While connecting: 0 picking a route, 1 opening the tunnel, 2 confirming it carries traffic. */
+    @Volatile var phase = 0
+    /** How many lines (transports) this location offers: the connect page draws one segment each. */
+    @Volatile var lines = 0
+    /** elapsedRealtime of the next retry while reconnecting (0 when none), and how many rounds have failed. */
+    @Volatile var retryAt = 0L
+    @Volatile var attempt = 0
+    /** Why the last connection ended on its own (an API code, HANDSHAKE_TIMEOUT, LEASE_EXPIRED…); empty after a disconnect by the user. */
+    @Volatile var errorCode = ""
+    /** Shows a refusal the app found before the service ran (the VPN permission), the same way as one from the service. */
+    fun failed(code: String, message: Int) { active = false; since = 0L; errorCode = code; messageId = message }
 }
 
 /** Thrown when no transport of a node answers from this network. */
@@ -106,6 +117,7 @@ class ConnectionService : VpnService() {
         wanted(this, true)
         ConnectionStateStore.active = true; ConnectionStateStore.messageId = R.string.authorizing_and_connecting
         ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L; ConnectionStateStore.switchedFrom = ""
+        ConnectionStateStore.phase = 0; ConnectionStateStore.retryAt = 0L; ConnectionStateStore.attempt = 0; ConnectionStateStore.errorCode = ""
         // Always-on VPN, the tile and a restart start the service without extras: use the location chosen in the app.
         nodeId = intent?.getStringExtra("nodeId") ?: getSharedPreferences("preferences", MODE_PRIVATE).getString("nodeId", "")!!
         automatic = nodeId.isEmpty()
@@ -124,14 +136,18 @@ class ConnectionService : VpnService() {
             network = Transports.networkKey(this); online = Transports.online(this); networkChanged = false
             // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
             Journal.add("connect: start ${api.attempt}, network ${network}, routing ${routing()}" + if (restored) ", restored" else "")
+            ConnectionStateStore.phase = 0
             if (automatic) { nodeId = ""; chooseFastest() }
             connect()
+            ConnectionStateStore.retryAt = 0L; ConnectionStateStore.attempt = 0
             started = true
             scheduleTick(TICK)
             api.report("")
         } catch (e: Exception) {
-            if (!restored || stopping || fatal(e)) { fail(e); return }
+            // Without a network a tap waits for one too, instead of failing at once.
+            if ((!restored && online) || stopping || fatal(e)) { fail(e); return }
             val delay = RETRY[minOf(attempt, RETRY.size - 1)]
+            ConnectionStateStore.retryAt = SystemClock.elapsedRealtime() + delay; ConnectionStateStore.attempt = attempt + 1
             Journal.add("connect: failed ${code(e)}, retrying in ${delay / 1000} s")
             ConnectionStateStore.messageId = if (online) R.string.reconnecting_status else R.string.waiting_for_network
             retry = worker.schedule({ begin(attempt + 1) }, delay, TimeUnit.MILLISECONDS)
@@ -199,6 +215,7 @@ class ConnectionService : VpnService() {
         val detail = if (e !is ApiFailure && e !is Unreachable) listOf(e.javaClass.simpleName, Journal.scrub(e.message)).filter { it.isNotEmpty() }.joinToString(": ") else ""
         Journal.add("connect: failed ${code(e)}" + if (detail.isNotEmpty()) " ($detail)" else "")
         api.report(code(e), nodeId, detail)
+        ConnectionStateStore.errorCode = code(e)
         stopConnection(if (e is Unreachable) R.string.this_location_is_not_responding_try_another else friendlyResource(e))
     }
     /** Measured before the tunnel exists; if the list cannot be loaded the server picks the least-loaded node. */
@@ -235,12 +252,14 @@ class ConnectionService : VpnService() {
     }
     private fun bringUp() {
         val started = SystemClock.elapsedRealtime()
+        ConnectionStateStore.phase = 1
         val lease = acquire(initial = true)
         val proxies = listOf(Transports.wireguard(lease, keyPair.privateKey.toBase64())) +
             lease.optJSONArray("proxies").let { list -> (0 until (list?.length() ?: 0)).map { list!!.getJSONObject(it) } }
             .filter { it.optString("name") in Transports.ladder }
         val blocked = Transports.blocked(this, network)
         transports = Transports.order(proxies.map { it.getString("name") }, blocked)
+        ConnectionStateStore.lines = transports.size
         Journal.add("node: ${ConnectionStateStore.node}, transports ${transports.joinToString(" > ")}" + if (blocked.isNotEmpty()) " (blocked here before: ${blocked.joinToString()})" else "")
         Core.stop()
         val tun = Builder().setSession("TrackNothing").setMtu(1500)
@@ -252,6 +271,7 @@ class ConnectionService : VpnService() {
         // mihomo owns the descriptor from here and closes it on stop.
         Core.run(home, Transports.options(proxies, transports, tun.detachFd(), routing() == "smart"))
         if (stopping) { Core.stop(); throw ApiFailure("CANCELLED") }
+        ConnectionStateStore.phase = 2
         if (!probe(initial = true)) {
             // WireGuard waits for the node to add this device; give it the rest of the readiness window.
             while (!leaseReady && SystemClock.elapsedRealtime() - started < 15000) { Thread.sleep(1000); leaseReady = status() }
@@ -354,7 +374,7 @@ class ConnectionService : VpnService() {
                 statusAt = now + if (now - ConnectionStateStore.since < 60000) 0 else 60000
                 if (status()) { leaseReady = true; Journal.add("lease: WireGuard ready"); probe(report = true) }
             }
-            if (SystemClock.elapsedRealtime() - renewedAt >= OFFLINE_GRACE) { Journal.add("lease: expired"); api.report("LEASE_RENEWAL_FAILED", nodeId); wanted(this, false); stopConnection(R.string.connection_authorization_expired_connect_again); return }
+            if (SystemClock.elapsedRealtime() - renewedAt >= OFFLINE_GRACE) { Journal.add("lease: expired"); api.report("LEASE_RENEWAL_FAILED", nodeId); wanted(this, false); ConnectionStateStore.errorCode = "LEASE_EXPIRED"; stopConnection(R.string.connection_authorization_expired_connect_again); return }
             if (!online) {
                 // Nothing to reach: no probes (they would only drain the battery) until Android reports a network.
                 ConnectionStateStore.messageId = R.string.waiting_for_network
@@ -366,6 +386,7 @@ class ConnectionService : VpnService() {
                 } else missed()
                 ConnectionStateStore.messageId = message()
             } else updateCarrying()
+            ConnectionStateStore.attempt = failures; ConnectionStateStore.retryAt = if (failures > 0) nextProbe else 0L
             Core.rate().split(' ').let { (up, down) -> ConnectionStateStore.txRate = up.toLong(); ConnectionStateStore.rxRate = down.toLong() }
         } catch (e: Exception) {
             // Never a reason to give up: count it as a failed round and try again later.
