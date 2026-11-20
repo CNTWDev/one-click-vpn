@@ -149,3 +149,7 @@ if [ "$agent_step" != "no" ]; then
 else
   echo "Node Agents were not checked (--no-agent / --only). Later: sudo ./one-click-update.sh --only agent"
 fi
+
+# Nightly off-site backup and weekly restore drill (only once VEILBIRD_BACKUP_S3_* is set in .env).
+echo ""
+sh ./scripts/install-backup-timer.sh || echo "Warning: off-site backup needs attention (see above); the update itself succeeded." >&2
