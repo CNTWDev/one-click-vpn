@@ -205,3 +205,38 @@ func TestRuleSetsDoNotBlockStart(t *testing.T) {
 	// A second seeding leaves existing files alone.
 	seedRuleSets(home)
 }
+
+func TestBuildPerAppRouting(t *testing.T) {
+	proxies := []map[string]any{{"name": "reality", "type": "vless", "server": "1.2.3.4", "port": 443, "uuid": "c7a5b0f4-1d2e-4c3b-9a8f-0e1d2c3b4a59"}}
+	parse := func(o Options) *config.Config {
+		o.Platform, o.Proxies, o.Order = "windows", proxies, []string{"reality"}
+		text, err := Build(o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := config.Parse(normalize([]byte(text)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cfg
+	}
+	only := parse(Options{AppMode: "only", Apps: []string{"chrome.exe", "Telegram.exe", "bad,name.exe", "chrome.exe"}})
+	var tunneled []string
+	for _, rule := range only.Rules {
+		if rule.RuleType().String() == "ProcessName" && rule.Adapter() == group {
+			tunneled = append(tunneled, rule.Payload())
+		}
+	}
+	if strings.Join(tunneled, " ") != "chrome.exe Telegram.exe" || only.Rules[len(only.Rules)-1].Adapter() != "DIRECT" {
+		t.Fatalf("only: tunneled %v, last %s", tunneled, only.Rules[len(only.Rules)-1].Adapter())
+	}
+	except := parse(Options{AppMode: "except", Apps: []string{"steam.exe"}, Smart: true})
+	if except.Rules[1].Payload() != "steam.exe" || except.Rules[1].Adapter() != "DIRECT" || except.Rules[len(except.Rules)-1].Adapter() != group {
+		t.Fatalf("except: rule 1 %s→%s", except.Rules[1].Payload(), except.Rules[1].Adapter())
+	}
+	// Android leaves apps out of its tun itself; the core ignores the list there.
+	text, _ := Build(Options{Platform: "android", Proxies: proxies, Order: []string{"reality"}, AppMode: "only", Apps: []string{"x"}})
+	if strings.Contains(text, "PROCESS-NAME") {
+		t.Fatal("android config has process rules")
+	}
+}
