@@ -17,8 +17,6 @@ using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 namespace Veilbird;
 
-public enum RingState {Idle,Connecting,Connected,Failed}
-
 /// The palette and the small drawn pieces every page uses, in the file language every TrackNothing client shares
 /// (warm near-black, amber only for light, nearly square corners) with the ∅ mark on a 16×16 grid, rings of square dots and the Doto dot-matrix face for figures.
 public static class Look {

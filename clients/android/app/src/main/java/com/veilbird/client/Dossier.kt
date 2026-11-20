@@ -12,9 +12,6 @@ import android.view.View
 import android.view.animation.LinearInterpolator
 import android.widget.TextView
 
-/** The connect page's four states. */
-enum class LinkState { IDLE, CONNECTING, CONNECTED, FAILED }
-
 /**
  * The file language shared by every TrackNothing client and the Portal (portal-web/src/dossier.tsx): one line of a
  * file that can be "sealed". Sealing or unsealing first runs the text through a few frames of random glyphs in amber,
@@ -137,6 +134,12 @@ class Portrait(context: Context) : View(context) {
         set(value) { if (field != value) { field = value; invalidate() } }
     var sub: String = ""
         set(value) { if (field != value) { field = value; invalidate() } }
+    /** Which drawing: the sphere (idle, dimmed after a failure) or, hidden, the ring of the state. */
+    var state = LinkState.IDLE
+        set(value) { if (field != value) { field = value; invalidate() } }
+    /** Lines (transports) of the location, one segment each while switching. */
+    var lines = 4
+    private val dot = Paint(Paint.ANTI_ALIAS_FLAG)
     private var t = 0f
     private var anim: ValueAnimator? = null
     private var pulse: ValueAnimator? = null
@@ -203,35 +206,90 @@ class Portrait(context: Context) : View(context) {
         val s = height; if (s <= 0) return
         val cx = width / 2f; val cy = height / 2f
         val left = cx - s / 2f
-        // The sphere: bright and breathing while visible, nearly dark once hidden.
-        bitmapPaint.alpha = (255 * ((0.82f + 0.18f * phase) * (1 - t) + 0.1f * t)).toInt()
+        val failed = state == LinkState.FAILED
+        // The sphere: bright and breathing while visible, dim and still after a failure, nearly dark once hidden.
+        bitmapPaint.alpha = (255 * ((if (failed) 0.42f else 0.82f + 0.18f * phase) * (1 - t) + 0.1f * t)).toInt()
         canvas.drawBitmap(sphere(s), left, 0f, bitmapPaint)
         ring.strokeWidth = 1 * d; ring.color = Palette.alpha(Palette.text, (18 * (1 - t)).toInt())
         canvas.drawCircle(cx, cy, s / 2f - d, ring)
         val accent = Palette.accent
         if (invite.isNotEmpty() && t < 1f) {
             label.typeface = Typeface.DEFAULT; label.textSize = 0.05f * s
-            label.color = Palette.alpha(accent, (255 * (1 - t) * (0.75f + 0.25f * phase)).toInt())
+            label.color = if (failed) Palette.alpha(Palette.text, (180 * (1 - t)).toInt()) else Palette.alpha(accent, (255 * (1 - t) * (0.75f + 0.25f * phase)).toInt())
             val wide = label.measureText(invite); if (wide > 0.8f * s) label.textSize *= 0.8f * s / wide
             canvas.drawText(invite, cx, cy + label.textSize * 0.35f, label)
         }
-        if (t > 0f) {
-            // The ring that takes the sphere's place, with a soft glow; the time hidden and the rates inside.
-            val rr = 0.375f * s; val glow = (0.82f + 0.18f * phase) * t
-            ring.strokeWidth = 8 * d; ring.color = Palette.alpha(accent, (28 * glow).toInt()); canvas.drawCircle(cx, cy, rr, ring)
-            ring.strokeWidth = 3 * d; ring.color = Palette.alpha(accent, (55 * glow).toInt()); canvas.drawCircle(cx, cy, rr, ring)
-            ring.strokeWidth = 1 * d; ring.color = Palette.alpha(accent, (255 * glow).toInt()); canvas.drawCircle(cx, cy, rr, ring)
-            if (centre.isNotEmpty()) {
-                label.typeface = Typeface.MONOSPACE; label.textSize = 0.072f * s; label.color = Palette.alpha(Palette.text, (255 * t).toInt())
-                canvas.drawText(centre, cx, cy, label)
+        if (t <= 0f) return
+        val rr = 0.375f * s
+        // One clock for the loops; under reduced motion every loop rests on its first frame.
+        val clock = if (ValueAnimator.areAnimatorsEnabled()) android.os.SystemClock.uptimeMillis() / 1000f else 0f
+        var small = false; var middle = centre
+        when (state) {
+            LinkState.CONNECTING -> {
+                // A faint track and an arc of light that circles it (1.4 s a turn), its tail fading.
+                ring.strokeWidth = 1 * d; ring.color = Palette.alpha(accent, (40 * t).toInt()); canvas.drawCircle(cx, cy, rr, ring)
+                val head = if (clock == 0f) 90f else (clock / 1.4f % 1f) * 360f
+                for (i in 0 until 24) {
+                    ring.strokeWidth = (if (i < 2) 2f else 1.5f) * d; ring.color = Palette.alpha(accent, (255 * t * (1 - i / 24f)).toInt())
+                    canvas.drawArc(cx - rr, cy - rr, cx + rr, cy + rr, head - 90f - (i + 1) * 3f, 3.2f, false, ring)
+                }
+                small = true
             }
-            if (sub.isNotEmpty()) {
-                label.typeface = Typeface.MONOSPACE; label.textSize = 0.036f * s; label.color = Palette.alpha(Palette.secondary, (255 * t).toInt())
-                // Long notices (ru) shrink to stay inside the ring.
-                val room = 0.62f * s; val wide = label.measureText(sub)
-                if (wide > room) label.textSize *= room / wide
-                canvas.drawText(sub, cx, cy + 0.08f * s, label)
+            LinkState.SWITCHING -> {
+                // One segment per line; the one being tried blinks and moves on every 0.6 s, the ones before it are dimmed.
+                val n = maxOf(lines, 2); val current = if (clock == 0f) 0 else (clock / 0.6f).toInt() % n
+                val blink = if (clock == 0f) 1f else 0.45f + 0.55f * Math.abs(Math.sin(clock * Math.PI)).toFloat()
+                for (i in 0 until n) {
+                    val start = 360f * i / n - 90f + 4.5f; val sweep = 360f / n - 9f
+                    when {
+                        i < current -> { ring.strokeWidth = 1.5f * d; ring.color = Palette.alpha(Palette.fair, (150 * t).toInt()) }
+                        i == current -> {
+                            ring.strokeWidth = 7 * d; ring.color = Palette.alpha(accent, (46 * blink * t).toInt())
+                            canvas.drawArc(cx - rr, cy - rr, cx + rr, cy + rr, start, sweep, false, ring)
+                            ring.strokeWidth = 2 * d; ring.color = Palette.alpha(accent, (255 * blink * t).toInt())
+                        }
+                        else -> { ring.strokeWidth = 1 * d; ring.color = Palette.alpha(accent, (40 * t).toInt()) }
+                    }
+                    canvas.drawArc(cx - rr, cy - rr, cx + rr, cy + rr, start, sweep, false, ring)
+                }
+                middle = L10n.text(R.string.switching_centre, L10n.number(current + 1), L10n.number(n))
+                small = true
             }
+            LinkState.RECONNECTING, LinkState.WAITING -> {
+                // A ring of dim square dots: reconnecting, a bright dot with a tail goes round (4 s a turn); offline, it rests.
+                val n = 64; val head = if (state == LinkState.RECONNECTING && clock > 0f) ((clock / 4f % 1f) * n).toInt() else -99
+                val half = 1.3f * d; dot.style = Paint.Style.FILL
+                for (i in 0 until n) {
+                    val gap = (head - i + n) % n
+                    var a = if (state == LinkState.WAITING) 0.2f else 0.28f
+                    if (head >= 0 && gap < 8) a = maxOf(a, 1 - gap / 8f)
+                    dot.color = Palette.alpha(accent, (255 * a * t).toInt())
+                    val angle = Math.toRadians(360.0 * i / n - 90.0)
+                    val x = cx + rr * Math.cos(angle).toFloat(); val y = cy + rr * Math.sin(angle).toFloat()
+                    canvas.drawRect(x - half, y - half, x + half, y + half, dot)
+                }
+            }
+            else -> {
+                // The ring that takes the sphere's place, with a soft glow.
+                val glow = (0.82f + 0.18f * phase) * t
+                ring.strokeWidth = 8 * d; ring.color = Palette.alpha(accent, (28 * glow).toInt()); canvas.drawCircle(cx, cy, rr, ring)
+                ring.strokeWidth = 3 * d; ring.color = Palette.alpha(accent, (55 * glow).toInt()); canvas.drawCircle(cx, cy, rr, ring)
+                ring.strokeWidth = 1 * d; ring.color = Palette.alpha(accent, (255 * glow).toInt()); canvas.drawCircle(cx, cy, rr, ring)
+            }
+        }
+        // Inside: the time hidden (or the countdown) and the rates under it; while connecting, one short line.
+        if (middle.isNotEmpty()) {
+            label.typeface = Typeface.MONOSPACE; label.textSize = (if (small) 0.044f else 0.072f) * s
+            label.color = Palette.alpha(if (small) Palette.secondary else Palette.text, (255 * t).toInt())
+            val wide = label.measureText(middle); if (wide > 0.62f * s) label.textSize *= 0.62f * s / wide
+            canvas.drawText(middle, cx, cy + if (small) label.textSize * 0.35f else 0f, label)
+        }
+        if (sub.isNotEmpty() && !small) {
+            label.typeface = Typeface.MONOSPACE; label.textSize = 0.036f * s; label.color = Palette.alpha(Palette.secondary, (255 * t).toInt())
+            // Long notices (ru) shrink to stay inside the ring.
+            val room = 0.62f * s; val wide = label.measureText(sub)
+            if (wide > room) label.textSize *= room / wide
+            canvas.drawText(sub, cx, cy + 0.08f * s, label)
         }
     }
 }
