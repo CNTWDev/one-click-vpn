@@ -142,16 +142,24 @@ public sealed class Portrait:FrameworkElement {
     private readonly System.Diagnostics.Stopwatch clock=System.Diagnostics.Stopwatch.StartNew();
     private static bool Moving(LinkState s)=>s is LinkState.Connecting or LinkState.Switching or LinkState.Reconnecting;
     private void Loop() {
-        if(Moving(state)&&SystemParameters.ClientAreaAnimation&&IsLoaded) frames.Start(); else frames.Stop();
+        if(Moving(state)&&SystemParameters.ClientAreaAnimation&&IsVisible&&!resting) frames.Start(); else frames.Stop();
     }
     private DrawingGroup? dots;private double dotsSize;private Color dotsColor;
     public Portrait() {
         Cursor=System.Windows.Input.Cursors.Hand;Focusable=true;
         frames.Tick+=(_,_)=>InvalidateVisual();
-        Loaded+=(_,_)=>{Breathe();Loop();};Unloaded+=(_,_)=>{BeginAnimation(PhaseProperty,null);frames.Stop();};
+        // Breathes only while it can be seen: the window closed to the tray (hidden, not unloaded) or minimised
+        // would otherwise keep redrawing the sphere every frame.
+        IsVisibleChanged+=(_,_)=>{Breathe();Loop();};Unloaded+=(_,_)=>frames.Stop();
     }
+    private bool breathing,resting;
+    /// Set while the window is minimised: still "visible" to WPF, but nobody sees it breathe.
+    public bool Resting {set {if(resting!=value) {resting=value;Breathe();Loop();}}}
     private void Breathe() {
-        if(!SystemParameters.ClientAreaAnimation) {BeginAnimation(PhaseProperty,null);Phase=1;return;}
+        var on=IsVisible&&!resting&&SystemParameters.ClientAreaAnimation;
+        if(on==breathing) return;
+        breathing=on;
+        if(!on) {BeginAnimation(PhaseProperty,null);Phase=1;return;}
         BeginAnimation(PhaseProperty,new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(3000)) {AutoReverse=true,RepeatBehavior=RepeatBehavior.Forever,EasingFunction=new SineEase {EasingMode=EasingMode.EaseInOut}});
     }
     public void Set(bool hidden,bool moving) {

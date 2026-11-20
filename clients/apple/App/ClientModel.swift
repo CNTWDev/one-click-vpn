@@ -232,7 +232,7 @@ import ServiceManagement
     /// The activity view's figures from the tunnel (open connections, rankings, hours, names looked up); nil when not connected.
     @Published var activity:[String:Any]?
     func loadActivity() async {
-        guard since != nil,let session=manager?.connection as? NETunnelProviderSession else {activity=nil;return}
+        guard since != nil,let session=manager?.connection as? NETunnelProviderSession else {if activity != nil {activity=nil};return}
         let result=await withCheckedContinuation {(done:CheckedContinuation<[String:Any]?,Never>) in
             do {
                 try session.sendProviderMessage(Data("activity".utf8)) {data in
@@ -446,6 +446,20 @@ import ServiceManagement
         tunnelLog=""
         try? (manager?.connection as? NETunnelProviderSession)?.sendProviderMessage(Data("journal-clear".utf8)) {_ in}
     }
+    /// Assigns only a different value (see refreshStatus).
+    private func update<Value:Equatable>(_ path:ReferenceWritableKeyPath<ClientModel,Value>,_ value:Value) {
+        if self[keyPath:path] != value {self[keyPath:path]=value}
+    }
+    #if os(macOS)
+    /// Pages that show the live figures (the window, the menu bar panel); see showing(_:).
+    private var watchers=0
+    private var quietTicks=0
+    /// The window or the menu bar panel appeared or went away. On appearing the figures are fetched at once.
+    func showing(_ on:Bool) {
+        watchers=max(0,watchers+(on ? 1:-1))
+        if on && watchers == 1 {refreshStatus()}
+    }
+    #endif
     func refreshStatus() {
         let current=manager?.connection.status ?? .invalid
         if current != lastVPNStatus {
@@ -453,12 +467,16 @@ import ServiceManagement
             if current == .connected {reconnects=0;reconnectAt=nil}
             if current == .disconnected && [.connected,.connecting,.reasserting,.disconnecting].contains(previous) {dropped(duringAttempt:attempt != nil)}
         }
+        // Runs every second all day (menu bar): a @Published assignment redraws every view that watches the model,
+        // even with the same value, so only changes are assigned.
         switch manager?.connection.status {
         case .connected:break
-        case .connecting,.reasserting:status="connecting"
-        case .disconnecting:status="disconnecting"
+        case .connecting,.reasserting:update(\.status,"connecting")
+        case .disconnecting:update(\.status,"disconnecting")
         default:
-            status="not_connected";since=nil;rxRate=0;txRate=0;rxHistory=[];txHistory=[];switchedFrom="";activity=nil
+            update(\.status,"not_connected");update(\.since,nil);update(\.rxRate,0);update(\.txRate,0)
+            update(\.rxHistory,[]);update(\.txHistory,[]);update(\.switchedFrom,"")
+            if activity != nil {activity=nil}
             // The tunnel went down on its own shortly after a requested start: show it as a failed attempt.
             if let attempt,Date().timeIntervalSince(attempt)>2 {
                 self.attempt=nil;failed=true;failure=L10n.text("unable_to_connect_check_your_network_and_try_again");failureCode="CONNECT_FAILED"
@@ -467,16 +485,26 @@ import ServiceManagement
         if manager?.connection.status == .connected {attempt=nil}
         // While connecting too: the tunnel tells its phase and lines (the call simply fails until it runs).
         guard [.connected,.connecting,.reasserting].contains(manager?.connection.status),let session=manager?.connection as? NETunnelProviderSession else {return}
+        #if os(macOS)
+        // Nothing on screen shows the figures (window closed, menu bar panel shut, no rates in the menu bar): ask the
+        // tunnel every 30 s instead of waking it every second, and every second only until it is confirmed (the
+        // update check waits for that). The rate chart starts again when something shows.
+        if watchers == 0 && !UserDefaults.standard.bool(forKey:MenuBarLabel.preferenceKey) {
+            update(\.rxHistory,[]);update(\.txHistory,[])
+            quietTicks+=1
+            if since != nil && quietTicks%30 != 0 {return}
+        } else {quietTicks=0}
+        #endif
         try? session.sendProviderMessage(Data("status".utf8)) {data in
             guard let data,let state=try? JSONSerialization.jsonObject(with:data) as? [String:Any] else {return}
             Task {@MainActor in
-                self.status=state["status"] as? String ?? "connection_confirming"
-                self.nodeName=state["node"] as? String ?? self.nodeName;self.connectedNodeId=state["nodeId"] as? String ?? ""
-                self.since=(state["since"] as? Double).map {Date(timeIntervalSince1970:$0)}
-                self.rxRate=state["rx"] as? Int ?? 0;self.txRate=state["tx"] as? Int ?? 0
-                self.switchedFrom=state["switchedFrom"] as? String ?? ""
-                self.phase=state["phase"] as? Int ?? self.phase;self.lines=state["lines"] as? Int ?? self.lines
-                self.retries=state["attempt"] as? Int ?? 0;self.retryAt=(state["retryAt"] as? Double).map {Date(timeIntervalSince1970:$0)}
+                self.update(\.status,state["status"] as? String ?? "connection_confirming")
+                self.update(\.nodeName,state["node"] as? String ?? self.nodeName);self.update(\.connectedNodeId,state["nodeId"] as? String ?? "")
+                self.update(\.since,(state["since"] as? Double).map {Date(timeIntervalSince1970:$0)})
+                self.update(\.rxRate,state["rx"] as? Int ?? 0);self.update(\.txRate,state["tx"] as? Int ?? 0)
+                self.update(\.switchedFrom,state["switchedFrom"] as? String ?? "")
+                self.update(\.phase,state["phase"] as? Int ?? self.phase);self.update(\.lines,state["lines"] as? Int ?? self.lines)
+                self.update(\.retries,state["attempt"] as? Int ?? 0);self.update(\.retryAt,(state["retryAt"] as? Double).map {Date(timeIntervalSince1970:$0)})
                 // The first connection ends the three steps.
                 if self.since != nil && !self.onboarded {self.onboarded=true}
                 if self.since != nil {

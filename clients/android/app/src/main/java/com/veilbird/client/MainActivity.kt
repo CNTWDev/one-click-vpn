@@ -133,7 +133,8 @@ class MainActivity : Activity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState); api = NativeApi(this); updater = Updater(this, api); NodeCache.restore(this)
+        // A new activity (also after a language change) looks the language up once more.
+        L10n.forget(); super.onCreate(savedInstanceState); api = NativeApi(this); updater = Updater(this, api); NodeCache.restore(this)
         val settings = getSharedPreferences("preferences", MODE_PRIVATE)
         Palette.theme = settings.getString("appearance", "amber")!!
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", "")!!; selectedCode = settings.getString("nodeCode", "")!!

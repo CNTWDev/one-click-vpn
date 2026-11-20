@@ -17,6 +17,12 @@
     <Version>0.1.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <StartupObject>Veilbird.Program</StartupObject>
+    <!-- Faster cold start: the app's own code is compiled ahead of time on publish instead of by the JIT at launch. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <!-- A tray app with a small heap: no background GC thread, and the heap is given back more readily. -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <!-- Only the languages the app ships (Resources/Native.*.resx): the framework's other translations are left out. -->
+    <SatelliteResourceLanguages>en;ru;zh</SatelliteResourceLanguages>
   </PropertyGroup>
   <ItemGroup><Using Remove="System.Windows.Forms" /><Using Remove="System.Drawing" /></ItemGroup>
   <ItemGroup><Resource Include="Assets\Veilbird.ico" /><Resource Include="Assets\Fonts\Doto-Black.ttf" /></ItemGroup>
