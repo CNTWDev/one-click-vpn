@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.13
+
+### zh
+- Mac 菜单栏和 Windows 托盘里直接切换节点：点「连接位置」就地展开节点列表（带延迟），选一个即切换，已连接时自动改连过去，不再打开主窗口
+- Windows 托盘右键菜单新增「连接位置」子菜单，自动选择或指定节点一步完成
+
+### en
+- Switch locations right from the Mac menu bar and the Windows tray: the location row opens the list with delays in place, and a pick switches at once (moving a running connection) without opening the main window
+- The Windows tray menu has a Location submenu: choose Automatic or a location in one step
+
+### ru
+- Смена локации прямо из строки меню Mac и трея Windows: строка локации открывает список с задержками на месте, выбор сразу переключает (и переносит текущее подключение), без открытия главного окна
+- В меню трея Windows появилось подменю «Локация»: автовыбор или конкретная локация в один шаг
+
 ## 1.0.12
 
 ### zh

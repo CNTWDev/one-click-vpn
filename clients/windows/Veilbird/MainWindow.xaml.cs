@@ -144,6 +144,16 @@ public partial class MainWindow : Window {
         menu.Items.Add(new Forms.ToolStripSeparator());
         if(signedIn&&update?.Mandatory!=true||connection.Active) menu.Items.Add(L10n.Text(connection.Active?"disconnect_action":"connect_action"),null,(_,_)=>Toggle());
         if(signedIn) {
+            // The locations as a submenu, fastest first with their delay; a pick moves a running VPN there.
+            var where=new Forms.ToolStripMenuItem(L10n.Text("location"));
+            where.DropDownItems.Add(new Forms.ToolStripMenuItem(L10n.Text("automatic"),null,(_,_)=>PickLocation("","")) {Checked=nodeId.Length==0});
+            var places=PickerNodes();
+            if(places.Count>0) where.DropDownItems.Add(new Forms.ToolStripSeparator());
+            foreach(var (id,name,quality) in places)
+                where.DropDownItems.Add(new Forms.ToolStripMenuItem(name,null,(_,_)=>PickLocation(id,name)) {Checked=id==nodeId,ShortcutKeyDisplayString=PickerDelay(quality)});
+            if(nodesData is null) _=QuietNodes();
+            menu.Items.Add(where);
+            menu.Items.Add(new Forms.ToolStripSeparator());
             foreach(var (value,title) in new[]{("smart","routing_smart"),("global","routing_global")})
                 menu.Items.Add(new Forms.ToolStripMenuItem(L10n.Text(title),null,(_,_)=>ChooseRouting(value)) {Checked=Settings.Get("routing","smart")==value,Enabled=!connection.Active});
         }
@@ -193,6 +203,7 @@ public partial class MainWindow : Window {
         var area=SystemParameters.WorkArea;
         flyout.Left=area.Right-flyout.Width-12;flyout.Top=area.Bottom-flyout.Height-12;
         flyState=null;UpdateFlyout();
+        if(flyPicking) SetFlyPicking(false);
         flyout.Show();flyout.Activate();
         _=RefreshAccount();
     }
@@ -200,7 +211,7 @@ public partial class MainWindow : Window {
         var window=new Window {Width=300,Height=440,WindowStyle=WindowStyle.None,AllowsTransparency=true,Background=Brushes.Transparent,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,
             FontFamily=FontFamily,UseLayoutRounding=true,Title="TrackNothing"};
         window.Deactivated+=(_,_)=>{if(window.IsVisible) {window.Hide();flyoutHidden=DateTime.UtcNow;}};
-        var root=new DockPanel {LastChildFill=false};
+        var root=new DockPanel {LastChildFill=true};
         var header=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,14)};
         var word=Look.Wordmark(14);word.Margin=new Thickness(8,0,0,0);header.Children.Add(Look.Mark(16,Look.Accent));header.Children.Add(word);
         DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
@@ -212,26 +223,34 @@ public partial class MainWindow : Window {
         toggle.Click+=(_,_)=>{Toggle();toggle.IsChecked=connection.Active;};
         var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(14,0,12,0)};texts.Children.Add(title);texts.Children.Add(detail);
         var card=new Border {CornerRadius=new CornerRadius(3),Padding=new Thickness(16),BorderThickness=new Thickness(1),Child=Columns(mark,texts,toggle)};
-        DockPanel.SetDock(card,Dock.Top);root.Children.Add(card);
+        // The status (card, note, rates) and the location list share one area that fills the flyout above the
+        // location row: the list fades in over the status, so the flyout never changes size and nothing moves.
+        var status=new StackPanel {VerticalAlignment=VerticalAlignment.Top};
+        status.Children.Add(card);
         var (note,noteText)=SwitchNote(12);note.Margin=new Thickness(0,10,0,0);
-        DockPanel.SetDock(note,Dock.Top);root.Children.Add(note);
+        status.Children.Add(note);
         var rate=new RateBars {Height=36,Margin=new Thickness(2,12,2,0),Opacity=0};
-        DockPanel.SetDock(rate,Dock.Top);root.Children.Add(rate);
+        status.Children.Add(rate);
+        var pickList=new StackPanel();
+        var pickScroll=new ScrollViewer {VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Content=pickList,Margin=new Thickness(0,8,0,0)};
+        var picker=new DockPanel {LastChildFill=true,Opacity=0,IsHitTestVisible=false};
+        var pickTitle=Dossier.Section("section_locations");DockPanel.SetDock(pickTitle,Dock.Top);
+        picker.Children.Add(pickTitle);picker.Children.Add(pickScroll);
+        var middle=new Grid();middle.Children.Add(status);middle.Children.Add(picker);
 
         var badge=new ContentControl();
         var place=new TextBlock {FontSize=13,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap};
         var placeDetail=new TextBlock {FontSize=11,Foreground=Look.Secondary,Margin=new Thickness(0,2,0,0),TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap};
         var placeTexts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,8,0)};placeTexts.Children.Add(place);placeTexts.Children.Add(placeDetail);
-        var placeRow=new Button {Height=52,Padding=new Thickness(12,0,12,0),Background=Brushes.Transparent,BorderBrush=Look.Line,BorderThickness=new Thickness(1),Margin=new Thickness(0,14,0,0),Content=Columns(badge,placeTexts,Look.Icon("",10,Look.Secondary))};
-        placeRow.Click+=(_,_)=>{
-            if(connection.Active&&connection.Since is not null&&connection.StatusKey!="location_retrying") {ShowFromTray();ConnectionCheck();}
-            else {page="nodes";Render();ShowFromTray();}
-        };
-        DockPanel.SetDock(placeRow,Dock.Top);root.Children.Add(placeRow);
+        // Points up at the list while it is open.
+        var chevron=Look.Icon("",10,Look.Secondary);chevron.RenderTransformOrigin=new Point(0.5,0.5);chevron.RenderTransform=new RotateTransform(0);
+        var placeRow=new Button {Height=52,Padding=new Thickness(12,0,12,0),Background=Brushes.Transparent,BorderBrush=Look.Line,BorderThickness=new Thickness(1),Margin=new Thickness(0,12,0,0),Content=Columns(badge,placeTexts,chevron)};
+        AutomationProperties.SetHelpText(placeRow,L10n.Text("tap_to_change"));
+        placeRow.Click+=(_,_)=>SetFlyPicking(!flyPicking);
+        window.KeyDown+=(_,e)=>{if(e.Key==Key.Escape) {if(flyPicking) SetFlyPicking(false);else window.Hide();e.Handled=true;}};
 
         var usage=new TextBlock {Text="—",FontSize=13,FontWeight=FontWeights.SemiBold};var until=new TextBlock {Text="—",FontSize=13,FontWeight=FontWeights.SemiBold};
-        var cells=Cells(("last_30_days",usage,11),("valid_until_label",until,11));cells.Margin=new Thickness(4,14,4,0);
-        DockPanel.SetDock(cells,Dock.Top);root.Children.Add(cells);
+        var cells=Cells(("last_30_days",usage,11),("valid_until_label",until,11));cells.Margin=new Thickness(4,14,4,14);
 
         var footer=new DockPanel {LastChildFill=false};
         var open=new Button {Content=L10n.Text("open_main_window"),FontSize=13,Height=32,Padding=new Thickness(10,0,10,0)};open.Click+=(_,_)=>ShowFromTray();
@@ -239,12 +258,62 @@ public partial class MainWindow : Window {
         DockPanel.SetDock(open,Dock.Left);DockPanel.SetDock(quit,Dock.Right);footer.Children.Add(open);footer.Children.Add(quit);
         var bottom=new Border {BorderBrush=Look.Hex("#14EDE7DF"),BorderThickness=new Thickness(0,1,0,0),Padding=new Thickness(0,10,0,0),Child=footer};
         DockPanel.SetDock(bottom,Dock.Bottom);root.Children.Add(bottom);
+        DockPanel.SetDock(cells,Dock.Bottom);root.Children.Add(cells);
+        DockPanel.SetDock(placeRow,Dock.Bottom);root.Children.Add(placeRow);
+        root.Children.Add(middle);
 
         window.Content=new Border {Background=Look.Hex("#0E0D0C"),BorderBrush=Look.Edge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(16),Child=root};
         TextElement.SetForeground(window,Look.Text);
         fly=(card,mark,title,detail,toggle,badge,place,placeDetail,usage,until);
         flyRate=rate;flyNote=note;flyNoteText=noteText;
+        flyPick=(status,picker,pickList,pickScroll,chevron);flyPicking=false;
         return window;
+    }
+    private (UIElement Status,UIElement Picker,StackPanel List,ScrollViewer Scroll,TextBlock Chevron)? flyPick;
+    private bool flyPicking;
+    /// Opens or closes the flyout's location list in place of the status.
+    private void SetFlyPicking(bool open) {
+        if(flyPick is not { } p) return;
+        flyPicking=open;
+        if(open) {FillFlyPicker();p.Scroll.ScrollToTop();if(nodesData is null) _=QuietNodes();}
+        Fade(p.Status,!open);Fade(p.Picker,open);
+        p.Chevron.Foreground=open?Look.Accent:Look.Secondary;
+        var turn=new DoubleAnimation(open?-90:0,TimeSpan.FromMilliseconds(Motion?200:0)) {EasingFunction=new CubicEase {EasingMode=EasingMode.EaseOut}};
+        ((RotateTransform)p.Chevron.RenderTransform).BeginAnimation(RotateTransform.AngleProperty,turn);
+    }
+    /// The locations, fastest first as in the window: automatic, then each one with its delay. The selected one is a
+    /// lifted row with an amber tile; nothing is added, so the rows never move.
+    private void FillFlyPicker() {
+        if(flyPick is not { } p) return;
+        p.List.Children.Clear();
+        p.List.Children.Add(PickerRow("",L10n.Text("automatic"),null,null));
+        foreach(var (id,name,quality) in PickerNodes()) p.List.Children.Add(PickerRow(id,name,Code(id,name),quality));
+        if(nodesData is { Count: 0 }) p.List.Children.Add(new TextBlock {Text=L10n.Text("no_locations_available_refresh_or_contact_your_administrator"),FontSize=12,Foreground=Look.Secondary,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(10,8,10,0)});
+    }
+    private Button PickerRow(string id,string name,string? code,Quality? quality) {
+        var selected=id==nodeId;var unreachable=quality is {Latency: null};
+        var badge=Look.Badge(code,24,selected?Look.OnAccent:unreachable?Look.Faint:null);
+        if(selected) {badge.Background=Look.AccentWash;badge.BorderBrush=Look.AccentLine;badge.BorderThickness=new Thickness(1);if(code is null&&badge.Child is TextBlock star) star.Foreground=Look.OnAccent;}
+        var label=Single(name,13,unreachable&&!selected?Look.Faint:Look.Text,strong:selected);label.Margin=new Thickness(10,0,8,0);
+        var delay=new TextBlock {Text=PickerDelay(quality),FontSize=11,Foreground=unreachable?Look.Danger:Look.Secondary,TextAlignment=TextAlignment.Right,VerticalAlignment=VerticalAlignment.Center};
+        if(!unreachable) Typography.SetNumeralAlignment(delay,FontNumeralAlignment.Tabular);
+        var right=new Border {Width=72,VerticalAlignment=VerticalAlignment.Center,
+            Child=new Viewbox {Stretch=Stretch.Uniform,StretchDirection=StretchDirection.DownOnly,HorizontalAlignment=HorizontalAlignment.Right,Child=delay}};
+        var row=new Button {Height=36,Padding=new Thickness(10,0,10,0),Background=selected?Look.Raised:Brushes.Transparent,Content=Columns(badge,label,right)};
+        AutomationProperties.SetName(row,name+(delay.Text.Length>0?", "+delay.Text:"")+(selected?L10n.Text("current_page"):""));
+        row.Click+=(_,_)=>{PickLocation(id,name);SetFlyPicking(false);UpdateFlyout();};
+        return row;
+    }
+    /// The saved locations with this PC's last results, fastest first, never measured last.
+    private List<(string Id,string Name,Quality? Quality)> PickerNodes()=>(nodesData??new JsonArray()).Where(n=>n?["id"] is not null)
+        .Select(n=>(Id:n!["id"]!.GetValue<string>(),Name:n["name"]?.GetValue<string>()??"",Quality:Latency.Recent.TryGetValue(n["id"]!.GetValue<string>(),out var q)?q:null))
+        .GroupBy(x=>x.Id).Select(g=>g.First()).OrderBy(x=>x.Quality?.Score??long.MaxValue).ToList();
+    private static string PickerDelay(Quality? quality)=>quality is null?"":Ms(quality)??L10n.Text("quality_unreachable");
+    /// A location picked in the tray: the window's choice, without opening it or changing its page. Picking the
+    /// location already in use does nothing.
+    private void PickLocation(string id,string name) {
+        if(id==nodeId&&(id.Length==0||!connection.Active||connection.NodeId==id)) return;
+        Select(id,name,showConnect:false);UpdateTray();
     }
     private void UpdateFlyout() {
         if(fly is not { } f||flyout?.IsVisible!=true&&flyState is not null) return;
@@ -257,7 +326,8 @@ public partial class MainWindow : Window {
         }
         f.Title.Text=StatusTitle(state);f.Detail.Text=StatusDetail(state);
         f.Switch.IsChecked=connection.Active;f.Switch.IsEnabled=!busy||connection.Active;
-        var place=Location();
+        // The flyout's row opens the location list, not the connection check.
+        var place=Location(checkable:false);
         f.Badge.Content=Look.Badge(place.Code,28);f.Location.Text=place.Title;f.LocationDetail.Text=place.Detail;
         ShowRates(flyRate,state);ShowSwitch(flyNote,flyNoteText,state);
         ShowFigures(f.Usage,f.Until);
@@ -298,9 +368,11 @@ public partial class MainWindow : Window {
         if(connection.Active) {Notify(L10n.Text("disconnect_before_changing_routing"));return;}
         Settings.Set("routing",value);if(page=="nodes") Render();
     }
-    private void Select(string id,string name) {
+    private void Select(string id,string name,bool showConnect=true) {
         var reconnect=connection.Active&&id!=connection.NodeId;
-        nodeId=id;nodeName=name;Settings.Set("nodeId",id);Settings.Set("nodeName",name);failed=false;page="connect";Render();
+        nodeId=id;nodeName=name;Settings.Set("nodeId",id);Settings.Set("nodeName",name);failed=false;
+        if(showConnect) page="connect";
+        if(showConnect||page is "connect" or "nodes") Render();
         // Connected (or reconnecting): one click moves the VPN to the new location; the kill switch keeps blocking meanwhile.
         if(reconnect) Work(async()=>{
             restoring?.Cancel();restoring=null;
@@ -972,7 +1044,7 @@ public partial class MainWindow : Window {
     private async Task QuietNodes() {
         if(loadingNodes||!api.SignedIn) return;
         loadingNodes=true;
-        try {var fresh=await LoadNodes();badgeKey="";UpdateLive();onNodes?.Invoke(fresh);} catch {/* the saved list stays */}
+        try {var fresh=await LoadNodes();badgeKey="";UpdateLive();onNodes?.Invoke(fresh);if(flyPicking) FillFlyPicker();} catch {/* the saved list stays */}
         finally {loadingNodes=false;}
     }
     private string UsageText()=>accountData?["traffic"] is { } traffic?Bytes(Number(traffic["uploadBytes"])+Number(traffic["downloadBytes"])):"—";
@@ -1006,14 +1078,14 @@ public partial class MainWindow : Window {
         _=>L10n.Text(update?.Mandatory==true?"update_required_detail":connection.Blocking?"kill_switch_blocking":"exposed_detail"),
     };
     /// The location the next (or current) connection uses, as title, detail and tile code (null: automatic).
-    private (string Title,string Detail,string? Code) Location() {
+    private (string Title,string Detail,string? Code) Location(bool checkable=true) {
         var active=connection.Active;var automatic=nodeId.Length==0;
         var id=active?connection.NodeId:nodeId;
         var quality=id.Length>0&&Latency.Recent.TryGetValue(id,out var known)?known:null;
         if(active&&id.Length>0) {
             var name=connection.NodeName.Length>0?connection.NodeName:directory.TryGetValue(id,out var entry)?entry.Name:L10n.Text("location");
             var detail=automatic?(Ms(quality) is { } ms?L10n.Text("connected_automatic_detail",ms):L10n.Text("automatic")):quality is not null?Summary(quality):L10n.Text("tap_to_change");
-            if(connection.Since is not null) detail+=" · "+L10n.Text("tap_to_check");
+            if(checkable&&connection.Since is not null) detail+=" · "+L10n.Text("tap_to_check");
             return (name,detail,Code(id,name));
         }
         if(automatic) {
