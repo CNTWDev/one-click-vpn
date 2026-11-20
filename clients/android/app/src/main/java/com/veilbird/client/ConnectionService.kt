@@ -2,10 +2,13 @@ package com.veilbird.client
 
 import android.app.*
 import android.content.Context
+import android.content.BroadcastReceiver
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.VpnService
+import android.os.PowerManager
 import android.os.SystemClock
 import com.veilbird.core.Core
 import com.wireguard.crypto.KeyPair
@@ -63,6 +66,9 @@ class ConnectionService : VpnService() {
     private var transports = listOf<String>()
     private var carrying = ""
     private var nextProbe = 0L
+    /** When the last health probe ran, and when the next one tests every transport instead of the one carrying traffic. */
+    private var probedAt = 0L
+    private var nextFullProbe = 0L
     private var lastNetworkCheck = 0L
     private var failures = 0
     /** The next full probe reports to the server (the connect probe did not test every transport). */
@@ -72,11 +78,17 @@ class ConnectionService : VpnService() {
     private var automatic = true
     /** Started by Android (restart after it killed the process, or always-on VPN), not by a tap. */
     private var restored = false
-    private var started = false
+    @Volatile private var started = false
+    /** When WireGuard readiness is next asked for while the lease is not ready yet. */
+    private var statusAt = 0L
     @Volatile private var online = true
     @Volatile private var networkChanged = false
     private var retry: ScheduledFuture<*>? = null
     private var callback: ConnectivityManager.NetworkCallback? = null
+    /** Screen on: the user may be looking, so the state and rates update every 2 s; off, the service wakes far less. */
+    @Volatile private var interactive = true
+    private var screen: BroadcastReceiver? = null
+    private var nextTick: ScheduledFuture<*>? = null
     private val home by lazy { File(filesDir, "core").path }
 
     override fun onCreate() {
@@ -98,7 +110,7 @@ class ConnectionService : VpnService() {
         nodeId = intent?.getStringExtra("nodeId") ?: getSharedPreferences("preferences", MODE_PRIVATE).getString("nodeId", "")!!
         automatic = nodeId.isEmpty()
         api.attempt = java.util.UUID.randomUUID().toString().replace("-", "").take(16)
-        watchNetwork()
+        watchNetwork(); watchScreen()
         worker.execute { begin(0) }
         return START_STICKY
     }
@@ -115,7 +127,7 @@ class ConnectionService : VpnService() {
             if (automatic) { nodeId = ""; chooseFastest() }
             connect()
             started = true
-            worker.scheduleWithFixedDelay({ tick() }, 2, 2, TimeUnit.SECONDS)
+            scheduleTick(TICK)
             api.report("")
         } catch (e: Exception) {
             if (!restored || stopping || fatal(e)) { fail(e); return }
@@ -125,7 +137,40 @@ class ConnectionService : VpnService() {
             retry = worker.schedule({ begin(attempt + 1) }, delay, TimeUnit.MILLISECONDS)
         }
     }
-    /** Android reports the network the app uses outside the VPN; the tick acts on it (at most every 2 s). */
+    /**
+     * The tick runs on the worker and schedules the next one itself: every 2 s while the screen is on, or while
+     * the connection is being repaired; with the screen off and the connection working, every TICK_IDLE.
+     * Network and screen events bring the next tick forward, so waking less never delays a reconnect.
+     */
+    private fun scheduleTick(delay: Long) {
+        if (stopping) return
+        nextTick?.cancel(false)
+        nextTick = try {
+            worker.schedule({ try { tick() } finally { scheduleTick(if (interactive || failures > 0 || !online) TICK else TICK_IDLE) } }, delay, TimeUnit.MILLISECONDS)
+        } catch (_: java.util.concurrent.RejectedExecutionException) { null }
+    }
+    /** From any thread: run the next tick soon instead of at the end of an idle wait. */
+    private fun tickSoon(delay: Long) {
+        if (!started || stopping) return
+        try { worker.execute { scheduleTick(delay) } } catch (_: java.util.concurrent.RejectedExecutionException) { }
+    }
+    private fun watchScreen() {
+        if (screen != null) return
+        interactive = getSystemService(PowerManager::class.java).isInteractive
+        val watcher = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                interactive = intent.action == Intent.ACTION_SCREEN_ON
+                // Back on: a health probe that is overdue by the screen-on interval runs right away.
+                if (interactive) tickSoon(0)
+            }
+        }
+        val filter = IntentFilter().apply { addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_SCREEN_OFF) }
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(watcher, filter, RECEIVER_NOT_EXPORTED) else registerReceiver(watcher, filter)
+            screen = watcher
+        } catch (_: Exception) { }
+    }
+    /** Android reports the network the app uses outside the VPN; the next tick (within a second) acts on it. */
     private fun watchNetwork() {
         if (callback != null) return
         val watcher = object : ConnectivityManager.NetworkCallback() {
@@ -133,6 +178,7 @@ class ConnectionService : VpnService() {
             override fun onLost(network: Network) { changed() }
             private fun changed() {
                 networkChanged = true
+                tickSoon(1000)
                 // Still waiting for a first connection: try now instead of at the end of the backoff.
                 if (!started && !stopping && Transports.online(this@ConnectionService) && retry?.cancel(false) == true) {
                     Journal.add("network: available, retrying now"); retry = worker.schedule({ begin(0) }, 2, TimeUnit.SECONDS)
@@ -216,7 +262,7 @@ class ConnectionService : VpnService() {
         Journal.add("connect: ready in ${SystemClock.elapsedRealtime() - started} ms via ${carrying.ifEmpty { "?" }}")
         // The connect probe stopped at the first transport: test them all shortly, off the connect path, for the
         // transport memory and the report to the server.
-        nextProbe = SystemClock.elapsedRealtime() + FULL_PROBE; reportNext = true
+        probedAt = SystemClock.elapsedRealtime(); nextProbe = probedAt + FULL_PROBE; nextFullProbe = 0; reportNext = true
     }
     /**
      * All transports at once; true when at least one answers. Failures are remembered only when another transport worked.
@@ -240,6 +286,23 @@ class ConnectionService : VpnService() {
         updateCarrying()
         return working.isNotEmpty()
     }
+    /**
+     * The round while connected. Usually one request through the transport carrying traffic; every transport
+     * (for the transport memory, and so the fallback group can return to a better one) after connecting, on a new
+     * network, while repairing, and every FULL_EVERY. When the carrying one does not answer, all are tested at once,
+     * so the group can move to another before this counts as a missed round.
+     */
+    private fun healthy(): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        val current = carrying
+        if (failures == 0 && current.isNotEmpty() && current in transports && now < nextFullProbe) {
+            val answered = Transports.parseProbe(Core.probe(current, Transports.TEST_URL, 5000))[current]?.let { it >= 0 } == true
+            if (answered) { updateCarrying(); return true }
+            Journal.add("probe: $current no answer, testing every transport")
+        }
+        nextFullProbe = now + FULL_EVERY
+        return probe()
+    }
     private fun updateCarrying() {
         val now = Core.now(Transports.GROUP)
         if (now.isNotEmpty() && now != carrying) { if (carrying.isNotEmpty()) Journal.add("transport: $carrying -> $now"); carrying = now }
@@ -256,7 +319,7 @@ class ConnectionService : VpnService() {
         nodeId = lease.getString("nodeId"); ConnectionStateStore.nodeId = nodeId
         val remaining = (Instant.parse(lease.getString("expiresAt")).toEpochMilli() - System.currentTimeMillis()).coerceAtMost(300000)
         if (remaining <= 0) throw ApiFailure("ACCESS_EXPIRED")
-        deadline = SystemClock.elapsedRealtime() + remaining; renewAt = SystemClock.elapsedRealtime() + 90000; renewedAt = SystemClock.elapsedRealtime()
+        deadline = SystemClock.elapsedRealtime() + remaining; renewAt = SystemClock.elapsedRealtime() + RENEW; renewedAt = SystemClock.elapsedRealtime()
         ConnectionStateStore.node = lease.getString("nodeName")
         leaseId = lease.getString("leaseId"); leaseReady = lease.optBoolean("ready")
         if (!initial) { if (!leaseReady) leaseReady = status(); return lease }
@@ -284,18 +347,22 @@ class ConnectionService : VpnService() {
                     if (e.code in FATAL) { fail(e); return }
                     Journal.add("lease: renewal failed (${e.code}), retrying"); renewAt = again
                 } catch (_: Exception) { renewAt = again }
-            } else if (online && !leaseReady) {
+            } else if (online && !leaseReady && now >= statusAt) {
                 // WireGuard became usable: test it now so the fallback group can count on it without waiting for the next round.
+                // Every tick for the first minute (it is usually ready within seconds), then once a minute: a node whose
+                // WireGuard never applies must not cost a request every 2 s for as long as the VPN stays on.
+                statusAt = now + if (now - ConnectionStateStore.since < 60000) 0 else 60000
                 if (status()) { leaseReady = true; Journal.add("lease: WireGuard ready"); probe(report = true) }
             }
             if (SystemClock.elapsedRealtime() - renewedAt >= OFFLINE_GRACE) { Journal.add("lease: expired"); api.report("LEASE_RENEWAL_FAILED", nodeId); wanted(this, false); stopConnection(R.string.connection_authorization_expired_connect_again); return }
             if (!online) {
                 // Nothing to reach: no probes (they would only drain the battery) until Android reports a network.
                 ConnectionStateStore.messageId = R.string.waiting_for_network
-            } else if (now >= nextProbe) {
-                if (probe()) {
+            } else if (now >= nextProbe || (interactive && failures == 0 && now - probedAt >= HEALTHY)) {
+                probedAt = now
+                if (healthy()) {
                     if (failures >= 2) Journal.add("reconnect: ${ConnectionStateStore.node} answers again via ${carrying.ifEmpty { "?" }}")
-                    failures = 0; nextProbe = SystemClock.elapsedRealtime() + HEALTHY
+                    failures = 0; nextProbe = SystemClock.elapsedRealtime() + if (interactive) HEALTHY else HEALTHY_IDLE
                 } else missed()
                 ConnectionStateStore.messageId = message()
             } else updateCarrying()
@@ -320,7 +387,7 @@ class ConnectionService : VpnService() {
         if (!online) return
         try { Core.reset() } catch (_: Exception) { }
         // Retry right away and restart the backoff; a renewal that failed meanwhile is due now too.
-        nextProbe = 0; failures = minOf(failures, 1)
+        nextProbe = 0; nextFullProbe = 0; failures = minOf(failures, 1)
         if (now - renewedAt > 90000) renewAt = 0
     }
     /** A round where no transport answered while the device has a network. */
@@ -365,7 +432,8 @@ class ConnectionService : VpnService() {
     @Synchronized private fun stopConnection(message: Int) {
         if (stopping) return
         stopping = true
-        retry?.cancel(false)
+        retry?.cancel(false); nextTick?.cancel(false)
+        screen?.let { try { unregisterReceiver(it) } catch (_: Exception) { } }; screen = null
         callback?.let { try { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it) } catch (_: Exception) { } }; callback = null
         try { Core.stop() } catch (_: Exception) { }
         Journal.add("disconnect: ${resources.getResourceEntryName(message)}")
@@ -379,6 +447,15 @@ class ConnectionService : VpnService() {
         private const val OFFLINE_GRACE = 12 * 3600 * 1000L
         /** Probe interval while the connection works; the core's fallback group reacts to failed dials in between. */
         private const val HEALTHY = 120000L
+        /** The same with the screen off: phones are mostly idle then, and each probe wakes the radio. */
+        private const val HEALTHY_IDLE = 300000L
+        /** How often a working connection tests every transport rather than only the one carrying traffic. */
+        private const val FULL_EVERY = 30 * 60000L
+        /** Tick interval with the screen on, and with it off while the connection works. */
+        private const val TICK = 2000L
+        private const val TICK_IDLE = 20000L
+        /** Lease renewal after a successful one. The server's lease lasts 300 s; failures retry every 15 s. */
+        private const val RENEW = 150000L
         /** After connecting, when every transport is tested (the connect probe stops at the first that works). */
         private const val FULL_PROBE = 10000L
         /** Connecting in automatic mode stops measuring locations this long after the first one answered. */

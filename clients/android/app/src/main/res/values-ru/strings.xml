@@ -341,7 +341,7 @@
   <string name="vpn_connection">VPN-подключение</string>
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Смена локации прямо из строки меню Mac и трея Windows: строка локации открывает список с задержками на месте, выбор сразу переключает (и переносит текущее подключение), без открытия главного окна\nВ меню трея Windows появилось подменю «Локация»: автовыбор или конкретная локация в один шаг</string>
+  <string name="whats_new_notes">Меньше расход батареи на Android: при выключенном экране фоновых проверок намного меньше, при рабочем подключении проверяется только используемая линия, авторизация продлевается реже; при потере или смене сети и включении экрана проверка и переподключение по-прежнему сразу</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Версия Windows для разработки · Интеграция VPN ещё не завершена</string>
