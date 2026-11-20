@@ -422,7 +422,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Напоминания, когда трафик или срок подходят к концу: подписи на главном экране, в строке меню Mac и в трее Windows показывают «Трафик заканчивается» или «Скоро закончится»\nСистемное уведомление за 7 дней и за 1 день до конца и при остатке 10%% трафика; янтарная точка на значке в строке меню Mac и в трее Windows, строка в уведомлении Android при подключении</string>
+  <string name="whats_new_notes">В этой версии собраны последние улучшения: первый запуск в три шага, одинаковые состояния подключения на всех устройствах и ошибки, которые называют причину и предлагают кнопку для её устранения\nНапоминания, когда трафик или срок подходят к концу; выбор приложений для VPN на Android и Windows\nМеньше расход батареи и памяти, быстрее запуск</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Версия Windows для разработки · Интеграция VPN ещё не завершена</string>

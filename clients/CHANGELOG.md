@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.19
+
+### zh
+- 这一版汇总了最近的改进：第一次使用三步上手，连接状态三端统一，连不上时直接说原因并给出解决按钮
+- 流量快用完或账号快到期时提前提醒；安卓和 Windows 支持按应用分流
+- 更省电、更省内存，启动更快
+
+### en
+- This release brings together recent improvements: a three-step first run, the same connection states on every device, and errors that name the cause with a button that fixes it
+- Reminders before your traffic or access runs out; per-app routing on Android and Windows
+- Lower battery and memory use, and faster startup
+
+### ru
+- В этой версии собраны последние улучшения: первый запуск в три шага, одинаковые состояния подключения на всех устройствах и ошибки, которые называют причину и предлагают кнопку для её устранения
+- Напоминания, когда трафик или срок подходят к концу; выбор приложений для VPN на Android и Windows
+- Меньше расход батареи и памяти, быстрее запуск
+
 ## 1.0.18
 
 ### zh
