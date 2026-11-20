@@ -84,8 +84,8 @@ struct MenuBarView:View {
                 .accessibilityAddTraits(picking ? .isSelected:[]).accessibilityHint(L10n.text("tap_to_change"))
                 let figures=UsageFigures(model.account)
                 HStack(alignment:.top,spacing:12) {
-                    cell(figures.trafficTitle,figures.traffic,figures.trafficTint)
-                    cell(L10n.text("valid_until_label"),figures.until,figures.untilTint)
+                    cell(figures.trafficTitle,figures.traffic,figures.trafficTint,figures.trafficTitleTint)
+                    cell(figures.untilTitle,figures.until,figures.untilTint,figures.untilTitleTint)
                 }.padding(.horizontal,6).padding(.vertical,12)
             } else {
                 Text(L10n.text("sign_in_tagline")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).padding(.vertical,16).padding(.horizontal,4)
@@ -162,9 +162,9 @@ struct MenuBarView:View {
         if reconnect {model.work {try await model.reconnect()}}
     }
     private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
-    private func cell(_ title:String,_ value:String,_ tint:Color)->some View {
+    private func cell(_ title:String,_ value:String,_ tint:Color,_ titleTint:Color)->some View {
         VStack(alignment:.leading,spacing:2) {
-            Text(title).font(.system(size:11)).foregroundStyle(VeilbirdStyle.secondary)
+            Text(title).font(.system(size:11)).foregroundStyle(titleTint).lineLimit(1)
             Text(value).font(.system(size:13,weight:.medium)).foregroundStyle(tint).monospacedDigit().lineLimit(1)
         }.frame(maxWidth:.infinity,alignment:.leading)
     }
@@ -212,6 +212,7 @@ struct MenuBarLabel:View {
     @ObservedObject var model:ClientModel
     @AppStorage(MenuBarLabel.preferenceKey) private var showSpeed=false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openWindow) private var openWindow
     @State private var blink=false
     private let ticker=Timer.publish(every:0.6,on:.main,in:.common).autoconnect()
     var body:some View {
@@ -220,15 +221,21 @@ struct MenuBarLabel:View {
         let state=model.ringState
         let busy=[RingState.connecting,.switching,.reconnecting,.waiting].contains(state)
         let on=state == .connected || (busy && (blink || reduceMotion))
-        Group {
+        icon(on:on).onReceive(ticker) {_ in if busy {blink.toggle()} else if blink {blink=false}}
+            // Always on screen, so it lends the window opener to a click on a reminder notification.
+            .onAppear {let open=openWindow;DockPresence.openMain={open(id:"main")}}
+    }
+    @ViewBuilder private func icon(on:Bool)->some View {
+        // Traffic or time running out: a small amber dot on the mark, and the reminder for VoiceOver.
+        let reminder=AccountAccess(model.account).line
+        let suffix=reminder.map {" · "+$0} ?? ""
         if showSpeed,on,model.since != nil,let image=Self.image(on:on,rx:model.rxRate,tx:model.txRate) {
-            Image(nsImage:image).accessibilityLabel("TrackNothing "+L10n.text("connection_rates",Self.mbps(model.rxRate),Self.mbps(model.txRate)))
+            Image(nsImage:reminder == nil ? image:Self.dottedRates(image)).accessibilityLabel("TrackNothing "+L10n.text("connection_rates",Self.mbps(model.rxRate),Self.mbps(model.txRate))+suffix)
         } else if let image=Self.mark(on:on) {
-            Image(nsImage:image).accessibilityLabel("TrackNothing")
+            Image(nsImage:reminder == nil ? image:Self.dottedMark(on:on,image)).accessibilityLabel("TrackNothing"+suffix)
         } else {
             Image(systemName:on ? "slash.circle.fill":"slash.circle").accessibilityLabel("TrackNothing")
         }
-        }.onReceive(ticker) {_ in if busy {blink.toggle()} else if blink {blink=false}}
     }
     /// "↑  820 Kb/s" / "↓ 12.4 Mb/s": bits per second like the rest of the app, the unit stepping up as needed.
     static func line(_ arrow:String,_ bytes:Int)->String {
@@ -251,6 +258,40 @@ struct MenuBarLabel:View {
         image.isTemplate=true
         marks[on]=image
         return image
+    }
+    /// The image with an amber dot at the mark's top right, cut out of the mark by a thin clear ring. A template
+    /// image can only be one colour, so this one is not: the mark is filled with the menu bar's text colour at draw
+    /// time (light or dark menu bar), then the dot goes on top.
+    @MainActor static func dotted(_ base:NSImage)->NSImage {
+        let image=NSImage(size:base.size,flipped:false) {rect in
+            base.draw(in:rect)
+            NSColor.labelColor.set();rect.fill(using:.sourceAtop)
+            guard let context=NSGraphicsContext.current?.cgContext else {return true}
+            // The mark is 15 pt square, 1 pt from the left edge and centred vertically.
+            let center=CGPoint(x:15,y:(rect.height+15)/2-3)
+            context.setBlendMode(.clear);context.fillEllipse(in:MenuBarLabel.dotRect(center,radius:4))
+            context.setBlendMode(.normal);context.setFillColor(red:224/255,green:164/255,blue:88/255,alpha:1)
+            context.fillEllipse(in:MenuBarLabel.dotRect(center,radius:2.75))
+            return true
+        }
+        image.isTemplate=false
+        return image
+    }
+    @MainActor private static var dottedMarks:[Bool:NSImage]=[:]
+    @MainActor static func dottedMark(on:Bool,_ base:NSImage)->NSImage {
+        if let cached=dottedMarks[on] {return cached}
+        let image=dotted(base);dottedMarks[on]=image
+        return image
+    }
+    /// The rates image changes only when the rates do; so does its dotted copy.
+    @MainActor private static var lastDotted:(base:NSImage,image:NSImage)?
+    @MainActor static func dottedRates(_ base:NSImage)->NSImage {
+        if let last=lastDotted,last.base === base {return last.image}
+        let image=dotted(base);lastDotted=(base,image)
+        return image
+    }
+    private static func dotRect(_ center:CGPoint,radius:CGFloat)->CGRect {
+        CGRect(x:center.x-radius,y:center.y-radius,width:radius*2,height:radius*2)
     }
     /// The last rates image and its two lines: the label is redrawn whenever the model changes, the rates mostly not.
     @MainActor private static var lastRates:(key:String,image:NSImage)?

@@ -3,6 +3,7 @@ import Combine
 import VeilbirdCore
 import NetworkExtension
 import AppIntents
+import UserNotifications
 #if os(iOS)
 import UIKit
 #else
@@ -38,9 +39,12 @@ struct VeilbirdApp: App {
 #if os(macOS)
 /// Closing the window (not quitting) takes TrackNothing out of the Dock and the ⌘-Tab switcher; the menu bar icon
 /// stays and opens the window again, which brings the Dock icon back. Quit (menu bar panel or ⌘Q) exits.
-final class DockPresence:NSObject,NSApplicationDelegate {
+final class DockPresence:NSObject,NSApplicationDelegate,UNUserNotificationCenterDelegate {
     private var observers:[NSObjectProtocol]=[]
+    /// Opens the main window; set by the menu bar icon, which is always there and can reach SwiftUI's openWindow.
+    static var openMain:(()->Void)?
     func applicationDidFinishLaunching(_ notification:Notification) {
+        UNUserNotificationCenter.current().delegate=self
         let center=NotificationCenter.default
         observers.append(center.addObserver(forName:NSWindow.willCloseNotification,object:nil,queue:.main) {note in
             let closing=note.object as? NSWindow
@@ -52,6 +56,14 @@ final class DockPresence:NSObject,NSApplicationDelegate {
         })
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender:NSApplication)->Bool {false}
+    /// A reminder (traffic or time running out) shows even while the app is in front, and clicking it opens the window.
+    func userNotificationCenter(_ center:UNUserNotificationCenter,willPresent notification:UNNotification,withCompletionHandler done:@escaping (UNNotificationPresentationOptions)->Void) {
+        done([.banner,.sound])
+    }
+    func userNotificationCenter(_ center:UNUserNotificationCenter,didReceive response:UNNotificationResponse,withCompletionHandler done:@escaping ()->Void) {
+        DispatchQueue.main.async {Self.show(true);Self.openMain?();NSApp.activate(ignoringOtherApps:true)}
+        done()
+    }
     /// The main window, not the menu bar panel, sheets or system panels.
     static func isAppWindow(_ window:NSWindow)->Bool {!(window is NSPanel) && window.canBecomeMain && window.styleMask.contains(.titled)}
     static func hasAppWindow(except closing:NSWindow?)->Bool {

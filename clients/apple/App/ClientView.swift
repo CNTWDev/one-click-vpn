@@ -752,13 +752,13 @@ struct ClientView:View {
     private var usageStrip:some View {
         let figures=UsageFigures(model.account)
         return HStack(alignment:.top,spacing:16) {
-            usageCell(figures.trafficTitle,figures.traffic,figures.trafficTint)
-            usageCell(L10n.text("valid_until_label"),figures.until,figures.untilTint)
+            usageCell(figures.trafficTitle,figures.traffic,figures.trafficTint,figures.trafficTitleTint)
+            usageCell(figures.untilTitle,figures.until,figures.untilTint,figures.untilTitleTint)
         }.padding(.horizontal,4)
     }
-    private func usageCell(_ title:String,_ value:String,_ tint:Color)->some View {
+    private func usageCell(_ title:String,_ value:String,_ tint:Color,_ titleTint:Color)->some View {
         VStack(alignment:.leading,spacing:4) {
-            Text(title).font(.system(size:mac ? 11:12)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
+            Text(title).font(.system(size:mac ? 11:12)).foregroundStyle(titleTint).lineLimit(1).animation(.easeInOut(duration:0.2),value:title)
             Text(value).font(.system(size:mac ? 14:16,weight:.medium)).foregroundStyle(tint).lineLimit(1).monospacedDigit()
         }.frame(maxWidth:.infinity,alignment:.leading)
     }

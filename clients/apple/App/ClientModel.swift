@@ -56,7 +56,10 @@ import ServiceManagement
     /// comes back after this long (it can stay open for days). Opening the list page does not load it.
     static let resumeAfter:TimeInterval=6*3600
     private var foreground:AnyCancellable?
-    @Published var account:[String:Any]=[:]
+    /// Each fresh copy also drives the once-per-step reminders (traffic or time running out).
+    @Published var account:[String:Any]=[:] {didSet {AccessReminders.check(account)}}
+    /// When the account was last read: the app stays open for days, and traffic runs down meanwhile.
+    private var accountLoadedAt=Date.distantPast
     @Published var manager:NETunnelProviderManager?
     /// A newer build from the release catalog, and the state of its download (Mac DMG; iPhone opens the store).
     @Published var update:ReleaseUpdate?
@@ -103,7 +106,7 @@ import ServiceManagement
         }}
         CrashReports.shared.start();ticker=Timer.publish(every:1,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in self?.refreshStatus()}}
         // The apps stay open for days (menu bar, background): check again once six hours have passed.
-        updateTicker=Timer.publish(every:900,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in await self?.checkIfDue()}}
+        updateTicker=Timer.publish(every:900,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in await self?.checkIfDue();await self?.refreshAccountIfDue()}}
     }
     var connected:Bool {[.connected,.connecting,.reasserting].contains(manager?.connection.status)}
     /// Tunnel status lines shown in place of the rates while connected.
@@ -212,7 +215,12 @@ import ServiceManagement
             do {try session.sendProviderMessage(Data(message.utf8)) {done.resume(returning:$0)}} catch {done.resume(returning:nil)}
         }
     }
-    func loadAccount() async throws {account=try await api().request("account")}
+    func loadAccount() async throws {account=try await api().request("account");accountLoadedAt=Date()}
+    /// Every three hours while signed in, so the reminders come without opening the window.
+    func refreshAccountIfDue() async {
+        guard signedIn,Date().timeIntervalSince(accountLoadedAt)>3*3600 else {return}
+        try? await loadAccount()
+    }
     /// The connection check's three legs in milliseconds (-1 = no answer), measured by the tunnel: "local", "node", "web".
     func connectionCheck() async -> [String:Int]? {
         if nodes.isEmpty {try? await loadNodes()}
@@ -516,24 +524,33 @@ import ServiceManagement
 }
 
 /// The two figures under the location: traffic left (or used in the last 30 days) and the end of the access
-/// period, tinted when either is running out or has run out. Traffic quotas count all nodes together.
+/// period. Running out, the small title above a figure becomes the reminder and both turn amber; run out, red.
+/// The titles swap in place: nothing is added, nothing moves. Traffic quotas count all nodes together.
 struct UsageFigures {
-    let trafficTitle:String, traffic:String, trafficTint:Color, until:String, untilTint:Color
+    let trafficTitle:String, traffic:String, trafficTint:Color, trafficTitleTint:Color
+    let untilTitle:String, until:String, untilTint:Color, untilTitleTint:Color
     init(_ account:[String:Any]) {
-        let access=account["access"] as? [String:Any] ?? [:]
-        let state=access["state"] as? String ?? "active"
-        let format={(value:Int64) in ByteCountFormatter.string(fromByteCount:value,countStyle:.binary)}
-        if let quota=(access["quotaBytes"] as? NSNumber)?.int64Value {
-            let remaining=(access["remainingBytes"] as? NSNumber)?.int64Value ?? 0
-            trafficTitle=L10n.text("traffic_left");traffic=format(remaining)
-            trafficTint=state=="exhausted" ? VeilbirdStyle.danger:(state=="active" && remaining<=quota/10 ? VeilbirdStyle.fair:VeilbirdStyle.text)
+        let access=AccountAccess(account)
+        let trafficLevel=Self.level(over:access.state=="exhausted",low:access.low)
+        let untilLevel=Self.level(over:access.state=="expired",low:access.ending)
+        if let quota=access.quota {
+            trafficTitle=L10n.text(trafficLevel==2 ? "access_used_title":(trafficLevel==1 ? "access_low_title":"traffic_left"))
+            traffic=AccountAccess.bytes(min(access.remaining,quota))
         } else {
-            let used=(account["traffic"] as? [String:Any]).map {(Int64(String(describing:$0["uploadBytes"] ?? "0")) ?? 0)+(Int64(String(describing:$0["downloadBytes"] ?? "0")) ?? 0)}
-            trafficTitle=L10n.text("last_30_days");traffic=used.map(format) ?? "—";trafficTint=VeilbirdStyle.text
+            trafficTitle=L10n.text("last_30_days");traffic=Self.used(account).map(AccountAccess.bytes) ?? "—"
         }
+        untilTitle=L10n.text(untilLevel==2 ? "access_expired_title":(untilLevel==1 ? "access_soon_title":"valid_until_label"))
         until=account.isEmpty ? "—":L10n.date(account["expiresAt"] as? String)
-        let parser=ISO8601DateFormatter();parser.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
-        let end=(access["until"] as? String).flatMap {parser.date(from:$0) ?? ISO8601DateFormatter().date(from:$0)}
-        untilTint=state=="expired" ? VeilbirdStyle.danger:(state=="active" && end.map {$0.timeIntervalSinceNow<=7*86_400} == true ? VeilbirdStyle.fair:VeilbirdStyle.text)
+        trafficTint=Self.tint(trafficLevel,VeilbirdStyle.text);trafficTitleTint=Self.tint(trafficLevel,VeilbirdStyle.secondary)
+        untilTint=Self.tint(untilLevel,VeilbirdStyle.text);untilTitleTint=Self.tint(untilLevel,VeilbirdStyle.secondary)
+    }
+    /// 0 usual, 1 running out, 2 run out.
+    private static func level(over:Bool,low:Bool)->Int {over ? 2:(low ? 1:0)}
+    private static func tint(_ level:Int,_ usual:Color)->Color {level==2 ? VeilbirdStyle.danger:(level==1 ? VeilbirdStyle.fair:usual)}
+    private static func used(_ account:[String:Any])->Int64? {
+        guard let traffic=account["traffic"] as? [String:Any] else {return nil}
+        let up=Int64(String(describing:traffic["uploadBytes"] ?? "0")) ?? 0
+        let down=Int64(String(describing:traffic["downloadBytes"] ?? "0")) ?? 0
+        return up+down
     }
 }

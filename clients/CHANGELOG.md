@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.18
+
+### zh
+- 流量快用完或账号快到期时提前提醒：首页、Mac 菜单栏和 Windows 托盘里的小标题会直接显示“流量快用完”或“即将到期”
+- 到期前 7 天、前 1 天和流量剩 10% 时各发一条系统通知；Mac 菜单栏和 Windows 托盘图标上出现一个琥珀色小点，安卓连接中的通知也会显示提醒
+
+### en
+- Reminders before your traffic or access runs out: the small titles on the home screen, the Mac menu bar and the Windows tray now say "Traffic running low" or "Ends soon"
+- One system notification each 7 days and 1 day before the end and at 10% traffic left; a small amber dot on the Mac menu bar and Windows tray icons, and a line in Android's notification while connected
+
+### ru
+- Напоминания, когда трафик или срок подходят к концу: подписи на главном экране, в строке меню Mac и в трее Windows показывают «Трафик заканчивается» или «Скоро закончится»
+- Системное уведомление за 7 дней и за 1 день до конца и при остатке 10% трафика; янтарная точка на значке в строке меню Mac и в трее Windows, строка в уведомлении Android при подключении
+
 ## 1.0.17
 
 ### zh

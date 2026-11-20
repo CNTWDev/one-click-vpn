@@ -4,7 +4,11 @@
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
   <data name="a_location_is_selected_automatically_allow_the_system_vpn" xml:space="preserve"><value>Самая быстрая локация выбирается автоматически. При первом подключении разрешите использование VPN.</value></data>
+  <data name="access_expired_title" xml:space="preserve"><value>Срок истёк</value></data>
   <data name="access_for_this_device_has_been_revoked_contact_your" xml:space="preserve"><value>Доступ устройства отозван. Обратитесь к администратору.</value></data>
+  <data name="access_low_title" xml:space="preserve"><value>Трафик заканчивается</value></data>
+  <data name="access_soon_title" xml:space="preserve"><value>Скоро закончится</value></data>
+  <data name="access_used_title" xml:space="preserve"><value>Трафик закончился</value></data>
   <data name="account" xml:space="preserve"><value>Аккаунт</value></data>
   <data name="account_device_quota" xml:space="preserve"><value>Устройства   {0} / {1}</value></data>
   <data name="account_valid_until" xml:space="preserve"><value>Действует до · {0}</value></data>
@@ -280,6 +284,13 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="reconnecting_title" xml:space="preserve"><value>Переподключение</value></data>
   <data name="refresh_devices" xml:space="preserve"><value>Обновить устройства</value></data>
   <data name="refresh_locations" xml:space="preserve"><value>Обновить локации</value></data>
+  <data name="reminder_channel" xml:space="preserve"><value>Напоминания об аккаунте</value></data>
+  <data name="reminder_low_body" xml:space="preserve"><value>Осталось {0} из {1}. Когда он закончится, подключиться будет нельзя.</value></data>
+  <data name="reminder_low_line" xml:space="preserve"><value>Трафик заканчивается · осталось {0}</value></data>
+  <data name="reminder_low_title" xml:space="preserve"><value>Трафик заканчивается</value></data>
+  <data name="reminder_soon_body" xml:space="preserve"><value>Доступ закончится {0}, после этого подключиться будет нельзя. Обратитесь к администратору, чтобы продлить.</value></data>
+  <data name="reminder_soon_line" xml:space="preserve"><value>Скоро закончится · {0}</value></data>
+  <data name="reminder_soon_title" xml:space="preserve"><value>Доступ скоро закончится</value></data>
   <data name="reset_by_email" xml:space="preserve"><value>Сброс пароля по email</value></data>
   <data name="reset_change_detail" xml:space="preserve"><value>Мы отправим на {0} ссылку для нового пароля. Она действует 1 час. После смены пароля на всех устройствах нужно войти заново.</value></data>
   <data name="reset_confirm_detail" xml:space="preserve"><value>Мы отправим ссылку для сброса на {0}. Она действует 1 час.</value></data>
@@ -418,7 +429,8 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Выбор приложений на Android и Windows: в «Аккаунт → Приложения в VPN» можно пустить через TrackNothing только некоторые приложения или, наоборот, исключить их</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Напоминания, когда трафик или срок подходят к концу: подписи на главном экране, в строке меню Mac и в трее Windows показывают «Трафик заканчивается» или «Скоро закончится»
+Системное уведомление за 7 дней и за 1 день до конца и при остатке 10% трафика; янтарная точка на значке в строке меню Mac и в трее Windows, строка в уведомлении Android при подключении</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>
