@@ -7827,19 +7827,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Faster connecting: the first line that answers is used right away instead of waiting for blocked ones to time out, and automatic location no longer waits for nodes that do not answer\nSmart routing no longer holds the first connection until its rules are downloaded: you connect at once and the rules apply when they arrive"
+            "value": "Switch locations right from the Mac menu bar and the Windows tray: the location row opens the list with delays in place, and a pick switches at once (moving a running connection) without opening the main window\nThe Windows tray menu has a Location submenu: choose Automatic or a location in one step"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连接更快：哪条线路先通就先用，不再等被屏蔽的线路超时；自动选择位置时不再等不通的节点\n智能分流第一次连接不再等规则下载完，先连上，规则在后台下载好后自动生效"
+            "value": "Mac 菜单栏和 Windows 托盘里直接切换节点：点「连接位置」就地展开节点列表（带延迟），选一个即切换，已连接时自动改连过去，不再打开主窗口\nWindows 托盘右键菜单新增「连接位置」子菜单，自动选择或指定节点一步完成"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Подключение быстрее: используется первая ответившая линия, без ожидания заблокированных, а автовыбор локации больше не ждёт неотвечающие узлы\nУмная маршрутизация больше не задерживает первое подключение до загрузки правил: подключение сразу, правила применятся после загрузки"
+            "value": "Смена локации прямо из строки меню Mac и трея Windows: строка локации открывает список с задержками на месте, выбор сразу переключает (и переносит текущее подключение), без открытия главного окна\nВ меню трея Windows появилось подменю «Локация»: автовыбор или конкретная локация в один шаг"
           }
         }
       }
