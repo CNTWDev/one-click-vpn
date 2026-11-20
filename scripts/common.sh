@@ -127,3 +127,50 @@ changed_services() {
   done
   return 0
 }
+
+# ---- Off-site backups (scripts/offsite-backup.sh, backup-drill.sh, offsite-restore.sh) ----
+# A .env value without surrounding quotes; empty when unset.
+backup_setting() {
+  value=$(env_value "$1" 2>/dev/null || true)
+  case "$value" in \"*\") value=${value#\"}; value=${value%\"} ;; \'*\') value=${value#\'}; value=${value%\'} ;; esac
+  printf '%s' "$value"
+}
+
+offsite_configured() {
+  [ -n "$(backup_setting VEILBIRD_BACKUP_S3_BUCKET)" ]
+}
+
+json_string() {
+  printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+}
+
+# The first stdin line scripts/offsite-backup.mjs reads: the command, the bucket settings and the backup
+# password (VEILBIRD_BACKUP_PASSPHRASE, else VEILBIRD_MASTER_KEY; OFFSITE_PASSPHRASE overrides both), then
+# extra JSON fields given as the second argument (",\"name\":\"...\"").
+offsite_request() {
+  passphrase=${OFFSITE_PASSPHRASE:-$(backup_setting VEILBIRD_BACKUP_PASSPHRASE)}
+  [ -n "$passphrase" ] || passphrase=$(backup_setting VEILBIRD_MASTER_KEY)
+  printf '{"command":%s,"endpoint":%s,"bucket":%s,"region":%s,"prefix":%s,"addressing":%s,"accessKeyId":%s,"secretAccessKey":%s,"passphrase":%s%s}\n' \
+    "$(json_string "$1")" \
+    "$(json_string "$(backup_setting VEILBIRD_BACKUP_S3_ENDPOINT)")" \
+    "$(json_string "$(backup_setting VEILBIRD_BACKUP_S3_BUCKET)")" \
+    "$(json_string "$(backup_setting VEILBIRD_BACKUP_S3_REGION)")" \
+    "$(json_string "$(backup_setting VEILBIRD_BACKUP_S3_PREFIX)")" \
+    "$(json_string "$(backup_setting VEILBIRD_BACKUP_S3_ADDRESSING)")" \
+    "$(json_string "$(backup_setting VEILBIRD_BACKUP_S3_ACCESS_KEY_ID)")" \
+    "$(json_string "$(backup_setting VEILBIRD_BACKUP_S3_SECRET_ACCESS_KEY)")" \
+    "$(json_string "$passphrase")" \
+    "${2:-}"
+}
+
+# Runs scripts/offsite-backup.mjs inside the Controller container (it has Node and reaches Loki); stdin is the
+# request line plus any data. The bucket keys travel on stdin, never on a command line.
+offsite_node() {
+  compose exec -T veilbird node --input-type=module -e "$(cat "$APP_DIR/scripts/offsite-backup.mjs")"
+}
+
+# Writes one line to Console → 日志 (best effort).
+offsite_log() {
+  printf '{"command":"log","level":%s,"action":%s,"message":%s}\n' "$(json_string "$1")" "$(json_string "$2")" "$(json_string "$3")" |
+    offsite_node >/dev/null 2>&1 || true
+}
