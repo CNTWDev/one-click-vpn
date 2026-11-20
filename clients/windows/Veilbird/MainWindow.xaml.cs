@@ -41,6 +41,8 @@ public partial class MainWindow : Window {
     private readonly DispatcherTimer updateTimer=new() {Interval=TimeSpan.FromSeconds(3)},downloadTimer=new() {Interval=TimeSpan.FromMilliseconds(300)};
     private string announcement="";
     private readonly DispatcherTimer refresh=new() {Interval=TimeSpan.FromSeconds(1)},toastTimer=new() {Interval=TimeSpan.FromSeconds(5)};
+    // Memory is handed back a little after the window leaves the screen, not at once (it may come straight back).
+    private readonly DispatcherTimer trimTimer=new() {Interval=TimeSpan.FromSeconds(5)};
     private string lastView="";
     // The last account summary and location list, so pages show at once and refresh quietly.
     private JsonNode? accountData;
@@ -85,11 +87,16 @@ public partial class MainWindow : Window {
         L10n.Initialize();InitializeComponent();api.Origin=api.SavedOrigin;
         TitleLogo.Content=Look.Mark(16,Look.Accent);
         connection=new Connection(api,core);
-        connection.Changed+=()=>Dispatcher.InvokeAsync(()=>{UpdateLive();UpdateTray();});
-        refresh.Tick+=(_,_)=>{SampleRates();UpdateLive();RefreshActivity();};refresh.Start();
+        // Hidden in the tray only the tray's tooltip follows the connection; the pages catch up when they show again.
+        connection.Changed+=()=>Dispatcher.InvokeAsync(()=>{if(Seen) UpdateLive();UpdateTray();});
+        refresh.Tick+=(_,_)=>{SampleRates();if(Seen) UpdateLive();RefreshActivity();};refresh.Start();
         toastTimer.Tick+=(_,_)=>{toastTimer.Stop();Toast.Visibility=Visibility.Collapsed;};
         Toast.MouseLeftButtonUp+=(_,_)=>{toastTimer.Stop();Toast.Visibility=Visibility.Collapsed;};
         SourceInitialized+=(_,_)=>DarkFrame();
+        IsVisibleChanged+=(_,_)=>OnScreenChanged();StateChanged+=(_,_)=>OnScreenChanged();
+        trimTimer.Tick+=(_,_)=>{trimTimer.Stop();if(!Seen) Trim();};
+        // Started in the background at sign-in (tray only): trim once the launch work has settled.
+        trimTimer.Start();
         SetupTray();
         Closing+=OnClosing;
         updateTimer.Tick+=(_,_)=>{
@@ -114,6 +121,17 @@ public partial class MainWindow : Window {
         if(api.SignedIn&&Connection.Wanted) _=Restore();
     }
 
+    [DllImport("kernel32.dll")] private static extern IntPtr GetCurrentProcess();
+    [DllImport("kernel32.dll")] private static extern bool SetProcessWorkingSetSize(IntPtr process,IntPtr minimum,IntPtr maximum);
+    /// In the tray for hours: the window's pages, images and fonts stay built but untouched. A full collection and
+    /// letting Windows trim the working set gives most of that memory back; it pages in again when the window shows.
+    private static void Trim() {
+        try {
+            System.Runtime.GCSettings.LargeObjectHeapCompactionMode=System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect(2,GCCollectionMode.Forced,true,true);GC.WaitForPendingFinalizers();
+            SetProcessWorkingSetSize(GetCurrentProcess(),-1,-1);
+        } catch {/* only an optimisation */}
+    }
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
     /// Dark window frame and Windows 11's rounded corners; older Windows ignores both.
     private void DarkFrame() {
@@ -211,6 +229,7 @@ public partial class MainWindow : Window {
         var window=new Window {Width=300,Height=440,WindowStyle=WindowStyle.None,AllowsTransparency=true,Background=Brushes.Transparent,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,
             FontFamily=FontFamily,UseLayoutRounding=true,Title="TrackNothing"};
         window.Deactivated+=(_,_)=>{if(window.IsVisible) {window.Hide();flyoutHidden=DateTime.UtcNow;}};
+        window.IsVisibleChanged+=(_,_)=>{if(!Seen) {trimTimer.Stop();trimTimer.Start();}};
         var root=new DockPanel {LastChildFill=true};
         var header=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,14)};
         var word=Look.Wordmark(14);word.Margin=new Thickness(8,0,0,0);header.Children.Add(Look.Mark(16,Look.Accent));header.Children.Add(word);
@@ -1011,6 +1030,28 @@ public partial class MainWindow : Window {
         if(fileLines is { Count: >0 } lines) lines[0].Value=visitorIp;
     }
     private string FileNumber()=>Dossier.FileNumber(accountData?["email"]?.GetValue<string>()??"");
+    private bool? dotBreathing;
+    /// The action's dot breathes while a connection is on, only while the window is on screen (a hidden or minimised
+    /// window would keep the animation clock ticking all day in the tray).
+    private void BreatheDot() {
+        if(actionDot is null) return;
+        var on=connection.Active&&Motion&&OnScreen;
+        if(dotBreathing==on) return;
+        dotBreathing=on;
+        actionDot.BeginAnimation(OpacityProperty,null);actionDot.Opacity=1;
+        if(on) actionDot.BeginAnimation(OpacityProperty,new DoubleAnimation(1,0.35,TimeSpan.FromMilliseconds(1800)) {AutoReverse=true,RepeatBehavior=RepeatBehavior.Forever,EasingFunction=new SineEase {EasingMode=EasingMode.EaseInOut}});
+    }
+    private bool OnScreen=>IsVisible&&WindowState!=WindowState.Minimized;
+    /// The window or the tray flyout is on screen.
+    private bool Seen=>OnScreen||flyout?.IsVisible==true;
+    /// The window went to the tray, was minimised or came back: pause or resume what moves on it, and once it has
+    /// been away a moment give memory back (see Trim).
+    private void OnScreenChanged() {
+        if(portrait is not null) portrait.Resting=WindowState==WindowState.Minimized;
+        BreatheDot();
+        if(OnScreen) {trimTimer.Stop();UpdateLive();}
+        else {trimTimer.Stop();trimTimer.Start();}
+    }
     /// Seals or opens the connect page's file when the connection starts or ends; the first show on a page is still.
     private void ShowSeal(RingState state) {
         var seal=connection.Active;
@@ -1025,9 +1066,7 @@ public partial class MainWindow : Window {
             actionButton.BorderBrush=on?Look.AccentLine:Look.Accent;
             AutomationProperties.SetName(actionButton,L10n.Text(state switch {RingState.Idle=>"connect_action",RingState.Failed=>"retry_action",RingState.Connecting=>"cancel",_=>"disconnect_action"}));
             actionDot.Fill=seal?Look.Accent:Look.Hex("#59EDE7DF");
-            actionDot.BeginAnimation(OpacityProperty,null);actionDot.Opacity=1;
-            if(seal&&Motion) actionDot.BeginAnimation(OpacityProperty,new DoubleAnimation(1,0.35,TimeSpan.FromMilliseconds(1800)) {AutoReverse=true,RepeatBehavior=RepeatBehavior.Forever,EasingFunction=new SineEase {EasingMode=EasingMode.EaseInOut}});
-            shownState=state;
+            shownState=state;dotBreathing=null;BreatheDot();
         }
         if(actionButton is not null) actionButton.IsEnabled=!busy||connection.Active;
         if(statusTitle is not null) statusTitle.Foreground=state==RingState.Connected?Look.Accent:Look.Text;

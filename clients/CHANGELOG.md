@@ -4,7 +4,7 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
-## 1.0.15
+## 1.0.16
 
 ### zh
 - 安卓和 Windows 支持按应用分流：在「账户 → 按应用分流」里选择只让部分应用走代理，或让部分应用直连
@@ -14,6 +14,20 @@
 
 ### ru
 - Выбор приложений на Android и Windows: в «Аккаунт → Приложения в VPN» можно пустить через TrackNothing только некоторые приложения или, наоборот, исключить их
+
+## 1.0.15
+
+### zh
+- 更省电省内存：Windows 关到托盘、最小化或 Mac 只留菜单栏时，界面动画暂停、不再每秒刷新，Windows 会把闲置内存还给系统
+- 启动更快：安卓打开页面时不再反复查询系统语言；Windows 版改为预编译，冷启动更快
+
+### en
+- Lighter in the background: closed to the Windows tray, minimised, or in the Mac menu bar only, the app pauses its animations and per-second updates, and Windows hands idle memory back
+- Faster start: Android no longer looks up the system language for every line on a page, and the Windows app is precompiled for a quicker cold start
+
+### ru
+- Экономнее в фоне: в трее Windows, свёрнутым или только в строке меню Mac приложение останавливает анимации и ежесекундные обновления, а Windows возвращает простаивающую память
+- Быстрее запуск: Android больше не запрашивает язык системы для каждой строки на странице, а приложение Windows заранее скомпилировано для более быстрого холодного старта
 
 ## 1.0.14
 
