@@ -24,7 +24,7 @@ test("Console locales: all routes, persisted choice, forms and mobile layout", {
       const user = { id: "owner", displayName: "Owner", email: "owner@example.com", role: "admin", status: "active", createdAt: "2026-10-01T00:00:00Z" };
       if (url.pathname === "/api/auth/me") { status = signedIn ? 200 : 401; body = signedIn ? { user } : { error: "Authentication required" }; }
       else if (url.pathname === "/api/auth/login") { signedIn = true; body = { user }; }
-      else if (url.pathname === "/api/v1/admin/users") body = { counts: { pending: 0, active: 1, rejected: 0, suspended: 0 }, users: url.searchParams.get("status") === "pending" ? [] : [user] };
+      else if (url.pathname === "/api/v1/admin/users") body = { counts: { all: 1, pending: 0, active: 1, rejected: 0, suspended: 0, ending: 0, ended: 0 }, total: url.searchParams.get("filter") === "pending" ? 0 : 1, users: url.searchParams.get("filter") === "pending" ? [] : [user] };
       else if (url.pathname === "/api/nodes") body = { nodes: [] };
       else if (url.pathname === "/api/v1/admin/overview-stats") body = { online: { users: 0, devices: 0 }, lastMonth: null, expiring: [], nearQuota: [] };
       else if (url.pathname === "/api/regions") { if (method === "POST") region = route.request().postDataJSON(); body = { regions: [] }; }

@@ -107,9 +107,11 @@ export function consoleApi({ signedIn = true } = {}) {
     if (pathname === "/api/auth/login") { session = true; return [200, { user }]; }
     if (pathname === "/api/auth/logout") { session = false; return [200, {}]; }
     if (pathname === "/api/v1/admin/users") {
-      const counts = { pending: 0, active: 0, rejected: 0, suspended: 0 };
-      for (const item of users) counts[item.status] += 1;
-      return [200, { counts, users: users.filter((item) => !query.get("status") || item.status === query.get("status")) }];
+      // A large deployment: the list shows one page of 1,234 accounts, so the pager is on screen.
+      const counts = { all: 1234, pending: 1, active: 1187, rejected: 12, suspended: 33, ending: 41, ended: 96 };
+      const filter = query.get("filter") || query.get("status") || "all";
+      const matching = users.filter((item) => filter === "all" || item.status === filter || (filter === "ending" && item.id === "u3"));
+      return [200, { counts, total: filter === "all" ? counts.all : matching.length, users: matching.slice(0, Number(query.get("limit") || 50)) }];
     }
     if (/^\/api\/v1\/admin\/users\/[^/]+\/credentials$/.test(pathname)) return [200, access];
     if (pathname === "/api/v1/admin/mail-settings") return [200, { settings: { provider: "aliyun", host: "smtpdm-ap-southeast-1.aliyun.com", port: 465, username: "no-reply@notifications.very-long-company-domain.example", fromName: "TrackNothing", passwordSet: true, updatedAt: now } }];
