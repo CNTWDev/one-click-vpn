@@ -152,6 +152,8 @@ elif [ "$assume_yes" = "no" ]; then
   echo "No recovery package will be created."
 fi
 
+# The nightly off-site backup would otherwise keep firing against a removed installation (bucket copies stay).
+sh "$APP_DIR/scripts/install-backup-timer.sh" --remove >/dev/null 2>&1 || true
 echo "Stopping TrackNothing and deleting project volumes..."
 compose down --volumes --remove-orphans --rmi local
 
