@@ -7827,19 +7827,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "On the Mac, closing the window takes TrackNothing out of the Dock: it keeps running in the menu bar, and \"Open TrackNothing\" there brings back the window and the Dock icon; choose Quit to exit"
+            "value": "Faster connecting: the first line that answers is used right away instead of waiting for blocked ones to time out, and automatic location no longer waits for nodes that do not answer\nSmart routing no longer holds the first connection until its rules are downloaded: you connect at once and the rules apply when they arrive"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac 关闭窗口后不再占着程序坞：应用继续在菜单栏运行，点菜单栏图标「打开 TrackNothing」窗口和程序坞图标一起回来；要彻底退出请选「退出」"
+            "value": "连接更快：哪条线路先通就先用，不再等被屏蔽的线路超时；自动选择位置时不再等不通的节点\n智能分流第一次连接不再等规则下载完，先连上，规则在后台下载好后自动生效"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "На Mac после закрытия окна TrackNothing пропадает из Dock и продолжает работать в строке меню; «Открыть TrackNothing» там возвращает окно и значок в Dock, для выхода выберите «Выйти»"
+            "value": "Подключение быстрее: используется первая ответившая линия, без ожидания заблокированных, а автовыбор локации больше не ждёт неотвечающие узлы\nУмная маршрутизация больше не задерживает первое подключение до загрузки правил: подключение сразу, правила применятся после загрузки"
           }
         }
       }

@@ -23,6 +23,10 @@ type testInput struct {
 	Nodes     map[string][]map[string]any `json:"nodes"`
 	URL       string                      `json:"url"`
 	TimeoutMs int                         `json:"timeoutMs"`
+	// First settles a node at its first answer (its fastest line, since all start together) instead of waiting
+	// for every line: connecting only needs to know which node is fastest, and a line blocked on this network
+	// would otherwise hold every node for the whole timeout. Lines that had not answered yet are left out.
+	First bool `json:"first"`
 }
 
 // Test measures nodes the way connecting would use them, as Clash apps do: an HTTP request to url through
@@ -46,35 +50,47 @@ func Test(input string) string {
 	}
 	results := make(map[string]*testResult, len(request.Nodes))
 	var mutex sync.Mutex
+	// One count per node: done when the node is settled (every line finished, or its first answer with First).
+	// Lines still running after that finish in the background; their results are no longer read.
 	var wait sync.WaitGroup
 	slots := make(chan struct{}, testWorkers)
 	for id, proxies := range request.Nodes {
 		result := &testResult{Ms: -1, Lines: make(map[string]int, len(proxies))}
-		mutex.Lock()
 		results[id] = result
-		mutex.Unlock()
+		if len(proxies) == 0 {
+			continue
+		}
+		wait.Add(1)
+		remaining, settled := len(proxies), false
 		for _, mapping := range proxies {
-			wait.Add(1)
-			go func(id string, mapping map[string]any) {
-				defer wait.Done()
+			go func(mapping map[string]any) {
 				slots <- struct{}{}
-				defer func() { <-slots }()
 				delay := testOne(mapping, request.URL, timeout)
+				<-slots
 				name, _ := mapping["name"].(string)
 				mutex.Lock()
-				result := results[id]
+				defer mutex.Unlock()
+				remaining--
+				if settled {
+					return
+				}
 				if name != "" {
 					result.Lines[name] = delay
 				}
 				if delay >= 0 && (result.Ms < 0 || delay < result.Ms) {
 					result.Ms = delay
 				}
-				mutex.Unlock()
-			}(id, mapping)
+				if remaining == 0 || (request.First && delay >= 0) {
+					settled = true
+					wait.Done()
+				}
+			}(mapping)
 		}
 	}
 	wait.Wait()
+	mutex.Lock()
 	reply, _ := json.Marshal(results)
+	mutex.Unlock()
 	return string(reply)
 }
 

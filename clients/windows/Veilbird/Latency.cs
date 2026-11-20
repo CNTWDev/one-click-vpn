@@ -84,10 +84,10 @@ public static class Latency {
     /// the lines a connect would use): the fastest answer in ms (-1 when none answers) and each transport's result;
     /// null when not measured. This is how Clash apps measure: it sees a node reached only over UDP, and one whose
     /// port answers but whose transport is blocked after the handshake.
-    public static async Task<(long Ms,Dictionary<string,long> Lines)?> Real(string id,JsonArray transports) {
+    public static async Task<(long Ms,Dictionary<string,long> Lines)?> Real(string id,JsonArray transports,bool first=false) {
         if(RealTest is not { } test) return null;
         try {
-            var input=new JsonObject {["nodes"]=new JsonObject {[id]=transports.DeepClone()},["url"]=Transports.TestUrl,["timeoutMs"]=RealTimeoutMs};
+            var input=new JsonObject {["nodes"]=new JsonObject {[id]=transports.DeepClone()},["url"]=Transports.TestUrl,["timeoutMs"]=RealTimeoutMs,["first"]=first};
             if(JsonNode.Parse(await test(input.ToJsonString()))?[id] is not JsonObject result) return null;
             var lines=new Dictionary<string,long>();
             if(result["lines"] is JsonObject map) foreach(var (name,value) in map) if(value is not null) lines[name]=value.GetValue<long>();
@@ -108,12 +108,15 @@ public static class Latency {
     }
     /// TCP connects give jitter and loss; the request through the transports, when the device has them, decides
     /// whether the node answers and its latency. Devices that never connected (no "test" list) keep the TCP result.
-    public static async Task<Quality> Measure(JsonNode node,int attempts=5) {
-        var pending=node["test"] is JsonArray { Count: >0 } transports&&node["id"]?.GetValue<string>() is { } id?Real(id,transports):null;
+    /// first (connecting): the node's first answering line is enough, so a line blocked here does not hold every node
+    /// for the whole wait; the lines are then not known (null).
+    public static async Task<Quality> Measure(JsonNode node,int attempts=5,bool first=false) {
+        var pending=node["test"] is JsonArray { Count: >0 } transports&&node["id"]?.GetValue<string>() is { } id?Real(id,transports,first):null;
         var tcp=await MeasureTcp(node,attempts);
         if(pending is null||await pending is not { } real) return tcp;
-        var (delay,lines)=real;
-        if(lines.Count>0) Journal.Add($"lines: {node["name"]?.GetValue<string>()} "+string.Join(", ",lines.Select(pair=>pair.Value>=0?$"{pair.Key} {pair.Value} ms":$"{pair.Key} no answer")));
+        var (delay,measured)=real;
+        var lines=first?null:measured;
+        if(lines is { Count: >0 }) Journal.Add($"lines: {node["name"]?.GetValue<string>()} "+string.Join(", ",lines.Select(pair=>pair.Value>=0?$"{pair.Key} {pair.Value} ms":$"{pair.Key} no answer")));
         if(delay<0) return new(null,0,100,tcp.Load,tcp.Users,lines);
         return tcp.Latency is not null?tcp with {Latency=delay,Lines=lines}:new(delay,0,0,tcp.Load,tcp.Users,lines);
     }
@@ -143,17 +146,41 @@ public static class Latency {
     /// Best first; unmeasured nodes follow in the server's least-loaded order. A node measured within reuse keeps
     /// that result (with the current load), so connecting right after the location list does not probe again.
     /// each is called as every new measurement arrives (not for reused ones), so a list can update row by row.
-    public static async Task<List<(JsonNode Node,Quality Quality)>> Rank(JsonArray nodes,int attempts=5,TimeSpan? reuse=null,Action<string,Quality>? each=null) {
+    ///
+    /// settle (connecting): stop waiting this long after the first node answered. A node still being measured then is
+    /// slower than that one by about as much, so it cannot be the best, while a node that is down would hold the
+    /// connect for its whole timeout. Such nodes follow the measured ones (before those that did not answer) and are
+    /// not recorded as unreachable; their measurement finishes in the background. It also takes each node's first
+    /// answering line (see Measure).
+    public static async Task<List<(JsonNode Node,Quality Quality)>> Rank(JsonArray nodes,int attempts=5,TimeSpan? reuse=null,TimeSpan? settle=null,Action<string,Quality>? each=null) {
         var list=nodes.Where(n=>n is not null).Select(n=>n!).ToList();
         Quality? Known(JsonNode node)=>reuse is { } age&&node["id"]?.GetValue<string>() is { } id&&MeasuredAt.TryGetValue(id,out var at)&&DateTime.UtcNow-at<age
             &&Recent.TryGetValue(id,out var quality)?quality:null;
-        var measured=await Task.WhenAll(list.Select(async node=>{
+        var tasks=list.Select(async node=>{
             if(Known(node) is { } known) return known with {Load=Load(node),Users=Users(node)};
-            var fresh=await Measure(node,attempts);
-            if(node["id"]?.GetValue<string>() is { } id) {MeasuredAt[id]=DateTime.UtcNow;Recent[id]=fresh;each?.Invoke(id,fresh);}
+            var fresh=await Measure(node,attempts,first:settle is not null);
+            if(node["id"]?.GetValue<string>() is { } id) {
+                if(fresh.Lines is null&&Recent.TryGetValue(id,out var previous)) fresh=fresh with {Lines=previous.Lines};
+                MeasuredAt[id]=DateTime.UtcNow;Recent[id]=fresh;each?.Invoke(id,fresh);
+            }
             return fresh;
-        }));
-        for(var i=0;i<list.Count;i++) if(list[i]["id"]?.GetValue<string>() is { } id) Recent[id]=measured[i];
-        return list.Select((node,i)=>(node,measured[i])).OrderBy(item=>item.Item2.Score).ToList();
+        }).ToList();
+        var results=new Quality?[list.Count];
+        var pending=new List<Task<Quality>>(tasks);
+        var cutoff=DateTime.UtcNow.AddSeconds(25);
+        while(pending.Count>0) {
+            var wait=cutoff-DateTime.UtcNow;
+            if(wait<=TimeSpan.Zero) break;
+            var finished=await Task.WhenAny(Task.WhenAny(pending),Task.Delay(wait));
+            if(finished is not Task<Task<Quality>> any) break;
+            var done=any.Result;pending.Remove(done);
+            Quality quality;
+            try {quality=await done;} catch {continue;}
+            results[tasks.IndexOf(done)]=quality;
+            if(settle is { } extra&&quality.Latency is not null&&DateTime.UtcNow+extra<cutoff) cutoff=DateTime.UtcNow+extra;
+        }
+        var unfinished=new Quality(null,0,0,null);
+        return Enumerable.Range(0,list.Count).OrderBy(i=>results[i]?.Score??long.MaxValue-1)
+            .Select(i=>(list[i],results[i]??unfinished)).ToList();
     }
 }

@@ -110,6 +110,9 @@ public sealed class Core : IDisposable {
     /// Tests the named transports at once through url; -1 means no answer.
     public Dictionary<string,long> Probe(IEnumerable<string> names,int timeoutMs)=>
         Transports.ParseProbe(Call($"probe {string.Join(',',names)} {Transports.TestUrl} {timeoutMs}"));
+    /// Probe for connecting (core.ProbeFirst): returns once traffic has a transport; probes not waited for are left out.
+    public Dictionary<string,long> ProbeFirst(IEnumerable<string> names,int timeoutMs)=>
+        Transports.ParseProbe(Call($"probefirst {string.Join(',',names)} {Transports.Group} {Transports.TestUrl} {timeoutMs}"));
     /// One proxy (by name, "DIRECT" for outside the tunnel) timed against url; -1 when it does not answer.
     public long ProbeUrl(string name,string url,int timeoutMs)=>Transports.ParseProbe(Call($"probe {name} {url} {timeoutMs}")).TryGetValue(name,out var ms)?ms:-1;
     /// A TCP connect to host:port outside the tunnel, in ms; -1 when it does not answer.

@@ -105,8 +105,8 @@ object Latency {
      * null when not measured. This is how Clash apps measure: it sees a node reached only over UDP, and one whose
      * port answers but whose transport is blocked after the handshake.
      */
-    fun real(id: String, transports: JSONArray): Pair<Long, Map<String, Long>>? = try {
-        val input = JSONObject().put("nodes", JSONObject().put(id, transports)).put("url", Transports.TEST_URL).put("timeoutMs", REAL_TIMEOUT_MS)
+    fun real(id: String, transports: JSONArray, first: Boolean = false): Pair<Long, Map<String, Long>>? = try {
+        val input = JSONObject().put("nodes", JSONObject().put(id, transports)).put("url", Transports.TEST_URL).put("timeoutMs", REAL_TIMEOUT_MS).put("first", first)
         JSONObject(Core.test(input.toString())).optJSONObject(id)?.let { result ->
             val lines = result.optJSONObject("lines")
             result.optLong("ms", -1) to (lines?.keys()?.asSequence()?.associateWith { lines.optLong(it, -1) } ?: emptyMap())
@@ -116,13 +116,16 @@ object Latency {
     /**
      * TCP connects give jitter and loss; the request through the transports, when the device has them, decides
      * whether the node answers and its latency. Devices that never connected (no "test" list) keep the TCP result.
+     * first (connecting): the node's first answering line is enough, so a line blocked here does not hold every node
+     * for the whole wait; the lines are then not known (null).
      */
-    fun measure(node: JSONObject, attempts: Int = 5): Quality {
+    fun measure(node: JSONObject, attempts: Int = 5, first: Boolean = false): Quality {
         val transports = node.optJSONArray("test")?.takeIf { it.length() > 0 }
-        val pending = transports?.let { list -> connector.submit<Pair<Long, Map<String, Long>>?> { real(node.optString("id"), list) } }
+        val pending = transports?.let { list -> connector.submit<Pair<Long, Map<String, Long>>?> { real(node.optString("id"), list, first) } }
         val tcp = measureTcp(node, attempts)
-        val (delay, lines) = pending?.let { try { it.get(REAL_TIMEOUT_MS + 3000L, TimeUnit.MILLISECONDS) } catch (_: Exception) { null } } ?: return tcp
-        if (lines.isNotEmpty()) Journal.add("lines: ${node.optString("name")} " + lines.entries.joinToString(", ") { (name, ms) -> if (ms >= 0) "$name $ms ms" else "$name no answer" })
+        val (delay, measured) = pending?.let { try { it.get(REAL_TIMEOUT_MS + 3000L, TimeUnit.MILLISECONDS) } catch (_: Exception) { null } } ?: return tcp
+        val lines = measured.takeUnless { first }
+        if (!lines.isNullOrEmpty()) Journal.add("lines: ${node.optString("name")} " + lines.entries.joinToString(", ") { (name, ms) -> if (ms >= 0) "$name $ms ms" else "$name no answer" })
         if (delay < 0) return Quality(null, 0, 100, tcp.load, tcp.users, lines)
         return if (tcp.latency != null) tcp.copy(latency = delay, lines = lines) else Quality(delay, 0, 0, tcp.load, tcp.users, lines)
     }
@@ -167,22 +170,41 @@ object Latency {
     /**
      * Best first; unmeasured nodes follow in the server's least-loaded order. A node measured less than reuseMs ago
      * keeps that result (with the current load), so connecting right after the location list does not probe again.
+     *
+     * settleMs (connecting): stop waiting settleMs after the first node answered. A node still being measured then is
+     * slower than that one by about as much, so it cannot be the best, while a node that is down would hold the
+     * connect for its whole timeout. Such nodes follow the measured ones (before those that did not answer) and are
+     * not recorded as unreachable; their measurement finishes in the background. It also takes each node's first
+     * answering line (see measure).
      */
-    fun rank(nodes: JSONArray, attempts: Int = 5, reuseMs: Long = 0, each: ((String, Quality) -> Unit)? = null): List<Pair<JSONObject, Quality>> {
+    fun rank(nodes: JSONArray, attempts: Int = 5, reuseMs: Long = 0, settleMs: Long = 0, each: ((String, Quality) -> Unit)? = null): List<Pair<JSONObject, Quality>> {
         val list = (0 until nodes.length()).map { nodes.getJSONObject(it) }
         if (list.isEmpty()) return emptyList()
         val pool = Executors.newFixedThreadPool(minOf(16, list.size))
         try {
-            val pending = list.map { node -> pool.submit<Quality> {
+            val done = java.util.concurrent.ExecutorCompletionService<Pair<Int, Quality>>(pool)
+            list.forEachIndexed { index, node -> done.submit {
                 val id = node.optString("id"); val known = recent[id]; val at = measuredAt[id] ?: 0L
                 val load = if (node.isNull("load")) null else node.optInt("load", -1).takeIf { it in 0..100 }
-                if (known != null && System.currentTimeMillis() - at < reuseMs) known.copy(load = load, users = users(node))
-                else measure(node, attempts).also { measuredAt[id] = System.currentTimeMillis(); recent[id] = it; each?.invoke(id, it) }
+                val quality = if (known != null && System.currentTimeMillis() - at < reuseMs) known.copy(load = load, users = users(node))
+                else measure(node, attempts, first = settleMs > 0).let { it.copy(lines = it.lines ?: recent[id]?.lines) }
+                    .also { measuredAt[id] = System.currentTimeMillis(); recent[id] = it; each?.invoke(id, it) }
+                index to quality
             } }
-            return list.zip(pending.map { task -> try { task.get(25, TimeUnit.SECONDS) } catch (_: Exception) { Quality(null, 0, 100, null) } })
-                .onEach { (node, quality) -> recent[node.getString("id")] = quality }
-                .sortedBy { it.second.score }
-        } finally { pool.shutdownNow() }
+            val results = arrayOfNulls<Quality>(list.size)
+            var cutoff = System.currentTimeMillis() + 25000
+            for (i in list.indices) {
+                val wait = cutoff - System.currentTimeMillis()
+                if (wait <= 0) break
+                val finished = done.poll(wait, TimeUnit.MILLISECONDS) ?: break
+                val (index, quality) = try { finished.get() } catch (_: Exception) { continue }
+                results[index] = quality
+                if (settleMs > 0 && quality.latency != null) cutoff = minOf(cutoff, System.currentTimeMillis() + settleMs)
+            }
+            val unfinished = Quality(null, 0, 0, null)
+            return list.indices.sortedBy { results[it]?.let { quality -> quality.score } ?: (Long.MAX_VALUE - 1) }
+                .map { list[it] to (results[it] ?: unfinished) }
+        } finally { pool.shutdown() }
     }
 
     /** The server's order, unmeasured: used while connected, when probes would run through the tunnel. */
