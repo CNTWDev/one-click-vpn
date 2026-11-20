@@ -39,6 +39,7 @@
   <data name="activity_time" xml:space="preserve"><value>Время</value></data>
   <data name="activity_title" xml:space="preserve"><value>Активность</value></data>
   <data name="activity_traffic" xml:space="preserve"><value>Трафик</value></data>
+  <data name="add_program" xml:space="preserve"><value>Добавить программу…</value></data>
   <data name="all_locations" xml:space="preserve"><value>Все локации</value></data>
   <data name="all_locations_count" xml:space="preserve"><value>Все локации: {0}</value></data>
   <data name="allow_system_extension" xml:space="preserve"><value>macOS должна разрешить сетевое расширение TrackNothing, иначе подключиться нельзя. Нажмите «Открыть Системные настройки» и включите TrackNothing в разделе «Основные › Объекты входа и расширения › Сетевые расширения» (macOS 14 и раньше: «Конфиденциальность и безопасность»). Подключение начнётся сразу после разрешения.</value></data>
@@ -50,6 +51,18 @@
   <data name="allow_vpn_configuration_short" xml:space="preserve"><value>Выберите «Разрешить» в системном окне, чтобы добавить конфигурацию VPN</value></data>
   <data name="announcement" xml:space="preserve"><value>Объявление</value></data>
   <data name="appearance" xml:space="preserve"><value>Оформление</value></data>
+  <data name="apps_all_value" xml:space="preserve"><value>Все</value></data>
+  <data name="apps_apply_next" xml:space="preserve"><value>Изменения вступят в силу при следующем подключении.</value></data>
+  <data name="apps_except_value" xml:space="preserve"><value>Кроме {0}</value></data>
+  <data name="apps_lockdown_note" xml:space="preserve"><value>Если в системе включено «Блокировать соединения без VPN», приложения напрямую не смогут выйти в сеть.</value></data>
+  <data name="apps_mode_all" xml:space="preserve"><value>Все приложения через VPN</value></data>
+  <data name="apps_mode_all_detail" xml:space="preserve"><value>По умолчанию. Защищены все приложения на устройстве.</value></data>
+  <data name="apps_mode_except" xml:space="preserve"><value>Кроме выбранных</value></data>
+  <data name="apps_mode_except_detail" xml:space="preserve"><value>Для банков и местных сервисов, которым нужно прямое подключение.</value></data>
+  <data name="apps_mode_only" xml:space="preserve"><value>Только выбранные</value></data>
+  <data name="apps_mode_only_detail" xml:space="preserve"><value>Остальные приложения подключаются напрямую, без TrackNothing.</value></data>
+  <data name="apps_only_value" xml:space="preserve"><value>Только {0}</value></data>
+  <data name="apps_selected" xml:space="preserve"><value>ВЫБРАНО: {0}</value></data>
   <data name="ask_your_administrator_to_enable_veilbird_client_access" xml:space="preserve"><value>Попросите администратора включить доступ через клиент TrackNothing.</value></data>
   <data name="attempt_n" xml:space="preserve"><value>Попытка {0}</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>Авторизованные устройства</value></data>
@@ -247,6 +260,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="or_choose_one" xml:space="preserve"><value>Или выберите сами</value></data>
   <data name="password" xml:space="preserve"><value>Пароль</value></data>
   <data name="password_reset_unavailable" xml:space="preserve"><value>Сброс пароля по email сейчас недоступен. Обратитесь к администратору.</value></data>
+  <data name="per_app_routing" xml:space="preserve"><value>Приложения в VPN</value></data>
   <data name="permission_needed_title" xml:space="preserve"><value>Нужно ваше разрешение</value></data>
   <data name="phase_confirm" xml:space="preserve"><value>Проверка</value></data>
   <data name="phase_route" xml:space="preserve"><value>Выбор маршрута</value></data>
@@ -286,10 +300,12 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="routing_global_detail" xml:space="preserve"><value>Весь трафик через TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>Умная</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>Сайты материкового Китая напрямую, остальное через TrackNothing</value></data>
+  <data name="running_apps" xml:space="preserve"><value>Запущенные программы</value></data>
   <data name="running_in_tray" xml:space="preserve"><value>TrackNothing работает в трее. Нажмите на значок, чтобы переключить.</value></data>
   <data name="seal_action" xml:space="preserve"><value>Подключиться</value></data>
   <data name="sealed_status" xml:space="preserve"><value>Скрыто</value></data>
   <data name="sealing_detail" xml:space="preserve"><value>Скрываем…</value></data>
+  <data name="search_apps" xml:space="preserve"><value>Поиск приложений</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>Поиск локаций или регионов</value></data>
   <data name="section_account" xml:space="preserve"><value>§04 Владелец</value></data>
   <data name="section_activity" xml:space="preserve"><value>§03 Активность</value></data>
@@ -301,6 +317,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>Защищённое хранилище недоступно. Разблокируйте устройство и повторите.</value></data>
   <data name="seen_as" xml:space="preserve"><value>Сайты видят только {0}</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>Самая быстрая локация, при сбое — следующая</value></data>
+  <data name="selected_state" xml:space="preserve"><value>выбрано</value></data>
   <data name="send_reset_link" xml:space="preserve"><value>Отправить</value></data>
   <data name="server_address" xml:space="preserve"><value>Адрес сервера</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Адрес сервера https://…</value></data>
@@ -401,10 +418,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Первый запуск в три шага: вход, выбор локации (по умолчанию «Автоматически», плюс три самые быстрые для вас), подключение; нижние вкладки появляются после подключения, а на каждой странице видно, какой это шаг
-Состояния подключения одинаковы на Android, Mac и Windows: при подключении по кругу бежит дуга, при смене линии они пробуются по очереди, при переподключении видны обратный отсчёт и номер попытки, без сети приложение спокойно ждёт
-Если подключиться не удалось, приложение говорит причину и что делать, а кнопка делает это: управлять устройствами при лимите, перейти на «Автоматически», если локация не отвечает, войти снова, если сессия истекла, обновиться, если требуется обновление
-Значок в строке меню Mac и в трее Windows в трёх видах: не подключено (приглушён), идёт работа (мигает), подключено (ярко)</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Выбор приложений на Android и Windows: в «Аккаунт → Приложения в VPN» можно пустить через TrackNothing только некоторые приложения или, наоборот, исключить их</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>

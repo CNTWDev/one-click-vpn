@@ -37,6 +37,7 @@
   <string name="activity_time">时间</string>
   <string name="activity_title">活动</string>
   <string name="activity_traffic">流量</string>
+  <string name="add_program">添加程序…</string>
   <string name="all_locations">全部节点</string>
   <string name="all_locations_count">全部 %1$s 个位置</string>
   <string name="allow_system_extension">macOS 需要你允许 TrackNothing 的网络扩展才能连接。点「打开系统设置」，在「通用 › 登录项与扩展 › 网络扩展」（macOS 14 及更早：「隐私与安全性」）里打开 TrackNothing，允许后会自动连接。</string>
@@ -48,6 +49,18 @@
   <string name="allow_vpn_configuration_short">系统弹窗里选「允许」添加 VPN 配置后才能连接</string>
   <string name="announcement">公告</string>
   <string name="appearance">外观</string>
+  <string name="apps_all_value">全部应用</string>
+  <string name="apps_apply_next">改动在下次连接时生效。</string>
+  <string name="apps_except_value">%1$s 个应用不走代理</string>
+  <string name="apps_lockdown_note">如果系统开启了「屏蔽无 VPN 连接」，直连的应用将无法上网。</string>
+  <string name="apps_mode_all">全部应用走代理</string>
+  <string name="apps_mode_all_detail">默认。这台设备上的所有应用都受保护。</string>
+  <string name="apps_mode_except">选中的应用不走代理</string>
+  <string name="apps_mode_except_detail">适合银行、本地服务这类需要直连的应用。</string>
+  <string name="apps_mode_only">仅选中的应用走代理</string>
+  <string name="apps_mode_only_detail">其他应用直接上网，不经过 TrackNothing。</string>
+  <string name="apps_only_value">%1$s 个应用走代理</string>
+  <string name="apps_selected">已选 %1$s 个</string>
   <string name="ask_your_administrator_to_enable_veilbird_client_access">请联系管理员开通 TrackNothing 客户端访问。</string>
   <string name="attempt_n">第 %1$s 次</string>
   <string name="authorized_devices">授权设备</string>
@@ -241,6 +254,7 @@
   <string name="or_choose_one">或者指定一个</string>
   <string name="password">密码</string>
   <string name="password_reset_unavailable">暂时无法通过邮件重置密码，请联系管理员。</string>
+  <string name="per_app_routing">按应用分流</string>
   <string name="permission_needed_title">需要你的许可</string>
   <string name="phase_confirm">确认中</string>
   <string name="phase_route">选择线路</string>
@@ -280,10 +294,12 @@
   <string name="routing_global_detail">全部流量经过 TrackNothing</string>
   <string name="routing_smart">智能分流</string>
   <string name="routing_smart_detail">国内网站直连，其余经过 TrackNothing</string>
+  <string name="running_apps">正在运行的应用</string>
   <string name="running_in_tray">TrackNothing 仍在托盘运行，点击图标即可切换。</string>
   <string name="seal_action">开始隐身</string>
   <string name="sealed_status">隐身中</string>
   <string name="sealing_detail">正在隐身…</string>
+  <string name="search_apps">搜索应用</string>
   <string name="search_locations_or_regions">搜索节点或地区</string>
   <string name="section_account">§04 持有人</string>
   <string name="section_activity">§03 活动</string>
@@ -295,6 +311,7 @@
   <string name="secure_storage_is_unavailable_unlock_your_device_and_try">无法访问安全存储，请解锁设备后重试。</string>
   <string name="seen_as">网站只能看到%1$s</string>
   <string name="select_an_available_location_for_you">选延迟最低的节点，连不上自动换</string>
+  <string name="selected_state">已选中</string>
   <string name="send_reset_link">发送</string>
   <string name="server_address">服务地址</string>
   <string name="server_address_url">服务地址 https://…</string>
@@ -394,7 +411,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">第一次打开分三步：登录、选位置（默认自动选择，并列出离你最快的 3 个）、连接；连上之前不显示底部标签栏，每页右上角标着第几步\n连接状态在安卓、Mac、Windows 上一个样：连接中光弧绕圈、换线路时逐段尝试、断线重连时显示倒计时和第几次、没网时安静等待\n连不上时直接说原因和下一步，按钮就是解决办法：设备已满去管理设备、位置没响应改用自动、登录过期重新登录、需要更新就立即更新\nMac 菜单栏和 Windows 托盘图标只有三档：未连接（半亮）、处理中（闪烁）、已连接（全亮）</string>
+  <string name="whats_new_notes">安卓和 Windows 支持按应用分流：在「账户 → 按应用分流」里选择只让部分应用走代理，或让部分应用直连</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>

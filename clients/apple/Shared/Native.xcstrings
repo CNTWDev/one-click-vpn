@@ -829,6 +829,29 @@
         }
       }
     },
+    "add_program": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a program…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加程序…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавить программу…"
+          }
+        }
+      }
+    },
     "all_locations": {
       "extractionState": "manual",
       "localizations": {
@@ -1078,6 +1101,282 @@
           "stringUnit": {
             "state": "translated",
             "value": "Оформление"
+          }
+        }
+      }
+    },
+    "apps_all_value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All apps"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部应用"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Все"
+          }
+        }
+      }
+    },
+    "apps_apply_next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes apply the next time you connect."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改动在下次连接时生效。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменения вступят в силу при следующем подключении."
+          }
+        }
+      }
+    },
+    "apps_except_value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bypass %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 个应用不走代理"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Кроме %1$@"
+          }
+        }
+      }
+    },
+    "apps_lockdown_note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If “Block connections without VPN” is on in system settings, direct apps cannot go online."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如果系统开启了「屏蔽无 VPN 连接」，直连的应用将无法上网。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Если в системе включено «Блокировать соединения без VPN», приложения напрямую не смогут выйти в сеть."
+          }
+        }
+      }
+    },
+    "apps_mode_all": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All apps use the VPN"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部应用走代理"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Все приложения через VPN"
+          }
+        }
+      }
+    },
+    "apps_mode_all_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default. Every app on this device is protected."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认。这台设备上的所有应用都受保护。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "По умолчанию. Защищены все приложения на устройстве."
+          }
+        }
+      }
+    },
+    "apps_mode_except": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bypass selected apps"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中的应用不走代理"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Кроме выбранных"
+          }
+        }
+      }
+    },
+    "apps_mode_except_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For banking or local apps that need a direct connection."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "适合银行、本地服务这类需要直连的应用。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Для банков и местных сервисов, которым нужно прямое подключение."
+          }
+        }
+      }
+    },
+    "apps_mode_only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only selected apps"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅选中的应用走代理"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Только выбранные"
+          }
+        }
+      }
+    },
+    "apps_mode_only_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other apps connect directly, outside TrackNothing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他应用直接上网，不经过 TrackNothing。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Остальные приложения подключаются напрямую, без TrackNothing."
+          }
+        }
+      }
+    },
+    "apps_only_value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 个应用走代理"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Только %1$@"
+          }
+        }
+      }
+    },
+    "apps_selected": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ SELECTED"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已选 %1$@ 个"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ВЫБРАНО: %1$@"
           }
         }
       }
@@ -5521,6 +5820,29 @@
         }
       }
     },
+    "per_app_routing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Per-app routing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按应用分流"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Приложения в VPN"
+          }
+        }
+      }
+    },
     "permission_needed_title": {
       "extractionState": "manual",
       "localizations": {
@@ -6418,6 +6740,29 @@
         }
       }
     },
+    "running_apps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running apps"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在运行的应用"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Запущенные программы"
+          }
+        }
+      }
+    },
     "running_in_tray": {
       "extractionState": "manual",
       "localizations": {
@@ -6506,6 +6851,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Скрываем…"
+          }
+        }
+      }
+    },
+    "search_apps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search apps"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索应用"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поиск приложений"
           }
         }
       }
@@ -6759,6 +7127,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Самая быстрая локация, при сбое — следующая"
+          }
+        }
+      }
+    },
+    "selected_state": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "selected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已选中"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "выбрано"
           }
         }
       }
@@ -9046,19 +9437,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "First launch takes three steps: sign in, pick a location (Automatic is preselected, with the three fastest for you listed), connect; the tab bar stays hidden until you connect, and each page shows which step you are on\nConnection states look the same on Android, Mac and Windows: an arc circles while connecting, lines are tried one by one when switching, reconnecting shows a countdown and the attempt, and without a network the app waits quietly\nWhen a connection fails, the app says why and what to do next, and the button does it: manage devices when the device limit is reached, switch to Automatic when a location does not answer, sign in again when the session expired, update when an update is required\nThe Mac menu bar and Windows tray icon have three levels: off (half), working (blinking), connected (full)"
+            "value": "Per-app routing on Android and Windows: in Account → Per-app routing, send only some apps through TrackNothing, or let some apps connect directly"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "第一次打开分三步：登录、选位置（默认自动选择，并列出离你最快的 3 个）、连接；连上之前不显示底部标签栏，每页右上角标着第几步\n连接状态在安卓、Mac、Windows 上一个样：连接中光弧绕圈、换线路时逐段尝试、断线重连时显示倒计时和第几次、没网时安静等待\n连不上时直接说原因和下一步，按钮就是解决办法：设备已满去管理设备、位置没响应改用自动、登录过期重新登录、需要更新就立即更新\nMac 菜单栏和 Windows 托盘图标只有三档：未连接（半亮）、处理中（闪烁）、已连接（全亮）"
+            "value": "安卓和 Windows 支持按应用分流：在「账户 → 按应用分流」里选择只让部分应用走代理，或让部分应用直连"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Первый запуск в три шага: вход, выбор локации (по умолчанию «Автоматически», плюс три самые быстрые для вас), подключение; нижние вкладки появляются после подключения, а на каждой странице видно, какой это шаг\nСостояния подключения одинаковы на Android, Mac и Windows: при подключении по кругу бежит дуга, при смене линии они пробуются по очереди, при переподключении видны обратный отсчёт и номер попытки, без сети приложение спокойно ждёт\nЕсли подключиться не удалось, приложение говорит причину и что делать, а кнопка делает это: управлять устройствами при лимите, перейти на «Автоматически», если локация не отвечает, войти снова, если сессия истекла, обновиться, если требуется обновление\nЗначок в строке меню Mac и в трее Windows в трёх видах: не подключено (приглушён), идёт работа (мигает), подключено (ярко)"
+            "value": "Выбор приложений на Android и Windows: в «Аккаунт → Приложения в VPN» можно пустить через TrackNothing только некоторые приложения или, наоборот, исключить их"
           }
         }
       }

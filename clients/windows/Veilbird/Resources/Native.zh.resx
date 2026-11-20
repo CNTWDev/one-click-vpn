@@ -39,6 +39,7 @@
   <data name="activity_time" xml:space="preserve"><value>时间</value></data>
   <data name="activity_title" xml:space="preserve"><value>活动</value></data>
   <data name="activity_traffic" xml:space="preserve"><value>流量</value></data>
+  <data name="add_program" xml:space="preserve"><value>添加程序…</value></data>
   <data name="all_locations" xml:space="preserve"><value>全部节点</value></data>
   <data name="all_locations_count" xml:space="preserve"><value>全部 {0} 个位置</value></data>
   <data name="allow_system_extension" xml:space="preserve"><value>macOS 需要你允许 TrackNothing 的网络扩展才能连接。点「打开系统设置」，在「通用 › 登录项与扩展 › 网络扩展」（macOS 14 及更早：「隐私与安全性」）里打开 TrackNothing，允许后会自动连接。</value></data>
@@ -50,6 +51,18 @@
   <data name="allow_vpn_configuration_short" xml:space="preserve"><value>系统弹窗里选「允许」添加 VPN 配置后才能连接</value></data>
   <data name="announcement" xml:space="preserve"><value>公告</value></data>
   <data name="appearance" xml:space="preserve"><value>外观</value></data>
+  <data name="apps_all_value" xml:space="preserve"><value>全部应用</value></data>
+  <data name="apps_apply_next" xml:space="preserve"><value>改动在下次连接时生效。</value></data>
+  <data name="apps_except_value" xml:space="preserve"><value>{0} 个应用不走代理</value></data>
+  <data name="apps_lockdown_note" xml:space="preserve"><value>如果系统开启了「屏蔽无 VPN 连接」，直连的应用将无法上网。</value></data>
+  <data name="apps_mode_all" xml:space="preserve"><value>全部应用走代理</value></data>
+  <data name="apps_mode_all_detail" xml:space="preserve"><value>默认。这台设备上的所有应用都受保护。</value></data>
+  <data name="apps_mode_except" xml:space="preserve"><value>选中的应用不走代理</value></data>
+  <data name="apps_mode_except_detail" xml:space="preserve"><value>适合银行、本地服务这类需要直连的应用。</value></data>
+  <data name="apps_mode_only" xml:space="preserve"><value>仅选中的应用走代理</value></data>
+  <data name="apps_mode_only_detail" xml:space="preserve"><value>其他应用直接上网，不经过 TrackNothing。</value></data>
+  <data name="apps_only_value" xml:space="preserve"><value>{0} 个应用走代理</value></data>
+  <data name="apps_selected" xml:space="preserve"><value>已选 {0} 个</value></data>
   <data name="ask_your_administrator_to_enable_veilbird_client_access" xml:space="preserve"><value>请联系管理员开通 TrackNothing 客户端访问。</value></data>
   <data name="attempt_n" xml:space="preserve"><value>第 {0} 次</value></data>
   <data name="authorized_devices" xml:space="preserve"><value>授权设备</value></data>
@@ -247,6 +260,7 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="or_choose_one" xml:space="preserve"><value>或者指定一个</value></data>
   <data name="password" xml:space="preserve"><value>密码</value></data>
   <data name="password_reset_unavailable" xml:space="preserve"><value>暂时无法通过邮件重置密码，请联系管理员。</value></data>
+  <data name="per_app_routing" xml:space="preserve"><value>按应用分流</value></data>
   <data name="permission_needed_title" xml:space="preserve"><value>需要你的许可</value></data>
   <data name="phase_confirm" xml:space="preserve"><value>确认中</value></data>
   <data name="phase_route" xml:space="preserve"><value>选择线路</value></data>
@@ -286,10 +300,12 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="routing_global_detail" xml:space="preserve"><value>全部流量经过 TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>智能分流</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>国内网站直连，其余经过 TrackNothing</value></data>
+  <data name="running_apps" xml:space="preserve"><value>正在运行的应用</value></data>
   <data name="running_in_tray" xml:space="preserve"><value>TrackNothing 仍在托盘运行，点击图标即可切换。</value></data>
   <data name="seal_action" xml:space="preserve"><value>开始隐身</value></data>
   <data name="sealed_status" xml:space="preserve"><value>隐身中</value></data>
   <data name="sealing_detail" xml:space="preserve"><value>正在隐身…</value></data>
+  <data name="search_apps" xml:space="preserve"><value>搜索应用</value></data>
   <data name="search_locations_or_regions" xml:space="preserve"><value>搜索节点或地区</value></data>
   <data name="section_account" xml:space="preserve"><value>§04 持有人</value></data>
   <data name="section_activity" xml:space="preserve"><value>§03 活动</value></data>
@@ -301,6 +317,7 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="secure_storage_is_unavailable_unlock_your_device_and_try" xml:space="preserve"><value>无法访问安全存储，请解锁设备后重试。</value></data>
   <data name="seen_as" xml:space="preserve"><value>网站只能看到{0}</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>选延迟最低的节点，连不上自动换</value></data>
+  <data name="selected_state" xml:space="preserve"><value>已选中</value></data>
   <data name="send_reset_link" xml:space="preserve"><value>发送</value></data>
   <data name="server_address" xml:space="preserve"><value>服务地址</value></data>
   <data name="server_address_url" xml:space="preserve"><value>服务地址 https://…</value></data>
@@ -401,10 +418,7 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>第一次打开分三步：登录、选位置（默认自动选择，并列出离你最快的 3 个）、连接；连上之前不显示底部标签栏，每页右上角标着第几步
-连接状态在安卓、Mac、Windows 上一个样：连接中光弧绕圈、换线路时逐段尝试、断线重连时显示倒计时和第几次、没网时安静等待
-连不上时直接说原因和下一步，按钮就是解决办法：设备已满去管理设备、位置没响应改用自动、登录过期重新登录、需要更新就立即更新
-Mac 菜单栏和 Windows 托盘图标只有三档：未连接（半亮）、处理中（闪烁）、已连接（全亮）</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>安卓和 Windows 支持按应用分流：在「账户 → 按应用分流」里选择只让部分应用走代理，或让部分应用直连</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>
