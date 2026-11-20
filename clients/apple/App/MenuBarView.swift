@@ -110,7 +110,7 @@ struct MenuBarView:View {
                 .frame(maxWidth:.infinity).frame(height:150).contentShape(Circle())
         }.buttonStyle(.plain).accessibilityLabel(L10n.text(model.connected ? "disconnect_action":"connect_action"))
     }
-    private func openMain() {openWindow(id:"main");NSApp.activate(ignoringOtherApps:true)}
+    private func openMain() {DockPresence.show(true);openWindow(id:"main");NSApp.activate(ignoringOtherApps:true)}
 }
 /// The menu bar icon. With "Show speed in menu bar" on and the tunnel up, upload and download rates sit beside
 /// it on two short lines. A menu bar label can only hold an image and a title, so the two lines are drawn into a
