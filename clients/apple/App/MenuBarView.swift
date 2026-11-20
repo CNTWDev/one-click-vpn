@@ -16,6 +16,9 @@ struct MenuBarView:View {
     @EnvironmentObject private var model:ClientModel
     @Environment(\.openWindow) private var openWindow
     @AppStorage(VeilbirdStyle.themeKey) private var appearance="amber"
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The location list is open in place of the portrait, so a location is picked without opening the window.
+    @State private var picking=false
     var body:some View {
         let on=model.connected && model.since != nil
         VStack(alignment:.leading,spacing:0) {
@@ -49,10 +52,13 @@ struct MenuBarView:View {
                         .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(on ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.accent,lineWidth:1))
                     }.buttonStyle(.plain)
                     .accessibilityLabel(L10n.text(model.connected ? (model.since == nil ? "cancel":"disconnect_action"):"connect_action"))
-                }.padding(.top,16).padding(.bottom,14)
+                }.opacity(picking ? 0:1).allowsHitTesting(!picking).accessibilityHidden(picking)
+                // The list takes the portrait's place at the same size: the panel keeps its height, nothing moves.
+                .overlay(alignment:.top) {if picking {locationPicker.transition(.opacity)}}
+                .padding(.top,16).padding(.bottom,14)
                 // The same update banner as the window, with its download progress.
                 if let update=model.update {UpdateBanner(update:update).padding(.bottom,10)}
-                Button {openMain()} label:{
+                Button {setPicking(!picking)} label:{
                     HStack(spacing:12) {
                         if model.connected && !model.connectedNodeId.isEmpty {Badge(code:model.code(model.connectedNodeId,name:model.nodeName),size:30)}
                         else if model.selected.isEmpty {Badge(icon:"sparkles",tint:VeilbirdStyle.accent,size:30)}
@@ -62,9 +68,12 @@ struct MenuBarView:View {
                             Text(L10n.text(model.routing=="smart" ? "routing_smart":"routing_global")).font(.system(size:11)).foregroundStyle(VeilbirdStyle.secondary)
                         }
                         Spacer(minLength:8)
-                        Image(systemName:"chevron.right").font(.system(size:10,weight:.semibold)).foregroundStyle(VeilbirdStyle.secondary)
+                        // Points up at the list while it is open.
+                        Image(systemName:"chevron.right").font(.system(size:10,weight:.semibold)).foregroundStyle(picking ? VeilbirdStyle.accent:VeilbirdStyle.secondary)
+                            .rotationEffect(.degrees(picking ? -90:0))
                     }.padding(.horizontal,12).frame(height:52)
                 }.buttonStyle(RowButton()).cardOutline(VeilbirdStyle.radius).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+                .accessibilityAddTraits(picking ? .isSelected:[]).accessibilityHint(L10n.text("tap_to_change"))
                 let figures=UsageFigures(model.account)
                 HStack(alignment:.top,spacing:12) {
                     cell(figures.trafficTitle,figures.traffic,figures.trafficTint)
@@ -81,6 +90,67 @@ struct MenuBarView:View {
         }.padding(.horizontal,12).padding(.top,14).padding(.bottom,8).frame(width:320)
         .background(VeilbirdStyle.ground).foregroundStyle(VeilbirdStyle.text).preferredColorScheme(.dark)
         .environment(\.locale, L10n.locale).id(appearance).task {try? await model.loadAccount()}
+        .onExitCommand {if picking {setPicking(false)}}
+        .onDisappear {picking=false}
+    }
+    private func setPicking(_ open:Bool) {
+        withAnimation(reduceMotion ? nil:.easeInOut(duration:0.2)) {picking=open}
+        guard open else {return}
+        // The saved list shows at once; only a device with none loads it, and only nodes never measured are measured.
+        if model.nodes.isEmpty {model.work {try await model.loadNodes()}}
+        else if model.unmeasured {Task {await model.measure()}}
+    }
+    /// The locations, fastest first, as in the window: automatic, then each one with its delay. The selected one is a
+    /// lifted row with an amber tile. Connected, a pick moves the VPN there at once; the list then closes.
+    private var locationPicker:some View {
+        VStack(alignment:.leading,spacing:8) {
+            SectionLabel(key:"section_locations")
+            ScrollView {
+                VStack(spacing:0) {
+                    pickerRow(id:"",name:L10n.text("automatic"),badge:Badge(icon:"sparkles",tint:VeilbirdStyle.accent,size:24,selected:model.selected.isEmpty),delay:nil,unreachable:false)
+                    ForEach(model.nodes.indices,id:\.self) {i in nodePickerRow(model.nodes[i])}
+                    if model.nodes.isEmpty {
+                        Text(model.busy ? "…":L10n.text("no_locations_available_refresh_or_contact_your_administrator")).font(.system(size:11)).foregroundStyle(VeilbirdStyle.secondary)
+                            .frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,10).padding(.vertical,10)
+                    }
+                }
+            }.scrollIndicators(.automatic)
+        }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.top)
+    }
+    // Small typed pieces: as one expression the optimized (release) build cannot type-check it in time.
+    private func nodePickerRow(_ node:[String:Any])->some View {
+        let id=node["id"] as? String ?? "",name=node["name"] as? String ?? ""
+        let quality=Latency.recent(id)
+        let unreachable=quality != nil && quality?.latency == nil
+        let tint:Color=unreachable ? VeilbirdStyle.faint:VeilbirdStyle.text
+        let badge=Badge(code:model.code(id,name:name),tint:tint,size:24,selected:model.selected==id)
+        return pickerRow(id:id,name:name,badge:badge,delay:delayText(quality),unreachable:unreachable)
+    }
+    private func delayText(_ quality:Quality?)->String? {
+        guard let quality else {return model.measuring ? "…":nil}
+        return quality.latency.map {L10n.text("latency_ms",L10n.number($0))} ?? L10n.text("quality_unreachable")
+    }
+    private func pickerRow(id:String,name:String,badge:Badge,delay:String?,unreachable:Bool)->some View {
+        let selected=model.selected==id
+        return Button {pick(id,name:name)} label:{
+            HStack(spacing:10) {
+                badge
+                Text(name).font(.system(size:13,weight:selected ? .semibold:.regular)).lineLimit(1)
+                    .foregroundStyle(unreachable && !selected ? VeilbirdStyle.faint:VeilbirdStyle.text)
+                Spacer(minLength:8)
+                Text(delay ?? "").font(.system(size:11)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.75)
+                    .foregroundStyle(unreachable ? VeilbirdStyle.danger:VeilbirdStyle.secondary).frame(width:72,alignment:.trailing)
+            }.padding(.horizontal,10).frame(height:36).contentShape(Rectangle())
+            .background(selected ? VeilbirdStyle.raised:Color.clear)
+        }.buttonStyle(RowButton()).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+        .accessibilityLabel(name+(delay.map {", "+$0} ?? "")).accessibilityAddTraits(selected ? .isSelected:[])
+    }
+    /// The window's choice in small: connected (or reconnecting) to another location, the VPN moves there.
+    private func pick(_ id:String,name:String) {
+        let reconnect=model.connected && id != model.connectedNodeId && !(id.isEmpty && model.selected.isEmpty)
+        model.selected=id;model.selectedName=name
+        setPicking(false)
+        if reconnect {model.work {try await model.reconnect()}}
     }
     private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
     private func cell(_ title:String,_ value:String,_ tint:Color)->some View {
