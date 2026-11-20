@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.12
+
+### zh
+- 连接更快：哪条线路先通就先用，不再等被屏蔽的线路超时；自动选择位置时不再等不通的节点
+- 智能分流第一次连接不再等规则下载完，先连上，规则在后台下载好后自动生效
+
+### en
+- Faster connecting: the first line that answers is used right away instead of waiting for blocked ones to time out, and automatic location no longer waits for nodes that do not answer
+- Smart routing no longer holds the first connection until its rules are downloaded: you connect at once and the rules apply when they arrive
+
+### ru
+- Подключение быстрее: используется первая ответившая линия, без ожидания заблокированных, а автовыбор локации больше не ждёт неотвечающие узлы
+- Умная маршрутизация больше не задерживает первое подключение до загрузки правил: подключение сразу, правила применятся после загрузки
+
 ## 1.0.11
 
 ### zh

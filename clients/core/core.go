@@ -150,6 +150,117 @@ func Probe(names string, url string, timeoutMs int) string {
 	return strings.Join(results, ",")
 }
 
+// settle is how long ProbeFirst waits, after a later transport answered, for the ones before it in the ladder.
+const settle = 1000 * time.Millisecond
+
+// ProbeFirst is Probe for connecting: it tests the named proxies (ladder order) concurrently through url and
+// returns as soon as the traffic has a transport, instead of waiting for the slowest one (a transport blocked on
+// this network, or WireGuard before the node has applied the device, would hold every connect for the whole
+// timeout). It returns when the first transport in order that has not failed answers; when only a later one has
+// answered, it waits up to settle for the earlier ones and then pins group to the one that answered, since
+// fallback would otherwise send traffic to an earlier, untested transport. The pin is lifted once every probe
+// has finished, so the group then follows the ladder and the results. The reply lists the finished probes as
+// "name=delayMs" (-1: no answer); probes still running are left out. "" means none of the names exist.
+func ProbeFirst(names string, group string, url string, timeoutMs int) string {
+	proxies := tunnel.Proxies()
+	type answer struct {
+		index int
+		delay int
+	}
+	list := strings.Split(names, ",")
+	answers := make(chan answer, len(list))
+	for i, name := range list {
+		go func(i int, name string) {
+			delay := -1
+			if proxy, ok := proxies[name]; ok {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
+				defer cancel()
+				if value, err := proxy.URLTest(ctx, url, utils.IntRanges[uint16]{}); err == nil {
+					delay = int(value)
+				}
+			}
+			answers <- answer{i, delay}
+		}(i, name)
+	}
+	delays := make([]int, len(list))
+	done := make([]bool, len(list))
+	for i := range delays {
+		delays[i] = -1
+	}
+	// best is the earliest transport in order that answered; ready once every transport before it failed.
+	best := func() (int, bool) {
+		for i := range list {
+			if !done[i] {
+				return -1, false
+			}
+			if delays[i] >= 0 {
+				return i, true
+			}
+		}
+		return -1, true
+	}
+	var deadline <-chan time.Time
+	received := 0
+	pinned := ""
+wait:
+	for received < len(list) {
+		select {
+		case a := <-answers:
+			received++
+			done[a.index], delays[a.index] = true, a.delay
+			if _, ready := best(); ready {
+				break wait
+			}
+			if a.delay >= 0 && deadline == nil {
+				deadline = time.After(settle)
+			}
+		case <-deadline:
+			for i := range list {
+				if done[i] && delays[i] >= 0 {
+					pinned = list[i]
+					break
+				}
+			}
+			break wait
+		}
+	}
+	if pinned != "" {
+		if g, ok := groupOf(group); ok {
+			if setter, ok := g.(interface{ ForceSet(string) }); ok {
+				setter.ForceSet(pinned)
+				go func(left int) {
+					for ; left > 0; left-- {
+						<-answers
+					}
+					// Unpin unless the configuration (and so the group) was replaced meanwhile; the lock keeps
+					// start and Stop from swapping the proxies while they are read.
+					lock.Lock()
+					defer lock.Unlock()
+					if current, ok := groupOf(group); ok && running && current == g {
+						setter.ForceSet("")
+					}
+				}(len(list) - received)
+			}
+		}
+	}
+	var results []string
+	for i, name := range list {
+		if done[i] {
+			results = append(results, fmt.Sprintf("%s=%d", name, delays[i]))
+		}
+	}
+	return strings.Join(results, ",")
+}
+
+func groupOf(name string) (outboundgroup.ProxyGroup, bool) {
+	proxy, ok := tunnel.Proxies()[name]
+	if !ok {
+		return nil, false
+	}
+	g, ok := proxy.Adapter().(outboundgroup.ProxyGroup)
+	return g, ok
+}
+
 // Now returns the proxy a group currently uses, or "" when the group does not exist.
 func Now(group string) string {
 	proxy, ok := tunnel.Proxies()[group]

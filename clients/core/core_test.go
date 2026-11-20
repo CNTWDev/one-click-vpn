@@ -2,7 +2,15 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/metacubex/mihomo/config"
 )
@@ -115,4 +123,85 @@ func TestTopRanksByBytes(t *testing.T) {
 	if len(rows) != 2 || rows[0].Name != "b" || rows[0].Proxy || rows[1].Name != "a" || !rows[1].Proxy {
 		t.Fatalf("unexpected %+v", rows)
 	}
+}
+
+// hangingListener accepts connections and never answers: a transport blocked after the handshake.
+func hangingListener(t *testing.T) int {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			t.Cleanup(func() { _ = conn.Close() })
+		}
+	}()
+	return listener.Addr().(*net.TCPAddr).Port
+}
+
+// Connecting does not wait for a transport that hangs: the first answer in ladder order counts, and when only a
+// later transport answered, the group is pinned to it so traffic does not go to the untested earlier one.
+func TestProbeFirst(t *testing.T) {
+	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	defer page.Close()
+	proxy := connectProxy()
+	defer proxy.Close()
+	up, slow := proxy.Listener.Addr().(*net.TCPAddr).Port, hangingListener(t)
+	for _, order := range [][]string{{"up", "slow"}, {"slow", "up"}} {
+		configuration := fmt.Sprintf("mode: rule\nlog-level: silent\nproxies:\n  - {name: up, type: http, server: 127.0.0.1, port: %d}\n  - {name: slow, type: http, server: 127.0.0.1, port: %d}\nproxy-groups:\n  - {name: Line, type: fallback, proxies: [%s], url: '%s/204', interval: 300, lazy: true}\nrules:\n  - MATCH,Line\n", up, slow, strings.Join(order, ", "), page.URL)
+		if err := start(t.TempDir(), configuration); err != nil {
+			t.Fatal(err)
+		}
+		started := time.Now()
+		got := ProbeFirst(strings.Join(order, ","), "Line", page.URL+"/204", 4000)
+		elapsed := time.Since(started)
+		if !strings.HasPrefix(got, "up=") || strings.Contains(got, "slow") {
+			t.Fatalf("%v: got %q", order, got)
+		}
+		limit := 500 * time.Millisecond
+		if order[0] == "slow" {
+			limit = settle + 500*time.Millisecond
+		}
+		if elapsed > limit {
+			t.Fatalf("%v: took %v", order, elapsed)
+		}
+		if now := Now("Line"); now != "up" {
+			t.Fatalf("%v: group uses %q", order, now)
+		}
+		Stop()
+	}
+}
+
+// A smart connection starts without downloading the rule sets: missing ones get a stale placeholder that mihomo
+// loads at once and refreshes in the background.
+func TestRuleSetsDoNotBlockStart(t *testing.T) {
+	home := t.TempDir()
+	slow := hangingListener(t)
+	providers := []string{}
+	for _, set := range smartRuleSets {
+		providers = append(providers, fmt.Sprintf("  %s: {type: http, behavior: %s, format: mrs, url: 'http://127.0.0.1:%d/%s.mrs', path: '%s', interval: 86400}", set.provider, set.behavior, slow, set.name, ruleSetPath(set.kind, set.name)))
+	}
+	configuration := "mode: rule\nlog-level: silent\nrule-providers:\n" + strings.Join(providers, "\n") + "\nrules:\n  - RULE-SET,cn_domain,DIRECT\n  - RULE-SET,cn_ip,DIRECT\n  - MATCH,DIRECT\n"
+	seedRuleSets(home)
+	started := time.Now()
+	if err := start(home, configuration); err != nil {
+		t.Fatal(err)
+	}
+	defer Stop()
+	if elapsed := time.Since(started); elapsed > 2*time.Second {
+		t.Fatalf("start waited %v for the rule sets", elapsed)
+	}
+	for _, set := range smartRuleSets {
+		info, err := os.Stat(filepath.Join(home, "rules", set.kind+"-"+set.name+".mrs"))
+		if err != nil || info.ModTime().After(time.Unix(1, 0)) {
+			t.Fatalf("%s: %v %v", set.name, err, info)
+		}
+	}
+	// A second seeding leaves existing files alone.
+	seedRuleSets(home)
 }

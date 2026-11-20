@@ -67,9 +67,9 @@ enum Latency {
     /// the lines a connect would use): the fastest answer in ms (-1 when none answers) and each transport's result;
     /// nil when not measured. This is how Clash apps measure: it sees a node reached only over UDP, and one whose
     /// port answers but whose transport is blocked after the handshake.
-    static func real(_ id:String,_ transports:[Any]) async -> (ms:Int,lines:[String:Int])? {
+    static func real(_ id:String,_ transports:[Any],first:Bool=false) async -> (ms:Int,lines:[String:Int])? {
         #if canImport(TunnelCore)
-        guard realTests,let data=try? JSONSerialization.data(withJSONObject:["nodes":[id:transports],"url":Transports.testURL,"timeoutMs":realTimeoutMs]) else {return nil}
+        guard realTests,let data=try? JSONSerialization.data(withJSONObject:["nodes":[id:transports],"url":Transports.testURL,"timeoutMs":realTimeoutMs,"first":first]) else {return nil}
         let input=String(decoding:data,as:UTF8.self)
         let output=await Task.detached {CoreTest(input)}.value
         guard let result=(try? JSONSerialization.jsonObject(with:Data(output.utf8)) as? [String:Any])?[id] as? [String:Any] else {return nil}
@@ -105,14 +105,16 @@ enum Latency {
     }
     /// TCP connects give jitter and loss; the request through the transports, when the device has them, decides
     /// whether the node answers and its latency. Devices that never connected (no "test" list) keep the TCP result.
-    static func measure(_ node:[String:Any],attempts:Int=5) async -> Quality {
+    /// first (connecting): the node's first answering line is enough, so a line blocked here does not hold every node
+    /// for the whole wait; the lines are then not known (nil).
+    static func measure(_ node:[String:Any],attempts:Int=5,first:Bool=false) async -> Quality {
         let transports=(node["test"] as? [Any]) ?? []
         guard !transports.isEmpty,let id=node["id"] as? String else {return await measureTcp(node,attempts:attempts)}
-        async let pending=real(id,transports)
+        async let pending=real(id,transports,first:first)
         let tcp=await measureTcp(node,attempts:attempts)
         guard let result=await pending else {return tcp}
-        let (delay,lines)=result
-        if !lines.isEmpty {
+        let delay=result.ms,lines:[String:Int]?=first ? nil:result.lines
+        if let lines,!lines.isEmpty {
             Journal.add("lines: \(node["name"] as? String ?? "") "+lines.sorted {$0.key<$1.key}.map {$0.value>=0 ? "\($0.key) \($0.value) ms":"\($0.key) no answer"}.joined(separator:", "))
         }
         if delay<0 {return Quality(latency:nil,jitter:0,loss:100,load:tcp.load,users:tcp.users,lines:lines)}
@@ -191,22 +193,51 @@ enum Latency {
     /// Best first; unmeasured nodes follow in the server's least-loaded order. A node measured less than reuse seconds
     /// ago keeps that result, so connecting right after the location list does not probe again.
     /// each is called as every new measurement arrives (not for reused ones), so a list can update row by row.
-    static func rank(_ nodes:[[String:Any]],attempts:Int=5,reuse:TimeInterval=0,each:(@Sendable (String,Quality) -> Void)?=nil) async -> [(node:[String:Any],quality:Quality)] {
-        let measured=await withTaskGroup(of:(Int,Quality).self) {group -> [Int:Quality] in
-            for (index,node) in nodes.enumerated() {group.addTask {
-                if let quality=known(node,age:reuse) {return (index,quality)}
-                let quality=await measure(node,attempts:attempts)
-                if let id=node["id"] as? String {lock.lock();measuredAt[id]=Date();recentResults[id]=quality;lock.unlock();each?(id,quality)}
-                return (index,quality)
-            }}
-            var results=[Int:Quality]()
-            for await (index,quality) in group {results[index]=quality}
-            return results
+    ///
+    /// settle (connecting): stop waiting settle seconds after the first node answered. A node still being measured then
+    /// is slower than that one by about as much, so it cannot be the best, while a node that is down would hold the
+    /// connect for its whole timeout. Such nodes follow the measured ones (before those that did not answer) and are
+    /// not recorded as unreachable; their measurement finishes in the background. It also takes each node's first
+    /// answering line (see measure).
+    static func rank(_ nodes:[[String:Any]],attempts:Int=5,reuse:TimeInterval=0,settle:TimeInterval=0,each:(@Sendable (String,Quality) -> Void)?=nil) async -> [(node:[String:Any],quality:Quality)] {
+        let collected=Collected()
+        for (index,node) in nodes.enumerated() {
+            Task.detached {
+                if let quality=known(node,age:reuse) {collected.add(index,quality);return}
+                var quality=await measure(node,attempts:attempts,first:settle>0)
+                if let id=node["id"] as? String {
+                    lock.lock()
+                    if quality.lines==nil {quality.lines=recentResults[id]?.lines}
+                    measuredAt[id]=Date();recentResults[id]=quality
+                    lock.unlock()
+                    each?(id,quality)
+                }
+                collected.add(index,quality)
+            }
         }
-        lock.lock()
-        for (index,quality) in measured {if let id=nodes[index]["id"] as? String {recentResults[id]=quality}}
-        lock.unlock()
-        return nodes.indices.sorted {(measured[$0]?.score ?? Int.max,$0)<(measured[$1]?.score ?? Int.max,$1)}
-            .map {(node:nodes[$0],quality:measured[$0] ?? Quality(latency:nil,jitter:0,loss:100,load:nil))}
+        var cutoff=Date().addingTimeInterval(25)
+        while Date()<cutoff {
+            let (count,answeredAt)=collected.progress()
+            if count>=nodes.count {break}
+            if settle>0,let answeredAt {cutoff=min(cutoff,answeredAt.addingTimeInterval(settle))}
+            try? await Task.sleep(nanoseconds:50_000_000)
+        }
+        let measured=collected.results()
+        let order={(index:Int) -> Int in measured[index].map {$0.score} ?? Int.max-1}
+        return nodes.indices.sorted {(order($0),$0)<(order($1),$1)}
+            .map {(node:nodes[$0],quality:measured[$0] ?? Quality(latency:nil,jitter:0,loss:0,load:nil))}
+    }
+    /// Results of rank's measurements as they arrive, and when the first node answered.
+    private final class Collected:@unchecked Sendable {
+        private let lock=NSLock()
+        private var measured=[Int:Quality]()
+        private var answeredAt:Date?
+        func add(_ index:Int,_ quality:Quality) {
+            lock.lock();defer {lock.unlock()}
+            measured[index]=quality
+            if quality.latency != nil && answeredAt==nil {answeredAt=Date()}
+        }
+        func progress() -> (Int,Date?) {lock.lock();defer {lock.unlock()};return (measured.count,answeredAt)}
+        func results() -> [Int:Quality] {lock.lock();defer {lock.unlock()};return measured}
     }
 }

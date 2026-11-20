@@ -126,3 +126,29 @@ func TestSpeedThroughGroup(t *testing.T) {
 		t.Fatalf("got %+v", status)
 	}
 }
+
+// With first, a node settles at its first answer: a line that hangs no longer holds the measurement.
+func TestTestFirstAnswer(t *testing.T) {
+	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	defer page.Close()
+	proxy := connectProxy()
+	defer proxy.Close()
+	slow := hangingListener(t)
+	input, _ := json.Marshal(map[string]any{"url": page.URL + "/generate_204", "timeoutMs": 4000, "first": true, "nodes": map[string]any{
+		"n1": []map[string]any{
+			{"name": "slow", "type": "http", "server": "127.0.0.1", "port": slow},
+			{"name": "up", "type": "http", "server": "127.0.0.1", "port": proxy.Listener.Addr().(*net.TCPAddr).Port},
+		},
+	}})
+	started := time.Now()
+	var reply map[string]testResult
+	if err := json.Unmarshal([]byte(Test(string(input))), &reply); err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("took %v", elapsed)
+	}
+	if _, ok := reply["n1"].Lines["slow"]; reply["n1"].Ms < 0 || reply["n1"].Lines["up"] != reply["n1"].Ms || ok {
+		t.Fatalf("got %v", reply)
+	}
+}

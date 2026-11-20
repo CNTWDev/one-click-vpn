@@ -65,6 +65,8 @@ class ConnectionService : VpnService() {
     private var nextProbe = 0L
     private var lastNetworkCheck = 0L
     private var failures = 0
+    /** The next full probe reports to the server (the connect probe did not test every transport). */
+    private var reportNext = false
     private var notified = ""
     /** The user left the location to the app: when it stops answering, the app moves to the fastest one. */
     private var automatic = true
@@ -112,7 +114,7 @@ class ConnectionService : VpnService() {
             Journal.add("connect: start ${api.attempt}, network ${network}, routing ${routing()}" + if (restored) ", restored" else "")
             if (automatic) { nodeId = ""; chooseFastest() }
             connect()
-            started = true; nextProbe = SystemClock.elapsedRealtime() + HEALTHY
+            started = true
             worker.scheduleWithFixedDelay({ tick() }, 2, 2, TimeUnit.SECONDS)
             api.report("")
         } catch (e: Exception) {
@@ -160,7 +162,7 @@ class ConnectionService : VpnService() {
         NodeCache.restore(this)
         val ranked = try {
             val nodes = api.request("nodes").getJSONArray("nodes"); NodeCache.save(this, nodes)
-            Latency.rank(nodes, attempts = 3, reuseMs = 60000).also { NodeCache.saveMeasured(this) }
+            Latency.rank(nodes, attempts = 3, reuseMs = 60000, settleMs = SETTLE).also { NodeCache.saveMeasured(this) }
         } catch (_: Exception) { emptyList() }
         ranked.take(3).forEach { (node, quality) -> Journal.add("probe: ${node.optString("name")} ${quality.latency?.let { "${it} ms" } ?: "no answer"}, jitter ${quality.jitter} ms, loss ${quality.loss}%") }
         nodeId = ranked.firstOrNull()?.first?.getString("id") ?: ""
@@ -212,17 +214,25 @@ class ConnectionService : VpnService() {
         if (stopping) { Core.stop(); throw ApiFailure("CANCELLED") }
         ConnectionStateStore.messageId = R.string.connected_status; ConnectionStateStore.since = SystemClock.elapsedRealtime()
         Journal.add("connect: ready in ${SystemClock.elapsedRealtime() - started} ms via ${carrying.ifEmpty { "?" }}")
+        // The connect probe stopped at the first transport: test them all shortly, off the connect path, for the
+        // transport memory and the report to the server.
+        nextProbe = SystemClock.elapsedRealtime() + FULL_PROBE; reportNext = true
     }
-    /** All transports at once; true when at least one answers. Failures are remembered only when another transport worked. */
-    private fun probe(initial: Boolean = false, report: Boolean = initial): Boolean {
-        val results = Transports.parseProbe(Core.probe(transports.joinToString(","), Transports.TEST_URL, 5000))
+    /**
+     * All transports at once; true when at least one answers. Failures are remembered only when another transport worked.
+     * The connect probe (initial) returns as soon as traffic has a transport (Core.probeFirst); the others are not waited for.
+     */
+    private fun probe(initial: Boolean = false, report: Boolean = false): Boolean {
+        val names = transports.joinToString(",")
+        val results = Transports.parseProbe(if (initial) Core.probeFirst(names, Transports.GROUP, Transports.TEST_URL, 5000) else Core.probe(names, Transports.TEST_URL, 5000))
         val working = results.filterValues { it >= 0 }.keys
         // WireGuard cannot answer before the node has applied this device; that is not a block.
         val failed = results.filterValues { it < 0 }.keys.filter { it != "wireguard" || leaseReady }
-        if (initial || failed.isNotEmpty()) Journal.add("probe: " + transports.joinToString(", ") { name -> results[name]?.takeIf { it >= 0 }?.let { "$name $it ms" } ?: "$name no answer" })
+        if (initial || failed.isNotEmpty()) Journal.add("probe: " + transports.joinToString(", ") { name -> results[name]?.let { if (it >= 0) "$name $it ms" else "$name no answer" } ?: "$name not waited for" })
         if (working.isNotEmpty()) Transports.remember(this, network, failed, working)
         // Tells the server which of this node's ports answer from here (Console: 云防火墙); off the connect path.
-        if (report && working.isNotEmpty()) {
+        if ((report || reportNext) && !initial && working.isNotEmpty()) {
+            reportNext = false
             val summary = (working.map { "$it=ok" } + failed.map { "$it=fail" }).joinToString(",")
             val node = nodeId; val key = network
             Thread { api.report("TRANSPORT_PROBE", node, summary, key) }.start()
@@ -322,7 +332,7 @@ class ConnectionService : VpnService() {
     }
     /** Automatic mode: measures every location now and moves to the fastest one that answers, if it is another. */
     private fun moveToFastest() {
-        val ranked = try { Latency.rank(api.request("nodes").getJSONArray("nodes"), attempts = 1) } catch (_: Exception) { emptyList() }
+        val ranked = try { Latency.rank(api.request("nodes").getJSONArray("nodes"), attempts = 1, settleMs = SETTLE) } catch (_: Exception) { emptyList() }
         val best = ranked.firstOrNull { it.second.latency != null }?.first ?: run { Journal.add("switch: no location answers, retrying"); return }
         val id = best.getString("id")
         if (id == nodeId) return
@@ -331,7 +341,7 @@ class ConnectionService : VpnService() {
         nodeId = id
         try {
             bringUp(); ConnectionStateStore.switchedFrom = from
-            failures = 0; nextProbe = SystemClock.elapsedRealtime() + HEALTHY
+            failures = 0
         } catch (e: Exception) {
             if (fatal(e)) { fail(e); return }
             // The lease request did not reach the server: the tunnel still runs on the previous location.
@@ -369,6 +379,10 @@ class ConnectionService : VpnService() {
         private const val OFFLINE_GRACE = 12 * 3600 * 1000L
         /** Probe interval while the connection works; the core's fallback group reacts to failed dials in between. */
         private const val HEALTHY = 120000L
+        /** After connecting, when every transport is tested (the connect probe stops at the first that works). */
+        private const val FULL_PROBE = 10000L
+        /** Connecting in automatic mode stops measuring locations this long after the first one answered. */
+        private const val SETTLE = 1500L
         /** Waits between retries while nothing answers; the last repeats for as long as the user leaves the VPN on. */
         private val RETRY = longArrayOf(5000, 15000, 30000, 60000, 300000)
         private val FATAL = setOf("AUTH_REQUIRED", "DEVICE_REVOKED", "DEVICE_LIMIT_REACHED", "MEMBERSHIP_EXPIRED", "QUOTA_EXHAUSTED", "ACCOUNT_UNAVAILABLE", "MANAGED_ACCESS_REQUIRED", "CLIENT_UPDATE_REQUIRED", "VPN_PERMISSION_REQUIRED")

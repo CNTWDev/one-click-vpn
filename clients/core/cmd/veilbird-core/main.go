@@ -5,6 +5,7 @@
 //
 //	run <base64 options JSON>     -> ok | ok killswitch <message> | error <message> (see core.Options)
 //	probe <names> <url> <ms>      -> name=delay,...
+//	probefirst <names> <group> <url> <ms> -> name=delay,... once traffic has a transport (see core.ProbeFirst)
 //	now <group>                   -> proxy name
 //	rate                          -> up down (bytes per second)
 //	stop                          -> ok
@@ -150,6 +151,13 @@ func main() {
 			}
 			timeout, _ := strconv.Atoi(fields[3])
 			reply(core.Probe(fields[1], fields[2], timeout))
+		case "probefirst":
+			if len(fields) != 5 {
+				reply("")
+				continue
+			}
+			timeout, _ := strconv.Atoi(fields[4])
+			reply(core.ProbeFirst(fields[1], fields[2], fields[3], timeout))
 		case "activity":
 			reply(core.Activity())
 		case "reach":

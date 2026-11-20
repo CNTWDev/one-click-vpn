@@ -49,6 +49,12 @@ public sealed class Connection(NativeApi api,Core core) {
     public static readonly string[] Fatal={"AUTH_REQUIRED","DEVICE_REVOKED","DEVICE_LIMIT_REACHED","MEMBERSHIP_EXPIRED","QUOTA_EXHAUSTED","ACCOUNT_UNAVAILABLE","MANAGED_ACCESS_REQUIRED","CLIENT_UPDATE_REQUIRED"};
     /// Probe interval while the connection works; the core's fallback group reacts to failed dials in between.
     private static readonly TimeSpan Healthy=TimeSpan.FromMinutes(2);
+    /// After connecting, when every transport is tested (the connect probe stops at the first that works).
+    private static readonly TimeSpan FullProbe=TimeSpan.FromSeconds(10);
+    /// The next full probe reports to the server (the connect probe did not test every transport).
+    private bool reportNext;
+    /// Connecting in automatic mode stops measuring locations this long after the first one answered.
+    private static readonly TimeSpan Settle=TimeSpan.FromSeconds(1.5);
     /// Waits between retries while nothing answers; the last repeats for as long as the user leaves the VPN on.
     public static readonly TimeSpan[] Retries={TimeSpan.FromSeconds(5),TimeSpan.FromSeconds(15),TimeSpan.FromSeconds(30),TimeSpan.FromMinutes(1),TimeSpan.FromMinutes(5)};
     /// Status lines shown in place of the rates while connected.
@@ -99,7 +105,6 @@ public sealed class Connection(NativeApi api,Core core) {
         }
         // Disconnect pressed while connecting: the core may have started after Disconnect stopped it.
         if(!Active) {await Task.Run(core.Stop);return;}
-        nextProbe=DateTime.UtcNow+Healthy;
         NetworkChange.NetworkAddressChanged+=OnNetworkChanged;
         loop=new CancellationTokenSource();
         var token=loop.Token;
@@ -108,7 +113,7 @@ public sealed class Connection(NativeApi api,Core core) {
     private async Task ChooseFastest() {
         try {
             // Measurements from the last minute (the location list) are reused, so connecting does not probe again.
-            var ranked=await Latency.Rank((await api.Request("nodes"))["nodes"]!.AsArray(),attempts:3,reuse:TimeSpan.FromMinutes(1));
+            var ranked=await Latency.Rank((await api.Request("nodes"))["nodes"]!.AsArray(),attempts:3,reuse:TimeSpan.FromMinutes(1),settle:Settle);
             foreach(var (node,quality) in ranked.Take(3)) Journal.Add($"probe: {node["name"]} {(quality.Latency is { } ms?$"{ms} ms":"no answer")}, jitter {quality.Jitter} ms, loss {quality.Loss}%");
             NodeId=ranked.FirstOrDefault().Node?["id"]?.GetValue<string>()??"";
             fallbacks.Clear();fallbacks.AddRange(ranked.Skip(1).Take(2).Select(r=>r.Node["id"]!.GetValue<string>()));
@@ -149,17 +154,22 @@ public sealed class Connection(NativeApi api,Core core) {
         if(!Active) throw new OperationCanceledException();
         Since=DateTime.UtcNow;Set("connected_status");
         Journal.Add($"connect: ready in {(int)(DateTime.UtcNow-started).TotalMilliseconds} ms via {carrying}");
+        // The connect probe stopped at the first transport: test them all shortly, off the connect path, for the
+        // transport memory and the report to the server.
+        nextProbe=DateTime.UtcNow+FullProbe;reportNext=true;
     }
     /// All transports at once; true when at least one answers. Failures are remembered only when another transport worked.
-    private async Task<bool> Probe(bool initial=false,bool? report=null) {
-        var results=await Task.Run(()=>core.Probe(transports,5000));
+    /// The connect probe (initial) returns as soon as traffic has a transport (core.ProbeFirst); the others are not waited for.
+    private async Task<bool> Probe(bool initial=false,bool report=false) {
+        var results=await Task.Run(()=>initial?core.ProbeFirst(transports,5000):core.Probe(transports,5000));
         var working=results.Where(r=>r.Value>=0).Select(r=>r.Key).ToList();
         // WireGuard cannot answer before the node has applied this PC; that is not a block.
         var failed=results.Where(r=>r.Value<0&&(r.Key!="wireguard"||leaseReady)).Select(r=>r.Key).ToList();
-        if(initial||failed.Count>0) Journal.Add("probe: "+string.Join(", ",transports.Select(name=>results.TryGetValue(name,out var ms)&&ms>=0?$"{name} {ms} ms":$"{name} no answer")));
+        if(initial||failed.Count>0) Journal.Add("probe: "+string.Join(", ",transports.Select(name=>!results.TryGetValue(name,out var ms)?$"{name} not waited for":ms>=0?$"{name} {ms} ms":$"{name} no answer")));
         if(working.Count>0) Transports.Remember(network,failed,working);
         // Tells the server which of this node's ports answer from here (Console: 云防火墙); off the connect path.
-        if((report??initial)&&working.Count>0) {
+        if((report||reportNext)&&!initial&&working.Count>0) {
+            reportNext=false;
             var summary=string.Join(",",working.Select(name=>$"{name}=ok").Concat(failed.Select(name=>$"{name}=fail")));
             _=api.Report("TRANSPORT_PROBE",NodeId,summary,network);
         }
@@ -255,7 +265,7 @@ public sealed class Connection(NativeApi api,Core core) {
     /// Automatic mode: measures every location now and moves to the fastest one that answers, if it is another.
     private async Task MoveToFastest(bool smart) {
         List<(JsonNode Node,Quality Quality)> ranked;
-        try {ranked=await Latency.Rank((await api.Request("nodes"))["nodes"]!.AsArray(),attempts:1);} catch {Journal.Add("switch: no location list, retrying");return;}
+        try {ranked=await Latency.Rank((await api.Request("nodes"))["nodes"]!.AsArray(),attempts:1,settle:Settle);} catch {Journal.Add("switch: no location list, retrying");return;}
         var best=ranked.FirstOrDefault(item=>item.Quality.Latency is not null).Node;
         if(best?["id"]?.GetValue<string>() is not { } id) {Journal.Add("switch: no location answers, retrying");return;}
         if(id==NodeId) return;
@@ -264,7 +274,7 @@ public sealed class Connection(NativeApi api,Core core) {
         NodeId=id;
         try {
             await BringUp(smart);
-            SwitchedFrom=from;failures=0;nextProbe=DateTime.UtcNow+Healthy;
+            SwitchedFrom=from;failures=0;
         } catch(AccessFailure error) when (Fatal.Contains(error.Code)) {
             await Fail(error.Code,"connection_authorization_expired_connect_again");
         } catch(AccessFailure error) when (error.Code=="HANDSHAKE_TIMEOUT") {

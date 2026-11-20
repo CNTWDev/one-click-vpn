@@ -48,6 +48,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     }
     /// Probe interval while the connection works; the core's fallback group reacts to failed dials in between.
     private let healthy:TimeInterval=120
+    /// After connecting, when every transport is tested (the connect probe stops at the first that works).
+    private let fullProbe:TimeInterval=10
+    /// The next full probe reports to the server (the connect probe did not test every transport).
+    private var reportNext=false
+    /// Connecting in automatic mode stops measuring locations this long after the first one answered.
+    private let settle:TimeInterval=1.5
     /// Waits between retries while nothing answers; the last repeats for as long as the user leaves the VPN on.
     private let retries:[TimeInterval]=[5,15,30,60,300]
     private var wokeFlag=false
@@ -82,7 +88,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 if nodeId.isEmpty {await chooseFastest()}
                 try await setTunnelNetworkSettings(networkSettings())
                 try await connectWithFallback()
-                nextProbe=Date().addingTimeInterval(healthy)
                 completionHandler(nil)
             } catch {
                 if Task.isCancelled {Journal.add("connect: cancelled");CoreStop();completionHandler(error);return}
@@ -124,7 +129,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     /// If the list cannot be loaded the server picks the least-loaded node.
     private func chooseFastest() async {
         guard let api,let nodes=try? await api.request("nodes")["nodes"] as? [[String:Any]] else {return}
-        let ranked=await Latency.rank(nodes,attempts:3,reuse:60)
+        let ranked=await Latency.rank(nodes,attempts:3,reuse:60,settle:settle)
         for item in ranked.prefix(3) {Journal.add("probe: \(item.node["name"] as? String ?? "?") \(item.quality.latency.map {"\($0) ms"} ?? "no answer"), jitter \(item.quality.jitter) ms, loss \(item.quality.loss)%")}
         let ids=ranked.compactMap {$0.node["id"] as? String}
         nodeId=ids.first ?? "";fallbacks=Array(ids.dropFirst().prefix(2))
@@ -169,18 +174,23 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         try Task.checkCancellation()
         publish {$0["status"]="connection_connected";$0["since"]=Date().timeIntervalSince1970;$0["node"]=self.nodeName;$0["nodeId"]=self.nodeId}
         Journal.add("connect: ready in \(Int(Date().timeIntervalSince(started)*1000)) ms via \(carrying)")
+        // The connect probe stopped at the first transport: test them all shortly, off the connect path, for the
+        // transport memory and the report to the server.
+        nextProbe=Date().addingTimeInterval(fullProbe);reportNext=true
     }
     /// All transports at once; true when at least one answers. Failures are remembered only when another transport worked.
-    private func probe(initial:Bool=false,report shouldReport:Bool?=nil) async -> Bool {
+    /// The connect probe (initial) returns as soon as traffic has a transport (CoreProbeFirst); the others are not waited for.
+    private func probe(initial:Bool=false,report shouldReport:Bool=false) async -> Bool {
         let names=transports.joined(separator:",")
-        let results=await Task.detached {Transports.parseProbe(CoreProbe(names,Transports.testURL,5000))}.value
+        let results=await Task.detached {Transports.parseProbe(initial ? CoreProbeFirst(names,Transports.group,Transports.testURL,5000):CoreProbe(names,Transports.testURL,5000))}.value
         let working=results.filter {$0.value>=0}.map {$0.key}
         // WireGuard cannot answer before the node has applied this device; that is not a block.
         let failed=results.filter {$0.value<0 && ($0.key != "wireguard" || leaseReady)}.map {$0.key}
-        if initial || !failed.isEmpty {Journal.add("probe: "+transports.map {name in (results[name] ?? -1)>=0 ? "\(name) \(results[name]!) ms":"\(name) no answer"}.joined(separator:", "))}
+        if initial || !failed.isEmpty {Journal.add("probe: "+transports.map {name in results[name].map {$0>=0 ? "\(name) \($0) ms":"\(name) no answer"} ?? "\(name) not waited for"}.joined(separator:", "))}
         if !working.isEmpty {Transports.remember(network,failed:failed,working:working)}
         // Tells the server which of this node's ports answer from here (Console: 云防火墙); off the connect path.
-        if shouldReport ?? initial,!working.isEmpty {
+        if shouldReport || reportNext,!initial,!working.isEmpty {
+            reportNext=false
             let summary=(working.map {"\($0)=ok"}+failed.map {"\($0)=fail"}).joined(separator:",")
             Task {await report("TRANSPORT_PROBE",summary,network:network)}
         }
@@ -285,7 +295,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     /// Automatic mode: measures every location now and moves to the fastest one that answers, if it is another.
     private func moveToFastest() async {
         guard let api,let nodes=try? await api.request("nodes")["nodes"] as? [[String:Any]] else {Journal.add("switch: no location list, retrying");return}
-        let ranked=await Latency.rank(nodes,attempts:1,reuse:0)
+        let ranked=await Latency.rank(nodes,attempts:1,reuse:0,settle:settle)
         guard let best=ranked.first(where:{$0.quality.latency != nil})?.node,let id=best["id"] as? String else {Journal.add("switch: no location answers, retrying");return}
         guard id != nodeId else {return}
         Journal.add("switch: \(nodeName) failed (HANDSHAKE_TIMEOUT), moving to \(best["name"] as? String ?? "?")")
@@ -294,7 +304,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         do {
             try await bringUp()
             publish {$0["switchedFrom"]=from}
-            failures=0;nextProbe=Date().addingTimeInterval(healthy)
+            failures=0
         } catch AccessFailure.code(let code) where Shared.fatal.contains(code) {
             await fail(code)
         } catch AccessFailure.code("HANDSHAKE_TIMEOUT") {
