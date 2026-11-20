@@ -253,7 +253,8 @@ newest 10 database dumps in `./backups` are kept (`VEILBIRD_BACKUP_KEEP` in `.en
 `0` keeps all), each container keeps at most 30 MB of Docker output, and after a
 healthy deploy the untagged images left by the previous build and build cache older
 than 7 days are removed (`VEILBIRD_DOCKER_PRUNE=no` skips this). Copy important
-dumps off the server; they are not a substitute for off-site backups.
+dumps off the server; they are not a substitute for off-site backups (see
+[Off-site backups](#off-site-backups)).
 
 ### Server images from CI
 
@@ -294,6 +295,62 @@ To rebuild only the frontends without pulling code:
 docker compose build portal-web admin-web
 docker compose up -d --no-deps portal-web admin-web
 ```
+
+## Off-site backups
+
+Every night at 03:30 (server time) the database is dumped, encrypted together with
+`.env`, and uploaded to an S3-compatible bucket: Aliyun OSS, Cloudflare R2, AWS S3
+or MinIO. Every Sunday a restore drill downloads the newest copy, restores it into a
+throwaway PostgreSQL container (no network, deleted afterwards) and compares it with
+the live database. Production is never touched by the drill.
+
+Setup is four lines in `.env`, then an update:
+
+```bash
+VEILBIRD_BACKUP_S3_ENDPOINT=https://oss-cn-hangzhou.aliyuncs.com   # R2: https://<account-id>.r2.cloudflarestorage.com
+VEILBIRD_BACKUP_S3_BUCKET=tracknothing-backups
+VEILBIRD_BACKUP_S3_ACCESS_KEY_ID=...
+VEILBIRD_BACKUP_S3_SECRET_ACCESS_KEY=...
+```
+
+```bash
+sudo ./one-click-update.sh
+```
+
+The update installs two systemd timers (`veilbird-backup.timer`,
+`veilbird-backup-drill.timer`) and, the first time, makes a backup and runs the drill
+right away so a wrong key or bucket shows at once. Use a private bucket in another
+region or with another provider, and keys limited to that bucket (read, write, list,
+delete objects). The newest 30 copies are kept (`VEILBIRD_BACKUP_S3_KEEP`, `0` keeps
+all); they go under `veilbird-backups/` (`VEILBIRD_BACKUP_S3_PREFIX`). Region and
+addressing are read from an OSS endpoint; set `VEILBIRD_BACKUP_S3_REGION` /
+`VEILBIRD_BACKUP_S3_ADDRESSING` for other providers if they need it.
+
+Each upload, failure and drill result is written to Console → 日志 (search
+"backup"). A drill fails, and logs an error, when the newest copy cannot be
+decrypted or restored, has no users, or is more than 36 hours old.
+
+Copies are encrypted (AES-256-GCM) with `VEILBIRD_MASTER_KEY`, or with
+`VEILBIRD_BACKUP_PASSPHRASE` when set. **Keep that key somewhere other than this
+server**: without it a copy cannot be opened, and the encrypted fields in the
+database (node SSH logins, keys) cannot be read either.
+
+By hand:
+
+```bash
+sudo ./scripts/offsite-backup.sh          # back up now
+sudo ./scripts/offsite-backup.sh --list   # copies in the bucket
+sudo ./scripts/backup-drill.sh            # restore drill now
+sudo ./scripts/install-backup-timer.sh --remove   # stop the nightly backups
+```
+
+Restoring after the server was lost: install a new server as usual
+(`scripts/one-click-deploy.sh`), add the same `VEILBIRD_BACKUP_S3_*` lines to its
+`.env`, then run `sudo ./scripts/offsite-restore.sh` (newest copy; `--list` or a copy
+name for another). It asks for the old server's master key when needed, offers to put
+that key into `.env`, and restores with `scripts/restore-postgres.sh`, which asks for
+confirmation first. The old `.env` is saved beside the dump in `./backups` for the
+other settings.
 
 ## Uninstall and clean reinstall
 
