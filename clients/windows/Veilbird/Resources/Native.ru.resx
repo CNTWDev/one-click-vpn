@@ -433,7 +433,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
   <data name="whats_new_notes" xml:space="preserve"><value>Главный экран Android помещается целиком: шар подстраивается под высоту экрана, прокручивать не нужно
 Главный экран проще: без непонятной мелкой подписи, только IP, который видят сайты; основная кнопка теперь залитая
-На Android больше нет рамок: карточки и кнопки с мягкой заливкой</value></data>
+На Android, Mac и Windows больше нет рамок: карточки и кнопки с мягкой заливкой, главный экран Mac и Windows тоже проще</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>

@@ -424,7 +424,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">The Android home screen now fits on one screen: the sphere scales with the screen height, so nothing needs scrolling\nA simpler home: no more cryptic small print, just the IP sites can see; the main button is now solid\nNo more outlines anywhere on Android: cards and buttons use soft solid fills</string>
+  <string name="whats_new_notes">The Android home screen now fits on one screen: the sphere scales with the screen height, so nothing needs scrolling\nA simpler home: no more cryptic small print, just the IP sites can see; the main button is now solid\nNo more outlines on Android, Mac or Windows: cards and buttons use soft solid fills, and the Mac and Windows home is simpler too</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

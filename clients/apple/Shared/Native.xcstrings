@@ -9736,19 +9736,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The Android home screen now fits on one screen: the sphere scales with the screen height, so nothing needs scrolling\nA simpler home: no more cryptic small print, just the IP sites can see; the main button is now solid\nNo more outlines anywhere on Android: cards and buttons use soft solid fills"
+            "value": "The Android home screen now fits on one screen: the sphere scales with the screen height, so nothing needs scrolling\nA simpler home: no more cryptic small print, just the IP sites can see; the main button is now solid\nNo more outlines on Android, Mac or Windows: cards and buttons use soft solid fills, and the Mac and Windows home is simpler too"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "安卓首页一屏放下：中间的球按屏幕高度自动缩放，任何手机都不用滑动\n首页更简洁：去掉看不懂的小字，直接告诉你网站能看到的 IP；主按钮改成实底\n安卓所有页面去掉描边，卡片和按钮改为柔和的实底"
+            "value": "安卓首页一屏放下：中间的球按屏幕高度自动缩放，任何手机都不用滑动\n首页更简洁：去掉看不懂的小字，直接告诉你网站能看到的 IP；主按钮改成实底\n安卓、Mac、Windows 全部去掉描边，卡片和按钮改为柔和的实底；Mac 和 Windows 首页同样精简"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Главный экран Android помещается целиком: шар подстраивается под высоту экрана, прокручивать не нужно\nГлавный экран проще: без непонятной мелкой подписи, только IP, который видят сайты; основная кнопка теперь залитая\nНа Android больше нет рамок: карточки и кнопки с мягкой заливкой"
+            "value": "Главный экран Android помещается целиком: шар подстраивается под высоту экрана, прокручивать не нужно\nГлавный экран проще: без непонятной мелкой подписи, только IP, который видят сайты; основная кнопка теперь залитая\nНа Android, Mac и Windows больше нет рамок: карточки и кнопки с мягкой заливкой, главный экран Mac и Windows тоже проще"
           }
         }
       }
