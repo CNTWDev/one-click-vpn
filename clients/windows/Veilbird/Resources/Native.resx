@@ -187,6 +187,8 @@
   <data name="error_update_detail" xml:space="preserve"><value>This version is no longer supported. Update to keep connecting.</value></data>
   <data name="error_update_title" xml:space="preserve"><value>Update needed</value></data>
   <data name="exposed_detail" xml:space="preserve"><value>Any site can see all of this right now</value></data>
+  <data name="exposed_ip" xml:space="preserve"><value>Sites can see your real IP: {0}</value></data>
+  <data name="exposed_plain" xml:space="preserve"><value>Sites can see your real IP</value></data>
   <data name="exposed_status" xml:space="preserve"><value>Visible</value></data>
   <data name="extension_guide_continue" xml:space="preserve"><value>Continue</value></data>
   <data name="extension_guide_detail" xml:space="preserve"><value>TrackNothing makes its encrypted connection through a macOS network extension, and the first time you switch it on yourself.
@@ -429,9 +431,9 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>This release brings together recent improvements: a three-step first run, the same connection states on every device, and errors that name the cause with a button that fixes it
-Reminders before your traffic or access runs out; per-app routing on Android and Windows
-Lower battery and memory use, and faster startup</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>The Android home screen now fits on one screen: the sphere scales with the screen height, so nothing needs scrolling
+A simpler home: no more cryptic small print, just the IP sites can see; the main button is now solid
+No more outlines on Android, Mac or Windows: cards and buttons use soft solid fills, and the Mac and Windows home is simpler too</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows development build · VPN service integration in progress</value></data>

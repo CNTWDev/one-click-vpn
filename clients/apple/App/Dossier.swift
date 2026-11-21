@@ -96,15 +96,15 @@ struct SealStamp:View {
     var animated=true
     var body:some View {
         Text(verbatim:"SEALED").font(.system(size:VeilbirdStyle.mac ? 10:11,weight:.semibold,design:.monospaced)).tracking(2.4)
-            .foregroundStyle(VeilbirdStyle.accent).padding(.horizontal,7).padding(.vertical,3)
-            .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(VeilbirdStyle.accent.opacity(0.8),lineWidth:1))
+            .foregroundStyle(VeilbirdStyle.onAccent).padding(.horizontal,7).padding(.vertical,3)
+            .background(VeilbirdStyle.accent,in:RoundedRectangle(cornerRadius:3))
             .rotationEffect(.degrees(-6)).scaleEffect(shown ? 1:1.6).opacity(shown ? 1:0)
             .animation(animated ? (shown ? .easeOut(duration:0.26).delay(1.25):.easeIn(duration:0.2)):nil,value:shown)
             .accessibilityHidden(true)
     }
 }
 
-/// The file header on every main page: mark and name on the left, the account's file number on the right.
+/// The header on every main page: the mark and the name, nothing else (no file number, no rule under it).
 struct FileHeader:View {
     let number:String
     var body:some View {
@@ -114,9 +114,7 @@ struct FileHeader:View {
                 Text(verbatim:"TRACKNOTHING").font(Pixel.font(VeilbirdStyle.mac ? 12:14)).tracking(0.6).foregroundStyle(VeilbirdStyle.secondary)
                     .accessibilityLabel(Text(verbatim:"TrackNothing"))
                 Spacer(minLength:8)
-                Text(verbatim:"№ "+number).font(.system(size:11,design:.monospaced)).tracking(0.9).foregroundStyle(VeilbirdStyle.faint)
             }.frame(height:VeilbirdStyle.mac ? 32:44).padding(.horizontal,4)
-            Rectangle().fill(VeilbirdStyle.hairline).frame(height:1)
         }
     }
     /// A short, stable file number for an account (same rule as the Portal's and the other clients'), not an id.
@@ -128,12 +126,10 @@ struct FileHeader:View {
 }
 
 /// "§01 STATUS": the small monospaced number above a page or block.
+/// Formerly a page's "§0n" label; the labels are gone (they read as noise), so this draws nothing.
 struct SectionLabel:View {
     let key:String
-    var body:some View {
-        Text(L10n.text(key)).font(.system(size:11,design:.monospaced)).tracking(0.9).foregroundStyle(VeilbirdStyle.faint).lineLimit(1)
-            .frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,4)
-    }
+    var body:some View {EmptyView()}
 }
 
 /// The action's dot: dim while exposed; amber and slowly breathing while sealed (still under Reduce Motion).
@@ -178,7 +174,6 @@ struct PortraitView:View {
                     DotSphere().opacity(failed ? 0.42:(low ? 0.82:1))
                     Text(verbatim:invite).font(.system(size:max(13,0.05*s))).tracking(0.8).foregroundStyle(failed ? VeilbirdStyle.text.opacity(0.7):VeilbirdStyle.accent)
                         .lineLimit(1).minimumScaleFactor(0.6).frame(width:0.8*s).opacity(failed || !low ? 1:0.75)
-                    Circle().strokeBorder(VeilbirdStyle.text.opacity(0.07),lineWidth:1)
                 }.opacity(hidden ? 0:1)
                 DotSphere().opacity(hidden ? 0.1:0)
                 StateRing(state:state,lines:lines,glow:low ? 0.82:1)

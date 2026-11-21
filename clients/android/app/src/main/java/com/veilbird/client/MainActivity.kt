@@ -173,16 +173,9 @@ class MainActivity : Activity() {
 
     // ---- Building blocks: one radius (nearly square), one palette, one type scale.
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
-    // A "surface" block is drawn as a hairline outline on the ground (same as the Portal and Console cards).
-    // Corners are nearly square (at most 4dp) like the sheets of a file; an "accent" control is an amber outline.
-    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
-        when (color) {
-            Palette.surface -> { setColor(Color.TRANSPARENT); setStroke(1.dp, Palette.edge) }
-            Palette.accent -> { setColor(Palette.alpha(Palette.accent, 15)); setStroke(1.dp, Palette.alpha(Palette.accent, 180)) }
-            else -> setColor(color)
-        }
-        cornerRadius = minOf(radius, 4).dp.toFloat()
-    }
+    // Every block is a soft filled shape on the ground, never an outline: cards are "surface", the main action is
+    // solid amber with dark text. Rounded corners, no strokes anywhere.
+    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply { setColor(color); cornerRadius = radius.dp.toFloat() }
     private fun pressable(color: Int, radius: Int): Drawable =
         RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.text, 22)), if (color == Color.TRANSPARENT) null else rounded(color, radius), rounded(Color.WHITE, radius))
     private fun TextView.weight(value: Int) = apply {
@@ -225,7 +218,6 @@ class MainActivity : Activity() {
         animate().cancel()
         animate().alpha(0f).setDuration(90).withEndAction { text = value; if (shown) animate().alpha(1f).setDuration(160).setInterpolator(DecelerateInterpolator()).start() }.start()
     }
-    private fun spacer(weight: Float) = add(View(this), height = 0).apply { (layoutParams as LinearLayout.LayoutParams).weight = weight }
     private fun row(minHeight: Int = 54) = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = minHeight.dp; setPadding(16.dp, 8.dp, 16.dp, 8.dp)
     }
@@ -265,9 +257,9 @@ class MainActivity : Activity() {
         setOnClickListener { if (!busy) onClick() }
     }
     /** A main page opens like a sheet of the file: the file header, its § number, then the title. */
-    private fun pageTitle(title: String, trailing: View? = null, section: Int? = null) {
+    private fun pageTitle(title: String, trailing: View? = null) {
         fileHeader()
-        section?.let { add(sectionLabel(it), top = 14) }
+        add(View(this), height = 14.dp)
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 0, 0) }
         header.addView(text(title, 30f, Palette.text, 300).apply { isFocusable = true; accessibilityHeading(); maxLines = 1; ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
         trailing?.let { header.addView(it) }
@@ -340,8 +332,7 @@ class MainActivity : Activity() {
         handler.removeCallbacks(refresh); if (visible) handler.post(refresh)
     }
     private fun tabBar() = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL; setBackgroundColor(Palette.alpha(Palette.ground, 140))
-        addView(View(this@MainActivity).apply { setBackgroundColor(Palette.hairline) }, LinearLayout.LayoutParams(-1, 1))
+        orientation = LinearLayout.VERTICAL; setBackgroundColor(Palette.alpha(Palette.ground, 200))
         val tabs = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12.dp, 6.dp, 12.dp, 6.dp) }
         for ((tab, title, res) in listOf(Triple("connect", R.string.connect_tab, R.drawable.ic_tab_connect), Triple("nodes", R.string.locations, R.drawable.ic_tab_nodes), Triple("activity", R.string.activity_title, R.drawable.ic_tab_activity), Triple("account", R.string.account, R.drawable.ic_tab_account))) {
             val selected = tab == page; val color = if (selected) Palette.accent else Palette.secondary
@@ -363,7 +354,7 @@ class MainActivity : Activity() {
     // connected, forgotten on disconnect; nothing is stored or sent.
     private val directColor = Color.rgb(97, 90, 80)
     private fun activity() {
-        pageTitle(L10n.text(R.string.activity_title), section = R.string.section_activity)
+        pageTitle(L10n.text(R.string.activity_title))
         add(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 0, 0)
             addView(View(this@MainActivity).apply { setBackgroundColor(Palette.past) }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 8.dp })
@@ -416,7 +407,7 @@ class MainActivity : Activity() {
                 val count = when (key) { "proxy" -> proxied; "direct" -> all.size - proxied; else -> all.size }
                 addView(LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(12.dp, 0, 12.dp, 0)
-                    background = GradientDrawable().apply { cornerRadius = 8.dp.toFloat(); setStroke(1.dp, if (selected) Palette.accent else Color.rgb(44, 41, 36)) }
+                    background = rounded(if (selected) Palette.selected else Palette.surface, 10)
                     if (color != null) addView(square(color).apply { (layoutParams as LinearLayout.LayoutParams).marginEnd = 6.dp })
                     addView(text(L10n.text(title), 13f, if (selected) Palette.text else Palette.secondary))
                     addView(text(L10n.number(count), 11f, if (selected) Palette.text else Palette.secondary).apply { typeface = Typeface.MONOSPACE },
@@ -450,7 +441,7 @@ class MainActivity : Activity() {
     }
     private fun card() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL; setPadding(18.dp, 16.dp, 18.dp, 16.dp)
-        background = GradientDrawable().apply { setColor(Color.TRANSPARENT); cornerRadius = 16.dp.toFloat(); setStroke(1.dp, Palette.edge) }
+        background = rounded(Palette.surface, 16)
     }
     private fun legend(proxy: Boolean, value: Long, free: Boolean = false) = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
@@ -523,19 +514,9 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(4.dp, 0, 4.dp, 0)
             addView(PixelMark(this@MainActivity), LinearLayout.LayoutParams(18.dp, 18.dp).apply { marginEnd = 10.dp })
             addView(wordmark(14f).apply { setTextColor(Palette.secondary) }, LinearLayout.LayoutParams(0, -2, 1f))
-            addView(mono("№ " + fileNumber(), 11f, Palette.faint))
-        }, height = 44.dp)
-        add(View(this).apply { setBackgroundColor(Palette.hairline) }, height = 1, bottom = 4)
+        }, height = 48.dp)
     }
     private fun mono(value: String, size: Float, color: Int) = text(value, size, color).apply { typeface = Typeface.MONOSPACE; letterSpacing = 0.08f; maxLines = 1 }
-    private fun sectionLabel(res: Int) = mono(L10n.text(res), 11f, Palette.faint).apply { setPadding(4.dp, 0, 0, 0) }
-    /** A short, stable file number for this account (same rule as the Portal's), not an id. */
-    private fun fileNumber(): String {
-        val seed = accountData?.optString("email").orEmpty().ifEmpty { api.secret("token")?.take(12).orEmpty() }
-        var hash = 7L
-        for (c in seed) hash = (hash * 31 + c.code) and 0xFFFFFFFFL
-        return String.format(java.util.Locale.ROOT, "%04d", hash % 10000)
-    }
 
     /**
      * The connect page as a file: its state, four lines of what anyone can see about this phone right now, one
@@ -557,56 +538,49 @@ class MainActivity : Activity() {
         }.also { add(it, top = 4) }
         // Notes that come and go above the file (update, location switch) slide the page smoothly instead of snapping it.
         if (ValueAnimator.areAnimatorsEnabled()) content.layoutTransition = LayoutTransition().apply { setDuration(220); enableTransitionType(LayoutTransition.CHANGING) }
-        spacer(0.6f)
-        add(sectionRow(R.string.section_portrait, if (onboarded) null else 3), top = 12, bottom = 4)
+        if (!onboarded) add(sectionRow(3), top = 4)
         // The portrait: what any site or app on this network can see of this phone, as a sphere of light. It is the
-        // switch: a tap starts (or stops) hiding; hidden, a ring holds the time hidden and the rates.
+        // switch: a tap starts (or stops) hiding; hidden, a ring holds the time hidden and the rates. It takes whatever
+        // height the rest of the page leaves (up to 280dp), so the whole page fits on one screen on any phone.
         portrait = Portrait(this).apply {
             isClickable = true; isFocusable = true
             setOnClickListener { if (!busy) toggleConnection() }
-        }.also { add(it, top = 4) }
-        // Under it, the same facts in words; they turn to a dim dot matrix while hidden.
-        val ip = SealedText(this).apply { value = visitorIp ?: "···"; typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL); textSize = 38f; letterSpacing = -0.01f; ellipsize = TextUtils.TruncateAt.END; setPadding(4.dp, 0, 4.dp, 0) }
-        add(ip, top = 14)
-        val meta = SealedText(this).apply { value = metaLine(); textSize = 11f; setTextColor(Palette.secondary); ellipsize = TextUtils.TruncateAt.END; setPadding(4.dp, 0, 4.dp, 0) }
-        add(meta, top = 8)
-        fileLines = listOf(ip, meta)
+        }.also { add(it, height = 0, top = 8, bottom = 12).apply { (layoutParams as LinearLayout.LayoutParams).weight = 1f } }
         // The state: a title (or the cause of a failure) and two lines held for the detail (or the next step), the same
         // height in every state, so nothing below moves when a connection comes up, drops or fails.
-        stateTitle = text("", 24f, Palette.text, 300).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END; setPadding(4.dp, 0, 4.dp, 0) }
-        add(stateTitle!!, top = 12)
-        stateDetail = text("", 13f, Palette.secondary).apply { minLines = 2; maxLines = 2; ellipsize = TextUtils.TruncateAt.END; setPadding(4.dp, 0, 4.dp, 0) }
-        add(stateDetail!!, top = 4)
-        spacer(1f)
+        stateTitle = text("", 26f, Palette.text, 300).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END; setPadding(4.dp, 0, 4.dp, 0) }
+        add(stateTitle!!)
+        stateDetail = text("", 14f, Palette.secondary).apply { minLines = 2; maxLines = 2; ellipsize = TextUtils.TruncateAt.END; setPadding(4.dp, 0, 4.dp, 0) }
+        add(stateDetail!!, top = 6)
         // First run: before the first tap, what the system is about to ask and which button to press.
         if (!onboarded && VpnService.prepare(this) != null) firstNote = note(L10n.text(R.string.first_connect_android), L10n.text(R.string.first_connect_android_detail))
             .also { dock?.addView(it, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp }) }
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         if (ValueAnimator.areAnimatorsEnabled()) actions.layoutTransition = LayoutTransition().apply { setDuration(200); enableTransitionType(LayoutTransition.CHANGING) }
         dock?.addView(actions, LinearLayout.LayoutParams(-1, 54.dp).apply { topMargin = 10.dp; bottomMargin = 12.dp })
-        // One outlined action: grey and quiet while exposed, amber with a breathing dot while sealed; after a failure it
-        // is the way out of it (manage devices, use automatic…), with "try again" beside it when that helps too.
+        // One filled action: solid amber with dark text while exposed, a quiet dark fill with a breathing dot while
+        // hidden; after a failure it is the way out of it (manage devices, use automatic…), with "try again" beside it.
         action = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(18.dp, 0, 18.dp, 0); isClickable = true; isFocusable = true
-            actionLabel = text("", 15f, Palette.text, 500).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }.also { addView(it, LinearLayout.LayoutParams(0, -2, 1f)) }
-            actionDot = View(this@MainActivity).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Palette.alpha(Palette.text, 90)) } }
-                .also { addView(it, LinearLayout.LayoutParams(6.dp, 6.dp)) }
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(18.dp, 0, 18.dp, 0); isClickable = true; isFocusable = true
+            actionDot = View(this@MainActivity).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Palette.accent) }; visibility = View.GONE }
+                .also { addView(it, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 10.dp }) }
+            actionLabel = text("", 16f, Palette.onAccent, 600).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }.also { addView(it, LinearLayout.LayoutParams(-2, -2)) }
             setOnClickListener { if (!busy) trouble(shownTrouble?.primaryDo) }
         }.also { actions.addView(it, LinearLayout.LayoutParams(0, -1, 1f)) }
-        secondary = text("", 15f, Palette.secondary).apply {
-            gravity = Gravity.CENTER; setPadding(16.dp, 0, 16.dp, 0); maxLines = 1; visibility = View.GONE
-            background = RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.text, 22)), GradientDrawable().apply { cornerRadius = 2.dp.toFloat(); setStroke(1.dp, Palette.hairline) }, null)
+        secondary = text("", 15f, Palette.text, 500).apply {
+            gravity = Gravity.CENTER; setPadding(20.dp, 0, 20.dp, 0); maxLines = 1; visibility = View.GONE
+            background = RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.text, 22)), rounded(Palette.raised, 16), null)
             isClickable = true; setOnClickListener { if (!busy) trouble(shownTrouble?.secondaryDo) }
         }.also { actions.addView(it, LinearLayout.LayoutParams(-2, -1).apply { marginStart = 10.dp }) }
         // Connected, the location row opens the connection check; otherwise, or while the chosen location does not
         // answer, it opens the location list (picking one there reconnects to it).
-        val node = row(64).apply { background = pressable(Palette.surface, 4); contentDescription = L10n.text(R.string.tap_to_change)
+        val node = row(64).apply { background = pressable(Palette.surface, 14); contentDescription = L10n.text(R.string.tap_to_change)
             setOnClickListener { if (busy) return@setOnClickListener; if (ConnectionStateStore.active && ConnectionStateStore.since > 0 && ConnectionStateStore.messageId != R.string.location_retrying) connectionCheck() else { page = "nodes"; render() } } }
         nodeBadge = badge(null).also { node.addView(it) }
         val names = titles(" ", " "); node.addView(names)
         nodeTitle = names.getChildAt(0) as TextView; nodeDetail = names.getChildAt(1) as TextView
         node.addView(chevron())
-        add(node, top = 10)
+        add(node, top = 14)
         usageStrip()
         sealedShown = null; shownState = null
         showState()
@@ -614,18 +588,12 @@ class MainActivity : Activity() {
         // Just signed in: no saved list yet, so load it for the location's name and code.
         if (NodeCache.nodes(this) == null) refreshNodes()
     }
-    /** Under the address: device, time zone and language, what any site can also read right now. */
-    private fun metaLine() = listOf("${Build.MODEL} · Android ${Build.VERSION.RELEASE}", zoneLabel(), L10n.locale.toLanguageTag()).joinToString("   ")
-    private fun zoneLabel(): String {
-        val minutes = java.util.TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60000
-        return String.format(java.util.Locale.ROOT, "UTC%s%02d:%02d", if (minutes >= 0) "+" else "-", Math.abs(minutes) / 60, Math.abs(minutes) % 60)
-    }
     /** The public address the service sees, read once while not connected (afterwards it would be the location's). */
     private fun loadVisitorIp() {
         if (ConnectionStateStore.active) return
         Thread {
             val ip = try { api.get("/api/v1/visitor").let { if (it.isNull("ip")) "—" else it.optString("ip") } } catch (_: Exception) { null }
-            runOnUiThread { visitorIp = ip; fileLines?.firstOrNull()?.value = ip ?: "—" }
+            runOnUiThread { visitorIp = ip; if (!isDestroyed && stateDetail != null) { shownState = null; showState() } }
         }.start()
     }
     /** What this account has left (or used) and how long it runs: two quiet figures under the location. */
@@ -640,7 +608,7 @@ class MainActivity : Activity() {
             addView(title)
             addView(value.apply { maxLines = 1 }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        add(strip, top = 16)
+        add(strip, top = 12)
         fun show(data: JSONObject) {
             val access = AccountAccess.from(data)
             trafficTitle.text = L10n.text(access.trafficTitle()); untilTitle.text = L10n.text(access.untilTitle())
@@ -686,17 +654,14 @@ class MainActivity : Activity() {
         if (state != shownState || trouble != shownTrouble) {
             action?.apply {
                 contentDescription = when (state) { LinkState.IDLE -> L10n.text(R.string.connect_action); LinkState.FAILED -> L10n.text(trouble!!.primary); LinkState.CONNECTING -> L10n.text(R.string.cancel); else -> L10n.text(R.string.disconnect_action) }
-                background = GradientDrawable().apply {
-                    cornerRadius = 2.dp.toFloat()
-                    if (on) { setColor(Palette.alpha(Palette.accent, 15)); setStroke(1.dp, Palette.alpha(Palette.accent, 180)) } else { setColor(Palette.alpha(Palette.accent, 22)); setStroke(1.dp, Palette.accent) }
-                }.let { RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.text, 22)), it, null) }
+                background = RippleDrawable(ColorStateList.valueOf(Palette.alpha(if (on) Palette.text else Palette.onAccent, if (on) 22 else 40)), rounded(if (on) Palette.raised else Palette.accent, 16), null)
             }
             actionLabel?.apply {
                 swap(when (state) { LinkState.IDLE -> L10n.text(R.string.seal_action); LinkState.CONNECTING -> L10n.text(R.string.cancel); LinkState.FAILED -> L10n.text(trouble!!.primary); else -> L10n.text(R.string.unseal_action) })
-                setTextColor(if (on) Palette.accent else Palette.text)
+                setTextColor(if (on) Palette.text else Palette.onAccent)
             }
             actionDot?.apply {
-                (background as? GradientDrawable)?.setColor(if (active) Palette.accent else Palette.alpha(Palette.text, 90))
+                visibility = if (on) View.VISIBLE else View.GONE
                 animate().cancel(); alpha = 1f
                 if (active && ValueAnimator.areAnimatorsEnabled()) breathe(this)
             }
@@ -740,7 +705,6 @@ class MainActivity : Activity() {
         // connecting, or the countdown to the next try while reconnecting.
         portrait?.apply {
             this.state = state; lines = maxOf(ConnectionStateStore.lines, 2)
-            invite = if (seal) "" else L10n.text(if (state == LinkState.FAILED) R.string.tap_to_retry else R.string.tap_to_hide)
             centre = when (state) {
                 LinkState.CONNECTED -> DateUtils.formatElapsedTime((SystemClock.elapsedRealtime() - since) / 1000)
                 LinkState.CONNECTING -> Guidance.phase()
@@ -772,7 +736,8 @@ class MainActivity : Activity() {
             LinkState.RECONNECTING -> if (ConnectionStateStore.messageId == R.string.location_retrying) ConnectionStateStore.message else L10n.text(R.string.reconnecting_detail)
             LinkState.WAITING -> L10n.text(R.string.waiting_detail)
             LinkState.FAILED -> trouble!!.detail
-            else -> L10n.text(if (update?.mandatory == true) R.string.update_required_detail else R.string.exposed_detail)
+            else -> if (update?.mandatory == true) L10n.text(R.string.update_required_detail)
+                else visitorIp?.takeIf { it != "—" }?.let { L10n.text(R.string.exposed_ip, it) } ?: L10n.text(R.string.exposed_plain)
         })
         // The first connection ends the three steps: the squares fill and say "ready", then the tab bar comes.
         if (connected && !onboarded) {
@@ -801,12 +766,11 @@ class MainActivity : Activity() {
             }
         }
     }
-    /** A page's § label; during the first run, with the step on the right (three squares and "n/3"). */
-    private fun sectionRow(res: Int, step: Int?): View {
-        if (step == null) return sectionLabel(res)
+    /** During the first run, the step on the right (three squares and "n/3"); afterwards nothing. */
+    private fun sectionRow(step: Int?): View {
+        if (step == null) return View(this)
         return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            addView(sectionLabel(res).apply { ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL or Gravity.END
             stepsRow = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(8.dp, 0, 4.dp, 0) }
                 .also { fillSteps(it, step); addView(it, LinearLayout.LayoutParams(-2, -2)) }
         }
@@ -819,7 +783,7 @@ class MainActivity : Activity() {
                 when {
                     i < step -> setColor(Palette.alpha(Palette.text, 190))
                     i == step -> setColor(Palette.accent)
-                    else -> { setColor(Color.TRANSPARENT); setStroke(1.dp, Palette.alpha(Palette.faint, 160)) }
+                    else -> setColor(Palette.selected)
                 }
             }
         }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 3.dp })
@@ -828,11 +792,11 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(-2, -2).apply { marginStart = 5.dp })
         row.contentDescription = if (ready) L10n.text(R.string.onboarding_ready) else "$step/3"
     }
-    /** A quiet amber-outlined note: what is about to happen, then what to do. */
+    /** A quiet amber-tinted note: what is about to happen, then what to do. */
     private fun note(title: String, detail: String) = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL; setPadding(12.dp, 11.dp, 12.dp, 11.dp)
-        background = GradientDrawable().apply { cornerRadius = 4.dp.toFloat(); setColor(Palette.alpha(Palette.accent, 15)); setStroke(1.dp, Palette.alpha(Palette.accent, 90)) }
-        addView(mono("i", 11f, Palette.accent).apply { gravity = Gravity.CENTER; background = GradientDrawable().apply { cornerRadius = 2.dp.toFloat(); setStroke(1.dp, Palette.accent) } },
+        background = rounded(Palette.alpha(Palette.accent, 22), 14)
+        addView(mono("i", 11f, Palette.onAccent).apply { gravity = Gravity.CENTER; letterSpacing = 0f; background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Palette.accent) } },
             LinearLayout.LayoutParams(18.dp, 18.dp).apply { marginEnd = 12.dp; topMargin = 1.dp })
         addView(LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
@@ -846,7 +810,7 @@ class MainActivity : Activity() {
      */
     private fun pickLocation() {
         fileHeader()
-        add(sectionRow(R.string.section_locations, 2), top = 14)
+        add(sectionRow(2), top = 14)
         add(text(L10n.text(R.string.where_would_you_like_to_connect), 28f, Palette.text, 300).apply { accessibilityHeading(); setPadding(4.dp, 0, 4.dp, 0) }, top = 14)
         add(text(L10n.text(R.string.pick_location_sub), 14f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, top = 6, bottom = 18)
         val options = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also { add(it) }
@@ -857,12 +821,11 @@ class MainActivity : Activity() {
             val ranked = nodes.mapNotNull { node -> Latency.recent[node.getString("id")]?.takeIf { it.latency != null }?.let { node to it } }.sortedBy { it.second.score }
             fun option(id: String, name: String, code: String, detail: String) = row(64).apply {
                 val chosen = selectedId == id
-                background = if (chosen) rounded(Palette.accent, 4) else pressable(Palette.surface, 4)
+                background = if (chosen) rounded(Palette.selected, 14) else pressable(Palette.surface, 14)
                 addView(if (id.isEmpty()) badge(null, R.drawable.ic_sparkle, Palette.accent) else badge(code))
                 addView(titles(name, detail))
                 addView(FrameLayout(this@MainActivity).apply {
-                    addView(View(this@MainActivity).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setStroke((1.5f * resources.displayMetrics.density).toInt(), if (chosen) Palette.accent else Palette.faint) } }, FrameLayout.LayoutParams(16.dp, 16.dp, Gravity.CENTER))
-                    if (chosen) addView(View(this@MainActivity).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Palette.accent) } }, FrameLayout.LayoutParams(8.dp, 8.dp, Gravity.CENTER))
+                    addView(radio(chosen), FrameLayout.LayoutParams(16.dp, 16.dp, Gravity.CENTER))
                 }, LinearLayout.LayoutParams(16.dp, 16.dp))
                 contentDescription = name; isSelected = chosen
                 setOnClickListener {
@@ -898,9 +861,9 @@ class MainActivity : Activity() {
         show()
         if (NodeCache.nodes(this) == null) refreshNodes()
         // Continue: the choice is already saved; step 3 is the connect page itself.
-        dock?.addView(text(L10n.text(R.string.continue_action), 15f, Palette.text, 500).apply {
-            gravity = Gravity.CENTER_VERTICAL; setPadding(18.dp, 0, 18.dp, 0); isClickable = true
-            background = RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.text, 22)), GradientDrawable().apply { cornerRadius = 2.dp.toFloat(); setColor(Palette.alpha(Palette.accent, 22)); setStroke(1.dp, Palette.accent) }, null)
+        dock?.addView(text(L10n.text(R.string.continue_action), 16f, Palette.onAccent, 600).apply {
+            gravity = Gravity.CENTER; setPadding(18.dp, 0, 18.dp, 0); isClickable = true; maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+            background = RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.onAccent, 40)), rounded(Palette.accent, 16), null)
             setOnClickListener { if (!busy) { getSharedPreferences("preferences", MODE_PRIVATE).edit().putBoolean("onboardPicked", true).apply(); render() } }
         }, LinearLayout.LayoutParams(-1, 54.dp).apply { topMargin = 10.dp; bottomMargin = 12.dp })
     }
@@ -980,7 +943,7 @@ class MainActivity : Activity() {
         add(PixelMark(this), height = 96.dp, width = 96.dp, top = 48, gravity = Gravity.CENTER_HORIZONTAL)
         add(wordmark(30f).apply { gravity = Gravity.CENTER; accessibilityHeading() }, top = 22)
         add(text(L10n.text(R.string.sign_in_tagline), 14f, Palette.secondary).apply { gravity = Gravity.CENTER }, top = 8, bottom = 36)
-        add(sectionRow(R.string.section_sign_in, if (onboarded) null else 1), bottom = 12)
+        add(sectionRow(if (onboarded) null else 1), bottom = 12)
         val server = if (BuildConfig.API_ORIGIN.isEmpty()) {
             fieldLabel(L10n.text(R.string.server_address))
             add(field(L10n.text(R.string.server_address_url), api.origin, InputType.TYPE_TEXT_VARIATION_URI), height = 50.dp, bottom = 14) as EditText
@@ -1038,7 +1001,7 @@ class MainActivity : Activity() {
             addView(icon(R.drawable.ic_refresh, Palette.secondary, 20), FrameLayout.LayoutParams(20.dp, 20.dp, Gravity.CENTER))
             layoutParams = LinearLayout.LayoutParams(44.dp, 44.dp)
         }
-        pageTitle(L10n.text(R.string.locations), retest, R.string.section_locations)
+        pageTitle(L10n.text(R.string.locations), retest)
         routingChoice()
         val search = FrameLayout(this).also { add(it) }
         val automatic = selectedId.isEmpty()
@@ -1325,7 +1288,7 @@ class MainActivity : Activity() {
         }.start()
     }
     private fun account() {
-        pageTitle(L10n.text(R.string.account), section = R.string.section_account)
+        pageTitle(L10n.text(R.string.account))
         withAccount { data ->
             val email = data.optString("email"); val name = data.optString("name").ifBlank { email }
             add(LinearLayout(this).apply {
@@ -1487,13 +1450,13 @@ class MainActivity : Activity() {
         }
     }
     private fun radio(on: Boolean) = FrameLayout(this).apply {
-        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setStroke((1.5f * resources.displayMetrics.density).toInt(), if (on) Palette.accent else Palette.faint) }
-        if (on) addView(View(this@MainActivity).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Palette.accent) } }, FrameLayout.LayoutParams(9.dp, 9.dp, Gravity.CENTER))
+        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (on) Palette.accent else Palette.selected) }
+        if (on) addView(View(this@MainActivity).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Palette.onAccent) } }, FrameLayout.LayoutParams(7.dp, 7.dp, Gravity.CENTER))
     }
     private fun checkbox(box: FrameLayout, on: Boolean) {
         box.removeAllViews()
-        box.background = GradientDrawable().apply { cornerRadius = 4.dp.toFloat(); setColor(if (on) Palette.alpha(Palette.accent, 30) else Color.TRANSPARENT); setStroke((1.5f * resources.displayMetrics.density).toInt(), if (on) Palette.accent else Palette.faint) }
-        if (on) box.addView(icon(R.drawable.ic_check, Palette.accent, 14), FrameLayout.LayoutParams(14.dp, 14.dp, Gravity.CENTER))
+        box.background = rounded(if (on) Palette.accent else Palette.selected, 5)
+        if (on) box.addView(icon(R.drawable.ic_check, Palette.onAccent, 14), FrameLayout.LayoutParams(14.dp, 14.dp, Gravity.CENTER))
     }
     private fun appsPage() {
         subPageTitle(L10n.text(R.string.per_app_routing)) { page = "account"; render() }

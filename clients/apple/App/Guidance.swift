@@ -64,7 +64,7 @@ struct StepMarks:View {
                 Group {
                     if i<step {Rectangle().fill(VeilbirdStyle.text.opacity(0.75))}
                     else if i==step {Rectangle().fill(VeilbirdStyle.accent)}
-                    else {Rectangle().strokeBorder(VeilbirdStyle.faint.opacity(0.6),lineWidth:1)}
+                    else {Rectangle().fill(VeilbirdStyle.selected)}
                 }.frame(width:6,height:6)
             }
             Text(verbatim:step>3 ? L10n.text("onboarding_ready"):L10n.number(step)+"/3")
@@ -73,33 +73,33 @@ struct StepMarks:View {
     }
 }
 
-/// A page's § label with the first-run step on the right.
+/// During the first run, the step on the right (three squares and "n/3"); afterwards nothing. [key] is kept for the
+/// call sites but no longer shown: the § labels are gone.
 struct SectionRow:View {
     let key:String
     let step:Int?
     var body:some View {
         HStack(spacing:8) {
-            SectionLabel(key:key)
+            Spacer(minLength:0)
             if let step {StepMarks(step:step).padding(.trailing,4)}
         }
     }
 }
 
-/// A quiet amber-outlined note: what is about to happen, then what to do.
+/// A quiet amber-tinted note: what is about to happen, then what to do.
 struct FirstNote:View {
     let title:String
     let detail:String
     var body:some View {
         HStack(alignment:.top,spacing:12) {
-            Text(verbatim:"i").font(.system(size:11,weight:.semibold,design:.monospaced)).foregroundStyle(VeilbirdStyle.accent)
-                .frame(width:18,height:18).overlay(RoundedRectangle(cornerRadius:2).strokeBorder(VeilbirdStyle.accent,lineWidth:1)).padding(.top,1)
+            Text(verbatim:"i").font(.system(size:11,weight:.semibold,design:.monospaced)).foregroundStyle(VeilbirdStyle.onAccent)
+                .frame(width:18,height:18).background(VeilbirdStyle.accent,in:Circle()).padding(.top,1)
             VStack(alignment:.leading,spacing:2) {
                 Text(title).font(.system(size:VeilbirdStyle.mac ? 12:13)).fixedSize(horizontal:false,vertical:true)
                 Text(detail).font(.system(size:VeilbirdStyle.mac ? 11:12)).foregroundStyle(VeilbirdStyle.secondary).fixedSize(horizontal:false,vertical:true)
             }.frame(maxWidth:.infinity,alignment:.leading)
         }.padding(.horizontal,12).padding(.vertical,10)
-        .background(VeilbirdStyle.accent.opacity(0.06),in:RoundedRectangle(cornerRadius:4))
-        .overlay(RoundedRectangle(cornerRadius:4).strokeBorder(VeilbirdStyle.accent.opacity(0.35),lineWidth:1))
+        .background(VeilbirdStyle.accent.opacity(0.09),in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
         .accessibilityElement(children:.combine)
     }
 }
@@ -184,7 +184,9 @@ extension ClientModel {
         case .reconnecting:return L10n.text(status == "location_retrying" ? "location_retrying":"reconnecting_detail")
         case .waiting:return L10n.text("waiting_detail")
         case .failed:return trouble?.detail ?? failure
-        case .idle:return L10n.text(update?.mandatory == true ? "update_required_detail":"exposed_detail")
+        case .idle:
+            if update?.mandatory == true {return L10n.text("update_required_detail")}
+            return visitorIP.map {L10n.text("exposed_ip",$0)} ?? L10n.text("exposed_plain")
         }
     }
     var actionLabel:String {

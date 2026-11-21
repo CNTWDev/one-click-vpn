@@ -2163,5 +2163,15 @@
     "zh": "账号提醒",
     "en": "Account reminders",
     "ru": "Напоминания об аккаунте"
+  },
+  "exposed_ip": {
+    "zh": "网站能看到你的真实 IP：{0}",
+    "en": "Sites can see your real IP: {0}",
+    "ru": "Сайты видят ваш настоящий IP: {0}"
+  },
+  "exposed_plain": {
+    "zh": "网站能看到你的真实 IP",
+    "en": "Sites can see your real IP",
+    "ru": "Сайты видят ваш настоящий IP"
   }
 }

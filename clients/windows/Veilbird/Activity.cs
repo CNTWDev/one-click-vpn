@@ -118,7 +118,7 @@ public sealed class ActivityPanel:Border {
             if(brush is not null) content.Children.Add(new Rectangle {Width=6,Height=6,Fill=brush,Margin=new Thickness(0,0,6,0),VerticalAlignment=VerticalAlignment.Center});
             content.Children.Add(new TextBlock {Text=L10n.Text(label),FontSize=12,Foreground=on?Look.Text:Look.Secondary,VerticalAlignment=VerticalAlignment.Center});
             content.Children.Add(new TextBlock {Text=number.ToString(L10n.Culture),FontFamily=Mono,FontSize=11,Foreground=on?Look.Text:Look.Secondary,Margin=new Thickness(6,0,0,0),VerticalAlignment=VerticalAlignment.Center});
-            var chip=new Button {Content=content,Height=26,Padding=new Thickness(10,0,10,0),Margin=new Thickness(0,0,6,0),BorderThickness=new Thickness(1),BorderBrush=on?Look.Accent:Look.Hex("#2C2924")};
+            var chip=new Button {Content=content,Height=26,Padding=new Thickness(10,0,10,0),Margin=new Thickness(0,0,6,0),Background=on?Look.Selected:Look.Surface};
             chip.Click+=(_,_)=>{filter=key;Fill();};
             chips.Children.Add(chip);
         }
@@ -147,7 +147,7 @@ public sealed class ActivityPanel:Border {
     }
 
     private (long Proxy,long Direct) Split()=>(Num(data?["proxy"]),Num(data?["direct"]));
-    private static Border CardOf(UIElement child,Thickness? margin=null)=>new() {Background=Card,BorderBrush=Line,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(3),Padding=new Thickness(18,16,18,16),Child=child,Margin=margin??new Thickness(0)};
+    private static Border CardOf(UIElement child,Thickness? margin=null)=>new() {Background=Card,CornerRadius=new CornerRadius(10),Padding=new Thickness(18,16,18,16),Child=child,Margin=margin??new Thickness(0)};
     private static FrameworkElement Legend(bool proxy,long bytes,bool free=false) {
         var line=new TextBlock {FontSize=12,Foreground=proxy?Look.Text:Look.Secondary,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.NoWrap};
         line.Inlines.Add(new Run("■ ") {Foreground=proxy?Look.Accent:Direct});

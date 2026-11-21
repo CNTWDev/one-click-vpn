@@ -2,7 +2,7 @@ import SwiftUI
 import CoreText
 
 /// The one palette of the app, shared with the Portal and the other clients: a warm near-black ground lit by one lamp,
-/// hairline sheets, and amber only for the light of the connect moment (scan line, seal, live state). Same values on
+/// soft filled cards (never outlines), and amber only for the light of the connect moment (scan line, seal, live state). Same values on
 /// every platform.
 enum VeilbirdStyle {
     /// "amber" (the default) or "moon", a softer look where the light is pearl to rose; chosen in Account → Appearance.
@@ -19,13 +19,11 @@ enum VeilbirdStyle {
     static var secondary:Color {moon ? rgb(172,160,162):rgb(163,155,145)}
     static var faint:Color {moon ? rgb(152,138,142):rgb(149,139,124)}
     static var accent:Color {moon ? rgb(235,184,195):rgb(224,164,88)}
-    /// Buttons are outlined, not filled: text on an "accent" control is the accent itself.
-    static var onAccent:Color {accent}
+    /// Buttons and cards are filled, never outlined: text on an amber (or pink) control is near-black.
+    static var onAccent:Color {moon ? rgb(38,20,26):rgb(28,19,7)}
     static let danger = Color(red:240/255,green:103/255,blue:90/255)
     static var fair:Color {moon ? rgb(226,150,120):rgb(232,134,106)}
     static var hairline:Color {text.opacity(0.063)}
-    /// Sheet outline: blocks are a hairline on the ground, not a filled card.
-    static var edge:Color {light.opacity(0.09)}
     /// Lamp light and sealed dots.
     static var light:Color {moon ? rgb(248,226,230):rgb(255,214,160)}
     /// Past figures in charts (the accent, dimmed).
@@ -39,7 +37,7 @@ enum VeilbirdStyle {
     static let body:CGFloat = mac ? 13:17
     static let detail:CGFloat = mac ? 12:13
     /// Nearly square, like the sheets of a file.
-    static let radius:CGFloat = 3
+    static let radius:CGFloat = mac ? 10:14
 }
 
 /// The pixel language shared by every TrackNothing client: the ∅ mark, rings of square dots and the Doto dot-matrix
@@ -164,12 +162,11 @@ struct Badge:View {
     var icon:String?=nil
     var tint:Color=VeilbirdStyle.text
     var size:CGFloat=VeilbirdStyle.mac ? 30:36
-    /// The selected location's tile: an amber outline and code, so the row needs no extra mark.
+    /// The selected location's tile: solid amber with a dark code, so the row needs no extra mark.
     var selected=false
     var body:some View {
         ZStack {
-            RoundedRectangle(cornerRadius:2).fill(selected ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.raised)
-                .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(selected ? VeilbirdStyle.accent.opacity(0.7):Color.clear,lineWidth:1))
+            RoundedRectangle(cornerRadius:VeilbirdStyle.mac ? 7:9).fill(selected ? VeilbirdStyle.accent:VeilbirdStyle.raised)
             if let icon {Image(systemName:icon).font(.system(size:size*0.44,weight:.medium)).foregroundStyle(selected ? VeilbirdStyle.onAccent:tint)}
             else {Text(code ?? "").font(Pixel.font(size*0.42)).foregroundStyle(selected ? VeilbirdStyle.onAccent:(tint == VeilbirdStyle.text ? VeilbirdStyle.accent:tint))}
         }.frame(width:size,height:size).accessibilityHidden(true)
@@ -258,9 +255,9 @@ struct RateBars:View {
 }
 
 extension View {
-    /// A card: a hairline outline on the ground (same as the Portal and Console), no fill.
+    /// A card: a soft filled block on the ground, no outline.
     func cardOutline(_ radius:CGFloat)->some View {
-        overlay(RoundedRectangle(cornerRadius:radius).strokeBorder(VeilbirdStyle.edge,lineWidth:1))
+        background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:radius))
     }
 }
 
@@ -287,9 +284,8 @@ struct PrimaryButton:ButtonStyle {
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration:Configuration)->some View {
         configuration.label.font(.system(size:VeilbirdStyle.mac ? 14:17,weight:.semibold)).frame(maxWidth:.infinity).frame(height:VeilbirdStyle.mac ? 40:52)
-            // Outlined, not filled: the accent is light, not paint.
-            .foregroundStyle(VeilbirdStyle.accent).background(VeilbirdStyle.accent.opacity(configuration.isPressed ? 0.14:0.06),in:RoundedRectangle(cornerRadius:2))
-            .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(VeilbirdStyle.accent.opacity(0.7),lineWidth:1))
+            // Filled: solid amber with dark text, no outline.
+            .foregroundStyle(VeilbirdStyle.onAccent).background(VeilbirdStyle.accent.opacity(configuration.isPressed ? 0.85:1),in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
             .opacity(enabled ? 1:0.45)
     }
 }

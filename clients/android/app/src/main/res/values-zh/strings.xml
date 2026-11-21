@@ -185,6 +185,8 @@
   <string name="error_update_detail">这个版本已停止支持，更新后就能继续连接。</string>
   <string name="error_update_title">需要更新</string>
   <string name="exposed_detail">任何网站此刻都能看到上面这些</string>
+  <string name="exposed_ip">网站能看到你的真实 IP：%1$s</string>
+  <string name="exposed_plain">网站能看到你的真实 IP</string>
   <string name="exposed_status">未隐身</string>
   <string name="extension_guide_continue">继续</string>
   <string name="extension_guide_detail">TrackNothing 用 macOS 的网络扩展建立加密连接，第一次要你亲手打开开关。\n\n点「继续」后会打开系统设置：在「通用 › 登录项与扩展 › 网络扩展」里打开 TrackNothing，打开后自动连接。\n\nmacOS 同时会弹出一个提示框，点里面的「好」只是关掉它，并不会开启。</string>
@@ -422,7 +424,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">这一版汇总了最近的改进：第一次使用三步上手，连接状态三端统一，连不上时直接说原因并给出解决按钮\n流量快用完或账号快到期时提前提醒；安卓和 Windows 支持按应用分流\n更省电、更省内存，启动更快</string>
+  <string name="whats_new_notes">安卓首页一屏放下：中间的球按屏幕高度自动缩放，任何手机都不用滑动\n首页更简洁：去掉看不懂的小字，直接告诉你网站能看到的 IP；主按钮改成实底\n安卓、Mac、Windows 全部去掉描边，卡片和按钮改为柔和的实底；Mac 和 Windows 首页同样精简</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>

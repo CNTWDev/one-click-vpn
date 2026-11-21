@@ -4233,6 +4233,52 @@
         }
       }
     },
+    "exposed_ip": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sites can see your real IP: %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网站能看到你的真实 IP：%1$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сайты видят ваш настоящий IP: %1$@"
+          }
+        }
+      }
+    },
+    "exposed_plain": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sites can see your real IP"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网站能看到你的真实 IP"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сайты видят ваш настоящий IP"
+          }
+        }
+      }
+    },
     "exposed_status": {
       "extractionState": "manual",
       "localizations": {
@@ -9690,19 +9736,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This release brings together recent improvements: a three-step first run, the same connection states on every device, and errors that name the cause with a button that fixes it\nReminders before your traffic or access runs out; per-app routing on Android and Windows\nLower battery and memory use, and faster startup"
+            "value": "The Android home screen now fits on one screen: the sphere scales with the screen height, so nothing needs scrolling\nA simpler home: no more cryptic small print, just the IP sites can see; the main button is now solid\nNo more outlines on Android, Mac or Windows: cards and buttons use soft solid fills, and the Mac and Windows home is simpler too"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这一版汇总了最近的改进：第一次使用三步上手，连接状态三端统一，连不上时直接说原因并给出解决按钮\n流量快用完或账号快到期时提前提醒；安卓和 Windows 支持按应用分流\n更省电、更省内存，启动更快"
+            "value": "安卓首页一屏放下：中间的球按屏幕高度自动缩放，任何手机都不用滑动\n首页更简洁：去掉看不懂的小字，直接告诉你网站能看到的 IP；主按钮改成实底\n安卓、Mac、Windows 全部去掉描边，卡片和按钮改为柔和的实底；Mac 和 Windows 首页同样精简"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "В этой версии собраны последние улучшения: первый запуск в три шага, одинаковые состояния подключения на всех устройствах и ошибки, которые называют причину и предлагают кнопку для её устранения\nНапоминания, когда трафик или срок подходят к концу; выбор приложений для VPN на Android и Windows\nМеньше расход батареи и памяти, быстрее запуск"
+            "value": "Главный экран Android помещается целиком: шар подстраивается под высоту экрана, прокручивать не нужно\nГлавный экран проще: без непонятной мелкой подписи, только IP, который видят сайты; основная кнопка теперь залитая\nНа Android, Mac и Windows больше нет рамок: карточки и кнопки с мягкой заливкой, главный экран Mac и Windows тоже проще"
           }
         }
       }

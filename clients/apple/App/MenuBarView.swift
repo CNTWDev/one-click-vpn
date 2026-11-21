@@ -26,7 +26,6 @@ struct MenuBarView:View {
                 PixelMark(size:16)
                 Wordmark(size:14)
                 Spacer()
-                Text(verbatim:"№ "+FileHeader.number(model.account["email"] as? String ?? "")).font(.system(size:11,design:.monospaced)).tracking(0.9).foregroundStyle(VeilbirdStyle.faint)
             }.padding(.horizontal,4)
             if model.signedIn {
                 // The connect page in small: the state with its seal, one slot for time and rates or a message, one action.
@@ -35,28 +34,26 @@ struct MenuBarView:View {
                     menuPortrait(on)
                     // The state (or the cause of a failure) and two lines held for its detail: one height in every state.
                     VStack(alignment:.leading,spacing:3) {
-                        Text(model.stateTitle).font(.system(size:20,weight:.light,design:.serif))
+                        Text(model.stateTitle).font(.system(size:20,weight:.light))
                             .foregroundStyle(model.ringState == .failed ? VeilbirdStyle.fair:(on ? VeilbirdStyle.accent:VeilbirdStyle.text)).lineLimit(1)
                         Text(model.stateDetail).font(.system(size:11)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2,reservesSpace:true)
                             .frame(maxWidth:.infinity,alignment:.leading)
                     }.padding(.horizontal,4).animation(.easeInOut(duration:0.2),value:model.ringState)
                     HStack(spacing:8) {
                         Button {act(model.trouble?.primaryDo)} label:{
-                            HStack {
-                                Text(model.actionLabel).font(.system(size:13,weight:.medium)).lineLimit(1)
-                                Spacer(minLength:8)
-                                BreathingDot(on:model.connected)
-                            }.padding(.horizontal,14).frame(height:40).contentShape(Rectangle())
-                            .foregroundStyle(on ? VeilbirdStyle.accent:VeilbirdStyle.text)
-                            .background(on ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.accent.opacity(0.09))
-                            .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(on ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.accent,lineWidth:1))
+                            HStack(spacing:8) {
+                                if on {BreathingDot(on:true)}
+                                Text(model.actionLabel).font(.system(size:13,weight:.semibold)).lineLimit(1)
+                            }.padding(.horizontal,14).frame(maxWidth:.infinity).frame(height:40).contentShape(Rectangle())
+                            .foregroundStyle(on ? VeilbirdStyle.text:VeilbirdStyle.onAccent)
+                            .background(on ? VeilbirdStyle.raised:VeilbirdStyle.accent,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
                         }.buttonStyle(.plain)
                         .accessibilityLabel(model.ringState == .failed ? model.actionLabel:L10n.text(model.connected ? (model.since == nil ? "cancel":"disconnect_action"):"connect_action"))
                         if let trouble=model.trouble,let second=trouble.secondary {
                             Button {act(trouble.secondaryDo)} label:{
-                                Text(second).font(.system(size:13)).lineLimit(1).fixedSize().foregroundStyle(VeilbirdStyle.secondary)
-                                    .padding(.horizontal,12).frame(height:40).contentShape(Rectangle())
-                                    .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(VeilbirdStyle.hairline,lineWidth:1))
+                                Text(second).font(.system(size:13,weight:.medium)).lineLimit(1).fixedSize().foregroundStyle(VeilbirdStyle.text)
+                                    .padding(.horizontal,14).frame(height:40).contentShape(Rectangle())
+                                    .background(VeilbirdStyle.raised,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
                             }.buttonStyle(.plain)
                         }
                     }
@@ -98,6 +95,7 @@ struct MenuBarView:View {
         }.padding(.horizontal,12).padding(.top,14).padding(.bottom,8).frame(width:320)
         .background(VeilbirdStyle.ground).foregroundStyle(VeilbirdStyle.text).preferredColorScheme(.dark)
         .environment(\.locale, L10n.locale).id(appearance).task {try? await model.loadAccount()}
+        .task {if model.visitorIP == nil && !model.connected {model.visitorIP=try? await model.api().visitorAddress()}}
         .onExitCommand {if picking {setPicking(false)}}
         .onAppear {model.showing(true)}
         .onDisappear {picking=false;model.showing(false)}
@@ -186,7 +184,7 @@ struct MenuBarView:View {
         Button {toggle()} label:{
             TimelineView(.periodic(from:.now,by:1)) {context in
                 let state=model.ringState
-                PortraitView(hidden:model.connected || state == .reconnecting,invite:L10n.text(state == .failed ? "tap_to_retry":"tap_to_hide"),since:on ? model.since:nil,
+                PortraitView(hidden:model.connected || state == .reconnecting,invite:"",since:on ? model.since:nil,
                     sub:model.portraitSub(state,rates:L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))),state:state,lines:model.lines,centre:model.portraitCentre(state,now:context.date))
             }.frame(maxWidth:.infinity).frame(height:150).contentShape(Circle())
         }.buttonStyle(.plain).accessibilityLabel(L10n.text(model.connected ? "disconnect_action":"connect_action"))
