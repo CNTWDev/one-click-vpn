@@ -443,6 +443,21 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .form-grid label > small, .stack-form > small, .stack-form label > small { display: block; margin-top: 6px; color: var(--text-3); font-size: 13px; font-weight: 400; line-height: 1.55; overflow-wrap: anywhere; }
 .stack-form input[readonly] { color: var(--text-2); background: var(--surface-2); cursor: default; }
 .stack-form { display: grid; gap: 16px; }
+/* SearchSelect: a select you can type into. The list is portalled to <body> and placed under the field. */
+.search-select { position: relative; margin-top: 6px; }
+.search-select input { padding-right: 36px; text-overflow: ellipsis; cursor: pointer; }
+.search-select input:focus { cursor: text; }
+.search-select-icon { position: absolute; top: 12px; right: 12px; display: flex; color: var(--text-3); pointer-events: none; }
+.search-select-list { position: fixed; z-index: 210; overflow-y: auto; overscroll-behavior: contain; padding: 6px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg); }
+.search-select-group { padding: 10px 10px 4px; color: var(--text-3); font-size: 12px; font-weight: 500; }
+.search-select-group:first-child { padding-top: 4px; }
+.search-select-option { min-height: 36px; padding: 7px 10px; display: flex; align-items: center; gap: 10px; color: var(--text); border-radius: 6px; font-size: 14px; line-height: 1.35; cursor: pointer; }
+.search-select-option > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.search-select-option > small { flex: none; max-width: 45%; color: var(--text-3); font-size: 12px; text-align: right; overflow-wrap: anywhere; }
+.search-select-option > .icon { flex: none; color: var(--accent); }
+.search-select-option.active { background: var(--hover); }
+.search-select-option.pinned { margin-top: 4px; color: var(--text-2); border-top: 1px solid var(--border); border-radius: 0 0 6px 6px; }
+.search-select-empty { margin: 0; padding: 10px; color: var(--text-3); font-size: 13px; line-height: 1.5; }
 .split-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .mail-server-fields { grid-template-columns: minmax(0, 1fr) 7rem; }
 .mail-actions > .danger-text { margin-right: auto; }

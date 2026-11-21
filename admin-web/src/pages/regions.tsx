@@ -1,9 +1,10 @@
 import { t, useConsoleLanguage } from "../i18n";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { api } from "../api";
 import { useConfirm } from "../confirm-dialog";
 import { useToast } from "../toast";
-import { countryName, countryOptions, presetGroups, regionPresets, localizedCountryLabel, localizedPresetLabel } from "../region-catalog";
+import { countryName, countryOptions, countrySearchOption, presetGroups, presetSearchOption, regionPresets } from "../region-catalog";
+import { type SearchOption, SearchSelect } from "../search-select";
 import { href } from "../router";
 import type { NodeRecord, Region } from "../types";
 import { Empty, InlineNotice, type Notice, PageHeader } from "./shared";
@@ -17,6 +18,18 @@ export function RegionsPage({ regions, nodes, onRefresh }: { regions: Region[]; 
   const [notice, setNotice] = useState<Notice | null>(null);
   const confirm = useConfirm();
   const toast = useToast();
+  const locations = useMemo<SearchOption[]>(() => {
+    const countries = t("全球国家 / 地区");
+    return [
+      ...[...regionPresets].sort((a, b) => presetGroups.indexOf(a.group) - presetGroups.indexOf(b.group)).map((item) => { const option = presetSearchOption(item, locale); return { ...option, value: `preset:${item.id}`, group: t("常用机房 · {0}", [t(item.group)]), keys: `${option.keys} ${item.group} ${t(item.group)}` }; }),
+      ...countryOptions.map((item) => ({ ...countrySearchOption(item.code, locale), value: `country:${item.code}`, group: countries })).sort((a, b) => a.label.localeCompare(b.label, locale)),
+      { value: "custom", label: t("自定义位置（城市未列出）"), pinned: true },
+    ];
+  }, [locale]);
+  const countries = useMemo<SearchOption[]>(() => {
+    const known = countryOptions.map((item) => ({ ...countrySearchOption(item.code, locale), value: item.code })).sort((a, b) => a.label.localeCompare(b.label, locale));
+    return form.code && !countryOptions.some((item) => item.code === form.code) ? [{ value: form.code, label: form.country, detail: form.code }, ...known] : known;
+  }, [locale, form.code, form.country]);
 
   function edit(region: Region) {
     const preset = regionPresets.find((item) => item.name === region.name && item.code === region.code);
@@ -64,7 +77,7 @@ export function RegionsPage({ regions, nodes, onRefresh }: { regions: Region[]; 
     <InlineNotice notice={notice} />
     <div className="region-layout">
       <section className="panel"><div className="panel-head"><h2>{t("区域列表")}</h2><span className="count-badge">{regions.length}</span></div>{regions.length ? <div className="region-list">{regions.map((region) => <article key={region.id}><span className="region-code">{region.code}</span><span className="grow"><b>{region.name}</b><small>{region.country} · <a href={href("nodes", { q: region.name })}>{t("{0} 个节点", [nodes.filter((node) => node.region_id === region.id).length])}</a></small></span><span className="row-actions"><button className="text-button" onClick={() => edit(region)}>{t("编辑")}</button><button className="text-button danger-text" onClick={() => void remove(region)}>{t("删除")}</button></span></article>)}</div> : <Empty>{t("尚未创建区域，请在右侧选择服务器位置创建。")}</Empty>}</section>
-      <section className="panel sticky-panel"><div className="panel-head"><h2>{editing ? t("编辑区域") : t("创建区域")}</h2></div><form className="stack-form" onSubmit={save}><label>{t("服务器位置")}<select required value={locationChoice} onChange={(event) => chooseLocation(event.target.value)}><option value="">{t("请选择服务器所在地")}</option>{presetGroups.map((group) => <optgroup key={group} label={t("常用机房 · {0}", [t(group)])}>{regionPresets.filter((item) => item.group === group).map((item) => <option key={item.id} value={`preset:${item.id}`}>{localizedPresetLabel(item, locale)}</option>)}</optgroup>)}<optgroup label={t("全球国家 / 地区")}>{countryOptions.map((item) => <option key={item.code} value={`country:${item.code}`}>{localizedCountryLabel(item.code, locale)}</option>)}</optgroup><option value="custom">{t("自定义位置（城市未列出）")}</option></select><small>{t("选择城市、州或国家后自动填写；同一国家可以添加多个区域，未列出的位置可自定义。")}</small></label><label>{t("城市 / 区域显示名称")}<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder={t("例如 Tokyo、US West")} /></label>{locationChoice === "custom" ? <label>{t("国家 / 地区")}<select required value={form.code} onChange={(event) => chooseCountry(event.target.value)}><option value="">{t("请选择国家 / 地区")}</option>{form.code && !countryOptions.some((item) => item.code === form.code) && <option value={form.code}>{form.country} ({form.code})</option>}{countryOptions.map((item) => <option key={item.code} value={item.code}>{localizedCountryLabel(item.code, locale)}</option>)}</select></label> : <label>{t("国家 / 地区")}<input required readOnly value={form.country} placeholder={t("自动填写")} /></label>}<label>{t("国家 / 地区代码（ISO）")}<input required readOnly value={form.code} placeholder={t("自动填写")} /></label><div className="form-actions">{editing && <button type="button" className="button ghost" onClick={clear}>{t("取消")}</button>}<button className="button primary" disabled={busy}>{busy ? t("保存中…") : t("保存区域")}</button></div></form></section>
+      <section className="panel sticky-panel"><div className="panel-head"><h2>{editing ? t("编辑区域") : t("创建区域")}</h2></div><form className="stack-form" onSubmit={save}><label>{t("服务器位置")}<SearchSelect required ariaLabel={t("服务器位置")} options={locations} value={locationChoice} onChange={chooseLocation} placeholder={t("请选择服务器所在地")} searchPlaceholder={t("搜索城市、国家或代码")} emptyText={t("没有匹配的位置，可以选择自定义位置。")} /><small>{t("选择城市、州或国家后自动填写；同一国家可以添加多个区域，未列出的位置可自定义。")}</small></label><label>{t("城市 / 区域显示名称")}<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder={t("例如 Tokyo、US West")} /></label>{locationChoice === "custom" ? <label>{t("国家 / 地区")}<SearchSelect required ariaLabel={t("国家 / 地区")} options={countries} value={form.code} onChange={chooseCountry} placeholder={t("请选择国家 / 地区")} searchPlaceholder={t("搜索国家或代码")} emptyText={t("没有匹配的国家 / 地区。")} /></label> : <label>{t("国家 / 地区")}<input required readOnly value={form.country} placeholder={t("自动填写")} /></label>}<label>{t("国家 / 地区代码（ISO）")}<input required readOnly value={form.code} placeholder={t("自动填写")} /></label><div className="form-actions">{editing && <button type="button" className="button ghost" onClick={clear}>{t("取消")}</button>}<button className="button primary" disabled={busy}>{busy ? t("保存中…") : t("保存区域")}</button></div></form></section>
     </div>
   </>;
 }

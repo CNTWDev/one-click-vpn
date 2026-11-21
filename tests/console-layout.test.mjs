@@ -39,6 +39,10 @@ const views = [
   { name: "services-policy", hash: "services?tab=policy" },
   { name: "services-reality", hash: "services?tab=reality" },
   { name: "regions", hash: "regions" },
+  // Searchable location picker: the full list, a query that spans several continents, and one with no match.
+  { name: "regions-picker", hash: "regions", modal: false, open: (page, l) => page.getByRole("combobox", { name: tr(l, "服务器位置") }).click() },
+  { name: "regions-search", hash: "regions", modal: false, open: async (page, l) => { await page.getByRole("combobox", { name: tr(l, "服务器位置") }).click(); await page.keyboard.type("san"); await page.keyboard.press("ArrowDown"); } },
+  { name: "regions-search-empty", hash: "regions", modal: false, open: async (page, l) => { await page.getByRole("combobox", { name: tr(l, "服务器位置") }).click(); await page.keyboard.type("zzzz"); } },
   { name: "controller", hash: "controller" },
   { name: "sites", hash: "sites" },
   { name: "sites-checked", hash: "sites", open: async (page, l) => { await page.getByRole("button", { name: tr(l, "检查域名") }).nth(1).click(); await page.locator(".site-check").first().waitFor(); }, modal: false },
