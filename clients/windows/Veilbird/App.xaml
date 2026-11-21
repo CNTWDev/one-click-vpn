@@ -9,7 +9,7 @@
     <SolidColorBrush x:Key="Secondary" Color="#A39B91"/>
     <SolidColorBrush x:Key="Faint" Color="#958B7C"/>
     <SolidColorBrush x:Key="Accent" Color="#E0A458"/>
-    <SolidColorBrush x:Key="OnAccent" Color="#E0A458"/>
+    <SolidColorBrush x:Key="OnAccent" Color="#1C1307"/>
     <SolidColorBrush x:Key="Danger" Color="#F0675A"/>
     <SolidColorBrush x:Key="Hover" Color="#0FEDE7DF"/>
     <SolidColorBrush x:Key="Pressed" Color="#08EDE7DF"/>
@@ -24,8 +24,8 @@
       <Setter Property="FontSize" Value="14"/><Setter Property="Padding" Value="14,0"/><Setter Property="BorderThickness" Value="0"/>
       <Setter Property="Cursor" Value="Hand"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
-        <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="3" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
-          <Border x:Name="Wash" Background="Transparent" CornerRadius="3" Padding="{TemplateBinding Padding}">
+        <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="10" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+          <Border x:Name="Wash" Background="Transparent" CornerRadius="10" Padding="{TemplateBinding Padding}">
             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
           </Border>
         </Border>
@@ -48,13 +48,13 @@
     <Style x:Key="Switch" TargetType="ToggleButton">
       <Setter Property="Cursor" Value="Hand"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
-        <Border x:Name="Track" Width="40" Height="20" CornerRadius="3" Background="Transparent" BorderBrush="{DynamicResource Secondary}" BorderThickness="1" Padding="3">
+        <Border x:Name="Track" Width="40" Height="20" CornerRadius="10" Background="{DynamicResource Selected}" Padding="4">
           <Ellipse x:Name="Knob" Width="12" Height="12" Fill="{DynamicResource Secondary}" HorizontalAlignment="Left"/>
         </Border>
         <ControlTemplate.Triggers>
           <Trigger Property="IsChecked" Value="True">
-            <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentWash}"/><Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Accent}"/>
-            <Setter TargetName="Knob" Property="Fill" Value="{DynamicResource Accent}"/><Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
+            <Setter TargetName="Track" Property="Background" Value="{DynamicResource Accent}"/>
+            <Setter TargetName="Knob" Property="Fill" Value="{DynamicResource OnAccent}"/><Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
           </Trigger>
           <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Track" Property="Opacity" Value="0.45"/></Trigger>
         </ControlTemplate.Triggers>

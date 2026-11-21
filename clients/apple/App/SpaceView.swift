@@ -16,18 +16,6 @@ struct SpaceView:View {
                     .opacity(lit ? 1:0).animation(reduceMotion ? nil:.easeOut(duration:1.6),value:lit)
             }
         }.ignoresSafeArea()
-        .overlay(CropMarks().stroke(VeilbirdStyle.light.opacity(0.26),lineWidth:1).padding(10))
         .accessibilityHidden(true).allowsHitTesting(false)
-    }
-}
-
-/// Four corner marks, 12 pt long, inside the safe area.
-struct CropMarks:Shape {
-    func path(in rect:CGRect)->Path {
-        var p=Path(); let l:CGFloat=12
-        for (x,y,dx,dy) in [(rect.minX,rect.minY,1.0,1.0),(rect.maxX,rect.minY,-1.0,1.0),(rect.minX,rect.maxY,1.0,-1.0),(rect.maxX,rect.maxY,-1.0,-1.0)] {
-            p.move(to:CGPoint(x:x+l*dx,y:y));p.addLine(to:CGPoint(x:x,y:y));p.addLine(to:CGPoint(x:x,y:y+l*dy))
-        }
-        return p
     }
 }

@@ -12,6 +12,8 @@ import ServiceManagement
 
 @MainActor final class ClientModel:ObservableObject {
     @Published var signedIn=false
+    /// The public address the service sees, read once while not connected (afterwards it would be the location's).
+    @Published var visitorIP:String?
     @Published var busy=false
     @Published var message=""
     /// A system permission the connection waits on; the connect page keeps a note about it until it is granted.

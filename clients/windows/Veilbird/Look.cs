@@ -36,8 +36,9 @@ public static class Look {
     public static Brush Secondary=>Current.Secondary;
     public static Brush Faint=>Current.Faint;
     public static Brush Accent=>Current.Accent;
-    /// An "accent" control is outlined, not filled: OnAccent is the accent itself.
-    public static Brush OnAccent=>Current.Accent;
+    /// Controls are filled, never outlined: text on a solid amber (or pink) control is near-black.
+    public static Brush OnAccent=>Theme=="moon"?MoonInk:AmberInk;
+    private static readonly Brush AmberInk=Hex("#1C1307"),MoonInk=Hex("#26141A");
     public static Brush Fair=>Current.Fair;
     public static Brush Hairline=>Current.Hairline;
     public static Brush Edge=>Current.Edge;
@@ -57,7 +58,7 @@ public static class Look {
         Theme=theme=="moon"?"moon":"amber";Settings.Set("appearance",Theme);
         var resources=Application.Current.Resources;
         resources["Ground"]=Ground;resources["Surface"]=Surface;resources["Raised"]=Raised;resources["Selected"]=Selected;resources["Text"]=Text;
-        resources["Secondary"]=Secondary;resources["Faint"]=Faint;resources["Accent"]=Accent;resources["OnAccent"]=Accent;resources["AccentWash"]=AccentWash;resources["Hairline"]=Hairline;
+        resources["Secondary"]=Secondary;resources["Faint"]=Faint;resources["Accent"]=Accent;resources["OnAccent"]=OnAccent;resources["AccentWash"]=AccentWash;resources["Hairline"]=Hairline;
     }
     public static readonly FontFamily Icons=new("Segoe Fluent Icons, Segoe MDL2 Assets");
     /// Doto Black (SIL OFL, under Assets/Fonts), Latin only: wordmark, timers, totals and country codes.

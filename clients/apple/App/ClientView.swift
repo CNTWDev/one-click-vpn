@@ -39,7 +39,6 @@ struct ClientView:View {
     @State private var speedLine=""
     @State private var usageRange="30d"
     /// The public address the service saw before connecting, and the connect page's scan line (direction, run count).
-    @State private var visitorIP:String?
     @State private var revealEmail=false
     #if os(macOS)
     @State private var openAtLogin=SMAppService.mainApp.status == .enabled
@@ -180,7 +179,6 @@ struct ClientView:View {
             Text(model.message).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.text).textSelection(.enabled)
                 .padding(.horizontal,16).padding(.vertical,12).frame(maxWidth:520,alignment:.leading)
                 .background(VeilbirdStyle.raised,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
-                .overlay(RoundedRectangle(cornerRadius:VeilbirdStyle.radius).stroke(VeilbirdStyle.danger.opacity(0.4)))
                 .padding(.horizontal,16).padding(.bottom,mac ? 16:96)
                 .onTapGesture {model.message=""}
                 .task(id:model.message) {try? await Task.sleep(nanoseconds:5_000_000_000);model.message=""}
@@ -205,7 +203,6 @@ struct ClientView:View {
             tabItem(L10n.text("account"),"person",2)
         }.padding(.horizontal,12).padding(.top,7).padding(.bottom,2)
         .background(Color(red:8/255,green:8/255,blue:7/255).opacity(0.6).ignoresSafeArea(edges:.bottom))
-        .overlay(alignment:.top) {Rectangle().fill(VeilbirdStyle.hairline).frame(height:0.5)}
     }
     private func tabItem(_ title:String,_ icon:String,_ index:Int)->some View {
         let selected=tab==index
@@ -353,20 +350,13 @@ struct ClientView:View {
         #endif
     }
     private func titleTint(_ state:RingState)->Color {state == .failed ? VeilbirdStyle.fair:(state == .connected ? VeilbirdStyle.accent:VeilbirdStyle.text)}
-    /// Under the portrait: the address in large type and the device line, both sealing into dots while hidden.
-    private func portraitFile(_ sealed:Bool)->some View {
-        VStack(alignment:.leading,spacing:mac ? 6:10) {
-            SealedText(text:visitorIP ?? "···",sealed:sealed,delay:0.3,size:mac ? 30:38,design:.serif)
-            SealedText(text:[deviceLine,zoneLine,L10n.locale.identifier.replacingOccurrences(of:"_",with:"-")].joined(separator:"   "),sealed:sealed,delay:0.9,size:11,color:VeilbirdStyle.secondary)
-        }.frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,4).accessibilityElement(children:.combine)
-    }
     /// The state (or the cause of a failure) and two lines held for its detail (or the next step): one height in every
     /// state, so nothing below moves when a connection comes up, drops or fails.
     private func stateLine(_ state:RingState)->some View {
         VStack(alignment:.leading,spacing:4) {
-            Text(model.stateTitle).font(.system(size:mac ? 22:26,weight:.light,design:.serif))
+            Text(model.stateTitle).font(.system(size:mac ? 22:26,weight:.light))
                 .foregroundStyle(titleTint(state)).lineLimit(1).contentTransition(.opacity)
-            Text(model.stateDetail).font(.system(size:mac ? 12:13)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2, reservesSpace:true)
+            Text(model.stateDetail).font(.system(size:mac ? 13:14)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(2, reservesSpace:true)
                 .id(stateDetailKey(state)).transition(.opacity)
         }.frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,4)
     }
@@ -392,21 +382,20 @@ struct ClientView:View {
         let on=model.connected && state != .connecting
         return HStack(spacing:10) {
             Button {act(state == .failed ? model.trouble?.primaryDo:nil)} label:{
-                HStack {
-                    Text(model.actionLabel).font(.system(size:mac ? 13:15,weight:.medium)).lineLimit(1).contentTransition(.opacity)
-                    Spacer(minLength:8)
-                    BreathingDot(on:model.connected)
-                }.padding(.horizontal,18).frame(height:mac ? 44:54).contentShape(Rectangle())
-                .foregroundStyle(on ? VeilbirdStyle.accent:VeilbirdStyle.text)
-                .background(on ? VeilbirdStyle.accent.opacity(0.06):VeilbirdStyle.accent.opacity(0.09))
-                .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(on ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.accent,lineWidth:1))
+                // Filled, no outline: solid amber while exposed; a quiet dark fill with a breathing dot while hidden.
+                HStack(spacing:10) {
+                    if on {BreathingDot(on:true)}
+                    Text(model.actionLabel).font(.system(size:mac ? 14:16,weight:.semibold)).lineLimit(1).contentTransition(.opacity)
+                }.padding(.horizontal,18).frame(maxWidth:.infinity).frame(height:mac ? 44:54).contentShape(Rectangle())
+                .foregroundStyle(on ? VeilbirdStyle.text:VeilbirdStyle.onAccent)
+                .background(on ? VeilbirdStyle.raised:VeilbirdStyle.accent,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
             }.buttonStyle(.plain)
             .accessibilityLabel(state == .idle ? L10n.text("connect_action"):(state == .failed ? model.actionLabel:L10n.text(state == .connecting ? "cancel":"disconnect_action")))
             if let trouble=model.trouble,let second=trouble.secondary {
                 Button {act(trouble.secondaryDo)} label:{
-                    Text(second).font(.system(size:mac ? 13:15)).lineLimit(1).fixedSize().foregroundStyle(VeilbirdStyle.secondary)
-                        .padding(.horizontal,16).frame(height:mac ? 44:54).contentShape(Rectangle())
-                        .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(VeilbirdStyle.hairline,lineWidth:1))
+                    Text(second).font(.system(size:mac ? 13:15,weight:.medium)).lineLimit(1).fixedSize().foregroundStyle(VeilbirdStyle.text)
+                        .padding(.horizontal,18).frame(height:mac ? 44:54).contentShape(Rectangle())
+                        .background(VeilbirdStyle.raised,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
                 }.buttonStyle(.plain).transition(.opacity)
             }
         }
@@ -414,7 +403,7 @@ struct ClientView:View {
     /// Inside the hidden portrait: the rates under the time, the phase while connecting, the countdown while reconnecting.
     private func portrait(_ state:RingState,height:CGFloat)->some View {
         TimelineView(.periodic(from:.now,by:1)) {context in
-            PortraitView(hidden:model.connected || state == .reconnecting,invite:L10n.text(state == .failed ? "tap_to_retry":"tap_to_hide"),since:state == .connected ? model.since:nil,
+            PortraitView(hidden:model.connected || state == .reconnecting,invite:"",since:state == .connected ? model.since:nil,
                 sub:model.portraitSub(state,rates:L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))),state:state,lines:model.lines,
                 centre:model.portraitCentre(state,now:context.date))
         }.frame(maxWidth:.infinity).frame(height:height).contentShape(Circle())
@@ -434,8 +423,7 @@ struct ClientView:View {
             // The portrait is the switch: "tap to hide" breathes in it; hidden, its ring draws the state (see StateRing).
             Button {toggleConnection()} label:{portrait(state,height:firstRun ? portraitHeight-30:portraitHeight)}.buttonStyle(.plain)
             .accessibilityLabel(L10n.text(sealed ? "disconnect_action":"connect_action"))
-            portraitFile(sealed).padding(.top,mac ? 6:10)
-            stateLine(state).padding(.top,mac ? 8:12)
+            stateLine(state).padding(.top,mac ? 10:14)
             Spacer(minLength:mac ? 12:16)
             // First run: before the first tap, what the system is about to ask and where.
             if firstRun && model.since == nil {
@@ -451,7 +439,7 @@ struct ClientView:View {
                 .accessibilityHint(L10n.text("tap_to_change")).padding(.top,10)
             usageStrip.padding(.top,16)
         }.padding(.horizontal,mac ? 20:16).padding(.bottom,20).task {try? await model.loadAccount()}
-        .task {if visitorIP == nil && !model.connected {visitorIP=try? await model.api().visitorAddress()}}
+        .task {if model.visitorIP == nil && !model.connected {model.visitorIP=try? await model.api().visitorAddress()}}
         .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:state)
         .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:model.trouble)
         // Notes that come and go above the file (update, location switch) slide the page instead of snapping it.
@@ -505,27 +493,14 @@ struct ClientView:View {
                 }
                 Spacer(minLength:8)
                 ZStack {
-                    Circle().strokeBorder(chosen ? VeilbirdStyle.accent:VeilbirdStyle.faint,lineWidth:1.5)
-                    if chosen {Circle().fill(VeilbirdStyle.accent).frame(width:8,height:8)}
+                    Circle().fill(chosen ? VeilbirdStyle.accent:VeilbirdStyle.selected)
+                    if chosen {Circle().fill(VeilbirdStyle.onAccent).frame(width:6,height:6)}
                 }.frame(width:16,height:16)
             }.padding(.horizontal,14).frame(height:mac ? 56:64).contentShape(Rectangle())
-            .background(chosen ? VeilbirdStyle.accent.opacity(0.06):Color.clear,in:RoundedRectangle(cornerRadius:4))
-            .overlay(RoundedRectangle(cornerRadius:4).strokeBorder(chosen ? VeilbirdStyle.accent.opacity(0.7):VeilbirdStyle.edge,lineWidth:1))
+            .background(chosen ? VeilbirdStyle.selected:VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
         }.buttonStyle(.plain).accessibilityAddTraits(chosen ? .isSelected:[])
     }
     private var fileNumber:String {FileHeader.number(model.account["email"] as? String ?? "")}
-    private var deviceLine:String {
-        let v=ProcessInfo.processInfo.operatingSystemVersion
-        #if os(iOS)
-        return UIDevice.current.model+" · iOS \(v.majorVersion).\(v.minorVersion)"
-        #else
-        return "Mac · macOS \(v.majorVersion).\(v.minorVersion)"
-        #endif
-    }
-    private var zoneLine:String {
-        let minutes=TimeZone.current.secondsFromGMT()/60
-        return String(format:"UTC%@%02d:%02d",minutes>=0 ? "+":"-",abs(minutes)/60,abs(minutes)%60)
-    }
     /// One line when automatic mode switched location during this connection; closed per switch.
     @ViewBuilder private func switchNote(_ state:RingState)->some View {
         let from=model.switchedFrom
@@ -1264,8 +1239,7 @@ struct UpdateBanner:View {
     private func button(_ title:String,filled:Bool=false,action:@escaping ()->Void)->some View {
         Button(action:action) {
             Text(title).font(.system(size:VeilbirdStyle.detail+1,weight:.semibold)).foregroundStyle(filled ? VeilbirdStyle.onAccent:VeilbirdStyle.accent)
-                .padding(.horizontal,12).frame(minHeight:VeilbirdStyle.mac ? 28:36).background(filled ? VeilbirdStyle.accent.opacity(0.06):Color.clear,in:RoundedRectangle(cornerRadius:2))
-                .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(filled ? VeilbirdStyle.accent.opacity(0.7):Color.clear,lineWidth:1))
+                .padding(.horizontal,12).frame(minHeight:VeilbirdStyle.mac ? 28:36).background(filled ? VeilbirdStyle.accent:Color.clear,in:RoundedRectangle(cornerRadius:VeilbirdStyle.mac ? 7:9))
         }.buttonStyle(.plain)
     }
 }
@@ -1290,10 +1264,9 @@ struct PermissionNote:View {
                 #endif
                 retry()
             } label:{
-                Text(L10n.text(permission == .systemExtension ? "open_settings_short":"retry_action")).font(.system(size:VeilbirdStyle.detail+1,weight:.semibold)).foregroundStyle(VeilbirdStyle.accent)
+                Text(L10n.text(permission == .systemExtension ? "open_settings_short":"retry_action")).font(.system(size:VeilbirdStyle.detail+1,weight:.semibold)).foregroundStyle(VeilbirdStyle.onAccent)
                     .lineLimit(1).padding(.horizontal,12).frame(minHeight:VeilbirdStyle.mac ? 28:36)
-                    .background(VeilbirdStyle.accent.opacity(0.06),in:RoundedRectangle(cornerRadius:2))
-                    .overlay(RoundedRectangle(cornerRadius:2).strokeBorder(VeilbirdStyle.accent.opacity(0.7),lineWidth:1))
+                    .background(VeilbirdStyle.accent,in:RoundedRectangle(cornerRadius:VeilbirdStyle.mac ? 7:9))
             }.buttonStyle(.plain)
         }.padding(.leading,14).padding(.trailing,8).padding(.vertical,12).cardOutline(VeilbirdStyle.radius)
         .accessibilityElement(children:.contain)

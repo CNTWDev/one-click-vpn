@@ -104,12 +104,12 @@ public static class Dossier {
         foreach(var c in seed) hash=(hash*31+c)&0xFFFFFFFF;
         return (hash%10000).ToString("0000",System.Globalization.CultureInfo.InvariantCulture);
     }
-    /// "§01 STATUS": the small monospaced number above a page or block.
-    public static TextBlock Section(string key)=>new() {Text=L10n.Text(key),FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=11,Foreground=Look.Faint,Margin=new Thickness(4,0,4,0),TextWrapping=TextWrapping.NoWrap};
+    /// Formerly the "§01 STATUS" label above a page; the labels are gone (they read as noise), so this is an empty slot.
+    public static TextBlock Section(string key)=>new() {Margin=new Thickness(4,0,4,0),TextWrapping=TextWrapping.NoWrap};
     /// The amber "SEALED" stamp, set slightly askew.
     public static Border Stamp()=>new() {
-        Child=new TextBlock {Text="SEALED",FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=11,FontWeight=FontWeights.SemiBold,Foreground=Look.Accent,TextWrapping=TextWrapping.NoWrap},
-        BorderBrush=Look.AccentLine,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(2),Padding=new Thickness(7,2,6,2),
+        Child=new TextBlock {Text="SEALED",FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=11,FontWeight=FontWeights.SemiBold,Foreground=Look.OnAccent,TextWrapping=TextWrapping.NoWrap},
+        Background=Look.Accent,CornerRadius=new CornerRadius(3),Padding=new Thickness(7,2,6,2),
         RenderTransformOrigin=new Point(0.5,0.5),RenderTransform=new TransformGroup {Children={new ScaleTransform(1,1),new RotateTransform(-6)}},Opacity=0,VerticalAlignment=VerticalAlignment.Center};
 }
 

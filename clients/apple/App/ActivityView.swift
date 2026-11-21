@@ -124,7 +124,7 @@ struct ActivityView:View {
             }
             .foregroundStyle(selected ? VeilbirdStyle.text:VeilbirdStyle.secondary)
             .padding(.horizontal,mac ? 10:12).frame(height:mac ? 26:30)
-            .overlay(RoundedRectangle(cornerRadius:VeilbirdStyle.radius).stroke(selected ? VeilbirdStyle.accent:Color(red:44/255,green:41/255,blue:36/255)))
+            .background(selected ? VeilbirdStyle.selected:Self.card,in:RoundedRectangle(cornerRadius:VeilbirdStyle.mac ? 7:9))
             .contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
     }
@@ -138,7 +138,7 @@ struct ActivityView:View {
                         Image(systemName:"magnifyingglass").font(.system(size:11)).foregroundStyle(VeilbirdStyle.faint)
                         TextField(L10n.text("activity_filter"),text:$query).textFieldStyle(.plain).font(.system(size:12))
                     }.padding(.horizontal,10).frame(width:220,height:28)
-                    .overlay(RoundedRectangle(cornerRadius:VeilbirdStyle.radius).stroke(Color(red:44/255,green:41/255,blue:36/255)))
+                    .background(Self.card,in:RoundedRectangle(cornerRadius:7))
                 }
             }
             if mac {
@@ -229,7 +229,6 @@ struct ActivityView:View {
                 }
             }
         }.padding(.horizontal,18).padding(.vertical,16).background(Self.card,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
-        .overlay(RoundedRectangle(cornerRadius:VeilbirdStyle.radius).stroke(Self.line))
     }
     private func rankList(_ title:String,_ rows:[[String:Any]],mono:Bool,note:String?)->some View {
         let top=max(1,int(rows.first?["bytes"]))
@@ -247,7 +246,7 @@ struct ActivityView:View {
             if rows.isEmpty {Text(L10n.text("activity_nothing")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).padding(.top,6)}
             if let note {Text(note).font(.system(size:11)).foregroundStyle(VeilbirdStyle.faint).fixedSize(horizontal:false,vertical:true).padding(.top,8)}
         }.padding(.horizontal,18).padding(.vertical,14).frame(maxWidth:.infinity,alignment:.topLeading)
-        .background(Self.card,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).overlay(RoundedRectangle(cornerRadius:VeilbirdStyle.radius).stroke(Self.line))
+        .background(Self.card,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
     }
     private var ranking:some View {
         let domains=data?["domains"] as? [[String:Any]] ?? []
@@ -292,7 +291,7 @@ struct ActivityView:View {
                 }
             }
         }.padding(.horizontal,18).padding(.vertical,16).frame(maxHeight:.infinity)
-        .background(Self.card,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).overlay(RoundedRectangle(cornerRadius:VeilbirdStyle.radius).stroke(Self.line))
+        .background(Self.card,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
     }
 
     // MARK: Names looked up (Mac)

@@ -9,17 +9,17 @@
 ### zh
 - 安卓首页一屏放下：中间的球按屏幕高度自动缩放，任何手机都不用滑动
 - 首页更简洁：去掉看不懂的小字，直接告诉你网站能看到的 IP；主按钮改成实底
-- 安卓所有页面去掉描边，卡片和按钮改为柔和的实底
+- 安卓、Mac、Windows 全部去掉描边，卡片和按钮改为柔和的实底；Mac 和 Windows 首页同样精简
 
 ### en
 - The Android home screen now fits on one screen: the sphere scales with the screen height, so nothing needs scrolling
 - A simpler home: no more cryptic small print, just the IP sites can see; the main button is now solid
-- No more outlines anywhere on Android: cards and buttons use soft solid fills
+- No more outlines on Android, Mac or Windows: cards and buttons use soft solid fills, and the Mac and Windows home is simpler too
 
 ### ru
 - Главный экран Android помещается целиком: шар подстраивается под высоту экрана, прокручивать не нужно
 - Главный экран проще: без непонятной мелкой подписи, только IP, который видят сайты; основная кнопка теперь залитая
-- На Android больше нет рамок: карточки и кнопки с мягкой заливкой
+- На Android, Mac и Windows больше нет рамок: карточки и кнопки с мягкой заливкой, главный экран Mac и Windows тоже проще
 
 ## 1.0.19
 
