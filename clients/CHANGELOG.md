@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.20
+
+### zh
+- 安卓首页一屏放下：中间的球按屏幕高度自动缩放，任何手机都不用滑动
+- 首页更简洁：去掉看不懂的小字，直接告诉你网站能看到的 IP；主按钮改成实底
+- 安卓所有页面去掉描边，卡片和按钮改为柔和的实底
+
+### en
+- The Android home screen now fits on one screen: the sphere scales with the screen height, so nothing needs scrolling
+- A simpler home: no more cryptic small print, just the IP sites can see; the main button is now solid
+- No more outlines anywhere on Android: cards and buttons use soft solid fills
+
+### ru
+- Главный экран Android помещается целиком: шар подстраивается под высоту экрана, прокручивать не нужно
+- Главный экран проще: без непонятной мелкой подписи, только IP, который видят сайты; основная кнопка теперь залитая
+- На Android больше нет рамок: карточки и кнопки с мягкой заливкой
+
 ## 1.0.19
 
 ### zh

@@ -34,8 +34,8 @@ object Palette {
     val secondary get() = if (moon) Color.rgb(172, 160, 162) else Color.rgb(163, 155, 145)
     val faint get() = if (moon) Color.rgb(152, 138, 142) else Color.rgb(149, 139, 124)
     val accent get() = if (moon) Color.rgb(235, 184, 195) else Color.rgb(224, 164, 88)
-    // Buttons are outlined, not filled: text on an "accent" control is the accent itself (see MainActivity.rounded).
-    val onAccent get() = accent
+    // Buttons and cards are filled, never outlined: text on an amber (or pink) control is the ground's near-black.
+    val onAccent get() = if (moon) Color.rgb(38, 20, 26) else Color.rgb(28, 19, 7)
     val danger = Color.rgb(240, 103, 90)
     val fair get() = if (moon) Color.rgb(226, 150, 120) else Color.rgb(232, 134, 106)
     /** The lamp, crop marks and sealed dots. */
@@ -43,8 +43,6 @@ object Palette {
     /** Past figures in charts (the accent, dimmed). */
     val past get() = if (moon) Color.rgb(112, 86, 94) else Color.rgb(111, 90, 63)
     val hairline get() = alpha(text, 16)
-    /** Card outline: cards are drawn as a hairline on the ground, not as a filled block. */
-    val edge get() = alpha(light, 23)
     fun alpha(color: Int, alpha: Int) = Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
 }
 

@@ -126,7 +126,7 @@ class ScanLine(context: Context) : View(context) {
  */
 class Portrait(context: Context) : View(context) {
     private val d = resources.displayMetrics.density
-    /** The line in the open sphere (tap_to_hide). */
+    /** An optional line in the open sphere (none on the home page: the action below says what a tap does). */
     var invite: String = ""
         set(value) { if (field != value) { field = value; invalidate() } }
     /** In the ring once hidden: the time hidden, and the rates under it. */
@@ -173,11 +173,13 @@ class Portrait(context: Context) : View(context) {
     override fun onDetachedFromWindow() { anim?.cancel(); pulse?.cancel(); pulse = null; super.onDetachedFromWindow() }
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
-        // Short phones get a smaller sphere so the page still fits without scrolling.
-        val side = minOf(w, (300 * d).toInt(), (resources.displayMetrics.heightPixels * 0.36f).toInt())
-        setMeasuredDimension(w, side)
+        // The page gives the sphere the height left over (see MainActivity.home); asked for its own height (the page
+        // measuring what it needs), it answers with its smallest, so a very short screen scrolls a little at worst.
+        val h = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY) MeasureSpec.getSize(heightMeasureSpec) else minOf(w, (MIN * d).toInt())
+        setMeasuredDimension(w, h)
     }
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { dots?.recycle(); dots = null }
+    private companion object { const val MAX = 280; const val MIN = 140 }
     /** The dot sphere, drawn once per size: a halftone of light falling from the upper left. */
     private fun sphere(s: Int): android.graphics.Bitmap {
         dots?.let { return it }
@@ -203,15 +205,14 @@ class Portrait(context: Context) : View(context) {
         return bitmap
     }
     override fun onDraw(canvas: Canvas) {
-        val s = height; if (s <= 0) return
+        // The sphere: as large as the space allows, up to 280dp, centred in it.
+        val s = minOf(width, height, (MAX * d).toInt()); if (s <= 0) return
         val cx = width / 2f; val cy = height / 2f
-        val left = cx - s / 2f
+        val left = cx - s / 2f; val top = cy - s / 2f
         val failed = state == LinkState.FAILED
         // The sphere: bright and breathing while visible, dim and still after a failure, nearly dark once hidden.
         bitmapPaint.alpha = (255 * ((if (failed) 0.42f else 0.82f + 0.18f * phase) * (1 - t) + 0.1f * t)).toInt()
-        canvas.drawBitmap(sphere(s), left, 0f, bitmapPaint)
-        ring.strokeWidth = 1 * d; ring.color = Palette.alpha(Palette.text, (18 * (1 - t)).toInt())
-        canvas.drawCircle(cx, cy, s / 2f - d, ring)
+        canvas.drawBitmap(sphere(s), left, top, bitmapPaint)
         val accent = Palette.accent
         if (invite.isNotEmpty() && t < 1f) {
             label.typeface = Typeface.DEFAULT; label.textSize = 0.05f * s
