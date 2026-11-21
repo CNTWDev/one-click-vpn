@@ -1,6 +1,6 @@
 import type { Locale } from "../../shared/i18n-core";
 export type CountryOption = { code: string; country: string; label: string };
-export type RegionPreset = { id: string; group: string; name: string; label: string; code: string };
+export type RegionPreset = { id: string; group: string; name: string; chinese: string; label: string; code: string };
 
 const COUNTRY_CODES = `AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW`.split(" ");
 
@@ -81,7 +81,7 @@ const presets: Array<[group: string, name: string, label: string, code: string]>
 
 export const regionPresets: RegionPreset[] = presets.map(([group, name, label, code]) => ({
   id: `${code.toLowerCase()}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
-  group, name, label: `${label} / ${name} · ${countryName(code)} (${code})`, code,
+  group, name, chinese: label, label: `${label} / ${name} · ${countryName(code)} (${code})`, code,
 }));
 
 export const presetGroups = [...new Set(regionPresets.map((item) => item.group))];
@@ -91,6 +91,21 @@ export function localizedCountryLabel(code: string, locale: Locale): string {
   try { return `${new Intl.DisplayNames([locale], { type: "region" }).of(code)} (${code})`; }
   catch { return `${countryName(code)} (${code})`; }
 }
-export function localizedPresetLabel(preset: RegionPreset, locale: Locale): string {
-  return locale === "zh" ? preset.label : `${preset.name} · ${localizedCountryLabel(preset.code, locale)}`;
+
+const russianNames = new Intl.DisplayNames(["ru"], { type: "region" });
+function regionNames(code: string): string {
+  const names = [countryName(code), code];
+  for (const display of [chineseNames, russianNames]) { try { names.push(display.of(code) || ""); } catch { /* English is enough */ } }
+  return names.join(" ");
+}
+
+/** Searchable form of the catalog: every city and country matches its zh/en/ru names, ISO code and continent. */
+export function presetSearchOption(preset: RegionPreset, locale: Locale) {
+  const city = locale === "zh" ? `${preset.chinese} / ${preset.name}` : preset.name;
+  return { label: city, detail: localizedCountryLabel(preset.code, locale), keys: `${preset.chinese} ${preset.name} ${regionNames(preset.code)}` };
+}
+export function countrySearchOption(code: string, locale: Locale) {
+  let name = countryName(code);
+  try { name = new Intl.DisplayNames([locale], { type: "region" }).of(code) || name; } catch { /* keep English */ }
+  return { label: name, detail: code, keys: regionNames(code) };
 }

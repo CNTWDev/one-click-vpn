@@ -3838,5 +3838,21 @@
   "备用端口": [
     "Spare port",
     "Резервный порт"
+  ],
+  "搜索城市、国家或代码": [
+    "Search city, country or code",
+    "Город, страна или код"
+  ],
+  "没有匹配的位置，可以选择自定义位置。": [
+    "No matching location. You can add a custom one.",
+    "Ничего не найдено. Можно указать своё местоположение."
+  ],
+  "搜索国家或代码": [
+    "Search country or code",
+    "Страна или код"
+  ],
+  "没有匹配的国家 / 地区。": [
+    "No matching country or region.",
+    "Страна или регион не найдены."
   ]
 }

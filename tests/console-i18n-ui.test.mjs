@@ -64,7 +64,11 @@ test("Console locales: all routes, persisted choice, forms and mobile layout", {
     assert.equal(await page.locator("html").getAttribute("lang"), "ru-RU");
     await page.locator(".console-language-picker select").selectOption("en");
     await page.goto(`${base}/#/regions`);
-    await page.getByLabel(/^Server location/).selectOption("preset:us-ohio");
+    // The location picker is searchable: type, then Enter picks the best match without submitting the form.
+    await page.getByRole("combobox", { name: "Server location" }).fill("ohio");
+    await page.keyboard.press("Enter");
+    assert.equal(await page.getByRole("combobox", { name: "Server location" }).inputValue(), "Ohio · United States (US)");
+    assert.equal(region, undefined, "Enter in the picker does not submit the form");
     await page.getByLabel("City / region display name").fill("我的 Ohio");
     await page.locator(".console-language-picker select").selectOption("ru");
     assert.equal(await page.locator('input[value="我的 Ohio"]').count(), 1, "language switch preserves form input");
