@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.21
+
+### zh
+- Mac 菜单栏和 Windows 托盘弹窗加入常用开关：智能分流、断网保护、登录时启动、菜单栏网速（Mac）/ 按应用分流（Windows），不用打开主窗口
+- 连接中在弹窗里切换智能分流或断网保护，会自动重连立即生效
+- 弹窗底部可以直接检查更新，结果就显示在那一行
+
+### en
+- The Mac menu bar and Windows tray panels now hold the common switches: smart routing, kill switch, open at login, and speed in menu bar (Mac) or per-app routing (Windows), no need to open the window
+- Changing smart routing or the kill switch there while connected reconnects and applies at once
+- Check for updates right from the panel; the result shows on the same line
+
+### ru
+- В панели строки меню Mac и в трее Windows появились частые переключатели: умный режим, блокировка без VPN, автозапуск, скорость в меню (Mac) или выбор приложений (Windows), окно открывать не нужно
+- Если сменить там умный режим или блокировку во время подключения, VPN переподключится и изменение сразу вступит в силу
+- Проверка обновлений прямо из панели, результат виден в той же строке
+
 ## 1.0.20
 
 ### zh

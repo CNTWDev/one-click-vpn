@@ -97,6 +97,7 @@
   <string name="check_web">打开网页</string>
   <string name="check_web_detail">经节点访问外网</string>
   <string name="check_web_slow">节点访问外网偏慢，稍后再试或换个节点。</string>
+  <string name="checking_for_updates">正在检查…</string>
   <string name="choose_a_location_then_connect_from_the_home_screen">选好位置后，返回首页一键连接。</string>
   <string name="choose_a_location_then_return_to_connect">选择位置后，返回连接首页。</string>
   <string name="choose_a_location_veilbird_takes_care_of_the_rest">选好位置，剩下的交给 TrackNothing。</string>
@@ -249,7 +250,9 @@
   <string name="node_load">负载 %1$s%%</string>
   <string name="node_quality_detail">抖动 %1$s ms · 丢包 %2$s%%</string>
   <string name="not_connected">未连接</string>
+  <string name="off_state">关</string>
   <string name="offline_centre">等网络</string>
+  <string name="on_state">开</string>
   <string name="onboarding_ready">已就绪</string>
   <string name="open_app">打开 TrackNothing</string>
   <string name="open_at_login">登录时启动</string>
@@ -270,6 +273,10 @@
   <string name="quality_good">优</string>
   <string name="quality_poor">差</string>
   <string name="quality_unreachable">不可达</string>
+  <string name="quick_menu_bar_speed">菜单栏网速</string>
+  <string name="quick_open_at_login">登录时启动</string>
+  <string name="quick_per_app">按应用分流</string>
+  <string name="quick_smart_routing">智能分流</string>
   <string name="quit_app">退出</string>
   <string name="quota_exhausted_hint">流量已用完，请联系管理员增加流量。</string>
   <string name="rate_unit_gbps">Gb/s</string>
@@ -424,7 +431,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">安卓首页一屏放下：中间的球按屏幕高度自动缩放，任何手机都不用滑动\n首页更简洁：去掉看不懂的小字，直接告诉你网站能看到的 IP；主按钮改成实底\n安卓、Mac、Windows 全部去掉描边，卡片和按钮改为柔和的实底；Mac 和 Windows 首页同样精简</string>
+  <string name="whats_new_notes">Mac 菜单栏和 Windows 托盘弹窗加入常用开关：智能分流、断网保护、登录时启动、菜单栏网速（Mac）/ 按应用分流（Windows），不用打开主窗口\n连接中在弹窗里切换智能分流或断网保护，会自动重连立即生效\n弹窗底部可以直接检查更新，结果就显示在那一行</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>

@@ -97,6 +97,7 @@
   <string name="check_web">Открытие страницы</string>
   <string name="check_web_detail">Через узел</string>
   <string name="check_web_slow">Узел медленно открывает сайты. Попробуйте позже или выберите другой.</string>
+  <string name="checking_for_updates">Проверка…</string>
   <string name="choose_a_location_then_connect_from_the_home_screen">Выберите локацию и подключитесь с главного экрана.</string>
   <string name="choose_a_location_then_return_to_connect">Выберите локацию и вернитесь к подключению.</string>
   <string name="choose_a_location_veilbird_takes_care_of_the_rest">Выберите локацию. Остальное сделает TrackNothing.</string>
@@ -249,7 +250,9 @@
   <string name="node_load">Нагрузка %1$s%%</string>
   <string name="node_quality_detail">Джиттер %1$s мс · Потери %2$s%%</string>
   <string name="not_connected">Не подключено</string>
+  <string name="off_state">Выкл.</string>
   <string name="offline_centre">Офлайн</string>
+  <string name="on_state">Вкл.</string>
   <string name="onboarding_ready">Готово</string>
   <string name="open_app">Открыть TrackNothing</string>
   <string name="open_at_login">Запускать при входе</string>
@@ -270,6 +273,10 @@
   <string name="quality_good">Хорошо</string>
   <string name="quality_poor">Плохо</string>
   <string name="quality_unreachable">Недоступен</string>
+  <string name="quick_menu_bar_speed">Скорость в меню</string>
+  <string name="quick_open_at_login">Автозапуск</string>
+  <string name="quick_per_app">По приложениям</string>
+  <string name="quick_smart_routing">Умный режим</string>
   <string name="quit_app">Выйти</string>
   <string name="quota_exhausted_hint">Трафик закончился. Обратитесь к администратору, чтобы добавить трафик.</string>
   <string name="rate_unit_gbps">Гбит/с</string>
@@ -424,7 +431,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Главный экран Android помещается целиком: шар подстраивается под высоту экрана, прокручивать не нужно\nГлавный экран проще: без непонятной мелкой подписи, только IP, который видят сайты; основная кнопка теперь залитая\nНа Android, Mac и Windows больше нет рамок: карточки и кнопки с мягкой заливкой, главный экран Mac и Windows тоже проще</string>
+  <string name="whats_new_notes">В панели строки меню Mac и в трее Windows появились частые переключатели: умный режим, блокировка без VPN, автозапуск, скорость в меню (Mac) или выбор приложений (Windows), окно открывать не нужно\nЕсли сменить там умный режим или блокировку во время подключения, VPN переподключится и изменение сразу вступит в силу\nПроверка обновлений прямо из панели, результат виден в той же строке</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Версия Windows для разработки · Интеграция VPN ещё не завершена</string>

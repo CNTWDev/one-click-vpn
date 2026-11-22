@@ -2209,6 +2209,29 @@
         }
       }
     },
+    "checking_for_updates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在检查…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Проверка…"
+          }
+        }
+      }
+    },
     "choose_a_location_then_connect_from_the_home_screen": {
       "extractionState": "manual",
       "localizations": {
@@ -5705,6 +5728,29 @@
         }
       }
     },
+    "off_state": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выкл."
+          }
+        }
+      }
+    },
     "offline_centre": {
       "extractionState": "manual",
       "localizations": {
@@ -5724,6 +5770,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Офлайн"
+          }
+        }
+      }
+    },
+    "on_state": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вкл."
           }
         }
       }
@@ -6184,6 +6253,98 @@
           "stringUnit": {
             "state": "translated",
             "value": "Недоступен"
+          }
+        }
+      }
+    },
+    "quick_menu_bar_speed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speed in menu bar"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "菜单栏网速"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скорость в меню"
+          }
+        }
+      }
+    },
+    "quick_open_at_login": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open at login"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录时启动"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Автозапуск"
+          }
+        }
+      }
+    },
+    "quick_per_app": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Per-app routing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按应用分流"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "По приложениям"
+          }
+        }
+      }
+    },
+    "quick_smart_routing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smart routing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "智能分流"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Умный режим"
           }
         }
       }
@@ -9736,19 +9897,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The Android home screen now fits on one screen: the sphere scales with the screen height, so nothing needs scrolling\nA simpler home: no more cryptic small print, just the IP sites can see; the main button is now solid\nNo more outlines on Android, Mac or Windows: cards and buttons use soft solid fills, and the Mac and Windows home is simpler too"
+            "value": "The Mac menu bar and Windows tray panels now hold the common switches: smart routing, kill switch, open at login, and speed in menu bar (Mac) or per-app routing (Windows), no need to open the window\nChanging smart routing or the kill switch there while connected reconnects and applies at once\nCheck for updates right from the panel; the result shows on the same line"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "安卓首页一屏放下：中间的球按屏幕高度自动缩放，任何手机都不用滑动\n首页更简洁：去掉看不懂的小字，直接告诉你网站能看到的 IP；主按钮改成实底\n安卓、Mac、Windows 全部去掉描边，卡片和按钮改为柔和的实底；Mac 和 Windows 首页同样精简"
+            "value": "Mac 菜单栏和 Windows 托盘弹窗加入常用开关：智能分流、断网保护、登录时启动、菜单栏网速（Mac）/ 按应用分流（Windows），不用打开主窗口\n连接中在弹窗里切换智能分流或断网保护，会自动重连立即生效\n弹窗底部可以直接检查更新，结果就显示在那一行"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Главный экран Android помещается целиком: шар подстраивается под высоту экрана, прокручивать не нужно\nГлавный экран проще: без непонятной мелкой подписи, только IP, который видят сайты; основная кнопка теперь залитая\nНа Android, Mac и Windows больше нет рамок: карточки и кнопки с мягкой заливкой, главный экран Mac и Windows тоже проще"
+            "value": "В панели строки меню Mac и в трее Windows появились частые переключатели: умный режим, блокировка без VPN, автозапуск, скорость в меню (Mac) или выбор приложений (Windows), окно открывать не нужно\nЕсли сменить там умный режим или блокировку во время подключения, VPN переподключится и изменение сразу вступит в силу\nПроверка обновлений прямо из панели, результат виден в той же строке"
           }
         }
       }

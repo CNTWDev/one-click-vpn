@@ -99,6 +99,7 @@
   <data name="check_web" xml:space="preserve"><value>Открытие страницы</value></data>
   <data name="check_web_detail" xml:space="preserve"><value>Через узел</value></data>
   <data name="check_web_slow" xml:space="preserve"><value>Узел медленно открывает сайты. Попробуйте позже или выберите другой.</value></data>
+  <data name="checking_for_updates" xml:space="preserve"><value>Проверка…</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>Выберите локацию и подключитесь с главного экрана.</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>Выберите локацию и вернитесь к подключению.</value></data>
   <data name="choose_a_location_veilbird_takes_care_of_the_rest" xml:space="preserve"><value>Выберите локацию. Остальное сделает TrackNothing.</value></data>
@@ -255,7 +256,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="node_load" xml:space="preserve"><value>Нагрузка {0}%</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>Джиттер {0} мс · Потери {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Не подключено</value></data>
+  <data name="off_state" xml:space="preserve"><value>Выкл.</value></data>
   <data name="offline_centre" xml:space="preserve"><value>Офлайн</value></data>
+  <data name="on_state" xml:space="preserve"><value>Вкл.</value></data>
   <data name="onboarding_ready" xml:space="preserve"><value>Готово</value></data>
   <data name="open_app" xml:space="preserve"><value>Открыть TrackNothing</value></data>
   <data name="open_at_login" xml:space="preserve"><value>Запускать при входе</value></data>
@@ -276,6 +279,10 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="quality_good" xml:space="preserve"><value>Хорошо</value></data>
   <data name="quality_poor" xml:space="preserve"><value>Плохо</value></data>
   <data name="quality_unreachable" xml:space="preserve"><value>Недоступен</value></data>
+  <data name="quick_menu_bar_speed" xml:space="preserve"><value>Скорость в меню</value></data>
+  <data name="quick_open_at_login" xml:space="preserve"><value>Автозапуск</value></data>
+  <data name="quick_per_app" xml:space="preserve"><value>По приложениям</value></data>
+  <data name="quick_smart_routing" xml:space="preserve"><value>Умный режим</value></data>
   <data name="quit_app" xml:space="preserve"><value>Выйти</value></data>
   <data name="quota_exhausted_hint" xml:space="preserve"><value>Трафик закончился. Обратитесь к администратору, чтобы добавить трафик.</value></data>
   <data name="rate_unit_gbps" xml:space="preserve"><value>Гбит/с</value></data>
@@ -431,9 +438,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Главный экран Android помещается целиком: шар подстраивается под высоту экрана, прокручивать не нужно
-Главный экран проще: без непонятной мелкой подписи, только IP, который видят сайты; основная кнопка теперь залитая
-На Android, Mac и Windows больше нет рамок: карточки и кнопки с мягкой заливкой, главный экран Mac и Windows тоже проще</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>В панели строки меню Mac и в трее Windows появились частые переключатели: умный режим, блокировка без VPN, автозапуск, скорость в меню (Mac) или выбор приложений (Windows), окно открывать не нужно
+Если сменить там умный режим или блокировку во время подключения, VPN переподключится и изменение сразу вступит в силу
+Проверка обновлений прямо из панели, результат виден в той же строке</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>

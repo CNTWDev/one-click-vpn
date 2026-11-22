@@ -2173,5 +2173,40 @@
     "zh": "网站能看到你的真实 IP",
     "en": "Sites can see your real IP",
     "ru": "Сайты видят ваш настоящий IP"
+  },
+  "quick_smart_routing": {
+    "zh": "智能分流",
+    "en": "Smart routing",
+    "ru": "Умный режим"
+  },
+  "quick_open_at_login": {
+    "zh": "登录时启动",
+    "en": "Open at login",
+    "ru": "Автозапуск"
+  },
+  "quick_menu_bar_speed": {
+    "zh": "菜单栏网速",
+    "en": "Speed in menu bar",
+    "ru": "Скорость в меню"
+  },
+  "quick_per_app": {
+    "zh": "按应用分流",
+    "en": "Per-app routing",
+    "ru": "По приложениям"
+  },
+  "checking_for_updates": {
+    "zh": "正在检查…",
+    "en": "Checking…",
+    "ru": "Проверка…"
+  },
+  "on_state": {
+    "zh": "开",
+    "en": "On",
+    "ru": "Вкл."
+  },
+  "off_state": {
+    "zh": "关",
+    "en": "Off",
+    "ru": "Выкл."
   }
 }

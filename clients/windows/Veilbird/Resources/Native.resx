@@ -99,6 +99,7 @@
   <data name="check_web" xml:space="preserve"><value>Opening a page</value></data>
   <data name="check_web_detail" xml:space="preserve"><value>Through the location</value></data>
   <data name="check_web_slow" xml:space="preserve"><value>The location is slow to reach the web. Try again later or pick another one.</value></data>
+  <data name="checking_for_updates" xml:space="preserve"><value>Checking…</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>Choose a location, then connect from the home screen.</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>Choose a location, then return to Connect.</value></data>
   <data name="choose_a_location_veilbird_takes_care_of_the_rest" xml:space="preserve"><value>Choose a location. TrackNothing takes care of the rest.</value></data>
@@ -255,7 +256,9 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="node_load" xml:space="preserve"><value>Load {0}%</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>Jitter {0} ms · Loss {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="off_state" xml:space="preserve"><value>Off</value></data>
   <data name="offline_centre" xml:space="preserve"><value>Offline</value></data>
+  <data name="on_state" xml:space="preserve"><value>On</value></data>
   <data name="onboarding_ready" xml:space="preserve"><value>Ready</value></data>
   <data name="open_app" xml:space="preserve"><value>Open TrackNothing</value></data>
   <data name="open_at_login" xml:space="preserve"><value>Open at login</value></data>
@@ -276,6 +279,10 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="quality_good" xml:space="preserve"><value>Good</value></data>
   <data name="quality_poor" xml:space="preserve"><value>Poor</value></data>
   <data name="quality_unreachable" xml:space="preserve"><value>Unreachable</value></data>
+  <data name="quick_menu_bar_speed" xml:space="preserve"><value>Speed in menu bar</value></data>
+  <data name="quick_open_at_login" xml:space="preserve"><value>Open at login</value></data>
+  <data name="quick_per_app" xml:space="preserve"><value>Per-app routing</value></data>
+  <data name="quick_smart_routing" xml:space="preserve"><value>Smart routing</value></data>
   <data name="quit_app" xml:space="preserve"><value>Quit</value></data>
   <data name="quota_exhausted_hint" xml:space="preserve"><value>Your traffic is used up. Contact your administrator to add more.</value></data>
   <data name="rate_unit_gbps" xml:space="preserve"><value>Gb/s</value></data>
@@ -431,9 +438,9 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>The Android home screen now fits on one screen: the sphere scales with the screen height, so nothing needs scrolling
-A simpler home: no more cryptic small print, just the IP sites can see; the main button is now solid
-No more outlines on Android, Mac or Windows: cards and buttons use soft solid fills, and the Mac and Windows home is simpler too</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>The Mac menu bar and Windows tray panels now hold the common switches: smart routing, kill switch, open at login, and speed in menu bar (Mac) or per-app routing (Windows), no need to open the window
+Changing smart routing or the kill switch there while connected reconnects and applies at once
+Check for updates right from the panel; the result shows on the same line</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows development build · VPN service integration in progress</value></data>
