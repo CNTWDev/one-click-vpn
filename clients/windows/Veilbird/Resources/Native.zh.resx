@@ -99,6 +99,7 @@
   <data name="check_web" xml:space="preserve"><value>打开网页</value></data>
   <data name="check_web_detail" xml:space="preserve"><value>经节点访问外网</value></data>
   <data name="check_web_slow" xml:space="preserve"><value>节点访问外网偏慢，稍后再试或换个节点。</value></data>
+  <data name="checking_for_updates" xml:space="preserve"><value>正在检查…</value></data>
   <data name="choose_a_location_then_connect_from_the_home_screen" xml:space="preserve"><value>选好位置后，返回首页一键连接。</value></data>
   <data name="choose_a_location_then_return_to_connect" xml:space="preserve"><value>选择位置后，返回连接首页。</value></data>
   <data name="choose_a_location_veilbird_takes_care_of_the_rest" xml:space="preserve"><value>选好位置，剩下的交给 TrackNothing。</value></data>
@@ -255,7 +256,9 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="node_load" xml:space="preserve"><value>负载 {0}%</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>抖动 {0} ms · 丢包 {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>未连接</value></data>
+  <data name="off_state" xml:space="preserve"><value>关</value></data>
   <data name="offline_centre" xml:space="preserve"><value>等网络</value></data>
+  <data name="on_state" xml:space="preserve"><value>开</value></data>
   <data name="onboarding_ready" xml:space="preserve"><value>已就绪</value></data>
   <data name="open_app" xml:space="preserve"><value>打开 TrackNothing</value></data>
   <data name="open_at_login" xml:space="preserve"><value>登录时启动</value></data>
@@ -276,6 +279,10 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="quality_good" xml:space="preserve"><value>优</value></data>
   <data name="quality_poor" xml:space="preserve"><value>差</value></data>
   <data name="quality_unreachable" xml:space="preserve"><value>不可达</value></data>
+  <data name="quick_menu_bar_speed" xml:space="preserve"><value>菜单栏网速</value></data>
+  <data name="quick_open_at_login" xml:space="preserve"><value>登录时启动</value></data>
+  <data name="quick_per_app" xml:space="preserve"><value>按应用分流</value></data>
+  <data name="quick_smart_routing" xml:space="preserve"><value>智能分流</value></data>
   <data name="quit_app" xml:space="preserve"><value>退出</value></data>
   <data name="quota_exhausted_hint" xml:space="preserve"><value>流量已用完，请联系管理员增加流量。</value></data>
   <data name="rate_unit_gbps" xml:space="preserve"><value>Gb/s</value></data>
@@ -431,9 +438,9 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>安卓首页一屏放下：中间的球按屏幕高度自动缩放，任何手机都不用滑动
-首页更简洁：去掉看不懂的小字，直接告诉你网站能看到的 IP；主按钮改成实底
-安卓、Mac、Windows 全部去掉描边，卡片和按钮改为柔和的实底；Mac 和 Windows 首页同样精简</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Mac 菜单栏和 Windows 托盘弹窗加入常用开关：智能分流、断网保护、登录时启动、菜单栏网速（Mac）/ 按应用分流（Windows），不用打开主窗口
+连接中在弹窗里切换智能分流或断网保护，会自动重连立即生效
+弹窗底部可以直接检查更新，结果就显示在那一行</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>

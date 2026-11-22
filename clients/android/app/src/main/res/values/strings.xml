@@ -97,6 +97,7 @@
   <string name="check_web">Opening a page</string>
   <string name="check_web_detail">Through the location</string>
   <string name="check_web_slow">The location is slow to reach the web. Try again later or pick another one.</string>
+  <string name="checking_for_updates">Checking…</string>
   <string name="choose_a_location_then_connect_from_the_home_screen">Choose a location, then connect from the home screen.</string>
   <string name="choose_a_location_then_return_to_connect">Choose a location, then return to Connect.</string>
   <string name="choose_a_location_veilbird_takes_care_of_the_rest">Choose a location. TrackNothing takes care of the rest.</string>
@@ -249,7 +250,9 @@
   <string name="node_load">Load %1$s%%</string>
   <string name="node_quality_detail">Jitter %1$s ms · Loss %2$s%%</string>
   <string name="not_connected">Not connected</string>
+  <string name="off_state">Off</string>
   <string name="offline_centre">Offline</string>
+  <string name="on_state">On</string>
   <string name="onboarding_ready">Ready</string>
   <string name="open_app">Open TrackNothing</string>
   <string name="open_at_login">Open at login</string>
@@ -270,6 +273,10 @@
   <string name="quality_good">Good</string>
   <string name="quality_poor">Poor</string>
   <string name="quality_unreachable">Unreachable</string>
+  <string name="quick_menu_bar_speed">Speed in menu bar</string>
+  <string name="quick_open_at_login">Open at login</string>
+  <string name="quick_per_app">Per-app routing</string>
+  <string name="quick_smart_routing">Smart routing</string>
   <string name="quit_app">Quit</string>
   <string name="quota_exhausted_hint">Your traffic is used up. Contact your administrator to add more.</string>
   <string name="rate_unit_gbps">Gb/s</string>
@@ -424,7 +431,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">The Android home screen now fits on one screen: the sphere scales with the screen height, so nothing needs scrolling\nA simpler home: no more cryptic small print, just the IP sites can see; the main button is now solid\nNo more outlines on Android, Mac or Windows: cards and buttons use soft solid fills, and the Mac and Windows home is simpler too</string>
+  <string name="whats_new_notes">The Mac menu bar and Windows tray panels now hold the common switches: smart routing, kill switch, open at login, and speed in menu bar (Mac) or per-app routing (Windows), no need to open the window\nChanging smart routing or the kill switch there while connected reconnects and applies at once\nCheck for updates right from the panel; the result shows on the same line</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

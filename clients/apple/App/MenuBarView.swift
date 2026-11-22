@@ -19,6 +19,9 @@ struct MenuBarView:View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The location list is open in place of the portrait, so a location is picked without opening the window.
     @State private var picking=false
+    @AppStorage(MenuBarLabel.preferenceKey) private var menuBarSpeed=false
+    @State private var openAtLogin=SMAppService.mainApp.status == .enabled
+    @State private var checking=false
     var body:some View {
         let on=model.connected && model.since != nil
         VStack(alignment:.leading,spacing:0) {
@@ -79,6 +82,7 @@ struct MenuBarView:View {
                     }.padding(.horizontal,12).frame(height:52)
                 }.buttonStyle(RowButton()).cardOutline(VeilbirdStyle.radius).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
                 .accessibilityAddTraits(picking ? .isSelected:[]).accessibilityHint(L10n.text("tap_to_change"))
+                quickSettings.padding(.top,8)
                 let figures=UsageFigures(model.account)
                 HStack(alignment:.top,spacing:12) {
                     cell(figures.trafficTitle,figures.traffic,figures.trafficTint,figures.trafficTitleTint)
@@ -90,6 +94,7 @@ struct MenuBarView:View {
             Rectangle().fill(VeilbirdStyle.hairline).frame(height:0.5).padding(.horizontal,4)
             VStack(spacing:0) {
                 menuItem(L10n.text("open_app"),shortcut:"⌘O") {openMain()}.keyboardShortcut("o")
+                if model.signedIn {menuItem(L10n.text("check_for_updates"),shortcut:updateValue) {checkUpdate()}}
                 menuItem(L10n.text("quit_app"),shortcut:"⌘Q") {NSApp.terminate(nil)}.keyboardShortcut("q")
             }.padding(.top,6)
         }.padding(.horizontal,12).padding(.top,14).padding(.bottom,8).frame(width:320)
@@ -168,7 +173,7 @@ struct MenuBarView:View {
     }
     private func menuItem(_ title:String,shortcut:String,action:@escaping ()->Void)->some View {
         Button(action:action) {
-            HStack {Text(title);Spacer();Text(shortcut).foregroundStyle(VeilbirdStyle.faint)}.font(.system(size:13)).padding(.horizontal,8).frame(height:26).contentShape(Rectangle())
+            HStack {Text(title).lineLimit(1).layoutPriority(1);Spacer(minLength:8);Text(shortcut).foregroundStyle(VeilbirdStyle.faint).lineLimit(1)}.font(.system(size:13)).padding(.horizontal,8).frame(height:26).contentShape(Rectangle())
         }.buttonStyle(RowButton()).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
     }
     private func toggle() {
@@ -178,6 +183,44 @@ struct MenuBarView:View {
             // The extension guide lives in the main window.
             if model.extensionGuide {openMain()}
         }
+    }
+    /// The settings people change most, as four tiles, so the window need not open: smart routing (connected, the
+    /// VPN moves to the new mode at once), kill switch (likewise), open at login and the speed in the menu bar.
+    private var quickSettings:some View {
+        Grid(horizontalSpacing:8,verticalSpacing:8) {
+            GridRow {
+                QuickTile(icon:"arrow.triangle.branch",title:L10n.text("quick_smart_routing"),on:model.routing == "smart") {
+                    model.routing=model.routing == "smart" ? "global":"smart";applyNow()
+                }
+                QuickTile(icon:"lock.shield",title:L10n.text("kill_switch"),on:model.killSwitch) {model.killSwitch.toggle();applyNow()}
+            }
+            GridRow {
+                QuickTile(icon:"power",title:L10n.text("quick_open_at_login"),on:openAtLogin) {
+                    let value = !openAtLogin
+                    do {if value {try SMAppService.mainApp.register()} else {try SMAppService.mainApp.unregister()};openAtLogin=value} catch {model.message=error.localizedDescription}
+                }
+                QuickTile(icon:"speedometer",title:L10n.text("quick_menu_bar_speed"),on:menuBarSpeed) {menuBarSpeed.toggle()}
+            }
+        }
+    }
+    /// A tunnel that is up takes a changed routing or kill switch at once, by connecting again.
+    private func applyNow() {
+        guard model.connected && model.since != nil else {return}
+        model.work {try await model.reconnect()}
+    }
+    /// The window's update row in small: the same value, and the same action once an update is known.
+    private var updateValue:String {
+        if checking {return L10n.text("checking_for_updates")}
+        guard let update=model.update else {return L10n.text("up_to_date")}
+        if model.downloading {return L10n.text("update_downloading_value","\(UpdateBanner.percent(model.downloadProgress,update))%")}
+        if update.direct && UpdateDownloader.downloaded(update) != nil {return L10n.text(ClientModel.installsInPlace ? "update_install_relaunch":"update_open_installer")}
+        return L10n.text("update_banner_title",update.version)
+    }
+    private func checkUpdate() {
+        if let update=model.update {model.startUpdate(update) {NSWorkspace.shared.open($0)};return}
+        guard !checking else {return}
+        checking=true
+        Task {await model.checkForUpdate();checking=false}
     }
     /// The home portrait in small: the sphere is the switch, and its ring draws the state once hidden.
     private func menuPortrait(_ on:Bool)->some View {
@@ -200,6 +243,24 @@ struct MenuBarView:View {
         }
     }
     private func openMain() {DockPresence.show(true);openWindow(id:"main");NSApp.activate(ignoringOtherApps:true)}
+}
+/// One quick setting: a filled tile, its icon lit in the accent while the setting is on. No outline; the label may
+/// take two lines, the tile's height never changes.
+private struct QuickTile:View {
+    let icon:String,title:String,on:Bool,action:()->Void
+    var body:some View {
+        Button(action:action) {
+            HStack(spacing:10) {
+                Image(systemName:icon).font(.system(size:12,weight:.semibold))
+                    .foregroundStyle(on ? VeilbirdStyle.onAccent:VeilbirdStyle.secondary)
+                    .frame(width:28,height:28).background(on ? VeilbirdStyle.accent:VeilbirdStyle.selected,in:Circle())
+                Text(title).font(.system(size:12,weight:.medium)).lineLimit(2).minimumScaleFactor(0.85).multilineTextAlignment(.leading)
+                Spacer(minLength:0)
+            }.padding(.horizontal,10).frame(maxWidth:.infinity).frame(height:52).contentShape(Rectangle())
+            .animation(.easeInOut(duration:0.15),value:on)
+        }.buttonStyle(RowButton()).background(VeilbirdStyle.surface).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+        .accessibilityLabel(title).accessibilityValue(L10n.text(on ? "on_state":"off_state"))
+    }
 }
 /// The menu bar icon. With "Show speed in menu bar" on and the tunnel up, upload and download rates sit beside
 /// it on two short lines. A menu bar label can only hold an image and a title, so the two lines are drawn into a

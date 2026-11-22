@@ -262,13 +262,13 @@ public partial class MainWindow : Window {
         flyout??=BuildFlyout();
         var area=SystemParameters.WorkArea;
         flyout.Left=area.Right-flyout.Width-12;flyout.Top=area.Bottom-flyout.Height-12;
-        flyState=null;UpdateFlyout();
+        flyState=null;UpdateFlyout();LightTiles();
         if(flyPicking) SetFlyPicking(false);
         flyout.Show();flyout.Activate();
         _=RefreshAccount();
     }
     private Window BuildFlyout() {
-        var window=new Window {Width=300,Height=440,WindowStyle=WindowStyle.None,AllowsTransparency=true,Background=Brushes.Transparent,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,
+        var window=new Window {Width=320,Height=640,WindowStyle=WindowStyle.None,AllowsTransparency=true,Background=Brushes.Transparent,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,
             FontFamily=FontFamily,UseLayoutRounding=true,Title="TrackNothing"};
         window.Deactivated+=(_,_)=>{if(window.IsVisible) {window.Hide();flyoutHidden=DateTime.UtcNow;}};
         window.IsVisibleChanged+=(_,_)=>{if(!Seen) {trimTimer.Stop();trimTimer.Start();}};
@@ -313,13 +313,31 @@ public partial class MainWindow : Window {
         var usage=new TextBlock {Text="—",FontSize=13,FontWeight=FontWeights.SemiBold};var until=new TextBlock {Text="—",FontSize=13,FontWeight=FontWeights.SemiBold};
         var cells=Cells(("last_30_days",usage,11),("valid_until_label",until,11));cells.Margin=new Thickness(4,14,4,14);
 
-        var footer=new DockPanel {LastChildFill=false};
-        var open=new Button {Content=L10n.Text("open_main_window"),FontSize=13,Height=32,Padding=new Thickness(10,0,10,0)};open.Click+=(_,_)=>ShowFromTray();
-        var quit=new Button {Content=L10n.Text("quit_app"),FontSize=13,Height=32,Padding=new Thickness(10,0,10,0),Foreground=Look.Secondary};quit.Click+=(_,_)=>Quit();
-        DockPanel.SetDock(open,Dock.Left);DockPanel.SetDock(quit,Dock.Right);footer.Children.Add(open);footer.Children.Add(quit);
-        var bottom=new Border {BorderBrush=Look.Hex("#14EDE7DF"),BorderThickness=new Thickness(0,1,0,0),Padding=new Thickness(0,10,0,0),Child=footer};
-        DockPanel.SetDock(bottom,Dock.Bottom);root.Children.Add(bottom);
+        // The window's menu in small: open it, check for updates (its state on the right), quit.
+        var footer=new StackPanel();
+        footer.Children.Add(FlyMenuRow(L10n.Text("open_main_window"),null,ShowFromTray));
+        var updateValue=new TextBlock();
+        footer.Children.Add(FlyMenuRow(L10n.Text("check_for_updates"),updateValue,FlyCheckUpdate));
+        footer.Children.Add(FlyMenuRow(L10n.Text("quit_app"),null,Quit));
+        DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
         DockPanel.SetDock(cells,Dock.Bottom);root.Children.Add(cells);
+        // The settings people change most, as four tiles, so the window need not open.
+        var smartTile=QuickTile("\uE8AB",L10n.Text("quick_smart_routing"),()=>{Settings.Set("routing",Smart?"global":"smart");if(page=="nodes") Render();ApplyNow();});
+        var guardTile=QuickTile("\uE72E",L10n.Text("kill_switch"),()=>{
+            var on=!Connection.KillSwitchOn;Settings.Set("killSwitch",on?"on":"off");
+            Work(async()=>{if(connection.Active) await Task.Run(()=>core.KillSwitch(on));else await connection.KillSwitchChanged();});
+        });
+        var loginTile=QuickTile("\uE7E8",L10n.Text("quick_open_at_login"),()=>{if(!LoginTask.Set(!LoginTask.Enabled)) Notify(L10n.Text("unable_to_reach_the_service_check_your_network_and"));});
+        // Choosing programs needs the list: this one opens the window on that page.
+        var appsTile=QuickTile("\uE71D",L10n.Text("quick_per_app"),()=>{ShowFromTray();page="apps";Render();});
+        var tiles=new Grid {Margin=new Thickness(0,8,0,0)};
+        for(var i=0;i<2;i++) {tiles.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(1,GridUnitType.Star)});tiles.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});}
+        var at=0;
+        foreach(var tile in new[]{smartTile,guardTile,loginTile,appsTile}) {
+            tile.Button.Margin=new Thickness(at%2==0?0:4,at<2?0:8,at%2==0?4:0,0);
+            Grid.SetColumn(tile.Button,at%2);Grid.SetRow(tile.Button,at/2);tiles.Children.Add(tile.Button);at++;
+        }
+        DockPanel.SetDock(tiles,Dock.Bottom);root.Children.Add(tiles);
         DockPanel.SetDock(placeRow,Dock.Bottom);root.Children.Add(placeRow);
         root.Children.Add(middle);
 
@@ -327,10 +345,65 @@ public partial class MainWindow : Window {
         TextElement.SetForeground(window,Look.Text);
         fly=(card,mark,title,detail,toggle,badge,place,placeDetail,usage,until);
         flyRate=rate;flyNote=note;flyNoteText=noteText;
+        flyTiles=new[]{smartTile,guardTile,loginTile,appsTile};flyUpdate=updateValue;
         flyPick=(status,picker,pickList,pickScroll,chevron);flyPicking=false;
         return window;
     }
     private (UIElement Status,UIElement Picker,StackPanel List,ScrollViewer Scroll,TextBlock Chevron)? flyPick;
+    private (Button Button,Border Dot,TextBlock Glyph)[] flyTiles=[];
+    private TextBlock? flyUpdate;
+    private bool flyChecking;
+    /// One quick setting: a filled tile, its icon lit in the accent while the setting is on. No outline; the label
+    /// may take two lines, the tile's height never changes.
+    private (Button Button,Border Dot,TextBlock Glyph) QuickTile(string glyph,string title,System.Action onClick) {
+        var icon=Look.Icon(glyph,13,Look.Secondary);
+        var dot=new Border {Width=28,Height=28,CornerRadius=new CornerRadius(14),Background=Look.Selected,Child=icon,VerticalAlignment=VerticalAlignment.Center};
+        var label=new TextBlock {Text=title,FontSize=12,FontWeight=FontWeights.Medium,TextWrapping=TextWrapping.Wrap,MaxHeight=34,TextTrimming=TextTrimming.CharacterEllipsis,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(10,0,0,0)};
+        var button=new Button {Height=52,Padding=new Thickness(10,0,8,0),Background=Look.Surface,Content=Columns(dot,label)};
+        AutomationProperties.SetName(button,title);
+        button.Click+=(_,_)=>{onClick();LightTiles();UpdateFlyout();};
+        return (button,dot,icon);
+    }
+    /// The tiles read the saved settings: when the flyout opens and after a click, not on every tick.
+    private void LightTiles() {
+        if(flyTiles.Length!=4) return;
+        LightTile(flyTiles[0],Smart);LightTile(flyTiles[1],Connection.KillSwitchOn);LightTile(flyTiles[2],LoginTask.Enabled);LightTile(flyTiles[3],AppRouting.Effective.Mode!=AppRouting.All);
+    }
+    private static void LightTile((Button Button,Border Dot,TextBlock Glyph) tile,bool on) {
+        tile.Dot.Background=on?Look.Accent:Look.Selected;tile.Glyph.Foreground=on?Look.OnAccent:Look.Secondary;
+        AutomationProperties.SetItemStatus(tile.Button,L10n.Text(on?"on_state":"off_state"));
+    }
+    private Button FlyMenuRow(string title,TextBlock? value,System.Action onClick) {
+        var label=Single(title,13);
+        UIElement right=value is null?new FrameworkElement():value;
+        if(value is not null) {value.FontSize=13;value.Foreground=Look.Faint;value.TextWrapping=TextWrapping.NoWrap;value.TextTrimming=TextTrimming.CharacterEllipsis;value.VerticalAlignment=VerticalAlignment.Center;value.Margin=new Thickness(8,0,0,0);value.MaxWidth=150;}
+        var row=new Button {Height=30,Padding=new Thickness(8,0,8,0),Content=Columns(new FrameworkElement(),label,right)};
+        row.Click+=(_,_)=>onClick();
+        return row;
+    }
+    /// A running tunnel takes a changed routing at once, by connecting again; the kill switch keeps blocking meanwhile.
+    private void ApplyNow() {
+        if(!connection.Active||connection.Since is null) return;
+        Work(async()=>{
+            restoring?.Cancel();restoring=null;
+            await connection.Disconnect("disconnected",unexpected:true);
+            try {await connection.Connect(nodeId,Smart);}
+            catch(AccessFailure) {Connection.Wanted=false;}
+        });
+    }
+    /// The account row's action from the tray: a known update downloads (or installs); otherwise it checks, the
+    /// answer showing on the row itself.
+    private async void FlyCheckUpdate() {
+        if(update is { } found) {ShowFromTray();StartDownload(found);return;}
+        if(flyChecking) return;
+        flyChecking=true;UpdateFlyout();
+        try {await CheckForUpdateAsync(false);} finally {flyChecking=false;}
+        UpdateFlyout();
+    }
+    private string FlyUpdateText()=>flyChecking?L10n.Text("checking_for_updates"):update is not { } row?L10n.Text("up_to_date"):Phase(row) switch {
+        UpdatePhase.Downloading=>L10n.Text("update_downloading_value",Percent(row)+"%"),
+        UpdatePhase.Ready=>L10n.Text("update_install"),
+        _=>L10n.Text("update_banner_title",row.Version)};
     private bool flyPicking;
     /// Opens or closes the flyout's location list in place of the status.
     private void SetFlyPicking(bool open) {
@@ -392,6 +465,7 @@ public partial class MainWindow : Window {
         f.Badge.Content=Look.Badge(place.Code,28);f.Location.Text=place.Title;f.LocationDetail.Text=place.Detail;
         ShowRates(flyRate,state);ShowSwitch(flyNote,flyNoteText,state);
         ShowFigures(f.Usage,f.Until);
+        if(flyUpdate is not null) flyUpdate.Text=FlyUpdateText();
     }
 
     // ---- Actions ----
@@ -452,7 +526,8 @@ public partial class MainWindow : Window {
             default:Toggle();break;
         }
     }
-    private async void CheckForUpdate(bool announce) {
+    private void CheckForUpdate(bool announce)=>_=CheckForUpdateAsync(announce);
+    private async Task CheckForUpdateAsync(bool announce) {
         try {
             if(await api.LatestRelease() is not { } found) {if(announce) Notify(L10n.Text("unable_to_reach_the_service_check_your_network_and"));return;}
             if(found.Update?.Build!=update?.Build||found.Announcement!=announcement) {
