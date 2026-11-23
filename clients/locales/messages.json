@@ -2209,6 +2209,131 @@
     "en": "Off",
     "ru": "Выкл."
   },
+  "diag_network": {
+    "zh": "网络",
+    "en": "Network",
+    "ru": "Сеть"
+  },
+  "diag_server": {
+    "zh": "服务器",
+    "en": "Server",
+    "ru": "Сервер"
+  },
+  "diag_lines": {
+    "zh": "线路",
+    "en": "Lines",
+    "ru": "Линии"
+  },
+  "diag_tunnel": {
+    "zh": "加密通道",
+    "en": "Tunnel",
+    "ru": "Туннель"
+  },
+  "diag_ok": {
+    "zh": "正常",
+    "en": "OK",
+    "ru": "В порядке"
+  },
+  "diag_reached": {
+    "zh": "已连上",
+    "en": "Reached",
+    "ru": "Доступен"
+  },
+  "diag_unreached": {
+    "zh": "连不上",
+    "en": "No answer",
+    "ru": "Не отвечает"
+  },
+  "diag_lines_blocked": {
+    "zh": "{0} 条都不通",
+    "en": "All {0} blocked",
+    "ru": "Все {0} заблокированы"
+  },
+  "diag_all_blocked": {
+    "zh": "都不通",
+    "en": "All blocked",
+    "ru": "Все заблокированы"
+  },
+  "diag_not_started": {
+    "zh": "未开始",
+    "en": "Not started",
+    "ru": "Не начат"
+  },
+  "diag_captive": {
+    "zh": "要先登录",
+    "en": "Needs sign-in",
+    "ru": "Нужен вход"
+  },
+  "diag_no_internet": {
+    "zh": "上不了网",
+    "en": "No internet",
+    "ru": "Нет интернета"
+  },
+  "diag_no_permission": {
+    "zh": "未授权",
+    "en": "Not allowed",
+    "ru": "Не разрешён"
+  },
+  "diag_tunnel_failed": {
+    "zh": "没能建立",
+    "en": "Couldn’t open",
+    "ru": "Не открылся"
+  },
+  "error_captive_title": {
+    "zh": "Wi‑Fi 需要先登录",
+    "en": "This Wi‑Fi needs sign-in",
+    "ru": "Wi‑Fi требует входа"
+  },
+  "error_captive_detail": {
+    "zh": "先在浏览器里完成这个 Wi‑Fi 的登录页，再连接。",
+    "en": "Finish the Wi‑Fi sign-in page in the browser first, then connect.",
+    "ru": "Сначала войдите на странице Wi‑Fi в браузере, затем подключитесь."
+  },
+  "error_no_internet_title": {
+    "zh": "这个网络上不了网",
+    "en": "This network has no internet",
+    "ru": "В этой сети нет интернета"
+  },
+  "error_no_internet_detail": {
+    "zh": "换个 Wi‑Fi，或打开移动数据再试。",
+    "en": "Try another Wi‑Fi, or turn on mobile data.",
+    "ru": "Смените Wi‑Fi или включите мобильные данные."
+  },
+  "open_network_settings": {
+    "zh": "网络设置",
+    "en": "Network settings",
+    "ru": "Настройки сети"
+  },
+  "error_lines_title": {
+    "zh": "这个网络拦住了所有线路",
+    "en": "Every line is blocked",
+    "ru": "Линии заблокированы"
+  },
+  "error_lines_detail": {
+    "zh": "服务器能连上，但线路都不通。换个网络，或换个地区试试。",
+    "en": "The server answers, but no line gets through. Try another network or location.",
+    "ru": "Сервер отвечает, а линии — нет. Смените сеть или локацию."
+  },
+  "send_check_action": {
+    "zh": "发送诊断",
+    "en": "Send check",
+    "ru": "Отправить"
+  },
+  "check_sent": {
+    "zh": "已发送给管理员 · 编号 {0}",
+    "en": "Sent to your admin · ref {0}",
+    "ru": "Отправлено администратору · {0}"
+  },
+  "bypass_udp": {
+    "zh": "这个网络拦了 UDP，已改用 {0}",
+    "en": "This network blocks UDP, using {0}",
+    "ru": "Сеть блокирует UDP, используется {0}"
+  },
+  "bypass_port": {
+    "zh": "443 端口被拦，已改用备用端口",
+    "en": "Port 443 is blocked, using a spare port",
+    "ru": "Порт 443 закрыт, используется запасной"
+  },
   "usage_title": {
     "zh": "用量",
     "en": "Usage",

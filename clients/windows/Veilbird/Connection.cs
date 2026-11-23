@@ -39,6 +39,19 @@ public sealed class Connection(NativeApi api,Core core) {
     /// Why the last connection ended (an API code, HANDSHAKE_TIMEOUT, CONNECT_FAILED…); empty when it did not fail.
     public string ErrorCode {get;private set;}="";
     public void ClearError() {ErrorCode="";Changed?.Invoke();}
+    /// The network outside the VPN when the last attempt failed: "ok" or "offline".
+    public string NetworkState {get;private set;}="ok";
+    /// The last attempt's id (its request id in Console → 运行日志): a sent check shows its first letters as the reference.
+    public string Request {get;private set;}="";
+    /// Connected over a line the network forced: "udp:<transport>" (UDP blocked) or "port" (443 blocked), else empty.
+    public string Bypass {get;private set;}="";
+    /// Sends the failure's check with the last attempt's id, so an administrator finds its lines in 运行日志;
+    /// returns the reference shown to the person.
+    public async Task<string> SendCheck(string summary) {
+        api.Attempt=Request.Length>0?Request:null;
+        await api.Report("CONNECT_CHECK",NodeId,summary);
+        return (Request.Length>0?Request:Guid.NewGuid().ToString("N"))[..6].ToUpperInvariant();
+    }
     public static bool KillSwitchOn=>Settings.Get("killSwitch","off")=="on";
     /// Keep a working tunnel this long when the server cannot be reached to renew the lease (it is down or
     /// blocked); the node keeps the lease alive on its side for as long (Agent offline grace).
@@ -92,7 +105,7 @@ public sealed class Connection(NativeApi api,Core core) {
     }
     private async Task Attempt(string nodeId,bool smart) {
         var wasBlocking=Blocking;
-        Active=true;Blocking=false;Since=null;RxRate=TxRate=0;NodeId=nodeId;failures=0;SwitchedFrom="";Phase=0;Retry=0;RetryAt=null;ErrorCode="";Set("authorizing_and_connecting");
+        Active=true;Blocking=false;Since=null;RxRate=TxRate=0;NodeId=nodeId;failures=0;SwitchedFrom="";Bypass="";Phase=0;Retry=0;RetryAt=null;ErrorCode="";Set("authorizing_and_connecting");
         automatic=nodeId.Length==0;Wanted=true;
         try {
             await Task.Run(()=>core.KillSwitch(KillSwitchOn));
@@ -101,6 +114,7 @@ public sealed class Connection(NativeApi api,Core core) {
             sessionOpen=true;sessionUp=null;sessionMs=sessionFallbacks=sessionDrops=0;sessionLine="";sessionNet=network.Split(':')[0];
             var began=DateTime.UtcNow;
             api.Attempt=Guid.NewGuid().ToString("N")[..16];
+            Request=api.Attempt;
             // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
             Journal.Add($"connect: start {api.Attempt}, network {network}, routing {(smart?"smart":"global")}, apps {AppRouting.Effective.Mode} {AppRouting.Effective.Apps.Count}");
             if(NodeId.Length==0) await ChooseFastest();
@@ -115,6 +129,7 @@ public sealed class Connection(NativeApi api,Core core) {
             var detail=error is AccessFailure?"":$"{error.GetType().Name}: {Journal.Scrub(error.Message)}";
             Journal.Add($"connect: failed {code}"+(detail.Length>0?$" ({detail})":""));
             if(Fatal.Contains(code)) Wanted=false;
+            NetworkState=System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable()?"ok":"offline";
             ErrorCode=code;
             await api.Report(code,NodeId,detail);
             await EndSession(failed:true);
@@ -204,6 +219,10 @@ public sealed class Connection(NativeApi api,Core core) {
     private async Task UpdateCarrying() {
         var now=await Task.Run(()=>core.Now(Transports.Group));
         if(now.Length>0&&now!=carrying) {if(carrying.Length>0) Journal.Add($"transport: {carrying} -> {now}");carrying=now;}
+        // A line the network forced, said once on the connect page: Hysteria2 (UDP) failed here while another works,
+        // or 443 failed and the spare port carries traffic. The transport memory holds what failed on this network.
+        var blocked=carrying.Length==0||carrying=="hysteria2"?new HashSet<string>():Transports.Blocked(network);
+        Bypass=blocked.Contains("hysteria2")&&transports.Contains("hysteria2")?"udp:"+carrying:carrying=="reality-alt"&&blocked.Contains("reality")?"port":"";
     }
     private async Task<bool> Status() {try {return (await api.Request("status/"+leaseId))["ready"]?.GetValue<bool>()==true;} catch {return false;}}
     /// A first connection with other transports waits briefly for WireGuard; without them up to 15 s. Renewals only check readiness.
@@ -340,7 +359,7 @@ public sealed class Connection(NativeApi api,Core core) {
             if(Blocking&&!unexpected) {Blocking=false;await LiftKillSwitch();Set(status);}
             return;
         }
-        Active=false;loop?.Cancel();Since=null;RxRate=TxRate=0;carrying="";
+        Active=false;loop?.Cancel();Since=null;RxRate=TxRate=0;carrying="";Bypass="";
         _=EndSession(failed:false);
         NetworkChange.NetworkAddressChanged-=OnNetworkChanged;
         Journal.Add("disconnect: "+status);

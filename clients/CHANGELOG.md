@@ -4,6 +4,26 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.25
+
+### zh
+- 连不上时直接告诉你卡在哪一步：网络、服务器、线路还是加密通道，并给出该怎么办
+- 网络本身上不了网时先说网络的问题，不再误报成服务器故障
+- 「发送诊断」一键把这次连接的检查结果发给管理员，并显示编号方便沟通
+- 网络拦了 UDP 或 443 端口时自动换线路，连上后会说明改用了什么
+
+### en
+- When connecting fails, the app shows which step stopped it (network, server, lines or tunnel) and what to do
+- A network with no internet is named as the cause, instead of looking like a server problem
+- "Send check" sends this attempt's check to your admin and shows a reference number
+- When a network blocks UDP or port 443 the app switches lines on its own, and says which one it used once connected
+
+### ru
+- Если подключиться не удалось, приложение показывает, на каком шаге (сеть, сервер, линии или туннель) и что делать
+- Если в сети нет интернета, причиной называется сеть, а не сервер
+- «Отправить» передаёт проверку этой попытки администратору и показывает номер обращения
+- Если сеть блокирует UDP или порт 443, приложение само меняет линию и после подключения сообщает, какую использует
+
 ## 1.0.24
 
 ### zh

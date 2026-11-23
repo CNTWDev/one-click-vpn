@@ -57,6 +57,29 @@ object Transports {
         manager.allNetworks.any { network -> manager.getNetworkCapabilities(network)?.let { !it.hasTransport(NetworkCapabilities.TRANSPORT_VPN) && it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) } == true }
     } catch (_: Exception) { true }
 
+    /**
+     * What the system knows of the network outside the VPN, for the cause of a failure: "offline" (none), "captive"
+     * (a Wi-Fi sign-in page holds it) or "ok". A network the system could not validate still counts as ok: phones
+     * that check against blocked hosts would otherwise call every network broken.
+     */
+    fun networkState(context: Context): String = try {
+        val manager = context.getSystemService(ConnectivityManager::class.java)
+        @Suppress("DEPRECATION")
+        val all = manager.allNetworks.mapNotNull { manager.getNetworkCapabilities(it) }
+            .filter { !it.hasTransport(NetworkCapabilities.TRANSPORT_VPN) && it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) }
+        when {
+            all.isEmpty() -> "offline"
+            all.any { it.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) } -> "ok"
+            all.any { it.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) } -> "captive"
+            else -> "ok"
+        }
+    } catch (_: Exception) { "ok" }
+
+    /** The transport's name as the connect page says it. */
+    fun label(transport: String): String = when (transport) {
+        "hysteria2" -> "Hysteria2"; "reality", "reality-alt" -> "REALITY"; "xhttp" -> "XHTTP"; "wireguard" -> "WireGuard"; else -> transport
+    }
+
     private fun memory(context: Context) = context.getSharedPreferences("transports", Context.MODE_PRIVATE)
 
     /** Transports that failed on this network within the last week, while another one worked. */

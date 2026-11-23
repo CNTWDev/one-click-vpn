@@ -80,6 +80,13 @@ import ServiceManagement
     /// try and how many rounds failed while reconnecting.
     @Published var phase=0
     @Published var lines=4
+    /// From the tunnel: the attempt's id (its request id in Console → 运行日志) and a line the network forced
+    /// ("udp:<transport>" or "port"); the network outside the VPN when the attempt failed ("ok" or "offline").
+    @Published var request=""
+    @Published var bypass=""
+    @Published var networkState="ok"
+    /// The reference of a check sent from a failure ("发送诊断"), shown under the check until the next attempt.
+    @Published var sentCheck:String?
     @Published var retryAt:Date?
     @Published var retries=0
     /// False on a new install until its first connection: sign-in and connect then show "n/2" (the location starts on Automatic).
@@ -94,6 +101,7 @@ import ServiceManagement
     private var ticker:AnyCancellable?
     // Status is polled here, not in the window: on the Mac the menu bar keeps working after the window is closed.
     init() {
+        _ = Guidance.networkState() // starts the path monitor, so a failure finds its first reading
         Latency.realTests=true // the app measures nodes through their transports (Latency.swift)
         restoreNodes()
         #if os(iOS)
@@ -124,7 +132,23 @@ import ServiceManagement
         default:return since != nil ? .connected:.connecting
         }
     }
-    var trouble:Trouble? {ringState == .failed ? Guidance.trouble(failureCode,node:nodeName.isEmpty ? selectedName:nodeName,automatic:selected.isEmpty,fallback:failure):nil}
+    var trouble:Trouble? {ringState == .failed ? Guidance.trouble(failureCode,node:nodeName.isEmpty ? selectedName:nodeName,automatic:selected.isEmpty,fallback:failure,network:networkState):nil}
+    /// The four-step check under a failure of the network (network, server, lines, tunnel), or nil.
+    var checks:[Check]? {ringState == .failed ? Guidance.checks(failureCode,lines:lines,network:networkState):nil}
+    /// Sends the check of the last failed attempt with that attempt's id, so an administrator finds its lines in 运行日志;
+    /// returns the reference shown to the person (the id's first letters), or nil when it could not be sent.
+    @discardableResult func sendCheck() async -> String? {
+        guard let client=try? self.api() else {return nil}
+        client.attempt=request.isEmpty ? nil:request
+        let summary=Guidance.summary(failureCode,lines:lines,network:networkState)
+        var event:[String:Any]=["code":"CONNECT_CHECK","at":ISO8601DateFormatter().string(from:Date()),"detail":summary]
+        if !connectedNodeId.isEmpty {event["nodeId"]=connectedNodeId} else if !selected.isEmpty {event["nodeId"]=selected}
+        if !request.isEmpty {event["attempt"]=request}
+        guard (try? await client.request("diagnostics",["events":[event]])) != nil else {return nil}
+        let ref=String((request.isEmpty ? UUID().uuidString:request).prefix(6)).uppercased()
+        sentCheck=ref
+        return ref
+    }
     /// Seconds until the next try while reconnecting.
     func countdown(_ now:Date)->Int {max(0,Int(((reconnectAt ?? retryAt)?.timeIntervalSince(now) ?? 0).rounded(.up)))}
     var phaseText:String {L10n.text(phase == 0 ? "phase_route":(phase == 1 ? "phase_tunnel":"phase_confirm"))}
@@ -365,7 +389,7 @@ import ServiceManagement
         throw AccessFailure.code("SIMULATOR_UNSUPPORTED")
         #else
         if connected || reconnectTask != nil {attempt=nil;reconnectTask?.cancel();reconnectTask=nil;reconnectAt=nil;await TunnelControl.stop(manager);return}
-        failed=false;failureCode="";phase=0
+        failed=false;failureCode="";phase=0;sentCheck=nil
         #if os(macOS)
         // Once the user allows the extension in System Settings, connect without another tap.
         SystemExtension.shared.onReady={[weak self] in
@@ -415,7 +439,7 @@ import ServiceManagement
                 if duringAttempt || code == "ACCESS_EXPIRED" || Shared.fatal.contains(code ?? "") {
                     Journal.add("disconnect: tunnel closed (\(code ?? "unknown")), not reconnecting")
                     await TunnelControl.stop(self.manager);Shared.refused=nil
-                    if let code {self.failed=true;self.failure=AccessFailure.code(code).localizedDescription;self.failureCode=code}
+                    if let code {self.failed=true;self.failure=AccessFailure.code(code).localizedDescription;self.failureCode=code;self.networkState=Guidance.networkState()}
                     if code == "AUTH_REQUIRED" {self.signedIn=false}
                     return
                 }
@@ -484,11 +508,11 @@ import ServiceManagement
         case .disconnecting:update(\.status,"disconnecting")
         default:
             update(\.status,"not_connected");update(\.since,nil);update(\.rxRate,0);update(\.txRate,0)
-            update(\.rxHistory,[]);update(\.txHistory,[]);update(\.switchedFrom,"")
+            update(\.rxHistory,[]);update(\.txHistory,[]);update(\.switchedFrom,"");update(\.bypass,"")
             if activity != nil {activity=nil}
             // The tunnel went down on its own shortly after a requested start: show it as a failed attempt.
             if let attempt,Date().timeIntervalSince(attempt)>2 {
-                self.attempt=nil;failed=true;failure=L10n.text("unable_to_connect_check_your_network_and_try_again");failureCode="CONNECT_FAILED"
+                self.attempt=nil;failed=true;failure=L10n.text("unable_to_connect_check_your_network_and_try_again");failureCode="CONNECT_FAILED";networkState=Guidance.networkState()
             }
         }
         if manager?.connection.status == .connected {attempt=nil}
@@ -513,6 +537,7 @@ import ServiceManagement
                 self.update(\.rxRate,state["rx"] as? Int ?? 0);self.update(\.txRate,state["tx"] as? Int ?? 0)
                 self.update(\.switchedFrom,state["switchedFrom"] as? String ?? "")
                 self.update(\.phase,state["phase"] as? Int ?? self.phase);self.update(\.lines,state["lines"] as? Int ?? self.lines)
+                self.update(\.request,state["request"] as? String ?? self.request);self.update(\.bypass,state["bypass"] as? String ?? "")
                 self.update(\.retries,state["attempt"] as? Int ?? 0);self.update(\.retryAt,(state["retryAt"] as? Double).map {Date(timeIntervalSince1970:$0)})
                 // The first connection ends the three steps.
                 if self.since != nil && !self.onboarded {self.onboarded=true}

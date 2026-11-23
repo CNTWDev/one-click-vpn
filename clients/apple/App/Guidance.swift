@@ -1,4 +1,5 @@
 import SwiftUI
+import Network
 
 /// What went wrong, said as the cause, the next step and the button that takes it (the second one is optional).
 /// The same causes and buttons as Android (Guidance.kt) and Windows (Guidance.cs).
@@ -11,15 +12,34 @@ struct Trouble:Equatable {
     var secondaryDo:String?=nil
 }
 
+/// One row of the check shown under a failure: what was checked, what it found, and whether that step passed.
+struct Check:Equatable,Hashable {
+    enum Status {case ok,bad,skip}
+    let key:String
+    let label:String
+    let value:String
+    let status:Status
+}
+
 enum Guidance {
     /// [code]: why the last connection ended (an API code, HANDSHAKE_TIMEOUT, VPN_CONFIGURATION, SYSTEM_EXTENSION…).
     /// Actions: retry, devices, automatic, nodes, signin, settings, account, update.
-    static func trouble(_ code:String,node:String,automatic:Bool,fallback:String)->Trouble {
+    static func trouble(_ code:String,node:String,automatic:Bool,fallback:String,network:String="ok")->Trouble {
         let retry=L10n.text("retry_action")
+        // The network explains a network failure first: no network at all outside the VPN.
+        if failuresOfNetwork.contains(code) && network == "offline" {
+            return Trouble(title:L10n.text("error_no_internet_title"),detail:L10n.text("error_no_internet_detail"),primary:L10n.text("open_network_settings"),primaryDo:"wifi",secondary:retry,secondaryDo:"retry")
+        }
+        let send=L10n.text("send_check_action")
         switch code {
         case "DEVICE_LIMIT_REACHED":
             return Trouble(title:L10n.text("error_device_title"),detail:L10n.text("error_device_detail"),primary:L10n.text("manage_devices_action"),primaryDo:"devices",secondary:retry,secondaryDo:"retry")
-        case "HANDSHAKE_TIMEOUT","NODE_UNAVAILABLE","NODE_FULL":
+        case "HANDSHAKE_TIMEOUT":
+            // Automatic already tried the fastest locations: the server answered, the lines did not.
+            return automatic
+                ? Trouble(title:L10n.text("error_lines_title"),detail:L10n.text("error_lines_detail"),primary:L10n.text("change_location_action"),primaryDo:"nodes",secondary:send,secondaryDo:"send")
+                : Trouble(title:L10n.text("error_node_title",node),detail:L10n.text("error_node_detail"),primary:L10n.text("use_automatic_action"),primaryDo:"automatic",secondary:send,secondaryDo:"send")
+        case "NODE_UNAVAILABLE","NODE_FULL":
             let title=L10n.text("error_node_title",node)
             return automatic
                 ? Trouble(title:title,detail:L10n.text("error_node_auto_detail"),primary:retry,primaryDo:"retry",secondary:L10n.text("change_location_action"),secondaryDo:"nodes")
@@ -42,8 +62,8 @@ enum Guidance {
             return Trouble(title:L10n.text("error_lease_title"),detail:L10n.text("error_lease_detail"),primary:L10n.text("connect_again_action"),primaryDo:"retry")
         case "ACCOUNT_UNAVAILABLE","MANAGED_ACCESS_REQUIRED","CLIENT_ACCESS_NOT_ENABLED":
             return Trouble(title:L10n.text("error_account_title"),detail:fallback,primary:retry,primaryDo:"retry")
-        case "":
-            return Trouble(title:L10n.text("connect_failed_title"),detail:fallback,primary:retry,primaryDo:"retry")
+        case "","CONNECT_FAILED":
+            return Trouble(title:L10n.text("connect_failed_title"),detail:fallback,primary:retry,primaryDo:"retry",secondary:send,secondaryDo:"send")
         default:
             #if os(macOS)
             let detail=L10n.text("error_service_detail_desktop")
@@ -53,6 +73,47 @@ enum Guidance {
             return Trouble(title:L10n.text("error_service_title"),detail:detail,primary:retry,primaryDo:"retry")
         }
     }
+    /// Failures the network itself can cause (no network then explains them better).
+    static let failuresOfNetwork:Set<String>=["SERVICE_UNAVAILABLE","HANDSHAKE_TIMEOUT","CONNECT_FAILED",""]
+    /// The four steps a connection takes (network, server, lines, tunnel) and where the last attempt stopped, for
+    /// failures of the network itself; nil for a refusal of the account or the device, which has its own cause.
+    static func checks(_ code:String,lines:Int,network:String)->[Check]? {
+        let ok=L10n.text("diag_ok"),skip=L10n.text("diag_not_started")
+        func row(_ key:String,_ value:String,_ status:Check.Status)->Check {Check(key:key,label:L10n.text("diag_"+key),value:value,status:status)}
+        let net=network == "offline" ? row("network",L10n.text("diag_no_internet"),.bad):row("network",ok,.ok)
+        if net.status == .bad && failuresOfNetwork.contains(code) {return [net,row("server",skip,.skip),row("lines",skip,.skip),row("tunnel",skip,.skip)]}
+        let reached=row("server",L10n.text("diag_reached"),.ok)
+        switch code {
+        case "SERVICE_UNAVAILABLE":return [net,row("server",L10n.text("diag_unreached"),.bad),row("lines",skip,.skip),row("tunnel",skip,.skip)]
+        case "HANDSHAKE_TIMEOUT":return [net,reached,row("lines",lines>0 ? L10n.text("diag_lines_blocked",L10n.number(lines)):L10n.text("diag_all_blocked"),.bad),row("tunnel",skip,.skip)]
+        case "VPN_CONFIGURATION","SYSTEM_EXTENSION":return [net,row("server",skip,.skip),row("lines",skip,.skip),row("tunnel",L10n.text("diag_no_permission"),.bad)]
+        case "CONNECT_FAILED","":return [net,reached,row("lines",skip,.skip),row("tunnel",L10n.text("diag_tunnel_failed"),.bad)]
+        default:return nil
+        }
+    }
+    /// The check as one line for the report a person sends: "network=ok server=bad lines=skip tunnel=skip net=ok code=…".
+    static func summary(_ code:String,lines:Int,network:String)->String {
+        guard let rows=checks(code,lines:lines,network:network) else {return "code=\(code)"}
+        return rows.map {"\($0.key)=\($0.status == .ok ? "ok":$0.status == .bad ? "bad":"skip")"}.joined(separator:" ")+" net=\(network) code=\(code.isEmpty ? "CONNECT_FAILED":code)"
+    }
+    /// The second line while connected over a line the network forced, or nil.
+    static func bypass(_ value:String)->String? {
+        if value.hasPrefix("udp:") {return L10n.text("bypass_udp",label(String(value.dropFirst(4))))}
+        return value == "port" ? L10n.text("bypass_port"):nil
+    }
+    static func label(_ transport:String)->String {
+        switch transport {
+        case "hysteria2":return "Hysteria2"
+        case "reality","reality-alt":return "REALITY"
+        case "xhttp":return "XHTTP"
+        case "wireguard":return "WireGuard"
+        default:return transport
+        }
+    }
+    /// "offline" when the device has no network outside the VPN (Wi-Fi, mobile data or Ethernet), else "ok".
+    /// The monitor runs from the first call; an unvalidated network still counts as one (captive checks differ by network).
+    static func networkState()->String {Transports.online(path.currentPath) ? "ok":"offline"}
+    private static let path:NWPathMonitor={let monitor=NWPathMonitor();monitor.start(queue:DispatchQueue(label:"guidance.path"));return monitor}()
 }
 
 /// During the first run, on a page's § line: two squares (done, current, to come) and "n/2"; count+1 is "ready".
@@ -181,7 +242,7 @@ extension ClientModel {
     }
     var stateDetail:String {
         switch ringState {
-        case .connected:return L10n.text("seen_as",nodeName)
+        case .connected:return L10n.text("seen_as",nodeName)+(Guidance.bypass(bypass).map {"\n"+$0} ?? "")
         case .connecting:return L10n.text("finding_best_route")
         case .switching:return L10n.text("switching_detail")
         case .reconnecting:return L10n.text(status == "location_retrying" ? "location_retrying":"reconnecting_detail")

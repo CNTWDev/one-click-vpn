@@ -77,6 +77,8 @@
   <data name="automatic_recommended" xml:space="preserve"><value>自动选择 · 推荐</value></data>
   <data name="available_location" xml:space="preserve"><value>可用位置</value></data>
   <data name="back_action" xml:space="preserve"><value>返回</value></data>
+  <data name="bypass_port" xml:space="preserve"><value>443 端口被拦，已改用备用端口</value></data>
+  <data name="bypass_udp" xml:space="preserve"><value>这个网络拦了 UDP，已改用 {0}</value></data>
   <data name="cancel" xml:space="preserve"><value>取消</value></data>
   <data name="change_location" xml:space="preserve"><value>更换连接位置  ›</value></data>
   <data name="change_location_action" xml:space="preserve"><value>换位置</value></data>
@@ -95,6 +97,7 @@
   <data name="check_node_slow" xml:space="preserve"><value>{0} 现在很慢，换个节点会更快。</value></data>
   <data name="check_ok" xml:space="preserve"><value>线路正常，三段都很快。</value></data>
   <data name="check_running" xml:space="preserve"><value>正在逐段测量…</value></data>
+  <data name="check_sent" xml:space="preserve"><value>已发送给管理员 · 编号 {0}</value></data>
   <data name="check_title" xml:space="preserve"><value>线路体检</value></data>
   <data name="check_web" xml:space="preserve"><value>打开网页</value></data>
   <data name="check_web_detail" xml:space="preserve"><value>经节点访问外网</value></data>
@@ -146,6 +149,20 @@
   <data name="devices_join_automatically" xml:space="preserve"><value>新设备首次连接自动加入</value></data>
   <data name="devices_unlimited" xml:space="preserve"><value>不限</value></data>
   <data name="devices_used" xml:space="preserve"><value>已用 {0} / {1}</value></data>
+  <data name="diag_all_blocked" xml:space="preserve"><value>都不通</value></data>
+  <data name="diag_captive" xml:space="preserve"><value>要先登录</value></data>
+  <data name="diag_lines" xml:space="preserve"><value>线路</value></data>
+  <data name="diag_lines_blocked" xml:space="preserve"><value>{0} 条都不通</value></data>
+  <data name="diag_network" xml:space="preserve"><value>网络</value></data>
+  <data name="diag_no_internet" xml:space="preserve"><value>上不了网</value></data>
+  <data name="diag_no_permission" xml:space="preserve"><value>未授权</value></data>
+  <data name="diag_not_started" xml:space="preserve"><value>未开始</value></data>
+  <data name="diag_ok" xml:space="preserve"><value>正常</value></data>
+  <data name="diag_reached" xml:space="preserve"><value>已连上</value></data>
+  <data name="diag_server" xml:space="preserve"><value>服务器</value></data>
+  <data name="diag_tunnel" xml:space="preserve"><value>加密通道</value></data>
+  <data name="diag_tunnel_failed" xml:space="preserve"><value>没能建立</value></data>
+  <data name="diag_unreached" xml:space="preserve"><value>连不上</value></data>
   <data name="disconnect_action" xml:space="preserve"><value>断开连接</value></data>
   <data name="disconnect_before_changing_location" xml:space="preserve"><value>请先断开连接，再更换位置。</value></data>
   <data name="disconnect_before_changing_routing" xml:space="preserve"><value>请先断开连接再切换分流方式。</value></data>
@@ -164,6 +181,8 @@
   <data name="enter_password" xml:space="preserve"><value>输入密码</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>请填写邮箱和密码。</value></data>
   <data name="error_account_title" xml:space="preserve"><value>账号暂不可用</value></data>
+  <data name="error_captive_detail" xml:space="preserve"><value>先在浏览器里完成这个 Wi‑Fi 的登录页，再连接。</value></data>
+  <data name="error_captive_title" xml:space="preserve"><value>Wi‑Fi 需要先登录</value></data>
   <data name="error_device_detail" xml:space="preserve"><value>解除一台不用的设备，这台就能连上。</value></data>
   <data name="error_device_title" xml:space="preserve"><value>设备已满</value></data>
   <data name="error_expired_detail" xml:space="preserve"><value>请管理员续期，续好后轻触重试。</value></data>
@@ -172,6 +191,10 @@
   <data name="error_extension_title" xml:space="preserve"><value>网络扩展没打开</value></data>
   <data name="error_lease_detail" xml:space="preserve"><value>离线太久，授权过期了。重新连接一次就好。</value></data>
   <data name="error_lease_title" xml:space="preserve"><value>连接授权过期</value></data>
+  <data name="error_lines_detail" xml:space="preserve"><value>服务器能连上，但线路都不通。换个网络，或换个地区试试。</value></data>
+  <data name="error_lines_title" xml:space="preserve"><value>这个网络拦住了所有线路</value></data>
+  <data name="error_no_internet_detail" xml:space="preserve"><value>换个 Wi‑Fi，或打开移动数据再试。</value></data>
+  <data name="error_no_internet_title" xml:space="preserve"><value>这个网络上不了网</value></data>
   <data name="error_node_auto_detail" xml:space="preserve"><value>所有位置暂时都没响应，稍后重试或换个网络。</value></data>
   <data name="error_node_detail" xml:space="preserve"><value>换个位置，或者交给自动选择。</value></data>
   <data name="error_node_title" xml:space="preserve"><value>{0}没有响应</value></data>
@@ -263,6 +286,7 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="open_app" xml:space="preserve"><value>打开 TrackNothing</value></data>
   <data name="open_at_login" xml:space="preserve"><value>登录时启动</value></data>
   <data name="open_main_window" xml:space="preserve"><value>打开主窗口</value></data>
+  <data name="open_network_settings" xml:space="preserve"><value>网络设置</value></data>
   <data name="open_settings_short" xml:space="preserve"><value>去设置</value></data>
   <data name="open_system_settings" xml:space="preserve"><value>打开系统设置</value></data>
   <data name="open_vpn_settings" xml:space="preserve"><value>打开 VPN 设置</value></data>
@@ -338,6 +362,7 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="seen_as" xml:space="preserve"><value>网站只能看到{0}</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>选延迟最低的节点，连不上自动换</value></data>
   <data name="selected_state" xml:space="preserve"><value>已选中</value></data>
+  <data name="send_check_action" xml:space="preserve"><value>发送诊断</value></data>
   <data name="send_reset_link" xml:space="preserve"><value>发送</value></data>
   <data name="server_address" xml:space="preserve"><value>服务地址</value></data>
   <data name="server_address_url" xml:space="preserve"><value>服务地址 https://…</value></data>
@@ -454,8 +479,10 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>连接时更稳：应用会记录每次连接的结果，帮助我们在新版本推给所有人之前先发现问题
-连不上的服务器会被自动移出列表，恢复后自动放回</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>连不上时直接告诉你卡在哪一步：网络、服务器、线路还是加密通道，并给出该怎么办
+网络本身上不了网时先说网络的问题，不再误报成服务器故障
+「发送诊断」一键把这次连接的检查结果发给管理员，并显示编号方便沟通
+网络拦了 UDP 或 443 端口时自动换线路，连上后会说明改用了什么</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>

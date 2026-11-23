@@ -1703,6 +1703,52 @@
         }
       }
     },
+    "bypass_port": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Port 443 is blocked, using a spare port"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "443 端口被拦，已改用备用端口"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Порт 443 закрыт, используется запасной"
+          }
+        }
+      }
+    },
+    "bypass_udp": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This network blocks UDP, using %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个网络拦了 UDP，已改用 %1$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сеть блокирует UDP, используется %1$@"
+          }
+        }
+      }
+    },
     "cancel": {
       "extractionState": "manual",
       "localizations": {
@@ -2113,6 +2159,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Измеряем каждый участок…"
+          }
+        }
+      }
+    },
+    "check_sent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent to your admin · ref %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已发送给管理员 · 编号 %1$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отправлено администратору · %1$@"
           }
         }
       }
@@ -3290,6 +3359,328 @@
         }
       }
     },
+    "diag_all_blocked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All blocked"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "都不通"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Все заблокированы"
+          }
+        }
+      }
+    },
+    "diag_captive": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs sign-in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要先登录"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нужен вход"
+          }
+        }
+      }
+    },
+    "diag_lines": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lines"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "线路"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Линии"
+          }
+        }
+      }
+    },
+    "diag_lines_blocked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All %1$@ blocked"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 条都不通"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Все %1$@ заблокированы"
+          }
+        }
+      }
+    },
+    "diag_network": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Network"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网络"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сеть"
+          }
+        }
+      }
+    },
+    "diag_no_internet": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No internet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上不了网"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нет интернета"
+          }
+        }
+      }
+    },
+    "diag_no_permission": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not allowed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未授权"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не разрешён"
+          }
+        }
+      }
+    },
+    "diag_not_started": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not started"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未开始"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не начат"
+          }
+        }
+      }
+    },
+    "diag_ok": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正常"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В порядке"
+          }
+        }
+      }
+    },
+    "diag_reached": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reached"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已连上"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Доступен"
+          }
+        }
+      }
+    },
+    "diag_server": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сервер"
+          }
+        }
+      }
+    },
+    "diag_tunnel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tunnel"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加密通道"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Туннель"
+          }
+        }
+      }
+    },
+    "diag_tunnel_failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t open"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没能建立"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не открылся"
+          }
+        }
+      }
+    },
+    "diag_unreached": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No answer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连不上"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не отвечает"
+          }
+        }
+      }
+    },
     "disconnect_action": {
       "extractionState": "manual",
       "localizations": {
@@ -3704,6 +4095,52 @@
         }
       }
     },
+    "error_captive_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish the Wi‑Fi sign-in page in the browser first, then connect."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先在浏览器里完成这个 Wi‑Fi 的登录页，再连接。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сначала войдите на странице Wi‑Fi в браузере, затем подключитесь."
+          }
+        }
+      }
+    },
+    "error_captive_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Wi‑Fi needs sign-in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wi‑Fi 需要先登录"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wi‑Fi требует входа"
+          }
+        }
+      }
+    },
     "error_device_detail": {
       "extractionState": "manual",
       "localizations": {
@@ -3884,6 +4321,98 @@
           "stringUnit": {
             "state": "translated",
             "value": "Доступ устарел"
+          }
+        }
+      }
+    },
+    "error_lines_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server answers, but no line gets through. Try another network or location."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器能连上，但线路都不通。换个网络，或换个地区试试。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сервер отвечает, а линии — нет. Смените сеть или локацию."
+          }
+        }
+      }
+    },
+    "error_lines_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every line is blocked"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个网络拦住了所有线路"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Линии заблокированы"
+          }
+        }
+      }
+    },
+    "error_no_internet_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try another Wi‑Fi, or turn on mobile data."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "换个 Wi‑Fi，或打开移动数据再试。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Смените Wi‑Fi или включите мобильные данные."
+          }
+        }
+      }
+    },
+    "error_no_internet_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This network has no internet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个网络上不了网"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В этой сети нет интернета"
           }
         }
       }
@@ -5889,6 +6418,29 @@
         }
       }
     },
+    "open_network_settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Network settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网络设置"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Настройки сети"
+          }
+        }
+      }
+    },
     "open_settings_short": {
       "extractionState": "manual",
       "localizations": {
@@ -7610,6 +8162,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "выбрано"
+          }
+        }
+      }
+    },
+    "send_check_action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send check"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发送诊断"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отправить"
           }
         }
       }
@@ -10265,19 +10840,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Steadier connections: the app now notes how each connection went, so problems in a new version are caught before it reaches everyone\nServers nobody can reach are taken out of the list automatically and come back once they recover"
+            "value": "When connecting fails, the app shows which step stopped it (network, server, lines or tunnel) and what to do\nA network with no internet is named as the cause, instead of looking like a server problem\n\"Send check\" sends this attempt's check to your admin and shows a reference number\nWhen a network blocks UDP or port 443 the app switches lines on its own, and says which one it used once connected"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连接时更稳：应用会记录每次连接的结果，帮助我们在新版本推给所有人之前先发现问题\n连不上的服务器会被自动移出列表，恢复后自动放回"
+            "value": "连不上时直接告诉你卡在哪一步：网络、服务器、线路还是加密通道，并给出该怎么办\n网络本身上不了网时先说网络的问题，不再误报成服务器故障\n「发送诊断」一键把这次连接的检查结果发给管理员，并显示编号方便沟通\n网络拦了 UDP 或 443 端口时自动换线路，连上后会说明改用了什么"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Стабильнее подключение: приложение отмечает, как прошло каждое подключение, чтобы проблемы новой версии находились до того, как она дойдёт до всех\nСерверы, к которым никто не может подключиться, автоматически убираются из списка и возвращаются после восстановления"
+            "value": "Если подключиться не удалось, приложение показывает, на каком шаге (сеть, сервер, линии или туннель) и что делать\nЕсли в сети нет интернета, причиной называется сеть, а не сервер\n«Отправить» передаёт проверку этой попытки администратору и показывает номер обращения\nЕсли сеть блокирует UDP или порт 443, приложение само меняет линию и после подключения сообщает, какую использует"
           }
         }
       }
