@@ -1,13 +1,12 @@
 name: Client build check
 on:
   workflow_dispatch:
-  pull_request:
-    paths: ['clients/**', 'scripts/native-locales.mjs', '.github/workflows/native-clients.yml']
-  # Master runs only when the shared core changes: they save the prebuilt core (Android AAR, Apple xcframework),
-  # Go and Gradle caches where every pull request can read them (a pull request's own caches are private to it).
+  # Runs on master after merge, not on pull requests: changes merge without waiting and are fixed forward. A
+  # newer master commit cancels the run of the previous one, so a burst of merges is built once. Each master run
+  # also saves the prebuilt core (Android AAR, Apple xcframework), Go and Gradle caches for the next one.
   push:
     branches: [master]
-    paths: ['clients/core/**', '.github/workflows/native-clients.yml']
+    paths: ['clients/**', 'scripts/native-locales.mjs', '.github/workflows/native-clients.yml']
 permissions:
   contents: read
 # A new push to the same branch cancels the builds still going for the previous commit.
