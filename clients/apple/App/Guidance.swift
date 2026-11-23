@@ -79,7 +79,8 @@ enum Guidance {
     /// failures of the network itself; nil for a refusal of the account or the device, which has its own cause.
     static func checks(_ code:String,lines:Int,network:String)->[Check]? {
         let ok=L10n.text("diag_ok"),skip=L10n.text("diag_not_started")
-        func row(_ key:String,_ value:String,_ status:Check.Status)->Check {Check(key:key,label:L10n.text("diag_"+key),value:value,status:status)}
+        let labels=["network":L10n.text("diag_network"),"server":L10n.text("diag_server"),"lines":L10n.text("diag_lines"),"tunnel":L10n.text("diag_tunnel")]
+        func row(_ key:String,_ value:String,_ status:Check.Status)->Check {Check(key:key,label:labels[key] ?? key,value:value,status:status)}
         let net=network == "offline" ? row("network",L10n.text("diag_no_internet"),.bad):row("network",ok,.ok)
         if net.status == .bad && failuresOfNetwork.contains(code) {return [net,row("server",skip,.skip),row("lines",skip,.skip),row("tunnel",skip,.skip)]}
         let reached=row("server",L10n.text("diag_reached"),.ok)

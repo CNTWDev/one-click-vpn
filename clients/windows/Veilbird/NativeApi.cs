@@ -142,6 +142,19 @@ public sealed class NativeApi : IDisposable {
             ["identityKey"]=new JsonObject {["kty"]="EC",["crv"]="P-256",["x"]=B64(key.Q.X!),["y"]=B64(key.Q.Y!)} });
         Save("token",Encoding.UTF8.GetBytes(result["accessToken"]!.GetValue<string>()));Save("origin",Encoding.UTF8.GetBytes(Origin));
     }
+    /// Signing in this PC with the phone (server/qr-login.ts): a code for the QR, then polls until the phone confirms.
+    public async Task<JsonObject> QrLoginStart() {
+        var key=identity.ExportParameters(false);
+        return await Request("qr-login",new JsonObject {["platform"]="windows",["deviceName"]=Environment.MachineName,
+            ["identityKey"]=new JsonObject {["kty"]="EC",["crv"]="P-256",["x"]=B64(key.Q.X!),["y"]=B64(key.Q.Y!)}});
+    }
+    /// "pending", "scanned", "declined", "expired", or "approved" (the session is then saved, as after a password sign-in).
+    public async Task<string> QrLoginPoll(string id,string secret) {
+        var result=await Request("qr-login/poll",new JsonObject {["id"]=id,["secret"]=secret});
+        var status=result["status"]?.GetValue<string>()??"expired";
+        if(status=="approved") {Save("token",Encoding.UTF8.GetBytes(result["accessToken"]!.GetValue<string>()));Save("origin",Encoding.UTF8.GetBytes(Origin));}
+        return status;
+    }
     /// Emails the Portal's reset link; the answer is the same whether or not the address has an account.
     public async Task RequestPasswordReset(string email)=>await Request("password-reset",new JsonObject {["email"]=email,["language"]=L10n.Culture.TwoLetterISOLanguageName});
     public async Task<JsonObject> Action(string action,JsonObject input) {

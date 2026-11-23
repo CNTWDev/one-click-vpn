@@ -656,6 +656,17 @@ const migrations = [
     ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS rollout_asked_at TIMESTAMPTZ;
     UPDATE client_releases SET rollout_since = COALESCE(published_at::timestamptz, updated_at) WHERE rollout_since IS NULL AND rollout_percent < 100;
   `)],
+  ["015-qr-logins", async (db) => db.query(`
+    -- Signing in a computer with the phone (server/qr-login.ts): hashes only, two minutes, used once.
+    CREATE TABLE IF NOT EXISTS qr_logins (
+      id TEXT PRIMARY KEY, code_hash TEXT NOT NULL UNIQUE, secret_hash TEXT NOT NULL,
+      kind TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', platform TEXT NOT NULL, device_name TEXT NOT NULL DEFAULT '',
+      identity_jwk TEXT, identity_thumbprint TEXT, user_id TEXT REFERENCES users(id) ON DELETE CASCADE, approved_by_session TEXT,
+      country TEXT, created_address_hash TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now(), expires_at TIMESTAMPTZ NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS qr_logins_expiry ON qr_logins(expires_at);
+    CREATE INDEX IF NOT EXISTS qr_logins_address ON qr_logins(created_address_hash, created_at);
+  `)],
 ];
 
 const client = await pool.connect();

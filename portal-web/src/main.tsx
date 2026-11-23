@@ -11,6 +11,7 @@ import { errorText } from "../../shared/i18n-errors";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { api } from "./api";
+import { QrSignIn } from "./qr-sign-in";
 import "./styles.css";
 
 // Signed-in pages load on demand, so the sign-in screen does not wait for them (or for the QR code library).
@@ -43,6 +44,14 @@ function Auth({ mode, onMode, onUser, notice }: {
   const [busy, setBusy] = useState(false);
   const [resetByEmail, setResetByEmail] = useState<boolean | null>(null);
   const [resetSent, setResetSent] = useState(false);
+  // The QR (scan with the phone app) only on a computer-sized screen: on a phone there is nothing to scan it with.
+  const [wide, setWide] = useState(() => window.matchMedia("(min-width: 900px) and (pointer: fine)").matches);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 900px) and (pointer: fine)");
+    const follow = () => setWide(query.matches);
+    query.addEventListener("change", follow);
+    return () => query.removeEventListener("change", follow);
+  }, []);
 
   function switchMode(next: AuthMode) {
     setError(""); setResetSent(false); onMode(next);
@@ -106,6 +115,7 @@ function Auth({ mode, onMode, onUser, notice }: {
       {askEmail && <button className="primary large wide" disabled={busy}>{busy ? t("处理中…") : mode === "login" ? t("登录") : mode === "register" ? t("提交申请") : t("发送重置链接")}</button>}
       {mode === "forgot" ? <button type="button" className={`${askEmail ? "ghost" : "secondary"} wide`} onClick={() => switchMode("login")}>{t("返回登录")}</button>
         : <button type="button" className="ghost wide" onClick={() => switchMode(mode === "login" ? "register" : "login")}>{mode === "login" ? t("还没有账号？申请使用") : t("已有账号？返回登录")}</button>}
+      {mode === "login" && wide && <QrSignIn<User> onUser={onUser} />}
     </form>
   </main>;
 }

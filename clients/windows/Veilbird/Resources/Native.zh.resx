@@ -299,6 +299,26 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="phase_route" xml:space="preserve"><value>选择线路</value></data>
   <data name="phase_tunnel" xml:space="preserve"><value>建立连接</value></data>
   <data name="pick_location_sub" xml:space="preserve"><value>默认帮你选最快的，之后随时能换。</value></data>
+  <data name="qr_code_expired" xml:space="preserve"><value>二维码已过期</value></data>
+  <data name="qr_confirm_action" xml:space="preserve"><value>确认登录</value></data>
+  <data name="qr_confirm_known" xml:space="preserve"><value>这台电脑已在你的设备里，不会多占名额。不是你本人操作就点取消。</value></data>
+  <data name="qr_confirm_place" xml:space="preserve"><value>{0}，在 {1}</value></data>
+  <data name="qr_confirm_slot" xml:space="preserve"><value>它连接时会占用一个设备名额（已用 {0} / {1}）。不是你本人操作就点取消。</value></data>
+  <data name="qr_confirm_title" xml:space="preserve"><value>登录这台电脑？</value></data>
+  <data name="qr_confirm_web" xml:space="preserve"><value>网页版 Portal 登录，不占设备名额。不是你本人操作就点取消。</value></data>
+  <data name="qr_declined" xml:space="preserve"><value>手机上已取消</value></data>
+  <data name="qr_expired" xml:space="preserve"><value>二维码已过期，请在电脑上刷新后再扫。</value></data>
+  <data name="qr_invalid" xml:space="preserve"><value>这不是 TrackNothing 的登录二维码。</value></data>
+  <data name="qr_or_password" xml:space="preserve"><value>或用邮箱密码登录</value></data>
+  <data name="qr_refresh" xml:space="preserve"><value>刷新</value></data>
+  <data name="qr_scan_computer" xml:space="preserve"><value>扫码登录电脑</value></data>
+  <data name="qr_scan_prompt" xml:space="preserve"><value>对准电脑上的二维码</value></data>
+  <data name="qr_scanned" xml:space="preserve"><value>已扫码，请在手机上确认</value></data>
+  <data name="qr_sign_in_detail" xml:space="preserve"><value>打开手机 App，在「我的」里点「扫码登录电脑」。</value></data>
+  <data name="qr_sign_in_first" xml:space="preserve"><value>先在手机上登录，再扫电脑上的二维码。</value></data>
+  <data name="qr_sign_in_title" xml:space="preserve"><value>用手机扫码登录</value></data>
+  <data name="qr_signed_in" xml:space="preserve"><value>电脑已登录</value></data>
+  <data name="qr_unknown_place" xml:space="preserve"><value>未知位置</value></data>
   <data name="quality_fair" xml:space="preserve"><value>良</value></data>
   <data name="quality_good" xml:space="preserve"><value>优</value></data>
   <data name="quality_poor" xml:space="preserve"><value>差</value></data>
@@ -479,10 +499,8 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>连不上时直接告诉你卡在哪一步：网络、服务器、线路还是加密通道，并给出该怎么办
-网络本身上不了网时先说网络的问题，不再误报成服务器故障
-「发送诊断」一键把这次连接的检查结果发给管理员，并显示编号方便沟通
-网络拦了 UDP 或 443 端口时自动换线路，连上后会说明改用了什么</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>电脑可以扫码登录：Mac、Windows 和网页 Portal 的登录页显示二维码，用已登录的手机 App 在「我的 → 扫码登录电脑」里扫一下并确认即可
+确认前手机会显示是哪台电脑、在哪里，以及是否会占用设备名额；二维码 2 分钟内有效，只能用一次</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>

@@ -1955,8 +1955,58 @@ public partial class MainWindow : Window {
         login.Click+=(_,_)=>{
             var password=showPassword?shown.Text:hidden.Password;
             if(string.IsNullOrWhiteSpace(email.Text)||password.Length==0) {Notify(L10n.Text("enter_your_email_and_password"));return;}
-            Work(async()=>{if(origin is not null) api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password);connection.ClearError();hidden.Clear();shown.Clear();page="connect";Render();CheckForUpdate(false);});
+            Work(async()=>{if(origin is not null) api.Origin=origin.Text.Trim();await api.Login(email.Text.Trim(),password);qrLoop?.Cancel();connection.ClearError();hidden.Clear();shown.Clear();page="connect";Render();CheckForUpdate(false);});
         };
+        // Or with the phone: the signed-in phone app scans this and confirms (我的 → 扫码登录电脑).
+        if(NativeApi.BuiltInOrigin.Length>0||api.Origin.Length>0) Add(QrSignIn(),16,0);
+    }
+    private CancellationTokenSource? qrLoop;
+    /// A filled card: the QR on white, what to do on the phone, and the state (scanned, expired, declined). A code lives
+    /// two minutes; then the card offers a new one. Asks every two seconds while the sign-in page shows.
+    private FrameworkElement QrSignIn() {
+        qrLoop?.Cancel();var loop=new CancellationTokenSource();qrLoop=loop;
+        var image=new Image {Width=104,Height=104,Stretch=Stretch.Uniform};RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.NearestNeighbor);
+        var refresh=new Button {Content=L10n.Text("qr_refresh"),Height=28,Padding=new Thickness(12,0,12,0),Background=Look.Accent,Foreground=Look.OnAccent,BorderThickness=new Thickness(0),
+            HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed};
+        var code=new Grid {Width=112,Height=112};
+        code.Children.Add(new Border {Background=Brushes.White,CornerRadius=new CornerRadius(8)});code.Children.Add(image);code.Children.Add(refresh);
+        AutomationProperties.SetName(code,L10n.Text("qr_sign_in_title"));
+        var title=new TextBlock {Text=L10n.Text("qr_sign_in_title"),FontSize=13,FontWeight=FontWeights.Medium,TextWrapping=TextWrapping.Wrap};
+        var detail=new TextBlock {Text=L10n.Text("qr_sign_in_detail"),FontSize=12,Foreground=Look.Secondary,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,4,0,0)};
+        var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(14,0,0,0)};texts.Children.Add(title);texts.Children.Add(detail);
+        var row=new DockPanel();DockPanel.SetDock(code,Dock.Left);row.Children.Add(code);row.Children.Add(texts);
+        var card=new Border {Background=Look.Surface,CornerRadius=new CornerRadius(14),Padding=new Thickness(12),Child=row,Visibility=Visibility.Collapsed};
+        void Show(string state) {
+            title.Text=L10n.Text(state switch {"scanned"=>"qr_scanned","expired"=>"qr_code_expired","declined"=>"qr_declined",_=>"qr_sign_in_title"});
+            var over=state is "expired" or "declined";
+            image.Opacity=over||state=="scanned"?0.12:1;refresh.Visibility=over?Visibility.Visible:Visibility.Collapsed;
+        }
+        async Task Run(CancellationToken token) {
+            try {
+                var created=await api.QrLoginStart();
+                var id=created["id"]!.GetValue<string>();var secret=created["secret"]!.GetValue<string>();
+                var png=new QRCoder.PngByteQRCode(new QRCoder.QRCodeGenerator().CreateQrCode(created["qr"]!.GetValue<string>(),QRCoder.QRCodeGenerator.ECCLevel.M)).GetGraphic(8);
+                var bitmap=new System.Windows.Media.Imaging.BitmapImage();
+                using(var stream=new MemoryStream(png)) {bitmap.BeginInit();bitmap.CacheOption=System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;bitmap.StreamSource=stream;bitmap.EndInit();}
+                bitmap.Freeze();
+                if(token.IsCancellationRequested) return;
+                image.Source=bitmap;card.Visibility=Visibility.Visible;Show("pending");
+                var until=DateTime.UtcNow.AddSeconds(created["ttl"]?.GetValue<int>()??120);
+                while(!token.IsCancellationRequested) {
+                    await Task.Delay(2000,token);
+                    if(DateTime.UtcNow>until) {Show("expired");return;}
+                    string state;
+                    try {state=await api.QrLoginPoll(id,secret);} catch(OperationCanceledException) {throw;} catch {continue;}
+                    if(token.IsCancellationRequested) return;
+                    if(state=="approved") {loop.Cancel();connection.ClearError();page="connect";Render();CheckForUpdate(false);return;}
+                    Show(state);
+                    if(state is "expired" or "declined") return;
+                }
+            } catch(OperationCanceledException) {} catch {/* no QR: the password form still works */}
+        }
+        refresh.Click+=(_,_)=>{if(loop.IsCancellationRequested) return;card.Visibility=Visibility.Collapsed;_=Run(loop.Token);};
+        _=Run(loop.Token);
+        return card;
     }
     /// Both "forgot password" and "change password" email the Portal's reset link; the new password is set there.
     private void ResetPassword(string email,string detail,string sent,Action? before=null) {

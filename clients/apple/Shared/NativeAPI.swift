@@ -187,6 +187,22 @@ final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         guard let token=result["accessToken"] as? String else {throw AccessFailure.code("INVALID_RESPONSE")}
         try SecureStorage.write("token",Data(token.utf8))
     }
+    /// Signing in this computer with the phone (server/qr-login.ts): a code for the QR, then polls until the phone confirms.
+    func qrLoginStart() async throws -> [String:Any] {
+        let raw=try Self.identity().publicKey.x963Representation
+        return try await request("qr-login",["platform":"macos","deviceName":ProcessInfo.processInfo.hostName,
+            "identityKey":["kty":"EC","crv":"P-256","x":Self.b64(raw.subdata(in:1..<33)),"y":Self.b64(raw.subdata(in:33..<65))]])
+    }
+    /// "pending", "scanned", "declined", "expired", or "approved" (the session is then saved, as after a password sign-in).
+    func qrLoginPoll(id:String,secret:String) async throws -> String {
+        let result=try await request("qr-login/poll",["id":id,"secret":secret])
+        let status=result["status"] as? String ?? "expired"
+        if status == "approved" {
+            guard let token=result["accessToken"] as? String else {throw AccessFailure.code("INVALID_RESPONSE")}
+            try SecureStorage.write("token",Data(token.utf8))
+        }
+        return status
+    }
     /// Emails the Portal's reset link; the answer is the same whether or not the address has an account.
     func requestPasswordReset(email:String) async throws {_ = try await request("password-reset",["email":email,"language":String(L10n.language.prefix(2))])}
     func action(_ action:String,_ input:[String:Any]) async throws -> [String:Any] {

@@ -34,4 +34,6 @@
        same name), so users only sign in; without it (development builds) the sign-in page asks for one. -->
   <ItemGroup><AssemblyMetadata Include="VeilbirdApiOrigin" Value="$(VEILBIRD_API_ORIGIN)" /></ItemGroup>
   <ItemGroup><PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" /></ItemGroup>
+  <!-- The sign-in QR the phone app scans ("扫码登录电脑"): PNG bytes, no System.Drawing. -->
+  <ItemGroup><PackageReference Include="QRCoder" Version="1.6.0" /></ItemGroup>
 </Project>
