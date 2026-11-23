@@ -604,7 +604,18 @@ const migrations = [
     );
     CREATE INDEX IF NOT EXISTS node_speed_tests_node_idx ON node_speed_tests(node_id, created_at DESC);
   `)],
-  ["012-node-drain", async (db) => db.query(`
+  ["012-node-path-stats", async (db) => db.query(`
+    -- How each node's transports do per country and network (ASN) per UTC day, from app probe reports;
+    -- no addresses. Rows older than 14 days are dropped (server/path-stats.ts).
+    CREATE TABLE IF NOT EXISTS node_path_stats (
+      node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, transport TEXT NOT NULL, country TEXT NOT NULL, asn INTEGER NOT NULL,
+      day DATE NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, successes INTEGER NOT NULL DEFAULT 0,
+      delay_sum_ms BIGINT NOT NULL DEFAULT 0, delay_count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (node_id, transport, country, asn, day)
+    );
+    CREATE INDEX IF NOT EXISTS node_path_stats_cohort_idx ON node_path_stats(country, asn, day);
+  `)],
+  ["013-node-drain", async (db) => db.query(`
     -- Automatic removal of nodes nobody can reach (server/node-health.ts): like a pause, set and cleared by the Controller.
     ALTER TABLE nodes ADD COLUMN IF NOT EXISTS drained_at TEXT;
     ALTER TABLE nodes ADD COLUMN IF NOT EXISTS drain_reason TEXT NOT NULL DEFAULT '';
