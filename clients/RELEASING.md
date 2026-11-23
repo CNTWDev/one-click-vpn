@@ -111,3 +111,20 @@ VEILBIRD_RELEASE_MIRROR_PUBLIC_BASE_URL=https://<CDN 加速域名>
 ## iPhone（之后再做）
 
 iPhone 没有直接下载的方式。个人账号可以用 TestFlight（内部测试最多 100 人；公开链接最多 10000 人，首个版本要过 Beta 审核）；公开上架 App Store 要求**组织账号**（需要邓白氏编码），且中国大陆区不上架 VPN 应用。届时 CI 用同一个 API Key 签名并上传 TestFlight，另需 `Apple Distribution` 证书（`VEILBIRD_IOS_DISTRIBUTION_P12` 和密码），控制台登记 TestFlight 链接，客户端已有的更新提示会打开它。
+
+## 真机回归
+
+`.github/workflows/device-regression.yml` 每晚、每次 Client release 之后、以及手动运行时检查：
+
+- **Clash 订阅**（GitHub 云端）：用回归账号的订阅地址按 Clash 客户端的方式导入，再通过每个节点的每条线路发一次请求。测试节点的所有线路必须都通；其他节点至少一条通。
+- **安卓真机**（你的 Mac 上的自托管 runner + USB 连接的旧安卓手机）：先装当前正式版，再覆盖安装最新测试版（和应用内更新走同一条安装路径），冷启动 3 次，任何崩溃或 ANR 都算失败。
+- **Mac 真机**（同一个 runner）：把最新测试版装到 `~/Applications/Regression`（不碰 /Applications 里你自己用的那份），检查公证、启动、无崩溃报告，关掉窗口后应只留菜单栏、Dock 无图标。
+
+结果写进运行日志（搜索 `client.regression`），有失败时发 Telegram（「客户端发布」事件），附运行记录链接。
+
+一次性设置：
+
+1. 在控制台建一个回归账号和一个测试节点（节点名里带一个固定词，例如 `regression`），把账号的订阅地址存成仓库 secret `VEILBIRD_REGRESSION_SUBSCRIPTION`，节点名里的那个词存成变量 `VEILBIRD_REGRESSION_NODE`。
+2. Mac：GitHub 仓库 → Settings → Actions → Runners → New self-hosted runner → macOS，按页面上的命令安装，标签加 `veilbird-device`，用 `./svc.sh install && ./svc.sh start` 让它开机自启。系统设置里关掉自动睡眠，并在「隐私与安全性 → 辅助功能」里允许 runner 的终端（Mac 用例要按 ⌘W）。
+3. 安卓手机：打开开发者选项和 USB 调试，用数据线插在这台 Mac 上，第一次在手机上点「始终允许这台电脑调试」；Mac 上装好 adb（`brew install android-platform-tools`）。保持插电。
+4. 仓库变量 `VEILBIRD_DEVICE_RUNNER` 设为 `true`。Mac 离线时真机部分会排队等待，订阅检查照常。
