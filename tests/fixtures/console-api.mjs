@@ -131,6 +131,16 @@ export function consoleApi({ signedIn = true } = {}) {
     if (pathname === "/api/v1/admin/sites") return [200, { sites }];
     if (pathname === "/api/v1/admin/api-origins") return [200, { backupDomains: ["api-backup.very-long-infrastructure-domain.example.net", "api.tracknothing-mirror.org"],
       origins: ["https://api.tracknothing.com", "https://subscriptions.very-long-brand-name.example.net", "https://api-backup.very-long-infrastructure-domain.example.net", "https://api.tracknothing-mirror.org"] }];
+    if (pathname.startsWith("/api/v1/admin/telegram")) return [200, {
+      bot: { username: "tracknothing_operations_notifications_bot", name: "TrackNothing Ops", updatedAt: now }, receiving: { ok: true, at: now },
+      events: [{ key: "alerts", approval: false }, { key: "signups", approval: true }, { key: "releases", approval: true }],
+      chats: [
+        { chatId: "-1002214567890", title: "TrackNothing operations and on-call engineering team (production)", kind: "supergroup", events: ["alerts", "signups", "releases"] },
+        { chatId: "53957246", title: "Owner", kind: "private", events: ["signups"] },
+      ],
+      approvers: [{ id: "53957246", name: "Aleksandra Konstantinopolskaya (@aleksandra_konstantinopolskaya)" }],
+      seen: [{ chatId: "-1001987654321", title: "Ops night shift", kind: "group", userId: "777001", userName: "Lena (@lena_k)", seenAt: now }],
+    }];
     if (pathname === "/api/v1/admin/alerts") return [200, { recipients: "ops@example.com, aleksandra.konstantinopolskaya@very-long-company-domain.example", mailConfigured: true, firing: [
       { key: "node-offline:n5", kind: "node-offline", subject: "Frankfurt-Edge-04@Germany (very long node name)", detail: "", since: ago(720), notified: true },
       { key: "service:n2:vless", kind: "service", subject: "Singapore-02 vless", detail: "xray: failed to bind 0.0.0.0:443", since: ago(120), notified: false },

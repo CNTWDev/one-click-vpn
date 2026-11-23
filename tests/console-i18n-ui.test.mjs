@@ -33,6 +33,8 @@ test("Console locales: all routes, persisted choice, forms and mobile layout", {
       else if (url.pathname === "/api/deployment-policy") body = { standard: { version: 2, protocols: [] }, counts: { standardNodes: 0, eligibleNodes: 0, driftedNodes: 0, blockedNodes: 0 }, driftedNodes: [], rollouts: [] };
       else if (url.pathname === "/api/reality-defaults") body = { mode: "auto", serverName: "", candidates: ["www.microsoft.com"], checkedAt: null, updatedAt: null };
       else if (url.pathname === "/api/logs") body = { logs: [], available: true };
+      else if (url.pathname === "/api/v1/admin/telegram") body = { bot: { username: "ops_bot", name: "Ops", updatedAt: "2026-10-06T00:00:00Z" }, receiving: { ok: true }, events: [{ key: "alerts", approval: false }, { key: "signups", approval: true }, { key: "releases", approval: true }],
+        chats: [{ chatId: "-100500", title: "Ops", kind: "supergroup", events: ["alerts"] }], approvers: [], seen: [{ chatId: "1", title: "Owner", kind: "private", userId: "1", userName: "Owner", seenAt: "2026-10-06T00:00:00Z" }] };
       else if (url.pathname.endsWith("/subscriptions")) body = { subscriptions: [], nodes: [] };
       else if (url.pathname.includes("agent-release")) body = { version: "test", revision: "test" };
       else if (url.pathname === "/api/v1/admin/client-releases") body = { releases: [{ id: "rel_1", platform: "android", arch: "universal", channel: "beta", version: "1.2.0", build: 12, status: "published", distribution: "direct", url: "https://downloads.example.com/a.apk", sha256: "a".repeat(64), sizeBytes: 12345678, minOs: "Android 8.0", notes: "", publishedAt: "2026-10-06T00:00:00Z", createdAt: "2026-10-06T00:00:00Z", createdBy: "release-token", rolloutPercent: 20 }],

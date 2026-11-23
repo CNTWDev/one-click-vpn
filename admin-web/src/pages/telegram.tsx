@@ -25,6 +25,11 @@ type Status = {
 const EVENT_LABELS: Record<string, string> = { alerts: "告警与恢复", signups: "注册审核", releases: "客户端发布" };
 const KIND_LABELS: Record<ChatKind, string> = { private: "私聊", group: "群组", supergroup: "群组", channel: "频道" };
 const ENDPOINT = "/api/v1/admin/telegram";
+// An older Controller (or a partial answer) must not break the page: fill in what is missing.
+const normalize = (value: Partial<Status> | null | undefined): Status => ({
+  bot: value?.bot ?? null, receiving: value?.receiving ?? { ok: false }, events: value?.events ?? [],
+  chats: value?.chats ?? [], approvers: value?.approvers ?? [], seen: value?.seen ?? [],
+});
 
 /** Telegram: one bot, the chats it posts to and what each chat receives, and who may press approve / reject. */
 export function TelegramPanel() {
@@ -39,7 +44,7 @@ export function TelegramPanel() {
   const toast = useToast();
   const confirm = useConfirm();
 
-  const refresh = useCallback(() => api<Status>(ENDPOINT).then(setStatus).catch((error: Error) => setNotice({ tone: "error", message: error.message })), []);
+  const refresh = useCallback(() => api<Status>(ENDPOINT).then((next) => setStatus(normalize(next))).catch((error: Error) => setNotice({ tone: "error", message: error.message })), []);
   useEffect(() => {
     void refresh();
     // New chats show up when someone sends /start to the bot; look again while the page is open.
@@ -49,7 +54,7 @@ export function TelegramPanel() {
 
   async function run(key: string, action: () => Promise<Status | void>, done?: string) {
     setBusy(key); setNotice(null);
-    try { const next = await action(); if (next) setStatus(next); if (done) toast(done); }
+    try { const next = await action(); if (next) setStatus(normalize(next)); if (done) toast(done); }
     catch (error) { setNotice({ tone: "error", message: (error as Error).message }); }
     finally { setBusy(""); }
   }
