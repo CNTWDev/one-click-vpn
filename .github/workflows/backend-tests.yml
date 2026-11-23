@@ -65,7 +65,20 @@ jobs:
           ./mihomo -v && ./xray version
           echo "VEILBIRD_TEST_MIHOMO=$RUNNER_TEMP/bin/mihomo" >> "$GITHUB_ENV"
           echo "VEILBIRD_TEST_XRAY=$RUNNER_TEMP/bin/xray" >> "$GITHUB_ENV"
-      - run: npm ci
+      # node_modules restored whole while package-lock.json is unchanged (saved by master runs, shared by all ubuntu-24.04
+      # jobs); npm ci only on a miss, saved straight away so later steps cannot add to it.
+      - id: modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-ubuntu-24.04-node22-${{ hashFiles('package-lock.json') }}
+      - if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
+      - if: steps.modules.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: node_modules
+          key: ${{ steps.modules.outputs.cache-primary-key }}
       - run: npm run typecheck
       # The integration tests start the built Controller (next start) and serve the built frontends.
       - run: npm run build

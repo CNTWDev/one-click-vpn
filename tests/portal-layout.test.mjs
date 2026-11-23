@@ -41,7 +41,8 @@ test("Portal layout: no overflow, spill or overlap in any state, locale or width
   try {
     for (let n = 0; n < 60; n++) { if (await fetch(`${base}/health`).then(r => r.ok).catch(() => false)) break; await new Promise(r => setTimeout(r, 100)); }
     browser = await chromium.launch({ headless: true, ...(process.env.VEILBIRD_TEST_BROWSER ? { executablePath: process.env.VEILBIRD_TEST_BROWSER } : {}) });
-    for (const locale of locales) for (const view of views) {
+    // Locales run side by side (separate browser contexts); views stay in order within a locale.
+    await Promise.all(locales.map(async (locale) => { for (const view of views) {
       const context = await browser.newContext({ locale, viewport: { width: widths[0], height: 900 }, reducedMotion: "reduce", ...(view.userAgent ? { userAgent: view.userAgent } : {}) });
       context.setDefaultTimeout(10000);
       await installWideFont(context);
@@ -62,7 +63,7 @@ test("Portal layout: no overflow, spill or overlap in any state, locale or width
         if (shots) await page.screenshot({ path: path.join(shots, `${locale.slice(0, 2)}-${width}-${view.name}.png`), fullPage: true });
       }
       await context.close();
-    }
+    } }));
   } finally { await browser?.close(); child.kill("SIGTERM"); }
   if (shots && failures.length) await writeFile(path.join(shots, "failures.txt"), failures.join("\n") + "\n");
   assert.deepEqual(errors, []);
