@@ -166,6 +166,14 @@ test("client releases: CI drafts, verified artifacts, promotion, permanent links
       const offered = async (installation) => (await (await fetch(`${base}/api/v1/client-releases/latest?platform=windows&build=200&installation=${installation}`)).json()).latest.build;
       assert.equal(await offered(inside), 400);
       assert.equal(await offered(outside), 200);
+      // A frozen rollout is offered to nobody new; resuming offers it to the same share again.
+      assert.equal((await asAdmin(`/api/v1/admin/client-releases/${staged.id}`, "POST", { action: "freeze", scope: "build" })).status, 200);
+      assert.equal(await offered(inside), 200);
+      const frozen = (await (await asAdmin("/api/v1/admin/client-releases", "GET")).json()).releases.find((r) => r.id === staged.id);
+      assert.deepEqual([frozen.rolloutPercent, Boolean(frozen.rolloutFrozenAt), frozen.rolloutFreezeReason], [5, true, "manual"]);
+      assert.equal((await asAdmin(`/api/v1/admin/client-releases/${staged.id}`, "POST", { action: "freeze", scope: "build" })).status, 409, "already frozen");
+      assert.equal((await asAdmin(`/api/v1/admin/client-releases/${staged.id}`, "POST", { action: "resume", scope: "build" })).status, 200);
+      assert.equal(await offered(inside), 400);
       assert.equal((await fetch(`${base}/api/v1/client-releases/latest?platform=windows&installation=bad!`)).status, 400);
       assert.equal((await fetch(`${base}/download/windows`, { redirect: "manual" })).headers.get("location"), `${cdn.origin}/v2.msix`, "anonymous downloads only see full rollouts");
       assert.equal((await asAdmin("/api/v1/admin/client-policy", "PUT", { platform: "windows", minBuild: 400 })).status, 409, "a staged release cannot satisfy a minimum build");

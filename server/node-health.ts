@@ -2,6 +2,7 @@ import { dbExec, dbQuery } from "./db";
 import { listControlNodes, listVpnServices } from "./control-db";
 import { writeOperationalLog } from "./operational-logs";
 import { tcpReachable } from "./port-reach";
+import { consoleLink, defineEvent, notify, registerApproval, requestApproval, settleApproval } from "./telegram";
 import { decide, FLAP_WINDOW_MS, USER_EVIDENCE_MINUTES, type HealthAction, type HealthNode } from "./node-health-rules";
 
 /**
@@ -17,6 +18,8 @@ import { decide, FLAP_WINDOW_MS, USER_EVIDENCE_MINUTES, type HealthAction, type 
  * network), never the last serving node of a region, and a node removed 3 times in 6 hours stays removed until
  * someone restores it. Counters live in memory (a restart starts them again); the state is on the node row.
  */
+
+defineEvent("nodes", { approval: true });
 
 type Counter = { fails: number; oks: number };
 const counters: Map<string, Counter> = (globalThis as { __nodeHealth?: Map<string, Counter> }).__nodeHealth ??= new Map();
@@ -71,14 +74,50 @@ export async function runNodeHealth(): Promise<HealthAction[]> {
         message: action.kind === "drain" ? `Node ${node.name} removed from new connections: outside check failed ${node.fails} min, no app reached it in ${USER_EVIDENCE_MINUTES} min`
           : `Node ${node.name} back in service: outside check passed ${node.oks} min`,
         fields: { fails: node.fails, oks: node.oks, locked: action.kind === "drain" ? action.lock : undefined } }).catch(() => undefined);
+      await tellTelegram(node, action.kind === "drain" ? (action.lock ? "locked" : "drained") : "restored").catch(() => undefined);
     }
     return actions;
   } finally { running = false; }
 }
 
+/** Removal asks in Telegram (event "nodes") whether to put the node back now; a return is only reported. */
+async function tellTelegram(node: HealthNode, what: "drained" | "locked" | "restored") {
+  const link = await consoleLink(`/nodes?focus=${encodeURIComponent(node.id)}`);
+  if (what === "restored") {
+    await settleNodeQuestions(node.id, "🟢 已自动放回");
+    await notify("nodes", { tone: "ok", title: `节点 ${node.name} 已自动放回`, lines: [`外部检查连续 ${node.oks} 分钟正常，重新提供给新连接。`], link });
+    return;
+  }
+  await requestApproval({ kind: "node-drain", target: `${node.id}:${Date.now()}`, event: "nodes", approveLabel: "🟢 立即恢复", rejectLabel: "保持摘除",
+    message: { tone: "alert", title: `节点 ${node.name} 已自动摘除`, lines: [
+      `控制面从外部连不上它的任何线路已 ${node.fails} 分钟，${USER_EVIDENCE_MINUTES} 分钟内也没有用户连上过。`,
+      "新连接不再使用它，已连着的用户不受影响。",
+      what === "locked" ? "6 小时内已摘除 3 次，不会自动放回，需要你恢复。" : "连续正常 10 分钟后会自动放回。",
+    ], link } });
+}
+
+async function settleNodeQuestions(id: string, footer: string) {
+  const open = await dbQuery<{ target: string }>("SELECT target FROM telegram_approvals WHERE status = 'pending' AND kind = 'node-drain' AND target LIKE $1", [`${id}:%`]).catch(() => []);
+  for (const row of open) await settleApproval("node-drain", row.target, footer);
+}
+
+registerApproval("node-drain", {
+  async decide(target, approve) {
+    const id = target.slice(0, target.lastIndexOf(":"));
+    if (!approve) return "保持摘除";
+    const rows = await dbQuery<{ drained_at: string | null }>("SELECT drained_at FROM nodes WHERE id = $1", [id]);
+    if (!rows[0]) return "节点已不存在";
+    if (!rows[0].drained_at) return "已经放回";
+    await restoreNode(id);
+    await writeOperationalLog({ component: "controller", nodeId: id, level: "info", source: "user", action: "node.restored", message: "Node restored from Telegram" }).catch(() => undefined);
+    return "🟢 已恢复";
+  },
+});
+
 /** Console 「立即恢复」: back in service now, the removal history and lock cleared. */
 export async function restoreNode(id: string): Promise<boolean> {
   counters.delete(id);
+  await settleNodeQuestions(id, "🟢 已在 Console 恢复");
   return (await dbExec("UPDATE nodes SET drained_at = NULL, drain_reason = '', drain_locked = 0, drain_history = '', updated_at = $2 WHERE id = $1", [id, new Date().toISOString()])) === 1;
 }
 

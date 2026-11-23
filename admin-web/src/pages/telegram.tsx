@@ -22,7 +22,7 @@ type Status = {
 };
 
 // Event names live with the Controller's notifier; the Console only translates the ones it knows.
-const EVENT_LABELS: Record<string, string> = { alerts: "告警与恢复", signups: "注册审核", releases: "客户端发布" };
+const EVENT_LABELS: Record<string, string> = { alerts: "告警与恢复", signups: "注册审核", releases: "客户端发布", rollout: "灰度放量", nodes: "节点自动摘除" };
 const KIND_LABELS: Record<ChatKind, string> = { private: "私聊", group: "群组", supergroup: "群组", channel: "频道" };
 const ENDPOINT = "/api/v1/admin/telegram";
 // An older Controller (or a partial answer) must not break the page: fill in what is missing.

@@ -647,6 +647,15 @@ const migrations = [
     ALTER TABLE nodes ADD COLUMN IF NOT EXISTS drain_locked INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE nodes ADD COLUMN IF NOT EXISTS auto_drain INTEGER NOT NULL DEFAULT 1;
   `)],
+  ["014-rollout-control", async (db) => db.query(`
+    -- Staged rollout steps by itself (server/rollout-control.ts): when the current share started, and a freeze.
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS rollout_since TIMESTAMPTZ;
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS rollout_frozen_at TIMESTAMPTZ;
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS rollout_freeze_reason TEXT NOT NULL DEFAULT '';
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS rollout_override INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS rollout_asked_at TIMESTAMPTZ;
+    UPDATE client_releases SET rollout_since = COALESCE(published_at::timestamptz, updated_at) WHERE rollout_since IS NULL AND rollout_percent < 100;
+  `)],
 ];
 
 const client = await pool.connect();
