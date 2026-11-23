@@ -447,7 +447,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">New users go straight to the home screen after sign-in, no location step: Automatic is preselected, picks the fastest line and moves on if one fails\nFirst run is now two steps: sign in, connect</string>
+  <string name="whats_new_notes">New Usage page: tap the usage line on the home screen to see what is left and how many days remain\nSee traffic per day over 7, 30 or 90 days; tap a bar for that day\'s figure\nSee usage per device and per location; on Windows, also which programs used the most over the last 7 days (kept on this computer only)</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

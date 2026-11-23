@@ -454,8 +454,9 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>New users go straight to the home screen after sign-in, no location step: Automatic is preselected, picks the fastest line and moves on if one fails
-First run is now two steps: sign in, connect</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>New Usage page: tap the usage line on the home screen to see what is left and how many days remain
+See traffic per day over 7, 30 or 90 days; tap a bar for that day's figure
+See usage per device and per location; on Windows, also which programs used the most over the last 7 days (kept on this computer only)</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows development build · VPN service integration in progress</value></data>
