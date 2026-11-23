@@ -6,6 +6,7 @@ import { clientHeader,recordDiagnostics,recordEnrollmentClient,recordSessionClie
 import { parseClientAgent,type ClientPlatform } from "../../../../../shared/client-releases";
 import { requestPasswordResetEmail } from "../../../../../server/password-reset";
 import { clientAddress } from "../../../../../server/rate-limit";
+import { approveQrLogin,createQrLogin,pollQrLogin,scanQrLogin } from "../../../../../server/qr-login";
 import { nativeAccount,nativeChallenge,nativeConnect,nativeEnd,nativeLogin,nativeLogout,nativeNodes,nativeSession,nativeStatus,nativeUsage } from "../../../../../server/native-access";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -31,6 +32,16 @@ async function handle(request:Request) {
       if(sent==="limited") throw new NativeError("RATE_LIMITED",429);
       result={status:"received"};
     }
+    // Signing in a computer with the phone: the computer makes a code and collects its session without one.
+    else if(request.method==="POST"&&path==="qr-login") {
+      if(["macos","windows"].includes(String(body.platform))) await requireSupportedClient(request,body.platform as ClientPlatform);
+      result=await createQrLogin("native",body,clientAddress(request));
+    }
+    else if(request.method==="POST"&&path==="qr-login/poll") {
+      const poll=await pollQrLogin("native",body);
+      if("accessToken" in poll&&poll.accessToken) await recordSessionClient(poll.accessToken,parseClientAgent(request.headers.get(clientHeader)));
+      result=poll;
+    }
     else {
       const session=await nativeSession(request);
       if(request.method==="GET"&&path==="account") result=await nativeAccount(session);
@@ -49,6 +60,8 @@ async function handle(request:Request) {
         const agent=parseClientAgent(request.headers.get(clientHeader));
         result=await recordDiagnostics(session,agent?.platform===session.platform?agent:null,body,clientAddress(request));
       }
+      else if(request.method==="POST"&&path==="qr-login/scan") result=await scanQrLogin(session,body);
+      else if(request.method==="POST"&&path==="qr-login/approve") result=await approveQrLogin(session,body);
       else if(request.method==="POST"&&path==="logout") result=await nativeLogout(session);
       else throw new NativeError("NOT_FOUND",404);
     }

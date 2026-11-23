@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.26
+
+### zh
+- 电脑可以扫码登录：Mac、Windows 和网页 Portal 的登录页显示二维码，用已登录的手机 App 在「我的 → 扫码登录电脑」里扫一下并确认即可
+- 确认前手机会显示是哪台电脑、在哪里，以及是否会占用设备名额；二维码 2 分钟内有效，只能用一次
+
+### en
+- Sign in a computer with your phone: Mac, Windows and the Portal show a QR code; scan it in the signed-in phone app (Account → Sign in a computer) and confirm
+- Before you confirm, the phone shows which computer it is, where it is and whether it takes a device slot; a code works once, for 2 minutes
+
+### ru
+- Вход на компьютере через телефон: Mac, Windows и Portal показывают QR-код; отсканируйте его в приложении на телефоне («Аккаунт» → «Войти на компьютере») и подтвердите
+- Перед подтверждением телефон показывает, что это за компьютер, где он и займёт ли он место устройства; код действует 2 минуты и только один раз
+
 ## 1.0.25
 
 ### zh

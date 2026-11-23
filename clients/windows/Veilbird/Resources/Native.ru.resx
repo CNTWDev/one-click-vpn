@@ -299,6 +299,26 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="phase_route" xml:space="preserve"><value>Выбор маршрута</value></data>
   <data name="phase_tunnel" xml:space="preserve"><value>Соединение</value></data>
   <data name="pick_location_sub" xml:space="preserve"><value>Мы выберем самую быструю. Сменить можно в любой момент.</value></data>
+  <data name="qr_code_expired" xml:space="preserve"><value>Код устарел</value></data>
+  <data name="qr_confirm_action" xml:space="preserve"><value>Войти</value></data>
+  <data name="qr_confirm_known" xml:space="preserve"><value>Этот компьютер уже среди ваших устройств. Отмените, если это не вы.</value></data>
+  <data name="qr_confirm_place" xml:space="preserve"><value>{0}, {1}</value></data>
+  <data name="qr_confirm_slot" xml:space="preserve"><value>При подключении займёт место устройства (занято {0} из {1}). Отмените, если это не вы.</value></data>
+  <data name="qr_confirm_title" xml:space="preserve"><value>Войти на этом компьютере?</value></data>
+  <data name="qr_confirm_web" xml:space="preserve"><value>Вход в Portal в браузере, место устройства не занимает. Отмените, если это не вы.</value></data>
+  <data name="qr_declined" xml:space="preserve"><value>Отменено на телефоне</value></data>
+  <data name="qr_expired" xml:space="preserve"><value>Код устарел. Обновите его на компьютере и отсканируйте снова.</value></data>
+  <data name="qr_invalid" xml:space="preserve"><value>Это не код входа TrackNothing.</value></data>
+  <data name="qr_or_password" xml:space="preserve"><value>Или войдите по email</value></data>
+  <data name="qr_refresh" xml:space="preserve"><value>Обновить</value></data>
+  <data name="qr_scan_computer" xml:space="preserve"><value>Войти на компьютере</value></data>
+  <data name="qr_scan_prompt" xml:space="preserve"><value>Наведите на QR-код на компьютере</value></data>
+  <data name="qr_scanned" xml:space="preserve"><value>Отсканировано. Подтвердите на телефоне</value></data>
+  <data name="qr_sign_in_detail" xml:space="preserve"><value>В приложении на телефоне: «Аккаунт» → «Войти на компьютере».</value></data>
+  <data name="qr_sign_in_first" xml:space="preserve"><value>Сначала войдите на телефоне, затем отсканируйте код на компьютере.</value></data>
+  <data name="qr_sign_in_title" xml:space="preserve"><value>Войти через телефон</value></data>
+  <data name="qr_signed_in" xml:space="preserve"><value>Компьютер вошёл в аккаунт</value></data>
+  <data name="qr_unknown_place" xml:space="preserve"><value>место неизвестно</value></data>
   <data name="quality_fair" xml:space="preserve"><value>Средне</value></data>
   <data name="quality_good" xml:space="preserve"><value>Хорошо</value></data>
   <data name="quality_poor" xml:space="preserve"><value>Плохо</value></data>
@@ -479,10 +499,8 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Если подключиться не удалось, приложение показывает, на каком шаге (сеть, сервер, линии или туннель) и что делать
-Если в сети нет интернета, причиной называется сеть, а не сервер
-«Отправить» передаёт проверку этой попытки администратору и показывает номер обращения
-Если сеть блокирует UDP или порт 443, приложение само меняет линию и после подключения сообщает, какую использует</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Вход на компьютере через телефон: Mac, Windows и Portal показывают QR-код; отсканируйте его в приложении на телефоне («Аккаунт» → «Войти на компьютере») и подтвердите
+Перед подтверждением телефон показывает, что это за компьютер, где он и займёт ли он место устройства; код действует 2 минуты и только один раз</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>

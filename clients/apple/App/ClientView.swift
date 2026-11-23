@@ -330,9 +330,18 @@ struct ClientView:View {
                     Button {login()} label:{
                         if model.busy {ProgressView().controlSize(.small).tint(VeilbirdStyle.onAccent)} else {Text(L10n.text("sign_in_action"))}
                     }.buttonStyle(PrimaryButton()).disabled(model.busy || email.trimmingCharacters(in:.whitespaces).isEmpty || password.isEmpty).padding(.top,mac ? 6:10)
+                    #if os(macOS)
+                    // Or with the phone: the signed-in phone app scans this and confirms (我的 → 扫码登录电脑).
+                    if !ClientModel.builtInOrigin.isEmpty || !model.origin.isEmpty {
+                        QRSignIn(start:{try await model.api().qrLoginStart()},poll:{try await model.api().qrLoginPoll(id:$0,secret:$1)},signedIn:finishQRSignIn).padding(.top,14)
+                    }
+                    #endif
                 }.padding(.top,mac ? 28:44)
             }.padding(.horizontal,mac ? 32:28).padding(.bottom,24).frame(maxWidth:460).frame(maxWidth:.infinity)
         }
+    }
+    private func finishQRSignIn() {
+        model.work {UserDefaults.standard.set(model.origin,forKey:"origin");tab=0;model.forgetNodes();if !model.connected {model.failed=false;model.failureCode=""};model.signedIn=true;try await model.loadNodes();await model.checkForUpdate()}
     }
     private func login() {
         guard !email.trimmingCharacters(in:.whitespaces).isEmpty,!password.isEmpty else {return}

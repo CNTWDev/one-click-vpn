@@ -284,3 +284,14 @@ footer { color: var(--text-2); text-align: center; font-size: 12px; padding-top:
 .crop.bl { bottom: 14px; left: 14px; border-bottom-width: 1px; border-left-width: 1px; }
 .crop.br { bottom: 14px; right: 14px; border-bottom-width: 1px; border-right-width: 1px; }
 @media (prefers-reduced-motion: reduce) { .file-scan { display: none; } .stamp, .file-state > span, .sealed-text, .sealed-text::after { transition: none; } }
+
+/* Sign in with the phone (qr-sign-in.tsx): under the password form on a computer, no outline. */
+.qr-sign-in { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 16px; align-items: center; margin-top: 4px; padding: 14px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.qr-sign-in-code { position: relative; width: 132px; height: 132px; border-radius: 8px; overflow: hidden; background: #fff; }
+.qr-sign-in-code img { display: block; width: 132px; height: 132px; transition: opacity .2s; }
+.qr-sign-in-code.faded img { opacity: .12; }
+.qr-sign-in-code button { position: absolute; inset: 0; margin: auto; width: fit-content; height: fit-content; }
+.qr-sign-in-blank { display: block; width: 132px; height: 132px; }
+.qr-sign-in-text { display: grid; gap: 6px; font-size: 13px; line-height: 1.5; }
+.qr-sign-in-text b { font-size: 14px; color: var(--text); }
+.qr-sign-in-text .muted { margin: 0 !important; }

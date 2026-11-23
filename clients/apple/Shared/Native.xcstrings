@@ -6717,6 +6717,466 @@
         }
       }
     },
+    "qr_code_expired": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The code expired"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "二维码已过期"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Код устарел"
+          }
+        }
+      }
+    },
+    "qr_confirm_action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确认登录"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Войти"
+          }
+        }
+      }
+    },
+    "qr_confirm_known": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This computer is already one of your devices. Cancel if this wasn't you."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台电脑已在你的设备里，不会多占名额。不是你本人操作就点取消。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Этот компьютер уже среди ваших устройств. Отмените, если это не вы."
+          }
+        }
+      }
+    },
+    "qr_confirm_place": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, in %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@，在 %2$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "qr_confirm_slot": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Once it connects it takes a device slot (%1$@ of %2$@ used). Cancel if this wasn't you."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "它连接时会占用一个设备名额（已用 %1$@ / %2$@）。不是你本人操作就点取消。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "При подключении займёт место устройства (занято %1$@ из %2$@). Отмените, если это не вы."
+          }
+        }
+      }
+    },
+    "qr_confirm_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in this computer?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录这台电脑？"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Войти на этом компьютере?"
+          }
+        }
+      }
+    },
+    "qr_confirm_web": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A Portal sign-in in a browser; it takes no device slot. Cancel if this wasn't you."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网页版 Portal 登录，不占设备名额。不是你本人操作就点取消。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вход в Portal в браузере, место устройства не занимает. Отмените, если это не вы."
+          }
+        }
+      }
+    },
+    "qr_declined": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelled on the phone"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手机上已取消"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отменено на телефоне"
+          }
+        }
+      }
+    },
+    "qr_expired": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The code expired. Refresh it on the computer and scan again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "二维码已过期，请在电脑上刷新后再扫。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Код устарел. Обновите его на компьютере и отсканируйте снова."
+          }
+        }
+      }
+    },
+    "qr_invalid": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This isn't a TrackNothing sign-in code."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这不是 TrackNothing 的登录二维码。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Это не код входа TrackNothing."
+          }
+        }
+      }
+    },
+    "qr_or_password": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Or sign in with email"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "或用邮箱密码登录"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Или войдите по email"
+          }
+        }
+      }
+    },
+    "qr_refresh": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Обновить"
+          }
+        }
+      }
+    },
+    "qr_scan_computer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in a computer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "扫码登录电脑"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Войти на компьютере"
+          }
+        }
+      }
+    },
+    "qr_scan_prompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point at the QR code on the computer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "对准电脑上的二维码"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Наведите на QR-код на компьютере"
+          }
+        }
+      }
+    },
+    "qr_scanned": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scanned. Confirm on your phone"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已扫码，请在手机上确认"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отсканировано. Подтвердите на телефоне"
+          }
+        }
+      }
+    },
+    "qr_sign_in_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the phone app, open Account and tap Sign in a computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开手机 App，在「我的」里点「扫码登录电脑」。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В приложении на телефоне: «Аккаунт» → «Войти на компьютере»."
+          }
+        }
+      }
+    },
+    "qr_sign_in_first": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in on the phone first, then scan the code on the computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先在手机上登录，再扫电脑上的二维码。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сначала войдите на телефоне, затем отсканируйте код на компьютере."
+          }
+        }
+      }
+    },
+    "qr_sign_in_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan with your phone"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用手机扫码登录"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Войти через телефон"
+          }
+        }
+      }
+    },
+    "qr_signed_in": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The computer is signed in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "电脑已登录"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Компьютер вошёл в аккаунт"
+          }
+        }
+      }
+    },
+    "qr_unknown_place": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "an unknown place"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知位置"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "место неизвестно"
+          }
+        }
+      }
+    },
     "quality_fair": {
       "extractionState": "manual",
       "localizations": {
@@ -10840,19 +11300,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "When connecting fails, the app shows which step stopped it (network, server, lines or tunnel) and what to do\nA network with no internet is named as the cause, instead of looking like a server problem\n\"Send check\" sends this attempt's check to your admin and shows a reference number\nWhen a network blocks UDP or port 443 the app switches lines on its own, and says which one it used once connected"
+            "value": "Sign in a computer with your phone: Mac, Windows and the Portal show a QR code; scan it in the signed-in phone app (Account → Sign in a computer) and confirm\nBefore you confirm, the phone shows which computer it is, where it is and whether it takes a device slot; a code works once, for 2 minutes"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连不上时直接告诉你卡在哪一步：网络、服务器、线路还是加密通道，并给出该怎么办\n网络本身上不了网时先说网络的问题，不再误报成服务器故障\n「发送诊断」一键把这次连接的检查结果发给管理员，并显示编号方便沟通\n网络拦了 UDP 或 443 端口时自动换线路，连上后会说明改用了什么"
+            "value": "电脑可以扫码登录：Mac、Windows 和网页 Portal 的登录页显示二维码，用已登录的手机 App 在「我的 → 扫码登录电脑」里扫一下并确认即可\n确认前手机会显示是哪台电脑、在哪里，以及是否会占用设备名额；二维码 2 分钟内有效，只能用一次"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Если подключиться не удалось, приложение показывает, на каком шаге (сеть, сервер, линии или туннель) и что делать\nЕсли в сети нет интернета, причиной называется сеть, а не сервер\n«Отправить» передаёт проверку этой попытки администратору и показывает номер обращения\nЕсли сеть блокирует UDP или порт 443, приложение само меняет линию и после подключения сообщает, какую использует"
+            "value": "Вход на компьютере через телефон: Mac, Windows и Portal показывают QR-код; отсканируйте его в приложении на телефоне («Аккаунт» → «Войти на компьютере») и подтвердите\nПеред подтверждением телефон показывает, что это за компьютер, где он и займёт ли он место устройства; код действует 2 минуты и только один раз"
           }
         }
       }

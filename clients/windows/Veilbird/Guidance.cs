@@ -53,7 +53,7 @@ public static class Guidance {
     /// failures of the network itself; null for a refusal of the account or the device, which has its own cause.
     public static List<Check>? Checks(string code,int lines,string network) {
         var ok=L10n.Text("diag_ok");var skip=L10n.Text("diag_not_started");
-        Check Row(string key,string value,CheckStatus status)=>new(key,L10n.Text("diag_"+key),value,status);
+        Check Row(string key,string value,CheckStatus status)=>new(key,key switch {"network"=>L10n.Text("diag_network"),"server"=>L10n.Text("diag_server"),"lines"=>L10n.Text("diag_lines"),_=>L10n.Text("diag_tunnel")},value,status);
         var net=network=="offline"?Row("network",L10n.Text("diag_no_internet"),CheckStatus.Bad):Row("network",ok,CheckStatus.Ok);
         if(net.Status==CheckStatus.Bad&&OfNetwork.Contains(code)) return new() {net,Row("server",skip,CheckStatus.Skip),Row("lines",skip,CheckStatus.Skip),Row("tunnel",skip,CheckStatus.Skip)};
         var reached=Row("server",L10n.Text("diag_reached"),CheckStatus.Ok);

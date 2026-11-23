@@ -299,6 +299,26 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="phase_route" xml:space="preserve"><value>Picking route</value></data>
   <data name="phase_tunnel" xml:space="preserve"><value>Opening tunnel</value></data>
   <data name="pick_location_sub" xml:space="preserve"><value>We pick the fastest one for you. You can change it any time.</value></data>
+  <data name="qr_code_expired" xml:space="preserve"><value>The code expired</value></data>
+  <data name="qr_confirm_action" xml:space="preserve"><value>Sign in</value></data>
+  <data name="qr_confirm_known" xml:space="preserve"><value>This computer is already one of your devices. Cancel if this wasn't you.</value></data>
+  <data name="qr_confirm_place" xml:space="preserve"><value>{0}, in {1}</value></data>
+  <data name="qr_confirm_slot" xml:space="preserve"><value>Once it connects it takes a device slot ({0} of {1} used). Cancel if this wasn't you.</value></data>
+  <data name="qr_confirm_title" xml:space="preserve"><value>Sign in this computer?</value></data>
+  <data name="qr_confirm_web" xml:space="preserve"><value>A Portal sign-in in a browser; it takes no device slot. Cancel if this wasn't you.</value></data>
+  <data name="qr_declined" xml:space="preserve"><value>Cancelled on the phone</value></data>
+  <data name="qr_expired" xml:space="preserve"><value>The code expired. Refresh it on the computer and scan again.</value></data>
+  <data name="qr_invalid" xml:space="preserve"><value>This isn't a TrackNothing sign-in code.</value></data>
+  <data name="qr_or_password" xml:space="preserve"><value>Or sign in with email</value></data>
+  <data name="qr_refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="qr_scan_computer" xml:space="preserve"><value>Sign in a computer</value></data>
+  <data name="qr_scan_prompt" xml:space="preserve"><value>Point at the QR code on the computer</value></data>
+  <data name="qr_scanned" xml:space="preserve"><value>Scanned. Confirm on your phone</value></data>
+  <data name="qr_sign_in_detail" xml:space="preserve"><value>In the phone app, open Account and tap Sign in a computer.</value></data>
+  <data name="qr_sign_in_first" xml:space="preserve"><value>Sign in on the phone first, then scan the code on the computer.</value></data>
+  <data name="qr_sign_in_title" xml:space="preserve"><value>Scan with your phone</value></data>
+  <data name="qr_signed_in" xml:space="preserve"><value>The computer is signed in</value></data>
+  <data name="qr_unknown_place" xml:space="preserve"><value>an unknown place</value></data>
   <data name="quality_fair" xml:space="preserve"><value>Fair</value></data>
   <data name="quality_good" xml:space="preserve"><value>Good</value></data>
   <data name="quality_poor" xml:space="preserve"><value>Poor</value></data>
@@ -479,10 +499,8 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>When connecting fails, the app shows which step stopped it (network, server, lines or tunnel) and what to do
-A network with no internet is named as the cause, instead of looking like a server problem
-&quot;Send check&quot; sends this attempt's check to your admin and shows a reference number
-When a network blocks UDP or port 443 the app switches lines on its own, and says which one it used once connected</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Sign in a computer with your phone: Mac, Windows and the Portal show a QR code; scan it in the signed-in phone app (Account → Sign in a computer) and confirm
+Before you confirm, the phone shows which computer it is, where it is and whether it takes a device slot; a code works once, for 2 minutes</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows development build · VPN service integration in progress</value></data>

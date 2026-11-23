@@ -15,6 +15,12 @@
     <application android:name=".VeilbirdApplication" android:label="${appLabel}" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:localeConfig="@xml/locales_config" android:supportsRtl="true" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.NoActionBar">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+            <!-- A computer's sign-in QR read with the system camera opens the app on the confirm sheet. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tracknothing" android:host="qr-login" />
+            </intent-filter>
         </activity>
         <!-- The VPN itself (tun handed to the embedded core); also what the system starts for always-on VPN. -->
         <service android:name=".ConnectionService" android:exported="true" android:permission="android.permission.BIND_VPN_SERVICE" android:foregroundServiceType="specialUse">

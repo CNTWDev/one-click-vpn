@@ -73,5 +73,7 @@ dependencies {
     implementation(files("libs/veilbird-core.aar"))
     // Only for Curve25519 key pairs: the private key never leaves the device.
     implementation("com.wireguard.android:tunnel:1.0.20260102")
+    // "扫码登录电脑": the camera screen that reads the QR a computer shows (asks for the camera on first use).
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }

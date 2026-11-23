@@ -153,6 +153,7 @@ class MainActivity : Activity() {
         render()
         executor.execute { Crash.send(this, api) }
         // The Quick Settings tile could not start the VPN from the background: connect now that the app is open.
+        intent?.data?.let { qrFromLink(it) }
         if (intent?.getBooleanExtra("connect", false) == true && api.secret("token") != null && !ConnectionStateStore.active) toggleConnection()
     }
     override fun onResume() {
@@ -1421,6 +1422,7 @@ class MainActivity : Activity() {
             usageCard(data)
             add(group(listOf(
                 settingRow(L10n.text(R.string.authorized_devices), "${L10n.number(data.optInt("used"))} / ${deviceLimit(data)}") { page = "devices"; render() },
+                settingRow(L10n.text(R.string.qr_scan_computer), "") { scanComputer() },
                 settingRow(L10n.text(R.string.change_password), "") { resetPassword(email, L10n.text(R.string.reset_change_detail, email), L10n.text(R.string.reset_link_sent_to, email)) },
                 settingRow(L10n.text(R.string.language), currentLanguage().second) { chooseLanguage() },
                 settingRow(L10n.text(R.string.appearance), L10n.text(if (Palette.theme == "moon") R.string.theme_moon else R.string.theme_amber)) { chooseAppearance() },
@@ -2109,9 +2111,62 @@ class MainActivity : Activity() {
     }
     private fun alert(message: String) { AlertDialog.Builder(this).setTitle("TrackNothing").setMessage(message).setPositiveButton(L10n.text(R.string.got_it), null).show() }
     private fun startConnection() { startForegroundService(Intent(this, ConnectionService::class.java).putExtra("nodeId", selectedId)) }
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); intent.data?.let { qrFromLink(it) } }
+
+    // ---- Signing in a computer with this phone ("扫码登录电脑", server/qr-login.ts): scan, see which computer and from
+    // where, confirm. The computer gets its own session; it takes a device slot when it connects.
+    private fun scanComputer() {
+        com.google.zxing.integration.android.IntentIntegrator(this).setDesiredBarcodeFormats(com.google.zxing.integration.android.IntentIntegrator.QR_CODE)
+            .setPrompt(L10n.text(R.string.qr_scan_prompt)).setBeepEnabled(false).setOrientationLocked(false).initiateScan()
+    }
+    /** Opened from the system camera (tracknothing://qr-login?c=…) or read by the scanner. */
+    private fun qrFromLink(link: android.net.Uri) {
+        if (link.scheme != "tracknothing" || link.host != "qr-login") return
+        val code = link.getQueryParameter("c").orEmpty()
+        if (api.secret("token") == null) { alert(L10n.text(R.string.qr_sign_in_first)); return }
+        if (!Regex("^[A-Za-z0-9_-]{32,64}$").matches(code)) { alert(L10n.text(R.string.qr_invalid)); return }
+        executor.execute {
+            val result = try { api.request("qr-login/scan", JSONObject().put("code", code)) } catch (e: Exception) { runOnUiThread { qrFailed(e) }; return@execute }
+            runOnUiThread { if (!isDestroyed) confirmComputer(code, result) }
+        }
+    }
+    private fun qrFailed(e: Exception) {
+        if (isDestroyed) return
+        when ((e as? ApiFailure)?.code) {
+            "QR_EXPIRED" -> alert(L10n.text(R.string.qr_expired))
+            "QR_INVALID" -> alert(L10n.text(R.string.qr_invalid))
+            else -> alert(friendly(e))
+        }
+    }
+    private fun confirmComputer(code: String, info: JSONObject) {
+        val name = info.optString("deviceName").ifBlank { info.optString("platform") }
+        val country = info.optString("country").takeIf { it.length == 2 }?.let { java.util.Locale("", it).getDisplayCountry(L10n.locale) } ?: L10n.text(R.string.qr_unknown_place)
+        val slot = when {
+            info.optString("kind") == "portal" -> L10n.text(R.string.qr_confirm_web)
+            !info.optBoolean("newDevice") -> L10n.text(R.string.qr_confirm_known)
+            else -> L10n.text(R.string.qr_confirm_slot, L10n.number(info.optInt("used")), if (info.isNull("limit")) L10n.text(R.string.devices_unlimited) else L10n.number(info.optInt("limit")))
+        }
+        fun answer(approve: Boolean) = executor.execute {
+            try {
+                api.request("qr-login/approve", JSONObject().put("code", code).put("approve", approve))
+                if (approve) runOnUiThread { if (!isDestroyed) android.widget.Toast.makeText(this, L10n.text(R.string.qr_signed_in), android.widget.Toast.LENGTH_SHORT).show() }
+            } catch (e: Exception) { runOnUiThread { qrFailed(e) } }
+        }
+        AlertDialog.Builder(this).setTitle(L10n.text(R.string.qr_confirm_title)).setMessage(L10n.text(R.string.qr_confirm_place, name, country) + "\n\n" + slot)
+            .setPositiveButton(L10n.text(R.string.qr_confirm_action)) { _, _ -> answer(true) }
+            .setNegativeButton(L10n.text(R.string.cancel)) { _, _ -> answer(false) }
+            .setOnCancelListener { answer(false) }.show()
+    }
+
     @Deprecated("Activity result compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == com.google.zxing.integration.android.IntentIntegrator.REQUEST_CODE) {
+            val text = com.google.zxing.integration.android.IntentIntegrator.parseActivityResult(requestCode, resultCode, data)?.contents ?: return
+            val link = try { android.net.Uri.parse(text) } catch (_: Exception) { null }
+            if (link?.scheme == "tracknothing" && link.host == "qr-login") qrFromLink(link) else alert(L10n.text(R.string.qr_invalid))
+            return
+        }
         // Refused or dismissed the system's VPN prompt: the connect page says so, with "try again" and the VPN settings.
         if (requestCode == 10) {
             if (resultCode == RESULT_OK) startConnection()

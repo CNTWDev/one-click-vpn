@@ -2413,5 +2413,105 @@
     "zh": "用量没加载出来，稍后再试。",
     "en": "Couldn't load usage. Try again later.",
     "ru": "Не удалось загрузить трафик. Попробуйте позже."
+  },
+  "qr_scan_computer": {
+    "zh": "扫码登录电脑",
+    "en": "Sign in a computer",
+    "ru": "Войти на компьютере"
+  },
+  "qr_scan_prompt": {
+    "zh": "对准电脑上的二维码",
+    "en": "Point at the QR code on the computer",
+    "ru": "Наведите на QR-код на компьютере"
+  },
+  "qr_confirm_title": {
+    "zh": "登录这台电脑？",
+    "en": "Sign in this computer?",
+    "ru": "Войти на этом компьютере?"
+  },
+  "qr_confirm_place": {
+    "zh": "{0}，在 {1}",
+    "en": "{0}, in {1}",
+    "ru": "{0}, {1}"
+  },
+  "qr_unknown_place": {
+    "zh": "未知位置",
+    "en": "an unknown place",
+    "ru": "место неизвестно"
+  },
+  "qr_confirm_slot": {
+    "zh": "它连接时会占用一个设备名额（已用 {0} / {1}）。不是你本人操作就点取消。",
+    "en": "Once it connects it takes a device slot ({0} of {1} used). Cancel if this wasn't you.",
+    "ru": "При подключении займёт место устройства (занято {0} из {1}). Отмените, если это не вы."
+  },
+  "qr_confirm_known": {
+    "zh": "这台电脑已在你的设备里，不会多占名额。不是你本人操作就点取消。",
+    "en": "This computer is already one of your devices. Cancel if this wasn't you.",
+    "ru": "Этот компьютер уже среди ваших устройств. Отмените, если это не вы."
+  },
+  "qr_confirm_web": {
+    "zh": "网页版 Portal 登录，不占设备名额。不是你本人操作就点取消。",
+    "en": "A Portal sign-in in a browser; it takes no device slot. Cancel if this wasn't you.",
+    "ru": "Вход в Portal в браузере, место устройства не занимает. Отмените, если это не вы."
+  },
+  "qr_confirm_action": {
+    "zh": "确认登录",
+    "en": "Sign in",
+    "ru": "Войти"
+  },
+  "qr_signed_in": {
+    "zh": "电脑已登录",
+    "en": "The computer is signed in",
+    "ru": "Компьютер вошёл в аккаунт"
+  },
+  "qr_expired": {
+    "zh": "二维码已过期，请在电脑上刷新后再扫。",
+    "en": "The code expired. Refresh it on the computer and scan again.",
+    "ru": "Код устарел. Обновите его на компьютере и отсканируйте снова."
+  },
+  "qr_invalid": {
+    "zh": "这不是 TrackNothing 的登录二维码。",
+    "en": "This isn't a TrackNothing sign-in code.",
+    "ru": "Это не код входа TrackNothing."
+  },
+  "qr_sign_in_first": {
+    "zh": "先在手机上登录，再扫电脑上的二维码。",
+    "en": "Sign in on the phone first, then scan the code on the computer.",
+    "ru": "Сначала войдите на телефоне, затем отсканируйте код на компьютере."
+  },
+  "qr_sign_in_title": {
+    "zh": "用手机扫码登录",
+    "en": "Scan with your phone",
+    "ru": "Войти через телефон"
+  },
+  "qr_sign_in_detail": {
+    "zh": "打开手机 App，在「我的」里点「扫码登录电脑」。",
+    "en": "In the phone app, open Account and tap Sign in a computer.",
+    "ru": "В приложении на телефоне: «Аккаунт» → «Войти на компьютере»."
+  },
+  "qr_scanned": {
+    "zh": "已扫码，请在手机上确认",
+    "en": "Scanned. Confirm on your phone",
+    "ru": "Отсканировано. Подтвердите на телефоне"
+  },
+  "qr_code_expired": {
+    "zh": "二维码已过期",
+    "en": "The code expired",
+    "ru": "Код устарел"
+  },
+  "qr_declined": {
+    "zh": "手机上已取消",
+    "en": "Cancelled on the phone",
+    "ru": "Отменено на телефоне"
+  },
+  "qr_refresh": {
+    "zh": "刷新",
+    "en": "Refresh",
+    "ru": "Обновить"
+  },
+  "qr_or_password": {
+    "zh": "或用邮箱密码登录",
+    "en": "Or sign in with email",
+    "ru": "Или войдите по email"
   }
 }
