@@ -153,8 +153,10 @@ export async function upgradeWireGuardSubscriptions(): Promise<number> {
       if (!old || old.protocol !== "wireguard") return;
       const credential = await createAccessCredential({ userId: old.user_id, displayName: old.display_name, protocol: "vless", identityKey: randomUUID(), subscription: true });
       const grace = new Date(Date.now() + WIREGUARD_GRACE_MS).toISOString();
-      await dbExec("UPDATE access_credentials SET expires_at=$1,user_disabled=$2,admin_disabled=$3 WHERE id=$4",
-        [old.expires_at, old.user_disabled, old.admin_disabled, credential.id]);
+      // Ranked just before the old credential, so device limits keep the subscription ahead of later devices.
+      const rank = new Date(Date.parse(old.created_at) - 1).toISOString();
+      await dbExec("UPDATE access_credentials SET expires_at=$1,user_disabled=$2,admin_disabled=$3,created_at=$5 WHERE id=$4",
+        [old.expires_at, old.user_disabled, old.admin_disabled, credential.id, rank]);
       const secret = await createSecretMaterial({ kind: `subscription_key:${credential.id}`, value: randomUUID() });
       await dbExec("UPDATE subscriptions SET credential_id=$1,private_key_secret_id=$2,updated_at=$3 WHERE id=$4", [credential.id, secret.id, new Date().toISOString(), id]);
       await dbExec("UPDATE access_credentials SET expires_at=$1,updated_at=$2 WHERE id=$3 AND (expires_at IS NULL OR expires_at>$1)", [grace, new Date().toISOString(), old.id]);
