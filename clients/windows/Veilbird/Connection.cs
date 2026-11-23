@@ -175,8 +175,10 @@ public sealed class Connection(NativeApi api,Core core) {
         var proxies=new List<JsonObject> {Transports.WireGuard(lease,keys.Private)};
         if(lease["proxies"] is JsonArray offered) proxies.AddRange(offered.OfType<JsonObject>().Where(p=>Transports.Ladder.Contains(p["name"]?.GetValue<string>())));
         var blocked=Transports.Blocked(network);
-        transports=Transports.Order(proxies.Select(p=>p["name"]!.GetValue<string>()),blocked);
-        Journal.Add($"node: {NodeName}, transports {string.Join(" > ",transports)}"+(blocked.Count>0?$" (blocked here before: {string.Join(", ",blocked)})":""));
+        // A location locked to one protocol (advanced) uses only that protocol's transports.
+        var locked=Advanced.Lock(NodeId);
+        transports=Advanced.Apply(Transports.Order(proxies.Select(p=>p["name"]!.GetValue<string>()),blocked),locked);
+        Journal.Add($"node: {NodeName}, transports {string.Join(" > ",transports)}"+(blocked.Count>0?$" (blocked here before: {string.Join(", ",blocked)})":"")+(locked.Length>0?$" (locked to {locked})":""));
         if(Since is null) {Lines=transports.Count;Phase=1;Changed?.Invoke();}
         // Disconnect pressed while connecting cancels the attempt here, before the tunnel stays up.
         if(!Active) throw new OperationCanceledException();

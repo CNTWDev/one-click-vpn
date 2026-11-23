@@ -44,6 +44,8 @@
   <data name="activity_title" xml:space="preserve"><value>Активность</value></data>
   <data name="activity_traffic" xml:space="preserve"><value>Трафик</value></data>
   <data name="add_program" xml:space="preserve"><value>Добавить программу…</value></data>
+  <data name="advanced" xml:space="preserve"><value>Расширенные функции</value></data>
+  <data name="advanced_detail" xml:space="preserve"><value>Избранные локации, один протокол для локации, названия протоколов в проверке соединения</value></data>
   <data name="all_locations" xml:space="preserve"><value>Все локации</value></data>
   <data name="all_locations_count" xml:space="preserve"><value>Все локации: {0}</value></data>
   <data name="allow_system_extension" xml:space="preserve"><value>macOS должна разрешить сетевое расширение TrackNothing, иначе подключиться нельзя. Нажмите «Открыть Системные настройки» и включите TrackNothing в разделе «Основные › Объекты входа и расширения › Сетевые расширения» (macOS 14 и раньше: «Конфиденциальность и безопасность»). Подключение начнётся сразу после разрешения.</value></data>
@@ -221,6 +223,9 @@
 
 macOS также покажет окно; кнопка OK в нём только закрывает его и ничего не включает.</value></data>
   <data name="extension_guide_title" xml:space="preserve"><value>Включите сетевое расширение</value></data>
+  <data name="favorite_add" xml:space="preserve"><value>В избранное</value></data>
+  <data name="favorite_remove" xml:space="preserve"><value>Убрать из избранного</value></data>
+  <data name="favorites" xml:space="preserve"><value>Избранное</value></data>
   <data name="file_device" xml:space="preserve"><value>Устройство</value></data>
   <data name="file_language" xml:space="preserve"><value>Язык</value></data>
   <data name="file_public_ip" xml:space="preserve"><value>Внешний IP</value></data>
@@ -235,6 +240,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="hide_password" xml:space="preserve"><value>Скрыть пароль</value></data>
   <data name="hiding_status" xml:space="preserve"><value>Скрываем</value></data>
   <data name="hold_to_reveal" xml:space="preserve"><value>Удерживайте, чтобы увидеть</value></data>
+  <data name="hop_note" xml:space="preserve"><value>Hysteria2 меняет порт каждые 20–40 с</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Неверная почта или пароль.</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>Некорректный ответ сервера. Повторите позже.</value></data>
   <data name="kill_switch" xml:space="preserve"><value>Блокировка без VPN</value></data>
@@ -276,7 +282,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="no_locations_available_refresh_or_contact_your_administrator" xml:space="preserve"><value>Нет доступных локаций. Обновите или обратитесь к администратору.</value></data>
   <data name="no_matching_locations_change_your_search_or_refresh_later" xml:space="preserve"><value>Локации не найдены. Измените запрос или обновите позже.</value></data>
   <data name="no_matching_locations_try_another_search" xml:space="preserve"><value>Локации не найдены. Попробуйте другой запрос.</value></data>
+  <data name="node_hold_hint" xml:space="preserve"><value>Нажмите и удерживайте локацию, чтобы добавить в избранное или выбрать протокол</value></data>
   <data name="node_load" xml:space="preserve"><value>Нагрузка {0}%</value></data>
+  <data name="node_menu_hint" xml:space="preserve"><value>Щёлкните локацию правой кнопкой, чтобы добавить в избранное или выбрать протокол</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>Джиттер {0} мс · Потери {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Не подключено</value></data>
   <data name="off_state" xml:space="preserve"><value>Выкл.</value></data>
@@ -299,6 +307,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="phase_route" xml:space="preserve"><value>Выбор маршрута</value></data>
   <data name="phase_tunnel" xml:space="preserve"><value>Соединение</value></data>
   <data name="pick_location_sub" xml:space="preserve"><value>Мы выберем самую быструю. Сменить можно в любой момент.</value></data>
+  <data name="protocol" xml:space="preserve"><value>Протокол</value></data>
+  <data name="protocol_lock_detail" xml:space="preserve"><value>После выбора эта локация использует только этот протокол и не переключится на другой, если он не работает.</value></data>
+  <data name="protocol_only" xml:space="preserve"><value>Только {0}</value></data>
   <data name="qr_code_expired" xml:space="preserve"><value>Код устарел</value></data>
   <data name="qr_confirm_action" xml:space="preserve"><value>Войти</value></data>
   <data name="qr_confirm_known" xml:space="preserve"><value>Этот компьютер уже среди ваших устройств. Отмените, если это не вы.</value></data>
@@ -332,6 +343,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="rate_unit_gbps" xml:space="preserve"><value>Гбит/с</value></data>
   <data name="rate_unit_kbps" xml:space="preserve"><value>Кбит/с</value></data>
   <data name="rate_unit_mbps" xml:space="preserve"><value>Мбит/с</value></data>
+  <data name="reality_alt" xml:space="preserve"><value>REALITY доп.</value></data>
   <data name="reconnecting_detail" xml:space="preserve"><value>Связь прервалась. Переподключаемся сами.</value></data>
   <data name="reconnecting_status" xml:space="preserve"><value>Связь прервалась. Переподключение…</value></data>
   <data name="reconnecting_title" xml:space="preserve"><value>Переподключение</value></data>
@@ -386,6 +398,8 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="send_reset_link" xml:space="preserve"><value>Отправить</value></data>
   <data name="server_address" xml:space="preserve"><value>Адрес сервера</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Адрес сервера https://…</value></data>
+  <data name="setting_off" xml:space="preserve"><value>Выкл.</value></data>
+  <data name="setting_on" xml:space="preserve"><value>Вкл.</value></data>
   <data name="share_action" xml:space="preserve"><value>Поделиться</value></data>
   <data name="shortcuts" xml:space="preserve"><value>Быстрые команды</value></data>
   <data name="shortcuts_detail" xml:space="preserve"><value>Подключить / Отключить</value></data>

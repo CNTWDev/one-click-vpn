@@ -33,6 +33,9 @@ struct ClientView:View {
     @State private var checkResult:[String:Int]?
     /// The node whose per-line detail is open in the list ("" = none).
     @State private var openNode=""
+    /// Advanced features (Account switch); bumped when a favorite or lock changes so the list redraws.
+    @State private var advanced=Advanced.enabled
+    @State private var advancedEdits=0
     /// The transport carrying traffic now (for "in use") and the speed test's last status from the tunnel.
     @State private var currentLine=""
     @State private var speedStatus:[String:Any]=["state":"idle"]
@@ -564,7 +567,7 @@ struct ClientView:View {
                     let name=Latency.lineOrder[i],ms=lines[name]
                     HStack(spacing:8) {
                         LineCells(states:[states[i]])
-                        Text(lineName(i)).font(.system(size:13))
+                        Text(checkLineName(i)).font(.system(size:13)).lineLimit(1)
                         Text(L10n.text("line_in_use")).font(.system(size:11)).foregroundStyle(VeilbirdStyle.accent).opacity(name==currentLine ? 1:0)
                         Spacer(minLength:4)
                         Text(lineValue(ms)).font(.system(size:12,design:.monospaced)).monospacedDigit()
@@ -574,8 +577,11 @@ struct ClientView:View {
             }.padding(.top,8)
             let down=Latency.lineOrder.enumerated().filter {(lines[$0.element] ?? 0)<0}
             if let used=Latency.lineOrder.firstIndex(of:currentLine),(lines[currentLine] ?? -1)>=0,!down.isEmpty {
-                Text(L10n.text("check_lines_note",down.map {lineName($0.offset)}.joined(separator:listJoin),lineName(used)))
+                Text(L10n.text("check_lines_note",down.map {checkLineName($0.offset)}.joined(separator:listJoin),checkLineName(used)))
                     .font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary).padding(.top,8)
+            }
+            if advanced && currentLine=="hysteria2" {
+                Text(L10n.text("hop_note")).font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary).padding(.top,8)
             }
         }
     }
@@ -785,17 +791,16 @@ struct ClientView:View {
                 }.buttonStyle(RowButton()).cardOutline(VeilbirdStyle.radius)
                 .clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).padding(.top,16)
                 .accessibilityAddTraits(model.selected.isEmpty ? .isSelected:[])
-                caption(L10n.text("all_locations")).padding(.top,20).padding(.bottom,8)
+                let (favorite,rest)=splitNodes
+                if !favorite.isEmpty {
+                    caption(L10n.text("favorites")).padding(.top,20).padding(.bottom,8)
+                    nodeGroup(favorite)
+                }
+                if !rest.isEmpty || favorite.isEmpty {caption(L10n.text("all_locations")).padding(.top,20).padding(.bottom,8)}
                 if filteredNodes.isEmpty {
                     caption(model.nodes.isEmpty ? L10n.text("no_locations_available_refresh_or_contact_your_administrator"):L10n.text("no_matching_locations_try_another_search"))
-                } else {
-                    CardGroup {
-                        ForEach(filteredNodes.indices,id:\.self) {i in
-                            if i>0 {Hairline(inset:mac ? 60:66)}
-                            nodeRow(filteredNodes[i])
-                        }
-                    }
-                }
+                } else if !rest.isEmpty {nodeGroup(rest)}
+                if advanced && !model.nodes.isEmpty {caption(L10n.text(mac ? "node_menu_hint":"node_hold_hint")).padding(.top,12)}
             }.padding(.horizontal,16).padding(.top,mac ? 4:8).padding(.bottom,20)
         }.task {
             // The saved list shows at once; it is loaded at launch and by the refresh button, not here. Only a device
@@ -805,6 +810,46 @@ struct ClientView:View {
         }
     }
     private func lineName(_ index:Int)->String {L10n.text("line_n",L10n.number(index+1))}
+    /// Advanced: favorite locations in their own group above the rest (advancedEdits redraws after a change).
+    private var splitNodes:([[String:Any]],[[String:Any]]) {
+        _=advancedEdits
+        let favorites=advanced ? Advanced.favorites:[]
+        let nodes=filteredNodes
+        return (nodes.filter {favorites.contains($0["id"] as? String ?? "")},nodes.filter {!favorites.contains($0["id"] as? String ?? "")})
+    }
+    private func nodeGroup(_ nodes:[[String:Any]])->some View {
+        CardGroup {
+            ForEach(nodes.indices,id:\.self) {i in
+                if i>0 {Hairline(inset:mac ? 60:66)}
+                nodeRow(nodes[i])
+            }
+        }
+    }
+    /// A protocol's name as the advanced views show it.
+    private func protocolName(_ transport:String)->String {transport=="reality-alt" ? L10n.text("reality_alt"):Guidance.label(transport)}
+    /// The check's line names: Line 1…4, or the protocols' names with advanced on.
+    private func checkLineName(_ index:Int)->String {advanced ? protocolName(Latency.lineOrder[index]):lineName(index)}
+    /// Advanced: favorite and protocol lock for one location (right-click on the Mac, press and hold on iOS).
+    @ViewBuilder private func nodeMenu(id:String)->some View {
+        let favorite=Advanced.favorites.contains(id),locked=Advanced.lock(id)
+        Button(L10n.text(favorite ? "favorite_remove":"favorite_add")) {Advanced.favorite(id,!favorite);advancedEdits+=1}
+        Menu(L10n.text("protocol")) {
+            ForEach([""]+Advanced.protocols,id:\.self) {value in
+                Button {setLock(id,value)} label:{
+                    if value==locked {Label(value.isEmpty ? L10n.text("automatic"):protocolName(value),systemImage:"checkmark")}
+                    else {Text(value.isEmpty ? L10n.text("automatic"):protocolName(value))}
+                }
+            }
+            Divider()
+            Text(L10n.text("protocol_lock_detail"))
+        }
+    }
+    /// A changed lock applies at once on the location in use (one reconnect), else from its next connection.
+    private func setLock(_ id:String,_ value:String) {
+        guard value != Advanced.lock(id) else {return}
+        Advanced.setLock(id,value);advancedEdits+=1
+        if model.connected && model.connectedNodeId==id {model.work {try await model.reconnect()}}
+    }
     private var listJoin:String {L10n.language.hasPrefix("zh") ? "、":", "}
     /// Each line's cell in the order Line 1…4; nil when this device has no line results for the node.
     private func lineStates(_ lines:[String:Int]?)->[LineState]? {
@@ -837,7 +882,11 @@ struct ClientView:View {
         let unreachable=quality != nil && quality?.latency == nil
         let selected=model.selected==id
         let states=lineStates(quality?.lines)
-        let note=linesNote(quality?.lines)
+        _=advancedEdits
+        let locked=advanced ? Advanced.lock(id):""
+        let lockNote=locked.isEmpty ? nil:L10n.text("protocol_only",protocolName(locked))
+        let parts:[String]=[linesNote(quality?.lines) ?? region,lockNote].compactMap {$0}
+        let note:String?=parts.isEmpty ? nil:parts.joined(separator:" · ")
         let offered=((node["test"] as? [[String:Any]]) ?? []).contains {Latency.lineOrder.contains($0["name"] as? String ?? "")}
         let open=openNode==id && states != nil
         // Split into small pieces: as one expression the optimized (release) build cannot type-check it in time.
@@ -849,6 +898,7 @@ struct ClientView:View {
             if open,let lines=quality?.lines,let states {nodeLines(lines:lines,states:states)}
         }.background(selected ? VeilbirdStyle.raised:(open ? Color(red:16/255,green:14/255,blue:13/255):Color.clear))
         .animation(reduceMotion ? nil:.easeInOut(duration:0.2),value:selected)
+        .contextMenu {if advanced {nodeMenu(id:id)}}
     }
     private func nodeMain(id:String,name:String,region:String?,quality:Quality?,unreachable:Bool,selected:Bool,note:String?)->some View {
         let tint:Color=unreachable ? VeilbirdStyle.faint:VeilbirdStyle.text
@@ -956,6 +1006,13 @@ struct ClientView:View {
                         VStack(alignment:.leading,spacing:2) {
                             Text(L10n.text("kill_switch")).font(.system(size:VeilbirdStyle.body))
                             Text(L10n.text("kill_switch_apple_detail")).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).fixedSize(horizontal:false,vertical:true)
+                        }
+                    }.toggleStyle(.switch).controlSize(mac ? .small:.regular).tint(VeilbirdStyle.accent).padding(.horizontal,16).padding(.vertical,8).frame(minHeight:mac ? 40:50)
+                    Hairline()
+                    Toggle(isOn:Binding(get:{advanced},set:{Advanced.enabled=$0;advanced=$0})) {
+                        VStack(alignment:.leading,spacing:2) {
+                            Text(L10n.text("advanced")).font(.system(size:VeilbirdStyle.body))
+                            Text(L10n.text("advanced_detail")).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).fixedSize(horizontal:false,vertical:true)
                         }
                     }.toggleStyle(.switch).controlSize(mac ? .small:.regular).tint(VeilbirdStyle.accent).padding(.horizontal,16).padding(.vertical,8).frame(minHeight:mac ? 40:50)
                     Hairline()
