@@ -210,21 +210,49 @@ struct LineCells:View {
     }
 }
 
-/// Daily usage as columns of square blocks; the last week is in full accent.
-struct UsageBars:View {
+/// Traffic per day on the usage page: one rounded bar per day, the picked day lit in the accent and the others dim.
+/// A tap or drag picks the day under the pointer.
+struct DayBars:View {
     let values:[Int64]
-    /// How many trailing columns are lit (the chosen range); the rest are dimmed.
-    var recent=7
+    @Binding var picked:Int
     var body:some View {
-        Canvas {context,area in
-            guard !values.isEmpty else {return}
-            let gap:CGFloat=3, width=(area.width-gap*CGFloat(values.count-1))/CGFloat(values.count)
-            let block:CGFloat=4, pitch:CGFloat=6, rows=max(1,Int((area.height+pitch-block)/pitch)), top=max(values.max() ?? 1,1)
-            for (i,value) in values.enumerated() {
-                let lit=value<=0 ? 1:max(1,Int((Double(rows)*Double(value)/Double(top)).rounded()))
-                let color=i>=values.count-recent ? VeilbirdStyle.accent:VeilbirdStyle.past
-                let left=CGFloat(i)*(width+gap)
-                for r in 0..<lit {context.fill(Path(CGRect(x:left,y:area.height-CGFloat(r)*pitch-block,width:width,height:block)),with:.color(color))}
+        GeometryReader {proxy in
+            Canvas {context,area in drawBars(context,area.size)}
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance:0).onChanged {pick($0.location.x,proxy.size.width)})
+        }.accessibilityHidden(true)
+    }
+    private func pick(_ x:CGFloat,_ width:CGFloat) {
+        guard !values.isEmpty,width>0 else {return}
+        let index:Int=Int(x/width*CGFloat(values.count))
+        picked=min(max(index,0),values.count-1)
+    }
+    private func drawBars(_ context:GraphicsContext,_ size:CGSize) {
+        guard !values.isEmpty else {return}
+        let pitch:CGFloat=size.width/CGFloat(values.count)
+        let gap:CGFloat=min(3,pitch*0.35)
+        let radius:CGFloat=min(2,(pitch-gap)/2)
+        let top:Double=Double(max(values.max() ?? 1,1))
+        for (i,value) in values.enumerated() {
+            let share:CGFloat=CGFloat(Double(value)/top)
+            let height:CGFloat=max(3,size.height*share)
+            let rect=CGRect(x:CGFloat(i)*pitch+gap/2,y:size.height-height,width:pitch-gap,height:height)
+            let color:Color=i==picked ? VeilbirdStyle.accent:(value<=0 ? VeilbirdStyle.raised:VeilbirdStyle.past)
+            context.fill(Path(roundedRect:rect,cornerRadius:radius),with:.color(color))
+        }
+    }
+}
+
+/// A share of a whole as a filled bar on a dim track, both rounded (quota used, a row's share of the largest).
+struct QuotaBar:View {
+    let share:Double
+    let tint:Color
+    var body:some View {
+        GeometryReader {proxy in
+            let width:CGFloat=proxy.size.width*CGFloat(min(max(share,0.01),1))
+            ZStack(alignment:.leading) {
+                RoundedRectangle(cornerRadius:proxy.size.height/2).fill(VeilbirdStyle.raised)
+                RoundedRectangle(cornerRadius:proxy.size.height/2).fill(tint).frame(width:width)
             }
         }.accessibilityHidden(true)
     }

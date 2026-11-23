@@ -37,7 +37,11 @@ struct ClientView:View {
     @State private var currentLine=""
     @State private var speedStatus:[String:Any]=["state":"idle"]
     @State private var speedLine=""
-    @State private var usageRange="30d"
+    /// The usage page: its range in days, the figures loaded for it, and the day picked on the chart.
+    @State private var usageDays=30
+    @State private var usage:[String:Any]?
+    @State private var usageFailed=false
+    @State private var usagePicked=29
     /// The public address the service saw before connecting, and the connect page's scan line (direction, run count).
     @State private var revealEmail=false
     #if os(macOS)
@@ -65,6 +69,7 @@ struct ClientView:View {
                         case 2:accountView
                         case 3:logsView
                         case 5:ActivityView()
+                        case 6:usageView
                         default:devicesView
                         }
                     }.id(tab).transition(.asymmetric(insertion:.opacity.combined(with:.offset(y:8)),removal:.identity))
@@ -672,10 +677,14 @@ struct ClientView:View {
     /// What this account has left (or used) and how long it runs: two quiet figures under the location.
     private var usageStrip:some View {
         let figures=UsageFigures(model.account)
-        return HStack(alignment:.top,spacing:16) {
-            usageCell(figures.trafficTitle,figures.traffic,figures.trafficTint,figures.trafficTitleTint)
-            usageCell(figures.untilTitle,figures.until,figures.untilTint,figures.untilTitleTint)
-        }.padding(.horizontal,4)
+        // A tap opens the usage page (per day, device and location).
+        return Button {tab=6} label:{
+            HStack(alignment:.center,spacing:16) {
+                usageCell(figures.trafficTitle,figures.traffic,figures.trafficTint,figures.trafficTitleTint)
+                usageCell(figures.untilTitle,figures.until,figures.untilTint,figures.untilTitleTint)
+                Image(systemName:"chevron.right").font(.system(size:mac ? 11:13,weight:.semibold)).foregroundStyle(VeilbirdStyle.faint)
+            }.padding(.horizontal,4).padding(.vertical,6).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityHint(L10n.text("usage_open"))
     }
     private func usageCell(_ title:String,_ value:String,_ tint:Color,_ titleTint:Color)->some View {
         VStack(alignment:.leading,spacing:4) {
@@ -892,7 +901,6 @@ struct ClientView:View {
                         Text(L10n.text("account_valid_until",L10n.date(model.account["expiresAt"] as? String))).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary)
                     }
                 }.padding(.horizontal,4).opacity(model.account.isEmpty ? 0:1)
-                usageCard
                 CardGroup {
                     settingRow(L10n.text("authorized_devices"),"\(L10n.number(model.account["used"] as? Int ?? 0)) / \(deviceLimit(model.account))") {tab=4}
                     Hairline()
@@ -947,47 +955,144 @@ struct ClientView:View {
             }.padding(.horizontal,16).padding(.top,mac ? 8:8).padding(.bottom,20)
         }.task {if model.account.isEmpty {model.work {try await model.loadAccount()}} else {try? await model.loadAccount()}}
     }
-    /// Today / this month / 30 days: the range's total, a bar per day for the last 30 days with the range lit, and for 30 days
-    /// the download / upload split. Days are the server's (UTC) days.
-    @ViewBuilder private var usageCard:some View {
-        if let traffic=model.account["traffic"] as? [String:Any] {
-            let down=Int64(String(describing:traffic["downloadBytes"] ?? "0")) ?? 0, up=Int64(String(describing:traffic["uploadBytes"] ?? "0")) ?? 0
-            let days=dailyUsage(traffic)
-            let today=days.last ?? 0
-            let dayOfMonth=Calendar(identifier:.gregorian).dateComponents(in:TimeZone(identifier:"UTC")!,from:Date()).day ?? 1
-            let month=days.suffix(min(30,dayOfMonth)).reduce(0,+)
-            VStack(alignment:.leading,spacing:mac ? 10:12) {
-                HStack(spacing:2) {
-                    ForEach([("today","usage_today"),("month","usage_this_month"),("30d","last_30_days")],id:\.0) {item in
-                        Button {usageRange=item.0} label:{
-                            Text(L10n.text(item.1)).font(.system(size:mac ? 12:13,weight:.medium)).lineLimit(1).padding(.horizontal,12).frame(height:mac ? 26:32)
-                                .foregroundStyle(usageRange==item.0 ? VeilbirdStyle.text:VeilbirdStyle.secondary)
-                                .background(usageRange==item.0 ? VeilbirdStyle.raised:Color.clear,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).contentShape(Rectangle())
-                        }.buttonStyle(.plain).accessibilityAddTraits(usageRange==item.0 ? .isSelected:[])
-                    }
-                }.padding(2).background(VeilbirdStyle.ground,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
-                totalText(bytes(usageRange=="today" ? today:(usageRange=="month" ? month:down+up)))
-                if !days.isEmpty {UsageBars(values:days,recent:usageRange=="today" ? 1:(usageRange=="month" ? min(30,dayOfMonth):30)).frame(height:mac ? 46:58)}
-                if usageRange=="30d" {
-                    HStack(spacing:20) {
-                        Text(L10n.text("download_amount",bytes(down)));Text(L10n.text("upload_amount",bytes(up)))
-                    }.font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).monospacedDigit()
-                }
-            }.padding(16).cardOutline(VeilbirdStyle.radius)
-        }
-    }
     /// "143 GB": the number large, its unit small and muted.
     private func totalText(_ value:String)->some View {
         let parts=value.split(separator:" ",maxSplits:1).map(String.init)
         return (Text(parts.first ?? value).font(Pixel.font(mac ? 34:42))
             + Text(parts.count>1 ? " "+parts[1]:"").font(.system(size:mac ? 14:17,weight:.medium)).foregroundColor(VeilbirdStyle.secondary)).monospacedDigit()
     }
-    private func dailyUsage(_ traffic:[String:Any])->[Int64] {
-        guard let days=traffic["days"] as? [[String:Any]],!days.isEmpty else {return []}
+    // MARK: Usage
+    /// What this account used: the quota and end date, traffic per day over 7, 30 or 90 days (the server's UTC days), and
+    /// per device and per location. Opened from the home page's usage strip.
+    private var usageView:some View {
+        ScrollView {
+            VStack(alignment:.leading,spacing:12) {
+                subPageHeader(L10n.text("usage_title")) {tab=0}
+                quotaCard
+                HStack(spacing:2) {
+                    ForEach([7,30,90],id:\.self) {days in
+                        Button {usageDays=days;Task {await loadUsage()}} label:{
+                            Text(L10n.text(rangeKey(days))).font(.system(size:mac ? 12:13,weight:.medium)).lineLimit(1).frame(maxWidth:.infinity).frame(height:mac ? 28:32)
+                                .foregroundStyle(usageDays==days ? VeilbirdStyle.text:VeilbirdStyle.secondary)
+                                .background(usageDays==days ? VeilbirdStyle.selected:Color.clear,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius-2)).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityAddTraits(usageDays==days ? .isSelected:[])
+                    }
+                }.padding(2).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+                dayChart
+                if usageFailed {caption(L10n.text("usage_load_failed"))}
+                else if let usage {
+                    rankCard(L10n.text("usage_by_device"),rows(usage["devices"]) {device in
+                        let name=(device["name"] as? String).flatMap {$0.isEmpty ? nil:$0} ?? L10n.text("device")
+                        return device["isCurrent"] as? Bool == true ? L10n.text("usage_this_device",name):name
+                    })
+                    rankCard(L10n.text("usage_by_location"),rows(usage["nodes"]) {$0["name"] as? String ?? ""})
+                }
+            }.padding(.horizontal,16).padding(.bottom,20)
+        }.task {await loadUsage();try? await model.loadAccount()}
+    }
+    private func rangeKey(_ days:Int)->String {days==7 ? "usage_7_days":(days==90 ? "usage_90_days":"usage_30_days")}
+    private func loadUsage() async {
+        let days=usageDays
+        do {
+            let data=try await model.api().request("usage?days=\(days)")
+            guard days==usageDays else {return}
+            usage=data;usageFailed=false;usagePicked=days-1
+        } catch {if days==usageDays {usageFailed=true}}
+    }
+    /// Every day of the range, oldest first, with the days without traffic as zero.
+    private var usageSeries:[(String,Int64)] {
         var perDay:[String:Int64]=[:]
-        for day in days {perDay[String((day["day"] as? String ?? "").prefix(10))]=Int64(String(describing:day["bytes"] ?? "0")) ?? 0}
+        for day in usage?["daily"] as? [[String:Any]] ?? [] {
+            let up:Int64=Int64(day["upload"] as? String ?? "0") ?? 0
+            let down:Int64=Int64(day["download"] as? String ?? "0") ?? 0
+            perDay[day["day"] as? String ?? ""]=up+down
+        }
         let formatter=DateFormatter();formatter.calendar=Calendar(identifier:.gregorian);formatter.locale=Locale(identifier:"en_US_POSIX");formatter.timeZone=TimeZone(identifier:"UTC");formatter.dateFormat="yyyy-MM-dd"
-        return (0..<30).reversed().map {offset in perDay[formatter.string(from:Date().addingTimeInterval(-Double(offset)*86400))] ?? 0}
+        return (0..<usageDays).reversed().map {(offset:Int)->(String,Int64) in
+            let key=formatter.string(from:Date().addingTimeInterval(-Double(offset)*86400))
+            return (key,perDay[key] ?? 0)
+        }
+    }
+    /// "11月22日", "Nov 22": a chart day in the app's language.
+    private func shortDay(_ key:String)->String {
+        let parser=DateFormatter();parser.locale=Locale(identifier:"en_US_POSIX");parser.timeZone=TimeZone(identifier:"UTC");parser.dateFormat="yyyy-MM-dd"
+        guard let date=parser.date(from:key) else {return key}
+        let formatter=DateFormatter();formatter.locale=L10n.locale;formatter.timeZone=TimeZone(identifier:"UTC");formatter.setLocalizedDateFormatFromTemplate("MMMd")
+        return formatter.string(from:date)
+    }
+    private var dayChart:some View {
+        let series=usageSeries
+        let values=series.map {$0.1}
+        let total:Int64=values.reduce(0,+)
+        let picked=series.indices.contains(usagePicked) ? series[usagePicked]:nil
+        return VStack(alignment:.leading,spacing:10) {
+            HStack {
+                Text(picked.map {shortDay($0.0)+" · "+bytes($0.1)} ?? " ").lineLimit(1)
+                Spacer(minLength:8)
+                Text(usage == nil ? " ":bytes(total)).monospacedDigit().lineLimit(1)
+            }.font(.system(size:mac ? 11:12)).foregroundStyle(VeilbirdStyle.secondary)
+            DayBars(values:values,picked:$usagePicked).frame(height:mac ? 72:88)
+            HStack {
+                Text(series.first.map {shortDay($0.0)} ?? " ")
+                Spacer()
+                Text(series.last.map {shortDay($0.0)} ?? " ")
+            }.font(.system(size:mac ? 10:11)).foregroundStyle(VeilbirdStyle.faint)
+        }.padding(16).cardOutline(VeilbirdStyle.radius).opacity(usage == nil ? 0.5:1).animation(.easeOut(duration:0.15),value:usage == nil)
+    }
+    private var quotaCard:some View {
+        let access=AccountAccess(model.account)
+        let quota:Int64?=access.quota
+        let used:Int64=quota.map {max(0,$0-access.remaining)} ?? usedLast30(model.account)
+        let ended=access.state=="expired", exhausted=access.state=="exhausted"
+        return VStack(alignment:.leading,spacing:0) {
+            Text(L10n.text(quota == nil ? "last_30_days":"usage_used_period")).font(.system(size:mac ? 11:12)).foregroundStyle(VeilbirdStyle.secondary)
+            HStack(alignment:.lastTextBaseline) {
+                totalText(bytes(used)).foregroundStyle(exhausted ? VeilbirdStyle.danger:VeilbirdStyle.text)
+                Spacer(minLength:8)
+                Text(quota.map {L10n.text("usage_of",bytes($0))} ?? L10n.text("usage_unlimited")).font(.system(size:mac ? 12:13)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
+            }.padding(.top,6)
+            if let quota {
+                let tint:Color=exhausted ? VeilbirdStyle.danger:(access.low ? VeilbirdStyle.fair:VeilbirdStyle.accent)
+                QuotaBar(share:Double(used)/Double(max(quota,1)),tint:tint).frame(height:8).padding(.top,12)
+                Text(L10n.text("usage_left",bytes(access.remaining))).font(.system(size:mac ? 11:12)).foregroundStyle(exhausted || access.low ? tint:VeilbirdStyle.secondary).padding(.top,8)
+            }
+            Rectangle().fill(VeilbirdStyle.hairline).frame(height:0.5).padding(.vertical,12)
+            HStack {
+                Text(ended ? L10n.text("access_expired_title"):(access.until == nil ? L10n.text("no_expiry"):L10n.text("valid_until_label")+" "+L10n.date(access.untilText)))
+                    .foregroundStyle(ended ? VeilbirdStyle.danger:(access.ending ? VeilbirdStyle.fair:VeilbirdStyle.secondary))
+                Spacer(minLength:12)
+                if let until=access.until,!ended {
+                    Text(L10n.text("usage_days_left",L10n.number(daysLeft(until)))).fontWeight(.medium).foregroundStyle(access.ending ? VeilbirdStyle.fair:VeilbirdStyle.text)
+                }
+            }.font(.system(size:mac ? 12:13)).lineLimit(2)
+        }.padding(16).cardOutline(VeilbirdStyle.radius).opacity(model.account.isEmpty ? 0:1)
+    }
+    private func daysLeft(_ until:Date)->Int {max(0,Int((until.timeIntervalSinceNow/86_400).rounded(.up)))}
+    private func usedLast30(_ account:[String:Any])->Int64 {
+        guard let traffic=account["traffic"] as? [String:Any] else {return 0}
+        let up:Int64=Int64(String(describing:traffic["uploadBytes"] ?? "0")) ?? 0
+        let down:Int64=Int64(String(describing:traffic["downloadBytes"] ?? "0")) ?? 0
+        return up+down
+    }
+    private func rows(_ value:Any?,_ name:([String:Any])->String)->[(String,Int64)] {
+        (value as? [[String:Any]] ?? []).map {(name($0),Int64($0["bytes"] as? String ?? "0") ?? 0)}
+    }
+    /// A titled card of names with a share bar and their bytes, largest first.
+    private func rankCard(_ title:String,_ items:[(String,Int64)])->some View {
+        let top:Int64=max(items.first?.1 ?? 1,1)
+        return VStack(alignment:.leading,spacing:10) {
+            Text(title).font(.system(size:mac ? 11:12,weight:.medium)).foregroundStyle(VeilbirdStyle.secondary)
+            if items.isEmpty {Text(L10n.text("activity_nothing")).font(.system(size:mac ? 12:13)).foregroundStyle(VeilbirdStyle.secondary)}
+            ForEach(items.indices,id:\.self) {i in
+                HStack(spacing:12) {
+                    VStack(alignment:.leading,spacing:6) {
+                        Text(items[i].0).font(.system(size:mac ? 12:13)).lineLimit(1).truncationMode(.middle)
+                        QuotaBar(share:Double(items[i].1)/Double(top),tint:VeilbirdStyle.accent).frame(height:4)
+                    }
+                    Text(bytes(items[i].1)).font(.system(size:mac ? 11:12,design:.monospaced)).lineLimit(1).frame(width:mac ? 70:78,alignment:.trailing)
+                }
+            }
+        }.padding(16).frame(maxWidth:.infinity,alignment:.leading).cardOutline(VeilbirdStyle.radius)
     }
     private func platformName(_ value:String)->String? {
         switch value.lowercased() {
