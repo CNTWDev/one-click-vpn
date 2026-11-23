@@ -2,17 +2,18 @@ name: Client build check
 on:
   workflow_dispatch:
   # Runs on master after merge, not on pull requests: changes merge without waiting and are fixed forward. A
-  # newer master commit cancels the run of the previous one, so a burst of merges is built once. Each master run
-  # also saves the prebuilt core (Android AAR, Apple xcframework), Go and Gradle caches for the next one.
+  # burst of merges is built at most twice (the running build, then the newest commit). Each master run also
+  # saves the prebuilt core (Android AAR, Apple xcframework), Go and Gradle caches for the next one.
   push:
     branches: [master]
     paths: ['clients/**', 'scripts/native-locales.mjs', '.github/workflows/native-clients.yml']
 permissions:
   contents: read
-# A new push to the same branch cancels the builds still going for the previous commit.
+# One build at a time per branch, never cancelled: a cancelled build saves no caches, and with frequent merges
+# none would finish. Commits merged while one runs wait as a single pending run of the newest commit.
 concurrency:
   group: client-build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 # The platform builds start at once instead of waiting for the localization check; a failure in either still fails the run.
 jobs:
   localization:

@@ -7,8 +7,9 @@ import test from "node:test";
 import { hashPassword } from "../server/password.ts";
 
 // The apps' usage page: traffic_daily summed per day, per signed-in app (all its per-node device rows) and per location.
-test("Native usage: per day, per device and per location from traffic_daily", { skip: !process.env.VEILBIRD_TEST_DATABASE_URL, timeout: 90000 }, async () => {
-  const databaseUrl = process.env.VEILBIRD_TEST_DATABASE_URL;
+test("Native usage: per day, per device and per location from traffic_daily", { skip: !(process.env.VEILBIRD_USAGE_TEST_DATABASE_URL || process.env.VEILBIRD_TEST_DATABASE_URL), timeout: 90000 }, async () => {
+  // Its own database in CI: the main one is shared with suites that start their own Controller at the same time.
+  const databaseUrl = process.env.VEILBIRD_USAGE_TEST_DATABASE_URL || process.env.VEILBIRD_TEST_DATABASE_URL;
   const base = "http://127.0.0.1:3199/api/v2/native/";
   const env = { ...process.env, VEILBIRD_DATABASE_URL: databaseUrl, VEILBIRD_NATIVE_ACCESS_ENABLED: "1", VEILBIRD_MASTER_KEY: Buffer.alloc(32, 9).toString("base64") };
   await promisify(execFile)(process.execPath, ["scripts/migrate.mjs"], { env });

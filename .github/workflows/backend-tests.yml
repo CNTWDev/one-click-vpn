@@ -37,6 +37,8 @@ jobs:
       VEILBIRD_NATIVE_TEST_DATABASE_URL: postgres://veilbird:veilbird@127.0.0.1:5432/veilbird_native
       # client-releases-api falls back to the native database; both start a Controller at once, so it gets its own.
       VEILBIRD_RELEASE_TEST_DATABASE_URL: postgres://veilbird:veilbird@127.0.0.1:5432/veilbird_release
+      # native-usage starts a Controller too; on the shared main database it got 503s from the others' state.
+      VEILBIRD_USAGE_TEST_DATABASE_URL: postgres://veilbird:veilbird@127.0.0.1:5432/veilbird_usage
       # Keep in step with the versions agent/agent.py installs on nodes.
       MIHOMO_VERSION: v1.19.33
       XRAY_VERSION: v26.3.27
@@ -53,7 +55,7 @@ jobs:
         env:
           PGPASSWORD: veilbird
         run: |
-          for db in veilbird_automation veilbird_reality veilbird_native veilbird_release; do
+          for db in veilbird_automation veilbird_reality veilbird_native veilbird_release veilbird_usage; do
             psql -h 127.0.0.1 -U veilbird -d veilbird_test -c "CREATE DATABASE $db"
           done
       - name: Install pinned Mihomo and Xray
