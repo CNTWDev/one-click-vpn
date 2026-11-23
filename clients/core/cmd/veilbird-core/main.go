@@ -8,6 +8,7 @@
 //	probefirst <names> <group> <url> <ms> -> name=delay,... once traffic has a transport (see core.ProbeFirst)
 //	now <group>                   -> proxy name
 //	rate                          -> up down (bytes per second)
+//	appusage <days>               -> [{name,bytes,proxy}] programs by traffic over local days (see core.AppUsage)
 //	stop                          -> ok
 //	keypair                       -> <private> <public> (WireGuard, base64)
 //	fetch <id> <base64 request>   -> fetch:<id> <response JSON>, possibly after later commands' replies
@@ -160,6 +161,12 @@ func main() {
 			reply(core.ProbeFirst(fields[1], fields[2], fields[3], timeout))
 		case "activity":
 			reply(core.Activity())
+		case "appusage":
+			days := 30
+			if len(fields) == 2 {
+				days, _ = strconv.Atoi(fields[1])
+			}
+			reply(core.AppUsage(home, days))
 		case "reach":
 			if len(fields) != 3 {
 				reply("-1")

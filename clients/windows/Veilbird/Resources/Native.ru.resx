@@ -425,8 +425,24 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="update_seconds" xml:space="preserve"><value>{0} с</value></data>
   <data name="update_time_left" xml:space="preserve"><value>около {0}</value></data>
   <data name="upload_amount" xml:space="preserve"><value>↑ Отдача {0}</value></data>
+  <data name="usage_30_days" xml:space="preserve"><value>30 дней</value></data>
+  <data name="usage_7_days" xml:space="preserve"><value>7 дней</value></data>
+  <data name="usage_90_days" xml:space="preserve"><value>90 дней</value></data>
+  <data name="usage_apps_local" xml:space="preserve"><value>Считается только здесь, не отправляется</value></data>
+  <data name="usage_by_app" xml:space="preserve"><value>По приложениям</value></data>
+  <data name="usage_by_device" xml:space="preserve"><value>По устройствам</value></data>
+  <data name="usage_by_location" xml:space="preserve"><value>По локациям</value></data>
+  <data name="usage_days_left" xml:space="preserve"><value>Осталось дней: {0}</value></data>
+  <data name="usage_left" xml:space="preserve"><value>Осталось {0}</value></data>
+  <data name="usage_load_failed" xml:space="preserve"><value>Не удалось загрузить трафик. Попробуйте позже.</value></data>
+  <data name="usage_of" xml:space="preserve"><value>из {0}</value></data>
+  <data name="usage_open" xml:space="preserve"><value>Подробнее о трафике</value></data>
+  <data name="usage_this_device" xml:space="preserve"><value>{0} (это)</value></data>
   <data name="usage_this_month" xml:space="preserve"><value>Этот месяц</value></data>
+  <data name="usage_title" xml:space="preserve"><value>Трафик</value></data>
   <data name="usage_today" xml:space="preserve"><value>Сегодня</value></data>
+  <data name="usage_unlimited" xml:space="preserve"><value>Без лимита</value></data>
+  <data name="usage_used_period" xml:space="preserve"><value>Использовано за период</value></data>
   <data name="use_automatic_action" xml:space="preserve"><value>Авто</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 Действует до · </value></data>
@@ -438,8 +454,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>После входа новые пользователи сразу попадают на главный экран, без выбора локации: по умолчанию «Автоматически» — самая быстрая линия и переход на другую при сбое
-Первый запуск теперь в два шага: вход и подключение</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Новая страница «Трафик»: нажмите строку трафика на главном экране, чтобы увидеть остаток и сколько дней осталось
+Трафик по дням за 7, 30 или 90 дней; нажмите столбец, чтобы увидеть цифру за день
+Трафик по устройствам и локациям; в Windows также программы, потратившие больше всего за 7 дней (хранится только на этом компьютере)</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>
