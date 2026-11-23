@@ -595,6 +595,15 @@ const migrations = [
         AND (g.quota_bytes IS NULL OR g.used_bytes < g.quota_bytes))
       WHERE EXISTS (SELECT 1 FROM access_grants g WHERE g.user_id = u.id AND g.source = 'welcome')`);
   }],
+  ["011-node-speed-tests", async (db) => db.query(`
+    -- A node's own connection speed, measured by its Agent (server/speed-test.ts); the last 30 per node are kept.
+    CREATE TABLE IF NOT EXISTS node_speed_tests (
+      id TEXT PRIMARY KEY, node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, kind TEXT NOT NULL,
+      down_mbps REAL, up_mbps REAL, latency_ms REAL, congestion TEXT NOT NULL DEFAULT '', error TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS node_speed_tests_node_idx ON node_speed_tests(node_id, created_at DESC);
+  `)],
 ];
 
 const client = await pool.connect();

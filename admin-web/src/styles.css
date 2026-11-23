@@ -507,6 +507,19 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .protocol-grid b, .action-list b { font-size: 14px; }
 .protocol-grid small, .action-list small { display: block; margin-top: 6px; color: var(--text-2); font-size: 13px; }
 .protocol-grid p, .action-list p { margin: 8px 0 0; color: var(--danger); font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+/* 网络调优: filled tiles without outlines; the tuned state and the gain carry the accent. */
+.node-tuning .button.soft { color: var(--accent); background: var(--accent-soft); }
+.node-tuning .button.soft:hover:not(:disabled) { color: var(--accent-contrast); background: var(--accent); }
+.tuning-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tuning-cards article { min-width: 0; padding: 14px; background: var(--surface-2); border-radius: var(--radius); }
+.tuning-cards small, .tuning-cards b, .tuning-cards article > span { display: block; }
+.tuning-cards small { color: var(--text-2); font-size: 13px; }
+.tuning-cards b { margin-top: 8px; font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tuning-cards article > span { margin-top: 6px; color: var(--text-2); font-size: 13px; overflow-wrap: anywhere; }
+.tuning-cards article.good { background: var(--accent-soft); }
+.tuning-cards article.good b { color: var(--accent); }
+.tuning-gain { margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+.tuning-gain span { color: var(--text); }
 .deployment-log { padding: 16px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
 .diagnostic-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 10px; }
 .diagnostic-section-head h3 { margin-bottom: 2px !important; }
@@ -764,6 +777,9 @@ details[open] > summary .chev { transform: rotate(180deg); }
   .form-grid { grid-template-columns: 1fr; }
   .span-2 { grid-column: auto; }
   .diagnostic-cards, .protocol-grid, .action-list { grid-template-columns: 1fr; }
+  .tuning-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tuning-cards article:first-child { grid-column: 1 / -1; }
+  .tuning-gain { display: grid; }
   .event-list { grid-template-columns: minmax(0, 1fr) auto; }
   .event-list > div > span:last-child { grid-column: 1 / -1; }
   .current-job-head { align-items: flex-start; flex-direction: column; }

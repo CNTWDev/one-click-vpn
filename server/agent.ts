@@ -14,6 +14,8 @@ function normalizeMetrics(input: unknown, wanRate: NodeNetworkRate | null): stri
   const memory = value.memory && typeof value.memory === "object" ? value.memory as Record<string, unknown> : {};
   const disk = value.disk && typeof value.disk === "object" ? value.disk as Record<string, unknown> : {};
   const network = value.network && typeof value.network === "object" ? value.network as Record<string, unknown> : {};
+  const tuning = value.tuning && typeof value.tuning === "object" ? value.tuning as Record<string, unknown> : null;
+  const word = (item: unknown) => typeof item === "string" ? item.replace(/[^a-z0-9_-]/gi, "").slice(0, 32) : "";
   return JSON.stringify({
     collectedAt: typeof value.collectedAt === "string" ? value.collectedAt.slice(0, 64) : new Date().toISOString(),
     cpuPercent: metricNumber(value.cpuPercent, 100),
@@ -25,6 +27,9 @@ function normalizeMetrics(input: unknown, wanRate: NodeNetworkRate | null): stri
       rxBytesPerSecond: metricNumber(network.rxBytesPerSecond), txBytesPerSecond: metricNumber(network.txBytesPerSecond),
       ...(wanRate ? { wanRxBytesPerSecond: wanRate.rxBytesPerSecond, wanTxBytesPerSecond: wanRate.txBytesPerSecond } : {}),
     },
+    // Agent 2.20+: BBR and socket buffers (agent.py network_tuning).
+    ...(tuning ? { tuning: { state: ["tuned", "no-bbr", "unsupported", "default"].includes(String(tuning.state)) ? tuning.state : "default",
+      congestion: word(tuning.congestion), qdisc: word(tuning.qdisc), udpBuffer: metricNumber(tuning.udpBuffer) } } : {}),
   });
 }
 

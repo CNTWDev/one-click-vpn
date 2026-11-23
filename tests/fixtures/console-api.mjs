@@ -124,6 +124,10 @@ export function consoleApi({ signedIn = true } = {}) {
     if (/^\/api\/v1\/admin\/users\/[^/]+\/native-access$/.test(pathname)) return [200, { enabled: true, devices: [], credentials: [] }];
     if (pathname === "/api/nodes" && method !== "POST") return [200, { nodes }];
     if (pathname === "/api/nodes/agent-release") return [200, { version: "2.10.0", revision: "test" }];
+    if (/^\/api\/nodes\/[^/]+\/speed-test$/.test(pathname)) return [200, method === "POST" ? { pending: { id: "speed_1", kind: "manual", status: "waiting" } } : { pending: null, tests: [
+      { id: "s3", kind: "baseline", downMbps: 931.2, upMbps: 880.5, latencyMs: 1.8, congestion: "bbr", error: "", createdAt: ago(12) },
+      { id: "s2", kind: "after", downMbps: 918.7, upMbps: 874.2, latencyMs: 2, congestion: "bbr", error: "", createdAt: ago(180) },
+      { id: "s1", kind: "before", downMbps: 412.4, upMbps: 386, latencyMs: 2.1, congestion: "cubic", error: "", createdAt: ago(181) }] }];
     if (/^\/api\/nodes\/[^/]+\/port-check$/.test(pathname)) return [200, { check: null, udp: "agent-outdated" }];
     if (/^\/api\/nodes\/[^/]+$/.test(pathname) && method === "GET") return [200, { node: nodes.find((n) => pathname.endsWith(n.id)), actions, actionEvents, reconcile: { observed: [{ protocol: "vless", appliedRevision: 14, status: "applied", lastError: "", updatedAt: now }], tasks: [{ id: "task_1", protocol: "vless", taskType: "apply", desiredRevision: 15, status: "failed", attempts: 3, lastError: "xray: failed to bind 0.0.0.0:443", createdAt: ago(20), startedAt: ago(19), finishedAt: ago(18) }] }, connectivity }];
     if (pathname === "/api/regions") return [200, { regions }];
