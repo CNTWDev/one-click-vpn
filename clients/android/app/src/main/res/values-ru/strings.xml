@@ -506,7 +506,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Вход на компьютере через телефон: Mac, Windows и Portal показывают QR-код; отсканируйте его в приложении на телефоне («Аккаунт» → «Войти на компьютере») и подтвердите\nПеред подтверждением телефон показывает, что это за компьютер, где он и займёт ли он место устройства; код действует 2 минуты и только один раз</string>
+  <string name="whats_new_notes">В «Аккаунте» появился переключатель «Расширенные функции», по умолчанию выключен, новички этих настроек не видят\nКогда он включён, частые локации можно добавить в избранное, они стоят вверху списка\nДля локации можно выбрать один протокол (Hysteria2, REALITY, XHTTP или WireGuard); проверка соединения показывает названия протоколов</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Версия Windows для разработки · Интеграция VPN ещё не завершена</string>

@@ -11622,19 +11622,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sign in a computer with your phone: Mac, Windows and the Portal show a QR code; scan it in the signed-in phone app (Account → Sign in a computer) and confirm\nBefore you confirm, the phone shows which computer it is, where it is and whether it takes a device slot; a code works once, for 2 minutes"
+            "value": "New \"Advanced\" switch in Account, off by default, so beginners never see these options\nWith it on, favorite the locations you use; favorites sit at the top of the list\nLock a location to one protocol (Hysteria2, REALITY, XHTTP or WireGuard); the connection check shows protocol names"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "电脑可以扫码登录：Mac、Windows 和网页 Portal 的登录页显示二维码，用已登录的手机 App 在「我的 → 扫码登录电脑」里扫一下并确认即可\n确认前手机会显示是哪台电脑、在哪里，以及是否会占用设备名额；二维码 2 分钟内有效，只能用一次"
+            "value": "「我的」里新增「高级功能」开关，默认关闭，新手看不到这些选项\n打开后可以收藏常用位置，收藏的排在位置列表最上面\n可以给某个位置锁定一种协议（Hysteria2、REALITY、XHTTP 或 WireGuard）；连接检查里直接显示协议名"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Вход на компьютере через телефон: Mac, Windows и Portal показывают QR-код; отсканируйте его в приложении на телефоне («Аккаунт» → «Войти на компьютере») и подтвердите\nПеред подтверждением телефон показывает, что это за компьютер, где он и займёт ли он место устройства; код действует 2 минуты и только один раз"
+            "value": "В «Аккаунте» появился переключатель «Расширенные функции», по умолчанию выключен, новички этих настроек не видят\nКогда он включён, частые локации можно добавить в избранное, они стоят вверху списка\nДля локации можно выбрать один протокол (Hysteria2, REALITY, XHTTP или WireGuard); проверка соединения показывает названия протоколов"
           }
         }
       }

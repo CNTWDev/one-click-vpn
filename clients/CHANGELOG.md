@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.27
+
+### zh
+- 「我的」里新增「高级功能」开关，默认关闭，新手看不到这些选项
+- 打开后可以收藏常用位置，收藏的排在位置列表最上面
+- 可以给某个位置锁定一种协议（Hysteria2、REALITY、XHTTP 或 WireGuard）；连接检查里直接显示协议名
+
+### en
+- New "Advanced" switch in Account, off by default, so beginners never see these options
+- With it on, favorite the locations you use; favorites sit at the top of the list
+- Lock a location to one protocol (Hysteria2, REALITY, XHTTP or WireGuard); the connection check shows protocol names
+
+### ru
+- В «Аккаунте» появился переключатель «Расширенные функции», по умолчанию выключен, новички этих настроек не видят
+- Когда он включён, частые локации можно добавить в избранное, они стоят вверху списка
+- Для локации можно выбрать один протокол (Hysteria2, REALITY, XHTTP или WireGuard); проверка соединения показывает названия протоколов
+
 ## 1.0.26
 
 ### zh
