@@ -217,7 +217,7 @@ struct DayBars:View {
     @Binding var picked:Int
     var body:some View {
         GeometryReader {proxy in
-            Canvas {context,area in drawBars(context,area.size)}
+            Canvas {context,size in drawBars(context,size)}
                 .contentShape(Rectangle())
                 .gesture(DragGesture(minimumDistance:0).onChanged {pick($0.location.x,proxy.size.width)})
         }.accessibilityHidden(true)
