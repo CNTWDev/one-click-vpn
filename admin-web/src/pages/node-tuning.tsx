@@ -37,7 +37,8 @@ export function NodeTuning({ node, outdated }: { node: NodeRecord; outdated: boo
   useEffect(() => () => { live.current = false; }, []);
   const load = useCallback(async () => {
     try {
-      const next = await api<SpeedView>(`/api/nodes/${node.id}/speed-test`);
+      const answer = await api<Partial<SpeedView>>(`/api/nodes/${node.id}/speed-test`);
+      const next: SpeedView = { pending: answer.pending || null, tests: Array.isArray(answer.tests) ? answer.tests : [] };
       if (live.current) setView(next);
       return next;
     } catch { return null; }
@@ -52,9 +53,9 @@ export function NodeTuning({ node, outdated }: { node: NodeRecord; outdated: boo
   async function run() {
     setFailed(false);
     try {
-      const started = await api<SpeedView>(`/api/nodes/${node.id}/speed-test`, { method: "POST" });
+      const started = await api<Partial<SpeedView>>(`/api/nodes/${node.id}/speed-test`, { method: "POST" });
       if (started.agent === "outdated") return setView((current) => ({ pending: null, tests: current?.tests || [], agent: "outdated" }));
-      setView((current) => ({ pending: started.pending, tests: current?.tests || [] }));
+      setView((current) => ({ pending: started.pending || null, tests: current?.tests || [] }));
     } catch { setFailed(true); }
   }
   const latest = view?.tests.find((test) => test.kind !== "before" && !test.error) || view?.tests.find((test) => !test.error);
