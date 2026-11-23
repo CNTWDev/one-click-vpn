@@ -3439,14 +3439,6 @@
     "Alerts",
     "Оповещения"
   ],
-  "节点离线 3 分钟、服务异常 10 分钟、线路疑似被封 30 分钟、磁盘超过 85%、Agent 落后一天时发邮件，恢复时再发一封。": [
-    "Emails when a node is offline for 3 minutes, a service is failing for 10 minutes, a line looks blocked for 30 minutes, a disk is over 85%, or an Agent is a day behind, and again on recovery.",
-    "Письмо, если узел недоступен 3 минуты, служба сбоит 10 минут, линия похоже заблокирована 30 минут, диск заполнен более чем на 85% или Agent отстаёт на сутки, и ещё одно при восстановлении."
-  ],
-  "先在上方“邮件发送”配置发信，告警才能发出。": [
-    "Set up Mail delivery above first, or alerts cannot be sent.",
-    "Сначала настройте отправку почты выше, иначе оповещения не уйдут."
-  ],
   "等待发送": [
     "not sent yet",
     "ещё не отправлено"
@@ -4094,5 +4086,161 @@
   "测于": [
     "Tested ",
     "Измерено "
+  ],
+  "告警与恢复": [
+    "Alerts & recovery",
+    "Оповещения и восстановление"
+  ],
+  "注册审核": [
+    "Sign-up approvals",
+    "Одобрение регистраций"
+  ],
+  "私聊": [
+    "Private chat",
+    "Личный чат"
+  ],
+  "群组": [
+    "Group",
+    "Группа"
+  ],
+  "频道": [
+    "Channel",
+    "Канал"
+  ],
+  "机器人已连接。": [
+    "Bot connected.",
+    "Бот подключён."
+  ],
+  "停用 Telegram": [
+    "Turn off Telegram",
+    "Отключить Telegram"
+  ],
+  "停用后不再发送 Telegram 消息，已添加的聊天和审批人会一并清除。": [
+    "Telegram messages stop, and the added chats and approvers are cleared.",
+    "Сообщения в Telegram прекратятся, добавленные чаты и одобряющие будут удалены."
+  ],
+  "Telegram 已停用。": [
+    "Telegram turned off.",
+    "Telegram отключён."
+  ],
+  "移除聊天": [
+    "Remove chat",
+    "Удалить чат"
+  ],
+  "「{0}」将不再收到任何消息。": [
+    "\"{0}\" will no longer receive any messages.",
+    "«{0}» больше не будет получать сообщения."
+  ],
+  "测试消息已发送到「{0}」。": [
+    "Test message sent to \"{0}\".",
+    "Тестовое сообщение отправлено в «{0}»."
+  ],
+  "告警、审核和发布消息统一发到 Telegram，审核直接在消息里点按钮。": [
+    "Alerts, approvals and releases go to Telegram. Approve right from the message.",
+    "Оповещения, одобрения и выпуски приходят в Telegram. Одобряйте прямо в сообщении."
+  ],
+  "已连接": [
+    "Connected",
+    "Подключено"
+  ],
+  "在 Telegram 打开 @BotFather，发送 /newbot 创建机器人。": [
+    "In Telegram, open @BotFather and send /newbot to create a bot.",
+    "В Telegram откройте @BotFather и отправьте /newbot, чтобы создать бота."
+  ],
+  "把它给你的 Token 粘贴到下面。": [
+    "Paste the token it gives you below.",
+    "Вставьте ниже полученный токен."
+  ],
+  "机器人 Token": [
+    "Bot token",
+    "Токен бота"
+  ],
+  "显示 Token": [
+    "Show token",
+    "Показать токен"
+  ],
+  "隐藏 Token": [
+    "Hide token",
+    "Скрыть токен"
+  ],
+  "连接中…": [
+    "Connecting…",
+    "Подключение…"
+  ],
+  "连接": [
+    "Connect",
+    "Подключить"
+  ],
+  "正在接收按钮和 /start": [
+    "Receiving button presses and /start",
+    "Принимает нажатия кнопок и /start"
+  ],
+  "暂时收不到消息：{0}": [
+    "Not receiving messages: {0}",
+    "Сообщения не принимаются: {0}"
+  ],
+  "更换 Token": [
+    "Change token",
+    "Сменить токен"
+  ],
+  "接收消息的聊天": [
+    "Chats that receive messages",
+    "Чаты для сообщений"
+  ],
+  "发送测试": [
+    "Send test",
+    "Отправить тест"
+  ],
+  "这个聊天接收": [
+    "This chat receives",
+    "Этот чат получает"
+  ],
+  "还没有聊天。": [
+    "No chats yet.",
+    "Чатов пока нет."
+  ],
+  "把机器人拉进群，或私聊它发送 /start，聊天会出现在这里。": [
+    "Add the bot to a group, or send it /start in a private chat. The chat shows up here.",
+    "Добавьте бота в группу или отправьте ему /start в личном чате. Чат появится здесь."
+  ],
+  "手动输入 Chat ID": [
+    "Enter a chat ID",
+    "Ввести ID чата"
+  ],
+  "审批人": [
+    "Approvers",
+    "Одобряющие"
+  ],
+  "只有这些 Telegram 账号能在「{0}」消息里点通过或拒绝。": [
+    "Only these Telegram accounts can press Approve or Reject on {0} messages.",
+    "Только эти аккаунты Telegram могут нажимать «Одобрить» или «Отклонить» в сообщениях: {0}."
+  ],
+  "只有这些 Telegram 账号能在消息里点通过或拒绝。": [
+    "Only these Telegram accounts can press Approve or Reject.",
+    "Только эти аккаунты Telegram могут нажимать «Одобрить» или «Отклонить»."
+  ],
+  "移除 {0}": [
+    "Remove {0}",
+    "Удалить {0}"
+  ],
+  "私聊机器人发送 /start 后，你的账号会出现在这里。": [
+    "Send /start to the bot in a private chat and your account shows up here.",
+    "Отправьте боту /start в личном чате, и ваш аккаунт появится здесь."
+  ],
+  "添加": [
+    "Add",
+    "Добавить"
+  ],
+  "节点离线 3 分钟、服务异常 10 分钟、线路疑似被封 30 分钟、磁盘超过 85%、Agent 落后一天时通知（Telegram 和邮件），恢复时再通知一次。": [
+    "Notifies (Telegram and email) when a node is offline for 3 minutes, a service fails for 10 minutes, a line looks blocked for 30 minutes, the disk is over 85%, or an Agent is a day behind, and again on recovery.",
+    "Уведомляет (Telegram и почта), когда узел недоступен 3 минуты, служба сбоит 10 минут, линия похожа на заблокированную 30 минут, диск заполнен более чем на 85% или Agent отстаёт на день, и снова при восстановлении."
+  ],
+  "先在上方配置 Telegram 或邮件发送，告警才能发出。": [
+    "Set up Telegram or email above so alerts can be sent.",
+    "Настройте Telegram или почту выше, чтобы оповещения отправлялись."
+  ],
+  "邮件收件人": [
+    "Email recipients",
+    "Получатели писем"
   ]
 }

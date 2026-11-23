@@ -5,6 +5,8 @@ import { expireDueConnectionProfiles } from "./control-db";
 import { markAccessChanged } from "./reconcile-schedule";
 import { writeOperationalLog } from "./operational-logs";
 import { runAlerts } from "./alerts";
+import { startTelegramPolling, cleanupTelegram } from "./telegram";
+import { announceBetaReleases } from "./telegram-actions";
 import { syncReleaseMirrors } from "./client-releases";
 import { logAccountsOverLimit } from "./online-clients";
 import { runHopChecks } from "./hop-check";
@@ -35,6 +37,7 @@ export async function runMinuteJobs(): Promise<void> {
   if (refreshed || expired || boundary) markAccessChanged();
   await retryReconcileTasks();
   await runAlerts().catch((error) => console.error("Alerts failed", error instanceof Error ? error.message : error));
+  await announceBetaReleases().catch((error) => console.error("Release announcement failed", error instanceof Error ? error.message : error));
   // Nodes nobody can reach leave new connections, and come back when they answer again (node-health.ts).
   void runNodeHealth().catch((error) => console.error("Node health failed", error instanceof Error ? error.message : error));
   // Outside checks of each node's hop ports; a UDP check runs ~10 s in the background, so it is not awaited.
@@ -73,6 +76,7 @@ export async function runDailyJobs(): Promise<Record<string, number>> {
     auditLogs: await dbExec("DELETE FROM audit_logs WHERE created_at < $1", [ago(180 * DAY)]),
     joinTokens: await dbExec("DELETE FROM node_join_tokens WHERE expires_at < $1", [ago(DAY)]),
     deviceSessions: await dbExec("DELETE FROM device_sessions WHERE refresh_expires_at < $1 OR revoked_at < $1", [ago(DAY)]),
+    telegramApprovalsExpired: await cleanupTelegram().catch(() => 0),
   };
   if (Object.values(removed).some(Boolean)) {
     await writeOperationalLog({ component: "controller", level: "info", message: "maintenance.pruned", action: "maintenance.pruned", fields: removed })
@@ -86,6 +90,7 @@ let started = false;
 export function startBackgroundJobs(): void {
   if (started) return;
   started = true;
+  startTelegramPolling();
   let minuteRunning = false;
   const minute = () => {
     if (minuteRunning) return;
