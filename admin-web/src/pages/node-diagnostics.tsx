@@ -3,6 +3,7 @@ import { api } from "../api";
 import { consoleLanguage, t } from "../i18n";
 import { protocolName, statusLabel } from "../status";
 import type { NodeDiagnostics, NodeRecord } from "../types";
+import { NodeTuning } from "./node-tuning";
 import { Empty, formatBytes, formatRate, formatTime, InlineNotice, Pill, Time } from "./shared";
 
 /** Live network speed from the last two heartbeats, or null before the second one arrives. */
@@ -146,6 +147,7 @@ export function NodeDiagnosticsView({ node, diagnostics, outdated }: { node: Nod
         </article>
       </div>
       {diagnostics.connectivity?.note && <div className="inline-notice info">{diagnostics.connectivity.note}</div>}
+      <NodeTuning node={node} outdated={outdated} />
       <section className="deployment-log">
         <div className="diagnostic-section-head">
           <div>

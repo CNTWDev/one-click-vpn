@@ -471,6 +471,18 @@ REALITY uses TCP `443`; the stealth transports for the TrackNothing apps (Hyster
 VLESS REALITY XHTTP, one mihomo process, Agent 2.12+) use UDP **and** TCP `8443`.
 Open those ports in the Edge Node firewall/security group separately from the Controller.
 
+### Network tuning and node speed tests (Agent 2.20+)
+
+The Agent turns on BBR with `fq` and raises socket buffers to 16 MB (Hysteria2 needs large UDP
+buffers) in the running kernel on every start, with a copy in `/etc/sysctl.d/99-northstar-tuning.conf`
+where its unit allows. Kernels
+without BBR still get the buffers; containers that cannot change sysctls are reported as such.
+The first time it tunes a node it measures the node's own connection to Cloudflare's speed test
+service before and after (8 s each way, at most about 300 MB); the Controller asks for a new
+baseline ten minutes after a node first appears and then about weekly. Console → node details →
+网络调优 shows the state, the latest result, the before/after gain and a 重新测速 button.
+Rollout: `sudo ./one-click-update.sh`, then 升级 Agent. No new ports.
+
 ### Port hopping and the spare REALITY port (Agent 2.19+)
 
 For networks that block or throttle one port, every node also accepts **TCP + UDP
