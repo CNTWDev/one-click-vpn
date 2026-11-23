@@ -77,6 +77,8 @@
   <data name="automatic_recommended" xml:space="preserve"><value>Automatic · Recommended</value></data>
   <data name="available_location" xml:space="preserve"><value>Available location</value></data>
   <data name="back_action" xml:space="preserve"><value>Back</value></data>
+  <data name="bypass_port" xml:space="preserve"><value>Port 443 is blocked, using a spare port</value></data>
+  <data name="bypass_udp" xml:space="preserve"><value>This network blocks UDP, using {0}</value></data>
   <data name="cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="change_location" xml:space="preserve"><value>Change location  ›</value></data>
   <data name="change_location_action" xml:space="preserve"><value>Change</value></data>
@@ -95,6 +97,7 @@
   <data name="check_node_slow" xml:space="preserve"><value>{0} is slow right now. Another location will be faster.</value></data>
   <data name="check_ok" xml:space="preserve"><value>All good: every leg is fast.</value></data>
   <data name="check_running" xml:space="preserve"><value>Measuring each leg…</value></data>
+  <data name="check_sent" xml:space="preserve"><value>Sent to your admin · ref {0}</value></data>
   <data name="check_title" xml:space="preserve"><value>Connection check</value></data>
   <data name="check_web" xml:space="preserve"><value>Opening a page</value></data>
   <data name="check_web_detail" xml:space="preserve"><value>Through the location</value></data>
@@ -146,6 +149,20 @@
   <data name="devices_join_automatically" xml:space="preserve"><value>New devices join on first connect</value></data>
   <data name="devices_unlimited" xml:space="preserve"><value>Unlimited</value></data>
   <data name="devices_used" xml:space="preserve"><value>{0} of {1} used</value></data>
+  <data name="diag_all_blocked" xml:space="preserve"><value>All blocked</value></data>
+  <data name="diag_captive" xml:space="preserve"><value>Needs sign-in</value></data>
+  <data name="diag_lines" xml:space="preserve"><value>Lines</value></data>
+  <data name="diag_lines_blocked" xml:space="preserve"><value>All {0} blocked</value></data>
+  <data name="diag_network" xml:space="preserve"><value>Network</value></data>
+  <data name="diag_no_internet" xml:space="preserve"><value>No internet</value></data>
+  <data name="diag_no_permission" xml:space="preserve"><value>Not allowed</value></data>
+  <data name="diag_not_started" xml:space="preserve"><value>Not started</value></data>
+  <data name="diag_ok" xml:space="preserve"><value>OK</value></data>
+  <data name="diag_reached" xml:space="preserve"><value>Reached</value></data>
+  <data name="diag_server" xml:space="preserve"><value>Server</value></data>
+  <data name="diag_tunnel" xml:space="preserve"><value>Tunnel</value></data>
+  <data name="diag_tunnel_failed" xml:space="preserve"><value>Couldn’t open</value></data>
+  <data name="diag_unreached" xml:space="preserve"><value>No answer</value></data>
   <data name="disconnect_action" xml:space="preserve"><value>Disconnect</value></data>
   <data name="disconnect_before_changing_location" xml:space="preserve"><value>Disconnect before changing location.</value></data>
   <data name="disconnect_before_changing_routing" xml:space="preserve"><value>Disconnect before changing the routing mode.</value></data>
@@ -164,6 +181,8 @@
   <data name="enter_password" xml:space="preserve"><value>Enter password</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Enter your email and password.</value></data>
   <data name="error_account_title" xml:space="preserve"><value>Account unavailable</value></data>
+  <data name="error_captive_detail" xml:space="preserve"><value>Finish the Wi‑Fi sign-in page in the browser first, then connect.</value></data>
+  <data name="error_captive_title" xml:space="preserve"><value>This Wi‑Fi needs sign-in</value></data>
   <data name="error_device_detail" xml:space="preserve"><value>Remove a device you no longer use, and this one can connect.</value></data>
   <data name="error_device_title" xml:space="preserve"><value>Device limit reached</value></data>
   <data name="error_expired_detail" xml:space="preserve"><value>Ask your administrator to renew it, then try again.</value></data>
@@ -172,6 +191,10 @@
   <data name="error_extension_title" xml:space="preserve"><value>Network extension is off</value></data>
   <data name="error_lease_detail" xml:space="preserve"><value>You were offline too long. Connect again to renew it.</value></data>
   <data name="error_lease_title" xml:space="preserve"><value>Authorization expired</value></data>
+  <data name="error_lines_detail" xml:space="preserve"><value>The server answers, but no line gets through. Try another network or location.</value></data>
+  <data name="error_lines_title" xml:space="preserve"><value>Every line is blocked</value></data>
+  <data name="error_no_internet_detail" xml:space="preserve"><value>Try another Wi‑Fi, or turn on mobile data.</value></data>
+  <data name="error_no_internet_title" xml:space="preserve"><value>This network has no internet</value></data>
   <data name="error_node_auto_detail" xml:space="preserve"><value>No location is answering right now. Try again later or on another network.</value></data>
   <data name="error_node_detail" xml:space="preserve"><value>Pick another location, or let Automatic choose.</value></data>
   <data name="error_node_title" xml:space="preserve"><value>{0} isn't answering</value></data>
@@ -263,6 +286,7 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="open_app" xml:space="preserve"><value>Open TrackNothing</value></data>
   <data name="open_at_login" xml:space="preserve"><value>Open at login</value></data>
   <data name="open_main_window" xml:space="preserve"><value>Open main window</value></data>
+  <data name="open_network_settings" xml:space="preserve"><value>Network settings</value></data>
   <data name="open_settings_short" xml:space="preserve"><value>Open Settings</value></data>
   <data name="open_system_settings" xml:space="preserve"><value>Open System Settings</value></data>
   <data name="open_vpn_settings" xml:space="preserve"><value>Open VPN settings</value></data>
@@ -338,6 +362,7 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="seen_as" xml:space="preserve"><value>Sites only see {0}</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>Fastest location, switches if one fails</value></data>
   <data name="selected_state" xml:space="preserve"><value>selected</value></data>
+  <data name="send_check_action" xml:space="preserve"><value>Send check</value></data>
   <data name="send_reset_link" xml:space="preserve"><value>Send link</value></data>
   <data name="server_address" xml:space="preserve"><value>Server address</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Server address https://…</value></data>

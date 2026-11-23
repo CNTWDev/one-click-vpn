@@ -43,6 +43,12 @@ object ConnectionStateStore {
     @Volatile var errorCode = ""
     /** Shows a refusal the app found before the service ran (the VPN permission), the same way as one from the service. */
     fun failed(code: String, message: Int) { active = false; since = 0L; errorCode = code; messageId = message }
+    /** The network outside the VPN when the last attempt failed (Transports.networkState): "ok", "captive" or "offline". */
+    @Volatile var networkState = "ok"
+    /** The last attempt's id (its request id in Console → 运行日志): a sent check shows its first letters as the reference. */
+    @Volatile var request = ""
+    /** Connected over a line the network forced: "udp:<transport>" (UDP blocked) or "port" (443 blocked), else empty. */
+    @Volatile var bypass = ""
 }
 
 /** Thrown when no transport of a node answers from this network. */
@@ -120,12 +126,13 @@ class ConnectionService : VpnService() {
         restored = intent == null || intent.action == VpnService.SERVICE_INTERFACE
         wanted(this, true)
         ConnectionStateStore.active = true; ConnectionStateStore.messageId = R.string.authorizing_and_connecting
-        ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L; ConnectionStateStore.switchedFrom = ""
+        ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L; ConnectionStateStore.switchedFrom = ""; ConnectionStateStore.bypass = ""
         ConnectionStateStore.phase = 0; ConnectionStateStore.retryAt = 0L; ConnectionStateStore.attempt = 0; ConnectionStateStore.errorCode = ""
         // Always-on VPN, the tile and a restart start the service without extras: use the location chosen in the app.
         nodeId = intent?.getStringExtra("nodeId") ?: getSharedPreferences("preferences", MODE_PRIVATE).getString("nodeId", "")!!
         automatic = nodeId.isEmpty()
         api.attempt = java.util.UUID.randomUUID().toString().replace("-", "").take(16)
+        ConnectionStateStore.request = api.attempt ?: ""
         watchNetwork(); watchScreen()
         worker.execute { begin(0) }
         return START_STICKY
@@ -220,6 +227,7 @@ class ConnectionService : VpnService() {
         val detail = if (e !is ApiFailure && e !is Unreachable) listOf(e.javaClass.simpleName, Journal.scrub(e.message)).filter { it.isNotEmpty() }.joinToString(": ") else ""
         Journal.add("connect: failed ${code(e)}" + if (detail.isNotEmpty()) " ($detail)" else "")
         api.report(code(e), nodeId, detail)
+        ConnectionStateStore.networkState = Transports.networkState(this)
         ConnectionStateStore.errorCode = code(e)
         stopConnection(if (e is Unreachable) R.string.this_location_is_not_responding_try_another else friendlyResource(e))
     }
@@ -332,6 +340,14 @@ class ConnectionService : VpnService() {
     private fun updateCarrying() {
         val now = Core.now(Transports.GROUP)
         if (now.isNotEmpty() && now != carrying) { if (carrying.isNotEmpty()) Journal.add("transport: $carrying -> $now"); carrying = now }
+        // A line the network forced, said once on the connect page: Hysteria2 (UDP) failed here while another works,
+        // or 443 failed and the spare port carries traffic. The transport memory holds what failed on this network.
+        val blocked = if (carrying.isEmpty() || carrying == "hysteria2") emptySet() else Transports.blocked(this, network)
+        ConnectionStateStore.bypass = when {
+            "hysteria2" in blocked && "hysteria2" in transports -> "udp:$carrying"
+            carrying == "reality-alt" && "reality" in blocked -> "port"
+            else -> ""
+        }
     }
     private fun status(): Boolean = try { api.request("status/$leaseId").getBoolean("ready") } catch (_: Exception) { false }
     /**

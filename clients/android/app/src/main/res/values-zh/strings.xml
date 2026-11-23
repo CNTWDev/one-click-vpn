@@ -75,6 +75,8 @@
   <string name="automatic_recommended">自动选择 · 推荐</string>
   <string name="available_location">可用位置</string>
   <string name="back_action">返回</string>
+  <string name="bypass_port">443 端口被拦，已改用备用端口</string>
+  <string name="bypass_udp">这个网络拦了 UDP，已改用 %1$s</string>
   <string name="cancel">取消</string>
   <string name="change_location">更换连接位置  ›</string>
   <string name="change_location_action">换位置</string>
@@ -93,6 +95,7 @@
   <string name="check_node_slow">%1$s 现在很慢，换个节点会更快。</string>
   <string name="check_ok">线路正常，三段都很快。</string>
   <string name="check_running">正在逐段测量…</string>
+  <string name="check_sent">已发送给管理员 · 编号 %1$s</string>
   <string name="check_title">线路体检</string>
   <string name="check_web">打开网页</string>
   <string name="check_web_detail">经节点访问外网</string>
@@ -144,6 +147,20 @@
   <string name="devices_join_automatically">新设备首次连接自动加入</string>
   <string name="devices_unlimited">不限</string>
   <string name="devices_used">已用 %1$s / %2$s</string>
+  <string name="diag_all_blocked">都不通</string>
+  <string name="diag_captive">要先登录</string>
+  <string name="diag_lines">线路</string>
+  <string name="diag_lines_blocked">%1$s 条都不通</string>
+  <string name="diag_network">网络</string>
+  <string name="diag_no_internet">上不了网</string>
+  <string name="diag_no_permission">未授权</string>
+  <string name="diag_not_started">未开始</string>
+  <string name="diag_ok">正常</string>
+  <string name="diag_reached">已连上</string>
+  <string name="diag_server">服务器</string>
+  <string name="diag_tunnel">加密通道</string>
+  <string name="diag_tunnel_failed">没能建立</string>
+  <string name="diag_unreached">连不上</string>
   <string name="disconnect_action">断开连接</string>
   <string name="disconnect_before_changing_location">请先断开连接，再更换位置。</string>
   <string name="disconnect_before_changing_routing">请先断开连接再切换分流方式。</string>
@@ -162,6 +179,8 @@
   <string name="enter_password">输入密码</string>
   <string name="enter_your_email_and_password">请填写邮箱和密码。</string>
   <string name="error_account_title">账号暂不可用</string>
+  <string name="error_captive_detail">先在浏览器里完成这个 Wi‑Fi 的登录页，再连接。</string>
+  <string name="error_captive_title">Wi‑Fi 需要先登录</string>
   <string name="error_device_detail">解除一台不用的设备，这台就能连上。</string>
   <string name="error_device_title">设备已满</string>
   <string name="error_expired_detail">请管理员续期，续好后轻触重试。</string>
@@ -170,6 +189,10 @@
   <string name="error_extension_title">网络扩展没打开</string>
   <string name="error_lease_detail">离线太久，授权过期了。重新连接一次就好。</string>
   <string name="error_lease_title">连接授权过期</string>
+  <string name="error_lines_detail">服务器能连上，但线路都不通。换个网络，或换个地区试试。</string>
+  <string name="error_lines_title">这个网络拦住了所有线路</string>
+  <string name="error_no_internet_detail">换个 Wi‑Fi，或打开移动数据再试。</string>
+  <string name="error_no_internet_title">这个网络上不了网</string>
   <string name="error_node_auto_detail">所有位置暂时都没响应，稍后重试或换个网络。</string>
   <string name="error_node_detail">换个位置，或者交给自动选择。</string>
   <string name="error_node_title">%1$s没有响应</string>
@@ -257,6 +280,7 @@
   <string name="open_app">打开 TrackNothing</string>
   <string name="open_at_login">登录时启动</string>
   <string name="open_main_window">打开主窗口</string>
+  <string name="open_network_settings">网络设置</string>
   <string name="open_settings_short">去设置</string>
   <string name="open_system_settings">打开系统设置</string>
   <string name="open_vpn_settings">打开 VPN 设置</string>
@@ -332,6 +356,7 @@
   <string name="seen_as">网站只能看到%1$s</string>
   <string name="select_an_available_location_for_you">选延迟最低的节点，连不上自动换</string>
   <string name="selected_state">已选中</string>
+  <string name="send_check_action">发送诊断</string>
   <string name="send_reset_link">发送</string>
   <string name="server_address">服务地址</string>
   <string name="server_address_url">服务地址 https://…</string>

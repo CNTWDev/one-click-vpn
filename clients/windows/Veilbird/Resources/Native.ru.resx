@@ -77,6 +77,8 @@
   <data name="automatic_recommended" xml:space="preserve"><value>Автоматически · Рекомендуется</value></data>
   <data name="available_location" xml:space="preserve"><value>Доступная локация</value></data>
   <data name="back_action" xml:space="preserve"><value>Назад</value></data>
+  <data name="bypass_port" xml:space="preserve"><value>Порт 443 закрыт, используется запасной</value></data>
+  <data name="bypass_udp" xml:space="preserve"><value>Сеть блокирует UDP, используется {0}</value></data>
   <data name="cancel" xml:space="preserve"><value>Отмена</value></data>
   <data name="change_location" xml:space="preserve"><value>Изменить локацию  ›</value></data>
   <data name="change_location_action" xml:space="preserve"><value>Сменить</value></data>
@@ -95,6 +97,7 @@
   <data name="check_node_slow" xml:space="preserve"><value>{0} сейчас медленный. Другой узел будет быстрее.</value></data>
   <data name="check_ok" xml:space="preserve"><value>Всё в порядке: все участки быстрые.</value></data>
   <data name="check_running" xml:space="preserve"><value>Измеряем каждый участок…</value></data>
+  <data name="check_sent" xml:space="preserve"><value>Отправлено администратору · {0}</value></data>
   <data name="check_title" xml:space="preserve"><value>Проверка связи</value></data>
   <data name="check_web" xml:space="preserve"><value>Открытие страницы</value></data>
   <data name="check_web_detail" xml:space="preserve"><value>Через узел</value></data>
@@ -146,6 +149,20 @@
   <data name="devices_join_automatically" xml:space="preserve"><value>Новые устройства добавляются сами</value></data>
   <data name="devices_unlimited" xml:space="preserve"><value>Без лимита</value></data>
   <data name="devices_used" xml:space="preserve"><value>Занято {0} из {1}</value></data>
+  <data name="diag_all_blocked" xml:space="preserve"><value>Все заблокированы</value></data>
+  <data name="diag_captive" xml:space="preserve"><value>Нужен вход</value></data>
+  <data name="diag_lines" xml:space="preserve"><value>Линии</value></data>
+  <data name="diag_lines_blocked" xml:space="preserve"><value>Все {0} заблокированы</value></data>
+  <data name="diag_network" xml:space="preserve"><value>Сеть</value></data>
+  <data name="diag_no_internet" xml:space="preserve"><value>Нет интернета</value></data>
+  <data name="diag_no_permission" xml:space="preserve"><value>Не разрешён</value></data>
+  <data name="diag_not_started" xml:space="preserve"><value>Не начат</value></data>
+  <data name="diag_ok" xml:space="preserve"><value>В порядке</value></data>
+  <data name="diag_reached" xml:space="preserve"><value>Доступен</value></data>
+  <data name="diag_server" xml:space="preserve"><value>Сервер</value></data>
+  <data name="diag_tunnel" xml:space="preserve"><value>Туннель</value></data>
+  <data name="diag_tunnel_failed" xml:space="preserve"><value>Не открылся</value></data>
+  <data name="diag_unreached" xml:space="preserve"><value>Не отвечает</value></data>
   <data name="disconnect_action" xml:space="preserve"><value>Отключиться</value></data>
   <data name="disconnect_before_changing_location" xml:space="preserve"><value>Перед сменой локации отключитесь.</value></data>
   <data name="disconnect_before_changing_routing" xml:space="preserve"><value>Отключитесь, чтобы сменить режим маршрутизации.</value></data>
@@ -164,6 +181,8 @@
   <data name="enter_password" xml:space="preserve"><value>Введите пароль</value></data>
   <data name="enter_your_email_and_password" xml:space="preserve"><value>Введите почту и пароль.</value></data>
   <data name="error_account_title" xml:space="preserve"><value>Аккаунт недоступен</value></data>
+  <data name="error_captive_detail" xml:space="preserve"><value>Сначала войдите на странице Wi‑Fi в браузере, затем подключитесь.</value></data>
+  <data name="error_captive_title" xml:space="preserve"><value>Wi‑Fi требует входа</value></data>
   <data name="error_device_detail" xml:space="preserve"><value>Отвяжите ненужное устройство, и это сможет подключиться.</value></data>
   <data name="error_device_title" xml:space="preserve"><value>Лимит устройств</value></data>
   <data name="error_expired_detail" xml:space="preserve"><value>Попросите администратора продлить доступ и повторите.</value></data>
@@ -172,6 +191,10 @@
   <data name="error_extension_title" xml:space="preserve"><value>Расширение выключено</value></data>
   <data name="error_lease_detail" xml:space="preserve"><value>Вы долго были офлайн. Подключитесь снова.</value></data>
   <data name="error_lease_title" xml:space="preserve"><value>Доступ устарел</value></data>
+  <data name="error_lines_detail" xml:space="preserve"><value>Сервер отвечает, а линии — нет. Смените сеть или локацию.</value></data>
+  <data name="error_lines_title" xml:space="preserve"><value>Линии заблокированы</value></data>
+  <data name="error_no_internet_detail" xml:space="preserve"><value>Смените Wi‑Fi или включите мобильные данные.</value></data>
+  <data name="error_no_internet_title" xml:space="preserve"><value>В этой сети нет интернета</value></data>
   <data name="error_node_auto_detail" xml:space="preserve"><value>Сейчас не отвечает ни одна локация. Повторите позже или в другой сети.</value></data>
   <data name="error_node_detail" xml:space="preserve"><value>Выберите другую локацию или режим «Авто».</value></data>
   <data name="error_node_title" xml:space="preserve"><value>{0} не отвечает</value></data>
@@ -263,6 +286,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="open_app" xml:space="preserve"><value>Открыть TrackNothing</value></data>
   <data name="open_at_login" xml:space="preserve"><value>Запускать при входе</value></data>
   <data name="open_main_window" xml:space="preserve"><value>Открыть окно</value></data>
+  <data name="open_network_settings" xml:space="preserve"><value>Настройки сети</value></data>
   <data name="open_settings_short" xml:space="preserve"><value>Настройки</value></data>
   <data name="open_system_settings" xml:space="preserve"><value>Открыть Системные настройки</value></data>
   <data name="open_vpn_settings" xml:space="preserve"><value>Открыть настройки VPN</value></data>
@@ -338,6 +362,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="seen_as" xml:space="preserve"><value>Сайты видят только {0}</value></data>
   <data name="select_an_available_location_for_you" xml:space="preserve"><value>Самая быстрая локация, при сбое — следующая</value></data>
   <data name="selected_state" xml:space="preserve"><value>выбрано</value></data>
+  <data name="send_check_action" xml:space="preserve"><value>Отправить</value></data>
   <data name="send_reset_link" xml:space="preserve"><value>Отправить</value></data>
   <data name="server_address" xml:space="preserve"><value>Адрес сервера</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Адрес сервера https://…</value></data>

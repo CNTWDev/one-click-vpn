@@ -85,6 +85,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 api?.attempt=String(UUID().uuidString.replacingOccurrences(of:"-",with:"").prefix(16)).lowercased()
                 // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
                 Journal.add("connect: start \(api?.attempt ?? ""), network \(network), routing \(smart ? "smart":"global")")
+                let request=api?.attempt ?? "";publish {$0["request"]=request;$0["bypass"]=""}
                 if nodeId.isEmpty {await chooseFastest()}
                 try await setTunnelNetworkSettings(networkSettings())
                 try await connectWithFallback()
@@ -205,6 +206,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private func updateCarrying() {
         let now=CoreNow(Transports.group)
         if !now.isEmpty && now != carrying {if !carrying.isEmpty {Journal.add("transport: \(carrying) -> \(now)")};carrying=now}
+        // A line the network forced, said once on the connect page: Hysteria2 (UDP) failed here while another works,
+        // or 443 failed and the spare port carries traffic. The transport memory holds what failed on this network.
+        let blocked=carrying.isEmpty || carrying == "hysteria2" ? []:Transports.blocked(network)
+        let bypass=blocked.contains("hysteria2") && transports.contains("hysteria2") ? "udp:\(carrying)":carrying == "reality-alt" && blocked.contains("reality") ? "port":""
+        publish {$0["bypass"]=bypass}
     }
     private func status() async -> Bool {(try? await api?.request("status/\(leaseId)")["ready"] as? Bool) ?? false}
     /// Failure codes and scrubbed error texts (no keys, addresses or traffic), so operators can see which builds and nodes fail and why.

@@ -374,6 +374,13 @@ struct ClientView:View {
             #endif
         case "update":Task {await model.checkForUpdate()}
         case "signin":model.work {try SecureStorage.write("token",nil);model.failed=false;model.failureCode="";model.signedIn=false}
+        case "send":Task {await model.sendCheck()}
+        case "wifi":
+            #if os(macOS)
+            if let url=URL(string:"x-apple.systempreferences:com.apple.Network-Settings.extension") {NSWorkspace.shared.open(url)}
+            #else
+            if let url=URL(string:UIApplication.openSettingsURLString) {UIApplication.shared.open(url)}
+            #endif
         default:toggleConnection()
         }
     }
@@ -399,6 +406,22 @@ struct ClientView:View {
                 }.buttonStyle(.plain).transition(.opacity)
             }
         }
+    }
+    /// The check under a failure: a square (passed, failed, not reached), the step and what it found; once sent, its reference.
+    private func checksCard(_ checks:[Check])->some View {
+        VStack(alignment:.leading,spacing:0) {
+            ForEach(checks,id:\.key) {check in
+                HStack(spacing:10) {
+                    Rectangle().fill(check.status == .ok ? VeilbirdStyle.secondary:check.status == .bad ? VeilbirdStyle.fair:VeilbirdStyle.selected).frame(width:7,height:7)
+                    Text(check.label).font(.system(size:mac ? 13:14)).foregroundStyle(check.status == .skip ? VeilbirdStyle.secondary:VeilbirdStyle.text).lineLimit(1)
+                    Spacer(minLength:8)
+                    Text(check.value).font(.system(size:mac ? 12:13)).foregroundStyle(check.status == .bad ? VeilbirdStyle.fair:VeilbirdStyle.secondary).lineLimit(1).minimumScaleFactor(0.85)
+                }.frame(minHeight:mac ? 26:30).accessibilityElement(children:.combine)
+            }
+            if let sent=model.sentCheck {
+                Text(L10n.text("check_sent",sent)).font(.system(size:mac ? 11:12)).foregroundStyle(VeilbirdStyle.secondary).padding(.top,6).lineLimit(1).minimumScaleFactor(0.85)
+            }
+        }.padding(.horizontal,14).padding(.vertical,8).frame(maxWidth:.infinity,alignment:.leading).cardOutline(VeilbirdStyle.radius)
     }
     /// Inside the hidden portrait: the rates under the time, the phase while connecting, the countdown while reconnecting.
     private func portrait(_ state:RingState,height:CGFloat)->some View {
@@ -432,12 +455,17 @@ struct ClientView:View {
                 #endif
             }
             actions(state)
+            if let checks=model.checks {
+                // A failure of the network: the four steps and where it stopped, in place of the location and usage.
+                checksCard(checks).padding(.top,10).transition(.opacity)
+            } else {
             // Connected, the location row opens the connection check; otherwise, or while the chosen location does not
             // answer, the location list (picking one there reconnects to it).
             Button {if (state == .connected || state == .switching) && model.status != "location_retrying" {checkResult=nil;checking=true} else {tab=1}} label:{currentLocationRow}.buttonStyle(RowButton())
                 .cardOutline(VeilbirdStyle.radius).clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
                 .accessibilityHint(L10n.text("tap_to_change")).padding(.top,10)
             usageStrip.padding(.top,16)
+            }
         }.padding(.horizontal,mac ? 20:16).padding(.bottom,20).task {try? await model.loadAccount()}
         .task {if model.visitorIP == nil && !model.connected {model.visitorIP=try? await model.api().visitorAddress()}}
         .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:state)

@@ -69,6 +69,10 @@ public partial class MainWindow : Window {
     private string? shownState;
     private string? visitorIp;
     private (ContentControl Badge,TextBlock Title,TextBlock Detail)? location;
+    /// Under a failure of the network: the four-step check, in place of the location row and the usage figures.
+    private Border? checksCard;
+    private FrameworkElement? placeRow,usageCells;
+    private string? sentCheck;
     private RateBars? rateBars,flyRate;
     private Border? switchNote,flyNote;
     private TextBlock? switchText,flyNoteText;
@@ -523,6 +527,8 @@ public partial class MainWindow : Window {
             case "devices" or "nodes" or "account":ShowFromTray();page=what!;Render();break;
             case "automatic":Select("","",showConnect:false);Toggle();break;
             case "update":ShowFromTray();CheckForUpdate(true);break;
+            case "send":_=SendCheck();break;
+            case "wifi":try {System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:network") {UseShellExecute=true});} catch {/* no Settings app */}break;
             case "signin":connection.ClearError();Work(async()=>{await api.Logout();accountData=null;page="connect";Render();});break;
             default:Toggle();break;
         }
@@ -1031,7 +1037,7 @@ public partial class MainWindow : Window {
     private void Render() {
         ContentPanel.Children.Clear();FullPanel.Children.Clear();NavigationPanel.Children.Clear();HeaderSlot.Content=null;
         rateBars=null;switchNote=null;switchText=null;onNodes=null;onMeasured=null;
-        statusTitle=statusDetail=usageTotal=usageUntil=actionLabel=null;stamp=null;actionButton=secondaryButton=null;stepsHost=null;actionDot=null;scan=null;fileLines=null;portrait=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
+        statusTitle=statusDetail=usageTotal=usageUntil=actionLabel=null;stamp=null;actionButton=secondaryButton=null;stepsHost=null;actionDot=null;scan=null;fileLines=null;portrait=null;location=null;checksCard=null;placeRow=usageCells=null;badgeKey="";bannerHost=null;updateRowValue=null;
         var view=!api.SignedIn?"login":page;
         var full=view=="connect";
         Scroller.Visibility=full?Visibility.Collapsed:Visibility.Visible;FullPanel.Visibility=full?Visibility.Visible:Visibility.Collapsed;
@@ -1149,7 +1155,9 @@ public partial class MainWindow : Window {
         location=(badge,title,detail);
         usageTotal=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold};usageUntil=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold};
         var cells=Cells(("last_30_days",usageTotal,12),("valid_until_label",usageUntil,12));cells.Margin=new Thickness(4,14,4,0);
-        var bottom=new StackPanel();bottom.Children.Add(actions);bottom.Children.Add(place);bottom.Children.Add(cells);
+        checksCard=new Border {Background=Look.Surface,CornerRadius=new CornerRadius(14),Padding=new Thickness(14,8,14,8),Margin=new Thickness(0,10,0,0),Visibility=Visibility.Collapsed};
+        placeRow=place;usageCells=cells;
+        var bottom=new StackPanel();bottom.Children.Add(actions);bottom.Children.Add(checksCard);bottom.Children.Add(place);bottom.Children.Add(cells);
         Grid.SetRow(bottom,2);layout.Children.Add(bottom);
         FullPanel.Children.Add(layout);
         sealedShown=null;shownState=null;
@@ -1220,6 +1228,7 @@ public partial class MainWindow : Window {
             }
             actionDot.Fill=Look.Accent;actionDot.Visibility=on?Visibility.Visible:Visibility.Collapsed;
             shownState=key;dotBreathing=null;BreatheDot();
+            ShowChecks(state);
         }
         if(actionButton is not null) actionButton.IsEnabled=!busy||connection.Active;
         if(statusTitle is not null) statusTitle.Foreground=state switch {LinkState.Connected=>Look.Accent,LinkState.Failed=>Look.Fair,_=>Look.Text};
@@ -1231,6 +1240,34 @@ public partial class MainWindow : Window {
         var n=fileLines.Count;
         for(var i=0;i<n;i++) fileLines[i].Seal(seal,moving?(int)(1200*((seal?i:n-1-i)+0.5)/n):0,moving);
         sealedShown=seal;
+    }
+    /// A failure of the network shows where it stopped (network, server, lines, tunnel): a square (passed, failed, not
+    /// reached), the step and what it found; once sent, the reference. The location row and the usage give it their place.
+    private void ShowChecks(LinkState state) {
+        if(checksCard is null) return;
+        var checks=state==LinkState.Failed?Guidance.Checks(connection.ErrorCode,connection.Lines,connection.NetworkState):null;
+        checksCard.Visibility=checks is null?Visibility.Collapsed:Visibility.Visible;
+        if(placeRow is not null) placeRow.Visibility=checks is null?Visibility.Visible:Visibility.Collapsed;
+        if(usageCells is not null) usageCells.Visibility=checks is null?Visibility.Visible:Visibility.Collapsed;
+        if(checks is null) {sentCheck=null;return;}
+        var rows=new StackPanel();
+        foreach(var check in checks) {
+            var square=new Rectangle {Width=7,Height=7,Margin=new Thickness(0,0,10,0),VerticalAlignment=VerticalAlignment.Center,
+                Fill=check.Status switch {CheckStatus.Ok=>Look.Secondary,CheckStatus.Bad=>Look.Fair,_=>Look.Selected}};
+            var label=new TextBlock {Text=check.Label,FontSize=13,Foreground=check.Status==CheckStatus.Skip?Look.Secondary:Look.Text,VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};
+            var value=new TextBlock {Text=check.Value,FontSize=12,Foreground=check.Status==CheckStatus.Bad?Look.Fair:Look.Secondary,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(8,0,0,0),TextTrimming=TextTrimming.CharacterEllipsis};
+            var row=new DockPanel {Height=28,LastChildFill=true};
+            DockPanel.SetDock(square,Dock.Left);DockPanel.SetDock(value,Dock.Right);
+            row.Children.Add(square);row.Children.Add(value);row.Children.Add(label);
+            AutomationProperties.SetName(row,check.Label+": "+check.Value);
+            rows.Children.Add(row);
+        }
+        if(sentCheck is not null) rows.Children.Add(new TextBlock {Text=L10n.Text("check_sent",sentCheck),FontSize=11,Foreground=Look.Secondary,Margin=new Thickness(0,4,0,0),TextTrimming=TextTrimming.CharacterEllipsis});
+        checksCard.Child=rows;
+    }
+    private async Task SendCheck() {
+        sentCheck=await connection.SendCheck(Guidance.Summary(connection.ErrorCode,connection.Lines,connection.NetworkState));
+        ShowChecks(State());
     }
     /// In the background: at launch, when the window comes back after six hours, and with the refresh button. Nothing
     /// changes on screen if it fails.
@@ -1261,7 +1298,7 @@ public partial class MainWindow : Window {
     private Trouble? CurrentTrouble() {
         if(connection.Active||connection.ErrorCode is not { Length: >0 } code) return null;
         var node=connection.NodeName.Length>0?connection.NodeName:nodeName.Length>0?nodeName:L10n.Text("location");
-        return Guidance.For(code,node,nodeId.Length==0,new AccessFailure(code).Message);
+        return Guidance.For(code,node,nodeId.Length==0,new AccessFailure(code).Message,connection.NetworkState);
     }
     private string StatusTitle(LinkState state)=>state switch {
         LinkState.Connected=>L10n.Text("sealed_status"),
@@ -1275,7 +1312,7 @@ public partial class MainWindow : Window {
     private string? Elapsed()=>!Connection.Notices.Contains(connection.StatusKey)&&connection.Since is { } since?(DateTime.UtcNow-since).ToString(@"hh\:mm\:ss"):null;
     /// The flyout's one line keeps time and rates together; the window shows the time large above the rates.
     private string StatusDetail(LinkState state,bool compact=true)=>state switch {
-        LinkState.Connected=>compact&&Elapsed() is { } time?L10n.Text("connection_stats",time,Mbps(connection.RxRate),Mbps(connection.TxRate)):L10n.Text("seen_as",connection.NodeName),
+        LinkState.Connected=>compact&&Elapsed() is { } time?L10n.Text("connection_stats",time,Mbps(connection.RxRate),Mbps(connection.TxRate)):L10n.Text("seen_as",connection.NodeName)+(Guidance.Bypass(connection.Bypass) is { } forced?"\n"+forced:""),
         LinkState.Connecting=>L10n.Text("finding_best_route"),
         LinkState.Switching=>L10n.Text("switching_detail"),
         LinkState.Reconnecting=>L10n.Text(connection.StatusKey=="location_retrying"?"location_retrying":"reconnecting_detail"),

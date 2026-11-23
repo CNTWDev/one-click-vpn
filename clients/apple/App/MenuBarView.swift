@@ -239,6 +239,9 @@ struct MenuBarView:View {
         case "settings":SystemExtension.openSettings()
         case "signin":try? SecureStorage.write("token",nil);model.failed=false;model.failureCode="";model.signedIn=false;openMain()
         case "devices","account","nodes","update":openMain()
+        // The window shows the check and, once sent, its reference.
+        case "send":Task {await model.sendCheck()};openMain()
+        case "wifi":if let url=URL(string:"x-apple.systempreferences:com.apple.Network-Settings.extension") {NSWorkspace.shared.open(url)}
         default:toggle()
         }
     }
