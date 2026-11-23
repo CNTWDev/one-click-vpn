@@ -1013,7 +1013,7 @@ struct ClientView:View {
             return (key,perDay[key] ?? 0)
         }
     }
-    /// "11月22日", "Nov 22": a chart day in the app's language.
+    /// "Nov 22": a chart day in the app's language.
     private func shortDay(_ key:String)->String {
         let parser=DateFormatter();parser.locale=Locale(identifier:"en_US_POSIX");parser.timeZone=TimeZone(identifier:"UTC");parser.dateFormat="yyyy-MM-dd"
         guard let date=parser.date(from:key) else {return key}

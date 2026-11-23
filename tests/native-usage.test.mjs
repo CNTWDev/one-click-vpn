@@ -52,5 +52,11 @@ test("Native usage: per day, per device and per location from traffic_daily", { 
     assert.deepEqual((await usage("?days=1")).daily.map((d) => d.day), [day(0)]);
     assert.equal((await usage("?days=5000")).days, 90);
     assert.equal((await fetch(base + "usage")).status, 401);
-  } finally { server.kill("SIGTERM"); await pool.end(); }
+  } finally {
+    // Other suites share the database and expect an empty fleet: leave nothing behind.
+    await pool.query("DELETE FROM nodes WHERE id LIKE $1", [`${user}_%`]).catch(() => undefined);
+    await pool.query("DELETE FROM regions WHERE id=$1", [`${user}_tokyo`]).catch(() => undefined);
+    await pool.query("DELETE FROM users WHERE id=$1", [user]).catch(() => undefined);
+    server.kill("SIGTERM"); await pool.end();
+  }
 });

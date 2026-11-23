@@ -64,7 +64,7 @@ object L10n {
         return blocks[locale.language] ?: blocks["en"] ?: blocks[""] ?: emptyList()
     }
     fun number(value: Number): String = NumberFormat.getNumberInstance(locale).format(value)
-    /** A day of the usage chart ("2026-11-22") as the locale writes a short month and day: 11月22日, Nov 22, 22 нояб. */
+    /** A day of the usage chart ("2026-11-22") as the locale writes a short month and day such as "Nov 22" */
     fun day(value: String): String = try {
         DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMd"), locale).format(java.time.LocalDate.parse(value))
     } catch (_: Exception) { value }

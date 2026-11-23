@@ -1712,7 +1712,7 @@ public partial class MainWindow : Window {
     private async Task RefreshUsageQuota(Action fill) {
         try {var fresh=await api.Request("account");accountData=fresh;if(page=="usage") fill();} catch {/* keep the copy */}
     }
-    /// "11月22日", "Nov 22": a chart day in the app's language.
+    /// "Nov 22": a chart day in the app's language.
     private static string ShortDay(string key)=>DateTime.TryParseExact(key,"yyyy-MM-dd",System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out var day)
         ?day.ToString(L10n.Culture.DateTimeFormat.MonthDayPattern,L10n.Culture):key;
     /// A share of a whole as a filled bar on a dim track, both rounded.
