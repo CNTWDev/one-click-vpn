@@ -431,7 +431,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">Mac 菜单栏和 Windows 托盘弹窗加入常用开关：智能分流、断网保护、登录时启动、菜单栏网速（Mac）/ 按应用分流（Windows），不用打开主窗口\n连接中在弹窗里切换智能分流或断网保护，会自动重连立即生效\n弹窗底部可以直接检查更新，结果就显示在那一行</string>
+  <string name="whats_new_notes">连接时更稳：应用会记录每次连接的结果，帮助我们在新版本推给所有人之前先发现问题\n连不上的服务器会被自动移出列表，恢复后自动放回</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>

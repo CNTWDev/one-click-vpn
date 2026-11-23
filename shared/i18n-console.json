@@ -4006,5 +4006,93 @@
   "已摘除": [
     "Removed",
     "Исключён"
+  ],
+  "UDP 缓冲 {0}": [
+    "UDP buffer {0}",
+    "UDP-буфер {0}"
+  ],
+  "升级 Agent 后开启": [
+    "Turns on after an Agent upgrade",
+    "Включится после обновления Agent"
+  ],
+  "内核不支持 BBR · {0}": [
+    "Kernel has no BBR · {0}",
+    "Ядро без BBR · {0}"
+  ],
+  "系统不允许修改（容器机器）": [
+    "System does not allow it (container)",
+    "Система не разрешает (контейнер)"
+  ],
+  "正在开启…": [
+    "Turning on…",
+    "Включается…"
+  ],
+  "升级 Agent 到 2.20 后自动开启 BBR 并测速。": [
+    "Upgrade the Agent to 2.20 to turn on BBR and test speed automatically.",
+    "Обновите Agent до 2.20: BBR включится, скорость измерится автоматически."
+  ],
+  "没能发起测速，稍后重试。": [
+    "Could not start the speed test. Try again later.",
+    "Не удалось запустить тест скорости. Повторите позже."
+  ],
+  "正在测速，约 30 秒…": [
+    "Testing, about 30 seconds…",
+    "Идёт тест, около 30 секунд…"
+  ],
+  "最近一次测速失败：{0}": [
+    "Last speed test failed: {0}",
+    "Последний тест скорости не удался: {0}"
+  ],
+  "测的是节点到 Cloudflare 的出口上限，不是用户到节点的速度。": [
+    "Measures the node's own uplink to Cloudflare, not the speed users get to the node.",
+    "Измеряет канал узла до Cloudflare, а не скорость пользователей до узла."
+  ],
+  "网络调优": [
+    "Network tuning",
+    "Настройка сети"
+  ],
+  "测速中…": [
+    "Testing…",
+    "Тест…"
+  ],
+  "重新测速": [
+    "Test again",
+    "Измерить снова"
+  ],
+  "拥塞控制": [
+    "Congestion control",
+    "Контроль перегрузки"
+  ],
+  "下行": [
+    "Download",
+    "Загрузка"
+  ],
+  "上行": [
+    "Upload",
+    "Отдача"
+  ],
+  "还没有测速": [
+    "Not tested yet",
+    "Ещё не измерялось"
+  ],
+  "延迟 {0} ms": [
+    "Latency {0} ms",
+    "Задержка {0} мс"
+  ],
+  "调优前后": [
+    "Before and after tuning",
+    "До и после настройки"
+  ],
+  "下行 {0} → {1}": [
+    "Download {0} → {1}",
+    "Загрузка {0} → {1}"
+  ],
+  "上行 {0} → {1}": [
+    "Upload {0} → {1}",
+    "Отдача {0} → {1}"
+  ],
+  "测于": [
+    "Tested ",
+    "Измерено "
   ]
 }

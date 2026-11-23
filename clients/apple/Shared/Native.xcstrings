@@ -9897,19 +9897,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The Mac menu bar and Windows tray panels now hold the common switches: smart routing, kill switch, open at login, and speed in menu bar (Mac) or per-app routing (Windows), no need to open the window\nChanging smart routing or the kill switch there while connected reconnects and applies at once\nCheck for updates right from the panel; the result shows on the same line"
+            "value": "Steadier connections: the app now notes how each connection went, so problems in a new version are caught before it reaches everyone\nServers nobody can reach are taken out of the list automatically and come back once they recover"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac 菜单栏和 Windows 托盘弹窗加入常用开关：智能分流、断网保护、登录时启动、菜单栏网速（Mac）/ 按应用分流（Windows），不用打开主窗口\n连接中在弹窗里切换智能分流或断网保护，会自动重连立即生效\n弹窗底部可以直接检查更新，结果就显示在那一行"
+            "value": "连接时更稳：应用会记录每次连接的结果，帮助我们在新版本推给所有人之前先发现问题\n连不上的服务器会被自动移出列表，恢复后自动放回"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "В панели строки меню Mac и в трее Windows появились частые переключатели: умный режим, блокировка без VPN, автозапуск, скорость в меню (Mac) или выбор приложений (Windows), окно открывать не нужно\nЕсли сменить там умный режим или блокировку во время подключения, VPN переподключится и изменение сразу вступит в силу\nПроверка обновлений прямо из панели, результат виден в той же строке"
+            "value": "Стабильнее подключение: приложение отмечает, как прошло каждое подключение, чтобы проблемы новой версии находились до того, как она дойдёт до всех\nСерверы, к которым никто не может подключиться, автоматически убираются из списка и возвращаются после восстановления"
           }
         }
       }

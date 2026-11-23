@@ -585,6 +585,46 @@ test("node heartbeats accumulate public-interface traffic per UTC month", integr
   }
 });
 
+test("node speed tests: tuning state, a Console request, the Agent's result and the before/after pair", integrationOptions, async () => {
+  const pool = new pg.Pool({ connectionString: databaseUrl });
+  const json = { "Content-Type": "application/json" };
+  const nodeId = `node_speed_${Date.now()}`;
+  const agentToken = `agent-speed-${Date.now()}`;
+  const timestamp = new Date().toISOString();
+  const agent = (path, body) => fetch(`${base}${path}`, { method: "POST", headers: json, body: JSON.stringify({ nodeId, token: agentToken, ...body }) });
+  const pull = async () => (await agent("/api/v1/agent/tasks/pull", { speedTest: true })).json();
+  try {
+    await pool.query(`INSERT INTO nodes (id,name,place,ip,ssh_user,credential_type,credential_ciphertext,credential_iv,credential_tag,created_at,updated_at,agent_token_hash)
+      VALUES ($1,'Speed','Test','127.0.0.4','root','password','','','',$2,$2,$3)`, [nodeId, timestamp, createHash("sha256").update(agentToken).digest("hex")]);
+    const tuning = { state: "tuned", congestion: "bbr", qdisc: "fq", udpBuffer: 16777216 };
+    assert.equal((await agent("/api/v1/agent/heartbeat", { version: "agent 2.20.0", metrics: { cpuPercent: 1, memory: {}, disk: {}, network: {}, tuning } })).status, 200);
+    const login = await fetch(`${base}/api/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ email: "owner@example.com", password: "test-password-123" }) });
+    const headers = { ...json, Cookie: login.headers.get("set-cookie").split(";")[0] };
+    const node = (await (await fetch(`${base}/api/nodes`, { headers })).json()).nodes.find((item) => item.id === nodeId);
+    assert.deepEqual(node.metrics.tuning, tuning);
+    assert.equal((await pull()).speedTest, undefined, "a new node waits ten minutes before its first baseline");
+    const requested = await (await fetch(`${base}/api/nodes/${nodeId}/speed-test`, { method: "POST", headers })).json();
+    assert.equal(requested.pending.status, "waiting");
+    const taken = (await pull()).speedTest;
+    assert.deepEqual(taken, { id: requested.pending.id, kind: "manual" });
+    assert.equal((await pull()).speedTest, undefined, "handed out once");
+    for (const result of [{ kind: "before", downMbps: 410.26, upMbps: 380, latencyMs: 2, congestion: "cubic" }, { kind: "after", downMbps: 912, upMbps: 870, latencyMs: 2, congestion: "bbr" },
+      { id: taken.id, kind: "manual", downMbps: 905, upMbps: 860, latencyMs: 3, congestion: "bbr; rm -rf" }]) {
+      assert.equal((await agent("/api/v1/agent/speed-test", result)).status, 200);
+    }
+    assert.equal((await (await agent("/api/v1/agent/speed-test", { kind: "manual", error: "busy" })).json()).ok, true);
+    const listed = await (await fetch(`${base}/api/nodes/${nodeId}/speed-test`, { headers })).json();
+    assert.equal(listed.pending, null);
+    assert.deepEqual(listed.tests.map((test) => [test.kind, test.downMbps, test.congestion]), [["manual", 905, "bbrrm-rf"], ["after", 912, "bbr"], ["before", 410.3, "cubic"]]);
+    assert.equal((await fetch(`${base}/api/nodes/${nodeId}/speed-test`)).status, 401);
+    await pool.query("UPDATE nodes SET version = 'agent 2.19.0' WHERE id = $1", [nodeId]);
+    assert.equal((await (await fetch(`${base}/api/nodes/${nodeId}/speed-test`, { method: "POST", headers })).json()).agent, "outdated");
+  } finally {
+    await pool.query("DELETE FROM nodes WHERE id = $1", [nodeId]);
+    await pool.end();
+  }
+});
+
 test("v1 bearer session can manage a device", integrationOptions, async () => {
   const login = await fetch(`${base}/api/v1/auth/login`, {
     method: "POST",
