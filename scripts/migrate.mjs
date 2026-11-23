@@ -604,6 +604,17 @@ const migrations = [
     );
     CREATE INDEX IF NOT EXISTS node_speed_tests_node_idx ON node_speed_tests(node_id, created_at DESC);
   `)],
+  ["012-node-path-stats", async (db) => db.query(`
+    -- How each node's transports do per country and network (ASN) per UTC day, from app probe reports;
+    -- no addresses. Rows older than 14 days are dropped (server/path-stats.ts).
+    CREATE TABLE IF NOT EXISTS node_path_stats (
+      node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, transport TEXT NOT NULL, country TEXT NOT NULL, asn INTEGER NOT NULL,
+      day DATE NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, successes INTEGER NOT NULL DEFAULT 0,
+      delay_sum_ms BIGINT NOT NULL DEFAULT 0, delay_count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (node_id, transport, country, asn, day)
+    );
+    CREATE INDEX IF NOT EXISTS node_path_stats_cohort_idx ON node_path_stats(country, asn, day);
+  `)],
 ];
 
 const client = await pool.connect();

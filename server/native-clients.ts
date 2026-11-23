@@ -6,6 +6,7 @@ import { digest, NativeError } from "./native-proof";
 import { writeOperationalLog } from "./operational-logs";
 import { scrubDetail } from "./scrub-detail";
 import { recordTransportProbe } from "./port-reach";
+import { recordProbeFromAddress } from "./path-stats";
 
 export const clientHeader = "x-veilbird-client";
 
@@ -38,7 +39,7 @@ const diagnosticCode = /^[A-Z][A-Z0-9_]{1,63}$/, diagnosticNode = /^[A-Za-z0-9_-
  * the full report goes to the runtime log (Loki only), next to the server's own lines for the same
  * connection attempt (`attempt` is the X-Request-Id the app sent while connecting).
  */
-export async function recordDiagnostics(session: { user_id: string; platform: string }, agent: ClientAgent | null, body: Record<string, unknown>) {
+export async function recordDiagnostics(session: { user_id: string; platform: string }, agent: ClientAgent | null, body: Record<string, unknown>, address = "") {
   const now = Date.now();
   const events = (Array.isArray(body.events) ? body.events.slice(0, 20) : []).flatMap((item: unknown) => {
     const event = item as Record<string, unknown> | null;
@@ -49,7 +50,11 @@ export async function recordDiagnostics(session: { user_id: string; platform: st
       detail: scrubDetail(event.detail, event.code === "APP_CRASH" ? 600 : 200), attempt: typeof event.attempt === "string" && diagnosticAttempt.test(event.attempt) ? event.attempt : null, network: event.network }];
   });
   // A probe summary is reachability data, not a failure: it updates the node's port status only.
-  for (const event of events.filter((item) => item.code === "TRANSPORT_PROBE" && item.nodeId)) await recordTransportProbe(event.nodeId!, event.network, event.detail);
+  // It also counts towards the node's record from this country and network (path-stats.ts); the address is not kept.
+  for (const event of events.filter((item) => item.code === "TRANSPORT_PROBE" && item.nodeId)) {
+    await recordTransportProbe(event.nodeId!, event.network, event.detail);
+    await recordProbeFromAddress(event.nodeId!, address, event.detail);
+  }
   const failures = events.filter((item) => item.code !== "TRANSPORT_PROBE");
   const recent = Number((await dbQuery<{ count: string }>("SELECT COUNT(*) AS count FROM native_diagnostics WHERE user_id=$1 AND created_at>now()-interval '1 hour'", [session.user_id]))[0]?.count || 0);
   const accepted = failures.slice(0, Math.max(0, 200 - recent));
