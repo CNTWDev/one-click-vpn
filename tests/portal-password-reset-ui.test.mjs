@@ -58,7 +58,7 @@ test("Portal password reset: forgot (email and admin), reset link, all locales a
             await page.getByRole("button", { name: text.send }).click();
             await page.getByText(text.sent).waitFor();
             await audit("forgot-sent");
-            assert.deepEqual(requests.find((r) => r.method === "POST")?.body, { email: "someone@example.com", language: locale });
+            assert.deepEqual(requests.find((r) => r.method === "POST" && r.pathname === "/api/v1/auth/password-reset")?.body, { email: "someone@example.com", language: locale });
           } else {
             await page.getByText(text.admin).waitFor();
             assert.equal(await page.getByLabel(text.email, { exact: true }).count(), 0);

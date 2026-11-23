@@ -78,7 +78,7 @@ test("Telegram: connect a bot, add a chat found by /start, and approve a sign-up
 
     assert.equal((await call("/chats", "POST", { chatId: "-999" })).status, 400, "a chat the bot cannot see is refused");
     let status = await (await call("/chats", "POST", { chatId: "-100500" })).json();
-    assert.deepEqual(status.chats[0].events.sort(), ["alerts", "releases", "signups"]);
+    assert.deepEqual(status.chats[0].events.sort(), ["alerts", "nodes", "releases", "rollout", "signups"]);
     status = await (await call("/chats", "PUT", { chatId: "-100500", events: ["signups", "bogus"] })).json();
     assert.deepEqual(status.chats[0].events, ["signups"]);
     status = await (await call("/approvers", "PUT", { approvers: ["111", "999"] })).json();

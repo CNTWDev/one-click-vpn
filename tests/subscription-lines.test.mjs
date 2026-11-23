@@ -35,10 +35,12 @@ test("subscriptions: Hysteria2 + REALITY + XHTTP per node once the node loaded t
     let ready = false; for (let i = 0; i < 100; i++) { if (await fetch(`${base}/api/v1/health`).then(() => true).catch(() => false)) { ready = true; break; } await new Promise((r) => setTimeout(r, 100)); } assert.ok(ready);
     const login = await (await fetch(`${base}/api/v1/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: `${user}@example.com`, password }) })).json();
     const auth = { Authorization: `Bearer ${login.accessToken}`, "Content-Type": "application/json" };
-    // No protocol field (new Portal): the subscription is VLESS.
-    const created = await fetch(`${base}/api/v1/subscriptions`, { method: "POST", headers: auth, body: JSON.stringify({ name: "Phone" }) });
-    assert.equal(created.status, 201);
-    const { token, credentialId } = await created.json();
+    // First use makes the account's one subscription; it is VLESS.
+    const created = await fetch(`${base}/api/v1/subscriptions`, { method: "POST", headers: auth, body: "{}" });
+    assert.equal(created.status, 200);
+    const { subscription } = await created.json();
+    const token = subscription.token;
+    const credentialId = (await pool.query("SELECT credential_id FROM subscriptions WHERE id=$1", [subscription.id])).rows[0].credential_id;
     assert.equal((await pool.query("SELECT protocol FROM access_credentials WHERE id=$1", [credentialId])).rows[0].protocol, "vless");
     // Creating it rebuilt both services of the node: VLESS and the stealth one that carries the same user.
     const desired = Object.fromEntries((await pool.query("SELECT protocol,revision,payload_json FROM desired_configs WHERE node_id=$1", [node])).rows.map((row) => [row.protocol, row]));
@@ -104,10 +106,10 @@ test("subscriptions: Hysteria2 + REALITY + XHTTP per node once the node loaded t
     const wgConfig = parseConfig(await (await fetchSubscription(wgToken, "clash-verge/v2.2.3")).text());
     assert.deepEqual(wgConfig.proxies.map((p) => p.type), ["hysteria2", "vless", "vless"]);
 
-    // Revoking the subscription takes it off the stealth service too.
+    // Deleting the subscription takes it off the stealth service too.
     const before = (await pool.query("SELECT revision FROM desired_configs WHERE node_id=$1 AND protocol='stealth'", [node])).rows[0].revision;
-    const sub = (await (await fetch(`${base}/api/v1/subscriptions`, { headers: auth })).json()).subscriptions.find((item) => item.credential_id === credentialId);
-    assert.equal((await fetch(`${base}/api/v1/subscriptions`, { method: "PATCH", headers: auth, body: JSON.stringify({ id: sub.id, action: "revoke" }) })).status, 200);
+    const removed = await fetch(`${base}/api/v1/subscriptions`, { method: "PATCH", headers: auth, body: JSON.stringify({ id: subscription.id, action: "delete" }) });
+    assert.equal(removed.status, 200, await removed.text());
     assert.ok((await pool.query("SELECT revision FROM desired_configs WHERE node_id=$1 AND protocol='stealth'", [node])).rows[0].revision > before);
   } finally {
     server.kill();
