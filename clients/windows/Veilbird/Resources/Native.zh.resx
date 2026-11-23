@@ -376,6 +376,14 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="routing_global_detail" xml:space="preserve"><value>全部流量经过 TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>智能分流</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>国内网站直连，其余经过 TrackNothing</value></data>
+  <data name="rules_count" xml:space="preserve"><value>{0} 条</value></data>
+  <data name="rules_help" xml:space="preserve"><value>每行一条：域名或网段，逗号后写 direct（直连）、proxy（走代理）或 block（拦截）。也可以直接粘贴 Clash 规则，# 后面是注释。规则排在智能分流前面，只保存在这台设备上。</value></data>
+  <data name="rules_none" xml:space="preserve"><value>未设置</value></data>
+  <data name="rules_save" xml:space="preserve"><value>保存</value></data>
+  <data name="rules_saved" xml:space="preserve"><value>已保存，下次连接时生效</value></data>
+  <data name="rules_saved_reconnect" xml:space="preserve"><value>已保存，正在重新连接</value></data>
+  <data name="rules_status" xml:space="preserve"><value>能用 {0} 条，看不懂 {1} 行</value></data>
+  <data name="rules_title" xml:space="preserve"><value>分流规则</value></data>
   <data name="running_apps" xml:space="preserve"><value>正在运行的应用</value></data>
   <data name="running_in_tray" xml:space="preserve"><value>TrackNothing 仍在托盘运行，点击图标即可切换。</value></data>
   <data name="seal_action" xml:space="preserve"><value>开始隐身</value></data>

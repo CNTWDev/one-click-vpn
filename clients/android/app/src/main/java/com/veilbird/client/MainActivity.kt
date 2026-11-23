@@ -174,7 +174,7 @@ class MainActivity : Activity() {
     @Deprecated("Back handling for API 26+")
     override fun onBackPressed() {
         when (page) {
-            "devices", "logs", "apps" -> { page = "account"; render() }
+            "devices", "logs", "apps", "rules" -> { page = "account"; render() }
             "nodes", "account", "activity", "usage" -> { page = "connect"; render() }
             else -> super.onBackPressed()
         }
@@ -329,6 +329,7 @@ class MainActivity : Activity() {
             "nodes" -> nodes()
             "devices" -> devices()
             "apps" -> appsPage()
+            "rules" -> rulesPage()
             "logs" -> logs()
             "activity" -> activity()
             "usage" -> usagePage()
@@ -1467,6 +1468,7 @@ class MainActivity : Activity() {
                         if ((i == 1) != on) { Advanced.enable(this, i == 1); render() }
                     }
                 },
+            ) + (if (Advanced.enabled(this)) listOf(settingRow(L10n.text(R.string.rules_title), rulesValue()) { page = "rules"; render() }) else emptyList()) + listOf(
                 settingRow(L10n.text(R.string.check_for_updates), "") { update?.let { if (!downloading) startDownload(it) } ?: checkForUpdate(announce = true) }
                     .also { updateRowValue = it.getChildAt(1) as TextView },
                 // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).
@@ -1552,6 +1554,44 @@ class MainActivity : Activity() {
         box.removeAllViews()
         box.background = rounded(if (on) Palette.accent else Palette.selected, 5)
         if (on) box.addView(icon(R.drawable.ic_check, Palette.onAccent, 14), FrameLayout.LayoutParams(14.dp, 14.dp, Gravity.CENTER))
+    }
+    private fun rulesValue(): String {
+        val count = Advanced.rules(this).size
+        return if (count == 0) L10n.text(R.string.rules_none) else L10n.text(R.string.rules_count, L10n.number(count))
+    }
+    /** Advanced: the person's own routing rules, one per line, ahead of smart routing; kept on this device. */
+    private fun rulesPage() {
+        subPageTitle(L10n.text(R.string.rules_title)) { page = "account"; render() }
+        add(text(L10n.text(R.string.rules_help), 13f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, top = 4)
+        val status = text("", 12f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }
+        fun recount(value: String) {
+            val states = value.lines().map { Advanced.ruleState(it.trim()) }
+            status.text = L10n.text(R.string.rules_status, L10n.number(states.count { it == 1 }), L10n.number(states.count { it == -1 }))
+        }
+        val editor = EditText(this).apply {
+            setText(Advanced.rulesText(this@MainActivity)); hint = "example.com, direct\n+.ads.example, block\n10.8.0.0/16, proxy"
+            typeface = Typeface.MONOSPACE; textSize = 13f; setTextColor(Palette.text); setHintTextColor(Palette.faint); textCursorDrawableTint()
+            gravity = Gravity.TOP or Gravity.START; minLines = 8; isSingleLine = false; setHorizontallyScrolling(false)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            background = rounded(Palette.surface, 12); setPadding(14.dp, 12.dp, 14.dp, 12.dp)
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { recount(s.toString()) }
+                override fun afterTextChanged(s: Editable?) {}
+            })
+        }
+        add(editor, top = 16)
+        recount(editor.text.toString())
+        add(status, top = 8)
+        add(primaryButton(L10n.text(R.string.rules_save)) {
+            val before = Advanced.rules(this)
+            Advanced.saveRules(this, editor.text.toString())
+            val changed = before != Advanced.rules(this)
+            val live = changed && ConnectionStateStore.active && ConnectionStateStore.since > 0
+            Toast.makeText(this, L10n.text(if (live) R.string.rules_saved_reconnect else R.string.rules_saved), Toast.LENGTH_SHORT).show()
+            if (live) reconnect()
+            page = "account"; render()
+        }, height = 52.dp, top = 16)
     }
     private fun appsPage() {
         subPageTitle(L10n.text(R.string.per_app_routing)) { page = "account"; render() }

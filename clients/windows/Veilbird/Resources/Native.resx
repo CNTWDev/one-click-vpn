@@ -376,6 +376,14 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="routing_global_detail" xml:space="preserve"><value>All traffic goes through TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>Smart</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>Sites in mainland China go direct, the rest through TrackNothing</value></data>
+  <data name="rules_count" xml:space="preserve"><value>{0} rules</value></data>
+  <data name="rules_help" xml:space="preserve"><value>One per line: a domain or network, a comma, then direct, proxy or block. Clash rules can be pasted as they are; # starts a comment. Rules come before smart routing and stay on this device.</value></data>
+  <data name="rules_none" xml:space="preserve"><value>None</value></data>
+  <data name="rules_save" xml:space="preserve"><value>Save</value></data>
+  <data name="rules_saved" xml:space="preserve"><value>Saved, applies from the next connection</value></data>
+  <data name="rules_saved_reconnect" xml:space="preserve"><value>Saved, reconnecting</value></data>
+  <data name="rules_status" xml:space="preserve"><value>{0} rules, {1} lines not understood</value></data>
+  <data name="rules_title" xml:space="preserve"><value>Routing rules</value></data>
   <data name="running_apps" xml:space="preserve"><value>Running apps</value></data>
   <data name="running_in_tray" xml:space="preserve"><value>TrackNothing keeps running in the tray. Click the icon to switch.</value></data>
   <data name="seal_action" xml:space="preserve"><value>Connect</value></data>

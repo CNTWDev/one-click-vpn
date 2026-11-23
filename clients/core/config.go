@@ -43,6 +43,8 @@ type Options struct {
 	// just Apps through the tunnel, "except" to send Apps direct. Apps are program names such as chrome.exe.
 	AppMode string   `json:"appMode,omitempty"`
 	Apps    []string `json:"apps,omitempty"`
+	// The person's own routing rules (advanced, rules.go), ahead of smart routing.
+	Rules []string `json:"rules,omitempty"`
 }
 
 // Run builds the configuration from options (JSON) and applies it with home as the data directory.
@@ -101,6 +103,7 @@ func Build(o Options) (string, error) {
 	for _, cidr := range privateNetworks {
 		rules = append(rules, "IP-CIDR,"+cidr+",DIRECT,no-resolve")
 	}
+	rules = append(rules, customRules(o.Rules, group)...)
 	config := map[string]any{"mode": "rule", "log-level": "silent", "ipv6": ipv6, "find-process-mode": findProcess,
 		"unified-delay": true, "tcp-concurrent": true, "geo-auto-update": false,
 		"profile": map[string]any{"store-selected": false, "store-fake-ip": false},

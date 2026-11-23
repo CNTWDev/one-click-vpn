@@ -39,4 +39,25 @@ object Advanced {
         return kept.ifEmpty { transports }
     }
     fun family(transport: String) = if (transport == "reality-alt") "reality" else transport
+
+    /** The person's routing rules as typed (one per line); the core reads them (clients/core/rules.go). */
+    fun rulesText(context: Context): String = prefs(context).getString("rules", "")!!
+    fun saveRules(context: Context, text: String) { prefs(context).edit().putString("rules", text).apply() }
+    /** The lines the core will use; none while advanced is off. */
+    fun rules(context: Context): List<String> = if (enabled(context)) rulesText(context).lines().map { it.trim() }.filter { ruleState(it) == 1 } else emptyList()
+    private val ruleTypes = setOf("DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "IP-CIDR", "IP-CIDR6")
+    private val cidr = Regex("^[0-9A-Fa-f:.]+/[0-9]{1,3}$")
+    /** 1 a rule, 0 blank or a comment, -1 a line the core cannot read; the same reading as rules.go. */
+    fun ruleState(line: String): Int {
+        val parts = line.substringBefore('#').split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        if (parts.isEmpty()) return 0
+        val (value, ip) = when {
+            parts.size >= 3 && parts[0].uppercase() in ruleTypes -> parts[1] to parts[0].uppercase().startsWith("IP")
+            parts.size == 2 -> parts[0] to ('/' in parts[0])
+            else -> return -1
+        }
+        if (value.any { it.isWhitespace() }) return -1
+        if (ip) return if (cidr.matches(value)) 1 else -1
+        return if (value.trimStart('+').trimStart('.').isNotEmpty()) 1 else -1
+    }
 }

@@ -66,8 +66,8 @@ enum Transports {
     }
     /// The whole mihomo configuration for one node (JSON is valid YAML). The provider owns the tun and passes its descriptor.
     /// What the core needs to build the configuration (clients/core/config.go): the same on every app.
-    static func options(proxies:[[String:Any]],order:[String],fd:Int32,smart:Bool) throws -> String {
-        let options:[String:Any]=["platform":"apple","fd":Int(fd),"smart":smart,"proxies":proxies,"order":order]
+    static func options(proxies:[[String:Any]],order:[String],fd:Int32,smart:Bool,rules:[String]=[]) throws -> String {
+        let options:[String:Any]=["platform":"apple","fd":Int(fd),"smart":smart,"proxies":proxies,"order":order,"rules":rules]
         return String(decoding:try JSONSerialization.data(withJSONObject:options),as:UTF8.self)
     }
     /// "name=delay,..." from the core; -1 means no answer.

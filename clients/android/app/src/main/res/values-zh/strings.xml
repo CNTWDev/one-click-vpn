@@ -370,6 +370,14 @@
   <string name="routing_global_detail">全部流量经过 TrackNothing</string>
   <string name="routing_smart">智能分流</string>
   <string name="routing_smart_detail">国内网站直连，其余经过 TrackNothing</string>
+  <string name="rules_count">%1$s 条</string>
+  <string name="rules_help">每行一条：域名或网段，逗号后写 direct（直连）、proxy（走代理）或 block（拦截）。也可以直接粘贴 Clash 规则，# 后面是注释。规则排在智能分流前面，只保存在这台设备上。</string>
+  <string name="rules_none">未设置</string>
+  <string name="rules_save">保存</string>
+  <string name="rules_saved">已保存，下次连接时生效</string>
+  <string name="rules_saved_reconnect">已保存，正在重新连接</string>
+  <string name="rules_status">能用 %1$s 条，看不懂 %2$s 行</string>
+  <string name="rules_title">分流规则</string>
   <string name="running_apps">正在运行的应用</string>
   <string name="running_in_tray">TrackNothing 仍在托盘运行，点击图标即可切换。</string>
   <string name="seal_action">开始隐身</string>

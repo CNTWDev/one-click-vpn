@@ -370,6 +370,14 @@
   <string name="routing_global_detail">Весь трафик через TrackNothing</string>
   <string name="routing_smart">Умная</string>
   <string name="routing_smart_detail">Сайты материкового Китая напрямую, остальное через TrackNothing</string>
+  <string name="rules_count">Правил: %1$s</string>
+  <string name="rules_help">По одному на строку: домен или сеть, запятая, затем direct, proxy или block. Правила Clash можно вставить как есть; # начинает комментарий. Правила идут раньше умного режима и хранятся только на этом устройстве.</string>
+  <string name="rules_none">Нет</string>
+  <string name="rules_save">Сохранить</string>
+  <string name="rules_saved">Сохранено, применится при следующем подключении</string>
+  <string name="rules_saved_reconnect">Сохранено, переподключение</string>
+  <string name="rules_status">Правил: %1$s, не распознано строк: %2$s</string>
+  <string name="rules_title">Правила маршрутизации</string>
   <string name="running_apps">Запущенные программы</string>
   <string name="running_in_tray">TrackNothing работает в трее. Нажмите на значок, чтобы переключить.</string>
   <string name="seal_action">Подключиться</string>

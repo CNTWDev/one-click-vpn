@@ -272,3 +272,26 @@ func TestAppUsageKeepsDaysAcrossConnections(t *testing.T) {
 	}
 	appUsage.begin("")
 }
+
+func TestCustomRules(t *testing.T) {
+	lines := []string{
+		"# mine", "example.com, direct", "+.ads.example,block", "10.8.1.0/16, proxy", "2001:db8::1/32,direct",
+		"DOMAIN-KEYWORD,video,Proxy", "domain,Exact.Example,REJECT # comment", "nonsense", "bad/cidr,direct", "", "a b,direct",
+	}
+	got := customRules(lines, "TrackNothing")
+	want := []string{
+		"DOMAIN-SUFFIX,example.com,DIRECT", "DOMAIN-SUFFIX,ads.example,REJECT", "IP-CIDR,10.8.0.0/16,TrackNothing,no-resolve",
+		"IP-CIDR6,2001:db8::/32,DIRECT,no-resolve", "DOMAIN-KEYWORD,video,TrackNothing", "DOMAIN,exact.example,REJECT",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("rules\n got %q\nwant %q", got, want)
+	}
+	out, err := Build(Options{Platform: "android", Proxies: []map[string]any{{"name": "reality", "type": "vless"}}, Order: []string{"reality"}, Smart: true, Rules: lines})
+	if err != nil {
+		t.Fatal(err)
+	}
+	custom, smart := strings.Index(out, "DOMAIN-SUFFIX,example.com,DIRECT"), strings.Index(out, "RULE-SET,")
+	if custom < 0 || smart < 0 || custom > smart {
+		t.Fatalf("custom rules must come before smart routing: %s", out)
+	}
+}

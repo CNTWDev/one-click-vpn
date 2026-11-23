@@ -90,7 +90,7 @@ enum TunnelControl {
         let proto=NETunnelProviderProtocol()
         proto.providerBundleIdentifier=(Bundle.main.bundleIdentifier ?? "")+".tunnel"
         proto.serverAddress="TrackNothing"
-        proto.providerConfiguration=["origin":origin,"nodeId":nodeId,"routing":routing,"locks":Advanced.locks]
+        proto.providerConfiguration=["origin":origin,"nodeId":nodeId,"routing":routing,"locks":Advanced.locks,"rules":Advanced.rules]
         // Kill switch: the system sends everything through the tunnel and nothing out while it is down (the
         // tunnel's own connections to nodes and the API are exempt). Local network devices stay reachable.
         proto.includeAllNetworks=UserDefaults.standard.bool(forKey:"killSwitch")

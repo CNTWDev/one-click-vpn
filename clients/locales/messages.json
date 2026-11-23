@@ -2583,5 +2583,45 @@
     "zh": "右键点位置可以收藏或锁定协议",
     "en": "Right-click a location to favorite it or lock its protocol",
     "ru": "Щёлкните локацию правой кнопкой, чтобы добавить в избранное или выбрать протокол"
+  },
+  "rules_title": {
+    "zh": "分流规则",
+    "en": "Routing rules",
+    "ru": "Правила маршрутизации"
+  },
+  "rules_count": {
+    "zh": "{0} 条",
+    "en": "{0} rules",
+    "ru": "Правил: {0}"
+  },
+  "rules_none": {
+    "zh": "未设置",
+    "en": "None",
+    "ru": "Нет"
+  },
+  "rules_help": {
+    "zh": "每行一条：域名或网段，逗号后写 direct（直连）、proxy（走代理）或 block（拦截）。也可以直接粘贴 Clash 规则，# 后面是注释。规则排在智能分流前面，只保存在这台设备上。",
+    "en": "One per line: a domain or network, a comma, then direct, proxy or block. Clash rules can be pasted as they are; # starts a comment. Rules come before smart routing and stay on this device.",
+    "ru": "По одному на строку: домен или сеть, запятая, затем direct, proxy или block. Правила Clash можно вставить как есть; # начинает комментарий. Правила идут раньше умного режима и хранятся только на этом устройстве."
+  },
+  "rules_save": {
+    "zh": "保存",
+    "en": "Save",
+    "ru": "Сохранить"
+  },
+  "rules_saved": {
+    "zh": "已保存，下次连接时生效",
+    "en": "Saved, applies from the next connection",
+    "ru": "Сохранено, применится при следующем подключении"
+  },
+  "rules_saved_reconnect": {
+    "zh": "已保存，正在重新连接",
+    "en": "Saved, reconnecting",
+    "ru": "Сохранено, переподключение"
+  },
+  "rules_status": {
+    "zh": "能用 {0} 条，看不懂 {1} 行",
+    "en": "{0} rules, {1} lines not understood",
+    "ru": "Правил: {0}, не распознано строк: {1}"
   }
 }
