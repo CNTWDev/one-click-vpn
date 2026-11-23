@@ -595,6 +595,14 @@ const migrations = [
         AND (g.quota_bytes IS NULL OR g.used_bytes < g.quota_bytes))
       WHERE EXISTS (SELECT 1 FROM access_grants g WHERE g.user_id = u.id AND g.source = 'welcome')`);
   }],
+  ["011-node-drain", async (db) => db.query(`
+    -- Automatic removal of nodes nobody can reach (server/node-health.ts): like a pause, set and cleared by the Controller.
+    ALTER TABLE nodes ADD COLUMN IF NOT EXISTS drained_at TEXT;
+    ALTER TABLE nodes ADD COLUMN IF NOT EXISTS drain_reason TEXT NOT NULL DEFAULT '';
+    ALTER TABLE nodes ADD COLUMN IF NOT EXISTS drain_history TEXT NOT NULL DEFAULT '';
+    ALTER TABLE nodes ADD COLUMN IF NOT EXISTS drain_locked INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE nodes ADD COLUMN IF NOT EXISTS auto_drain INTEGER NOT NULL DEFAULT 1;
+  `)],
 ];
 
 const client = await pool.connect();

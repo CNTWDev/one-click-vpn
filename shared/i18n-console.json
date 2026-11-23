@@ -3950,5 +3950,61 @@
   "只看不判：协议回退 {0}（正式版 {1}） · 连上用时 P50 {2}（正式版 {3}）": [
     "Shown, not judged: protocol fallback {0} (stable {1}) · time to connect P50 {2} (stable {3})",
     "Для справки: откат протокола {0} (стабильная {1}) · время подключения P50 {2} (стабильная {3})"
+  ],
+  "节点已自动摘除：{0}": [
+    "Node removed automatically: {0}",
+    "Узел исключён автоматически: {0}"
+  ],
+  "节点连不上，但没有自动摘除：{0}": [
+    "Node unreachable but kept in service: {0}",
+    "Узел недоступен, но не исключён: {0}"
+  ],
+  "控制面连不上 {0} 时将不再自动摘除它，适合做实验的节点。如果它现在已被摘除，会立即放回。": [
+    "{0} will no longer be removed automatically when the Controller can't reach it. Useful for test nodes. If it is removed now, it goes back into service at once.",
+    "{0} больше не будет исключаться автоматически, когда Controller не может до него достучаться. Подходит для тестовых узлов. Если он сейчас исключён, он сразу вернётся."
+  ],
+  "不自动摘除": [
+    "Never remove automatically",
+    "Не исключать автоматически"
+  ],
+  "{0} 不会再被自动摘除。": [
+    "{0} will not be removed automatically.",
+    "{0} не будет исключаться автоматически."
+  ],
+  "{0} 连不上时会自动摘除。": [
+    "{0} will be removed automatically when nobody can reach it.",
+    "{0} будет исключаться автоматически, если до него никто не может достучаться."
+  ],
+  "立即恢复": [
+    "Restore now",
+    "Вернуть сейчас"
+  ],
+  "取消自动摘除": [
+    "Undo the automatic removal",
+    "Отменить автоматическое исключение"
+  ],
+  "连不上时自动摘除": [
+    "Remove automatically when unreachable",
+    "Исключать автоматически при недоступности"
+  ],
+  "用于实验节点": [
+    "For test nodes",
+    "Для тестовых узлов"
+  ],
+  "已自动摘除": [
+    "Removed automatically",
+    "Исключён автоматически"
+  ],
+  "已自动摘除：控制面从外部连不上它的任何线路，15 分钟内也没有用户连上过。6 小时内已摘除 3 次，不会再自动放回，确认没问题后在「更多操作」里点「立即恢复」。": [
+    "Removed automatically: the Controller couldn't reach any of its lines from outside, and no user reached it in 15 minutes. It was removed 3 times in 6 hours, so it won't come back on its own. Once it's fixed, choose \"Restore now\" under More actions.",
+    "Исключён автоматически: Controller не смог извне достучаться ни до одной его линии, и за 15 минут к нему не подключился ни один пользователь. За 6 часов он исключался 3 раза, поэтому сам не вернётся. После исправления выберите «Вернуть сейчас» в меню действий."
+  ],
+  "已自动摘除：控制面从外部连不上它的任何线路，15 分钟内也没有用户连上过。现有连接不受影响，连续正常 10 分钟后自动放回。": [
+    "Removed automatically: the Controller couldn't reach any of its lines from outside, and no user reached it in 15 minutes. Current connections are not affected. It comes back after 10 healthy minutes in a row.",
+    "Исключён автоматически: Controller не смог извне достучаться ни до одной его линии, и за 15 минут к нему не подключился ни один пользователь. Текущие подключения не затронуты. Узел вернётся после 10 минут нормальной работы подряд."
+  ],
+  "已摘除": [
+    "Removed",
+    "Исключён"
   ]
 }

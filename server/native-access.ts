@@ -145,9 +145,9 @@ export async function nativeConnect(session:Session,body:Record<string,unknown>)
   const input=await consume(session,"connect",body);
   if(typeof input.publicKey!=="string" || !/^[A-Za-z0-9+/]{43}=$/.test(input.publicKey) || Buffer.from(input.publicKey,"base64").length!==32) throw new NativeError("INVALID_KEY");
   const available=await candidates(true);
-  let chosen=input.nodeId?available.find(({node})=>node.id===input.nodeId):available.find(({node})=>!node.paused_at);
+  let chosen=input.nodeId?available.find(({node})=>node.id===input.nodeId):available.find(({node})=>!node.paused_at&&!node.drained_at);
   // A paused node takes no new connections; a device already connected there keeps renewing until it disconnects.
-  if(chosen?.node.paused_at && !(await dbQuery(`SELECT 1 FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id
+  if((chosen?.node.paused_at||chosen?.node.drained_at) && !(await dbQuery(`SELECT 1 FROM native_leases l JOIN native_enrollments e ON e.id=l.enrollment_id
     WHERE l.node_id=$1 AND e.user_id=$2 AND e.identity_thumbprint=$3 AND l.expires_at>now()`,[chosen.node.id,session.user_id,session.identity_thumbprint])).length) chosen=undefined;
   if(!chosen || !chosen.node.server_public_key) throw new NativeError("NODE_UNAVAILABLE",409);
   const {node,service}=chosen;

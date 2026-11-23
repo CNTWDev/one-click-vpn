@@ -130,6 +130,10 @@ export type NodeRecord = {
   policy_version?: number;
   /** Set while paused: apps, subscriptions and new configs no longer offer the node. */
   paused_at?: string | null;
+  /** Set while the Controller has removed the node automatically because nobody could reach it. */
+  drained_at?: string | null;
+  drain_locked?: number;
+  auto_drain?: number;
   metrics?: NodeMetrics | null;
   monthlyTraffic?: NodeMonthlyTraffic | null;
 };
