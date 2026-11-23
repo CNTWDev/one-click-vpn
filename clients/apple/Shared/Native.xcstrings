@@ -9897,19 +9897,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The Mac menu bar and Windows tray panels now hold the common switches: smart routing, kill switch, open at login, and speed in menu bar (Mac) or per-app routing (Windows), no need to open the window\nChanging smart routing or the kill switch there while connected reconnects and applies at once\nCheck for updates right from the panel; the result shows on the same line"
+            "value": "New users go straight to the home screen after sign-in, no location step: Automatic is preselected, picks the fastest line and moves on if one fails\nFirst run is now two steps: sign in, connect"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac 菜单栏和 Windows 托盘弹窗加入常用开关：智能分流、断网保护、登录时启动、菜单栏网速（Mac）/ 按应用分流（Windows），不用打开主窗口\n连接中在弹窗里切换智能分流或断网保护，会自动重连立即生效\n弹窗底部可以直接检查更新，结果就显示在那一行"
+            "value": "新用户登录后直接到首页，不用再选地区：默认“自动”，会帮你挑最快的线路，连不上自动换\n首次使用只剩两步：登录、连接"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "В панели строки меню Mac и в трее Windows появились частые переключатели: умный режим, блокировка без VPN, автозапуск, скорость в меню (Mac) или выбор приложений (Windows), окно открывать не нужно\nЕсли сменить там умный режим или блокировку во время подключения, VPN переподключится и изменение сразу вступит в силу\nПроверка обновлений прямо из панели, результат виден в той же строке"
+            "value": "После входа новые пользователи сразу попадают на главный экран, без выбора локации: по умолчанию «Автоматически» — самая быстрая линия и переход на другую при сбое\nПервый запуск теперь в два шага: вход и подключение"
           }
         }
       }

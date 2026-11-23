@@ -52,6 +52,9 @@ import com.veilbird.core.Core
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
+/** First-run steps before the tab bar appears: sign in, then connect (the location starts on Automatic). */
+private const val STEPS = 2
+
 class MainActivity : Activity() {
     private lateinit var api: NativeApi
     private lateinit var updater: Updater
@@ -92,7 +95,7 @@ class MainActivity : Activity() {
     private var sealedShown: Boolean? = null
     private var shownState: LinkState? = null
     private var shownTrouble: Trouble? = null
-    /** False on a new install until its first connection: sign-in, location and connect then show "n/3" and no tab bar. */
+    /** False on a new install until its first connection: sign-in and connect then show "n/2" and no tab bar (the location is Automatic until changed). */
     private var onboarded = true
     private var stepsRow: LinearLayout? = null
     private var firstNote: View? = null
@@ -138,7 +141,7 @@ class MainActivity : Activity() {
         val settings = getSharedPreferences("preferences", MODE_PRIVATE)
         Palette.theme = settings.getString("appearance", "amber")!!
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", "")!!; selectedCode = settings.getString("nodeCode", "")!!
-        // Someone already signed in when this version arrives is not new: only a fresh install gets the three steps.
+        // Someone already signed in when this version arrives is not new: only a fresh install gets the first-run steps.
         if (!settings.contains("onboarded")) settings.edit().putBoolean("onboarded", api.secret("token") != null).apply()
         onboarded = settings.getBoolean("onboarded", true)
         @Suppress("DEPRECATION") window.apply { statusBarColor = Palette.ground; navigationBarColor = Palette.ground; decorView.systemUiVisibility = 0 }
@@ -311,14 +314,12 @@ class MainActivity : Activity() {
         setContentView(FrameLayout(this).apply { setBackgroundColor(Palette.ground); addView(space, FrameLayout.LayoutParams(-1, -1)); addView(root, FrameLayout.LayoutParams(-1, -1)) })
         val signedIn = api.secret("token") != null
         // A new page eases in (short fade and rise); re-renders of the same page stay still.
-        // First run, signed in but no location chosen yet: step 2 instead of the connect page.
-        val picking = signedIn && !onboarded && page == "connect" && !getSharedPreferences("preferences", MODE_PRIVATE).getBoolean("onboardPicked", false)
-        val view = if (!signedIn) "login" else if (picking) "pick" else page
+        val view = if (!signedIn) "login" else page
         if (view != lastView) { content.alpha = 0f; content.translationY = 8.dp.toFloat(); content.animate().alpha(1f).translationY(0f).setDuration(200).setInterpolator(DecelerateInterpolator()).start() }
         lastView = view
         if (!signedIn) { accountData = null; login(); return }
         when (page) {
-            "connect" -> if (picking) pickLocation() else home()
+            "connect" -> home()
             "nodes" -> nodes()
             "devices" -> devices()
             "apps" -> appsPage()
@@ -538,7 +539,7 @@ class MainActivity : Activity() {
         }.also { add(it, top = 4) }
         // Notes that come and go above the file (update, location switch) slide the page smoothly instead of snapping it.
         if (ValueAnimator.areAnimatorsEnabled()) content.layoutTransition = LayoutTransition().apply { setDuration(220); enableTransitionType(LayoutTransition.CHANGING) }
-        if (!onboarded) add(sectionRow(3), top = 4)
+        if (!onboarded) add(sectionRow(2), top = 4)
         // The portrait: what any site or app on this network can see of this phone, as a sphere of light. It is the
         // switch: a tap starts (or stops) hiding; hidden, a ring holds the time hidden and the rates. It takes whatever
         // height the rest of the page leaves (up to 280dp), so the whole page fits on one screen on any phone.
@@ -739,10 +740,10 @@ class MainActivity : Activity() {
             else -> if (update?.mandatory == true) L10n.text(R.string.update_required_detail)
                 else visitorIp?.takeIf { it != "—" }?.let { L10n.text(R.string.exposed_ip, it) } ?: L10n.text(R.string.exposed_plain)
         })
-        // The first connection ends the three steps: the squares fill and say "ready", then the tab bar comes.
+        // The first connection ends the two steps: the squares fill and say "ready", then the tab bar comes.
         if (connected && !onboarded) {
             onboarded = true; getSharedPreferences("preferences", MODE_PRIVATE).edit().putBoolean("onboarded", true).apply()
-            stepsRow?.let { fillSteps(it, 4) }
+            stepsRow?.let { fillSteps(it, STEPS + 1) }
             handler.postDelayed({ if (!isDestroyed && page == "connect") render() }, 3000)
         }
         shownState = state; shownTrouble = trouble
@@ -766,7 +767,7 @@ class MainActivity : Activity() {
             }
         }
     }
-    /** During the first run, the step on the right (three squares and "n/3"); afterwards nothing. */
+    /** During the first run, the step on the right (two squares and "n/2"); afterwards nothing. */
     private fun sectionRow(step: Int?): View {
         if (step == null) return View(this)
         return LinearLayout(this).apply {
@@ -775,10 +776,10 @@ class MainActivity : Activity() {
                 .also { fillSteps(it, step); addView(it, LinearLayout.LayoutParams(-2, -2)) }
         }
     }
-    /** Steps 1–3 done, current or to come; 4 is "ready" after the first connection. */
+    /** Steps 1–2 done, current or to come; 3 is "ready" after the first connection. */
     private fun fillSteps(row: LinearLayout, step: Int) {
         row.removeAllViews()
-        for (i in 1..3) row.addView(View(this).apply {
+        for (i in 1..STEPS) row.addView(View(this).apply {
             background = GradientDrawable().apply {
                 when {
                     i < step -> setColor(Palette.alpha(Palette.text, 190))
@@ -787,10 +788,10 @@ class MainActivity : Activity() {
                 }
             }
         }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 3.dp })
-        val ready = step > 3
-        row.addView(mono(if (ready) L10n.text(R.string.onboarding_ready) else L10n.number(step) + "/3", 11f, if (ready) Palette.accent else Palette.secondary),
+        val ready = step > STEPS
+        row.addView(mono(if (ready) L10n.text(R.string.onboarding_ready) else L10n.number(step) + "/" + L10n.number(STEPS), 11f, if (ready) Palette.accent else Palette.secondary),
             LinearLayout.LayoutParams(-2, -2).apply { marginStart = 5.dp })
-        row.contentDescription = if (ready) L10n.text(R.string.onboarding_ready) else "$step/3"
+        row.contentDescription = if (ready) L10n.text(R.string.onboarding_ready) else "$step/$STEPS"
     }
     /** A quiet amber-tinted note: what is about to happen, then what to do. */
     private fun note(title: String, detail: String) = LinearLayout(this).apply {
@@ -803,69 +804,6 @@ class MainActivity : Activity() {
             addView(text(title, 13f))
             addView(text(detail, 12f, Palette.secondary), LinearLayout.LayoutParams(-2, -2).apply { topMargin = 2.dp })
         }, LinearLayout.LayoutParams(0, -2, 1f))
-    }
-    /**
-     * First run, step 2: where to connect from. Automatic is chosen already, so one tap goes on; under it the three
-     * fastest locations this phone measured, and the whole list.
-     */
-    private fun pickLocation() {
-        fileHeader()
-        add(sectionRow(2), top = 14)
-        add(text(L10n.text(R.string.where_would_you_like_to_connect), 28f, Palette.text, 300).apply { accessibilityHeading(); setPadding(4.dp, 0, 4.dp, 0) }, top = 14)
-        add(text(L10n.text(R.string.pick_location_sub), 14f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, top = 6, bottom = 18)
-        val options = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also { add(it) }
-        var asked = false
-        fun show() {
-            options.removeAllViews()
-            val nodes = NodeCache.nodes(this)?.let { list -> (0 until list.length()).map { list.getJSONObject(it) } }.orEmpty()
-            val ranked = nodes.mapNotNull { node -> Latency.recent[node.getString("id")]?.takeIf { it.latency != null }?.let { node to it } }.sortedBy { it.second.score }
-            fun option(id: String, name: String, code: String, detail: String) = row(64).apply {
-                val chosen = selectedId == id
-                background = if (chosen) rounded(Palette.selected, 14) else pressable(Palette.surface, 14)
-                addView(if (id.isEmpty()) badge(null, R.drawable.ic_sparkle, Palette.accent) else badge(code))
-                addView(titles(name, detail))
-                addView(FrameLayout(this@MainActivity).apply {
-                    addView(radio(chosen), FrameLayout.LayoutParams(16.dp, 16.dp, Gravity.CENTER))
-                }, LinearLayout.LayoutParams(16.dp, 16.dp))
-                contentDescription = name; isSelected = chosen
-                setOnClickListener {
-                    selectedId = id; selectedName = name; selectedCode = code
-                    getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("nodeId", id).putString("nodeName", name).putString("nodeCode", code).apply()
-                    show()
-                }
-            }
-            val best = ranked.firstOrNull()
-            options.addView(option("", L10n.text(R.string.automatic_recommended), "", best?.let { L10n.text(R.string.automatic_now, it.first.getString("name"), ms(it.second) ?: "") } ?: L10n.text(R.string.auto_detail)))
-            if (ranked.isNotEmpty()) options.addView(text(L10n.text(R.string.or_choose_one), 13f, Palette.secondary).apply { setPadding(4.dp, 0, 0, 0) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 18.dp; bottomMargin = 8.dp })
-            ranked.take(3).forEachIndexed { i, (node, quality) ->
-                val id = node.getString("id"); val name = node.getString("name")
-                options.addView(option(id, name, Directory.code(id, name), ms(quality) ?: ""), LinearLayout.LayoutParams(-1, -2).apply { if (i > 0) topMargin = 8.dp })
-            }
-            if (nodes.isNotEmpty()) options.addView(row(48).apply {
-                setPadding(4.dp, 0, 4.dp, 0); background = pressable(Color.TRANSPARENT, 4)
-                addView(text(L10n.text(R.string.all_locations_count, L10n.number(nodes.size)), 13f, Palette.secondary), LinearLayout.LayoutParams(0, -2, 1f))
-                addView(chevron())
-                setOnClickListener { if (!busy) { page = "nodes"; render() } }
-            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 10.dp })
-            // Nothing measured on this phone yet: measure once, quietly, and show the fastest when it is done.
-            if (ranked.isEmpty() && nodes.isNotEmpty() && !asked) {
-                asked = true
-                val list = JSONArray().also { array -> nodes.forEach { array.put(it) } }
-                Thread {
-                    try { Latency.rank(list, attempts = 1, reuseMs = 60000, settleMs = 1500); NodeCache.saveMeasured(applicationContext) } catch (_: Exception) { }
-                    runOnUiThread { if (!isDestroyed && options.isAttachedToWindow) show() }
-                }.start()
-            }
-        }
-        onNodes = { if (options.isAttachedToWindow) show() }
-        show()
-        if (NodeCache.nodes(this) == null) refreshNodes()
-        // Continue: the choice is already saved; step 3 is the connect page itself.
-        dock?.addView(text(L10n.text(R.string.continue_action), 16f, Palette.onAccent, 600).apply {
-            gravity = Gravity.CENTER; setPadding(18.dp, 0, 18.dp, 0); isClickable = true; maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-            background = RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.onAccent, 40)), rounded(Palette.accent, 16), null)
-            setOnClickListener { if (!busy) { getSharedPreferences("preferences", MODE_PRIVATE).edit().putBoolean("onboardPicked", true).apply(); render() } }
-        }, LinearLayout.LayoutParams(-1, 54.dp).apply { topMargin = 10.dp; bottomMargin = 12.dp })
     }
     /** The action's dot breathes slowly while a connection is up; it stops when the view is gone or the state changes. */
     private fun breathe(dot: View) {
@@ -1261,7 +1199,7 @@ class MainActivity : Activity() {
     private fun select(id: String, name: String, code: String) {
         val reconnect = ConnectionStateStore.active && id != ConnectionStateStore.nodeId
         selectedId = id; selectedName = name; selectedCode = code; page = "connect"
-        getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("nodeId", id).putString("nodeName", name).putString("nodeCode", code).putBoolean("onboardPicked", true).apply()
+        getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("nodeId", id).putString("nodeName", name).putString("nodeCode", code).apply()
         render()
         // Connected (or reconnecting): one tap moves the VPN to the new location.
         if (reconnect) {
