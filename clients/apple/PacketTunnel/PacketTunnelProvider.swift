@@ -62,6 +62,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         set {stateLock.lock();defer {stateLock.unlock()};wokeFlag=newValue}
     }
     private let monitor=NWPathMonitor()
+    /// This connection session, summed up for the staged-rollout health check (Console → 客户端发布) and sent once,
+    /// as CONNECT_SESSION, when it ends: never an address, a node name or traffic.
+    private var sessionUp:Date?
+    private var sessionMs=0
+    private var sessionLine=""
+    private var sessionFallbacks=0
+    private var sessionDrops=0
+    private var sessionNet=""
+    private var sessionSent=false
     private var home:String {Shared.folder.appendingPathComponent("core").path}
 
     override func startTunnel(options:[String:NSObject]?,completionHandler:@escaping (Error?)->Void) {
@@ -82,20 +91,23 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 api=try NativeAPI(origin:origin);nodeId=configuration["nodeId"] as? String ?? "";automatic=nodeId.isEmpty;smart=(configuration["routing"] as? String ?? "smart") != "global"
                 try await Task.sleep(nanoseconds:200_000_000) // let the path monitor report the current network
                 network=Transports.networkKey(monitor.currentPath);online=Transports.online(monitor.currentPath);networkChanged=false
+                sessionNet=String(network.split(separator:":").first ?? "unknown")
+                let began=Date()
                 api?.attempt=String(UUID().uuidString.replacingOccurrences(of:"-",with:"").prefix(16)).lowercased()
                 // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
                 Journal.add("connect: start \(api?.attempt ?? ""), network \(network), routing \(smart ? "smart":"global")")
                 if nodeId.isEmpty {await chooseFastest()}
                 try await setTunnelNetworkSettings(networkSettings())
                 try await connectWithFallback()
+                sessionConnected(began)
                 completionHandler(nil)
             } catch {
-                if Task.isCancelled {Journal.add("connect: cancelled");CoreStop();completionHandler(error);return}
+                if Task.isCancelled {Journal.add("connect: cancelled");await endSession(failed:false);CoreStop();completionHandler(error);return}
                 var code="CONNECT_FAILED",detail=""
                 if case AccessFailure.code(let known)=error {code=known}
                 // Unexpected errors keep their (scrubbed) text, e.g. why the core refused its configuration.
                 else {detail=Journal.scrub(error.localizedDescription)}
-                Journal.add("connect: failed \(code)"+(detail.isEmpty ? "":" (\(detail))"));await report(code,detail)
+                Journal.add("connect: failed \(code)"+(detail.isEmpty ? "":" (\(detail))"));await report(code,detail);await endSession(failed:true)
                 if Shared.fatal.contains(code) {Shared.refused=code}
                 // The app reads the code (fetchLastDisconnectError) to say why and to stop keeping the VPN on.
                 CoreStop();completionHandler(NSError(domain:Shared.errorDomain,code:1,userInfo:["code":code]));return
@@ -144,7 +156,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private func nextNode(_ code:String) async {
         Journal.add("switch: \(nodeName) failed (\(code)), trying the next location")
         let failed=nodeName
-        await report(code);nodeId=fallbacks.removeFirst()
+        await report(code);nodeId=fallbacks.removeFirst();sessionFallbacks+=1
         // The app shows one line about the switch ("Tokyo 03 did not answer, switched to Tokyo 05").
         publish {$0["status"]="connection_confirming";$0["since"]=nil;$0["switchedFrom"]=failed;$0["phase"]=0}
     }
@@ -202,6 +214,25 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         updateCarrying()
         return !working.isEmpty
     }
+    private func sessionConnected(_ began:Date) {
+        sessionUp=Date()
+        sessionMs=Int(Date().timeIntervalSince(began)*1000)
+        sessionLine=carrying
+        if let first=transports.first,!carrying.isEmpty,carrying != first {sessionFallbacks+=1}
+    }
+    /// Sends the session once: ok when it connected at all, else failed (an error) or cancelled (the user stopped it).
+    private func endSession(failed:Bool) async {
+        guard !sessionSent else {return}
+        sessionSent=true
+        var outcome="cancelled"
+        var seconds=0
+        if let up=sessionUp {outcome="ok";seconds=Int(Date().timeIntervalSince(up))} else if failed {outcome="failed"}
+        let ms=sessionUp == nil ? -1:sessionMs
+        let line=sessionLine.isEmpty ? "-":sessionLine
+        let net=sessionNet.isEmpty ? "unknown":sessionNet
+        let parts:[String]=["outcome=\(outcome)","ms=\(ms)","line=\(line)","fallbacks=\(sessionFallbacks)","drops=\(sessionDrops)","seconds=\(seconds)","net=\(net)"]
+        await report("CONNECT_SESSION",parts.joined(separator:" "))
+    }
     private func updateCarrying() {
         let now=CoreNow(Transports.group)
         if !now.isEmpty && now != carrying {if !carrying.isEmpty {Journal.add("transport: \(carrying) -> \(now)")};carrying=now}
@@ -221,7 +252,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private func fail(_ code:String,_ shown:String?=nil) async {
         Journal.add("disconnect: \(code)")
         if Shared.fatal.contains(code) {Shared.refused=code}
-        await report(code);cancelTunnelWithError(NSError(domain:Shared.errorDomain,code:1,userInfo:["code":shown ?? code]))
+        await report(code);await endSession(failed:true);cancelTunnelWithError(NSError(domain:Shared.errorDomain,code:1,userInfo:["code":shown ?? code]))
     }
     /// A first connection with other transports does not wait for WireGuard (they carry traffic until it is ready;
     /// tick switches then); without them it waits up to 15 s. Renewals only check readiness.
@@ -296,7 +327,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private func missed() async {
         failures+=1;nextProbe=Date().addingTimeInterval(retries[min(max(failures-1,0),retries.count-1)])
         guard failures>=2 else {return}
-        if failures==2 {Journal.add("probe: no transport answers, reconnecting");await report("HANDSHAKE_TIMEOUT")}
+        if failures==2 {Journal.add("probe: no transport answers, reconnecting");await report("HANDSHAKE_TIMEOUT");if sessionUp != nil {sessionDrops+=1}}
         if automatic {await moveToFastest()}
     }
     /// Automatic mode: measures every location now and moves to the fastest one that answers, if it is another.
@@ -366,6 +397,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         lifecycle?.cancel();lifecycle=nil;monitor.cancel()
         Journal.add("disconnect: stopped (\(reason.rawValue))")
         CoreStop()
-        if let api {Task {_ = try? await api.action("disconnect",[:]);completionHandler()}} else {completionHandler()}
+        if let api {Task {await endSession(failed:false);_ = try? await api.action("disconnect",[:]);completionHandler()}} else {completionHandler()}
     }
 }

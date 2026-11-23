@@ -9,6 +9,7 @@ import { requestAdmin } from "./request-auth";
 import { apiOrigin } from "./config";
 import { appendLocalArtifact, copyToMirror, deleteStoredObject, StoreError, testMirror, inspectArtifact, inspectLocalArtifact, localArtifactPath, localArtifactUrl, maxInstallerBytes, presignReleaseUpload, releaseMirror, releaseObjectKey, releaseStorage, uploadChunkBytes } from "./release-storage";
 import { writeOperationalLog } from "./operational-logs";
+import { rolloutHealth, type BuildHealth } from "./rollout-health";
 
 export class ReleaseError extends Error {
   constructor(public code: string, public status = 400) { super(code); }
@@ -372,6 +373,30 @@ export async function setMinimumBuild(actor: ReleaseActor, body: Record<string, 
   return releaseOverview();
 }
 
+/**
+ * Builds in staged rollout (stable, published, under 100%), each with the stable build it replaces: the newest
+ * fully released stable build below it on the same platform. Health comes from Loki; cached for 5 minutes, and an
+ * unreachable Loki shows as "unavailable" instead of failing the page.
+ */
+let healthCache: { at: number; key: string; value: BuildHealth[] } | null = null;
+async function rolloutsWithHealth(rows: ReleaseRow[]): Promise<{ health: BuildHealth[]; healthError: string | null }> {
+  const stable = rows.filter((row) => row.channel === "stable" && row.status === "published");
+  const rollouts = [...new Map(stable.filter((row) => Number(row.rollout_percent) < 100).map((row) => [`${row.platform}:${row.build}`, row])).values()]
+    .map((row) => ({ platform: row.platform, build: row.build,
+      baselineBuild: stable.filter((other) => other.platform === row.platform && Number(other.rollout_percent) >= 100 && other.build < row.build)
+        .reduce<number | null>((best, other) => best === null || other.build > best ? other.build : best, null) }));
+  if (!rollouts.length) return { health: [], healthError: null };
+  const key = JSON.stringify(rollouts);
+  if (healthCache && healthCache.key === key && Date.now() - healthCache.at < 5 * 60_000) return { health: healthCache.value, healthError: null };
+  try {
+    const value = await rolloutHealth(rollouts);
+    healthCache = { at: Date.now(), key, value };
+    return { health: value, healthError: null };
+  } catch (error) {
+    return { health: [], healthError: (error as Error).message || "LOKI_UNAVAILABLE" };
+  }
+}
+
 export async function releaseOverview() {
   const storage = releaseStorage();
   const [rows, policies, adoption, diagnostics] = await Promise.all([
@@ -383,8 +408,10 @@ export async function releaseOverview() {
       COUNT(DISTINCT user_id)::int AS users,MAX(occurred_at) AS last_at FROM native_diagnostics WHERE created_at>now()-interval '7 days'
       GROUP BY platform,client_build,code ORDER BY events DESC LIMIT 50`),
   ]);
+  const { health, healthError } = await rolloutsWithHealth(rows);
   return {
     releases: rows.map(adminRelease),
+    health, healthError,
     policies: clientPlatforms.map((platform) => { const policy = policies.find((p) => p.platform === platform);
       return { platform, minBuild: policy?.min_build || 0, announcement: policy?.announcement || "", downloadPath: downloadPath(platform) }; }),
     adoption: adoption.map((row) => ({ platform: row.platform, version: row.client_version, build: row.client_build, devices: row.devices })),
