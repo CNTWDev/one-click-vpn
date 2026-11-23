@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.24
+
+### zh
+- 连接时更稳：应用会记录每次连接的结果，帮助我们在新版本推给所有人之前先发现问题
+- 连不上的服务器会被自动移出列表，恢复后自动放回
+
+### en
+- Steadier connections: the app now notes how each connection went, so problems in a new version are caught before it reaches everyone
+- Servers nobody can reach are taken out of the list automatically and come back once they recover
+
+### ru
+- Стабильнее подключение: приложение отмечает, как прошло каждое подключение, чтобы проблемы новой версии находились до того, как она дойдёт до всех
+- Серверы, к которым никто не может подключиться, автоматически убираются из списка и возвращаются после восстановления
+
 ## 1.0.23
 
 ### zh

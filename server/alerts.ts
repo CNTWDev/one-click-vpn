@@ -5,6 +5,7 @@ import { agentRelease } from "./agent-self-upgrade";
 import { listSites, siteBrand } from "./sites";
 import { PRODUCT_NAME } from "../shared/brand-name";
 import { writeOperationalLog } from "./operational-logs";
+import { heldNodes } from "./node-health";
 
 // Email alerts to the addresses in Console → Controller → 告警通知, through the mail settings there.
 // Every minute each rule lists what is wrong right now. A problem is mailed once it has lasted the rule's
@@ -12,7 +13,7 @@ import { writeOperationalLog } from "./operational-logs";
 // Controller restart neither repeats an alert nor forgets one.
 
 // kind + subject let Console show the problem in its own language; title and detail are the (Chinese) email text.
-type Problem = { key: string; kind: "node-offline" | "service" | "agent-outdated" | "disk" | "transport-blocked"; subject: string; title: string; detail: string; delayMinutes: number };
+type Problem = { key: string; kind: "node-offline" | "service" | "agent-outdated" | "disk" | "transport-blocked" | "node-drained" | "node-drain-held"; subject: string; title: string; detail: string; delayMinutes: number };
 type Row = { key: string; firing_since: Date; notified_at: Date | null; detail: string };
 
 const startedAt = Date.now();
@@ -41,6 +42,13 @@ async function nodeProblems(): Promise<Problem[]> {
     FROM vpn_services s JOIN nodes n ON n.id = s.node_id WHERE s.enabled = 1 AND s.status = 'attention'`);
   for (const service of failing) problems.push({ key: `service:${service.node_id}:${service.protocol}`, kind: "service", subject: `${service.name} ${service.protocol}`, title: `协议同步失败：${service.name} ${service.protocol}`,
     detail: service.last_error.slice(0, 300) || "状态为 attention", delayMinutes: 10 });
+  // Removed automatically (node-health.ts): reported at once, and as recovered when it is back in service.
+  const drained = await dbQuery<{ id: string; name: string; drained_at: string; drain_locked: number }>("SELECT id, name, drained_at, drain_locked FROM nodes WHERE drained_at IS NOT NULL");
+  for (const node of drained) problems.push({ key: `node-drained:${node.id}`, kind: "node-drained", subject: node.name, title: `节点已自动摘除：${node.name}`,
+    detail: `控制面从外部连续 3 分钟连不上它的任何线路，15 分钟内也没有用户连上过。已停止给新连接下发，现有连接不受影响。${node.drain_locked ? "6 小时内已摘除 3 次，需要在 Console 手动恢复。" : "连续正常 10 分钟后自动放回。"}`, delayMinutes: 0 });
+  const names = new Map((await dbQuery<{ id: string; name: string }>("SELECT id, name FROM nodes")).map((row) => [row.id, row.name]));
+  for (const [id, why] of heldNodes) problems.push({ key: `node-drain-held:${id}`, kind: "node-drain-held", subject: names.get(id) || id, title: `节点连不上，但没有自动摘除：${names.get(id) || id}`,
+    detail: why === "fleet" ? "摘除它会超过节点总数的一半，更可能是控制面自己的网络出了问题。" : "它是所在地区最后一个可用节点。", delayMinutes: 0 });
   const release = agentRelease().version;
   const behind = await dbQuery<{ name: string; version: string }>(`SELECT name, version FROM nodes
     WHERE agent_token_hash IS NOT NULL AND status = 'online' AND version LIKE 'agent %' AND version <> $1 ORDER BY name`, [release]);

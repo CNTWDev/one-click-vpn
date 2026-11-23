@@ -10265,19 +10265,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New Usage page: tap the usage line on the home screen to see what is left and how many days remain\nSee traffic per day over 7, 30 or 90 days; tap a bar for that day's figure\nSee usage per device and per location; on Windows, also which programs used the most over the last 7 days (kept on this computer only)"
+            "value": "Steadier connections: the app now notes how each connection went, so problems in a new version are caught before it reaches everyone\nServers nobody can reach are taken out of the list automatically and come back once they recover"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "新增「用量」页：在首页点用量那一行进入，看剩余流量、到期还有几天\n按 7 / 30 / 90 天看每天用了多少，点某一天的柱子看当天数字\n看每台设备、每个地区各用了多少；Windows 还能看最近 7 天哪些程序用得最多（只保存在这台电脑上）"
+            "value": "连接时更稳：应用会记录每次连接的结果，帮助我们在新版本推给所有人之前先发现问题\n连不上的服务器会被自动移出列表，恢复后自动放回"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Новая страница «Трафик»: нажмите строку трафика на главном экране, чтобы увидеть остаток и сколько дней осталось\nТрафик по дням за 7, 30 или 90 дней; нажмите столбец, чтобы увидеть цифру за день\nТрафик по устройствам и локациям; в Windows также программы, потратившие больше всего за 7 дней (хранится только на этом компьютере)"
+            "value": "Стабильнее подключение: приложение отмечает, как прошло каждое подключение, чтобы проблемы новой версии находились до того, как она дойдёт до всех\nСерверы, к которым никто не может подключиться, автоматически убираются из списка и возвращаются после восстановления"
           }
         }
       }

@@ -3,6 +3,7 @@ import { currentUser } from "../../../../../server/auth";
 import { addAudit, countRunningNodeActions, findNode, NodeBusyError, setNodePaused } from "../../../../../server/db";
 import { jsonError } from "../../../../../server/http";
 import { queueNodeAction } from "../../../../../server/bootstrap";
+import { restoreNode, setAutoDrain } from "../../../../../server/node-health";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!(await setNodePaused(id, paused))) return jsonError("Node not found", 404);
     await addAudit({ actorUserId: user.id, action: paused ? "node.paused" : "node.resumed", targetType: "node", targetId: id });
     return NextResponse.json({ ok: true, paused });
+  }
+  // Automatic removal (node-health.ts): put a removed node back now, or keep the Controller from removing it.
+  if (body.action === "restore" || body.action === "auto-drain-on" || body.action === "auto-drain-off") {
+    const done = body.action === "restore" ? await restoreNode(id) : await setAutoDrain(id, body.action === "auto-drain-on");
+    if (!done) return jsonError("Node not found", 404);
+    await addAudit({ actorUserId: user.id, action: `node.${body.action}`, targetType: "node", targetId: id });
+    return NextResponse.json({ ok: true });
   }
   const action = body.action === "restart-agent" || body.action === "status-agent" || body.action === "upgrade-agent" ? body.action : null;
   if (!action) return jsonError("Unsupported node action");

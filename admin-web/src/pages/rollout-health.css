@@ -1,0 +1,39 @@
+/* Staged rollout health (客户端发布): filled cards and rows, no outlines; tokens from styles.css. */
+.rollout-health { margin-bottom: 18px; display: grid; gap: 12px; }
+.rollout-health .panel-head { margin-bottom: 0; }
+.rollout-error { margin: 0; color: var(--text-2); font-size: 13px; }
+.rollout-card { padding: 20px; display: grid; gap: 14px; background: var(--surface); border-radius: var(--radius-lg); min-width: 0; }
+.rollout-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.rollout-title b { font-size: 17px; }
+.rollout-title small { color: var(--text-3); font-family: var(--mono); }
+.rollout-stages { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.rollout-stage { display: grid; gap: 6px; min-width: 0; }
+.rollout-stage i { height: 6px; border-radius: 3px; background: var(--surface-2); }
+.rollout-stage.done i { background: var(--data); }
+.rollout-stage.now i { background: var(--accent); }
+.rollout-card.alarm .rollout-stage.now i { background: var(--danger); }
+.rollout-stage span { font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rollout-stage.now span { color: var(--text); font-weight: 600; }
+.rollout-summary, .rollout-observed { margin: 0; color: var(--text-2); font-size: 13px; }
+.rollout-reason { margin: 0; padding: 12px 14px; background: var(--danger-soft); color: var(--text); border-radius: var(--radius); font-size: 13.5px; }
+.rollout-metrics { display: grid; gap: 2px; min-width: 0; }
+.rollout-metric { display: grid; grid-template-columns: minmax(130px, 1.3fr) minmax(70px, 1fr) minmax(70px, 1fr) minmax(90px, .9fr) 96px; gap: 12px; align-items: center; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius); }
+.rollout-metric.head { background: none; padding-block: 0 4px; font-size: 12px; color: var(--text-3); }
+.rollout-metric.alarm { background: var(--danger-soft); }
+.rollout-metric .name { font-weight: 600; min-width: 0; }
+.rollout-metric .name small { display: block; font-weight: 400; color: var(--text-3); font-size: 12px; }
+.rollout-metric .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.spark { width: 100%; height: 28px; display: block; }
+.spark polygon { fill: var(--accent); fill-opacity: .12; }
+.spark polyline { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.spark circle { fill: var(--accent); }
+.spark.bad polygon, .spark.bad circle { fill: var(--danger); }
+.spark.bad polyline { stroke: var(--danger); }
+.spark-empty { color: var(--text-3); }
+@media (max-width: 760px) {
+  .rollout-card { padding: 16px; }
+  .rollout-metric { grid-template-columns: 1fr 1fr; }
+  .rollout-metric.head { display: none; }
+  .rollout-metric .name { grid-column: 1 / -1; }
+  .rollout-stage span { font-size: 11px; }
+}

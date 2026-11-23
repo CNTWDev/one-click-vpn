@@ -38,7 +38,7 @@ const metrics = (cpu, mem, disk, wanTx = 1.6e6, wanRx = 1.4e6) => ({ collectedAt
 const monthly = (rxGb, txGb) => ({ month: now.slice(0, 7), rxBytes: rxGb * GB, txBytes: txGb * GB, trackedSince: now.slice(0, 8) + "01T00:00:04Z" });
 const node = (id, name, region, ip, user, port, extra = {}) => ({ id, name, place: regions.find((r) => r.id === region).name, region_id: region, ip, ssh_user: user, ssh_port: port, ssh_privilege_mode: "auto", credential_type: "private_key", status: "online", latency: "38 ms", users: 3, traffic: "12.4 GB", version: "agent 2.10.0", last_seen: "now", host_fingerprint: "SHA256:" + "x".repeat(43), host_fingerprint_source: "ssh_tofu", node_identity: "node-" + id, identity_verified_at: now, deployment_policy: "standard", policy_version: 2, metrics: metrics(2, 17, 3), monthlyTraffic: monthly(412.6, 438.9), ...extra });
 const nodes = [
-  node("n1", "13.245.35.167@Cape Town", "r1", "13.245.35.167", "root", 10022, { metrics: metrics(2, 17, 3) }),
+  node("n1", "13.245.35.167@Cape Town", "r1", "13.245.35.167", "root", 10022, { metrics: metrics(2, 17, 3), drained_at: now }),
   node("n2", "190.92.202.34@Singapore", "r2", "190.92.202.34", "root", 22, { metrics: metrics(3, 16, 18, 117.6e6, 112.9e6), monthlyTraffic: monthly(1843.2, 1907.5) }),
   node("n3", "3.139.105.5(US)", "r3", "3.139.105.5", "ubuntu", 22, { metrics: metrics(2, 48, 3, 90, 40), monthlyTraffic: monthly(0.004, 0.006), paused_at: now }),
   node("n4", "Johor-bytedance", "r4", "101.47.28.201", "root", 22, { metrics: metrics(100, 94, 71), has_ssh_credential: true }),
@@ -100,6 +100,22 @@ const sites = [
 ];
 const release = (id, platform, channel, version, build, extra = {}) => ({ id, platform, arch: "universal", channel, version, build, status: "published", distribution: "direct", url: `https://downloads.example.com/veilbird/${platform}/${version}/Veilbird-${version}-${platform}-universal-release.bin`, sha256: "a".repeat(64), sizeBytes: 48234567, minOs: platform === "android" ? "Android 8.0" : platform === "windows" ? "Windows 10 1809" : "13.0", notes: "Fixes reconnect after network change.", publishedAt: "2026-10-06T00:00:00Z", createdAt: "2026-10-06T00:00:00Z", createdBy: "release-token", rolloutPercent: channel === "beta" ? 20 : 100, ...extra });
 
+/** A build in staged rollout against its stable baseline, as server/rollout-health.ts returns it. */
+function rolloutHealth(platform, build, baselineBuild, verdict) {
+  const bad = verdict === "bad";
+  const figures = { users: 412, sessions: 2380, crashUsers: bad ? 33 : 1, okSessions: 2300, failedSessions: 52, connectP50: 1400, connectP90: 3900, drops: 30, connectedSeconds: 3600 * 380, fallbackSessions: 250 };
+  const baseline = { ...figures, users: 1206, sessions: 7100, crashUsers: 5, okSessions: 6800, failedSessions: 200, connectP50: 1900, connectP90: 4600, drops: 70, connectedSeconds: 3600 * 1000 };
+  const trend = (values) => values;
+  return { platform, build, baselineBuild, verdict, figures, baselineFigures: baseline,
+    metrics: [
+      { key: "crash", current: bad ? 0.081 : 0.0024, baseline: 0.0042, verdict: bad ? "bad" : "ok", trend: trend(bad ? [0, 0, 0.005, 0.022, 0.049, 0.068, 0.081] : [0.004, 0.0035, 0.003, 0.0028, 0.0026, 0.0025, 0.0024]) },
+      { key: "success", current: 0.978, baseline: 0.971, verdict: "ok", trend: trend([0.969, 0.972, null, 0.975, 0.979, 0.977, 0.978]) },
+      { key: "connectP90", current: 3900, baseline: 4600, verdict: "better", trend: trend([4800, 4500, 4300, 4100, 4000, 3900, 3900]) },
+      { key: "drops", current: 0.079, baseline: 0.07, verdict: bad ? "insufficient" : "ok", trend: trend([0.06, 0.07, 0.07, 0.08, 0.08, 0.09, 0.079]) },
+    ],
+    fallbackRate: 0.11, baselineFallbackRate: 0.12, crashBurst: bad ? { signature: "9f2c4e1a07bd", users: 3 } : null, reasons: bad ? ["crash-burst", "crash"] : [] };
+}
+
 export function consoleApi({ signedIn = true } = {}) {
   let session = signedIn;
   return (pathname, method, query = new URLSearchParams()) => {
@@ -154,10 +170,11 @@ export function consoleApi({ signedIn = true } = {}) {
     if (pathname === "/api/logs") return [200, { logs, available: true, nextCursor: "1792725817388486405", counts: { info: 11804, warning: 427, error: 39 } }];
     if (pathname.endsWith("/subscriptions")) return [200, { subscriptions, nodes: [] }];
     if (pathname === "/api/v1/admin/client-releases") return [200, {
-      releases: [release("rel_6", "android", "stable", "1.2.1", 13, { status: "draft", publishedAt: null }), release("rel_1", "android", "beta", "1.2.0", 12, { mirror: "failed", mirrorError: "Mirror upload failed (HTTP 403, AccessDenied, request 671B4F2E9C3D5A0001)" }), release("rel_2", "android", "stable", "1.1.3", 11, { mirror: "ready" }), release("rel_3", "windows", "stable", "1.1.3", 11, { distribution: "external" }), release("rel_4", "macos", "beta", "1.2.0-rc.1", 12, { status: "withdrawn" }), release("rel_5", "ios", "stable", "1.1.3", 11, { distribution: "app_store", url: "https://apps.apple.com/app/id1234567890" })],
+      releases: [release("rel_7", "android", "stable", "1.2.2", 14, { rolloutPercent: 30 }), release("rel_8", "windows", "stable", "1.2.2", 14, { rolloutPercent: 10 }), release("rel_6", "android", "stable", "1.2.1", 13, { status: "draft", publishedAt: null }), release("rel_1", "android", "beta", "1.2.0", 12, { mirror: "failed", mirrorError: "Mirror upload failed (HTTP 403, AccessDenied, request 671B4F2E9C3D5A0001)" }), release("rel_2", "android", "stable", "1.1.3", 11, { mirror: "ready" }), release("rel_3", "windows", "stable", "1.1.3", 11, { distribution: "external" }), release("rel_4", "macos", "beta", "1.2.0-rc.1", 12, { status: "withdrawn" }), release("rel_5", "ios", "stable", "1.1.3", 11, { distribution: "app_store", url: "https://apps.apple.com/app/id1234567890" })],
       policies: ["android", "ios", "macos", "windows"].map((platform) => ({ platform, minBuild: platform === "android" ? 10 : 0, announcement: platform === "android" ? "Please update to 1.2 for faster reconnects." : "", downloadPath: `/download/${platform}` })),
       adoption: [{ platform: "android", version: "1.2.0", build: 12, devices: 2 }, { platform: "android", version: "1.1.3", build: 11, devices: 14 }, { platform: "windows", version: null, build: null, devices: 1 }],
       diagnostics: [{ platform: "android", build: 12, code: "HANDSHAKE_TIMEOUT", events: 3, users: 2, lastAt: ago(30) }, { platform: "windows", build: 11, code: "TUN_ADAPTER_CREATE_FAILED_ACCESS_DENIED", events: 41, users: 9, lastAt: ago(90) }],
+      health: [rolloutHealth("android", 14, 11, "ok"), rolloutHealth("windows", 14, 11, "bad")], healthError: null,
       storage: { mode: "local", mirror: "https://dl.very-long-subdomain.example.com" }, ciTokenConfigured: true }];
     if (pathname === "/api/v1/admin/client-releases/mirror-test") return [200, { ok: false, steps: [
       { name: "config", ok: true, detail: "https://oss-ap-northeast-1.aliyuncs.com · bucket tracknothing-downloads · region ap-northeast-1 · virtual-hosted · CDN https://dl.very-long-subdomain.example.com" },

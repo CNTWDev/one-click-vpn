@@ -31,6 +31,7 @@ const views = [
   { name: "nodes-detail", hash: "nodes?focus=n4" },
   { name: "nodes-port-check", hash: "nodes?focus=n4", open: async (page, l) => { await page.locator(".modal").first().waitFor(); await page.getByRole("button", { name: tr(l, "检测端口") }).click(); await page.getByText(tr(l, "TCP 已重新检测；UDP 检测需要先升级 Agent 到 2.16。")).waitFor(); } },
   { name: "nodes-paused-detail", hash: "nodes?focus=n3" },
+  { name: "nodes-drained-detail", hash: "nodes?focus=n1" },
   { name: "nodes-pause", hash: "nodes", modal: false, open: async (page, l) => { const more = page.getByRole("button", { name: tr(l, "{0} 的更多操作").replace("{0}", "190.92.202.34@Singapore") }); await more.scrollIntoViewIfNeeded(); await page.waitForTimeout(150); await more.click(); await page.getByRole("menuitem", { name: tr(l, "暂停服务") }).click(); await page.locator(".confirm-dialog").waitFor(); } },
   { name: "nodes-add", hash: "nodes", open: (page) => page.locator(".page-actions .button.primary").click() },
   { name: "nodes-add-ssh", hash: "nodes", open: async (page, l) => { await page.locator(".page-actions .button.primary").click(); await page.getByRole("radio", { name: tr(l, "SSH 部署") }).click(); } },
