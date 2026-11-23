@@ -47,7 +47,7 @@ registerApproval("release", {
     const builds = await dbQuery<{ id: string }>("SELECT id FROM client_releases WHERE version = $1 AND channel = 'beta' AND status = 'published'", [version]);
     if (!builds.length) return "已在 Console 处理";
     for (const build of builds) await transitionRelease({ kind: "admin", userId: owner }, build.id, "promote");
-    return "⬆️ 已晋升正式版";
+    return "⬆️ 已晋升正式版，从 10% 开始灰度";
   },
 });
 
@@ -65,7 +65,7 @@ export async function announceBetaReleases(): Promise<number> {
   for (const row of versions) {
     const ok = await requestApproval({
       kind: "release", target: row.version, event: "releases", approveLabel: "⬆️ 晋升正式版", rejectLabel: null,
-      message: { tone: "release", title: `客户端 ${row.version} 已发布到测试版`, lines: [row.platforms.map((item) => PLATFORM_NAMES[item] || item).join(" · "), "测试没问题再晋升正式版。"], link: await consoleLink("/releases") },
+      message: { tone: "release", title: `客户端 ${row.version} 已发布到测试版`, lines: [row.platforms.map((item) => PLATFORM_NAMES[item] || item).join(" · "), "测试没问题再晋升正式版：先发给 10% 的用户，指标正常每 24 小时自动放量。"], link: await consoleLink("/releases") },
     }).catch(() => false);
     if (ok) sent++;
   }

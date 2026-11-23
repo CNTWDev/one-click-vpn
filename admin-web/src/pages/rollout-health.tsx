@@ -13,7 +13,9 @@ export type BuildHealth = {
   fallbackRate: number | null; baselineFallbackRate: number | null;
   crashBurst: { signature: string; users: number } | null; reasons: string[];
 };
-type ReleaseLite = { platform: Platform; build: number; version: string; channel: string; status: string; rolloutPercent: number };
+type ReleaseLite = { id: string; platform: Platform; build: number; version: string; channel: string; status: string; rolloutPercent: number;
+  rolloutSince?: string | null; rolloutFrozenAt?: string | null; rolloutFreezeReason?: string };
+export type RolloutAction = "freeze" | "resume" | "full" | "withdraw";
 
 const platformNames: Record<Platform, string> = { android: "Android", ios: "iPhone / iPad", macos: "macOS", windows: "Windows" };
 const stages = [10, 30, 60, 100];
@@ -59,6 +61,25 @@ function Spark({ points, bad }: { points: Array<number | null>; bad: boolean }) 
   </svg>;
 }
 
+const STAGE_HOURS = 24;
+const hoursSince = (iso: string | null | undefined) => iso ? Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 3600_000)) : null;
+
+function reasonText(reason: string) {
+  const names: Record<string, string> = { "crash-burst": t("同一个崩溃集中出现"), "success-floor": t("连接成功率低于 70%"), crash: t("崩溃率"), success: t("连接成功率"),
+    connectP90: t("连上用时 P90"), drops: t("意外断线"), manual: t("手动暂停") };
+  return reason.split(",").filter(Boolean).map((item) => names[item] || item).join(t("、"));
+}
+
+/** Where the stage stands in words: frozen and why, or how long until the next automatic step. */
+function stageLine(release: ReleaseLite, verdict: Verdict | null) {
+  const hours = hoursSince(release.rolloutSince);
+  if (release.rolloutFrozenAt) return release.rolloutFreezeReason === "manual" ? t("已暂停：新用户不再收到这个版本，已升级的照常使用。") : t("已自动暂停（{0}）：新用户不再收到这个版本，已升级的照常使用。", [reasonText(release.rolloutFreezeReason || "")]);
+  if (hours === null) return "";
+  if (hours < STAGE_HOURS) return t("这一档已 {0} 小时，满 24 小时且指标正常会自动放量。", [hours]);
+  if (verdict === "insufficient") return t("这一档已 {0} 小时，样本还不够判断；满 48 小时会在 Telegram 问你。", [hours]);
+  return t("这一档已 {0} 小时，下次检查时会自动放量。", [hours]);
+}
+
 function Stages({ current }: { current: number }) {
   const at = stages.filter((stage) => stage <= current).pop() ?? 0;
   return <div className="rollout-stages" aria-label={t("灰度阶段")}>
@@ -67,26 +88,31 @@ function Stages({ current }: { current: number }) {
   </div>;
 }
 
-export function RolloutHealthPanel({ health, error, releases }: { health: BuildHealth[]; error: string | null; releases: ReleaseLite[] }) {
+export function RolloutHealthPanel({ health, error, releases, busy, onAction }: { health: BuildHealth[]; error: string | null; releases: ReleaseLite[]; busy: boolean; onAction: (release: ReleaseLite, action: RolloutAction) => void }) {
   useConsoleLanguage();
-  if (!health.length && !error) return null;
+  // One card per build in staged rollout (stable, published, under 100%); Windows x64 and arm64 share one.
+  const staged = [...new Map(releases.filter((row) => row.channel === "stable" && row.status === "published" && row.rolloutPercent < 100)
+    .map((row) => [`${row.platform}:${row.build}`, row])).values()];
+  if (!staged.length) return null;
   return <section className="rollout-health">
-    <div className="panel-head"><div><h2>{t("正在灰度的版本")}</h2><p>{t("新版本和同平台当前正式版在最近 24 小时里对比；数据来自客户端上报，只存在运行日志里。")}</p></div></div>
+    <div className="panel-head"><div><h2>{t("正在灰度的版本")}</h2><p>{t("新版本和同平台当前正式版在最近 24 小时里对比，每档至少 24 小时，指标正常自动放量，超红线自动暂停；数据来自客户端上报，只存在运行日志里。")}</p></div></div>
     {error && <p className="rollout-error">{t("暂时读不到运行日志，指标稍后再看。")}</p>}
-    {health.map((item) => {
-      const release = releases.find((row) => row.platform === item.platform && row.build === item.build && row.channel === "stable" && row.status === "published");
-      const baseline = releases.find((row) => row.platform === item.platform && row.build === item.baselineBuild);
-      const rollout = release?.rolloutPercent ?? 0;
-      return <article key={`${item.platform}:${item.build}`} className={`rollout-card${item.verdict === "bad" ? " alarm" : ""}`}>
+    {staged.map((release) => {
+      const item = health.find((row) => row.platform === release.platform && row.build === release.build);
+      const baseline = item && releases.find((row) => row.platform === item.platform && row.build === item.baselineBuild);
+      const frozen = !!release.rolloutFrozenAt;
+      const rollout = release.rolloutPercent;
+      return <article key={`${release.platform}:${release.build}`} className={`rollout-card${item?.verdict === "bad" || frozen ? " alarm" : ""}`}>
         <div className="rollout-title">
-          <b>{platformNames[item.platform]} {release?.version ?? ""}</b><small>{t("构建 {0}", [item.build])}</small>
-          {verdictPill(item.verdict, "build")}
+          <b>{platformNames[release.platform]} {release.version}</b><small>{t("构建 {0}", [release.build])}</small>
+          {frozen ? <Pill value="frozen" tone="danger" label={t("已暂停")} /> : item ? verdictPill(item.verdict, "build") : null}
         </div>
         <Stages current={rollout} />
-        <p className="rollout-summary">{t("当前 {0}% · 新版 {1} 个活跃用户、{2} 次连接 · 正式版 {3} 个活跃用户", [rollout, item.figures.users, item.figures.sessions, item.baselineFigures?.users ?? 0])}</p>
-        {item.reasons.includes("crash-burst") && item.crashBurst && <p className="rollout-reason">{t("1 小时内 {0} 个用户出现同一个崩溃（签名 {1}），在运行日志里搜索这个签名可以看到详情。", [item.crashBurst.users, item.crashBurst.signature])}</p>}
-        {item.reasons.includes("success-floor") && <p className="rollout-reason">{t("新版连接成功率低于 70%。")}</p>}
-        <div className="rollout-metrics" role="table" aria-label={t("指标对比")}>
+        <p className="rollout-summary">{item ? t("当前 {0}% · 新版 {1} 个活跃用户、{2} 次连接 · 正式版 {3} 个活跃用户", [rollout, item.figures.users, item.figures.sessions, item.baselineFigures?.users ?? 0]) : t("当前 {0}%", [rollout])}</p>
+        <p className="rollout-summary">{stageLine(release, item?.verdict ?? null)}</p>
+        {item?.reasons.includes("crash-burst") && item.crashBurst && <p className="rollout-reason">{t("1 小时内 {0} 个用户出现同一个崩溃（签名 {1}），在运行日志里搜索这个签名可以看到详情。", [item.crashBurst.users, item.crashBurst.signature])}</p>}
+        {item?.reasons.includes("success-floor") && <p className="rollout-reason">{t("新版连接成功率低于 70%。")}</p>}
+        {item && <div className="rollout-metrics" role="table" aria-label={t("指标对比")}>
           <div className="rollout-metric head" role="row"><span role="columnheader">{t("指标（近 24 小时）")}</span><span role="columnheader">{t("构建 {0}", [item.build])}</span><span role="columnheader">{baseline ? t("正式版 {0}", [baseline.version]) : t("正式版")}</span><span role="columnheader">{t("近 7 天")}</span><span role="columnheader">{t("状态")}</span></div>
           {item.metrics.map((metric) => { const label = metricName(metric.key); return <div key={metric.key} role="row" className={`rollout-metric${metric.verdict === "bad" ? " alarm" : ""}`}>
             <span role="cell" className="name">{label.name}<small>{label.limit}</small></span>
@@ -95,8 +121,14 @@ export function RolloutHealthPanel({ health, error, releases }: { health: BuildH
             <span role="cell"><Spark points={metric.trend} bad={metric.verdict === "bad"} /></span>
             <span role="cell">{verdictPill(metric.verdict, "metric")}</span>
           </div>; })}
+        </div>}
+        {item && <p className="rollout-observed">{t("只看不判：协议回退 {0}（正式版 {1}） · 连上用时 P50 {2}（正式版 {3}）", [percent(item.fallbackRate, 0), percent(item.baselineFallbackRate, 0), seconds(item.figures.connectP50), seconds(item.baselineFigures?.connectP50 ?? null)])}</p>}
+        <div className="rollout-actions">
+          {frozen ? <button className="button primary small" disabled={busy} onClick={() => onAction(release, "resume")}>{t("继续灰度")}</button>
+            : <button className="button ghost small" disabled={busy} onClick={() => onAction(release, "freeze")}>{t("暂停")}</button>}
+          <button className="button ghost small" disabled={busy} onClick={() => onAction(release, "full")}>{t("直接全量")}</button>
+          <button className="button danger small" disabled={busy} onClick={() => onAction(release, "withdraw")}>{t("撤回")}</button>
         </div>
-        <p className="rollout-observed">{t("只看不判：协议回退 {0}（正式版 {1}） · 连上用时 P50 {2}（正式版 {3}）", [percent(item.fallbackRate, 0), percent(item.baselineFallbackRate, 0), seconds(item.figures.connectP50), seconds(item.baselineFigures?.connectP50 ?? null)])}</p>
       </article>;
     })}
   </section>;
