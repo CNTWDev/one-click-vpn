@@ -876,6 +876,9 @@ public partial class MainWindow : Window {
             var exit=Columns(Single(L10n.Text("check_exit"),12,Look.Secondary),new FrameworkElement(),Single(region,12));
             exit.Margin=new Thickness(2,12,2,0);stack.Children.Add(exit);
         }
+        // With advanced on, each line by its protocol's name instead of its number.
+        var advancedNames=Advanced.Enabled;
+        string CheckLine(int index)=>advancedNames?ProtocolName(Latency.LineOrder[index]):LineName(index);
         // This node's lines (Line 1…4), each with its delay and the one carrying traffic marked "in use".
         var linesLabel=Single(L10n.Text("check_lines"),12,Look.Secondary);linesLabel.Margin=new Thickness(2,14,0,0);linesLabel.Visibility=Visibility.Collapsed;
         stack.Children.Add(linesLabel);
@@ -885,7 +888,7 @@ public partial class MainWindow : Window {
             var cellHost=new ContentControl {Focusable=false,Content=LineCells(new[]{LineState.Wait}),Margin=new Thickness(0,0,8,0),VerticalAlignment=VerticalAlignment.Center};
             var now=Single(L10n.Text("line_in_use"),11,Look.Accent);now.Opacity=0;now.Margin=new Thickness(6,0,0,0);
             var value=Single("—",12,Look.Faint);value.FontFamily=new FontFamily("Cascadia Mono, Consolas");
-            var left=new StackPanel {Orientation=Orientation.Horizontal};left.Children.Add(cellHost);left.Children.Add(Single(LineName(i),13));left.Children.Add(now);
+            var left=new StackPanel {Orientation=Orientation.Horizontal};left.Children.Add(cellHost);left.Children.Add(Single(CheckLine(i),13));left.Children.Add(now);
             lineGrid.Children.Add(new Border {Height=34,Background=Look.Surface,CornerRadius=new CornerRadius(10),Padding=new Thickness(10,0,10,0),
                 Margin=new Thickness(i%2==0?0:3,i>1?6:0,i%2==0?3:0,0),Child=Columns(left,new FrameworkElement(),value)});
             lineBoxes.Add((cellHost,now,value));
@@ -904,7 +907,8 @@ public partial class MainWindow : Window {
             }
             var down=Latency.LineOrder.Select((n,i)=>(Name:n,Index:i)).Where(x=>lines.TryGetValue(x.Name,out var v)&&v<0).ToList();
             var used=Array.IndexOf(Latency.LineOrder,current);
-            var text=down.Count>0&&used>=0&&lines.TryGetValue(current,out var usedMs)&&usedMs>=0?L10n.Text("check_lines_note",string.Join(ListJoin,down.Select(x=>LineName(x.Index))),LineName(used)):"";
+            var text=down.Count>0&&used>=0&&lines.TryGetValue(current,out var usedMs)&&usedMs>=0?L10n.Text("check_lines_note",string.Join(ListJoin,down.Select(x=>CheckLine(x.Index))),CheckLine(used)):"";
+            if(advancedNames&&current=="hysteria2") text=text.Length>0?text+"\n"+L10n.Text("hop_note"):L10n.Text("hop_note");
             lineNote.Text=text;lineNote.Visibility=text.Length>0?Visibility.Visible:Visibility.Collapsed;
         }
         var currentNow="";try {currentNow=core.Now(Transports.Group);} catch {/* not connected */}
@@ -1357,7 +1361,6 @@ public partial class MainWindow : Window {
         JsonArray nodes=new();
         var searchHost=Add(new ContentControl());
         Add(AutomaticRow(),12,0);
-        Add(Caption(L10n.Text("all_locations")),20,8);
         ContentPanel.Children.Add(list);
         Quality? Known(JsonNode node)=>Latency.Recent.TryGetValue(node["id"]!.GetValue<string>(),out var known)?known:null;
         void Figures() {ranked=ranked.Select(x=>(x.Node,Known(x.Node))).ToList();}
@@ -1463,6 +1466,9 @@ public partial class MainWindow : Window {
     private void ShowNodes(StackPanel list,List<(JsonNode Node,Quality? Quality)> ranked,string query) {
         list.Children.Clear();
         var rows=new List<FrameworkElement>();
+        // Advanced: favorite locations in their own group above the rest; right-click a row for its options.
+        var advanced=Advanced.Enabled;var favorites=Advanced.Favorites;
+        var favoriteRows=new List<FrameworkElement>();
         var details=new Dictionary<string,(Border Detail,Border Item)>();
         foreach(var (node,quality) in ranked) {
             var name=node["name"]!.GetValue<string>();var id=node["id"]!.GetValue<string>();var region=node["region"]?.GetValue<string>()??"";
@@ -1470,6 +1476,8 @@ public partial class MainWindow : Window {
             var unreachable=quality is {Latency: null};
             var selected=id==nodeId;
             var states=LineStates(quality?.Lines);var note=LinesNote(quality?.Lines);
+            var locked=Advanced.Lock(id);
+            if(locked.Length>0) note=(note??(region.Length>0&&region!=name?region:null)) is { } before?before+" · "+L10n.Text("protocol_only",ProtocolName(locked)):L10n.Text("protocol_only",ProtocolName(locked));
             var offered=node["test"] is JsonArray tests&&tests.Any(t=>t?["name"]?.GetValue<string>() is { } n&&Latency.LineOrder.Contains(n));
             // Fixed columns on every row: tile, name, delay (fixed width, right-aligned), cell slot (always 44 wide).
             // Selected = a lifted row, a amber tile and a bolder name; nothing is added, so the columns never move.
@@ -1484,6 +1492,7 @@ public partial class MainWindow : Window {
             var badge=Look.Badge(Code(id,name),28,selected?Look.OnAccent:unreachable?Look.Faint:null);
             if(selected) {badge.Background=Look.Accent;if(badge.Child is TextBlock glyph) glyph.Foreground=Look.OnAccent;}
             var row=new Button {Height=note is null?48:52,Content=Columns(badge,label,right)};
+            if(advanced) row.MouseRightButtonUp+=(_,e)=>{e.Handled=true;NodeOptions(row,id,()=>ShowNodes(list,ranked,query));};
             var item=new Border {Background=selected?Look.Raised:Brushes.Transparent,Tag=selected};
             var stack=new StackPanel();item.Child=stack;
             var head=new Grid();head.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(1,GridUnitType.Star)});head.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});
@@ -1522,10 +1531,43 @@ public partial class MainWindow : Window {
                 };
                 Grid.SetColumn(toggle,1);head.Children.Add(toggle);
             }
-            rows.Add(item);
+            if(favorites.Contains(id)) favoriteRows.Add(item); else rows.Add(item);
         }
+        void Header(string key) {var caption=Caption(L10n.Text(key));caption.Margin=new Thickness(caption.Margin.Left,20,caption.Margin.Right,8);list.Children.Add(caption);}
+        if(favoriteRows.Count>0) {Header("favorites");list.Children.Add(Card(favoriteRows));}
+        if(rows.Count>0||favoriteRows.Count==0) Header("all_locations");
         if(rows.Count>0) list.Children.Add(Card(rows));
-        else list.Children.Add(Caption(L10n.Text(ranked.Count==0?"no_locations_available_refresh_later_or_contact_your_administrator":"no_matching_locations_try_another_search")));
+        else if(favoriteRows.Count==0) list.Children.Add(Caption(L10n.Text(ranked.Count==0?"no_locations_available_refresh_later_or_contact_your_administrator":"no_matching_locations_try_another_search")));
+        if(advanced&&ranked.Count>0) {var hint=Caption(L10n.Text("node_menu_hint"));hint.Margin=new Thickness(hint.Margin.Left,12,hint.Margin.Right,0);list.Children.Add(hint);}
+    }
+    /// A protocol's name as the advanced views show it.
+    private static string ProtocolName(string transport)=>transport=="reality-alt"?L10n.Text("reality_alt"):Guidance.Label(transport);
+    /// Advanced: a location's options at the pointer, favorite and protocol lock; a changed lock on the location in
+    /// use reconnects at once.
+    private void NodeOptions(FrameworkElement anchor,string id,Action redraw) {
+        var favorite=Advanced.Favorites.Contains(id);var locked=Advanced.Lock(id);
+        var list=new StackPanel {MinWidth=220,MaxWidth=280};
+        var popup=new Popup {PlacementTarget=anchor,Placement=PlacementMode.MousePoint,StaysOpen=false,AllowsTransparency=true,
+            Child=new Border {Background=Look.Raised,CornerRadius=new CornerRadius(10),Padding=new Thickness(4),Child=list}};
+        Button Item(string text,bool chosen,Action act) {
+            var item=new Button {Height=34,Padding=new Thickness(10,0,10,0),Content=Columns(new FrameworkElement(),Single(text,13),chosen?Look.Icon("\uE73E",12,Look.Accent):null)};
+            AutomationProperties.SetName(item,text+(chosen?L10n.Text("current_page"):""));
+            item.Click+=(_,_)=>{popup.IsOpen=false;act();};
+            return item;
+        }
+        list.Children.Add(Item(L10n.Text(favorite?"favorite_remove":"favorite_add"),false,()=>{Advanced.Favorite(id,!favorite);redraw();}));
+        var title=Single(L10n.Text("protocol"),12,Look.Secondary);title.Margin=new Thickness(10,10,10,4);list.Children.Add(title);
+        foreach(var value in new[]{""}.Concat(Advanced.Protocols)) {
+            var text=value.Length==0?L10n.Text("automatic"):ProtocolName(value);
+            list.Children.Add(Item(text,value==locked,()=>{
+                if(value==locked) return;
+                Advanced.SetLock(id,value);redraw();
+                if(connection.Active&&connection.NodeId==id) ApplyNow();
+            }));
+        }
+        var note=Single(L10n.Text("protocol_lock_detail"),11,Look.Faint);note.TextWrapping=TextWrapping.Wrap;note.TextTrimming=TextTrimming.None;note.Margin=new Thickness(10,6,10,6);
+        list.Children.Add(note);
+        popup.IsOpen=true;
     }
     private static readonly Brush OpenRow=Look.Hex("#100E0D");
     /// Opens or closes a node's line detail by animating its height, so the rows below slide instead of jumping.
@@ -1614,7 +1656,14 @@ public partial class MainWindow : Window {
         var appVersion=System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)??"0";
         var whatsNew=SettingRow(L10n.Text("whats_new"),appVersion,_=>ShowNotes(appVersion,L10n.Text("whats_new_notes").Split('\n').Where(line=>line.Trim().Length>0).ToList()));
         var apps=SettingRow(L10n.Text("per_app_routing"),AppsValue(),_=>{page="apps";Render();});
-        Add(Card(new FrameworkElement[]{devices,password,language,appearance,startupRow,guardRow,apps,updates,whatsNew},14));
+        // Advanced: favorites and per-location protocol lock on the location page, protocol names in the check.
+        var advanced=new ToggleButton {Style=(Style)FindResource("Switch"),IsChecked=Advanced.Enabled,VerticalAlignment=VerticalAlignment.Center};
+        AutomationProperties.SetName(advanced,L10n.Text("advanced"));
+        advanced.Click+=(_,_)=>Advanced.Enabled=advanced.IsChecked==true;
+        var advancedText=TwoLines(L10n.Text("advanced"),L10n.Text("advanced_detail"));advancedText.Margin=new Thickness(0,0,12,0);
+        if(advancedText.Children[1] is TextBlock advancedDetail) {advancedDetail.TextWrapping=TextWrapping.Wrap;advancedDetail.TextTrimming=TextTrimming.None;}
+        var advancedRow=new Border {MinHeight=56,Padding=new Thickness(14,8,14,8),Child=Columns(new FrameworkElement(),advancedText,advanced)};
+        Add(Card(new FrameworkElement[]{devices,password,language,appearance,startupRow,guardRow,apps,advancedRow,updates,whatsNew},14));
 
         var signOut=new Button {Content=L10n.Text("sign_out"),Height=40,Background=Look.Surface,Foreground=Look.Danger,HorizontalContentAlignment=HorizontalAlignment.Center};
         signOut.Click+=(_,_)=>{

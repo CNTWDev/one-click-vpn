@@ -1117,7 +1117,6 @@ class MainActivity : Activity() {
             contentDescription = L10n.text(R.string.automatic) + if (automatic) L10n.text(R.string.current_page) else ""
             setOnClickListener { if (!busy) select("", "", "") }
         }, top = 20)
-        add(text(L10n.text(R.string.all_locations), 13f, Palette.secondary).apply { setPadding(4.dp, 0, 0, 0) }, top = 20, bottom = 8)
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also { add(it) }
         var query = ""
         // Shown in this order while the page is open: new measurements change the figures in place, never the order.
@@ -1291,13 +1290,18 @@ class MainActivity : Activity() {
     private fun show(list: LinearLayout, ranked: List<Pair<JSONObject, Quality?>>, query: String) {
         list.removeAllViews()
         val rows = mutableListOf<View>()
+        // Advanced: favorite locations in their own group above the rest; press and hold a row for its options.
+        val advanced = Advanced.enabled(this)
+        val favorites = Advanced.favorites(this)
+        val favoriteRows = mutableListOf<View>()
         for ((node, quality) in ranked) {
             val name = node.getString("name"); val region = node.optString("region").takeIf { it.isNotBlank() && it != "null" && it != name } ?: ""
             if (!("$name $region").contains(query, ignoreCase = true)) continue
             val id = node.getString("id"); val code = Directory.code(id, name)
             val unreachable = quality != null && quality.latency == null
             val states = lineStates(quality)
-            val note = linesNote(quality)
+            val locked = Advanced.lock(this, id)
+            val note = listOfNotNull(linesNote(quality) ?: region.ifEmpty { null }, locked.ifEmpty { null }?.let { L10n.text(R.string.protocol_only, protocolName(it)) }).joinToString(" · ").ifEmpty { null }
             val selected = id == selectedId
             // Selected = a lifted row, a amber tile and a bolder name; opened = a darker row (unless selected).
             val rest = if (selected) Palette.raised else Color.TRANSPARENT
@@ -1320,6 +1324,7 @@ class MainActivity : Activity() {
                 }, LinearLayout.LayoutParams(76.dp, 20.dp).apply { marginStart = 8.dp })
                 contentDescription = name + ", " + (quality?.let { summary(it) } ?: "") + (note?.let { ", $it" } ?: "") + if (selected) L10n.text(R.string.current_page) else ""
                 setOnClickListener { if (!busy) select(id, name, code) }
+                if (advanced) setOnLongClickListener { if (!busy) nodeOptions(id, name) { show(list, ranked, query) }; true }
             }
             item.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
@@ -1354,31 +1359,55 @@ class MainActivity : Activity() {
             detail.tag = "lines:$id"
             item.addView(detail, LinearLayout.LayoutParams(-1, -2))
             if (openNode == id && states != null && !selected) item.background = ColorDrawable(Color.rgb(16, 14, 13))
-            rows.add(item)
+            if (id in favorites) favoriteRows.add(item) else rows.add(item)
         }
+        fun header(title: Int) = list.addView(text(L10n.text(title), 13f, Palette.secondary).apply { setPadding(4.dp, 0, 0, 0) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 20.dp; bottomMargin = 8.dp })
+        if (favoriteRows.isNotEmpty()) { header(R.string.favorites); list.addView(group(favoriteRows, inset = 66)) }
+        if (rows.isNotEmpty() || favoriteRows.isEmpty()) header(R.string.all_locations)
         when {
             rows.isNotEmpty() -> list.addView(group(rows, inset = 66))
+            favoriteRows.isNotEmpty() -> {}
             ranked.isEmpty() -> list.addView(text(L10n.text(R.string.no_locations_available_refresh_later_or_contact_your_administrator), 14f, Palette.secondary).apply { setPadding(4.dp, 4.dp, 4.dp, 4.dp) })
             else -> list.addView(text(L10n.text(R.string.no_matching_locations_try_another_search), 14f, Palette.secondary).apply { setPadding(4.dp, 4.dp, 4.dp, 4.dp) })
         }
+        if (advanced && ranked.isNotEmpty()) list.addView(text(L10n.text(R.string.node_hold_hint), 12f, Palette.faint).apply { setPadding(4.dp, 0, 4.dp, 0) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12.dp })
+    }
+    /** A protocol's name as the advanced views show it. */
+    private fun protocolName(transport: String) = if (transport == "reality-alt") L10n.text(R.string.reality_alt) else Transports.label(transport)
+    /** Advanced: a location's options, favorite and protocol lock; a changed lock reconnects that location at once. */
+    private fun nodeOptions(id: String, name: String, redraw: () -> Unit) {
+        val favorite = id in Advanced.favorites(this)
+        val locked = Advanced.lock(this, id)
+        val protocolValue = if (locked.isEmpty()) L10n.text(R.string.automatic) else protocolName(locked)
+        sheet(name, listOf(L10n.text(if (favorite) R.string.favorite_remove else R.string.favorite_add), L10n.text(R.string.protocol) + " · " + protocolValue), -1) { i ->
+            if (i == 0) { Advanced.favorite(this, id, !favorite); redraw(); return@sheet }
+            val options = listOf("") + Advanced.protocols
+            sheet(L10n.text(R.string.protocol), options.map { if (it.isEmpty()) L10n.text(R.string.automatic) else protocolName(it) }, options.indexOf(locked), L10n.text(R.string.protocol_lock_detail)) { pick ->
+                if (options[pick] == locked) return@sheet
+                Advanced.setLock(this, id, options[pick]); redraw()
+                if (ConnectionStateStore.active && ConnectionStateStore.nodeId == id) reconnect()
+            }
+        }
     }
     private fun select(id: String, name: String, code: String) {
-        val reconnect = ConnectionStateStore.active && id != ConnectionStateStore.nodeId
+        val moving = ConnectionStateStore.active && id != ConnectionStateStore.nodeId
         selectedId = id; selectedName = name; selectedCode = code; page = "connect"
         getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("nodeId", id).putString("nodeName", name).putString("nodeCode", code).apply()
         render()
         // Connected (or reconnecting): one tap moves the VPN to the new location.
-        if (reconnect) {
-            startService(Intent(this, ConnectionService::class.java).setAction("disconnect"))
-            val started = SystemClock.elapsedRealtime()
-            handler.post(object : Runnable {
-                override fun run() {
-                    // A moment after the old service is gone, so the new connection gets a fresh one.
-                    if (!ConnectionStateStore.active) handler.postDelayed({ startConnection() }, 600)
-                    else if (SystemClock.elapsedRealtime() - started < 10_000) handler.postDelayed(this, 200)
-                }
-            })
-        }
+        if (moving) reconnect()
+    }
+    /** Ends the connection and starts a fresh one a moment after the old service is gone. */
+    private fun reconnect() {
+        startService(Intent(this, ConnectionService::class.java).setAction("disconnect"))
+        val started = SystemClock.elapsedRealtime()
+        handler.post(object : Runnable {
+            override fun run() {
+                // A moment after the old service is gone, so the new connection gets a fresh one.
+                if (!ConnectionStateStore.active) handler.postDelayed({ startConnection() }, 600)
+                else if (SystemClock.elapsedRealtime() - started < 10_000) handler.postDelayed(this, 200)
+            }
+        })
     }
 
     /** Builds a page from the cached account at once and refreshes it in the background. */
@@ -1419,7 +1448,6 @@ class MainActivity : Activity() {
                     addView(text(L10n.text(R.string.account_valid_until, L10n.date(data.optString("expiresAt"))), 13f, Palette.secondary), LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
                 }, LinearLayout.LayoutParams(0, -2, 1f))
             }, top = 4)
-            usageCard(data)
             add(group(listOf(
                 settingRow(L10n.text(R.string.authorized_devices), "${L10n.number(data.optInt("used"))} / ${deviceLimit(data)}") { page = "devices"; render() },
                 settingRow(L10n.text(R.string.qr_scan_computer), "") { scanComputer() },
@@ -1433,6 +1461,12 @@ class MainActivity : Activity() {
                         .setNegativeButton(L10n.text(R.string.cancel), null).show()
                 },
                 settingRow(L10n.text(R.string.per_app_routing), appsValue()) { page = "apps"; render() },
+                settingRow(L10n.text(R.string.advanced), L10n.text(if (Advanced.enabled(this)) R.string.setting_on else R.string.setting_off)) {
+                    val on = Advanced.enabled(this)
+                    sheet(L10n.text(R.string.advanced), listOf(L10n.text(R.string.setting_off), L10n.text(R.string.setting_on)), if (on) 1 else 0, L10n.text(R.string.advanced_detail)) { i ->
+                        if ((i == 1) != on) { Advanced.enable(this, i == 1); render() }
+                    }
+                },
                 settingRow(L10n.text(R.string.check_for_updates), "") { update?.let { if (!downloading) startDownload(it) } ?: checkForUpdate(announce = true) }
                     .also { updateRowValue = it.getChildAt(1) as TextView },
                 // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).
@@ -1458,50 +1492,6 @@ class MainActivity : Activity() {
                 }
             }, top = 4)
         }
-    }
-    /**
-     * Today / this month / 30 days: the total for the range in the pixel face, a bar per day for the last 30 days with
-     * the range lit, and for 30 days the download / upload split. Days are the server's (UTC) days.
-     */
-    private fun usageCard(data: JSONObject) {
-        val traffic = data.optJSONObject("traffic") ?: return
-        val down = traffic.optString("downloadBytes", "0").toLongOrNull() ?: 0; val up = traffic.optString("uploadBytes", "0").toLongOrNull() ?: 0
-        val perDay = HashMap<String, Long>()
-        traffic.optJSONArray("days")?.let { days -> for (i in 0 until days.length()) days.optJSONObject(i)?.let { perDay[it.optString("day").take(10)] = it.optString("bytes", "0").toLongOrNull() ?: 0 } }
-        val today = LocalDate.now(ZoneOffset.UTC)
-        val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = rounded(Palette.surface, 16); setPadding(16.dp, 14.dp, 16.dp, 16.dp) }
-        val ranges = listOf("today" to R.string.usage_today, "month" to R.string.usage_this_month, "30d" to R.string.last_30_days)
-        val switcher = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; background = rounded(Palette.ground, 10); setPadding(2.dp, 2.dp, 2.dp, 2.dp) }
-        val figure = text("", 42f).apply { typeface = Pixel.font(this@MainActivity) }
-        val bars = UsageBars(this).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO; values = (29 downTo 0).map { perDay[today.minusDays(it.toLong()).toString()] ?: 0L } }
-        val split = text(L10n.text(R.string.download_amount, bytes(down)) + "    " + L10n.text(R.string.upload_amount, bytes(up)), 13f, Palette.secondary)
-        fun pick(range: String) {
-            usageRange = range
-            for (i in 0 until switcher.childCount) (switcher.getChildAt(i) as TextView).apply {
-                val on = ranges[i].first == range
-                setTextColor(if (on) Palette.text else Palette.secondary); background = if (on) rounded(Palette.selected, 8) else null
-                contentDescription = text.toString() + if (on) L10n.text(R.string.current_page) else ""
-            }
-            val total = when (range) {
-                "today" -> perDay[today.toString()] ?: 0L
-                "month" -> perDay.filterKeys { it.startsWith(today.toString().take(7)) }.values.sum()
-                else -> down + up
-            }
-            // "143 GB": the number large, its unit small and muted.
-            val label = bytes(total); val cut = label.indexOfLast { it.isWhitespace() || it == '\u00A0' }
-            figure.text = SpannableString(label).apply { if (cut > 0) { setSpan(AbsoluteSizeSpan(16, true), cut, label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); setSpan(ForegroundColorSpan(Palette.secondary), cut, label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) } }
-            bars.recent = when (range) { "today" -> 1; "month" -> today.dayOfMonth.coerceAtMost(30); else -> 30 }
-            split.visibility = if (range == "30d") View.VISIBLE else View.GONE
-        }
-        for ((key, title) in ranges) switcher.addView(text(L10n.text(title), 13f, Palette.secondary, 500).apply {
-            gravity = Gravity.CENTER; maxLines = 1; setPadding(12.dp, 0, 12.dp, 0); setOnClickListener { pick(key) }
-        }, LinearLayout.LayoutParams(-2, 32.dp))
-        card.addView(LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; addView(switcher) })
-        card.addView(figure, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 14.dp })
-        if (perDay.isNotEmpty()) card.addView(bars, LinearLayout.LayoutParams(-1, 58.dp).apply { topMargin = 14.dp })
-        card.addView(split, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 14.dp })
-        pick(usageRange)
-        add(card, top = 20)
     }
     private fun devices() {
         subPageTitle(L10n.text(R.string.authorized_devices)) { page = "account"; render() }
@@ -1713,7 +1703,7 @@ class MainActivity : Activity() {
         @Suppress("DEPRECATION") window.apply { statusBarColor = Palette.ground; navigationBarColor = Palette.ground }
         space.invalidate(); render()
     }
-    private fun sheet(title: String, options: List<String>, checked: Int, onPick: (Int) -> Unit) {
+    private fun sheet(title: String, options: List<String>, checked: Int, note: String? = null, onPick: (Int) -> Unit) {
         val dialog = Dialog(this).apply { requestWindowFeature(Window.FEATURE_NO_TITLE) }
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(20.dp, 10.dp, 20.dp, 28.dp)
@@ -1729,6 +1719,7 @@ class MainActivity : Activity() {
                 setOnClickListener { dialog.dismiss(); onPick(i) }
             }
         }, color = Color.rgb(31, 29, 26)))
+        if (note != null) box.addView(text(note, 13f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12.dp })
         dialog.setContentView(android.widget.ScrollView(this).apply { isVerticalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER; addView(box) })
         dialog.show()
         dialog.window?.apply {
@@ -1746,6 +1737,9 @@ class MainActivity : Activity() {
      */
     private fun connectionCheck() {
         val nodeId = ConnectionStateStore.nodeId; val nodeName = ConnectionStateStore.node
+        // Advanced: each line by its protocol's name instead of its number.
+        val advanced = Advanced.enabled(this)
+        fun lineTitle(index: Int) = if (advanced) protocolName(Latency.lineOrder[index]) else lineName(index)
         val dialog = Dialog(this).apply { requestWindowFeature(Window.FEATURE_NO_TITLE) }
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(20.dp, 10.dp, 20.dp, 24.dp)
@@ -1793,7 +1787,7 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(10.dp, 0, 10.dp, 0)
                 background = rounded(Palette.surface, 8)
                 addView(cell, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 8.dp })
-                addView(text(lineName(i), 13f), LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 6.dp })
+                addView(text(lineTitle(i), 13f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 6.dp })
                 addView(now, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(value)
             }
@@ -1817,8 +1811,10 @@ class MainActivity : Activity() {
             }
             val down = Latency.lineOrder.withIndex().filter { (lines[it.value] ?: 0) < 0 }
             val used = Latency.lineOrder.indexOf(current).takeIf { it >= 0 && (lines[current] ?: -1) >= 0 }
-            val note = if (down.isNotEmpty() && used != null) L10n.text(R.string.check_lines_note, down.joinToString(if (L10n.locale.language == "zh") "、" else ", ") { lineName(it.index) }, lineName(used)) else ""
-            lineNote.text = note; lineNote.visibility = if (note.isEmpty()) View.GONE else View.VISIBLE
+            val note = if (down.isNotEmpty() && used != null) L10n.text(R.string.check_lines_note, down.joinToString(if (L10n.locale.language == "zh") "、" else ", ") { lineTitle(it.index) }, lineTitle(used)) else ""
+            val hop = if (advanced && current == "hysteria2") L10n.text(R.string.hop_note) else ""
+            val shown = listOf(note, hop).filter { it.isNotEmpty() }.joinToString("\n")
+            lineNote.text = shown; lineNote.visibility = if (shown.isEmpty()) View.GONE else View.VISIBLE
         }
         showLines(Latency.recent[nodeId]?.lines, try { Core.now(Transports.GROUP) } catch (_: Exception) { "" })
 
@@ -1849,7 +1845,7 @@ class MainActivity : Activity() {
         val speedButton = text(L10n.text(R.string.speed_start), 15f, Palette.onAccent, 600).apply { gravity = Gravity.CENTER; background = pressable(Palette.accent, 12) }
         box.addView(speedButton, LinearLayout.LayoutParams(-1, 48.dp).apply { topMargin = 18.dp })
         var speedLine = ""
-        fun lineLabel(name: String) = Latency.lineOrder.indexOf(name).takeIf { it >= 0 }?.let { lineName(it) }
+        fun lineLabel(name: String) = Latency.lineOrder.indexOf(name).takeIf { it >= 0 }?.let { lineTitle(it) }
         fun showSpeed(status: JSONObject) {
             val state = status.optString("state")
             val running = state == "ping" || state == "download"

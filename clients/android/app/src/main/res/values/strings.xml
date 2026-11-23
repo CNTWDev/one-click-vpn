@@ -42,6 +42,8 @@
   <string name="activity_title">Activity</string>
   <string name="activity_traffic">Traffic</string>
   <string name="add_program">Add a program…</string>
+  <string name="advanced">Advanced</string>
+  <string name="advanced_detail">Favorite locations, lock a location to one protocol, protocol names in the connection check</string>
   <string name="all_locations">All locations</string>
   <string name="all_locations_count">All %1$s locations</string>
   <string name="allow_system_extension">macOS needs you to allow the TrackNothing network extension before it can connect. Choose Open System Settings and turn TrackNothing on under General › Login Items &amp; Extensions › Network Extensions (macOS 14 and earlier: Privacy &amp; Security). It connects as soon as you allow it.</string>
@@ -215,6 +217,9 @@
   <string name="extension_guide_continue">Continue</string>
   <string name="extension_guide_detail">TrackNothing makes its encrypted connection through a macOS network extension, and the first time you switch it on yourself.\n\nContinue opens System Settings: turn TrackNothing on under General › Login Items &amp; Extensions › Network Extensions, and it connects right away.\n\nmacOS also shows a prompt; its OK only closes it and does not turn anything on.</string>
   <string name="extension_guide_title">Turn on the network extension</string>
+  <string name="favorite_add">Add to favorites</string>
+  <string name="favorite_remove">Remove from favorites</string>
+  <string name="favorites">Favorites</string>
   <string name="file_device">Device</string>
   <string name="file_language">Language</string>
   <string name="file_public_ip">Public IP</string>
@@ -229,6 +234,7 @@
   <string name="hide_password">Hide password</string>
   <string name="hiding_status">Hiding</string>
   <string name="hold_to_reveal">Hold to reveal</string>
+  <string name="hop_note">Hysteria2 changes port every 20–40 s</string>
   <string name="incorrect_email_or_password">Incorrect email or password.</string>
   <string name="invalid_server_response_try_again_later">Invalid server response. Try again later.</string>
   <string name="kill_switch">Kill switch</string>
@@ -270,7 +276,9 @@
   <string name="no_locations_available_refresh_or_contact_your_administrator">No locations available. Refresh or contact your administrator.</string>
   <string name="no_matching_locations_change_your_search_or_refresh_later">No matching locations. Change your search or refresh later.</string>
   <string name="no_matching_locations_try_another_search">No matching locations. Try another search.</string>
+  <string name="node_hold_hint">Press and hold a location to favorite it or lock its protocol</string>
   <string name="node_load">Load %1$s%%</string>
+  <string name="node_menu_hint">Right-click a location to favorite it or lock its protocol</string>
   <string name="node_quality_detail">Jitter %1$s ms · Loss %2$s%%</string>
   <string name="not_connected">Not connected</string>
   <string name="off_state">Off</string>
@@ -293,6 +301,9 @@
   <string name="phase_route">Picking route</string>
   <string name="phase_tunnel">Opening tunnel</string>
   <string name="pick_location_sub">We pick the fastest one for you. You can change it any time.</string>
+  <string name="protocol">Protocol</string>
+  <string name="protocol_lock_detail">Once locked, this location uses only this protocol and won\'t switch to another if it fails.</string>
+  <string name="protocol_only">%1$s only</string>
   <string name="qr_code_expired">The code expired</string>
   <string name="qr_confirm_action">Sign in</string>
   <string name="qr_confirm_known">This computer is already one of your devices. Cancel if this wasn\'t you.</string>
@@ -326,6 +337,7 @@
   <string name="rate_unit_gbps">Gb/s</string>
   <string name="rate_unit_kbps">Kb/s</string>
   <string name="rate_unit_mbps">Mb/s</string>
+  <string name="reality_alt">REALITY alt</string>
   <string name="reconnecting_detail">The connection dropped. Reconnecting on its own.</string>
   <string name="reconnecting_status">Connection lost. Reconnecting…</string>
   <string name="reconnecting_title">Reconnecting</string>
@@ -380,6 +392,8 @@
   <string name="send_reset_link">Send link</string>
   <string name="server_address">Server address</string>
   <string name="server_address_url">Server address https://…</string>
+  <string name="setting_off">Off</string>
+  <string name="setting_on">On</string>
   <string name="share_action">Share</string>
   <string name="shortcuts">Shortcuts</string>
   <string name="shortcuts_detail">Connect / Disconnect</string>
@@ -492,7 +506,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Sign in a computer with your phone: Mac, Windows and the Portal show a QR code; scan it in the signed-in phone app (Account → Sign in a computer) and confirm\nBefore you confirm, the phone shows which computer it is, where it is and whether it takes a device slot; a code works once, for 2 minutes</string>
+  <string name="whats_new_notes">New \&quot;Advanced\&quot; switch in Account, off by default, so beginners never see these options\nWith it on, favorite the locations you use; favorites sit at the top of the list\nLock a location to one protocol (Hysteria2, REALITY, XHTTP or WireGuard); the connection check shows protocol names</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

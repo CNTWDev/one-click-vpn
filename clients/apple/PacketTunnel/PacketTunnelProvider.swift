@@ -23,6 +23,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var fallbacks:[String]=[]
     private let keys=Transports.keyPair()
     private var smart=true
+    /// Location id -> protocol, from the app (advanced protocol lock).
+    private var locks:[String:String]=[:]
     // Wall-clock times: systemUptime stops while the device sleeps, the server's lease does not.
     private var deadline=Date.distantPast
     private var renewAt=Date.distantPast
@@ -89,6 +91,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 SecureStorage.handed=["token":token,"identity":identity]
                 #endif
                 api=try NativeAPI(origin:origin);nodeId=configuration["nodeId"] as? String ?? "";automatic=nodeId.isEmpty;smart=(configuration["routing"] as? String ?? "smart") != "global"
+                locks=configuration["locks"] as? [String:String] ?? [:]
                 try await Task.sleep(nanoseconds:200_000_000) // let the path monitor report the current network
                 network=Transports.networkKey(monitor.currentPath);online=Transports.online(monitor.currentPath);networkChanged=false
                 sessionNet=String(network.split(separator:":").first ?? "unknown")
@@ -170,8 +173,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         let offered=(lease["proxies"] as? [[String:Any]] ?? []).filter {Transports.ladder.contains($0["name"] as? String ?? "")}
         let proxies=[wireguard]+offered
         let blocked=Transports.blocked(network)
-        transports=Transports.order(proxies.compactMap {$0["name"] as? String},blocked:blocked)
-        Journal.add("node: \(nodeName), transports \(transports.joined(separator:" > "))"+(blocked.isEmpty ? "":" (blocked here before: \(blocked.sorted().joined(separator:", ")))"))
+        // A location locked to one protocol (advanced) uses only that protocol's transports.
+        let locked=locks[nodeId] ?? ""
+        transports=Advanced.apply(Transports.order(proxies.compactMap {$0["name"] as? String},blocked:blocked),locked:locked)
+        Journal.add("node: \(nodeName), transports \(transports.joined(separator:" > "))"+(blocked.isEmpty ? "":" (blocked here before: \(blocked.sorted().joined(separator:", ")))")+(locked.isEmpty ? "":" (locked to \(locked))"))
         let lines=transports.count
         publish {$0["phase"]=1;$0["lines"]=lines}
         guard let fd=tunnelDescriptor() else {throw AccessFailure.code("TUNNEL_ERROR")}

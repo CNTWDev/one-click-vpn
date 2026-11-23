@@ -84,13 +84,13 @@ enum TunnelControl {
     static func saved() async throws -> NETunnelProviderManager? {
         try await NETunnelProviderManager.loadAllFromPreferences().first {$0.localizedDescription == "TrackNothing"}
     }
-    /// Saves the configuration (origin, location, routing, kill switch) and starts the tunnel.
+    /// Saves the configuration (origin, location, routing, protocol locks, kill switch) and starts the tunnel.
     static func start(origin:String,nodeId:String,routing:String) async throws -> NETunnelProviderManager {
         let manager=try await saved() ?? NETunnelProviderManager()
         let proto=NETunnelProviderProtocol()
         proto.providerBundleIdentifier=(Bundle.main.bundleIdentifier ?? "")+".tunnel"
         proto.serverAddress="TrackNothing"
-        proto.providerConfiguration=["origin":origin,"nodeId":nodeId,"routing":routing]
+        proto.providerConfiguration=["origin":origin,"nodeId":nodeId,"routing":routing,"locks":Advanced.locks]
         // Kill switch: the system sends everything through the tunnel and nothing out while it is down (the
         // tunnel's own connections to nodes and the API are exempt). Local network devices stay reachable.
         proto.includeAllNetworks=UserDefaults.standard.bool(forKey:"killSwitch")

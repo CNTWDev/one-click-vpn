@@ -276,9 +276,11 @@ class ConnectionService : VpnService() {
             lease.optJSONArray("proxies").let { list -> (0 until (list?.length() ?: 0)).map { list!!.getJSONObject(it) } }
             .filter { it.optString("name") in Transports.ladder }
         val blocked = Transports.blocked(this, network)
-        transports = Transports.order(proxies.map { it.getString("name") }, blocked)
+        // A location locked to one protocol (advanced) uses only that protocol's transports.
+        val locked = Advanced.lock(this, nodeId)
+        transports = Advanced.apply(Transports.order(proxies.map { it.getString("name") }, blocked), locked)
         ConnectionStateStore.lines = transports.size
-        Journal.add("node: ${ConnectionStateStore.node}, transports ${transports.joinToString(" > ")}" + if (blocked.isNotEmpty()) " (blocked here before: ${blocked.joinToString()})" else "")
+        Journal.add("node: ${ConnectionStateStore.node}, transports ${transports.joinToString(" > ")}" + (if (blocked.isNotEmpty()) " (blocked here before: ${blocked.joinToString()})" else "") + (if (locked.isNotEmpty()) " (locked to $locked)" else ""))
         Core.stop()
         val tun = Builder().setSession("TrackNothing").setMtu(1500)
             .addAddress("198.18.0.1", 30).addAddress("fdfe:dcba:9876::1", 126)

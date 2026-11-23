@@ -944,6 +944,52 @@
         }
       }
     },
+    "advanced": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Advanced"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "高级功能"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Расширенные функции"
+          }
+        }
+      }
+    },
+    "advanced_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorite locations, lock a location to one protocol, protocol names in the connection check"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收藏位置、给位置锁定协议、连接检查里显示协议名"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Избранные локации, один протокол для локации, названия протоколов в проверке соединения"
+          }
+        }
+      }
+    },
     "all_locations": {
       "extractionState": "manual",
       "localizations": {
@@ -4923,6 +4969,75 @@
         }
       }
     },
+    "favorite_add": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add to favorites"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加入收藏"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В избранное"
+          }
+        }
+      }
+    },
+    "favorite_remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove from favorites"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消收藏"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Убрать из избранного"
+          }
+        }
+      }
+    },
+    "favorites": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorites"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收藏"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Избранное"
+          }
+        }
+      }
+    },
     "file_device": {
       "extractionState": "manual",
       "localizations": {
@@ -5241,6 +5356,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Удерживайте, чтобы увидеть"
+          }
+        }
+      }
+    },
+    "hop_note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hysteria2 changes port every 20–40 s"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hysteria2 每 20–40 秒换一次端口"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hysteria2 меняет порт каждые 20–40 с"
           }
         }
       }
@@ -6188,6 +6326,29 @@
         }
       }
     },
+    "node_hold_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Press and hold a location to favorite it or lock its protocol"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "长按位置可以收藏或锁定协议"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нажмите и удерживайте локацию, чтобы добавить в избранное или выбрать протокол"
+          }
+        }
+      }
+    },
     "node_load": {
       "extractionState": "manual",
       "localizations": {
@@ -6207,6 +6368,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Нагрузка %1$@%%"
+          }
+        }
+      }
+    },
+    "node_menu_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right-click a location to favorite it or lock its protocol"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "右键点位置可以收藏或锁定协议"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Щёлкните локацию правой кнопкой, чтобы добавить в избранное или выбрать протокол"
           }
         }
       }
@@ -6713,6 +6897,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Мы выберем самую быструю. Сменить можно в любой момент."
+          }
+        }
+      }
+    },
+    "protocol": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protocol"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "协议"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Протокол"
+          }
+        }
+      }
+    },
+    "protocol_lock_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Once locked, this location uses only this protocol and won't switch to another if it fails."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "锁定后这个位置只用这一种协议，它不通时不会换别的。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "После выбора эта локация использует только этот протокол и не переключится на другой, если он не работает."
+          }
+        }
+      }
+    },
+    "protocol_only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅 %1$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Только %1$@"
           }
         }
       }
@@ -7472,6 +7725,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Мбит/с"
+          }
+        }
+      }
+    },
+    "reality_alt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "REALITY alt"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "REALITY 备用"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "REALITY доп."
           }
         }
       }
@@ -8714,6 +8990,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Адрес сервера https://…"
+          }
+        }
+      }
+    },
+    "setting_off": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выкл."
+          }
+        }
+      }
+    },
+    "setting_on": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вкл."
           }
         }
       }
@@ -11300,19 +11622,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sign in a computer with your phone: Mac, Windows and the Portal show a QR code; scan it in the signed-in phone app (Account → Sign in a computer) and confirm\nBefore you confirm, the phone shows which computer it is, where it is and whether it takes a device slot; a code works once, for 2 minutes"
+            "value": "New \"Advanced\" switch in Account, off by default, so beginners never see these options\nWith it on, favorite the locations you use; favorites sit at the top of the list\nLock a location to one protocol (Hysteria2, REALITY, XHTTP or WireGuard); the connection check shows protocol names"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "电脑可以扫码登录：Mac、Windows 和网页 Portal 的登录页显示二维码，用已登录的手机 App 在「我的 → 扫码登录电脑」里扫一下并确认即可\n确认前手机会显示是哪台电脑、在哪里，以及是否会占用设备名额；二维码 2 分钟内有效，只能用一次"
+            "value": "「我的」里新增「高级功能」开关，默认关闭，新手看不到这些选项\n打开后可以收藏常用位置，收藏的排在位置列表最上面\n可以给某个位置锁定一种协议（Hysteria2、REALITY、XHTTP 或 WireGuard）；连接检查里直接显示协议名"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Вход на компьютере через телефон: Mac, Windows и Portal показывают QR-код; отсканируйте его в приложении на телефоне («Аккаунт» → «Войти на компьютере») и подтвердите\nПеред подтверждением телефон показывает, что это за компьютер, где он и займёт ли он место устройства; код действует 2 минуты и только один раз"
+            "value": "В «Аккаунте» появился переключатель «Расширенные функции», по умолчанию выключен, новички этих настроек не видят\nКогда он включён, частые локации можно добавить в избранное, они стоят вверху списка\nДля локации можно выбрать один протокол (Hysteria2, REALITY, XHTTP или WireGuard); проверка соединения показывает названия протоколов"
           }
         }
       }

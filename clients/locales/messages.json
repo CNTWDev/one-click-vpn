@@ -2513,5 +2513,75 @@
     "zh": "或用邮箱密码登录",
     "en": "Or sign in with email",
     "ru": "Или войдите по email"
+  },
+  "advanced": {
+    "zh": "高级功能",
+    "en": "Advanced",
+    "ru": "Расширенные функции"
+  },
+  "advanced_detail": {
+    "zh": "收藏位置、给位置锁定协议、连接检查里显示协议名",
+    "en": "Favorite locations, lock a location to one protocol, protocol names in the connection check",
+    "ru": "Избранные локации, один протокол для локации, названия протоколов в проверке соединения"
+  },
+  "setting_on": {
+    "zh": "开",
+    "en": "On",
+    "ru": "Вкл."
+  },
+  "setting_off": {
+    "zh": "关",
+    "en": "Off",
+    "ru": "Выкл."
+  },
+  "favorites": {
+    "zh": "收藏",
+    "en": "Favorites",
+    "ru": "Избранное"
+  },
+  "favorite_add": {
+    "zh": "加入收藏",
+    "en": "Add to favorites",
+    "ru": "В избранное"
+  },
+  "favorite_remove": {
+    "zh": "取消收藏",
+    "en": "Remove from favorites",
+    "ru": "Убрать из избранного"
+  },
+  "protocol": {
+    "zh": "协议",
+    "en": "Protocol",
+    "ru": "Протокол"
+  },
+  "protocol_only": {
+    "zh": "仅 {0}",
+    "en": "{0} only",
+    "ru": "Только {0}"
+  },
+  "protocol_lock_detail": {
+    "zh": "锁定后这个位置只用这一种协议，它不通时不会换别的。",
+    "en": "Once locked, this location uses only this protocol and won't switch to another if it fails.",
+    "ru": "После выбора эта локация использует только этот протокол и не переключится на другой, если он не работает."
+  },
+  "node_hold_hint": {
+    "zh": "长按位置可以收藏或锁定协议",
+    "en": "Press and hold a location to favorite it or lock its protocol",
+    "ru": "Нажмите и удерживайте локацию, чтобы добавить в избранное или выбрать протокол"
+  },
+  "reality_alt": {
+    "zh": "REALITY 备用",
+    "en": "REALITY alt",
+    "ru": "REALITY доп."
+  },
+  "hop_note": {
+    "zh": "Hysteria2 每 20–40 秒换一次端口",
+    "en": "Hysteria2 changes port every 20–40 s",
+    "ru": "Hysteria2 меняет порт каждые 20–40 с"
+  },
+  "node_menu_hint": {
+    "zh": "右键点位置可以收藏或锁定协议",
+    "en": "Right-click a location to favorite it or lock its protocol",
+    "ru": "Щёлкните локацию правой кнопкой, чтобы добавить в избранное или выбрать протокол"
   }
 }

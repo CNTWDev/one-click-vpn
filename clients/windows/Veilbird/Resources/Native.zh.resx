@@ -44,6 +44,8 @@
   <data name="activity_title" xml:space="preserve"><value>活动</value></data>
   <data name="activity_traffic" xml:space="preserve"><value>流量</value></data>
   <data name="add_program" xml:space="preserve"><value>添加程序…</value></data>
+  <data name="advanced" xml:space="preserve"><value>高级功能</value></data>
+  <data name="advanced_detail" xml:space="preserve"><value>收藏位置、给位置锁定协议、连接检查里显示协议名</value></data>
   <data name="all_locations" xml:space="preserve"><value>全部节点</value></data>
   <data name="all_locations_count" xml:space="preserve"><value>全部 {0} 个位置</value></data>
   <data name="allow_system_extension" xml:space="preserve"><value>macOS 需要你允许 TrackNothing 的网络扩展才能连接。点「打开系统设置」，在「通用 › 登录项与扩展 › 网络扩展」（macOS 14 及更早：「隐私与安全性」）里打开 TrackNothing，允许后会自动连接。</value></data>
@@ -221,6 +223,9 @@
 
 macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，并不会开启。</value></data>
   <data name="extension_guide_title" xml:space="preserve"><value>先打开网络扩展</value></data>
+  <data name="favorite_add" xml:space="preserve"><value>加入收藏</value></data>
+  <data name="favorite_remove" xml:space="preserve"><value>取消收藏</value></data>
+  <data name="favorites" xml:space="preserve"><value>收藏</value></data>
   <data name="file_device" xml:space="preserve"><value>设备</value></data>
   <data name="file_language" xml:space="preserve"><value>语言</value></data>
   <data name="file_public_ip" xml:space="preserve"><value>出口 IP</value></data>
@@ -235,6 +240,7 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="hide_password" xml:space="preserve"><value>隐藏密码</value></data>
   <data name="hiding_status" xml:space="preserve"><value>正在隐身</value></data>
   <data name="hold_to_reveal" xml:space="preserve"><value>按住查看</value></data>
+  <data name="hop_note" xml:space="preserve"><value>Hysteria2 每 20–40 秒换一次端口</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>邮箱或密码不正确。</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>服务器响应无效，请稍后重试。</value></data>
   <data name="kill_switch" xml:space="preserve"><value>断网保护</value></data>
@@ -276,7 +282,9 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="no_locations_available_refresh_or_contact_your_administrator" xml:space="preserve"><value>暂无可用节点，请刷新或联系管理员。</value></data>
   <data name="no_matching_locations_change_your_search_or_refresh_later" xml:space="preserve"><value>没有可用的匹配位置，请更换关键词或稍后刷新。</value></data>
   <data name="no_matching_locations_try_another_search" xml:space="preserve"><value>没有匹配的位置，试试其他关键词。</value></data>
+  <data name="node_hold_hint" xml:space="preserve"><value>长按位置可以收藏或锁定协议</value></data>
   <data name="node_load" xml:space="preserve"><value>负载 {0}%</value></data>
+  <data name="node_menu_hint" xml:space="preserve"><value>右键点位置可以收藏或锁定协议</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>抖动 {0} ms · 丢包 {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>未连接</value></data>
   <data name="off_state" xml:space="preserve"><value>关</value></data>
@@ -299,6 +307,9 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="phase_route" xml:space="preserve"><value>选择线路</value></data>
   <data name="phase_tunnel" xml:space="preserve"><value>建立连接</value></data>
   <data name="pick_location_sub" xml:space="preserve"><value>默认帮你选最快的，之后随时能换。</value></data>
+  <data name="protocol" xml:space="preserve"><value>协议</value></data>
+  <data name="protocol_lock_detail" xml:space="preserve"><value>锁定后这个位置只用这一种协议，它不通时不会换别的。</value></data>
+  <data name="protocol_only" xml:space="preserve"><value>仅 {0}</value></data>
   <data name="qr_code_expired" xml:space="preserve"><value>二维码已过期</value></data>
   <data name="qr_confirm_action" xml:space="preserve"><value>确认登录</value></data>
   <data name="qr_confirm_known" xml:space="preserve"><value>这台电脑已在你的设备里，不会多占名额。不是你本人操作就点取消。</value></data>
@@ -332,6 +343,7 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="rate_unit_gbps" xml:space="preserve"><value>Gb/s</value></data>
   <data name="rate_unit_kbps" xml:space="preserve"><value>Kb/s</value></data>
   <data name="rate_unit_mbps" xml:space="preserve"><value>Mb/s</value></data>
+  <data name="reality_alt" xml:space="preserve"><value>REALITY 备用</value></data>
   <data name="reconnecting_detail" xml:space="preserve"><value>连接断了，正在自动接回，不用操作</value></data>
   <data name="reconnecting_status" xml:space="preserve"><value>连接中断，正在重连…</value></data>
   <data name="reconnecting_title" xml:space="preserve"><value>重连中</value></data>
@@ -386,6 +398,8 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="send_reset_link" xml:space="preserve"><value>发送</value></data>
   <data name="server_address" xml:space="preserve"><value>服务地址</value></data>
   <data name="server_address_url" xml:space="preserve"><value>服务地址 https://…</value></data>
+  <data name="setting_off" xml:space="preserve"><value>关</value></data>
+  <data name="setting_on" xml:space="preserve"><value>开</value></data>
   <data name="share_action" xml:space="preserve"><value>分享</value></data>
   <data name="shortcuts" xml:space="preserve"><value>快捷指令</value></data>
   <data name="shortcuts_detail" xml:space="preserve"><value>连接 / 断开</value></data>
@@ -499,8 +513,9 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>电脑可以扫码登录：Mac、Windows 和网页 Portal 的登录页显示二维码，用已登录的手机 App 在「我的 → 扫码登录电脑」里扫一下并确认即可
-确认前手机会显示是哪台电脑、在哪里，以及是否会占用设备名额；二维码 2 分钟内有效，只能用一次</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>「我的」里新增「高级功能」开关，默认关闭，新手看不到这些选项
+打开后可以收藏常用位置，收藏的排在位置列表最上面
+可以给某个位置锁定一种协议（Hysteria2、REALITY、XHTTP 或 WireGuard）；连接检查里直接显示协议名</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>

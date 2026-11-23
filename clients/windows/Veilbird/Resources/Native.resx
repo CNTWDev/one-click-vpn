@@ -44,6 +44,8 @@
   <data name="activity_title" xml:space="preserve"><value>Activity</value></data>
   <data name="activity_traffic" xml:space="preserve"><value>Traffic</value></data>
   <data name="add_program" xml:space="preserve"><value>Add a program…</value></data>
+  <data name="advanced" xml:space="preserve"><value>Advanced</value></data>
+  <data name="advanced_detail" xml:space="preserve"><value>Favorite locations, lock a location to one protocol, protocol names in the connection check</value></data>
   <data name="all_locations" xml:space="preserve"><value>All locations</value></data>
   <data name="all_locations_count" xml:space="preserve"><value>All {0} locations</value></data>
   <data name="allow_system_extension" xml:space="preserve"><value>macOS needs you to allow the TrackNothing network extension before it can connect. Choose Open System Settings and turn TrackNothing on under General › Login Items &amp; Extensions › Network Extensions (macOS 14 and earlier: Privacy &amp; Security). It connects as soon as you allow it.</value></data>
@@ -221,6 +223,9 @@ Continue opens System Settings: turn TrackNothing on under General › Login Ite
 
 macOS also shows a prompt; its OK only closes it and does not turn anything on.</value></data>
   <data name="extension_guide_title" xml:space="preserve"><value>Turn on the network extension</value></data>
+  <data name="favorite_add" xml:space="preserve"><value>Add to favorites</value></data>
+  <data name="favorite_remove" xml:space="preserve"><value>Remove from favorites</value></data>
+  <data name="favorites" xml:space="preserve"><value>Favorites</value></data>
   <data name="file_device" xml:space="preserve"><value>Device</value></data>
   <data name="file_language" xml:space="preserve"><value>Language</value></data>
   <data name="file_public_ip" xml:space="preserve"><value>Public IP</value></data>
@@ -235,6 +240,7 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="hide_password" xml:space="preserve"><value>Hide password</value></data>
   <data name="hiding_status" xml:space="preserve"><value>Hiding</value></data>
   <data name="hold_to_reveal" xml:space="preserve"><value>Hold to reveal</value></data>
+  <data name="hop_note" xml:space="preserve"><value>Hysteria2 changes port every 20–40 s</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Incorrect email or password.</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>Invalid server response. Try again later.</value></data>
   <data name="kill_switch" xml:space="preserve"><value>Kill switch</value></data>
@@ -276,7 +282,9 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="no_locations_available_refresh_or_contact_your_administrator" xml:space="preserve"><value>No locations available. Refresh or contact your administrator.</value></data>
   <data name="no_matching_locations_change_your_search_or_refresh_later" xml:space="preserve"><value>No matching locations. Change your search or refresh later.</value></data>
   <data name="no_matching_locations_try_another_search" xml:space="preserve"><value>No matching locations. Try another search.</value></data>
+  <data name="node_hold_hint" xml:space="preserve"><value>Press and hold a location to favorite it or lock its protocol</value></data>
   <data name="node_load" xml:space="preserve"><value>Load {0}%</value></data>
+  <data name="node_menu_hint" xml:space="preserve"><value>Right-click a location to favorite it or lock its protocol</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>Jitter {0} ms · Loss {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Not connected</value></data>
   <data name="off_state" xml:space="preserve"><value>Off</value></data>
@@ -299,6 +307,9 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="phase_route" xml:space="preserve"><value>Picking route</value></data>
   <data name="phase_tunnel" xml:space="preserve"><value>Opening tunnel</value></data>
   <data name="pick_location_sub" xml:space="preserve"><value>We pick the fastest one for you. You can change it any time.</value></data>
+  <data name="protocol" xml:space="preserve"><value>Protocol</value></data>
+  <data name="protocol_lock_detail" xml:space="preserve"><value>Once locked, this location uses only this protocol and won't switch to another if it fails.</value></data>
+  <data name="protocol_only" xml:space="preserve"><value>{0} only</value></data>
   <data name="qr_code_expired" xml:space="preserve"><value>The code expired</value></data>
   <data name="qr_confirm_action" xml:space="preserve"><value>Sign in</value></data>
   <data name="qr_confirm_known" xml:space="preserve"><value>This computer is already one of your devices. Cancel if this wasn't you.</value></data>
@@ -332,6 +343,7 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="rate_unit_gbps" xml:space="preserve"><value>Gb/s</value></data>
   <data name="rate_unit_kbps" xml:space="preserve"><value>Kb/s</value></data>
   <data name="rate_unit_mbps" xml:space="preserve"><value>Mb/s</value></data>
+  <data name="reality_alt" xml:space="preserve"><value>REALITY alt</value></data>
   <data name="reconnecting_detail" xml:space="preserve"><value>The connection dropped. Reconnecting on its own.</value></data>
   <data name="reconnecting_status" xml:space="preserve"><value>Connection lost. Reconnecting…</value></data>
   <data name="reconnecting_title" xml:space="preserve"><value>Reconnecting</value></data>
@@ -386,6 +398,8 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="send_reset_link" xml:space="preserve"><value>Send link</value></data>
   <data name="server_address" xml:space="preserve"><value>Server address</value></data>
   <data name="server_address_url" xml:space="preserve"><value>Server address https://…</value></data>
+  <data name="setting_off" xml:space="preserve"><value>Off</value></data>
+  <data name="setting_on" xml:space="preserve"><value>On</value></data>
   <data name="share_action" xml:space="preserve"><value>Share</value></data>
   <data name="shortcuts" xml:space="preserve"><value>Shortcuts</value></data>
   <data name="shortcuts_detail" xml:space="preserve"><value>Connect / Disconnect</value></data>
@@ -499,8 +513,9 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Sign in a computer with your phone: Mac, Windows and the Portal show a QR code; scan it in the signed-in phone app (Account → Sign in a computer) and confirm
-Before you confirm, the phone shows which computer it is, where it is and whether it takes a device slot; a code works once, for 2 minutes</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>New &quot;Advanced&quot; switch in Account, off by default, so beginners never see these options
+With it on, favorite the locations you use; favorites sit at the top of the list
+Lock a location to one protocol (Hysteria2, REALITY, XHTTP or WireGuard); the connection check shows protocol names</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows development build · VPN service integration in progress</value></data>
