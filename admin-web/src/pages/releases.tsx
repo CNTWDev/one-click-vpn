@@ -5,6 +5,7 @@ import { useConfirm } from "../confirm-dialog";
 import { Icon } from "../icons";
 import { useToast } from "../toast";
 import { extractEntry, zipEntries } from "../zip";
+import { type BuildHealth, RolloutHealthPanel } from "./rollout-health";
 import { Empty, formatBytes, formatTime, InlineNotice, type Notice, PageHeader, Pill, StateDot } from "./shared";
 
 type Platform = "android" | "ios" | "macos" | "windows";
@@ -18,6 +19,7 @@ type Overview = {
   releases: Release[]; policies: Array<{ platform: Platform; minBuild: number; announcement: string; downloadPath: string }>;
   adoption: Array<{ platform: string; version: string | null; build: number | null; devices: number }>;
   diagnostics: Array<{ platform: string; build: number | null; code: string; events: number; users: number; lastAt: string | null }>;
+  health: BuildHealth[]; healthError: string | null;
   storage: { mode: "local" | "s3"; publicBaseUrl?: string; maxBytes?: number; chunkBytes?: number; mirror?: string | null; mirrorError?: string }; ciTokenConfigured: boolean;
 };
 const platformNames: Record<Platform, string> = { android: "Android", ios: "iPhone / iPad", macos: "macOS", windows: "Windows" };
@@ -312,6 +314,7 @@ export function ReleasesPage() {
         data.storage.mode === "s3" ? t("安装包存储：S3 兼容对象存储（{0}）", [data.storage.publicBaseUrl || ""]) : t("安装包存储：Controller 数据卷"),
         data.ciTokenConfigured ? t("发布令牌已配置：CI 或本地脚本可以上传、登记草稿并发布到测试版。") : t("发布令牌未配置：只能在这里手动登记版本。"),
       ].filter(Boolean).join(" ") }} />
+      <RolloutHealthPanel health={data.health || []} error={data.healthError ?? null} releases={data.releases} />
       {data.storage.mirror && <section className="panel result-panel"><div className="panel-head"><h2>{t("下载加速（CDN）")}</h2>
           <button className="button ghost small" disabled={mirrorTest === "running"} onClick={() => void testMirror()}>{mirrorTest === "running" ? t("测试中…") : t("测试 OSS/CDN")}</button></div>
         <p className="form-note">{data.storage.mirror === "invalid" ? t("配置有误：{0}", [data.storage.mirrorError || "VEILBIRD_RELEASE_MIRROR_*"]) : t("{0}，客户端优先从这里下载，失败时改从 Controller 下载。", [data.storage.mirror])}</p>

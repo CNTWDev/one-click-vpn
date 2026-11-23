@@ -3439,14 +3439,6 @@
     "Alerts",
     "Оповещения"
   ],
-  "节点离线 3 分钟、服务异常 10 分钟、线路疑似被封 30 分钟、磁盘超过 85%、Agent 落后一天时发邮件，恢复时再发一封。": [
-    "Emails when a node is offline for 3 minutes, a service is failing for 10 minutes, a line looks blocked for 30 minutes, a disk is over 85%, or an Agent is a day behind, and again on recovery.",
-    "Письмо, если узел недоступен 3 минуты, служба сбоит 10 минут, линия похоже заблокирована 30 минут, диск заполнен более чем на 85% или Agent отстаёт на сутки, и ещё одно при восстановлении."
-  ],
-  "先在上方“邮件发送”配置发信，告警才能发出。": [
-    "Set up Mail delivery above first, or alerts cannot be sent.",
-    "Сначала настройте отправку почты выше, иначе оповещения не уйдут."
-  ],
   "等待发送": [
     "not sent yet",
     "ещё не отправлено"
@@ -3855,6 +3847,158 @@
     "No matching country or region.",
     "Страна или регион не найдены."
   ],
+  "崩溃率": [
+    "Crash rate",
+    "Доля сбоев"
+  ],
+  "红线：旧版 ×1.5 或 1%": [
+    "Limit: stable ×1.5 or 1%",
+    "Порог: стабильная ×1,5 или 1%"
+  ],
+  "连接成功率": [
+    "Connect success",
+    "Успешные подключения"
+  ],
+  "红线：比旧版低 2 个百分点": [
+    "Limit: 2 points below stable",
+    "Порог: на 2 п. ниже стабильной"
+  ],
+  "连上用时 P90": [
+    "Time to connect P90",
+    "Время подключения P90"
+  ],
+  "红线：超过旧版 ×1.3 且多 2 秒": [
+    "Limit: over stable ×1.3 and 2 s slower",
+    "Порог: выше стабильной ×1,3 и на 2 с дольше"
+  ],
+  "意外断线": [
+    "Unexpected disconnects",
+    "Неожиданные разрывы"
+  ],
+  "每连接小时；红线：旧版 ×1.5": [
+    "Per connected hour; limit: stable ×1.5",
+    "На час подключения; порог: стабильная ×1,5"
+  ],
+  "超红线": [
+    "Over limit",
+    "Выше порога"
+  ],
+  "样本不足": [
+    "Not enough data",
+    "Мало данных"
+  ],
+  "更好": [
+    "Better",
+    "Лучше"
+  ],
+  "指标正常": [
+    "Metrics healthy",
+    "Метрики в норме"
+  ],
+  "灰度阶段": [
+    "Rollout stages",
+    "Этапы выпуска"
+  ],
+  "正在灰度的版本": [
+    "Builds in staged rollout",
+    "Сборки в поэтапном выпуске"
+  ],
+  "新版本和同平台当前正式版在最近 24 小时里对比；数据来自客户端上报，只存在运行日志里。": [
+    "Each new build is compared with the current stable build on the same platform over the last 24 hours. Figures come from the apps' reports and live only in the runtime log.",
+    "Новая сборка сравнивается с текущей стабильной на той же платформе за последние 24 часа. Данные — из отчётов приложений, хранятся только в журнале работы."
+  ],
+  "暂时读不到运行日志，指标稍后再看。": [
+    "The runtime log can't be read right now. Check the metrics again later.",
+    "Журнал работы сейчас недоступен. Проверьте метрики позже."
+  ],
+  "当前 {0}% · 新版 {1} 个活跃用户、{2} 次连接 · 正式版 {3} 个活跃用户": [
+    "Now at {0}% · new build: {1} active users, {2} connections · stable: {3} active users",
+    "Сейчас {0}% · новая сборка: {1} активных пользователей, {2} подключений · стабильная: {3}"
+  ],
+  "1 小时内 {0} 个用户出现同一个崩溃（签名 {1}），在运行日志里搜索这个签名可以看到详情。": [
+    "{0} users hit the same crash within an hour (signature {1}). Search the runtime log for the signature to see details.",
+    "У {0} пользователей за час один и тот же сбой (подпись {1}). Найдите подпись в журнале работы, чтобы увидеть подробности."
+  ],
+  "新版连接成功率低于 70%。": [
+    "Connect success on the new build is below 70%.",
+    "Успешных подключений в новой сборке меньше 70%."
+  ],
+  "指标对比": [
+    "Metric comparison",
+    "Сравнение метрик"
+  ],
+  "指标（近 24 小时）": [
+    "Metric (last 24 h)",
+    "Метрика (24 ч)"
+  ],
+  "正式版 {0}": [
+    "Stable {0}",
+    "Стабильная {0}"
+  ],
+  "近 7 天": [
+    "Last 7 days",
+    "7 дней"
+  ],
+  "只看不判：协议回退 {0}（正式版 {1}） · 连上用时 P50 {2}（正式版 {3}）": [
+    "Shown, not judged: protocol fallback {0} (stable {1}) · time to connect P50 {2} (stable {3})",
+    "Для справки: откат протокола {0} (стабильная {1}) · время подключения P50 {2} (стабильная {3})"
+  ],
+  "节点已自动摘除：{0}": [
+    "Node removed automatically: {0}",
+    "Узел исключён автоматически: {0}"
+  ],
+  "节点连不上，但没有自动摘除：{0}": [
+    "Node unreachable but kept in service: {0}",
+    "Узел недоступен, но не исключён: {0}"
+  ],
+  "控制面连不上 {0} 时将不再自动摘除它，适合做实验的节点。如果它现在已被摘除，会立即放回。": [
+    "{0} will no longer be removed automatically when the Controller can't reach it. Useful for test nodes. If it is removed now, it goes back into service at once.",
+    "{0} больше не будет исключаться автоматически, когда Controller не может до него достучаться. Подходит для тестовых узлов. Если он сейчас исключён, он сразу вернётся."
+  ],
+  "不自动摘除": [
+    "Never remove automatically",
+    "Не исключать автоматически"
+  ],
+  "{0} 不会再被自动摘除。": [
+    "{0} will not be removed automatically.",
+    "{0} не будет исключаться автоматически."
+  ],
+  "{0} 连不上时会自动摘除。": [
+    "{0} will be removed automatically when nobody can reach it.",
+    "{0} будет исключаться автоматически, если до него никто не может достучаться."
+  ],
+  "立即恢复": [
+    "Restore now",
+    "Вернуть сейчас"
+  ],
+  "取消自动摘除": [
+    "Undo the automatic removal",
+    "Отменить автоматическое исключение"
+  ],
+  "连不上时自动摘除": [
+    "Remove automatically when unreachable",
+    "Исключать автоматически при недоступности"
+  ],
+  "用于实验节点": [
+    "For test nodes",
+    "Для тестовых узлов"
+  ],
+  "已自动摘除": [
+    "Removed automatically",
+    "Исключён автоматически"
+  ],
+  "已自动摘除：控制面从外部连不上它的任何线路，15 分钟内也没有用户连上过。6 小时内已摘除 3 次，不会再自动放回，确认没问题后在「更多操作」里点「立即恢复」。": [
+    "Removed automatically: the Controller couldn't reach any of its lines from outside, and no user reached it in 15 minutes. It was removed 3 times in 6 hours, so it won't come back on its own. Once it's fixed, choose \"Restore now\" under More actions.",
+    "Исключён автоматически: Controller не смог извне достучаться ни до одной его линии, и за 15 минут к нему не подключился ни один пользователь. За 6 часов он исключался 3 раза, поэтому сам не вернётся. После исправления выберите «Вернуть сейчас» в меню действий."
+  ],
+  "已自动摘除：控制面从外部连不上它的任何线路，15 分钟内也没有用户连上过。现有连接不受影响，连续正常 10 分钟后自动放回。": [
+    "Removed automatically: the Controller couldn't reach any of its lines from outside, and no user reached it in 15 minutes. Current connections are not affected. It comes back after 10 healthy minutes in a row.",
+    "Исключён автоматически: Controller не смог извне достучаться ни до одной его линии, и за 15 минут к нему не подключился ни один пользователь. Текущие подключения не затронуты. Узел вернётся после 10 минут нормальной работы подряд."
+  ],
+  "已摘除": [
+    "Removed",
+    "Исключён"
+  ],
   "UDP 缓冲 {0}": [
     "UDP buffer {0}",
     "UDP-буфер {0}"
@@ -3942,5 +4086,161 @@
   "测于": [
     "Tested ",
     "Измерено "
+  ],
+  "告警与恢复": [
+    "Alerts & recovery",
+    "Оповещения и восстановление"
+  ],
+  "注册审核": [
+    "Sign-up approvals",
+    "Одобрение регистраций"
+  ],
+  "私聊": [
+    "Private chat",
+    "Личный чат"
+  ],
+  "群组": [
+    "Group",
+    "Группа"
+  ],
+  "频道": [
+    "Channel",
+    "Канал"
+  ],
+  "机器人已连接。": [
+    "Bot connected.",
+    "Бот подключён."
+  ],
+  "停用 Telegram": [
+    "Turn off Telegram",
+    "Отключить Telegram"
+  ],
+  "停用后不再发送 Telegram 消息，已添加的聊天和审批人会一并清除。": [
+    "Telegram messages stop, and the added chats and approvers are cleared.",
+    "Сообщения в Telegram прекратятся, добавленные чаты и одобряющие будут удалены."
+  ],
+  "Telegram 已停用。": [
+    "Telegram turned off.",
+    "Telegram отключён."
+  ],
+  "移除聊天": [
+    "Remove chat",
+    "Удалить чат"
+  ],
+  "「{0}」将不再收到任何消息。": [
+    "\"{0}\" will no longer receive any messages.",
+    "«{0}» больше не будет получать сообщения."
+  ],
+  "测试消息已发送到「{0}」。": [
+    "Test message sent to \"{0}\".",
+    "Тестовое сообщение отправлено в «{0}»."
+  ],
+  "告警、审核和发布消息统一发到 Telegram，审核直接在消息里点按钮。": [
+    "Alerts, approvals and releases go to Telegram. Approve right from the message.",
+    "Оповещения, одобрения и выпуски приходят в Telegram. Одобряйте прямо в сообщении."
+  ],
+  "已连接": [
+    "Connected",
+    "Подключено"
+  ],
+  "在 Telegram 打开 @BotFather，发送 /newbot 创建机器人。": [
+    "In Telegram, open @BotFather and send /newbot to create a bot.",
+    "В Telegram откройте @BotFather и отправьте /newbot, чтобы создать бота."
+  ],
+  "把它给你的 Token 粘贴到下面。": [
+    "Paste the token it gives you below.",
+    "Вставьте ниже полученный токен."
+  ],
+  "机器人 Token": [
+    "Bot token",
+    "Токен бота"
+  ],
+  "显示 Token": [
+    "Show token",
+    "Показать токен"
+  ],
+  "隐藏 Token": [
+    "Hide token",
+    "Скрыть токен"
+  ],
+  "连接中…": [
+    "Connecting…",
+    "Подключение…"
+  ],
+  "连接": [
+    "Connect",
+    "Подключить"
+  ],
+  "正在接收按钮和 /start": [
+    "Receiving button presses and /start",
+    "Принимает нажатия кнопок и /start"
+  ],
+  "暂时收不到消息：{0}": [
+    "Not receiving messages: {0}",
+    "Сообщения не принимаются: {0}"
+  ],
+  "更换 Token": [
+    "Change token",
+    "Сменить токен"
+  ],
+  "接收消息的聊天": [
+    "Chats that receive messages",
+    "Чаты для сообщений"
+  ],
+  "发送测试": [
+    "Send test",
+    "Отправить тест"
+  ],
+  "这个聊天接收": [
+    "This chat receives",
+    "Этот чат получает"
+  ],
+  "还没有聊天。": [
+    "No chats yet.",
+    "Чатов пока нет."
+  ],
+  "把机器人拉进群，或私聊它发送 /start，聊天会出现在这里。": [
+    "Add the bot to a group, or send it /start in a private chat. The chat shows up here.",
+    "Добавьте бота в группу или отправьте ему /start в личном чате. Чат появится здесь."
+  ],
+  "手动输入 Chat ID": [
+    "Enter a chat ID",
+    "Ввести ID чата"
+  ],
+  "审批人": [
+    "Approvers",
+    "Одобряющие"
+  ],
+  "只有这些 Telegram 账号能在「{0}」消息里点通过或拒绝。": [
+    "Only these Telegram accounts can press Approve or Reject on {0} messages.",
+    "Только эти аккаунты Telegram могут нажимать «Одобрить» или «Отклонить» в сообщениях: {0}."
+  ],
+  "只有这些 Telegram 账号能在消息里点通过或拒绝。": [
+    "Only these Telegram accounts can press Approve or Reject.",
+    "Только эти аккаунты Telegram могут нажимать «Одобрить» или «Отклонить»."
+  ],
+  "移除 {0}": [
+    "Remove {0}",
+    "Удалить {0}"
+  ],
+  "私聊机器人发送 /start 后，你的账号会出现在这里。": [
+    "Send /start to the bot in a private chat and your account shows up here.",
+    "Отправьте боту /start в личном чате, и ваш аккаунт появится здесь."
+  ],
+  "添加": [
+    "Add",
+    "Добавить"
+  ],
+  "节点离线 3 分钟、服务异常 10 分钟、线路疑似被封 30 分钟、磁盘超过 85%、Agent 落后一天时通知（Telegram 和邮件），恢复时再通知一次。": [
+    "Notifies (Telegram and email) when a node is offline for 3 minutes, a service fails for 10 minutes, a line looks blocked for 30 minutes, the disk is over 85%, or an Agent is a day behind, and again on recovery.",
+    "Уведомляет (Telegram и почта), когда узел недоступен 3 минуты, служба сбоит 10 минут, линия похожа на заблокированную 30 минут, диск заполнен более чем на 85% или Agent отстаёт на день, и снова при восстановлении."
+  ],
+  "先在上方配置 Telegram 或邮件发送，告警才能发出。": [
+    "Set up Telegram or email above so alerts can be sent.",
+    "Настройте Telegram или почту выше, чтобы оповещения отправлялись."
+  ],
+  "邮件收件人": [
+    "Email recipients",
+    "Получатели писем"
   ]
 }

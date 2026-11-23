@@ -133,6 +133,7 @@ class ConnectionService : VpnService() {
         automatic = nodeId.isEmpty()
         api.attempt = java.util.UUID.randomUUID().toString().replace("-", "").take(16)
         ConnectionStateStore.request = api.attempt ?: ""
+        Session.start(this, api, Transports.networkKey(this))
         watchNetwork(); watchScreen()
         worker.execute { begin(0) }
         return START_STICKY
@@ -143,6 +144,7 @@ class ConnectionService : VpnService() {
      */
     private fun begin(attempt: Int) {
         if (stopping) return
+        val began = SystemClock.elapsedRealtime()
         try {
             network = Transports.networkKey(this); online = Transports.online(this); networkChanged = false
             // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
@@ -150,6 +152,7 @@ class ConnectionService : VpnService() {
             ConnectionStateStore.phase = 0
             if (automatic) { nodeId = ""; chooseFastest() }
             connect()
+            Session.connected(this, SystemClock.elapsedRealtime() - began, carrying, transports.firstOrNull() ?: "")
             ConnectionStateStore.retryAt = 0L; ConnectionStateStore.attempt = 0
             started = true
             accountAt = SystemClock.elapsedRealtime() + 20000
@@ -228,6 +231,7 @@ class ConnectionService : VpnService() {
         Journal.add("connect: failed ${code(e)}" + if (detail.isNotEmpty()) " ($detail)" else "")
         api.report(code(e), nodeId, detail)
         ConnectionStateStore.networkState = Transports.networkState(this)
+        Session.end(this, api, failed = true)
         ConnectionStateStore.errorCode = code(e)
         stopConnection(if (e is Unreachable) R.string.this_location_is_not_responding_try_another else friendlyResource(e))
     }
@@ -259,6 +263,7 @@ class ConnectionService : VpnService() {
         Journal.add("switch: ${ConnectionStateStore.node} failed ($code), trying the next location")
         ConnectionStateStore.switchedFrom = ConnectionStateStore.node
         api.report(code, nodeId)
+        Session.movedNode(this)
         nodeId = fallbacks.removeAt(0); ConnectionStateStore.messageId = R.string.authorizing_and_connecting
         ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L
         return true
@@ -438,7 +443,7 @@ class ConnectionService : VpnService() {
     private fun missed() {
         failures++; nextProbe = SystemClock.elapsedRealtime() + backoff()
         if (failures < 2) return
-        if (failures == 2) { Journal.add("probe: no transport answers, reconnecting"); api.report("HANDSHAKE_TIMEOUT", nodeId) }
+        if (failures == 2) { Journal.add("probe: no transport answers, reconnecting"); api.report("HANDSHAKE_TIMEOUT", nodeId); Session.dropped(this) }
         if (automatic) moveToFastest()
     }
     /** Automatic mode: measures every location now and moves to the fastest one that answers, if it is another. */
@@ -496,6 +501,7 @@ class ConnectionService : VpnService() {
         ConnectionStateStore.active = false; ConnectionStateStore.messageId = message
         ConnectionStateStore.since = 0L; ConnectionStateStore.rxRate = 0L; ConnectionStateStore.txRate = 0L
         try { api.action("disconnect", JSONObject()) } catch (_: Exception) { }
+        Session.end(this, api, failed = false)
         stopForeground(STOP_FOREGROUND_REMOVE); stopSelf()
     }
     companion object {

@@ -84,6 +84,12 @@ public sealed class Connection(NativeApi api,Core core) {
     /// The user left the VPN on: set by a connection, cleared by the user's disconnect or a refusal.
     public static bool Wanted {get=>Settings.Get("vpnWanted","0")=="1";set=>Settings.Set("vpnWanted",value?"1":"0");}
     private void OnNetworkChanged(object? sender,EventArgs e)=>networkChanged=true;
+    /// This connection session, summed up for the staged-rollout health check (Console → 客户端发布) and sent once,
+    /// as CONNECT_SESSION, when it ends: never an address, a node name or traffic.
+    private bool sessionOpen;
+    private DateTime? sessionUp;
+    private int sessionMs,sessionFallbacks,sessionDrops;
+    private string sessionLine="",sessionNet="";
 
     private void Set(string status) {StatusKey=status;Changed?.Invoke();}
 
@@ -105,13 +111,17 @@ public sealed class Connection(NativeApi api,Core core) {
             await Task.Run(()=>core.KillSwitch(KillSwitchOn));
             keys=await Task.Run(core.NewKeypair);
             network=await Task.Run(Transports.NetworkKey);online=network!="unknown";lastNetworkCheck=DateTime.UtcNow;networkChanged=false;
+            sessionOpen=true;sessionUp=null;sessionMs=sessionFallbacks=sessionDrops=0;sessionLine="";sessionNet=network.Split(':')[0];
+            var began=DateTime.UtcNow;
             api.Attempt=Guid.NewGuid().ToString("N")[..16];
             Request=api.Attempt;
             // The attempt id is also the request id of this attempt's lines in Console → 运行日志.
             Journal.Add($"connect: start {api.Attempt}, network {network}, routing {(smart?"smart":"global")}, apps {AppRouting.Effective.Mode} {AppRouting.Effective.Apps.Count}");
             if(NodeId.Length==0) await ChooseFastest();
             await ConnectWithFallback(smart);
+            if(Active) SessionConnected(began);
         } catch(Exception) when (!Active) {
+            _=EndSession(failed:false);
             await Task.Run(core.Stop);return; // disconnected while connecting
         } catch(Exception error) {
             var code=error is AccessFailure failure?failure.Code:"CONNECT_FAILED";
@@ -122,6 +132,7 @@ public sealed class Connection(NativeApi api,Core core) {
             NetworkState=System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable()?"ok":"offline";
             ErrorCode=code;
             await api.Report(code,NodeId,detail);
+            await EndSession(failed:true);
             await Task.Run(core.Stop);Active=false;
             // A reconnect after a drop keeps blocking; a first attempt that failed does not.
             if(wasBlocking&&KillSwitchOn) {Blocking=true;Set("kill_switch_blocking");}
@@ -153,6 +164,7 @@ public sealed class Connection(NativeApi api,Core core) {
     private async Task NextNode(string code) {
         Journal.Add($"switch: {NodeName} failed ({code}), trying the next location");
         await api.Report(code,NodeId);
+        sessionFallbacks++;
         if(NodeName.Length>0) SwitchedFrom=NodeName;
         NodeId=fallbacks[0];fallbacks.RemoveAt(0);Since=null;Phase=0;Set("authorizing_and_connecting");
     }
@@ -291,7 +303,7 @@ public sealed class Connection(NativeApi api,Core core) {
     private async Task Missed(bool smart) {
         failures++;nextProbe=DateTime.UtcNow+Backoff();
         if(failures<2) return;
-        if(failures==2) {Journal.Add("probe: no transport answers, reconnecting");_=api.Report("HANDSHAKE_TIMEOUT",NodeId);}
+        if(failures==2) {Journal.Add("probe: no transport answers, reconnecting");_=api.Report("HANDSHAKE_TIMEOUT",NodeId);if(sessionUp is not null) sessionDrops++;}
         if(automatic) await MoveToFastest(smart);
     }
     /// Automatic mode: measures every location now and moves to the fastest one that answers, if it is another.
@@ -329,12 +341,26 @@ public sealed class Connection(NativeApi api,Core core) {
     }
     /// Closes the tunnel and releases the device slot (best effort, at most 5 s). A drop the user did not ask
     /// for keeps the kill switch blocking.
+    private void SessionConnected(DateTime began) {
+        sessionUp=DateTime.UtcNow;sessionMs=(int)(DateTime.UtcNow-began).TotalMilliseconds;sessionLine=carrying;
+        if(transports.Count>0&&carrying.Length>0&&carrying!=transports[0]) sessionFallbacks++;
+    }
+    /// Sends the session once: ok when it connected at all, else failed (an error) or cancelled (the user stopped it).
+    private async Task EndSession(bool failed) {
+        if(!sessionOpen) return;
+        sessionOpen=false;
+        var outcome=sessionUp is not null?"ok":failed?"failed":"cancelled";
+        var seconds=sessionUp is { } up?(int)(DateTime.UtcNow-up).TotalSeconds:0;
+        var detail=$"outcome={outcome} ms={(sessionUp is null?-1:sessionMs)} line={(sessionLine.Length>0?sessionLine:"-")} fallbacks={sessionFallbacks} drops={sessionDrops} seconds={seconds} net={(sessionNet.Length>0?sessionNet:"unknown")}";
+        try {await api.Report("CONNECT_SESSION",detail:detail);} catch {/* best effort */}
+    }
     public async Task Disconnect(string status="disconnected",bool unexpected=false) {
         if(!Active) {
             if(Blocking&&!unexpected) {Blocking=false;await LiftKillSwitch();Set(status);}
             return;
         }
         Active=false;loop?.Cancel();Since=null;RxRate=TxRate=0;carrying="";Bypass="";
+        _=EndSession(failed:false);
         NetworkChange.NetworkAddressChanged-=OnNetworkChanged;
         Journal.Add("disconnect: "+status);
         await Task.Run(core.Stop);

@@ -174,7 +174,7 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         when (page) {
             "devices", "logs", "apps" -> { page = "account"; render() }
-            "nodes", "account", "activity" -> { page = "connect"; render() }
+            "nodes", "account", "activity", "usage" -> { page = "connect"; render() }
             else -> super.onBackPressed()
         }
     }
@@ -330,6 +330,7 @@ class MainActivity : Activity() {
             "apps" -> appsPage()
             "logs" -> logs()
             "activity" -> activity()
+            "usage" -> usagePage()
             else -> account()
         }
         showUpdate()
@@ -612,13 +613,18 @@ class MainActivity : Activity() {
         val traffic = text("—", 15f, Palette.text, 500); val until = text("—", 15f, Palette.text, 500)
         val untilTitle = text(L10n.text(R.string.valid_until_label), 12f, Palette.secondary).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
         trafficTitle.ellipsize = android.text.TextUtils.TruncateAt.END
-        val strip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(4.dp, 0, 4.dp, 0) }
+        // A tap opens the usage page (per day, device and location).
+        val strip = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; setPadding(4.dp, 6.dp, 4.dp, 6.dp); background = pressable(Color.TRANSPARENT, 12)
+            contentDescription = L10n.text(R.string.usage_open); setOnClickListener { if (!busy) { page = "usage"; render() } }
+        }
         for ((title, value) in listOf(trafficTitle to traffic, untilTitle to until)) strip.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(title)
             addView(value.apply { maxLines = 1 }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        add(strip, top = 12)
+        strip.gravity = Gravity.CENTER_VERTICAL; strip.addView(chevron())
+        add(strip, top = 6)
         usageRow = strip
         fun show(data: JSONObject) {
             val access = AccountAccess.from(data)
@@ -636,6 +642,123 @@ class MainActivity : Activity() {
             runOnUiThread { accountData = data; remind(data); if (!isDestroyed && traffic.isAttachedToWindow) show(data) }
         }.start()
     }
+    // ---- Usage: what this account used, per day, per device and per location (the server's daily totals), and on
+    // Windows per program (kept on that computer only). Opened from the home's usage strip.
+    private var usageDays = 30
+    private fun usagePage() {
+        subPageTitle(L10n.text(R.string.usage_title)) { page = "connect"; render() }
+        val quota = card().also { add(it) }
+        fun fillQuota(data: JSONObject) {
+            quota.removeAllViews()
+            val access = AccountAccess.from(data)
+            val used = if (access.metered) maxOf(0L, access.quotaBytes!! - access.remainingBytes) else totalTraffic(data) ?: 0L
+            quota.addView(text(L10n.text(if (access.metered) R.string.usage_used_period else R.string.last_30_days), 12f, Palette.secondary).apply { maxLines = 1 })
+            quota.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM
+                val parts = bytes(used).split(' ', '\u00A0', limit = 2)
+                addView(text(parts[0], 38f, tint(access.state == "exhausted", false, Palette.text)).apply { typeface = Pixel.font(this@MainActivity); maxLines = 1 })
+                addView(text(parts.getOrElse(1) { "" }, 14f, Palette.secondary).apply { typeface = Typeface.MONOSPACE }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 6.dp; bottomMargin = 5.dp })
+                addView(View(this@MainActivity), LinearLayout.LayoutParams(0, 1, 1f))
+                addView(text(if (access.metered) L10n.text(R.string.usage_of, bytes(access.quotaBytes!!)) else L10n.text(R.string.usage_unlimited), 13f, Palette.secondary).apply { maxLines = 1 },
+                    LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = 5.dp; marginStart = 8.dp })
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp })
+            if (access.metered) {
+                val share = used.toFloat() / maxOf(1L, access.quotaBytes!!)
+                quota.addView(LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL; background = rounded(Palette.raised, 4); clipToOutline = true
+                    addView(View(this@MainActivity).apply { background = rounded(tint(access.state == "exhausted", access.low, Palette.accent), 4) }, LinearLayout.LayoutParams(0, -1, share.coerceIn(0.01f, 1f)))
+                    if (share < 1f) addView(View(this@MainActivity), LinearLayout.LayoutParams(0, -1, 1f - share.coerceIn(0.01f, 1f)))
+                }, LinearLayout.LayoutParams(-1, 8.dp).apply { topMargin = 12.dp })
+                quota.addView(text(L10n.text(R.string.usage_left, bytes(access.remainingBytes)), 12f, tint(access.state == "exhausted", access.low, Palette.secondary)).apply { maxLines = 1 },
+                    LinearLayout.LayoutParams(-2, -2).apply { topMargin = 8.dp })
+            }
+            quota.addView(View(this).apply { setBackgroundColor(Palette.hairline) }, LinearLayout.LayoutParams(-1, 1).apply { topMargin = 14.dp; bottomMargin = 12.dp })
+            val until = access.until
+            val ended = access.state == "expired"
+            quota.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                val left = when { ended -> L10n.text(R.string.access_expired_title); until == null -> L10n.text(R.string.no_expiry); else -> L10n.text(R.string.valid_until_label) + " " + L10n.date(until.toString()) }
+                addView(text(left, 13f, tint(ended, access.ending, Palette.secondary)).apply { maxLines = 2 }, LinearLayout.LayoutParams(0, -2, 1f))
+                if (until != null && !ended) {
+                    val days = maxOf(0L, (until.toEpochMilli() - System.currentTimeMillis() + AccountAccess.DAY - 1) / AccountAccess.DAY)
+                    addView(text(L10n.text(R.string.usage_days_left, L10n.number(days)), 13f, tint(false, access.ending, Palette.text), 500).apply { maxLines = 1 },
+                        LinearLayout.LayoutParams(-2, -2).apply { marginStart = 12.dp })
+                }
+            })
+        }
+        accountData?.let { fillQuota(it) }
+        // The range: 7, 30 or 90 days; changing it reloads the figures below, the page keeps its place.
+        val ranges = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(2.dp, 2.dp, 2.dp, 2.dp); background = rounded(Palette.surface, 12) }
+        add(ranges, height = 36.dp, top = 14)
+        val chart = card().also { add(it, top = 12) }
+        val dayLabel = text(" ", 12f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
+        val rangeTotal = text(" ", 12f, Palette.secondary).apply { typeface = Typeface.MONOSPACE; maxLines = 1 }
+        chart.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(dayLabel, LinearLayout.LayoutParams(0, -2, 1f)); addView(rangeTotal, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
+        })
+        var shownDays: List<Pair<String, Long>> = emptyList()
+        fun pick(index: Int) { shownDays.getOrNull(index)?.let { (day, value) -> dayLabel.swap(L10n.day(day) + " · " + bytes(value)) } }
+        val bars = DayBars(this) { pick(it) }
+        chart.addView(bars, LinearLayout.LayoutParams(-1, 88.dp).apply { topMargin = 12.dp })
+        val firstDay = text(" ", 11f, Palette.faint).apply { maxLines = 1 }; val lastDay = text(" ", 11f, Palette.faint).apply { maxLines = 1 }
+        chart.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(firstDay, LinearLayout.LayoutParams(0, -2, 1f)); addView(lastDay)
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp })
+        val lists = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also { add(it, top = 12) }
+        var loading = 0
+        fun load() {
+            val ask = ++loading; val days = usageDays
+            ranges.removeAllViews()
+            for ((value, title) in listOf(7 to R.string.usage_7_days, 30 to R.string.usage_30_days, 90 to R.string.usage_90_days)) {
+                val selected = value == usageDays
+                ranges.addView(text(L10n.text(title), 13f, if (selected) Palette.text else Palette.secondary, if (selected) 500 else 400).apply {
+                    gravity = Gravity.CENTER; maxLines = 1
+                    background = if (selected) rounded(Palette.selected, 10) else pressable(Color.TRANSPARENT, 10)
+                    contentDescription = L10n.text(title) + if (selected) L10n.text(R.string.current_page) else ""
+                    setOnClickListener { if (!selected) { usageDays = value; load() } }
+                }, LinearLayout.LayoutParams(0, -1, 1f))
+            }
+            lists.alpha = 0.5f
+            Thread {
+                val data = try { api.request("usage?days=$days") } catch (_: Exception) { null }
+                runOnUiThread {
+                    if (isDestroyed || ask != loading || !lists.isAttachedToWindow) return@runOnUiThread
+                    lists.animate().alpha(1f).setDuration(150).start()
+                    lists.removeAllViews()
+                    if (data == null) {
+                        lists.addView(text(L10n.text(R.string.usage_load_failed), 13f, Palette.secondary), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp; marginStart = 4.dp })
+                        return@runOnUiThread
+                    }
+                    // Every day of the range, with the days without traffic as empty bars.
+                    val byDay = data.optJSONArray("daily")?.let { arr -> (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.associate {
+                        it.optString("day") to ((it.optString("upload").toLongOrNull() ?: 0L) + (it.optString("download").toLongOrNull() ?: 0L)) } } ?: emptyMap()
+                    val today = java.time.LocalDate.now(java.time.ZoneOffset.UTC)
+                    shownDays = (days - 1 downTo 0).map { ago -> today.minusDays(ago.toLong()).toString().let { it to (byDay[it] ?: 0L) } }
+                    bars.set(shownDays.map { it.second }, shownDays.size - 1); pick(shownDays.size - 1)
+                    rangeTotal.swap(bytes(shownDays.sumOf { it.second }))
+                    firstDay.text = L10n.day(shownDays.first().first); lastDay.text = L10n.day(shownDays.last().first)
+                    bars.contentDescription = L10n.text(usageRangeTitle(days)) + " · " + bytes(shownDays.sumOf { it.second })
+                    fun rows(key: String, name: (JSONObject) -> String) = org.json.JSONArray().apply {
+                        val arr = data.optJSONArray(key) ?: return@apply
+                        for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { put(JSONObject().put("name", name(it)).put("bytes", it.optString("bytes").toLongOrNull() ?: 0L).put("proxy", true)) }
+                    }
+                    lists.addView(rankList(L10n.text(R.string.usage_by_device), rows("devices") { d ->
+                        d.optString("name").ifBlank { L10n.text(R.string.device) }.let { if (d.optBoolean("isCurrent")) L10n.text(R.string.usage_this_device, it) else it } }, mono = false, note = null),
+                        LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12.dp })
+                    lists.addView(rankList(L10n.text(R.string.usage_by_location), rows("nodes") { n -> n.optString("name") }, mono = false, note = null))
+                }
+            }.start()
+        }
+        load()
+        // The account (quota and end date) may be newer than the copy from the home page.
+        Thread {
+            val data = try { api.request("account") } catch (_: Exception) { null } ?: return@Thread
+            runOnUiThread { accountData = data; if (!isDestroyed && quota.isAttachedToWindow) fillQuota(data) }
+        }.start()
+    }
+    private fun usageRangeTitle(days: Int) = when (days) { 7 -> R.string.usage_7_days; 90 -> R.string.usage_90_days; else -> R.string.usage_30_days }
     /** Running out: amber; run out: red. */
     private fun tint(over: Boolean, low: Boolean, usual: Int) = when { over -> Palette.danger; low -> Palette.fair; else -> usual }
     /**

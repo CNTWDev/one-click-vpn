@@ -183,7 +183,8 @@ func (a *activityState) sample() {
 	if a.stop == nil {
 		return
 	}
-	hour := time.Now().Hour()
+	now := time.Now()
+	hour, day := now.Hour(), now.Format("2006-01-02")
 	live := map[string]bool{}
 	statistic.DefaultManager.Range(func(c statistic.Tracker) bool {
 		info := c.Info()
@@ -204,6 +205,7 @@ func (a *activityState) sample() {
 		add(a.domains, site(name), delta, proxy)
 		add(a.rules, rule(info), delta, proxy)
 		add(a.apps, info.Metadata.Process, delta, proxy)
+		appUsage.count(day, info.Metadata.Process, delta, proxy)
 		if delta > 0 {
 			if proxy {
 				a.hours[hour].Proxy += delta
@@ -218,6 +220,7 @@ func (a *activityState) sample() {
 			delete(a.conns, id)
 		}
 	}
+	appUsage.tick()
 }
 
 // lookup records a name the first time a connection uses it: proxied names are resolved by the

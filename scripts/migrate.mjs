@@ -595,6 +595,30 @@ const migrations = [
         AND (g.quota_bytes IS NULL OR g.used_bytes < g.quota_bytes))
       WHERE EXISTS (SELECT 1 FROM access_grants g WHERE g.user_id = u.id AND g.source = 'welcome')`);
   }],
+  ["010-telegram", async (db) => db.query(`
+    -- Telegram notifications and approvals (server/telegram.ts). The bot token is encrypted with the master key.
+    CREATE TABLE IF NOT EXISTS telegram_settings (
+      id TEXT PRIMARY KEY CHECK (id = 'primary'), token_ciphertext TEXT NOT NULL, token_iv TEXT NOT NULL, token_tag TEXT NOT NULL,
+      bot_id TEXT NOT NULL, bot_username TEXT NOT NULL, bot_name TEXT NOT NULL DEFAULT '', update_offset BIGINT NOT NULL DEFAULT 0,
+      approvers JSONB NOT NULL DEFAULT '[]', updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    -- Chats the bot posts to, each with the events it receives.
+    CREATE TABLE IF NOT EXISTS telegram_chats (
+      chat_id TEXT PRIMARY KEY, title TEXT NOT NULL, kind TEXT NOT NULL, events TEXT[] NOT NULL DEFAULT '{}',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    -- Chats and people that recently wrote to the bot, so the Console can offer them without typing ids.
+    CREATE TABLE IF NOT EXISTS telegram_seen (
+      chat_id TEXT NOT NULL, user_id TEXT NOT NULL DEFAULT '', title TEXT NOT NULL, kind TEXT NOT NULL,
+      user_name TEXT NOT NULL DEFAULT '', seen_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (chat_id, user_id)
+    );
+    -- One approval per kind + target (a user to approve, a version to promote) and the messages that carry its buttons.
+    CREATE TABLE IF NOT EXISTS telegram_approvals (
+      id TEXT PRIMARY KEY, kind TEXT NOT NULL, target TEXT NOT NULL, event TEXT NOT NULL, message JSONB NOT NULL,
+      sent JSONB NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'pending', decided_by TEXT, decided_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), expires_at TIMESTAMPTZ NOT NULL, UNIQUE (kind, target)
+    );
+  `)],
   ["011-node-speed-tests", async (db) => db.query(`
     -- A node's own connection speed, measured by its Agent (server/speed-test.ts); the last 30 per node are kept.
     CREATE TABLE IF NOT EXISTS node_speed_tests (
@@ -614,6 +638,14 @@ const migrations = [
       PRIMARY KEY (node_id, transport, country, asn, day)
     );
     CREATE INDEX IF NOT EXISTS node_path_stats_cohort_idx ON node_path_stats(country, asn, day);
+  `)],
+  ["013-node-drain", async (db) => db.query(`
+    -- Automatic removal of nodes nobody can reach (server/node-health.ts): like a pause, set and cleared by the Controller.
+    ALTER TABLE nodes ADD COLUMN IF NOT EXISTS drained_at TEXT;
+    ALTER TABLE nodes ADD COLUMN IF NOT EXISTS drain_reason TEXT NOT NULL DEFAULT '';
+    ALTER TABLE nodes ADD COLUMN IF NOT EXISTS drain_history TEXT NOT NULL DEFAULT '';
+    ALTER TABLE nodes ADD COLUMN IF NOT EXISTS drain_locked INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE nodes ADD COLUMN IF NOT EXISTS auto_drain INTEGER NOT NULL DEFAULT 1;
   `)],
 ];
 

@@ -4,6 +4,57 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.25
+
+### zh
+- 连不上时直接告诉你卡在哪一步：网络、服务器、线路还是加密通道，并给出该怎么办
+- 网络本身上不了网时先说网络的问题，不再误报成服务器故障
+- 「发送诊断」一键把这次连接的检查结果发给管理员，并显示编号方便沟通
+- 网络拦了 UDP 或 443 端口时自动换线路，连上后会说明改用了什么
+
+### en
+- When connecting fails, the app shows which step stopped it (network, server, lines or tunnel) and what to do
+- A network with no internet is named as the cause, instead of looking like a server problem
+- "Send check" sends this attempt's check to your admin and shows a reference number
+- When a network blocks UDP or port 443 the app switches lines on its own, and says which one it used once connected
+
+### ru
+- Если подключиться не удалось, приложение показывает, на каком шаге (сеть, сервер, линии или туннель) и что делать
+- Если в сети нет интернета, причиной называется сеть, а не сервер
+- «Отправить» передаёт проверку этой попытки администратору и показывает номер обращения
+- Если сеть блокирует UDP или порт 443, приложение само меняет линию и после подключения сообщает, какую использует
+
+## 1.0.24
+
+### zh
+- 连接时更稳：应用会记录每次连接的结果，帮助我们在新版本推给所有人之前先发现问题
+- 连不上的服务器会被自动移出列表，恢复后自动放回
+
+### en
+- Steadier connections: the app now notes how each connection went, so problems in a new version are caught before it reaches everyone
+- Servers nobody can reach are taken out of the list automatically and come back once they recover
+
+### ru
+- Стабильнее подключение: приложение отмечает, как прошло каждое подключение, чтобы проблемы новой версии находились до того, как она дойдёт до всех
+- Серверы, к которым никто не может подключиться, автоматически убираются из списка и возвращаются после восстановления
+
+## 1.0.23
+
+### zh
+- 新增「用量」页：在首页点用量那一行进入，看剩余流量、到期还有几天
+- 按 7 / 30 / 90 天看每天用了多少，点某一天的柱子看当天数字
+- 看每台设备、每个地区各用了多少；Windows 还能看最近 7 天哪些程序用得最多（只保存在这台电脑上）
+
+### en
+- New Usage page: tap the usage line on the home screen to see what is left and how many days remain
+- See traffic per day over 7, 30 or 90 days; tap a bar for that day's figure
+- See usage per device and per location; on Windows, also which programs used the most over the last 7 days (kept on this computer only)
+
+### ru
+- Новая страница «Трафик»: нажмите строку трафика на главном экране, чтобы увидеть остаток и сколько дней осталось
+- Трафик по дням за 7, 30 или 90 дней; нажмите столбец, чтобы увидеть цифру за день
+- Трафик по устройствам и локациям; в Windows также программы, потратившие больше всего за 7 дней (хранится только на этом компьютере)
+
 ## 1.0.22
 
 ### zh

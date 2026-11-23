@@ -5,14 +5,16 @@ import { agentRelease } from "./agent-self-upgrade";
 import { listSites, siteBrand } from "./sites";
 import { PRODUCT_NAME } from "../shared/brand-name";
 import { writeOperationalLog } from "./operational-logs";
+import { consoleLink, notify, telegramReady } from "./telegram";
+import { heldNodes } from "./node-health";
 
-// Email alerts to the addresses in Console → Controller → 告警通知, through the mail settings there.
+// Alerts go to Telegram (chats that receive "alerts") and by email to the addresses in Console → Controller → 告警.
 // Every minute each rule lists what is wrong right now. A problem is mailed once it has lasted the rule's
 // delay, and once more when it is gone; nothing repeats while it lasts. State lives in alert_states, so a
 // Controller restart neither repeats an alert nor forgets one.
 
 // kind + subject let Console show the problem in its own language; title and detail are the (Chinese) email text.
-type Problem = { key: string; kind: "node-offline" | "service" | "agent-outdated" | "disk" | "transport-blocked"; subject: string; title: string; detail: string; delayMinutes: number };
+type Problem = { key: string; kind: "node-offline" | "service" | "agent-outdated" | "disk" | "transport-blocked" | "node-drained" | "node-drain-held"; subject: string; title: string; detail: string; delayMinutes: number };
 type Row = { key: string; firing_since: Date; notified_at: Date | null; detail: string };
 
 const startedAt = Date.now();
@@ -41,6 +43,13 @@ async function nodeProblems(): Promise<Problem[]> {
     FROM vpn_services s JOIN nodes n ON n.id = s.node_id WHERE s.enabled = 1 AND s.status = 'attention'`);
   for (const service of failing) problems.push({ key: `service:${service.node_id}:${service.protocol}`, kind: "service", subject: `${service.name} ${service.protocol}`, title: `协议同步失败：${service.name} ${service.protocol}`,
     detail: service.last_error.slice(0, 300) || "状态为 attention", delayMinutes: 10 });
+  // Removed automatically (node-health.ts): reported at once, and as recovered when it is back in service.
+  const drained = await dbQuery<{ id: string; name: string; drained_at: string; drain_locked: number }>("SELECT id, name, drained_at, drain_locked FROM nodes WHERE drained_at IS NOT NULL");
+  for (const node of drained) problems.push({ key: `node-drained:${node.id}`, kind: "node-drained", subject: node.name, title: `节点已自动摘除：${node.name}`,
+    detail: `控制面从外部连续 3 分钟连不上它的任何线路，15 分钟内也没有用户连上过。已停止给新连接下发，现有连接不受影响。${node.drain_locked ? "6 小时内已摘除 3 次，需要在 Console 手动恢复。" : "连续正常 10 分钟后自动放回。"}`, delayMinutes: 0 });
+  const names = new Map((await dbQuery<{ id: string; name: string }>("SELECT id, name FROM nodes")).map((row) => [row.id, row.name]));
+  for (const [id, why] of heldNodes) problems.push({ key: `node-drain-held:${id}`, kind: "node-drain-held", subject: names.get(id) || id, title: `节点连不上，但没有自动摘除：${names.get(id) || id}`,
+    detail: why === "fleet" ? "摘除它会超过节点总数的一半，更可能是控制面自己的网络出了问题。" : "它是所在地区最后一个可用节点。", delayMinutes: 0 });
   const release = agentRelease().version;
   const behind = await dbQuery<{ name: string; version: string }>(`SELECT name, version FROM nodes
     WHERE agent_token_hash IS NOT NULL AND status = 'online' AND version LIKE 'agent %' AND version <> $1 ORDER BY name`, [release]);
@@ -125,7 +134,24 @@ export async function runAlerts(): Promise<{ fired: string[]; resolved: string[]
   if (gone.length) await dbExec("DELETE FROM alert_states WHERE key = ANY($1)", [gone.map((row) => row.key)]);
 
   const recipients = alertRecipients((await getControllerSettings() as { alert_emails?: string }).alert_emails || "");
-  if (!recipients.length || !(await mailConfigured()) || (!fire.length && !resolved.length)) return { fired: [], resolved: [] };
+  const byMail = recipients.length > 0 && await mailConfigured();
+  const byTelegram = await telegramReady("alerts").catch(() => false);
+  if ((!byMail && !byTelegram) || (!fire.length && !resolved.length)) return { fired: [], resolved: [] };
+  let delivered = false;
+  if (byTelegram) {
+    const link = await consoleLink("/controller");
+    let count = 0;
+    if (fire.length) count += await notify("alerts", fire.length === 1
+      ? { tone: "alert", title: fire[0].title, lines: [fire[0].detail], link }
+      : { tone: "alert", title: `${fire.length} 个问题需要处理`, lines: fire.map((problem) => `● ${problem.title}\n${problem.detail}`), link });
+    if (resolved.length) count += await notify("alerts", { tone: "ok", title: resolved.length === 1 ? `已恢复：${resolved[0].detail}` : `已恢复 ${resolved.length} 个问题`, lines: resolved.length === 1 ? [] : resolved.map((row) => `✓ ${row.detail}`) });
+    delivered = count > 0;
+  }
+  if (!byMail) {
+    // Not marked as notified when nothing arrived: the next minute tries again.
+    if (delivered && fire.length) await dbExec("UPDATE alert_states SET notified_at = now() WHERE key = ANY($1)", [fire.map((problem) => problem.key)]);
+    return delivered ? { fired: fire.map((problem) => problem.key), resolved: resolved.map((row) => row.key) } : { fired: [], resolved: [] };
+  }
   const lines = [
     ...fire.map((problem) => `● ${problem.title}\n${problem.detail}`),
     ...resolved.map((row) => `✓ 已恢复：${row.detail}`),
@@ -137,13 +163,14 @@ export async function runAlerts(): Promise<{ fired: string[]; resolved: string[]
     if (fire.length) await dbExec("UPDATE alert_states SET notified_at = now() WHERE key = ANY($1)", [fire.map((problem) => problem.key)]);
     void writeOperationalLog({ component: "controller", level: "info", action: "alerts.sent", message: `Alert email sent: ${subject}`, fields: { fired: fire.length, resolved: resolved.length } });
   } catch (error) {
-    // Not marked as notified: the next minute tries again.
+    // Not marked as notified unless Telegram got it: the next minute tries again.
+    if (delivered && fire.length) await dbExec("UPDATE alert_states SET notified_at = now() WHERE key = ANY($1)", [fire.map((problem) => problem.key)]);
     void writeOperationalLog({ component: "controller", level: "warning", action: "alerts.failed", message: `Alert email failed: ${error instanceof Error ? error.message : String(error)}` });
   }
   return { fired: fire.map((problem) => problem.key), resolved: resolved.map((row) => row.key) };
 }
 
-export type AlertStatus = { recipients: string; mailConfigured: boolean; firing: Array<{ key: string; kind: Problem["kind"]; subject: string; title: string; detail: string; since: string; notified: boolean }> };
+export type AlertStatus = { recipients: string; mailConfigured: boolean; telegramConfigured: boolean; firing: Array<{ key: string; kind: Problem["kind"]; subject: string; title: string; detail: string; since: string; notified: boolean }> };
 
 export async function alertStatus(): Promise<AlertStatus> {
   const problems = new Map((await currentProblems()).map((problem) => [problem.key, problem]));
@@ -151,6 +178,7 @@ export async function alertStatus(): Promise<AlertStatus> {
   return {
     recipients: (await getControllerSettings() as { alert_emails?: string }).alert_emails || "",
     mailConfigured: await mailConfigured(),
+    telegramConfigured: await telegramReady("alerts").catch(() => false),
     firing: rows.filter((row) => problems.has(row.key)).map((row) => ({ key: row.key, kind: problems.get(row.key)!.kind, subject: problems.get(row.key)!.subject, title: problems.get(row.key)!.title, detail: problems.get(row.key)!.detail,
       since: new Date(row.firing_since).toISOString(), notified: Boolean(row.notified_at) })),
   };

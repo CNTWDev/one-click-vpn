@@ -119,6 +119,8 @@ public sealed class Core : IDisposable {
     public long Reach(string address,int timeoutMs)=>long.TryParse(Call($"reach {address} {timeoutMs}"),out var ms)?ms:-1;
     /// Open connections, rankings, hourly split and names looked up since connecting (core.Activity), as JSON.
     public string Activity()=>Call("activity");
+    /// The programs that used the most traffic over the last days local days, kept on this computer (core.AppUsage), as JSON.
+    public string AppUsage(int days)=>Call("appusage "+days);
     public string Now(string group)=>Call("now "+group);
     /// The connection check's speed test (core.SpeedStart): "ok", or "error <reason>"; poll SpeedProgress for the figures.
     public string SpeedStart(string request)=>Call("speedstart "+Convert.ToBase64String(Encoding.UTF8.GetBytes(request)));

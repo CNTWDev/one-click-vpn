@@ -178,7 +178,7 @@ export async function selectVpnServices(input: { protocol: Protocol; regionId?: 
     if (!services.some((service) => service.node_id === node.id)) return false;
     if (!advertised.get(node.id)) return false;
     if (input.regionId && node.region_id !== input.regionId) return false;
-    if (node.paused_at && !input.includePaused) return false;
+    if ((node.paused_at || node.drained_at) && !input.includePaused) return false;
     if (node.status !== "online" || !node.last_heartbeat_at) return false;
     if (Date.now() - new Date(node.last_heartbeat_at).getTime() >= 90_000) return false;
     const connectivity = node.capabilities.connectivity as { protocols?: Record<string, { runtimeActive?: boolean; interfaceActive?: boolean; serviceActive?: boolean; listening?: boolean }> } | undefined;

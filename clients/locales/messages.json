@@ -2333,5 +2333,85 @@
     "zh": "443 端口被拦，已改用备用端口",
     "en": "Port 443 is blocked, using a spare port",
     "ru": "Порт 443 закрыт, используется запасной"
+  },
+  "usage_title": {
+    "zh": "用量",
+    "en": "Usage",
+    "ru": "Трафик"
+  },
+  "usage_open": {
+    "zh": "查看用量",
+    "en": "See usage",
+    "ru": "Подробнее о трафике"
+  },
+  "usage_used_period": {
+    "zh": "本期已用",
+    "en": "Used this period",
+    "ru": "Использовано за период"
+  },
+  "usage_of": {
+    "zh": "共 {0}",
+    "en": "of {0}",
+    "ru": "из {0}"
+  },
+  "usage_left": {
+    "zh": "剩余 {0}",
+    "en": "{0} left",
+    "ru": "Осталось {0}"
+  },
+  "usage_unlimited": {
+    "zh": "不限流量",
+    "en": "Unlimited data",
+    "ru": "Без лимита"
+  },
+  "usage_days_left": {
+    "zh": "还有 {0} 天",
+    "en": "{0} days left",
+    "ru": "Осталось дней: {0}"
+  },
+  "usage_7_days": {
+    "zh": "7 天",
+    "en": "7 days",
+    "ru": "7 дней"
+  },
+  "usage_30_days": {
+    "zh": "30 天",
+    "en": "30 days",
+    "ru": "30 дней"
+  },
+  "usage_90_days": {
+    "zh": "90 天",
+    "en": "90 days",
+    "ru": "90 дней"
+  },
+  "usage_by_device": {
+    "zh": "按设备",
+    "en": "By device",
+    "ru": "По устройствам"
+  },
+  "usage_by_location": {
+    "zh": "按节点",
+    "en": "By location",
+    "ru": "По локациям"
+  },
+  "usage_by_app": {
+    "zh": "按应用",
+    "en": "By app",
+    "ru": "По приложениям"
+  },
+  "usage_this_device": {
+    "zh": "{0}（本机）",
+    "en": "{0} (this device)",
+    "ru": "{0} (это)"
+  },
+  "usage_apps_local": {
+    "zh": "只在本机统计，不上传",
+    "en": "Counted on this device only, never uploaded",
+    "ru": "Считается только здесь, не отправляется"
+  },
+  "usage_load_failed": {
+    "zh": "用量没加载出来，稍后再试。",
+    "en": "Couldn't load usage. Try again later.",
+    "ru": "Не удалось загрузить трафик. Попробуйте позже."
   }
 }

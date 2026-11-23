@@ -4,6 +4,8 @@ import { hashPasswordAsync } from "../../../../../server/password";
 import { cleanText, jsonError, readJson } from "../../../../../server/http";
 import { allowRegistration } from "../../../../../server/rate-limit";
 import { grantWelcome } from "../../../../../server/entitlements";
+import { siteForRequest } from "../../../../../server/sites";
+import { askSignupApproval } from "../../../../../server/telegram-actions";
 
 export const runtime = "nodejs";
 
@@ -26,6 +28,7 @@ export async function POST(request: Request) {
       const user = await createPendingUser({ email, displayName, passwordHash });
       await grantWelcome(user.id);
       await addAudit({ actorUserId: user.id, action: "auth.registered", targetType: "user", targetId: user.id });
+      if (user.status === "pending") void siteForRequest(request).then((site) => askSignupApproval({ id: user.id, email: user.email, displayName: user.display_name }, site.name)).catch(() => undefined);
     }
     return NextResponse.json({ status: "received", email, message: "Registration received. An administrator must approve the account before VPN access is available." }, { status: 202 });
   } catch (error) {
