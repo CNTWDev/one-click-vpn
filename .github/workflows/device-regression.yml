@@ -1,0 +1,107 @@
+# Real-device regression: the published beta build on real devices, plus the regression account's Clash
+# subscription through every line. Runs every night, after each Client release, and on demand.
+#
+# One-time setup (see clients/RELEASING.md, "真机回归"):
+#   - secret VEILBIRD_REGRESSION_SUBSCRIPTION: the regression account's subscription URL
+#   - variable VEILBIRD_REGRESSION_NODE: part of the test node's name (every line of it must work)
+#   - a self-hosted runner on the owner's Mac with labels self-hosted, macOS, veilbird-device, an Android phone
+#     on USB with USB debugging allowed, then variable VEILBIRD_DEVICE_RUNNER = true
+#   - variable VEILBIRD_RELEASE_API + secret VEILBIRD_RELEASE_TOKEN (already used by Client release) for
+#     downloads and for the report, which goes to Loki and, on failure, to Telegram.
+# Without the runner only the subscription check runs; without the subscription secret it is skipped too.
+name: Device regression
+on:
+  schedule:
+    - cron: '0 19 * * *'
+  workflow_run:
+    workflows: [Client release]
+    types: [completed]
+  workflow_dispatch:
+run-name: Device regression · ${{ github.event_name == 'workflow_run' && 'after Client release' || github.event_name }}
+permissions:
+  contents: read
+concurrency:
+  group: device-regression
+  cancel-in-progress: false
+env:
+  API: ${{ vars.VEILBIRD_RELEASE_API }}
+jobs:
+  subscription:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: clients/core/go.mod
+          cache-dependency-path: clients/core/go.sum
+      - name: Clash subscription through every line
+        env:
+          VEILBIRD_REGRESSION_SUBSCRIPTION: ${{ secrets.VEILBIRD_REGRESSION_SUBSCRIPTION }}
+          VEILBIRD_REGRESSION_NODE: ${{ vars.VEILBIRD_REGRESSION_NODE }}
+        working-directory: clients/core
+        run: |
+          if [[ -z "$VEILBIRD_REGRESSION_SUBSCRIPTION" ]]; then echo "::notice::VEILBIRD_REGRESSION_SUBSCRIPTION not set: skipped"; exit 0; fi
+          set +e
+          go test -run TestRegressionSubscription -count=1 -v . > out.txt 2>&1; code=$?
+          set -e
+          cat out.txt
+          detail=$(grep -E 'regression_test.go:[0-9]+: (node|test node|subscription|download)' out.txt | head -3 | sed 's/^ *//' | tr '\n' ' ' | tr -d '"')
+          printf '{"platform":"subscription","case":"clash-import","ok":%s,"detail":"%s"}\n' "$([[ $code == 0 ]] && echo true || echo false)" "${detail:-every node reachable}" > "$GITHUB_WORKSPACE/results.jsonl"
+          exit $code
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-subscription
+          path: results.jsonl
+          if-no-files-found: ignore
+
+  devices:
+    if: vars.VEILBIRD_DEVICE_RUNNER == 'true' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: [self-hosted, macOS, veilbird-device]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the beta builds and the current stable Android build
+        run: |
+          rm -rf builds results.jsonl && mkdir builds
+          curl -fsSL -o builds/new.apk "$API/download/android?channel=beta"
+          curl -fsSL -o builds/previous.apk "$API/download/android" || rm -f builds/previous.apk
+          curl -fsSL -o builds/app.dmg "$API/download/macos?channel=beta"
+      - name: Android
+        if: always()
+        run: scripts/device/android-smoke.sh builds/new.apk $( [[ -f builds/previous.apk ]] && echo builds/previous.apk )
+      - name: Mac
+        if: always()
+        run: scripts/device/mac-smoke.sh builds/app.dmg
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-devices
+          path: results.jsonl
+          if-no-files-found: ignore
+
+  report:
+    needs: [subscription, devices]
+    if: always() && vars.VEILBIRD_RELEASE_API != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: results-*
+          path: results
+      - name: Send results to the Controller (Loki; Telegram on failure)
+        env:
+          TOKEN: ${{ secrets.VEILBIRD_RELEASE_TOKEN }}
+          DEVICES: ${{ needs.devices.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TRIGGER: ${{ github.event_name }}
+        run: |
+          cat results/*/results.jsonl 2>/dev/null > all.jsonl || true
+          if [[ ! -s all.jsonl || -z "$TOKEN" ]]; then echo "::notice::Nothing to report"; exit 0; fi
+          skipped='[]'; [[ "$DEVICES" == skipped ]] && skipped='["Android","Mac"]'
+          version=$(curl -fsS "$API/api/v1/client-releases/latest?platform=android&channel=beta" | jq -r '.latest.version // ""' || true)
+          jq -s --arg version "$version" --arg runUrl "$RUN_URL" --arg trigger "$TRIGGER" --argjson skipped "$skipped" \
+            '{version: $version, runUrl: $runUrl, trigger: $trigger, skipped: $skipped, cases: .}' all.jsonl > body.json
+          curl -fsS -X POST "$API/api/v1/admin/client-releases/regression" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data @body.json
