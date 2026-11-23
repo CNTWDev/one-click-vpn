@@ -4,6 +4,7 @@ import { revokeApiSessionsForUser } from "../../../../../../../server/control-db
 import { reconcileUserAccess } from "../../../../../../../server/credential-access";
 import { publicUser } from "../../../../../../../server/device-auth";
 import { requestAdmin } from "../../../../../../../server/request-auth";
+import { settleSignup } from "../../../../../../../server/telegram-actions";
 import { cleanText, jsonError, readJson } from "../../../../../../../server/http";
 
 export const runtime = "nodejs";
@@ -28,6 +29,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       await Promise.all([deleteSessionsForUser(id), revokeApiSessionsForUser(id), dbExec("DELETE FROM native_sessions WHERE user_id=$1",[id])]);
     }
     const sync = await reconcileUserAccess(id);
+    if (target.status === "pending") void settleSignup(id, status);
     await addAudit({ actorUserId: admin.id, action: `user.${status}`, targetType: "user", targetId: id, metadata: reason ? { reason } : {} });
     return NextResponse.json({ user: publicUser(user), sync });
   } catch (error) {

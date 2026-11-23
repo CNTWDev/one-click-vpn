@@ -696,6 +696,16 @@ Rollout: `sudo ./one-click-update.sh` (migration 009) → **升级 Agent** on ea
 - **Alerts.** Console → Controller → **告警**: recipients for email (sent through the mail
   settings above it) when a node has no heartbeat for 3 minutes, a service is failing for
   10 minutes, a disk is above 85% or an Agent is a day behind; recovery is mailed too.
+- **Telegram.** Console → Controller → **Telegram** is the main channel for alerts and
+  approvals. Paste a bot token from @BotFather (stored encrypted with the master key), add
+  the bot to a group or send it `/start`, then add the chat and pick what it receives:
+  alerts and recovery, sign-up approvals, client releases. Approvals are inline buttons
+  only the listed approvers can press. The Controller reads updates by long polling, so it
+  needs outbound HTTPS to `api.telegram.org` and no inbound port
+  (`VEILBIRD_TELEGRAM_API_ORIGIN` points it at a self-hosted Bot API server instead).
+  Other modules send through `server/telegram.ts`: `notify(event, message)` and
+  `requestApproval(...)` with `registerApproval(kind, handler)`; messages are plain data
+  rendered to Telegram HTML (escaped, kept under 4096 characters).
 - **App entry points.** The apps try their own API domain, then the API domains of every
   site and the backup domains in Console → 站点 → **App 备用入口**. Per domain they dial
   addresses that worked before first, then system DNS, then DNS over HTTPS; certificates

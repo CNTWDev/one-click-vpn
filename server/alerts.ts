@@ -5,8 +5,9 @@ import { agentRelease } from "./agent-self-upgrade";
 import { listSites, siteBrand } from "./sites";
 import { PRODUCT_NAME } from "../shared/brand-name";
 import { writeOperationalLog } from "./operational-logs";
+import { consoleLink, notify, telegramReady } from "./telegram";
 
-// Email alerts to the addresses in Console → Controller → 告警通知, through the mail settings there.
+// Alerts go to Telegram (chats that receive "alerts") and by email to the addresses in Console → Controller → 告警.
 // Every minute each rule lists what is wrong right now. A problem is mailed once it has lasted the rule's
 // delay, and once more when it is gone; nothing repeats while it lasts. State lives in alert_states, so a
 // Controller restart neither repeats an alert nor forgets one.
@@ -125,7 +126,24 @@ export async function runAlerts(): Promise<{ fired: string[]; resolved: string[]
   if (gone.length) await dbExec("DELETE FROM alert_states WHERE key = ANY($1)", [gone.map((row) => row.key)]);
 
   const recipients = alertRecipients((await getControllerSettings() as { alert_emails?: string }).alert_emails || "");
-  if (!recipients.length || !(await mailConfigured()) || (!fire.length && !resolved.length)) return { fired: [], resolved: [] };
+  const byMail = recipients.length > 0 && await mailConfigured();
+  const byTelegram = await telegramReady("alerts").catch(() => false);
+  if ((!byMail && !byTelegram) || (!fire.length && !resolved.length)) return { fired: [], resolved: [] };
+  let delivered = false;
+  if (byTelegram) {
+    const link = await consoleLink("/controller");
+    let count = 0;
+    if (fire.length) count += await notify("alerts", fire.length === 1
+      ? { tone: "alert", title: fire[0].title, lines: [fire[0].detail], link }
+      : { tone: "alert", title: `${fire.length} 个问题需要处理`, lines: fire.map((problem) => `● ${problem.title}\n${problem.detail}`), link });
+    if (resolved.length) count += await notify("alerts", { tone: "ok", title: resolved.length === 1 ? `已恢复：${resolved[0].detail}` : `已恢复 ${resolved.length} 个问题`, lines: resolved.length === 1 ? [] : resolved.map((row) => `✓ ${row.detail}`) });
+    delivered = count > 0;
+  }
+  if (!byMail) {
+    // Not marked as notified when nothing arrived: the next minute tries again.
+    if (delivered && fire.length) await dbExec("UPDATE alert_states SET notified_at = now() WHERE key = ANY($1)", [fire.map((problem) => problem.key)]);
+    return delivered ? { fired: fire.map((problem) => problem.key), resolved: resolved.map((row) => row.key) } : { fired: [], resolved: [] };
+  }
   const lines = [
     ...fire.map((problem) => `● ${problem.title}\n${problem.detail}`),
     ...resolved.map((row) => `✓ 已恢复：${row.detail}`),
@@ -137,13 +155,14 @@ export async function runAlerts(): Promise<{ fired: string[]; resolved: string[]
     if (fire.length) await dbExec("UPDATE alert_states SET notified_at = now() WHERE key = ANY($1)", [fire.map((problem) => problem.key)]);
     void writeOperationalLog({ component: "controller", level: "info", action: "alerts.sent", message: `Alert email sent: ${subject}`, fields: { fired: fire.length, resolved: resolved.length } });
   } catch (error) {
-    // Not marked as notified: the next minute tries again.
+    // Not marked as notified unless Telegram got it: the next minute tries again.
+    if (delivered && fire.length) await dbExec("UPDATE alert_states SET notified_at = now() WHERE key = ANY($1)", [fire.map((problem) => problem.key)]);
     void writeOperationalLog({ component: "controller", level: "warning", action: "alerts.failed", message: `Alert email failed: ${error instanceof Error ? error.message : String(error)}` });
   }
   return { fired: fire.map((problem) => problem.key), resolved: resolved.map((row) => row.key) };
 }
 
-export type AlertStatus = { recipients: string; mailConfigured: boolean; firing: Array<{ key: string; kind: Problem["kind"]; subject: string; title: string; detail: string; since: string; notified: boolean }> };
+export type AlertStatus = { recipients: string; mailConfigured: boolean; telegramConfigured: boolean; firing: Array<{ key: string; kind: Problem["kind"]; subject: string; title: string; detail: string; since: string; notified: boolean }> };
 
 export async function alertStatus(): Promise<AlertStatus> {
   const problems = new Map((await currentProblems()).map((problem) => [problem.key, problem]));
@@ -151,6 +170,7 @@ export async function alertStatus(): Promise<AlertStatus> {
   return {
     recipients: (await getControllerSettings() as { alert_emails?: string }).alert_emails || "",
     mailConfigured: await mailConfigured(),
+    telegramConfigured: await telegramReady("alerts").catch(() => false),
     firing: rows.filter((row) => problems.has(row.key)).map((row) => ({ key: row.key, kind: problems.get(row.key)!.kind, subject: problems.get(row.key)!.subject, title: problems.get(row.key)!.title, detail: problems.get(row.key)!.detail,
       since: new Date(row.firing_since).toISOString(), notified: Boolean(row.notified_at) })),
   };
