@@ -75,6 +75,8 @@
   <string name="automatic_recommended">Automatic · Recommended</string>
   <string name="available_location">Available location</string>
   <string name="back_action">Back</string>
+  <string name="bypass_port">Port 443 is blocked, using a spare port</string>
+  <string name="bypass_udp">This network blocks UDP, using %1$s</string>
   <string name="cancel">Cancel</string>
   <string name="change_location">Change location  ›</string>
   <string name="change_location_action">Change</string>
@@ -93,6 +95,7 @@
   <string name="check_node_slow">%1$s is slow right now. Another location will be faster.</string>
   <string name="check_ok">All good: every leg is fast.</string>
   <string name="check_running">Measuring each leg…</string>
+  <string name="check_sent">Sent to your admin · ref %1$s</string>
   <string name="check_title">Connection check</string>
   <string name="check_web">Opening a page</string>
   <string name="check_web_detail">Through the location</string>
@@ -144,6 +147,20 @@
   <string name="devices_join_automatically">New devices join on first connect</string>
   <string name="devices_unlimited">Unlimited</string>
   <string name="devices_used">%1$s of %2$s used</string>
+  <string name="diag_all_blocked">All blocked</string>
+  <string name="diag_captive">Needs sign-in</string>
+  <string name="diag_lines">Lines</string>
+  <string name="diag_lines_blocked">All %1$s blocked</string>
+  <string name="diag_network">Network</string>
+  <string name="diag_no_internet">No internet</string>
+  <string name="diag_no_permission">Not allowed</string>
+  <string name="diag_not_started">Not started</string>
+  <string name="diag_ok">OK</string>
+  <string name="diag_reached">Reached</string>
+  <string name="diag_server">Server</string>
+  <string name="diag_tunnel">Tunnel</string>
+  <string name="diag_tunnel_failed">Couldn’t open</string>
+  <string name="diag_unreached">No answer</string>
   <string name="disconnect_action">Disconnect</string>
   <string name="disconnect_before_changing_location">Disconnect before changing location.</string>
   <string name="disconnect_before_changing_routing">Disconnect before changing the routing mode.</string>
@@ -162,6 +179,8 @@
   <string name="enter_password">Enter password</string>
   <string name="enter_your_email_and_password">Enter your email and password.</string>
   <string name="error_account_title">Account unavailable</string>
+  <string name="error_captive_detail">Finish the Wi‑Fi sign-in page in the browser first, then connect.</string>
+  <string name="error_captive_title">This Wi‑Fi needs sign-in</string>
   <string name="error_device_detail">Remove a device you no longer use, and this one can connect.</string>
   <string name="error_device_title">Device limit reached</string>
   <string name="error_expired_detail">Ask your administrator to renew it, then try again.</string>
@@ -170,6 +189,10 @@
   <string name="error_extension_title">Network extension is off</string>
   <string name="error_lease_detail">You were offline too long. Connect again to renew it.</string>
   <string name="error_lease_title">Authorization expired</string>
+  <string name="error_lines_detail">The server answers, but no line gets through. Try another network or location.</string>
+  <string name="error_lines_title">Every line is blocked</string>
+  <string name="error_no_internet_detail">Try another Wi‑Fi, or turn on mobile data.</string>
+  <string name="error_no_internet_title">This network has no internet</string>
   <string name="error_node_auto_detail">No location is answering right now. Try again later or on another network.</string>
   <string name="error_node_detail">Pick another location, or let Automatic choose.</string>
   <string name="error_node_title">%1$s isn\'t answering</string>
@@ -257,6 +280,7 @@
   <string name="open_app">Open TrackNothing</string>
   <string name="open_at_login">Open at login</string>
   <string name="open_main_window">Open main window</string>
+  <string name="open_network_settings">Network settings</string>
   <string name="open_settings_short">Open Settings</string>
   <string name="open_system_settings">Open System Settings</string>
   <string name="open_vpn_settings">Open VPN settings</string>
@@ -332,6 +356,7 @@
   <string name="seen_as">Sites only see %1$s</string>
   <string name="select_an_available_location_for_you">Fastest location, switches if one fails</string>
   <string name="selected_state">selected</string>
+  <string name="send_check_action">Send check</string>
   <string name="send_reset_link">Send link</string>
   <string name="server_address">Server address</string>
   <string name="server_address_url">Server address https://…</string>
@@ -447,7 +472,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Steadier connections: the app now notes how each connection went, so problems in a new version are caught before it reaches everyone\nServers nobody can reach are taken out of the list automatically and come back once they recover</string>
+  <string name="whats_new_notes">When connecting fails, the app shows which step stopped it (network, server, lines or tunnel) and what to do\nA network with no internet is named as the cause, instead of looking like a server problem\n\&quot;Send check\&quot; sends this attempt\'s check to your admin and shows a reference number\nWhen a network blocks UDP or port 443 the app switches lines on its own, and says which one it used once connected</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

@@ -110,6 +110,11 @@ class MainActivity : Activity() {
     private var nodeBadge: FrameLayout? = null
     private var rateBars: RateBars? = null
     private var switchNote: View? = null
+    /** Under a network failure: the four steps and where the attempt stopped. The location row and the usage give it their room. */
+    private var checksCard: LinearLayout? = null
+    private var nodeRow: View? = null
+    private var usageRow: View? = null
+    private var shownChecks: List<Check>? = null
     private var switchText: TextView? = null
     // The note is dismissed per switch: a later switch shows it again.
     private var dismissedSwitch = ""
@@ -554,6 +559,9 @@ class MainActivity : Activity() {
         add(stateTitle!!)
         stateDetail = text("", 14f, Palette.secondary).apply { minLines = 2; maxLines = 2; ellipsize = TextUtils.TruncateAt.END; setPadding(4.dp, 0, 4.dp, 0) }
         add(stateDetail!!, top = 6)
+        shownChecks = null
+        checksCard = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(14.dp, 6.dp, 14.dp, 6.dp); background = rounded(Palette.surface, 14); visibility = View.GONE }
+            .also { add(it, top = 14) }
         // First run: before the first tap, what the system is about to ask and which button to press.
         if (!onboarded && VpnService.prepare(this) != null) firstNote = note(L10n.text(R.string.first_connect_android), L10n.text(R.string.first_connect_android_detail))
             .also { dock?.addView(it, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp }) }
@@ -583,6 +591,7 @@ class MainActivity : Activity() {
         nodeTitle = names.getChildAt(0) as TextView; nodeDetail = names.getChildAt(1) as TextView
         node.addView(chevron())
         add(node, top = 14)
+        nodeRow = node
         usageStrip()
         sealedShown = null; shownState = null
         showState()
@@ -616,6 +625,7 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(0, -2, 1f))
         strip.gravity = Gravity.CENTER_VERTICAL; strip.addView(chevron())
         add(strip, top = 6)
+        usageRow = strip
         fun show(data: JSONObject) {
             val access = AccountAccess.from(data)
             trafficTitle.text = L10n.text(access.trafficTitle()); untilTitle.text = L10n.text(access.untilTitle())
@@ -854,7 +864,7 @@ class MainActivity : Activity() {
         switchText?.text = if (noteShown) L10n.text(R.string.switched_location, from, ConnectionStateStore.node) else ""
         switchNote?.visibility = if (noteShown) View.VISIBLE else View.GONE
         stateDetail?.swap(when (state) {
-            LinkState.CONNECTED -> L10n.text(R.string.seen_as, ConnectionStateStore.node)
+            LinkState.CONNECTED -> L10n.text(R.string.seen_as, ConnectionStateStore.node) + Guidance.bypass().let { if (it.isEmpty()) "" else "\n" + it }
             LinkState.CONNECTING -> L10n.text(R.string.finding_best_route)
             LinkState.SWITCHING -> L10n.text(R.string.switching_detail)
             LinkState.RECONNECTING -> if (ConnectionStateStore.messageId == R.string.location_retrying) ConnectionStateStore.message else L10n.text(R.string.reconnecting_detail)
@@ -869,8 +879,38 @@ class MainActivity : Activity() {
             stepsRow?.let { fillSteps(it, STEPS + 1) }
             handler.postDelayed({ if (!isDestroyed && page == "connect") render() }, 3000)
         }
+        showChecks(if (state == LinkState.FAILED) Guidance.checks() else null)
         shownState = state; shownTrouble = trouble
         showCurrentNode()
+    }
+    /** The four-step check under a network failure; while it shows, the location row and the usage step aside so the page still fits. */
+    private fun showChecks(checks: List<Check>?) {
+        val card = checksCard ?: return
+        if (checks == shownChecks) return
+        shownChecks = checks
+        card.removeAllViews()
+        card.visibility = if (checks == null) View.GONE else View.VISIBLE
+        nodeRow?.visibility = if (checks == null) View.VISIBLE else View.GONE
+        usageRow?.visibility = if (checks == null) View.VISIBLE else View.GONE
+        checks?.forEach { c ->
+            card.addView(row(30).apply {
+                setPadding(0, 0, 0, 0)
+                addView(View(this@MainActivity).apply { setBackgroundColor(when (c.status) { Check.OK -> Palette.secondary; Check.BAD -> Palette.fair; else -> Palette.selected }) },
+                    LinearLayout.LayoutParams(7.dp, 7.dp).apply { marginEnd = 10.dp })
+                addView(text(L10n.text(c.label), 13f, Palette.secondary).apply { maxLines = 1 })
+                addView(text(c.value, 13f, when (c.status) { Check.BAD -> Palette.fair; Check.SKIP -> Palette.faint; else -> Palette.text }).apply {
+                    maxLines = 1; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.END
+                }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = 12.dp })
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                contentDescription = L10n.text(c.label) + ": " + c.value
+            }, LinearLayout.LayoutParams(-1, 30.dp))
+        }
+    }
+    /** Sends the check and the attempt's id; the toast gives the reference the admin finds in 运行日志. */
+    private fun sendCheck() {
+        val request = ConnectionStateStore.request; val node = ConnectionStateStore.nodeId; val summary = Guidance.summary()
+        Thread { api.attempt = request.ifEmpty { null }; api.report("CONNECT_CHECK", node, summary) }.start()
+        Toast.makeText(this, L10n.text(R.string.check_sent, request.take(6).uppercase().ifEmpty { "—" }), Toast.LENGTH_LONG).show()
     }
     /** What a failure's button does: try again, or go where the cause is fixed. */
     private fun trouble(what: String?) {
@@ -882,6 +922,8 @@ class MainActivity : Activity() {
             "account" -> { page = "account"; render() }
             "automatic" -> { select("", "", ""); toggleConnection() }
             "settings" -> try { startActivity(Intent(android.provider.Settings.ACTION_VPN_SETTINGS)) } catch (_: Exception) { }
+            "wifi" -> try { startActivity(Intent(android.provider.Settings.ACTION_WIFI_SETTINGS)) } catch (_: Exception) { }
+            "send" -> sendCheck()
             "update" -> update?.let { installUpdate(it) } ?: checkForUpdate(announce = true)
             "signin" -> {
                 // The chosen location stays; only the session goes.

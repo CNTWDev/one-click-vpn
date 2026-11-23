@@ -75,6 +75,8 @@
   <string name="automatic_recommended">Автоматически · Рекомендуется</string>
   <string name="available_location">Доступная локация</string>
   <string name="back_action">Назад</string>
+  <string name="bypass_port">Порт 443 закрыт, используется запасной</string>
+  <string name="bypass_udp">Сеть блокирует UDP, используется %1$s</string>
   <string name="cancel">Отмена</string>
   <string name="change_location">Изменить локацию  ›</string>
   <string name="change_location_action">Сменить</string>
@@ -93,6 +95,7 @@
   <string name="check_node_slow">%1$s сейчас медленный. Другой узел будет быстрее.</string>
   <string name="check_ok">Всё в порядке: все участки быстрые.</string>
   <string name="check_running">Измеряем каждый участок…</string>
+  <string name="check_sent">Отправлено администратору · %1$s</string>
   <string name="check_title">Проверка связи</string>
   <string name="check_web">Открытие страницы</string>
   <string name="check_web_detail">Через узел</string>
@@ -144,6 +147,20 @@
   <string name="devices_join_automatically">Новые устройства добавляются сами</string>
   <string name="devices_unlimited">Без лимита</string>
   <string name="devices_used">Занято %1$s из %2$s</string>
+  <string name="diag_all_blocked">Все заблокированы</string>
+  <string name="diag_captive">Нужен вход</string>
+  <string name="diag_lines">Линии</string>
+  <string name="diag_lines_blocked">Все %1$s заблокированы</string>
+  <string name="diag_network">Сеть</string>
+  <string name="diag_no_internet">Нет интернета</string>
+  <string name="diag_no_permission">Не разрешён</string>
+  <string name="diag_not_started">Не начат</string>
+  <string name="diag_ok">В порядке</string>
+  <string name="diag_reached">Доступен</string>
+  <string name="diag_server">Сервер</string>
+  <string name="diag_tunnel">Туннель</string>
+  <string name="diag_tunnel_failed">Не открылся</string>
+  <string name="diag_unreached">Не отвечает</string>
   <string name="disconnect_action">Отключиться</string>
   <string name="disconnect_before_changing_location">Перед сменой локации отключитесь.</string>
   <string name="disconnect_before_changing_routing">Отключитесь, чтобы сменить режим маршрутизации.</string>
@@ -162,6 +179,8 @@
   <string name="enter_password">Введите пароль</string>
   <string name="enter_your_email_and_password">Введите почту и пароль.</string>
   <string name="error_account_title">Аккаунт недоступен</string>
+  <string name="error_captive_detail">Сначала войдите на странице Wi‑Fi в браузере, затем подключитесь.</string>
+  <string name="error_captive_title">Wi‑Fi требует входа</string>
   <string name="error_device_detail">Отвяжите ненужное устройство, и это сможет подключиться.</string>
   <string name="error_device_title">Лимит устройств</string>
   <string name="error_expired_detail">Попросите администратора продлить доступ и повторите.</string>
@@ -170,6 +189,10 @@
   <string name="error_extension_title">Расширение выключено</string>
   <string name="error_lease_detail">Вы долго были офлайн. Подключитесь снова.</string>
   <string name="error_lease_title">Доступ устарел</string>
+  <string name="error_lines_detail">Сервер отвечает, а линии — нет. Смените сеть или локацию.</string>
+  <string name="error_lines_title">Линии заблокированы</string>
+  <string name="error_no_internet_detail">Смените Wi‑Fi или включите мобильные данные.</string>
+  <string name="error_no_internet_title">В этой сети нет интернета</string>
   <string name="error_node_auto_detail">Сейчас не отвечает ни одна локация. Повторите позже или в другой сети.</string>
   <string name="error_node_detail">Выберите другую локацию или режим «Авто».</string>
   <string name="error_node_title">%1$s не отвечает</string>
@@ -257,6 +280,7 @@
   <string name="open_app">Открыть TrackNothing</string>
   <string name="open_at_login">Запускать при входе</string>
   <string name="open_main_window">Открыть окно</string>
+  <string name="open_network_settings">Настройки сети</string>
   <string name="open_settings_short">Настройки</string>
   <string name="open_system_settings">Открыть Системные настройки</string>
   <string name="open_vpn_settings">Открыть настройки VPN</string>
@@ -332,6 +356,7 @@
   <string name="seen_as">Сайты видят только %1$s</string>
   <string name="select_an_available_location_for_you">Самая быстрая локация, при сбое — следующая</string>
   <string name="selected_state">выбрано</string>
+  <string name="send_check_action">Отправить</string>
   <string name="send_reset_link">Отправить</string>
   <string name="server_address">Адрес сервера</string>
   <string name="server_address_url">Адрес сервера https://…</string>
@@ -447,7 +472,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Стабильнее подключение: приложение отмечает, как прошло каждое подключение, чтобы проблемы новой версии находились до того, как она дойдёт до всех\nСерверы, к которым никто не может подключиться, автоматически убираются из списка и возвращаются после восстановления</string>
+  <string name="whats_new_notes">Если подключиться не удалось, приложение показывает, на каком шаге (сеть, сервер, линии или туннель) и что делать\nЕсли в сети нет интернета, причиной называется сеть, а не сервер\n«Отправить» передаёт проверку этой попытки администратору и показывает номер обращения\nЕсли сеть блокирует UDP или порт 443, приложение само меняет линию и после подключения сообщает, какую использует</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Версия Windows для разработки · Интеграция VPN ещё не завершена</string>
