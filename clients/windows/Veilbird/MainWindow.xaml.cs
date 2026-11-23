@@ -57,7 +57,8 @@ public partial class MainWindow : Window {
     private ContentControl? stepsHost;
     // The first run: sign in (1), pick a location (2), connect (3); the tabs show once the first connection is up.
     private static bool Onboarded {get=>Settings.Get("onboarded")=="1";set=>Settings.Set("onboarded",value?"1":"0");}
-    private static bool Picked=>Settings.Get("onboardPicked")=="1";
+    /// First-run steps before the tabs appear: sign in, then connect (the location starts on Automatic).
+    private const int Steps=2;
     private Ellipse? actionDot;
     private ScanLine? scan;
     private Portrait? portrait;
@@ -504,7 +505,7 @@ public partial class MainWindow : Window {
     }
     private void Select(string id,string name,bool showConnect=true) {
         var reconnect=connection.Active&&id!=connection.NodeId;
-        nodeId=id;nodeName=name;Settings.Set("nodeId",id);Settings.Set("nodeName",name);Settings.Set("onboardPicked","1");
+        nodeId=id;nodeName=name;Settings.Set("nodeId",id);Settings.Set("nodeName",name);
         if(!connection.Active&&connection.ErrorCode.Length>0) connection.ClearError();
         if(showConnect) page="connect";
         if(showConnect||page is "connect" or "nodes") Render();
@@ -1031,7 +1032,7 @@ public partial class MainWindow : Window {
         ContentPanel.Children.Clear();FullPanel.Children.Clear();NavigationPanel.Children.Clear();HeaderSlot.Content=null;
         rateBars=null;switchNote=null;switchText=null;onNodes=null;onMeasured=null;
         statusTitle=statusDetail=usageTotal=usageUntil=actionLabel=null;stamp=null;actionButton=secondaryButton=null;stepsHost=null;actionDot=null;scan=null;fileLines=null;portrait=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
-        var view=!api.SignedIn?"login":page=="connect"&&!Onboarded&&!Picked?"pick":page;
+        var view=!api.SignedIn?"login":page;
         var full=view=="connect";
         Scroller.Visibility=full?Visibility.Collapsed:Visibility.Visible;FullPanel.Visibility=full?Visibility.Visible:Visibility.Collapsed;
         if(view!=lastView) {Scroller.ScrollToTop();Enter(full?FullPanel:ContentPanel);}
@@ -1073,7 +1074,6 @@ public partial class MainWindow : Window {
             button.Click+=(_,_)=>{if(!busy) {page=id;Render();}};NavigationPanel.Children.Add(button);
         }
         switch(view) {
-            case "pick":Pick();break;
             case "connect":Home();break;
             case "nodes":Nodes();break;
             case "devices":Devices();break;
@@ -1107,7 +1107,7 @@ public partial class MainWindow : Window {
         // The state block has one height in every state, so nothing below it moves when a connection comes up or goes
         // down: what only exists while connected fades in and out of space that is always reserved.
         var center=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
-        stepsHost=new ContentControl {Focusable=false,Content=SectionRow("section_portrait",Onboarded?null:3)};
+        stepsHost=new ContentControl {Focusable=false,Content=SectionRow("section_portrait",Onboarded?null:Steps)};
         center.Children.Add(stepsHost);
         // The portrait is the switch (the action below says what a tap does); hidden, its ring draws the state and holds
         // the time and the rates (or the phase, the countdown).
@@ -1158,69 +1158,21 @@ public partial class MainWindow : Window {
         if(visitorIp is null&&!connection.Active) _=LoadVisitor();
         if(nodesData is null) _=QuietNodes();
     }
-    /// A page's § label, with the first-run step on the right: three squares (done, current, to come) and "n/3";
-    /// 4 is "Ready".
+    /// A page's § label, with the first-run step on the right: two squares (done, current, to come) and "n/2";
+    /// Steps+1 is "Ready".
     private static FrameworkElement SectionRow(string key,int? step) {
         var label=Dossier.Section(key);
         if(step is not { } n) return label;
         var marks=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(8,0,4,0)};
         var text=((SolidColorBrush)Look.Text).Color;
-        for(var i=1;i<=3;i++) marks.Children.Add(new Rectangle {Width=6,Height=6,Margin=new Thickness(0,0,3,0),VerticalAlignment=VerticalAlignment.Center,
+        for(var i=1;i<=Steps;i++) marks.Children.Add(new Rectangle {Width=6,Height=6,Margin=new Thickness(0,0,3,0),VerticalAlignment=VerticalAlignment.Center,
             Fill=i<n?new SolidColorBrush(Color.FromArgb(191,text.R,text.G,text.B)):i==n?Look.Accent:Look.Selected});
-        var words=n>3?L10n.Text("onboarding_ready"):n.ToString(L10n.Culture)+"/3";
-        marks.Children.Add(new TextBlock {Text=words,FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=11,Foreground=n>3?Look.Accent:Look.Secondary,Margin=new Thickness(4,0,0,0),VerticalAlignment=VerticalAlignment.Center});
+        var words=n>Steps?L10n.Text("onboarding_ready"):n.ToString(L10n.Culture)+"/"+Steps.ToString(L10n.Culture);
+        marks.Children.Add(new TextBlock {Text=words,FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=11,Foreground=n>Steps?Look.Accent:Look.Secondary,Margin=new Thickness(4,0,0,0),VerticalAlignment=VerticalAlignment.Center});
         AutomationProperties.SetName(marks,words);
         var row=new DockPanel {LastChildFill=true};
         DockPanel.SetDock(marks,Dock.Right);row.Children.Add(marks);row.Children.Add(label);
         return row;
-    }
-    /// The first run's second page: Automatic preselected, the three fastest from this PC, the whole list, Continue.
-    private void Pick() {
-        HeaderSlot.Content=null;
-        Add(SectionRow("section_locations",2),4,0);
-        Add(new TextBlock {Text=L10n.Text("where_would_you_like_to_connect"),FontSize=24,FontWeight=FontWeights.Light,FontFamily=new FontFamily("Georgia, Cambria"),TextWrapping=TextWrapping.Wrap,Margin=new Thickness(4,0,4,0)},14,0);
-        Add(Words(L10n.Text("pick_location_sub"),13,Look.Secondary),6,16).Margin=new Thickness(4,6,4,16);
-        var options=Add(new StackPanel());
-        var asked=false;
-        Button Option(string id,string name,string? code,string detail) {
-            var chosen=nodeId==id;
-            var badge=Look.Badge(code);
-            if(chosen) {badge.Background=Look.Accent;if(badge.Child is TextBlock glyph) glyph.Foreground=Look.OnAccent;if(code is null&&badge.Child is TextBlock star) star.Foreground=Look.OnAccent;}
-            var radio=new Grid {Width=16,Height=16,VerticalAlignment=VerticalAlignment.Center};
-            radio.Children.Add(new Ellipse {Fill=chosen?Look.Accent:Look.Selected});
-            if(chosen) radio.Children.Add(new Ellipse {Width=6,Height=6,Fill=Look.OnAccent});
-            var row=new Button {Height=56,Margin=new Thickness(0,0,0,8),Background=chosen?Look.Selected:Look.Surface,BorderThickness=new Thickness(0),
-                Content=Columns(badge,TwoLines(name,detail,strong:chosen),radio)};
-            AutomationProperties.SetName(row,name+(chosen?L10n.Text("current_page"):""));
-            row.Click+=(_,_)=>{nodeId=id;nodeName=id.Length==0?"":name;Settings.Set("nodeId",nodeId);Settings.Set("nodeName",nodeName);Show();};
-            return row;
-        }
-        async void Measure(JsonArray list) {
-            try {await Latency.Rank(list,attempts:1,reuse:TimeSpan.FromMinutes(1),settle:TimeSpan.FromSeconds(1.5));} catch {/* Automatic needs no figures */}
-            if(options.IsLoaded) Show();
-        }
-        void Show() {
-            options.Children.Clear();
-            var ranked=PickerNodes().Where(x=>x.Quality?.Latency is not null).ToList();
-            var best=ranked.FirstOrDefault();
-            options.Children.Add(Option("",L10n.Text("automatic_recommended"),null,best.Quality is { } q?L10n.Text("automatic_now",best.Name,Ms(q)??""):L10n.Text("select_an_available_location_for_you")));
-            if(ranked.Count>0) options.Children.Add(new TextBlock {Text=L10n.Text("or_choose_one"),FontSize=13,Foreground=Look.Secondary,Margin=new Thickness(4,10,4,8)});
-            foreach(var (id,name,quality) in ranked.Take(3)) options.Children.Add(Option(id,name,Code(id,name),Ms(quality)??""));
-            if(nodesData is { Count: >0 } all) {
-                var more=new Button {Height=44,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(4,0,4,0),
-                    Content=Columns(new Border(),Single(L10n.Text("all_locations_count",all.Count.ToString("N0",L10n.Culture)),13,Look.Secondary),Look.Icon("\uE76C",11,Look.Secondary))};
-                more.Click+=(_,_)=>{if(!busy) {page="nodes";Render();}};
-                options.Children.Add(more);
-                // Nothing measured on this PC yet: measure once, quietly, and show the fastest when it is done.
-                if(ranked.Count==0&&!asked&&!connection.Active) {asked=true;Measure(all);}
-            }
-        }
-        onNodes=_=>{if(options.IsLoaded) Show();};
-        Show();
-        if(nodesData is null) _=QuietNodes();
-        // Continue: the choice is already saved; step 3 is the connect page itself.
-        var next=Add(Primary(L10n.Text("continue_action")),10,0);next.Height=48;
-        next.Click+=(_,_)=>{if(busy) return;Settings.Set("onboardPicked","1");Render();};
     }
     /// The public address the service sees, read once while not connected (afterwards it would be the location's).
     private async Task LoadVisitor() {
@@ -1946,7 +1898,7 @@ public partial class MainWindow : Window {
         // The first connection ends the first run: "Ready" for a moment, then the tabs.
         if(!Onboarded&&state==LinkState.Connected) {
             Onboarded=true;
-            if(stepsHost is not null) stepsHost.Content=SectionRow("section_portrait",4);
+            if(stepsHost is not null) stepsHost.Content=SectionRow("section_portrait",Steps+1);
             var later=new DispatcherTimer {Interval=TimeSpan.FromSeconds(3)};
             later.Tick+=(_,_)=>{later.Stop();if(!busy) Render();};later.Start();
         }

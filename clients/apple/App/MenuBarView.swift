@@ -33,7 +33,7 @@ struct MenuBarView:View {
             if model.signedIn {
                 // The connect page in small: the state with its seal, one slot for time and rates or a message, one action.
                 VStack(alignment:.leading,spacing:8) {
-                    SectionRow(key:"section_portrait",step:model.onboarded ? nil:3)
+                    SectionRow(key:"section_portrait",step:model.onboarded ? nil:StepMarks.count)
                     menuPortrait(on)
                     // The state (or the cause of a failure) and two lines held for its detail: one height in every state.
                     VStack(alignment:.leading,spacing:3) {

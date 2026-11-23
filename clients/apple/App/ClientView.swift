@@ -60,7 +60,7 @@ struct ClientView:View {
                     // A new page eases in with a short fade and rise.
                     Group {
                         switch tab {
-                        case 0:if model.onboarded || model.onboardPicked {connectionView} else {pickView}
+                        case 0:connectionView
                         case 1:nodesView
                         case 2:accountView
                         case 3:logsView
@@ -419,7 +419,7 @@ struct ClientView:View {
             notices
             switchNote(state)
             Spacer(minLength:mac ? 8:12)
-            SectionRow(key:"section_portrait",step:firstRun ? (model.since != nil ? 4:3):nil).padding(.bottom,mac ? 2:4)
+            SectionRow(key:"section_portrait",step:firstRun ? (model.since != nil ? StepMarks.count+1:StepMarks.count):nil).padding(.bottom,mac ? 2:4)
             // The portrait is the switch: "tap to hide" breathes in it; hidden, its ring draws the state (see StateRing).
             Button {toggleConnection()} label:{portrait(state,height:firstRun ? portraitHeight-30:portraitHeight)}.buttonStyle(.plain)
             .accessibilityLabel(L10n.text(sealed ? "disconnect_action":"connect_action"))
@@ -445,60 +445,6 @@ struct ClientView:View {
         // Notes that come and go above the file (update, location switch) slide the page instead of snapping it.
         .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:model.update)
         .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:model.switchedFrom+"|"+model.dismissedSwitch)
-    }
-    /// First run, step 2: where to connect from. Automatic is chosen already, so one tap goes on; under it the three
-    /// fastest locations this device measured, and the whole list.
-    private var pickView:some View {
-        let ranked=pickRanked
-        return VStack(alignment:.leading,spacing:0) {
-            #if os(iOS)
-            FileHeader(number:fileNumber)
-            #endif
-            SectionRow(key:"section_locations",step:2).padding(.top,mac ? 10:14)
-            Text(L10n.text("where_would_you_like_to_connect")).font(.system(size:mac ? 24:28,weight:.light,design:.serif)).padding(.horizontal,4).padding(.top,12)
-                .fixedSize(horizontal:false,vertical:true).accessibilityAddTraits(.isHeader)
-            Text(L10n.text("pick_location_sub")).font(.system(size:mac ? 13:14)).foregroundStyle(VeilbirdStyle.secondary).padding(.horizontal,4).padding(.top,6)
-                .fixedSize(horizontal:false,vertical:true)
-            pickOption(id:"",name:L10n.text("automatic_recommended"),code:nil,
-                detail:ranked.first.map {L10n.text("automatic_now",$0.name,ms($0.quality) ?? "")} ?? L10n.text("auto_detail")).padding(.top,18)
-            if !ranked.isEmpty {caption(L10n.text("or_choose_one")).padding(.top,16).padding(.bottom,8)}
-            ForEach(Array(ranked.prefix(3).enumerated()),id:\.offset) {item in
-                pickOption(id:item.element.id,name:item.element.name,code:model.code(item.element.id,name:item.element.name),detail:ms(item.element.quality) ?? "").padding(.top,item.offset>0 ? 8:0)
-            }
-            if !model.nodes.isEmpty {
-                Button {tab=1} label:{
-                    HStack {Text(L10n.text("all_locations_count",L10n.number(model.nodes.count)));Spacer();Image(systemName:"chevron.right").font(.system(size:11,weight:.semibold))}
-                        .font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary).padding(.horizontal,4).frame(height:44).contentShape(Rectangle())
-                }.buttonStyle(.plain).padding(.top,6)
-            }
-            Spacer(minLength:12)
-            Button {model.onboardPicked=true} label:{Text(L10n.text("continue_action"))}.buttonStyle(PrimaryButton())
-        }.padding(.horizontal,mac ? 20:16).padding(.bottom,20)
-        .task {if model.nodes.isEmpty {await model.refreshNodes()};if model.unmeasured {await model.measure()}}
-    }
-    private var pickRanked:[(id:String,name:String,quality:Quality)] {
-        model.nodes.compactMap {node -> (id:String,name:String,quality:Quality)? in
-            guard let id=node["id"] as? String,let q=Latency.recent(id),q.latency != nil else {return nil}
-            return (id,node["name"] as? String ?? "",q)
-        }.sorted {$0.quality.score<$1.quality.score}
-    }
-    private func pickOption(id:String,name:String,code:String?,detail:String)->some View {
-        let chosen=model.selected == id
-        return Button {model.selected=id;model.selectedName=name} label:{
-            HStack(spacing:14) {
-                if let code {Badge(code:code)} else {Badge(icon:"sparkles",tint:VeilbirdStyle.accent)}
-                VStack(alignment:.leading,spacing:3) {
-                    Text(name).font(.system(size:VeilbirdStyle.body,weight:.medium)).lineLimit(1)
-                    Text(detail).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)
-                }
-                Spacer(minLength:8)
-                ZStack {
-                    Circle().fill(chosen ? VeilbirdStyle.accent:VeilbirdStyle.selected)
-                    if chosen {Circle().fill(VeilbirdStyle.onAccent).frame(width:6,height:6)}
-                }.frame(width:16,height:16)
-            }.padding(.horizontal,14).frame(height:mac ? 56:64).contentShape(Rectangle())
-            .background(chosen ? VeilbirdStyle.selected:VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
-        }.buttonStyle(.plain).accessibilityAddTraits(chosen ? .isSelected:[])
     }
     private var fileNumber:String {FileHeader.number(model.account["email"] as? String ?? "")}
     /// One line when automatic mode switched location during this connection; closed per switch.
@@ -920,7 +866,7 @@ struct ClientView:View {
     /// Connected (or reconnecting), one tap moves the VPN to the new location.
     private func choose(_ id:String,name:String) {
         let reconnect=model.connected && id != model.connectedNodeId
-        model.selected=id;model.selectedName=name;model.onboardPicked=true;tab=0
+        model.selected=id;model.selectedName=name;tab=0
         if reconnect {model.work {try await model.reconnect()}}
     }
 

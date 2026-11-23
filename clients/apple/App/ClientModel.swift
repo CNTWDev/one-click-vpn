@@ -82,9 +82,8 @@ import ServiceManagement
     @Published var lines=4
     @Published var retryAt:Date?
     @Published var retries=0
-    /// False on a new install until its first connection: sign-in, location and connect then show "n/3".
+    /// False on a new install until its first connection: sign-in and connect then show "n/2" (the location starts on Automatic).
     @Published var onboarded=UserDefaults.standard.object(forKey:"onboarded") as? Bool ?? true {didSet {UserDefaults.standard.set(onboarded,forKey:"onboarded")}}
-    @Published var onboardPicked=UserDefaults.standard.bool(forKey:"onboardPicked") {didSet {UserDefaults.standard.set(onboardPicked,forKey:"onboardPicked")}}
     /// Mac: when the app starts the dropped tunnel again (nil when it is not waiting to).
     @Published var reconnectAt:Date?
     private var attempt:Date?
