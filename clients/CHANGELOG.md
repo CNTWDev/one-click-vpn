@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.28
+
+### zh
+- 打开「高级功能」后，「我的」里多了「分流规则」：每行一条，域名或网段加 direct、proxy 或 block
+- 可以直接粘贴 Clash 规则；规则排在智能分流前面，只保存在这台设备上
+- 连着的时候保存规则，会自动重连立即生效
+
+### en
+- With Advanced on, Account has Routing rules: one per line, a domain or network plus direct, proxy or block
+- Clash rules can be pasted as they are; your rules come before smart routing and stay on this device
+- Saving rules while connected reconnects so they apply at once
+
+### ru
+- При включённых расширенных функциях в «Аккаунте» есть «Правила маршрутизации»: по одному на строку, домен или сеть и direct, proxy или block
+- Правила Clash можно вставить как есть; ваши правила идут раньше умного режима и хранятся только на этом устройстве
+- Если сохранить правила во время подключения, VPN переподключится и они сразу заработают
+
 ## 1.0.27
 
 ### zh
