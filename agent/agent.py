@@ -1879,7 +1879,217 @@ def metrics():
         "memory": memory,
         "disk": {"usedBytes": used_disk, "totalBytes": disk.total, "percent": round((used_disk / disk.total) * 100, 1) if disk.total else 0},
         "network": read_network(),
+        "tuning": network_tuning(),
     }
+
+
+# Network tuning (Agent 2.20): BBR with fq for the TCP transports (REALITY, XHTTP) and larger socket buffers,
+# which Hysteria2 (quic-go wants 7.5 MB for UDP) needs to fill a long, lossy route. Set in the running kernel on
+# every start, with a copy in its own sysctl.d file where the unit allows. Containers (OpenVZ, LXC) often cannot.
+SYSCTL_ROOT = Path("/proc/sys")
+TUNING_CONF = Path("/etc/sysctl.d/99-northstar-tuning.conf")
+TUNING_MARKER = STATE_DIR / "network-tuned"
+BUFFER_BYTES = 16 * 1024 * 1024
+TUNING_BUFFERS = {
+    "net.core.rmem_max": str(BUFFER_BYTES),
+    "net.core.wmem_max": str(BUFFER_BYTES),
+    "net.ipv4.tcp_rmem": f"4096 131072 {BUFFER_BYTES}",
+    "net.ipv4.tcp_wmem": f"4096 131072 {BUFFER_BYTES}",
+    "net.ipv4.tcp_slow_start_after_idle": "0",
+    "net.ipv4.tcp_mtu_probing": "1",
+}
+TUNING_BBR = {"net.core.default_qdisc": "fq", "net.ipv4.tcp_congestion_control": "bbr"}
+tuning_attempted = False
+
+
+def read_sysctl(key):
+    try:
+        return " ".join((SYSCTL_ROOT / key.replace(".", "/")).read_text().split())
+    except OSError:
+        return ""
+
+
+def bbr_available():
+    if "bbr" in read_sysctl("net.ipv4.tcp_available_congestion_control").split():
+        return True
+    run_optional(["modprobe", "tcp_bbr"])
+    return "bbr" in read_sysctl("net.ipv4.tcp_available_congestion_control").split()
+
+
+def tuning_wanted(bbr):
+    return {**(TUNING_BBR if bbr else {}), **TUNING_BUFFERS}
+
+
+def tuning_applied(wanted):
+    return all(read_sysctl(key) == value for key, value in wanted.items())
+
+
+def write_sysctl(key, value):
+    (SYSCTL_ROOT / key.replace(".", "/")).write_text(value + "\n")
+
+
+def apply_network_tuning():
+    """Sets the values in the running kernel and keeps a copy in sysctl.d; returns the state as network_tuning() reports it.
+
+    The values go straight to /proc/sys: the Agent's unit (ProtectSystem=strict) cannot write /etc/sysctl.d on
+    older installs, and the Agent sets them again on every start, so they also survive a reboot that way.
+    """
+    global tuning_attempted
+    tuning_attempted = True
+    wanted = tuning_wanted(bbr_available())
+    if not tuning_applied(wanted):
+        for key, value in wanted.items():
+            try:
+                write_sysctl(key, value)
+            except OSError:
+                pass
+        text = "# Written by the Northstar Agent (faster VPN transports); the Agent sets these on every start.\n" + "".join(f"{key} = {value}\n" for key, value in wanted.items())
+        try:
+            atomic_write(TUNING_CONF, text, 0o644)
+        except OSError:
+            pass
+    return network_tuning()
+
+
+def network_tuning():
+    """What the kernel runs now: congestion control, queueing and the UDP receive buffer limit."""
+    congestion, qdisc = read_sysctl("net.ipv4.tcp_congestion_control"), read_sysctl("net.core.default_qdisc")
+    try:
+        buffer = int(read_sysctl("net.core.rmem_max") or 0)
+    except ValueError:
+        buffer = 0
+    bbr = congestion == "bbr" and qdisc == "fq"
+    if bbr and buffer >= BUFFER_BYTES:
+        state = "tuned"
+    elif buffer >= BUFFER_BYTES:
+        state = "no-bbr"
+    else:
+        state = "unsupported" if tuning_attempted else "default"
+    return {"state": state, "congestion": congestion[:32], "qdisc": qdisc[:32], "udpBuffer": buffer}
+
+
+# Speed test from the node itself to Cloudflare's speed test service: the ceiling of this machine's own
+# connection, not the speed a user sees. Each direction runs 4 streams for 8 s and stops early at its byte cap.
+SPEED_HOST = "speed.cloudflare.com"
+SPEED_SECONDS = 8
+SPEED_STREAMS = 4
+SPEED_DOWN_CAP = 200 * 1024 * 1024
+SPEED_UP_CAP = 100 * 1024 * 1024
+speed_test_lock = threading.Lock()
+
+
+def speed_connection(timeout=10):
+    import http.client
+    return http.client.HTTPSConnection(SPEED_HOST, 443, timeout=timeout, context=ssl.create_default_context())
+
+
+def speed_latency(samples=5):
+    """Median TCP connect time in milliseconds."""
+    results = []
+    for _ in range(samples):
+        started = time.monotonic()
+        try:
+            with socket.create_connection((SPEED_HOST, 443), timeout=3):
+                results.append((time.monotonic() - started) * 1000)
+        except OSError:
+            continue
+    return round(sorted(results)[len(results) // 2], 1) if results else None
+
+
+def speed_direction(upload, seconds=SPEED_SECONDS, streams=SPEED_STREAMS):
+    """Mbps over all streams; None when no stream moved a byte."""
+    cap = SPEED_UP_CAP if upload else SPEED_DOWN_CAP
+    moved, lock, deadline = [0], threading.Lock(), time.monotonic() + seconds
+    chunk = os.urandom(256 * 1024) if upload else b""
+
+    def add(count):
+        with lock:
+            moved[0] += count
+            return moved[0] < cap
+
+    def stream():
+        while time.monotonic() < deadline:
+            connection = speed_connection()
+            try:
+                if upload:
+                    size = 8 * len(chunk)
+                    connection.putrequest("POST", "/__up")
+                    connection.putheader("Content-Length", str(size))
+                    connection.putheader("Content-Type", "application/octet-stream")
+                    connection.endheaders()
+                    for _ in range(8):
+                        connection.send(chunk)
+                        if not add(len(chunk)) or time.monotonic() >= deadline:
+                            return
+                    connection.getresponse().read()
+                else:
+                    connection.request("GET", f"/__down?bytes={50 * 1024 * 1024}")
+                    response = connection.getresponse()
+                    while time.monotonic() < deadline:
+                        data = response.read(64 * 1024)
+                        if not data:
+                            break
+                        if not add(len(data)):
+                            return
+            except OSError:
+                return
+            finally:
+                connection.close()
+
+    started = time.monotonic()
+    threads = [threading.Thread(target=stream, daemon=True) for _ in range(streams)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(seconds + 15)
+    elapsed = max(time.monotonic() - started, 0.001)
+    return round(moved[0] * 8 / elapsed / 1_000_000, 1) if moved[0] else None
+
+
+def run_speed_test(kind):
+    """One measurement; a second request while one runs is answered as busy."""
+    if not speed_test_lock.acquire(blocking=False):
+        return {"kind": kind, "error": "busy"}
+    try:
+        latency = speed_latency()
+        down = speed_direction(False)
+        up = speed_direction(True)
+        tuning = network_tuning()
+        error = "" if down or up else "no connection to the speed test service"
+        return {"kind": kind, "downMbps": down, "upMbps": up, "latencyMs": latency, "congestion": tuning["congestion"], "error": error}
+    finally:
+        speed_test_lock.release()
+
+
+def report_speed_test(result, test_id=None):
+    try:
+        request_json("/api/v1/agent/speed-test", {"nodeId": NODE_ID, "token": TOKEN, "id": test_id, **result})
+    except Exception as error:
+        log_failure("speed test result", error)
+
+
+def first_network_tuning():
+    """The first time this Agent tunes a node: a speed test before and after, so the Console can show the gain."""
+    wanted = tuning_wanted(bbr_available())
+    if TUNING_MARKER.exists() or tuning_applied(wanted):
+        apply_network_tuning()
+        return
+    before = run_speed_test("before")
+    apply_network_tuning()
+    try:
+        atomic_write(TUNING_MARKER, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), 0o600)
+    except OSError:
+        pass
+    after = run_speed_test("after")
+    for result in (before, after):
+        report_speed_test(result)
+
+
+def start_speed_test(request):
+    """A test the Controller asked for (weekly, first online, or the Console button), run off the main loop."""
+    kind = request.get("kind") if request.get("kind") in ("baseline", "manual") else "baseline"
+    test_id = str(request.get("id") or "")[:64] or None
+    threading.Thread(target=lambda: report_speed_test(run_speed_test(kind), test_id), name="speed-test", daemon=True).start()
 
 
 def counter_epoch():
@@ -2048,7 +2258,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.19.0",
+        "version": "agent 2.20.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
@@ -2088,7 +2298,7 @@ def adopt_controller_origin(target):
     CONTROLLER = target
     try:
         request_json("/api/v1/agent/heartbeat", {"nodeId": NODE_ID, "token": TOKEN, "hostname": socket.gethostname(),
-                                                 "version": "agent 2.19.0", "capabilities": capabilities()})
+                                                 "version": "agent 2.20.0", "capabilities": capabilities()})
         lines = CONFIG_ENV.read_text().splitlines()
         lines = [f"NORTHSTAR_CONTROLLER_URL={target}" if line.startswith("NORTHSTAR_CONTROLLER_URL=") else line for line in lines]
         if f"NORTHSTAR_CONTROLLER_URL={target}" not in lines:
@@ -2157,7 +2367,7 @@ task_handled = threading.Event()
 
 def pull_tasks():
     return request_json("/api/v1/agent/tasks/pull", {"nodeId": NODE_ID, "token": TOKEN, "limit": 10, "nativePeers": True, "portCheck": True,
-                                                     "selfUpgrade": True, "wait": TASK_WAIT}, timeout=TASK_WAIT + 20)
+                                                     "selfUpgrade": True, "speedTest": True, "wait": TASK_WAIT}, timeout=TASK_WAIT + 20)
 
 
 def task_poller():
@@ -2179,7 +2389,7 @@ def task_poller():
         task_handled.clear()
         task_responses.put(response)
         task_handled.wait()
-        if time.time() - started < 2 and not response.get("tasks") and not response.get("portCheck"):
+        if time.time() - started < 2 and not response.get("tasks") and not response.get("portCheck") and not response.get("speedTest"):
             time.sleep(5)
 
 
@@ -2200,6 +2410,9 @@ def handle_task_response(response):
             request_json("/api/v1/agent/port-check", {"nodeId": NODE_ID, "token": TOKEN, **outcome})
         except Exception as error:
             log_failure("port check result", error)
+    speed = response.get("speedTest")
+    if isinstance(speed, dict):
+        start_speed_test(speed)
     try:
         apply_pulled_tasks(response.get("tasks", []))
     finally:
@@ -2264,6 +2477,8 @@ def main():
         enable_vless_online_stats()
     except Exception as error:
         log_failure("VLESS online stats", error)
+    threading.Thread(target=lambda: _safe(first_network_tuning, "network tuning"), name="network-tuning", daemon=True).start()
+    last_tuning_check = time.time()
     last_heartbeat_attempt = 0
     last_offline_check = 0
     threading.Thread(target=task_poller, name="task-poller", daemon=True).start()
@@ -2296,6 +2511,12 @@ def main():
                 ensure_hop_rules()
             except Exception as error:
                 log_failure("port hopping", command_failure_detail(error))
+        if now - last_tuning_check >= 3600:
+            last_tuning_check = now
+            try:
+                apply_network_tuning()
+            except Exception as error:
+                log_failure("network tuning", command_failure_detail(error))
         if now - last_reality_probe >= 6 * 3600:
             last_reality_probe = now
             start_reality_probe()

@@ -102,7 +102,11 @@ export type NodeMetrics = {
   memory: { usedBytes: number; totalBytes: number; percent: number };
   disk: { usedBytes: number; totalBytes: number; percent: number };
   network: { rxBytes: number; txBytes: number; rxBytesPerSecond: number; txBytesPerSecond: number; wanRxBytesPerSecond?: number; wanTxBytesPerSecond?: number };
+  /** Agent 2.20+: BBR and socket buffers. */
+  tuning?: { state: "tuned" | "no-bbr" | "unsupported" | "default"; congestion: string; qdisc: string; udpBuffer: number };
 };
+
+export type NodeSpeedTest = { id: string; kind: "before" | "after" | "baseline" | "manual"; downMbps: number | null; upMbps: number | null; latencyMs: number | null; congestion: string; error: string; createdAt: string };
 
 export type NodeRecord = {
   id: string;
