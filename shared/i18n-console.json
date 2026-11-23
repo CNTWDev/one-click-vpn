@@ -4242,5 +4242,81 @@
   "邮件收件人": [
     "Email recipients",
     "Получатели писем"
+  ],
+  "、": [
+    ", ",
+    ", "
+  ],
+  "同一个崩溃集中出现": [
+    "Same crash on several users",
+    "Один и тот же сбой у нескольких пользователей"
+  ],
+  "已暂停：新用户不再收到这个版本，已升级的照常使用。": [
+    "Paused: new users no longer get this version; those who updated keep it.",
+    "Приостановлено: новые пользователи эту версию не получают, у обновившихся она остаётся."
+  ],
+  "已自动暂停（{0}）：新用户不再收到这个版本，已升级的照常使用。": [
+    "Paused automatically ({0}): new users no longer get this version; those who updated keep it.",
+    "Приостановлено автоматически ({0}): новые пользователи эту версию не получают, у обновившихся она остаётся."
+  ],
+  "当前 {0}%": [
+    "Now {0}%",
+    "Сейчас {0}%"
+  ],
+  "手动暂停": [
+    "paused by hand",
+    "приостановлено вручную"
+  ],
+  "新版本和同平台当前正式版在最近 24 小时里对比，每档至少 24 小时，指标正常自动放量，超红线自动暂停；数据来自客户端上报，只存在运行日志里。": [
+    "Each new build is compared with the current stable build of its platform over the last 24 hours. Every stage lasts at least 24 hours; healthy builds widen by themselves, builds past a limit pause by themselves. Data comes from app reports and is kept only in the runtime logs.",
+    "Каждая новая сборка сравнивается с текущей стабильной своей платформы за последние 24 часа. Каждый этап длится не меньше 24 часов: при нормальных показателях охват растёт сам, при превышении порога раскатка сама приостанавливается. Данные приходят из отчётов приложений и хранятся только в журналах."
+  ],
+  "暂停": [
+    "Pause",
+    "Пауза"
+  ],
+  "直接全量": [
+    "Release to everyone",
+    "Выпустить для всех"
+  ],
+  "继续灰度": [
+    "Resume rollout",
+    "Продолжить раскатку"
+  ],
+  "这一档已 {0} 小时，下次检查时会自动放量。": [
+    "At this stage for {0} h; it widens at the next check.",
+    "На этом этапе {0} ч; охват вырастет при следующей проверке."
+  ],
+  "这一档已 {0} 小时，样本还不够判断；满 48 小时会在 Telegram 问你。": [
+    "At this stage for {0} h; not enough data yet. After 48 h you are asked in Telegram.",
+    "На этом этапе {0} ч; данных пока мало. Через 48 ч придёт вопрос в Telegram."
+  ],
+  "这一档已 {0} 小时，满 24 小时且指标正常会自动放量。": [
+    "At this stage for {0} h; it widens after 24 h if the metrics are fine.",
+    "На этом этапе {0} ч; через 24 ч при нормальных показателях охват вырастет."
+  ],
+  "连接成功率低于 70%": [
+    "Connect success under 70%",
+    "Успешных подключений меньше 70%"
+  ],
+  "{0} 将发给所有用户，跳过剩下的灰度阶段。": [
+    "{0} goes to every user, skipping the remaining rollout stages.",
+    "{0} получат все пользователи, оставшиеся этапы раскатки пропускаются."
+  ],
+  "已暂停 · {0}%": [
+    "Paused · {0}%",
+    "Пауза · {0}%"
+  ],
+  "撤回 {0}？没升级的用户不会再收到它，已升级的不受影响；要修复请发一个更高构建号的新版本。": [
+    "Withdraw {0}? Users who have not updated will no longer get it; those who did keep it. To fix, ship a new version with a higher build number.",
+    "Отозвать {0}? Не обновившиеся пользователи её больше не получат, у обновившихся она останется. Для исправления выпустите версию с бо́льшим номером сборки."
+  ],
+  "灰度放量": [
+    "Staged rollout",
+    "Поэтапная раскатка"
+  ],
+  "节点自动摘除": [
+    "Automatic node removal",
+    "Автоисключение узлов"
   ]
 }

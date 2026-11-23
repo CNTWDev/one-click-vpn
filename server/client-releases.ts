@@ -35,6 +35,7 @@ type ReleaseRow = {
   status: ClientRelease["status"]; distribution: ClientRelease["distribution"]; url: string; sha256: string | null; size_bytes: string | null;
   min_os: string; notes: string; storage_key: string | null; verified_at: Date | null; published_at: Date | null;
   created_by: string | null; created_at: Date; updated_at: Date; rollout_percent: number;
+  rollout_since: Date | null; rollout_frozen_at: Date | null; rollout_freeze_reason: string; rollout_override: number;
   mirror_url: string | null; mirror_error: string; mirror_attempts: number;
 };
 const iso = (value: Date | null) => value ? new Date(value).toISOString() : null;
@@ -62,7 +63,8 @@ function toRelease(row: ReleaseRow): ClientRelease {
 function adminRelease(row: ReleaseRow) {
   return { ...toRelease(row), id: row.id, notes: row.notes, storageKey: row.storage_key, verifiedAt: iso(row.verified_at),
     publishedAt: iso(row.published_at), createdAt: iso(row.created_at), updatedAt: iso(row.updated_at), createdBy: row.created_by,
-    rolloutPercent: Number(row.rollout_percent ?? 100),
+    rolloutPercent: Number(row.rollout_percent ?? 100), rolloutSince: iso(row.rollout_since), rolloutFrozenAt: iso(row.rollout_frozen_at),
+    rolloutFreezeReason: row.rollout_freeze_reason || "",
     mirror: row.mirror_url ? "ready" : mirrorConfigured() && row.storage_key && releaseStorage().mode === "local" && row.status !== "withdrawn"
       ? (row.mirror_error ? (Number(row.mirror_attempts) >= mirrorAttempts ? "failed" : "retrying") : "pending") : null,
     mirrorError: row.mirror_error || null };
@@ -81,7 +83,8 @@ export const validInstallation = (value: string | null | undefined) => !!value &
 export async function publicReleases(installation?: string): Promise<ClientRelease[]> {
   const legacy = parseClientReleases(process.env.VEILBIRD_CLIENT_RELEASES_JSON || "[]");
   const rows = await dbQuery<ReleaseRow>("SELECT * FROM client_releases WHERE status='published'");
-  const visible = rows.filter((row) => Number(row.rollout_percent ?? 100) >= 100
+  // A frozen rollout (rollout-control.ts) is offered to nobody new; installs already on it keep it.
+  const visible = rows.filter((row) => !row.rollout_frozen_at).filter((row) => Number(row.rollout_percent ?? 100) >= 100
     || (validInstallation(installation) && rolloutBucket(row.id, installation!) < Number(row.rollout_percent)));
   return [...legacy, ...visible.map(toRelease)];
 }
@@ -301,7 +304,12 @@ export async function transitionRelease(actor: ReleaseActor, id: string, action:
   } else if (action === "promote") {
     requireAdmin(actor);
     if (release.version.includes("-") || release.distribution === "testflight") throw new ReleaseError("PRERELEASE_CANNOT_BE_STABLE");
-    changed = await dbExec("UPDATE client_releases SET channel='stable',status='published',published_at=now(),updated_at=now() WHERE id=$1 AND channel='beta' AND status<>'withdrawn'", [id]);
+    // A promoted build starts its staged rollout at 10% when there is a fully released stable build to compare
+    // it with (rollout-control.ts widens it from there); the first stable build of a platform goes to everyone.
+    const start = (await stableBuildAtLeast(release.platform, 1)) ? 10 : 100;
+    changed = await dbExec(`UPDATE client_releases SET channel='stable',status='published',published_at=now(),updated_at=now(),
+      rollout_percent=$2,rollout_since=now(),rollout_frozen_at=NULL,rollout_freeze_reason='',rollout_override=0,rollout_asked_at=NULL
+      WHERE id=$1 AND channel='beta' AND status<>'withdrawn'`, [id, start]);
   } else if (action === "withdraw") {
     requireAdmin(actor);
     changed = await dbExec("UPDATE client_releases SET status='withdrawn',updated_at=now() WHERE id=$1 AND status='published'", [id]);
@@ -309,7 +317,17 @@ export async function transitionRelease(actor: ReleaseActor, id: string, action:
     requireAdmin(actor);
     const percent = Number(extra?.percent);
     if (!Number.isInteger(percent) || percent < 1 || percent > 100) throw new ReleaseError("INVALID_ROLLOUT");
-    changed = await dbExec("UPDATE client_releases SET rollout_percent=$2,updated_at=now() WHERE id=$1 AND status<>'withdrawn'", [id, percent]);
+    // A new share starts a new stage: the freeze lifts and its 24 hours count from now.
+    changed = await dbExec(`UPDATE client_releases SET rollout_percent=$2,rollout_since=now(),rollout_frozen_at=NULL,rollout_freeze_reason='',
+      rollout_override=$3,rollout_asked_at=NULL,updated_at=now() WHERE id=$1 AND status<>'withdrawn'`, [id, percent, extra?.override ? 1 : 0]);
+  } else if (action === "freeze") {
+    requireAdmin(actor);
+    const reason = typeof extra?.reason === "string" ? extra.reason.slice(0, 200) : "manual";
+    changed = await dbExec("UPDATE client_releases SET rollout_frozen_at=now(),rollout_freeze_reason=$2,updated_at=now() WHERE id=$1 AND status='published' AND rollout_frozen_at IS NULL AND rollout_percent<100", [id, reason]);
+  } else if (action === "resume") {
+    requireAdmin(actor);
+    // Back to being offered at the same share; a person decided, so this stage no longer freezes on the metrics.
+    changed = await dbExec("UPDATE client_releases SET rollout_frozen_at=NULL,rollout_freeze_reason='',rollout_override=1,rollout_since=now(),updated_at=now() WHERE id=$1 AND rollout_frozen_at IS NOT NULL", [id]);
   } else if (action === "delete") {
     requireAdmin(actor);
     // Published builds are withdrawn first (that step keeps a build reachable for the minimum version).
@@ -333,7 +351,8 @@ export async function transitionRelease(actor: ReleaseActor, id: string, action:
     }
   }
   await addAudit({ actorUserId: actorId(actor), action: `client_release.${action}`, targetType: "client_release", targetId: id,
-    metadata: { actor: actorLabel(actor), ...(action === "rollout" ? { percent: extra?.percent } : {}) } });
+    metadata: { actor: actorLabel(actor), ...(action === "rollout" ? { percent: extra?.percent } : {}), ...(action === "freeze" ? { reason: extra?.reason ?? "manual" } : {}),
+      ...(typeof extra?.via === "string" ? { via: extra.via } : {}) } });
   return action === "delete" ? { id, deleted: true } : findRelease(id);
 }
 

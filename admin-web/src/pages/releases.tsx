@@ -5,7 +5,7 @@ import { useConfirm } from "../confirm-dialog";
 import { Icon } from "../icons";
 import { useToast } from "../toast";
 import { extractEntry, zipEntries } from "../zip";
-import { type BuildHealth, RolloutHealthPanel } from "./rollout-health";
+import { type BuildHealth, RolloutHealthPanel, type RolloutAction } from "./rollout-health";
 import { Empty, formatBytes, formatTime, InlineNotice, type Notice, PageHeader, Pill, StateDot } from "./shared";
 
 type Platform = "android" | "ios" | "macos" | "windows";
@@ -13,6 +13,7 @@ type Release = {
   id: string; platform: Platform; arch: string; channel: "stable" | "beta"; version: string; build: number;
   status: "draft" | "published" | "withdrawn"; distribution: string; url: string; sha256?: string; sizeBytes?: number;
   minOs: string; notes: string; publishedAt: string | null; createdAt: string; createdBy: string | null; rolloutPercent: number;
+  rolloutSince?: string | null; rolloutFrozenAt?: string | null; rolloutFreezeReason?: string;
   mirror: "ready" | "pending" | "retrying" | "failed" | null; mirrorError: string | null;
 };
 type Overview = {
@@ -128,7 +129,6 @@ export function ReleasesPage() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [minBuilds, setMinBuilds] = useState<Record<string, string>>({});
   const [announcements, setAnnouncements] = useState<Record<string, string>>({});
-  const [rollouts, setRollouts] = useState<Record<string, string>>({});
   const [platformFilter, setPlatformFilter] = useState<"all" | Platform>("all");
   const [formPlatform, setFormPlatform] = useState<Platform>("android");
   const [source, setSource] = useState<"import" | "upload" | "url">("import");
@@ -149,7 +149,6 @@ export function ReleasesPage() {
       setData(result);
       setMinBuilds(Object.fromEntries(result.policies.map((policy) => [policy.platform, String(policy.minBuild)])));
       setAnnouncements(Object.fromEntries(result.policies.map((policy) => [policy.platform, policy.announcement])));
-      setRollouts(Object.fromEntries(result.releases.map((release) => [release.id, String(release.rolloutPercent)])));
     } catch (error) { setNotice({ tone: "error", message: errorText(error) }); }
     finally { setBusy(false); }
   }, []);
@@ -185,9 +184,12 @@ export function ReleasesPage() {
   async function saveAnnouncement(platform: Platform) {
     await run(() => api("/api/v1/admin/client-policy", { method: "PUT", body: JSON.stringify({ platform, announcement: announcements[platform] || "" }) }), t("已保存"));
   }
-  async function saveRollout(release: Release) {
-    const percent = Number(rollouts[release.id]);
-    await run(() => api(`/api/v1/admin/client-releases/${release.id}`, { method: "POST", body: JSON.stringify({ action: "rollout", percent }) }), t("已更新"));
+  async function rolloutAct(release: Release, action: RolloutAction) {
+    const label = `${platformNames[release.platform]} ${release.version} (${release.build})`;
+    if ((action === "full" || action === "withdraw") && !(await confirm(action === "full"
+      ? { title: t("直接全量"), message: t("{0} 将发给所有用户，跳过剩下的灰度阶段。", [label]), confirmLabel: t("直接全量") }
+      : { title: t("撤回版本"), message: t("撤回 {0}？没升级的用户不会再收到它，已升级的不受影响；要修复请发一个更高构建号的新版本。", [label]), confirmLabel: t("撤回"), danger: true }))) return;
+    await run(() => api(`/api/v1/admin/client-releases/${release.id}`, { method: "POST", body: JSON.stringify({ action, scope: "build" }) }), t("已更新"));
   }
   function fillFromInstaller(input: HTMLInputElement) {
     const parsed = input.files?.[0] && parseInstallerName(input.files[0].name), form = input.form;
@@ -314,7 +316,7 @@ export function ReleasesPage() {
         data.storage.mode === "s3" ? t("安装包存储：S3 兼容对象存储（{0}）", [data.storage.publicBaseUrl || ""]) : t("安装包存储：Controller 数据卷"),
         data.ciTokenConfigured ? t("发布令牌已配置：CI 或本地脚本可以上传、登记草稿并发布到测试版。") : t("发布令牌未配置：只能在这里手动登记版本。"),
       ].filter(Boolean).join(" ") }} />
-      <RolloutHealthPanel health={data.health || []} error={data.healthError ?? null} releases={data.releases} />
+      <RolloutHealthPanel health={data.health || []} error={data.healthError ?? null} releases={data.releases} busy={busy} onAction={(release, action) => void rolloutAct(release as Release, action)} />
       {data.storage.mirror && <section className="panel result-panel"><div className="panel-head"><h2>{t("下载加速（CDN）")}</h2>
           <button className="button ghost small" disabled={mirrorTest === "running"} onClick={() => void testMirror()}>{mirrorTest === "running" ? t("测试中…") : t("测试 OSS/CDN")}</button></div>
         <p className="form-note">{data.storage.mirror === "invalid" ? t("配置有误：{0}", [data.storage.mirrorError || "VEILBIRD_RELEASE_MIRROR_*"]) : t("{0}，客户端优先从这里下载，失败时改从 Controller 下载。", [data.storage.mirror])}</p>
@@ -390,8 +392,7 @@ export function ReleasesPage() {
             ? <Pill value={release.channel} label={release.channel === "stable" ? t("正式版") : t("测试版")} tone={release.channel === "stable" ? "success" : "progress"} />
             : <Pill value={release.status} label={release.status === "draft" ? t("草稿") : t("已撤回")} tone={release.status === "draft" ? "neutral" : "warning"} />}
             {release.status === "draft" && <small style={{ display: "block", marginTop: 6, whiteSpace: "nowrap" }}>{release.channel === "stable" ? t("发布后为正式版") : t("发布后为测试版")}</small>}</td>
-          <td>{release.status !== "withdrawn" && <div className="row-actions"><input type="number" min={1} max={100} style={{ width: 80 }} aria-label={t("灰度比例 (%)")} title={t("灰度比例 (%)")} value={rollouts[release.id] ?? "100"} onChange={(event) => setRollouts({ ...rollouts, [release.id]: event.target.value })} /><small>%</small>
-              <button className="button ghost small" disabled={busy || String(release.rolloutPercent) === (rollouts[release.id] ?? "100")} onClick={() => void saveRollout(release)}>{t("保存")}</button></div>}</td>
+          <td>{release.status === "withdrawn" ? "—" : release.rolloutFrozenAt ? <Pill value="frozen" tone="danger" label={t("已暂停 · {0}%", [release.rolloutPercent])} /> : `${release.rolloutPercent}%`}</td>
           <td><a href={release.url} target="_blank" rel="noopener noreferrer">{release.distribution === "direct" ? formatBytes(release.sizeBytes) : release.distribution}</a>{release.sha256 && <small><br /><code title={release.sha256}>{release.sha256.slice(0, 12)}…</code></small>}
             {release.mirror && <small title={release.mirrorError || undefined}><br />{release.mirror === "ready" ? t("CDN 已同步") : release.mirror === "failed" ? t("CDN 同步失败") : t("CDN 同步中")}</small>}</td>
           <td>{formatTime(release.createdAt)}{release.publishedAt && release.status === "published" && Date.parse(release.publishedAt) - Date.parse(release.createdAt) > 60_000 && <small>{t("发布于 {0}", [formatTime(release.publishedAt)])}</small>}</td>

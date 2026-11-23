@@ -4,6 +4,8 @@ import { jsonError, readJson } from "../../../../../server/http";
 import { requestAdmin } from "../../../../../server/request-auth";
 import { deleteTelegram, saveTelegramToken, telegramStatus } from "../../../../../server/telegram";
 import "../../../../../server/telegram-actions";
+import "../../../../../server/rollout-control";
+import "../../../../../server/node-health";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

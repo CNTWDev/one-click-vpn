@@ -647,7 +647,16 @@ const migrations = [
     ALTER TABLE nodes ADD COLUMN IF NOT EXISTS drain_locked INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE nodes ADD COLUMN IF NOT EXISTS auto_drain INTEGER NOT NULL DEFAULT 1;
   `)],
-  ["014-qr-logins", async (db) => db.query(`
+  ["014-rollout-control", async (db) => db.query(`
+    -- Staged rollout steps by itself (server/rollout-control.ts): when the current share started, and a freeze.
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS rollout_since TIMESTAMPTZ;
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS rollout_frozen_at TIMESTAMPTZ;
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS rollout_freeze_reason TEXT NOT NULL DEFAULT '';
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS rollout_override INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE client_releases ADD COLUMN IF NOT EXISTS rollout_asked_at TIMESTAMPTZ;
+    UPDATE client_releases SET rollout_since = COALESCE(published_at::timestamptz, updated_at) WHERE rollout_since IS NULL AND rollout_percent < 100;
+  `)],
+  ["015-qr-logins", async (db) => db.query(`
     -- Signing in a computer with the phone (server/qr-login.ts): hashes only, two minutes, used once.
     CREATE TABLE IF NOT EXISTS qr_logins (
       id TEXT PRIMARY KEY, code_hash TEXT NOT NULL UNIQUE, secret_hash TEXT NOT NULL,
