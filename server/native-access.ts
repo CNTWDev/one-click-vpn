@@ -72,6 +72,30 @@ export async function nativeAccount(session: Session) {
     limit:slots.limit,used:slots.used,configs:slots.used-devices.filter(d=>d.status!=="revoked").length,
     expiresAt:access.state==="active"?access.until:access.endedAt,access,devices,traffic };
 }
+/**
+ * The apps' usage page: per day, per device and per location over the last `days` days (1–90, default 30). Read from
+ * the billing rollup traffic_daily (per day, device, node and protocol), never from logs. An app signs in once per node
+ * as a separate device row (native_leases), so its rows add up under its enrollment, named as on the account page.
+ */
+export async function nativeUsage(session: Session, daysParam: string|null) {
+  const days=Math.min(90,Math.max(1,Math.trunc(Number(daysParam))||30));
+  const since=new Date(Date.now()-(days-1)*86400000).toISOString().slice(0,10);
+  const daily=await dbQuery<{day:string;upload:string;download:string}>(`SELECT day,SUM(upload_bytes)::text AS upload,SUM(download_bytes)::text AS download
+    FROM traffic_daily WHERE user_id=$1 AND day>=$2 GROUP BY day ORDER BY day`,[session.user_id,since]);
+  const devices=await dbQuery<{id:string;name:string;platform:string;isCurrent:boolean;bytes:string}>(`SELECT COALESCE(e.id,t.device_id) AS id,
+      COALESCE(MAX(e.device_name),MAX(d.display_name),'') AS name,COALESCE(MAX(e.platform),MAX(d.platform),'') AS platform,
+      COALESCE(BOOL_OR(e.identity_thumbprint=$3),FALSE) AS "isCurrent",SUM(t.upload_bytes+t.download_bytes)::text AS bytes
+    FROM traffic_daily t LEFT JOIN native_leases l ON l.device_id=t.device_id LEFT JOIN native_enrollments e ON e.id=l.enrollment_id
+      LEFT JOIN devices d ON d.id=t.device_id
+    WHERE t.user_id=$1 AND t.day>=$2 GROUP BY COALESCE(e.id,t.device_id) ORDER BY SUM(t.upload_bytes+t.download_bytes) DESC LIMIT 20`,
+  [session.user_id,since,session.identity_thumbprint]);
+  const nodes=await dbQuery<{id:string;name:string;countryCode:string|null;bytes:string}>(`SELECT t.node_id AS id,MAX(n.name) AS name,UPPER(MAX(r.code)) AS "countryCode",
+      SUM(t.upload_bytes+t.download_bytes)::text AS bytes
+    FROM traffic_daily t JOIN nodes n ON n.id=t.node_id LEFT JOIN regions r ON r.id=n.region_id
+    WHERE t.user_id=$1 AND t.day>=$2 GROUP BY t.node_id ORDER BY SUM(t.upload_bytes+t.download_bytes) DESC LIMIT 20`,[session.user_id,since]);
+  // Byte counts are strings: past 2^53 a JSON number would round.
+  return {days,since,daily,devices,nodes};
+}
 async function candidates(includePaused=false) {
   return (await selectVpnServices({protocol:"wireguard",includePaused})).filter(({node})=>node.capabilities.nativeLeaseEnforcement === 1);
 }
