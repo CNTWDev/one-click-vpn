@@ -516,6 +516,23 @@ VLESS. AmneziaWG is not used: it needs a kernel module or a separately built use
 daemon on every node, and Hysteria2 with Salamander covers the same "UDP without a
 signature" case.
 
+## Route statistics by country and network
+
+When an app reports which transports reached a node (the TRANSPORT_PROBE diagnostic),
+the Controller looks up the request address in the free DB-IP Lite databases and keeps
+only the country and the network's AS number, never the address. Results are summed per
+node, transport, country, AS number and day in `node_path_stats` (attempts, successes,
+delay) and rows older than 14 days are removed. Private addresses are skipped.
+
+The Controller downloads `dbip-country-lite` and `dbip-asn-lite` from download.db-ip.com
+into `data/geo` on first use and again when they are older than 35 days (DB-IP publishes
+monthly). A failed download is logged to Loki as `geo.download_failed`, and reports are
+then recorded without a country until the next try six hours later. Set
+`VEILBIRD_GEO_DOWNLOAD=off` to stop downloads, or `VEILBIRD_GEO_DIR` to read the
+databases from another folder.
+
+IP Geolocation by DB-IP (https://db-ip.com), licensed under CC BY 4.0.
+
 ## Dynamic subscriptions and VLESS + REALITY
 
 The Portal uses **新建连接 → 订阅 / 指定节点**, with subscriptions recommended by

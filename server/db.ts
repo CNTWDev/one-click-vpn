@@ -51,6 +51,12 @@ export type DbNode = {
   policy_version?: number;
   /** Set while the node is paused: hidden from apps, subscriptions and new configs, still serving existing ones. */
   paused_at?: string | null;
+  /** Set while the Controller has removed the node automatically (server/node-health.ts); same effect as a pause. */
+  drained_at?: string | null;
+  drain_reason?: string;
+  drain_history?: string;
+  drain_locked?: number;
+  auto_drain?: number;
 };
 
 export type NodeMetrics = {

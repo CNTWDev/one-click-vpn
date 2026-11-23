@@ -7,7 +7,7 @@ import { hashPassword } from "../server/password.ts";
 
 const database=process.env.VEILBIRD_NATIVE_TEST_DATABASE_URL;
 test("native admission: signed proof, concurrency quota, revoke grace, ownership and expiry",{skip:!database,timeout:90000},async()=>{
-  const env={...process.env,VEILBIRD_DATABASE_URL:database,VEILBIRD_NATIVE_ACCESS_ENABLED:"1",VEILBIRD_MASTER_KEY:Buffer.alloc(32,9).toString("base64")};
+  const env={...process.env,VEILBIRD_DATABASE_URL:database,VEILBIRD_NATIVE_ACCESS_ENABLED:"1",VEILBIRD_MASTER_KEY:Buffer.alloc(32,9).toString("base64"),VEILBIRD_GEO_DIR:"tests/fixtures/geo",VEILBIRD_GEO_DOWNLOAD:"off"};
   execFileSync(process.execPath,["scripts/migrate.mjs"],{env,stdio:"pipe"});
   const pool=new pg.Pool({connectionString:database});
   const stamp=new Date().toISOString(),user=`native_${Date.now()}`,node=`${user}_node`,password="test-password-123";
@@ -16,8 +16,8 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     VALUES($1,'Test node','Test','192.0.2.1','root','password','','','','online',$2,$3,$4,$2,$2)`,[node,stamp,randomBytes(32).toString("base64"),JSON.stringify({nativeLeaseEnforcement:1,connectivity:{protocols:{wireguard:{runtimeActive:true,listening:true}}}})]);
   await pool.query("INSERT INTO vpn_services(node_id,protocol,listen_port,subnet,status,created_at,updated_at) VALUES($1,'wireguard',51820,'10.70.0.0/24','healthy',$2,$2)",[node,stamp]);
   await pool.query("INSERT INTO node_protocols(node_id,protocol,updated_at) VALUES($1,'wireguard',$2)",[node,stamp]);
-  const server=spawn(process.execPath,["node_modules/next/dist/bin/next","start","-p","3397","-H","127.0.0.1"],{env,stdio:"ignore"});
-  const base="http://127.0.0.1:3397/api/v2/native/";
+  const server=spawn(process.execPath,["node_modules/next/dist/bin/next","start","-p","3398","-H","127.0.0.1"],{env,stdio:"ignore"});
+  const base="http://127.0.0.1:3398/api/v2/native/";
   const call=async(path,body,token)=>{const response=await fetch(base+path,{method:body?"POST":"GET",headers:{"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,data:await response.json()};};
   try {
     let ready=false;for(let i=0;i<100;i++){if(await fetch(base+"account").then(()=>true).catch(()=>false)){ready=true;break;}await new Promise(r=>setTimeout(r,100));}assert.ok(ready);
@@ -103,8 +103,17 @@ test("native admission: signed proof, concurrency quota, revoke grace, ownership
     const report=await call("diagnostics",{events:[{code:"HANDSHAKE_TIMEOUT",at:new Date().toISOString(),nodeId:node},{code:"bad code",at:new Date().toISOString()},{code:"OLD",at:"2000-01-01T00:00:00Z"}]},loser.token);
     assert.deepEqual([report.status,report.data.accepted],[200,1],"only well-formed recent codes are stored");
     assert.equal((await call("diagnostics",{events:[]})).status,401);
+    // Probe summaries count per country and network of the sender's address (fixture: 203.0.113.0/25 = CN AS4134); no address is kept.
+    const probe=(address,detail)=>fetch(base+"diagnostics",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${loser.token}`,"X-Real-IP":address},
+      body:JSON.stringify({events:[{code:"TRANSPORT_PROBE",at:new Date().toISOString(),nodeId:node,network:"cell:0123456789ab",detail}]})});
+    assert.equal((await probe("203.0.113.5","hysteria2=fail,reality=ok:180,bogus=ok")).status,200);
+    assert.equal((await probe("203.0.113.6","hysteria2=fail,reality=ok")).status,200);
+    assert.equal((await probe("192.168.1.2","reality=ok:90")).status,200,"a private address has no country and is skipped");
+    const paths=(await pool.query("SELECT transport,country,asn,attempts,successes,delay_sum_ms::int AS sum,delay_count FROM node_path_stats WHERE node_id=$1 ORDER BY transport",[node])).rows;
+    assert.deepEqual(paths,[{transport:"hysteria2",country:"CN",asn:4134,attempts:2,successes:0,sum:0,delay_count:0},{transport:"reality",country:"CN",asn:4134,attempts:2,successes:2,sum:180,delay_count:1}]);
+    assert.equal((await pool.query("SELECT ok_at IS NOT NULL AS ok FROM node_transport_reach WHERE node_id=$1 AND transport='reality'",[node])).rows[0].ok,true,"the delay suffix still reads as ok");
     // Portal: the account page lists the signed-in app and can sign it out; signing in with the password brings it back.
-    const portal="http://127.0.0.1:3397/api/v1/";
+    const portal="http://127.0.0.1:3398/api/v1/";
     const web=await fetch(portal+"auth/web-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:`${user}@example.com`,password})});
     assert.equal(web.status,200);const cookie=web.headers.get("set-cookie").split(";")[0];
     const listed2=await (await fetch(portal+"account",{headers:{cookie}})).json();

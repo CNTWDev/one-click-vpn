@@ -425,8 +425,24 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="update_seconds" xml:space="preserve"><value>{0} s</value></data>
   <data name="update_time_left" xml:space="preserve"><value>about {0}</value></data>
   <data name="upload_amount" xml:space="preserve"><value>↑ Up {0}</value></data>
+  <data name="usage_30_days" xml:space="preserve"><value>30 days</value></data>
+  <data name="usage_7_days" xml:space="preserve"><value>7 days</value></data>
+  <data name="usage_90_days" xml:space="preserve"><value>90 days</value></data>
+  <data name="usage_apps_local" xml:space="preserve"><value>Counted on this device only, never uploaded</value></data>
+  <data name="usage_by_app" xml:space="preserve"><value>By app</value></data>
+  <data name="usage_by_device" xml:space="preserve"><value>By device</value></data>
+  <data name="usage_by_location" xml:space="preserve"><value>By location</value></data>
+  <data name="usage_days_left" xml:space="preserve"><value>{0} days left</value></data>
+  <data name="usage_left" xml:space="preserve"><value>{0} left</value></data>
+  <data name="usage_load_failed" xml:space="preserve"><value>Couldn't load usage. Try again later.</value></data>
+  <data name="usage_of" xml:space="preserve"><value>of {0}</value></data>
+  <data name="usage_open" xml:space="preserve"><value>See usage</value></data>
+  <data name="usage_this_device" xml:space="preserve"><value>{0} (this device)</value></data>
   <data name="usage_this_month" xml:space="preserve"><value>This month</value></data>
+  <data name="usage_title" xml:space="preserve"><value>Usage</value></data>
   <data name="usage_today" xml:space="preserve"><value>Today</value></data>
+  <data name="usage_unlimited" xml:space="preserve"><value>Unlimited data</value></data>
+  <data name="usage_used_period" xml:space="preserve"><value>Used this period</value></data>
   <data name="use_automatic_action" xml:space="preserve"><value>Use Automatic</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 Valid until · </value></data>
@@ -438,9 +454,8 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>The Mac menu bar and Windows tray panels now hold the common switches: smart routing, kill switch, open at login, and speed in menu bar (Mac) or per-app routing (Windows), no need to open the window
-Changing smart routing or the kill switch there while connected reconnects and applies at once
-Check for updates right from the panel; the result shows on the same line</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Steadier connections: the app now notes how each connection went, so problems in a new version are caught before it reaches everyone
+Servers nobody can reach are taken out of the list automatically and come back once they recover</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows development build · VPN service integration in progress</value></data>

@@ -425,8 +425,24 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="update_seconds" xml:space="preserve"><value>{0} 秒</value></data>
   <data name="update_time_left" xml:space="preserve"><value>约 {0}</value></data>
   <data name="upload_amount" xml:space="preserve"><value>↑ 上传 {0}</value></data>
+  <data name="usage_30_days" xml:space="preserve"><value>30 天</value></data>
+  <data name="usage_7_days" xml:space="preserve"><value>7 天</value></data>
+  <data name="usage_90_days" xml:space="preserve"><value>90 天</value></data>
+  <data name="usage_apps_local" xml:space="preserve"><value>只在本机统计，不上传</value></data>
+  <data name="usage_by_app" xml:space="preserve"><value>按应用</value></data>
+  <data name="usage_by_device" xml:space="preserve"><value>按设备</value></data>
+  <data name="usage_by_location" xml:space="preserve"><value>按节点</value></data>
+  <data name="usage_days_left" xml:space="preserve"><value>还有 {0} 天</value></data>
+  <data name="usage_left" xml:space="preserve"><value>剩余 {0}</value></data>
+  <data name="usage_load_failed" xml:space="preserve"><value>用量没加载出来，稍后再试。</value></data>
+  <data name="usage_of" xml:space="preserve"><value>共 {0}</value></data>
+  <data name="usage_open" xml:space="preserve"><value>查看用量</value></data>
+  <data name="usage_this_device" xml:space="preserve"><value>{0}（本机）</value></data>
   <data name="usage_this_month" xml:space="preserve"><value>本月</value></data>
+  <data name="usage_title" xml:space="preserve"><value>用量</value></data>
   <data name="usage_today" xml:space="preserve"><value>今日</value></data>
+  <data name="usage_unlimited" xml:space="preserve"><value>不限流量</value></data>
+  <data name="usage_used_period" xml:space="preserve"><value>本期已用</value></data>
   <data name="use_automatic_action" xml:space="preserve"><value>改用自动</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 有效期 · </value></data>
@@ -438,9 +454,8 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac 菜单栏和 Windows 托盘弹窗加入常用开关：智能分流、断网保护、登录时启动、菜单栏网速（Mac）/ 按应用分流（Windows），不用打开主窗口
-连接中在弹窗里切换智能分流或断网保护，会自动重连立即生效
-弹窗底部可以直接检查更新，结果就显示在那一行</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>连接时更稳：应用会记录每次连接的结果，帮助我们在新版本推给所有人之前先发现问题
+连不上的服务器会被自动移出列表，恢复后自动放回</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>

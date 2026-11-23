@@ -52,6 +52,9 @@ import com.veilbird.core.Core
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
+/** First-run steps before the tab bar appears: sign in, then connect (the location starts on Automatic). */
+private const val STEPS = 2
+
 class MainActivity : Activity() {
     private lateinit var api: NativeApi
     private lateinit var updater: Updater
@@ -92,7 +95,7 @@ class MainActivity : Activity() {
     private var sealedShown: Boolean? = null
     private var shownState: LinkState? = null
     private var shownTrouble: Trouble? = null
-    /** False on a new install until its first connection: sign-in, location and connect then show "n/3" and no tab bar. */
+    /** False on a new install until its first connection: sign-in and connect then show "n/2" and no tab bar (the location is Automatic until changed). */
     private var onboarded = true
     private var stepsRow: LinearLayout? = null
     private var firstNote: View? = null
@@ -138,7 +141,7 @@ class MainActivity : Activity() {
         val settings = getSharedPreferences("preferences", MODE_PRIVATE)
         Palette.theme = settings.getString("appearance", "amber")!!
         selectedId = settings.getString("nodeId", "")!!; selectedName = settings.getString("nodeName", "")!!; selectedCode = settings.getString("nodeCode", "")!!
-        // Someone already signed in when this version arrives is not new: only a fresh install gets the three steps.
+        // Someone already signed in when this version arrives is not new: only a fresh install gets the first-run steps.
         if (!settings.contains("onboarded")) settings.edit().putBoolean("onboarded", api.secret("token") != null).apply()
         onboarded = settings.getBoolean("onboarded", true)
         @Suppress("DEPRECATION") window.apply { statusBarColor = Palette.ground; navigationBarColor = Palette.ground; decorView.systemUiVisibility = 0 }
@@ -166,7 +169,7 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         when (page) {
             "devices", "logs", "apps" -> { page = "account"; render() }
-            "nodes", "account", "activity" -> { page = "connect"; render() }
+            "nodes", "account", "activity", "usage" -> { page = "connect"; render() }
             else -> super.onBackPressed()
         }
     }
@@ -311,19 +314,18 @@ class MainActivity : Activity() {
         setContentView(FrameLayout(this).apply { setBackgroundColor(Palette.ground); addView(space, FrameLayout.LayoutParams(-1, -1)); addView(root, FrameLayout.LayoutParams(-1, -1)) })
         val signedIn = api.secret("token") != null
         // A new page eases in (short fade and rise); re-renders of the same page stay still.
-        // First run, signed in but no location chosen yet: step 2 instead of the connect page.
-        val picking = signedIn && !onboarded && page == "connect" && !getSharedPreferences("preferences", MODE_PRIVATE).getBoolean("onboardPicked", false)
-        val view = if (!signedIn) "login" else if (picking) "pick" else page
+        val view = if (!signedIn) "login" else page
         if (view != lastView) { content.alpha = 0f; content.translationY = 8.dp.toFloat(); content.animate().alpha(1f).translationY(0f).setDuration(200).setInterpolator(DecelerateInterpolator()).start() }
         lastView = view
         if (!signedIn) { accountData = null; login(); return }
         when (page) {
-            "connect" -> if (picking) pickLocation() else home()
+            "connect" -> home()
             "nodes" -> nodes()
             "devices" -> devices()
             "apps" -> appsPage()
             "logs" -> logs()
             "activity" -> activity()
+            "usage" -> usagePage()
             else -> account()
         }
         showUpdate()
@@ -538,7 +540,7 @@ class MainActivity : Activity() {
         }.also { add(it, top = 4) }
         // Notes that come and go above the file (update, location switch) slide the page smoothly instead of snapping it.
         if (ValueAnimator.areAnimatorsEnabled()) content.layoutTransition = LayoutTransition().apply { setDuration(220); enableTransitionType(LayoutTransition.CHANGING) }
-        if (!onboarded) add(sectionRow(3), top = 4)
+        if (!onboarded) add(sectionRow(2), top = 4)
         // The portrait: what any site or app on this network can see of this phone, as a sphere of light. It is the
         // switch: a tap starts (or stops) hiding; hidden, a ring holds the time hidden and the rates. It takes whatever
         // height the rest of the page leaves (up to 280dp), so the whole page fits on one screen on any phone.
@@ -602,13 +604,18 @@ class MainActivity : Activity() {
         val traffic = text("—", 15f, Palette.text, 500); val until = text("—", 15f, Palette.text, 500)
         val untilTitle = text(L10n.text(R.string.valid_until_label), 12f, Palette.secondary).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
         trafficTitle.ellipsize = android.text.TextUtils.TruncateAt.END
-        val strip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(4.dp, 0, 4.dp, 0) }
+        // A tap opens the usage page (per day, device and location).
+        val strip = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; setPadding(4.dp, 6.dp, 4.dp, 6.dp); background = pressable(Color.TRANSPARENT, 12)
+            contentDescription = L10n.text(R.string.usage_open); setOnClickListener { if (!busy) { page = "usage"; render() } }
+        }
         for ((title, value) in listOf(trafficTitle to traffic, untilTitle to until)) strip.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(title)
             addView(value.apply { maxLines = 1 }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        add(strip, top = 12)
+        strip.gravity = Gravity.CENTER_VERTICAL; strip.addView(chevron())
+        add(strip, top = 6)
         fun show(data: JSONObject) {
             val access = AccountAccess.from(data)
             trafficTitle.text = L10n.text(access.trafficTitle()); untilTitle.text = L10n.text(access.untilTitle())
@@ -625,6 +632,123 @@ class MainActivity : Activity() {
             runOnUiThread { accountData = data; remind(data); if (!isDestroyed && traffic.isAttachedToWindow) show(data) }
         }.start()
     }
+    // ---- Usage: what this account used, per day, per device and per location (the server's daily totals), and on
+    // Windows per program (kept on that computer only). Opened from the home's usage strip.
+    private var usageDays = 30
+    private fun usagePage() {
+        subPageTitle(L10n.text(R.string.usage_title)) { page = "connect"; render() }
+        val quota = card().also { add(it) }
+        fun fillQuota(data: JSONObject) {
+            quota.removeAllViews()
+            val access = AccountAccess.from(data)
+            val used = if (access.metered) maxOf(0L, access.quotaBytes!! - access.remainingBytes) else totalTraffic(data) ?: 0L
+            quota.addView(text(L10n.text(if (access.metered) R.string.usage_used_period else R.string.last_30_days), 12f, Palette.secondary).apply { maxLines = 1 })
+            quota.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM
+                val parts = bytes(used).split(' ', '\u00A0', limit = 2)
+                addView(text(parts[0], 38f, tint(access.state == "exhausted", false, Palette.text)).apply { typeface = Pixel.font(this@MainActivity); maxLines = 1 })
+                addView(text(parts.getOrElse(1) { "" }, 14f, Palette.secondary).apply { typeface = Typeface.MONOSPACE }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 6.dp; bottomMargin = 5.dp })
+                addView(View(this@MainActivity), LinearLayout.LayoutParams(0, 1, 1f))
+                addView(text(if (access.metered) L10n.text(R.string.usage_of, bytes(access.quotaBytes!!)) else L10n.text(R.string.usage_unlimited), 13f, Palette.secondary).apply { maxLines = 1 },
+                    LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = 5.dp; marginStart = 8.dp })
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp })
+            if (access.metered) {
+                val share = used.toFloat() / maxOf(1L, access.quotaBytes!!)
+                quota.addView(LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL; background = rounded(Palette.raised, 4); clipToOutline = true
+                    addView(View(this@MainActivity).apply { background = rounded(tint(access.state == "exhausted", access.low, Palette.accent), 4) }, LinearLayout.LayoutParams(0, -1, share.coerceIn(0.01f, 1f)))
+                    if (share < 1f) addView(View(this@MainActivity), LinearLayout.LayoutParams(0, -1, 1f - share.coerceIn(0.01f, 1f)))
+                }, LinearLayout.LayoutParams(-1, 8.dp).apply { topMargin = 12.dp })
+                quota.addView(text(L10n.text(R.string.usage_left, bytes(access.remainingBytes)), 12f, tint(access.state == "exhausted", access.low, Palette.secondary)).apply { maxLines = 1 },
+                    LinearLayout.LayoutParams(-2, -2).apply { topMargin = 8.dp })
+            }
+            quota.addView(View(this).apply { setBackgroundColor(Palette.hairline) }, LinearLayout.LayoutParams(-1, 1).apply { topMargin = 14.dp; bottomMargin = 12.dp })
+            val until = access.until
+            val ended = access.state == "expired"
+            quota.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                val left = when { ended -> L10n.text(R.string.access_expired_title); until == null -> L10n.text(R.string.no_expiry); else -> L10n.text(R.string.valid_until_label) + " " + L10n.date(until.toString()) }
+                addView(text(left, 13f, tint(ended, access.ending, Palette.secondary)).apply { maxLines = 2 }, LinearLayout.LayoutParams(0, -2, 1f))
+                if (until != null && !ended) {
+                    val days = maxOf(0L, (until.toEpochMilli() - System.currentTimeMillis() + AccountAccess.DAY - 1) / AccountAccess.DAY)
+                    addView(text(L10n.text(R.string.usage_days_left, L10n.number(days)), 13f, tint(false, access.ending, Palette.text), 500).apply { maxLines = 1 },
+                        LinearLayout.LayoutParams(-2, -2).apply { marginStart = 12.dp })
+                }
+            })
+        }
+        accountData?.let { fillQuota(it) }
+        // The range: 7, 30 or 90 days; changing it reloads the figures below, the page keeps its place.
+        val ranges = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(2.dp, 2.dp, 2.dp, 2.dp); background = rounded(Palette.surface, 12) }
+        add(ranges, height = 36.dp, top = 14)
+        val chart = card().also { add(it, top = 12) }
+        val dayLabel = text(" ", 12f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
+        val rangeTotal = text(" ", 12f, Palette.secondary).apply { typeface = Typeface.MONOSPACE; maxLines = 1 }
+        chart.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(dayLabel, LinearLayout.LayoutParams(0, -2, 1f)); addView(rangeTotal, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
+        })
+        var shownDays: List<Pair<String, Long>> = emptyList()
+        fun pick(index: Int) { shownDays.getOrNull(index)?.let { (day, value) -> dayLabel.swap(L10n.day(day) + " · " + bytes(value)) } }
+        val bars = DayBars(this) { pick(it) }
+        chart.addView(bars, LinearLayout.LayoutParams(-1, 88.dp).apply { topMargin = 12.dp })
+        val firstDay = text(" ", 11f, Palette.faint).apply { maxLines = 1 }; val lastDay = text(" ", 11f, Palette.faint).apply { maxLines = 1 }
+        chart.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(firstDay, LinearLayout.LayoutParams(0, -2, 1f)); addView(lastDay)
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp })
+        val lists = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also { add(it, top = 12) }
+        var loading = 0
+        fun load() {
+            val ask = ++loading; val days = usageDays
+            ranges.removeAllViews()
+            for ((value, title) in listOf(7 to R.string.usage_7_days, 30 to R.string.usage_30_days, 90 to R.string.usage_90_days)) {
+                val selected = value == usageDays
+                ranges.addView(text(L10n.text(title), 13f, if (selected) Palette.text else Palette.secondary, if (selected) 500 else 400).apply {
+                    gravity = Gravity.CENTER; maxLines = 1
+                    background = if (selected) rounded(Palette.selected, 10) else pressable(Color.TRANSPARENT, 10)
+                    contentDescription = L10n.text(title) + if (selected) L10n.text(R.string.current_page) else ""
+                    setOnClickListener { if (!selected) { usageDays = value; load() } }
+                }, LinearLayout.LayoutParams(0, -1, 1f))
+            }
+            lists.alpha = 0.5f
+            Thread {
+                val data = try { api.request("usage?days=$days") } catch (_: Exception) { null }
+                runOnUiThread {
+                    if (isDestroyed || ask != loading || !lists.isAttachedToWindow) return@runOnUiThread
+                    lists.animate().alpha(1f).setDuration(150).start()
+                    lists.removeAllViews()
+                    if (data == null) {
+                        lists.addView(text(L10n.text(R.string.usage_load_failed), 13f, Palette.secondary), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp; marginStart = 4.dp })
+                        return@runOnUiThread
+                    }
+                    // Every day of the range, with the days without traffic as empty bars.
+                    val byDay = data.optJSONArray("daily")?.let { arr -> (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.associate {
+                        it.optString("day") to ((it.optString("upload").toLongOrNull() ?: 0L) + (it.optString("download").toLongOrNull() ?: 0L)) } } ?: emptyMap()
+                    val today = java.time.LocalDate.now(java.time.ZoneOffset.UTC)
+                    shownDays = (days - 1 downTo 0).map { ago -> today.minusDays(ago.toLong()).toString().let { it to (byDay[it] ?: 0L) } }
+                    bars.set(shownDays.map { it.second }, shownDays.size - 1); pick(shownDays.size - 1)
+                    rangeTotal.swap(bytes(shownDays.sumOf { it.second }))
+                    firstDay.text = L10n.day(shownDays.first().first); lastDay.text = L10n.day(shownDays.last().first)
+                    bars.contentDescription = L10n.text(usageRangeTitle(days)) + " · " + bytes(shownDays.sumOf { it.second })
+                    fun rows(key: String, name: (JSONObject) -> String) = org.json.JSONArray().apply {
+                        val arr = data.optJSONArray(key) ?: return@apply
+                        for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { put(JSONObject().put("name", name(it)).put("bytes", it.optString("bytes").toLongOrNull() ?: 0L).put("proxy", true)) }
+                    }
+                    lists.addView(rankList(L10n.text(R.string.usage_by_device), rows("devices") { d ->
+                        d.optString("name").ifBlank { L10n.text(R.string.device) }.let { if (d.optBoolean("isCurrent")) L10n.text(R.string.usage_this_device, it) else it } }, mono = false, note = null),
+                        LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12.dp })
+                    lists.addView(rankList(L10n.text(R.string.usage_by_location), rows("nodes") { n -> n.optString("name") }, mono = false, note = null))
+                }
+            }.start()
+        }
+        load()
+        // The account (quota and end date) may be newer than the copy from the home page.
+        Thread {
+            val data = try { api.request("account") } catch (_: Exception) { null } ?: return@Thread
+            runOnUiThread { accountData = data; if (!isDestroyed && quota.isAttachedToWindow) fillQuota(data) }
+        }.start()
+    }
+    private fun usageRangeTitle(days: Int) = when (days) { 7 -> R.string.usage_7_days; 90 -> R.string.usage_90_days; else -> R.string.usage_30_days }
     /** Running out: amber; run out: red. */
     private fun tint(over: Boolean, low: Boolean, usual: Int) = when { over -> Palette.danger; low -> Palette.fair; else -> usual }
     /**
@@ -739,10 +863,10 @@ class MainActivity : Activity() {
             else -> if (update?.mandatory == true) L10n.text(R.string.update_required_detail)
                 else visitorIp?.takeIf { it != "—" }?.let { L10n.text(R.string.exposed_ip, it) } ?: L10n.text(R.string.exposed_plain)
         })
-        // The first connection ends the three steps: the squares fill and say "ready", then the tab bar comes.
+        // The first connection ends the two steps: the squares fill and say "ready", then the tab bar comes.
         if (connected && !onboarded) {
             onboarded = true; getSharedPreferences("preferences", MODE_PRIVATE).edit().putBoolean("onboarded", true).apply()
-            stepsRow?.let { fillSteps(it, 4) }
+            stepsRow?.let { fillSteps(it, STEPS + 1) }
             handler.postDelayed({ if (!isDestroyed && page == "connect") render() }, 3000)
         }
         shownState = state; shownTrouble = trouble
@@ -766,7 +890,7 @@ class MainActivity : Activity() {
             }
         }
     }
-    /** During the first run, the step on the right (three squares and "n/3"); afterwards nothing. */
+    /** During the first run, the step on the right (two squares and "n/2"); afterwards nothing. */
     private fun sectionRow(step: Int?): View {
         if (step == null) return View(this)
         return LinearLayout(this).apply {
@@ -775,10 +899,10 @@ class MainActivity : Activity() {
                 .also { fillSteps(it, step); addView(it, LinearLayout.LayoutParams(-2, -2)) }
         }
     }
-    /** Steps 1–3 done, current or to come; 4 is "ready" after the first connection. */
+    /** Steps 1–2 done, current or to come; 3 is "ready" after the first connection. */
     private fun fillSteps(row: LinearLayout, step: Int) {
         row.removeAllViews()
-        for (i in 1..3) row.addView(View(this).apply {
+        for (i in 1..STEPS) row.addView(View(this).apply {
             background = GradientDrawable().apply {
                 when {
                     i < step -> setColor(Palette.alpha(Palette.text, 190))
@@ -787,10 +911,10 @@ class MainActivity : Activity() {
                 }
             }
         }, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 3.dp })
-        val ready = step > 3
-        row.addView(mono(if (ready) L10n.text(R.string.onboarding_ready) else L10n.number(step) + "/3", 11f, if (ready) Palette.accent else Palette.secondary),
+        val ready = step > STEPS
+        row.addView(mono(if (ready) L10n.text(R.string.onboarding_ready) else L10n.number(step) + "/" + L10n.number(STEPS), 11f, if (ready) Palette.accent else Palette.secondary),
             LinearLayout.LayoutParams(-2, -2).apply { marginStart = 5.dp })
-        row.contentDescription = if (ready) L10n.text(R.string.onboarding_ready) else "$step/3"
+        row.contentDescription = if (ready) L10n.text(R.string.onboarding_ready) else "$step/$STEPS"
     }
     /** A quiet amber-tinted note: what is about to happen, then what to do. */
     private fun note(title: String, detail: String) = LinearLayout(this).apply {
@@ -803,69 +927,6 @@ class MainActivity : Activity() {
             addView(text(title, 13f))
             addView(text(detail, 12f, Palette.secondary), LinearLayout.LayoutParams(-2, -2).apply { topMargin = 2.dp })
         }, LinearLayout.LayoutParams(0, -2, 1f))
-    }
-    /**
-     * First run, step 2: where to connect from. Automatic is chosen already, so one tap goes on; under it the three
-     * fastest locations this phone measured, and the whole list.
-     */
-    private fun pickLocation() {
-        fileHeader()
-        add(sectionRow(2), top = 14)
-        add(text(L10n.text(R.string.where_would_you_like_to_connect), 28f, Palette.text, 300).apply { accessibilityHeading(); setPadding(4.dp, 0, 4.dp, 0) }, top = 14)
-        add(text(L10n.text(R.string.pick_location_sub), 14f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, top = 6, bottom = 18)
-        val options = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also { add(it) }
-        var asked = false
-        fun show() {
-            options.removeAllViews()
-            val nodes = NodeCache.nodes(this)?.let { list -> (0 until list.length()).map { list.getJSONObject(it) } }.orEmpty()
-            val ranked = nodes.mapNotNull { node -> Latency.recent[node.getString("id")]?.takeIf { it.latency != null }?.let { node to it } }.sortedBy { it.second.score }
-            fun option(id: String, name: String, code: String, detail: String) = row(64).apply {
-                val chosen = selectedId == id
-                background = if (chosen) rounded(Palette.selected, 14) else pressable(Palette.surface, 14)
-                addView(if (id.isEmpty()) badge(null, R.drawable.ic_sparkle, Palette.accent) else badge(code))
-                addView(titles(name, detail))
-                addView(FrameLayout(this@MainActivity).apply {
-                    addView(radio(chosen), FrameLayout.LayoutParams(16.dp, 16.dp, Gravity.CENTER))
-                }, LinearLayout.LayoutParams(16.dp, 16.dp))
-                contentDescription = name; isSelected = chosen
-                setOnClickListener {
-                    selectedId = id; selectedName = name; selectedCode = code
-                    getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("nodeId", id).putString("nodeName", name).putString("nodeCode", code).apply()
-                    show()
-                }
-            }
-            val best = ranked.firstOrNull()
-            options.addView(option("", L10n.text(R.string.automatic_recommended), "", best?.let { L10n.text(R.string.automatic_now, it.first.getString("name"), ms(it.second) ?: "") } ?: L10n.text(R.string.auto_detail)))
-            if (ranked.isNotEmpty()) options.addView(text(L10n.text(R.string.or_choose_one), 13f, Palette.secondary).apply { setPadding(4.dp, 0, 0, 0) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 18.dp; bottomMargin = 8.dp })
-            ranked.take(3).forEachIndexed { i, (node, quality) ->
-                val id = node.getString("id"); val name = node.getString("name")
-                options.addView(option(id, name, Directory.code(id, name), ms(quality) ?: ""), LinearLayout.LayoutParams(-1, -2).apply { if (i > 0) topMargin = 8.dp })
-            }
-            if (nodes.isNotEmpty()) options.addView(row(48).apply {
-                setPadding(4.dp, 0, 4.dp, 0); background = pressable(Color.TRANSPARENT, 4)
-                addView(text(L10n.text(R.string.all_locations_count, L10n.number(nodes.size)), 13f, Palette.secondary), LinearLayout.LayoutParams(0, -2, 1f))
-                addView(chevron())
-                setOnClickListener { if (!busy) { page = "nodes"; render() } }
-            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 10.dp })
-            // Nothing measured on this phone yet: measure once, quietly, and show the fastest when it is done.
-            if (ranked.isEmpty() && nodes.isNotEmpty() && !asked) {
-                asked = true
-                val list = JSONArray().also { array -> nodes.forEach { array.put(it) } }
-                Thread {
-                    try { Latency.rank(list, attempts = 1, reuseMs = 60000, settleMs = 1500); NodeCache.saveMeasured(applicationContext) } catch (_: Exception) { }
-                    runOnUiThread { if (!isDestroyed && options.isAttachedToWindow) show() }
-                }.start()
-            }
-        }
-        onNodes = { if (options.isAttachedToWindow) show() }
-        show()
-        if (NodeCache.nodes(this) == null) refreshNodes()
-        // Continue: the choice is already saved; step 3 is the connect page itself.
-        dock?.addView(text(L10n.text(R.string.continue_action), 16f, Palette.onAccent, 600).apply {
-            gravity = Gravity.CENTER; setPadding(18.dp, 0, 18.dp, 0); isClickable = true; maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-            background = RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.onAccent, 40)), rounded(Palette.accent, 16), null)
-            setOnClickListener { if (!busy) { getSharedPreferences("preferences", MODE_PRIVATE).edit().putBoolean("onboardPicked", true).apply(); render() } }
-        }, LinearLayout.LayoutParams(-1, 54.dp).apply { topMargin = 10.dp; bottomMargin = 12.dp })
     }
     /** The action's dot breathes slowly while a connection is up; it stops when the view is gone or the state changes. */
     private fun breathe(dot: View) {
@@ -1261,7 +1322,7 @@ class MainActivity : Activity() {
     private fun select(id: String, name: String, code: String) {
         val reconnect = ConnectionStateStore.active && id != ConnectionStateStore.nodeId
         selectedId = id; selectedName = name; selectedCode = code; page = "connect"
-        getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("nodeId", id).putString("nodeName", name).putString("nodeCode", code).putBoolean("onboardPicked", true).apply()
+        getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("nodeId", id).putString("nodeName", name).putString("nodeCode", code).apply()
         render()
         // Connected (or reconnecting): one tap moves the VPN to the new location.
         if (reconnect) {

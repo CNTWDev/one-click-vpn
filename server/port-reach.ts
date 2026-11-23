@@ -1,5 +1,8 @@
 import { connect } from "node:net";
 import { dbExec, dbQuery } from "./db";
+import { appTransports } from "./app-transports";
+
+export { appTransports };
 
 /**
  * Whether a node's ports can be reached from outside, past cloud security groups and network ACLs
@@ -27,15 +30,6 @@ export async function tcpReachable(host: string, port: number, { timeoutMs = 300
   return open;
 }
 
-/** App transport names and the node service port they use. */
-export const appTransports: Record<string, { protocol: string; transport: "udp" | "tcp" }> = {
-  wireguard: { protocol: "wireguard", transport: "udp" },
-  hysteria2: { protocol: "stealth", transport: "udp" },
-  reality: { protocol: "vless", transport: "tcp" },
-  // REALITY on the node's spare port (hop-ports.ts).
-  "reality-alt": { protocol: "vless", transport: "tcp" },
-  xhttp: { protocol: "stealth", transport: "tcp" },
-};
 const networkKey = /^[a-z]{2,8}:[0-9a-f]{12}$/;
 
 /**
@@ -46,7 +40,8 @@ const networkKey = /^[a-z]{2,8}:[0-9a-f]{12}$/;
 export async function recordTransportProbe(nodeId: string, network: unknown, detail: string | null) {
   if (typeof network !== "string" || !networkKey.test(network) || !detail) return;
   for (const part of detail.split(",")) {
-    const [name, result] = part.trim().split("=");
+    // Newer apps add the delay after the result ("reality=ok:182").
+    const [name, outcome = ""] = part.trim().split("="), result = outcome.split(":")[0];
     if (!appTransports[name] || !["ok", "fail"].includes(result)) continue;
     await dbExec(`INSERT INTO node_transport_reach (node_id, transport, network, ok_at, failed_at)
       SELECT $1, $2, $3, CASE WHEN $4 THEN now() END, CASE WHEN $4 THEN NULL ELSE now() END WHERE EXISTS (SELECT 1 FROM nodes WHERE id = $1)

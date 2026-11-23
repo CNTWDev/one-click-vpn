@@ -8,6 +8,10 @@ on:
     paths: ['admin-web/**', 'portal-web/**', 'shared/**', 'tests/console-*.mjs', 'tests/portal-*.mjs', 'tests/fixtures/**', 'frontend-server.mjs', '.github/workflows/console-ui.yml']
 permissions:
   contents: read
+# A new push to the same branch cancels the run still going for the previous commit.
+concurrency:
+  group: ui-check-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   layout:
     # Pinned: ubuntu-latest moved to 26.04, where Playwright 1.56 cannot install Chromium.
@@ -18,14 +22,27 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
+      # node_modules restored whole while package-lock.json is unchanged (saved by master runs, shared by all ubuntu-24.04
+      # jobs); npm ci only on a miss, saved straight away so later steps cannot add to it.
+      - id: modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-ubuntu-24.04-node22-${{ hashFiles('package-lock.json') }}
+      - if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
+      - if: steps.modules.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: node_modules
+          key: ${{ steps.modules.outputs.cache-primary-key }}
       - run: npm run i18n:check
       # Vite does not type-check; the Console and Portal have their own tsconfig.
       - run: npm run typecheck
       - run: npm run build:admin-web
       - run: npm run build:portal
       # Browser tests run only when VEILBIRD_TEST_PLAYWRIGHT points at playwright-core; it is not a project dependency.
-      - run: npm install --no-save playwright-core@1.56 && npx playwright-core install --with-deps chromium
+      - run: npm install --no-save --no-audit --no-fund playwright-core@1.56 && npx playwright-core install --with-deps chromium
       - name: Layout and locale checks (Console and Portal, zh/en/ru, desktop to phone widths)
         run: node --test tests/console-layout.test.mjs tests/console-i18n-ui.test.mjs tests/portal-layout.test.mjs tests/portal-i18n-ui.test.mjs tests/portal-password-reset-ui.test.mjs
         env:

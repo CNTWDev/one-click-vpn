@@ -1,11 +1,13 @@
 import { parseClientAgent, type ClientAgent, type ClientPlatform } from "../shared/client-releases";
 import { downloadPath, minimumBuild } from "./client-releases";
 import { randomUUID } from "node:crypto";
+import { crashSignature, parseSession } from "./client-session";
 import { dbExec, dbQuery } from "./db";
 import { digest, NativeError } from "./native-proof";
 import { writeOperationalLog } from "./operational-logs";
 import { scrubDetail } from "./scrub-detail";
 import { recordTransportProbe } from "./port-reach";
+import { recordProbeFromAddress } from "./path-stats";
 
 export const clientHeader = "x-veilbird-client";
 
@@ -38,7 +40,7 @@ const diagnosticCode = /^[A-Z][A-Z0-9_]{1,63}$/, diagnosticNode = /^[A-Za-z0-9_-
  * the full report goes to the runtime log (Loki only), next to the server's own lines for the same
  * connection attempt (`attempt` is the X-Request-Id the app sent while connecting).
  */
-export async function recordDiagnostics(session: { user_id: string; platform: string }, agent: ClientAgent | null, body: Record<string, unknown>) {
+export async function recordDiagnostics(session: { user_id: string; platform: string }, agent: ClientAgent | null, body: Record<string, unknown>, address = "") {
   const now = Date.now();
   const events = (Array.isArray(body.events) ? body.events.slice(0, 20) : []).flatMap((item: unknown) => {
     const event = item as Record<string, unknown> | null;
@@ -49,8 +51,19 @@ export async function recordDiagnostics(session: { user_id: string; platform: st
       detail: scrubDetail(event.detail, event.code === "APP_CRASH" ? 600 : 200), attempt: typeof event.attempt === "string" && diagnosticAttempt.test(event.attempt) ? event.attempt : null, network: event.network }];
   });
   // A probe summary is reachability data, not a failure: it updates the node's port status only.
-  for (const event of events.filter((item) => item.code === "TRANSPORT_PROBE" && item.nodeId)) await recordTransportProbe(event.nodeId!, event.network, event.detail);
-  const failures = events.filter((item) => item.code !== "TRANSPORT_PROBE");
+  // It also counts towards the node's record from this country and network (path-stats.ts); the address is not kept.
+  for (const event of events.filter((item) => item.code === "TRANSPORT_PROBE" && item.nodeId)) {
+    await recordTransportProbe(event.nodeId!, event.network, event.detail);
+    await recordProbeFromAddress(event.nodeId!, address, event.detail);
+  }
+  // A session summary is health data for staged rollouts: Loki only (rollout-health.ts reads it back), never Postgres.
+  for (const event of events.filter((item) => item.code === "CONNECT_SESSION")) {
+    const summary = parseSession(event.detail);
+    if (summary) void writeOperationalLog({ component: "client", level: "info", actor: { id: session.user_id }, timestamp: event.at,
+      message: `App ${session.platform} ${agent ? `${agent.version}+${agent.build}` : ""}: session ${summary.outcome}`.replace(/ {2,}/g, " "),
+      fields: { event: "client.session", platform: session.platform, build: agent?.build ?? 0, ...summary } });
+  }
+  const failures = events.filter((item) => item.code !== "TRANSPORT_PROBE" && item.code !== "CONNECT_SESSION");
   const recent = Number((await dbQuery<{ count: string }>("SELECT COUNT(*) AS count FROM native_diagnostics WHERE user_id=$1 AND created_at>now()-interval '1 hour'", [session.user_id]))[0]?.count || 0);
   const accepted = failures.slice(0, Math.max(0, 200 - recent));
   for (const event of accepted) {
@@ -58,7 +71,8 @@ export async function recordDiagnostics(session: { user_id: string; platform: st
       [`diag_${randomUUID()}`, session.user_id, session.platform, agent?.version ?? null, agent?.build ?? null, event.code, event.nodeId, event.at]);
     void writeOperationalLog({ component: "client", level: event.code === "APP_CRASH" ? "error" : "warning", nodeId: event.nodeId, actor: { id: session.user_id },
       message: `App ${session.platform} ${agent ? `${agent.version}+${agent.build}` : ""}: ${event.code}${event.detail ? ` (${event.detail})` : ""}`.replace(/ {2,}/g, " "),
-      fields: { code: event.code, occurredAt: event.at, attempt: event.attempt ?? undefined } });
+      fields: { code: event.code, occurredAt: event.at, attempt: event.attempt ?? undefined, platform: session.platform, build: agent?.build ?? 0,
+        event: event.code === "APP_CRASH" ? "client.crash" : "client.diagnostic", ...(event.code === "APP_CRASH" ? { signature: crashSignature(event.detail) } : {}) } });
   }
   await dbExec("DELETE FROM native_diagnostics WHERE created_at<now()-interval '30 days'");
   return { accepted: accepted.length + events.length - failures.length };

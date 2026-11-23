@@ -4,6 +4,51 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.24
+
+### zh
+- 连接时更稳：应用会记录每次连接的结果，帮助我们在新版本推给所有人之前先发现问题
+- 连不上的服务器会被自动移出列表，恢复后自动放回
+
+### en
+- Steadier connections: the app now notes how each connection went, so problems in a new version are caught before it reaches everyone
+- Servers nobody can reach are taken out of the list automatically and come back once they recover
+
+### ru
+- Стабильнее подключение: приложение отмечает, как прошло каждое подключение, чтобы проблемы новой версии находились до того, как она дойдёт до всех
+- Серверы, к которым никто не может подключиться, автоматически убираются из списка и возвращаются после восстановления
+
+## 1.0.23
+
+### zh
+- 新增「用量」页：在首页点用量那一行进入，看剩余流量、到期还有几天
+- 按 7 / 30 / 90 天看每天用了多少，点某一天的柱子看当天数字
+- 看每台设备、每个地区各用了多少；Windows 还能看最近 7 天哪些程序用得最多（只保存在这台电脑上）
+
+### en
+- New Usage page: tap the usage line on the home screen to see what is left and how many days remain
+- See traffic per day over 7, 30 or 90 days; tap a bar for that day's figure
+- See usage per device and per location; on Windows, also which programs used the most over the last 7 days (kept on this computer only)
+
+### ru
+- Новая страница «Трафик»: нажмите строку трафика на главном экране, чтобы увидеть остаток и сколько дней осталось
+- Трафик по дням за 7, 30 или 90 дней; нажмите столбец, чтобы увидеть цифру за день
+- Трафик по устройствам и локациям; в Windows также программы, потратившие больше всего за 7 дней (хранится только на этом компьютере)
+
+## 1.0.22
+
+### zh
+- 新用户登录后直接到首页，不用再选地区：默认“自动”，会帮你挑最快的线路，连不上自动换
+- 首次使用只剩两步：登录、连接
+
+### en
+- New users go straight to the home screen after sign-in, no location step: Automatic is preselected, picks the fastest line and moves on if one fails
+- First run is now two steps: sign in, connect
+
+### ru
+- После входа новые пользователи сразу попадают на главный экран, без выбора локации: по умолчанию «Автоматически» — самая быстрая линия и переход на другую при сбое
+- Первый запуск теперь в два шага: вход и подключение
+
 ## 1.0.21
 
 ### zh

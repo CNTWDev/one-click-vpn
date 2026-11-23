@@ -57,7 +57,8 @@ public partial class MainWindow : Window {
     private ContentControl? stepsHost;
     // The first run: sign in (1), pick a location (2), connect (3); the tabs show once the first connection is up.
     private static bool Onboarded {get=>Settings.Get("onboarded")=="1";set=>Settings.Set("onboarded",value?"1":"0");}
-    private static bool Picked=>Settings.Get("onboardPicked")=="1";
+    /// First-run steps before the tabs appear: sign in, then connect (the location starts on Automatic).
+    private const int Steps=2;
     private Ellipse? actionDot;
     private ScanLine? scan;
     private Portrait? portrait;
@@ -75,7 +76,8 @@ public partial class MainWindow : Window {
     private string dismissedSwitch="";
     // Download / upload rates of the last 40 seconds for the rate chart, newest last.
     private readonly List<long> rxHistory=new(),txHistory=new();
-    private string usageRange="30d";
+    /// The usage page's range in days.
+    private int usageDays=30;
     // The activity panel beside the app's column, signed in only; filled from the core once a second.
     private ActivityPanel? activity;
     private bool activityLoading;
@@ -504,7 +506,7 @@ public partial class MainWindow : Window {
     }
     private void Select(string id,string name,bool showConnect=true) {
         var reconnect=connection.Active&&id!=connection.NodeId;
-        nodeId=id;nodeName=name;Settings.Set("nodeId",id);Settings.Set("nodeName",name);Settings.Set("onboardPicked","1");
+        nodeId=id;nodeName=name;Settings.Set("nodeId",id);Settings.Set("nodeName",name);
         if(!connection.Active&&connection.ErrorCode.Length>0) connection.ClearError();
         if(showConnect) page="connect";
         if(showConnect||page is "connect" or "nodes") Render();
@@ -1031,7 +1033,7 @@ public partial class MainWindow : Window {
         ContentPanel.Children.Clear();FullPanel.Children.Clear();NavigationPanel.Children.Clear();HeaderSlot.Content=null;
         rateBars=null;switchNote=null;switchText=null;onNodes=null;onMeasured=null;
         statusTitle=statusDetail=usageTotal=usageUntil=actionLabel=null;stamp=null;actionButton=secondaryButton=null;stepsHost=null;actionDot=null;scan=null;fileLines=null;portrait=null;location=null;badgeKey="";bannerHost=null;updateRowValue=null;
-        var view=!api.SignedIn?"login":page=="connect"&&!Onboarded&&!Picked?"pick":page;
+        var view=!api.SignedIn?"login":page;
         var full=view=="connect";
         Scroller.Visibility=full?Visibility.Collapsed:Visibility.Visible;FullPanel.Visibility=full?Visibility.Visible:Visibility.Collapsed;
         if(view!=lastView) {Scroller.ScrollToTop();Enter(full?FullPanel:ContentPanel);}
@@ -1064,7 +1066,7 @@ public partial class MainWindow : Window {
             Login();return;
         }
         if(Onboarded) foreach(var (id,key) in new[]{("connect","connect_tab"),("nodes","locations"),("account","account")}) {
-            var selected=page==id||(page is "logs" or "devices" or "apps"&&id=="account");
+            var selected=page==id||(page is "logs" or "devices" or "apps"&&id=="account")||(page=="usage"&&id=="connect");
             var label=new TextBlock {Text=L10n.Text(key),FontSize=14,FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal,Foreground=selected?Look.Text:Look.Secondary,VerticalAlignment=VerticalAlignment.Center};
             var tab=new Grid {Height=44};tab.Children.Add(label);
             if(selected) tab.Children.Add(new Border {Height=3,Width=16,CornerRadius=new CornerRadius(1.5),Background=Look.Accent,VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,0,6)});
@@ -1073,12 +1075,12 @@ public partial class MainWindow : Window {
             button.Click+=(_,_)=>{if(!busy) {page=id;Render();}};NavigationPanel.Children.Add(button);
         }
         switch(view) {
-            case "pick":Pick();break;
             case "connect":Home();break;
             case "nodes":Nodes();break;
             case "devices":Devices();break;
             case "apps":AppsPage();break;
             case "logs":Logs();break;
+            case "usage":UsagePage();break;
             default:Account();break;
         }
         UpdateLive();
@@ -1107,7 +1109,7 @@ public partial class MainWindow : Window {
         // The state block has one height in every state, so nothing below it moves when a connection comes up or goes
         // down: what only exists while connected fades in and out of space that is always reserved.
         var center=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
-        stepsHost=new ContentControl {Focusable=false,Content=SectionRow("section_portrait",Onboarded?null:3)};
+        stepsHost=new ContentControl {Focusable=false,Content=SectionRow("section_portrait",Onboarded?null:Steps)};
         center.Children.Add(stepsHost);
         // The portrait is the switch (the action below says what a tap does); hidden, its ring draws the state and holds
         // the time and the rates (or the phase, the countdown).
@@ -1148,8 +1150,13 @@ public partial class MainWindow : Window {
         place.Click+=(_,_)=>{if(busy) return;if(connection.Active&&connection.Since is not null&&connection.StatusKey!="location_retrying") ConnectionCheck();else {page="nodes";Render();}};
         location=(badge,title,detail);
         usageTotal=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold};usageUntil=new TextBlock {Text="—",FontSize=14,FontWeight=FontWeights.SemiBold};
-        var cells=Cells(("last_30_days",usageTotal,12),("valid_until_label",usageUntil,12));cells.Margin=new Thickness(4,14,4,0);
-        var bottom=new StackPanel();bottom.Children.Add(actions);bottom.Children.Add(place);bottom.Children.Add(cells);
+        var cells=Cells(("last_30_days",usageTotal,12),("valid_until_label",usageUntil,12));
+        // A click opens the usage page (per day, device, location and program).
+        var usageChevron=Look.Icon("\uE76C",10,Look.Faint);usageChevron.VerticalAlignment=VerticalAlignment.Center;
+        var usageButton=new Button {Margin=new Thickness(0,8,0,0),Padding=new Thickness(4,6,8,6),Content=Columns(new FrameworkElement(),cells,usageChevron)};
+        AutomationProperties.SetName(usageButton,L10n.Text("usage_open"));
+        usageButton.Click+=(_,_)=>{if(!busy) {page="usage";Render();}};
+        var bottom=new StackPanel();bottom.Children.Add(actions);bottom.Children.Add(place);bottom.Children.Add(usageButton);
         Grid.SetRow(bottom,2);layout.Children.Add(bottom);
         FullPanel.Children.Add(layout);
         sealedShown=null;shownState=null;
@@ -1158,69 +1165,21 @@ public partial class MainWindow : Window {
         if(visitorIp is null&&!connection.Active) _=LoadVisitor();
         if(nodesData is null) _=QuietNodes();
     }
-    /// A page's § label, with the first-run step on the right: three squares (done, current, to come) and "n/3";
-    /// 4 is "Ready".
+    /// A page's § label, with the first-run step on the right: two squares (done, current, to come) and "n/2";
+    /// Steps+1 is "Ready".
     private static FrameworkElement SectionRow(string key,int? step) {
         var label=Dossier.Section(key);
         if(step is not { } n) return label;
         var marks=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(8,0,4,0)};
         var text=((SolidColorBrush)Look.Text).Color;
-        for(var i=1;i<=3;i++) marks.Children.Add(new Rectangle {Width=6,Height=6,Margin=new Thickness(0,0,3,0),VerticalAlignment=VerticalAlignment.Center,
+        for(var i=1;i<=Steps;i++) marks.Children.Add(new Rectangle {Width=6,Height=6,Margin=new Thickness(0,0,3,0),VerticalAlignment=VerticalAlignment.Center,
             Fill=i<n?new SolidColorBrush(Color.FromArgb(191,text.R,text.G,text.B)):i==n?Look.Accent:Look.Selected});
-        var words=n>3?L10n.Text("onboarding_ready"):n.ToString(L10n.Culture)+"/3";
-        marks.Children.Add(new TextBlock {Text=words,FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=11,Foreground=n>3?Look.Accent:Look.Secondary,Margin=new Thickness(4,0,0,0),VerticalAlignment=VerticalAlignment.Center});
+        var words=n>Steps?L10n.Text("onboarding_ready"):n.ToString(L10n.Culture)+"/"+Steps.ToString(L10n.Culture);
+        marks.Children.Add(new TextBlock {Text=words,FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=11,Foreground=n>Steps?Look.Accent:Look.Secondary,Margin=new Thickness(4,0,0,0),VerticalAlignment=VerticalAlignment.Center});
         AutomationProperties.SetName(marks,words);
         var row=new DockPanel {LastChildFill=true};
         DockPanel.SetDock(marks,Dock.Right);row.Children.Add(marks);row.Children.Add(label);
         return row;
-    }
-    /// The first run's second page: Automatic preselected, the three fastest from this PC, the whole list, Continue.
-    private void Pick() {
-        HeaderSlot.Content=null;
-        Add(SectionRow("section_locations",2),4,0);
-        Add(new TextBlock {Text=L10n.Text("where_would_you_like_to_connect"),FontSize=24,FontWeight=FontWeights.Light,FontFamily=new FontFamily("Georgia, Cambria"),TextWrapping=TextWrapping.Wrap,Margin=new Thickness(4,0,4,0)},14,0);
-        Add(Words(L10n.Text("pick_location_sub"),13,Look.Secondary),6,16).Margin=new Thickness(4,6,4,16);
-        var options=Add(new StackPanel());
-        var asked=false;
-        Button Option(string id,string name,string? code,string detail) {
-            var chosen=nodeId==id;
-            var badge=Look.Badge(code);
-            if(chosen) {badge.Background=Look.Accent;if(badge.Child is TextBlock glyph) glyph.Foreground=Look.OnAccent;if(code is null&&badge.Child is TextBlock star) star.Foreground=Look.OnAccent;}
-            var radio=new Grid {Width=16,Height=16,VerticalAlignment=VerticalAlignment.Center};
-            radio.Children.Add(new Ellipse {Fill=chosen?Look.Accent:Look.Selected});
-            if(chosen) radio.Children.Add(new Ellipse {Width=6,Height=6,Fill=Look.OnAccent});
-            var row=new Button {Height=56,Margin=new Thickness(0,0,0,8),Background=chosen?Look.Selected:Look.Surface,BorderThickness=new Thickness(0),
-                Content=Columns(badge,TwoLines(name,detail,strong:chosen),radio)};
-            AutomationProperties.SetName(row,name+(chosen?L10n.Text("current_page"):""));
-            row.Click+=(_,_)=>{nodeId=id;nodeName=id.Length==0?"":name;Settings.Set("nodeId",nodeId);Settings.Set("nodeName",nodeName);Show();};
-            return row;
-        }
-        async void Measure(JsonArray list) {
-            try {await Latency.Rank(list,attempts:1,reuse:TimeSpan.FromMinutes(1),settle:TimeSpan.FromSeconds(1.5));} catch {/* Automatic needs no figures */}
-            if(options.IsLoaded) Show();
-        }
-        void Show() {
-            options.Children.Clear();
-            var ranked=PickerNodes().Where(x=>x.Quality?.Latency is not null).ToList();
-            var best=ranked.FirstOrDefault();
-            options.Children.Add(Option("",L10n.Text("automatic_recommended"),null,best.Quality is { } q?L10n.Text("automatic_now",best.Name,Ms(q)??""):L10n.Text("select_an_available_location_for_you")));
-            if(ranked.Count>0) options.Children.Add(new TextBlock {Text=L10n.Text("or_choose_one"),FontSize=13,Foreground=Look.Secondary,Margin=new Thickness(4,10,4,8)});
-            foreach(var (id,name,quality) in ranked.Take(3)) options.Children.Add(Option(id,name,Code(id,name),Ms(quality)??""));
-            if(nodesData is { Count: >0 } all) {
-                var more=new Button {Height=44,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(4,0,4,0),
-                    Content=Columns(new Border(),Single(L10n.Text("all_locations_count",all.Count.ToString("N0",L10n.Culture)),13,Look.Secondary),Look.Icon("\uE76C",11,Look.Secondary))};
-                more.Click+=(_,_)=>{if(!busy) {page="nodes";Render();}};
-                options.Children.Add(more);
-                // Nothing measured on this PC yet: measure once, quietly, and show the fastest when it is done.
-                if(ranked.Count==0&&!asked&&!connection.Active) {asked=true;Measure(all);}
-            }
-        }
-        onNodes=_=>{if(options.IsLoaded) Show();};
-        Show();
-        if(nodesData is null) _=QuietNodes();
-        // Continue: the choice is already saved; step 3 is the connect page itself.
-        var next=Add(Primary(L10n.Text("continue_action")),10,0);next.Height=48;
-        next.Click+=(_,_)=>{if(busy) return;Settings.Set("onboardPicked","1");Render();};
     }
     /// The public address the service sees, read once while not connected (afterwards it would be the location's).
     private async Task LoadVisitor() {
@@ -1592,7 +1551,6 @@ public partial class MainWindow : Window {
         who.Children.Add(Single(L10n.Text("account_valid_until",L10n.Date(account["expiresAt"]?.GetValue<string>())),12,Look.Secondary));
         var identity=Columns(avatar,who);
         identity.Margin=new Thickness(4,0,4,0);Add(identity,4,16);
-        if(account["traffic"] is { } traffic) Add(UsageCard(traffic),0,16);
 
         var devices=SettingRow(L10n.Text("authorized_devices"),$"{Number(account["used"]).ToString("N0",L10n.Culture)} / {DeviceLimit(account)}",_=>{page="devices";Render();});
         var password=SettingRow(L10n.Text("change_password"),"",_=>ResetPassword(email,L10n.Text("reset_change_detail",email),L10n.Text("reset_link_sent_to",email)));
@@ -1644,53 +1602,146 @@ public partial class MainWindow : Window {
         row.Click+=(_,_)=>onClick(row);
         return row;
     }
-    /// Today / this month / 30 days: the range's total in the dot face, a bar per day for the last 30 days with the
-    /// range lit, and for 30 days the download / upload split. Days are the server's (UTC) days.
-    private Border UsageCard(JsonNode traffic) {
-        long down=Number(traffic["downloadBytes"]),up=Number(traffic["uploadBytes"]);
-        var perDay=new Dictionary<string,long>();
-        if(traffic["days"] is JsonArray list) foreach(var day in list) if(day?["day"]?.GetValue<string>() is { Length: >=10 } date) perDay[date[..10]]=Number(day["bytes"]);
-        var today=DateTime.UtcNow.Date;
-        string Key(DateTime day)=>day.ToString("yyyy-MM-dd",System.Globalization.CultureInfo.InvariantCulture);
-        var days=Enumerable.Range(0,30).Reverse().Select(offset=>perDay.TryGetValue(Key(today.AddDays(-offset)),out var bytes)?bytes:0).ToList();
-        var stack=new StackPanel();
-        var ranges=new[]{("today","usage_today"),("month","usage_this_month"),("30d","last_30_days")};
-        var switcher=new StackPanel {Orientation=Orientation.Horizontal};
-        var figure=new TextBlock {Margin=new Thickness(0,12,0,0)};
-        var blocks=perDay.Count>0?new UsageBlocks(days) {Height=46,Margin=new Thickness(0,12,0,0)}:null;
-        var split=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,10,0,0)};
-        split.Children.Add(Single(L10n.Text("download_amount",Bytes(down)),12,Look.Secondary));
-        var upload=Single(L10n.Text("upload_amount",Bytes(up)),12,Look.Secondary);upload.Margin=new Thickness(20,0,0,0);split.Children.Add(upload);
-        void Pick(string range) {
-            usageRange=range;
-            for(var i=0;i<switcher.Children.Count;i++) if(switcher.Children[i] is Button choice) {
-                var on=ranges[i].Item1==range;
-                choice.Background=on?Look.Selected:Brushes.Transparent;choice.Foreground=on?Look.Text:Look.Secondary;choice.FontWeight=on?FontWeights.SemiBold:FontWeights.Normal;
-                AutomationProperties.SetName(choice,L10n.Text(ranges[i].Item2)+(on?L10n.Text("current_page"):""));
-            }
-            var month=Key(today)[..7];
-            var total=range switch {"today"=>perDay.TryGetValue(Key(today),out var t)?t:0,"month"=>perDay.Where(x=>x.Key.StartsWith(month,StringComparison.Ordinal)).Sum(x=>x.Value),_=>down+up};
-            // "143 GB": the number large, its unit small and muted.
-            var parts=Bytes(total).Split(' ',2);
-            figure.Inlines.Clear();
+    // ---- Usage: the quota and end date, traffic per day over 7, 30 or 90 days (the server's UTC days), per device and
+    // per location, and per program over the last 7 days (kept on this computer only). Opened from the home page.
+    private void UsagePage() {
+        Add(SubHeader(L10n.Text("usage_title"),"connect"),0,8);
+        var quota=Add(new Border {Background=Look.Surface,CornerRadius=new CornerRadius(10),Padding=new Thickness(16)});
+        void FillQuota() {
+            if(accountData is not { } account) {quota.Opacity=0;return;}
+            quota.Opacity=1;
+            var access=AccountAccess.From(account);
+            var used=access.Quota is { } q?Math.Max(0,q-access.Remaining):Number(account["traffic"]?["uploadBytes"])+Number(account["traffic"]?["downloadBytes"]);
+            var exhausted=access.State=="exhausted";var ended=access.State=="expired";
+            var stack=new StackPanel();
+            stack.Children.Add(Single(L10n.Text(access.Quota is null?"last_30_days":"usage_used_period"),12,Look.Secondary));
+            var figure=new TextBlock {Margin=new Thickness(0,6,0,0),Foreground=exhausted?Look.Danger:Look.Text,VerticalAlignment=VerticalAlignment.Bottom};
+            var parts=Bytes(used).Split(' ',2);
             figure.Inlines.Add(new Run(parts[0]) {FontFamily=Look.Dots,FontSize=34});
             if(parts.Length>1) figure.Inlines.Add(new Run(" "+parts[1]) {FontSize=14,FontWeight=FontWeights.SemiBold,Foreground=Look.Secondary});
-            if(blocks is not null) blocks.Recent=range switch {"today"=>1,"month"=>Math.Min(today.Day,30),_=>30};
-            split.Visibility=range=="30d"?Visibility.Visible:Visibility.Collapsed;
+            var of=Single(access.Quota is { } total?L10n.Text("usage_of",Bytes(total)):L10n.Text("usage_unlimited"),13,Look.Secondary);
+            of.VerticalAlignment=VerticalAlignment.Bottom;of.Margin=new Thickness(8,0,0,6);
+            stack.Children.Add(Columns(new FrameworkElement(),figure,of));
+            if(access.Quota is { } limit) {
+                var tint=exhausted?Look.Danger:access.Low?Look.Fair:Look.Accent;
+                stack.Children.Add(ShareBar((double)used/Math.Max(limit,1),tint,8,new Thickness(0,12,0,0)));
+                var left=Single(L10n.Text("usage_left",Bytes(access.Remaining)),12,exhausted||access.Low?tint:Look.Secondary);
+                left.Margin=new Thickness(0,8,0,0);stack.Children.Add(left);
+            }
+            stack.Children.Add(new Border {Height=1,Background=Look.Hairline,Margin=new Thickness(0,14,0,12)});
+            var untilText=ended?L10n.Text("access_expired_title"):access.Until is null?L10n.Text("no_expiry"):L10n.Text("valid_until_label")+" "+L10n.Date(access.UntilText);
+            var untilLine=new TextBlock {Text=untilText,FontSize=13,Foreground=ended?Look.Danger:access.Ending?Look.Fair:Look.Secondary,TextWrapping=TextWrapping.Wrap,VerticalAlignment=VerticalAlignment.Center};
+            FrameworkElement daysLeft=new FrameworkElement();
+            if(access.Until is { } until&&!ended) {
+                var days=Math.Max(0,(long)Math.Ceiling((until-DateTimeOffset.UtcNow).TotalDays));
+                var label=Single(L10n.Text("usage_days_left",days.ToString("N0",L10n.Culture)),13,access.Ending?Look.Fair:Look.Text,strong:true);
+                label.Margin=new Thickness(12,0,0,0);daysLeft=label;
+            }
+            stack.Children.Add(Columns(new FrameworkElement(),untilLine,daysLeft));
+            quota.Child=stack;
         }
-        foreach(var (key,title) in ranges) {
-            var choice=new Button {Content=L10n.Text(title),FontSize=12,Height=28,Padding=new Thickness(10,0,10,0),HorizontalContentAlignment=HorizontalAlignment.Center};
-            choice.Click+=(_,_)=>Pick(key);switcher.Children.Add(choice);
+        FillQuota();
+        // The range: 7, 30 or 90 days; changing it reloads the figures below in place.
+        var ranges=new UniformGrid {Rows=1};
+        Add(new Border {Background=Look.Surface,CornerRadius=new CornerRadius(10),Padding=new Thickness(2),Child=ranges},12,0);
+        var chart=Add(new Border {Background=Look.Surface,CornerRadius=new CornerRadius(10),Padding=new Thickness(16),MinHeight=140},12,0);
+        var lists=Add(new StackPanel(),12,0);
+        var asked=0;
+        async Task Load() {
+            var ask=++asked;var days=usageDays;
+            ranges.Children.Clear();
+            foreach(var (value,key) in new[]{(7,"usage_7_days"),(30,"usage_30_days"),(90,"usage_90_days")}) {
+                var on=value==usageDays;
+                var choice=new Button {Content=L10n.Text(key),FontSize=12,Height=28,Padding=new Thickness(6,0,6,0),HorizontalContentAlignment=HorizontalAlignment.Center,
+                    Background=on?Look.Selected:Brushes.Transparent,Foreground=on?Look.Text:Look.Secondary,FontWeight=on?FontWeights.SemiBold:FontWeights.Normal};
+                AutomationProperties.SetName(choice,L10n.Text(key)+(on?L10n.Text("current_page"):""));
+                choice.Click+=(_,_)=>{if(value!=usageDays) {usageDays=value;_=Load();}};
+                ranges.Children.Add(choice);
+            }
+            chart.Opacity=0.5;lists.Opacity=0.5;
+            JsonNode? data=null;var apps="[]";
+            try {data=await api.Request("usage?days="+days);} catch {/* shown below */}
+            try {apps=await Task.Run(()=>core.AppUsage(7));} catch {/* no programs */}
+            if(ask!=asked||page!="usage") return;
+            chart.Opacity=1;lists.Opacity=1;lists.Children.Clear();
+            if(data is null) {lists.Children.Add(Caption(L10n.Text("usage_load_failed")));return;}
+            JsonNode found=data;
+            var perDay=new Dictionary<string,long>();
+            foreach(var day in found["daily"]?.AsArray()??new JsonArray()) if(day?["day"]?.GetValue<string>() is { } dayKey) perDay[dayKey]=Number(day["upload"])+Number(day["download"]);
+            var today=DateTime.UtcNow.Date;
+            var series=Enumerable.Range(0,days).Reverse().Select(offset=>{
+                var dayKey=today.AddDays(-offset).ToString("yyyy-MM-dd",System.Globalization.CultureInfo.InvariantCulture);
+                return (Key:dayKey,Bytes:perDay.TryGetValue(dayKey,out var b)?b:0L);
+            }).ToList();
+            var sum=series.Sum(d=>d.Bytes);
+            var stack=new StackPanel();
+            var dayLabel=Single("",12,Look.Secondary);
+            void Show(int index)=>dayLabel.Text=ShortDay(series[index].Key)+" · "+Bytes(series[index].Bytes);
+            Show(series.Count-1);
+            var totalLabel=Single(Bytes(sum),12,Look.Secondary);totalLabel.Margin=new Thickness(8,0,0,0);
+            stack.Children.Add(Columns(new FrameworkElement(),dayLabel,totalLabel));
+            var bars=new DayBars(series.Select(d=>d.Bytes).ToList(),series.Count-1) {Height=72,Margin=new Thickness(0,12,0,0)};
+            bars.Picked+=Show;
+            AutomationProperties.SetName(bars,L10n.Text(days==7?"usage_7_days":days==90?"usage_90_days":"usage_30_days")+" · "+Bytes(sum));
+            stack.Children.Add(bars);
+            var axis=Columns(new FrameworkElement(),Single(ShortDay(series[0].Key),11,Look.Faint),Single(ShortDay(series[^1].Key),11,Look.Faint));
+            axis.Margin=new Thickness(0,8,0,0);stack.Children.Add(axis);
+            chart.Child=stack;
+            List<(string Name,long Bytes,bool Proxy)> Rows(string key,Func<JsonNode,string> name)=>
+                (found[key]?.AsArray()??new JsonArray()).Where(n=>n is not null).Select(n=>(name(n!),Number(n!["bytes"]),true)).ToList();
+            lists.Children.Add(RankCard(L10n.Text("usage_by_device"),Rows("devices",d=>{
+                var given=d["name"]?.GetValue<string>() is { Length: >0 } text?text:L10n.Text("device");
+                return d["isCurrent"]?.GetValue<bool>()==true?L10n.Text("usage_this_device",given):given;
+            })));
+            lists.Children.Add(RankCard(L10n.Text("usage_by_location"),Rows("nodes",n=>n["name"]?.GetValue<string>()??""),new Thickness(0,12,0,0)));
+            // Programs: only this computer's, over the last 7 days, whatever the range above.
+            var programs=new List<(string Name,long Bytes,bool Proxy)>();
+            try {
+                foreach(var row in JsonNode.Parse(apps)?.AsArray()??new JsonArray())
+                    if(row is not null) programs.Add((row["name"]?.GetValue<string>()??"",Number(row["bytes"]),row["proxy"]?.GetValue<bool>()!=false));
+            } catch {/* none */}
+            if(programs.Count>0) {
+                lists.Children.Add(RankCard(L10n.Text("usage_by_app")+" · "+L10n.Text("usage_7_days"),programs,new Thickness(0,12,0,0)));
+                var note=Caption(L10n.Text("usage_apps_local"));note.Margin=new Thickness(4,8,4,0);lists.Children.Add(note);
+            }
         }
-        stack.Children.Add(new Border {Background=Look.Ground,CornerRadius=new CornerRadius(3),Padding=new Thickness(2),HorizontalAlignment=HorizontalAlignment.Left,Child=switcher});
-        stack.Children.Add(figure);
-        if(blocks is not null) stack.Children.Add(blocks);
-        stack.Children.Add(split);
-        Pick(usageRange);
-        return new Border {Background=Look.Surface,CornerRadius=new CornerRadius(10),Padding=new Thickness(16),Child=stack};
+        _=Load();
+        // The account (quota, end date) may be newer than the home page's copy.
+        _=RefreshUsageQuota(FillQuota);
     }
-    private FrameworkElement SubHeader(string title) {
-        var back=IconButton("",L10n.Text("back_action"),()=>{page="account";Render();});back.HorizontalAlignment=HorizontalAlignment.Left;
+    private async Task RefreshUsageQuota(Action fill) {
+        try {var fresh=await api.Request("account");accountData=fresh;if(page=="usage") fill();} catch {/* keep the copy */}
+    }
+    /// "Nov 22": a chart day in the app's language.
+    private static string ShortDay(string key)=>DateTime.TryParseExact(key,"yyyy-MM-dd",System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out var day)
+        ?day.ToString(L10n.Culture.DateTimeFormat.MonthDayPattern,L10n.Culture):key;
+    /// A share of a whole as a filled bar on a dim track, both rounded.
+    private static Border ShareBar(double share,Brush tint,double height,Thickness margin) {
+        var fill=Math.Clamp(share,0.01,1);
+        var grid=new Grid {Height=height};
+        grid.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(fill,GridUnitType.Star)});
+        grid.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(Math.Max(0,1-fill),GridUnitType.Star)});
+        grid.Children.Add(new Border {Background=tint,CornerRadius=new CornerRadius(height/2)});
+        return new Border {Background=Look.Raised,CornerRadius=new CornerRadius(height/2),Child=grid,Margin=margin};
+    }
+    /// A titled card of names with a share bar and their bytes, largest first; dim bars for traffic that went direct.
+    private static Border RankCard(string title,List<(string Name,long Bytes,bool Proxy)> rows,Thickness? margin=null) {
+        var stack=new StackPanel();
+        stack.Children.Add(Single(title,12,Look.Secondary,strong:true));
+        var top=Math.Max(rows.Count>0?rows[0].Bytes:1,1);
+        if(rows.Count==0) {var none=Single(L10n.Text("activity_nothing"),12,Look.Secondary);none.Margin=new Thickness(0,8,0,0);stack.Children.Add(none);}
+        foreach(var (name,bytes,proxy) in rows) {
+            var left=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
+            left.Children.Add(Single(name,13));
+            left.Children.Add(ShareBar((double)bytes/top,proxy?Look.Accent:Look.Past,4,new Thickness(0,6,0,0)));
+            var figure=Single(Bytes(bytes),12);figure.FontFamily=new FontFamily("Consolas");figure.Width=78;figure.TextAlignment=TextAlignment.Right;figure.Margin=new Thickness(12,0,0,0);
+            var row=Columns(new FrameworkElement(),left,figure);row.Margin=new Thickness(0,10,0,0);
+            stack.Children.Add(row);
+        }
+        return new Border {Background=Look.Surface,CornerRadius=new CornerRadius(10),Padding=new Thickness(16,14,16,14),Child=stack,Margin=margin??new Thickness(0)};
+    }
+    private FrameworkElement SubHeader(string title,string backTo="account") {
+        var back=IconButton("",L10n.Text("back_action"),()=>{page=backTo;Render();});back.HorizontalAlignment=HorizontalAlignment.Left;
         var grid=new Grid {Height=40};
         grid.Children.Add(new TextBlock {Text=title,FontSize=14,FontWeight=FontWeights.SemiBold,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});
         grid.Children.Add(back);
@@ -1946,7 +1997,7 @@ public partial class MainWindow : Window {
         // The first connection ends the first run: "Ready" for a moment, then the tabs.
         if(!Onboarded&&state==LinkState.Connected) {
             Onboarded=true;
-            if(stepsHost is not null) stepsHost.Content=SectionRow("section_portrait",4);
+            if(stepsHost is not null) stepsHost.Content=SectionRow("section_portrait",Steps+1);
             var later=new DispatcherTimer {Interval=TimeSpan.FromSeconds(3)};
             later.Tick+=(_,_)=>{later.Stop();if(!busy) Render();};later.Start();
         }

@@ -4,9 +4,9 @@ import { api } from "../api";
 import { useToast } from "../toast";
 import { InlineNotice, type Notice, StateDot, Time } from "./shared";
 
-type Kind = "node-offline" | "service" | "agent-outdated" | "disk" | "transport-blocked";
+type Kind = "node-offline" | "service" | "agent-outdated" | "disk" | "transport-blocked" | "node-drained" | "node-drain-held";
 type Status = { recipients: string; mailConfigured: boolean; telegramConfigured?: boolean; firing: Array<{ key: string; kind: Kind; subject: string; detail: string; since: string; notified: boolean }> };
-const titles: Record<Kind, string> = { "node-offline": "节点离线：{0}", service: "协议同步失败：{0}", "agent-outdated": "Agent 不是最新版：{0}", disk: "控制面磁盘已用 {0}", "transport-blocked": "线路疑似被封：{0}" };
+const titles: Record<Kind, string> = { "node-offline": "节点离线：{0}", service: "协议同步失败：{0}", "agent-outdated": "Agent 不是最新版：{0}", disk: "控制面磁盘已用 {0}", "transport-blocked": "线路疑似被封：{0}", "node-drained": "节点已自动摘除：{0}", "node-drain-held": "节点连不上，但没有自动摘除：{0}" };
 
 /** Email alerts: who gets them, and what is wrong right now. Checked every minute by the Controller. */
 export function AlertsPanel() {

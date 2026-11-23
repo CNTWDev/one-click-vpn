@@ -1,23 +1,38 @@
 name: Client build check
 on:
   workflow_dispatch:
-  pull_request:
+  # Runs on master after merge, not on pull requests: changes merge without waiting and are fixed forward. A
+  # newer master commit cancels the run of the previous one, so a burst of merges is built once. Each master run
+  # also saves the prebuilt core (Android AAR, Apple xcframework), Go and Gradle caches for the next one.
+  push:
+    branches: [master]
     paths: ['clients/**', 'scripts/native-locales.mjs', '.github/workflows/native-clients.yml']
 permissions:
   contents: read
+# A new push to the same branch cancels the builds still going for the previous commit.
+concurrency:
+  group: client-build-${{ github.ref }}
+  cancel-in-progress: true
+# The platform builds start at once instead of waiting for the localization check; a failure in either still fails the run.
 jobs:
   localization:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
+      # Same node_modules cache as backend-tests.yml and console-ui.yml.
+      - id: modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-ubuntu-24.04-node22-${{ hashFiles('package-lock.json') }}
+      - if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
       - run: npm run i18n:check
   android:
-    needs: localization
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,9 +54,18 @@ jobs:
       # The shared mihomo configuration every app runs (clients/core/config.go) must parse for each platform.
       - run: go test ./...
         working-directory: clients/core
-      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
-      # The embedded core (mihomo) as an AAR; Gradle links it from app/libs.
-      - run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash clients/core/build-android.sh
+      # The embedded core (mihomo) as an AAR; Gradle links it from app/libs. Rebuilt (with the NDK) only when the
+      # core or its build scripts changed since a cached build.
+      - id: aar
+        uses: actions/cache@v4
+        with:
+          path: clients/android/app/libs/veilbird-core.aar
+          key: android-core-aar-${{ hashFiles('clients/core/**/*.go', 'clients/core/go.mod', 'clients/core/go.sum', 'clients/core/build-android.sh', 'clients/core/gomobile.sh') }}
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - if: steps.aar.outputs.cache-hit != 'true'
+        run: sdkmanager 'ndk;27.2.12479018'
+      - if: steps.aar.outputs.cache-hit != 'true'
+        run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018" bash clients/core/build-android.sh
       - run: gradle -p clients/android :app:assembleDevDebug :app:assembleProdDebug
       - uses: actions/upload-artifact@v4
         with:
@@ -49,13 +73,21 @@ jobs:
           path: clients/android/app/build/outputs/apk/dev/debug/*.apk
           if-no-files-found: error
   apple:
-    needs: localization
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - run: swift test --package-path clients/apple
       - run: brew install xcodegen
-      - uses: actions/setup-go@v5
+      # TunnelCore.xcframework (gomobile, iOS + Simulator + macOS) is most of this job's time. build-apple.sh keeps
+      # a stamp of its inputs and rebuilds only when they differ, so a cached copy is used only while still current.
+      - id: core
+        uses: actions/cache@v4
+        with:
+          path: clients/apple/.deps/TunnelCore.xcframework
+          key: apple-core-${{ hashFiles('clients/core/**/*.go', 'clients/core/go.mod', 'clients/core/go.sum', 'clients/core/build-apple.sh', 'clients/core/gomobile.sh') }}
+      # Go is needed only to build the core.
+      - if: steps.core.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v5
         with:
           go-version-file: clients/core/go.mod
           cache-dependency-path: clients/core/go.sum
@@ -70,7 +102,6 @@ jobs:
           path: clients/apple/artifacts/*.zip
           if-no-files-found: error
   windows:
-    needs: localization
     runs-on: windows-latest
     strategy:
       matrix:

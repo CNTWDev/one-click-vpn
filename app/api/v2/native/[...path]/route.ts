@@ -5,7 +5,8 @@ import { writeOperationalLog } from "../../../../../server/operational-logs";
 import { clientHeader,recordDiagnostics,recordEnrollmentClient,recordSessionClient,requireSupportedClient } from "../../../../../server/native-clients";
 import { parseClientAgent,type ClientPlatform } from "../../../../../shared/client-releases";
 import { requestPasswordResetEmail } from "../../../../../server/password-reset";
-import { nativeAccount,nativeChallenge,nativeConnect,nativeEnd,nativeLogin,nativeLogout,nativeNodes,nativeSession,nativeStatus } from "../../../../../server/native-access";
+import { clientAddress } from "../../../../../server/rate-limit";
+import { nativeAccount,nativeChallenge,nativeConnect,nativeEnd,nativeLogin,nativeLogout,nativeNodes,nativeSession,nativeStatus,nativeUsage } from "../../../../../server/native-access";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 async function handle(request:Request) {
@@ -34,6 +35,7 @@ async function handle(request:Request) {
       const session=await nativeSession(request);
       if(request.method==="GET"&&path==="account") result=await nativeAccount(session);
       else if(request.method==="GET"&&path==="nodes") result=await nativeNodes(session);
+      else if(request.method==="GET"&&path==="usage") result=await nativeUsage(session,new URL(request.url).searchParams.get("days"));
       else if(request.method==="GET"&&path?.startsWith("status/")) result=await nativeStatus(session,path.slice(7));
       else if(request.method==="POST"&&path==="challenge") result=await nativeChallenge(session,body);
       else if(request.method==="POST"&&path==="connect") {
@@ -45,7 +47,7 @@ async function handle(request:Request) {
       else if(request.method==="POST"&&(path==="disconnect"||path==="revoke")) result=await nativeEnd(session,path,body);
       else if(request.method==="POST"&&path==="diagnostics") {
         const agent=parseClientAgent(request.headers.get(clientHeader));
-        result=await recordDiagnostics(session,agent?.platform===session.platform?agent:null,body);
+        result=await recordDiagnostics(session,agent?.platform===session.platform?agent:null,body,clientAddress(request));
       }
       else if(request.method==="POST"&&path==="logout") result=await nativeLogout(session);
       else throw new NativeError("NOT_FOUND",404);

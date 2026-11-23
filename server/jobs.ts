@@ -10,6 +10,7 @@ import { announceBetaReleases } from "./telegram-actions";
 import { syncReleaseMirrors } from "./client-releases";
 import { logAccountsOverLimit } from "./online-clients";
 import { runHopChecks } from "./hop-check";
+import { runNodeHealth } from "./node-health";
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
@@ -37,6 +38,8 @@ export async function runMinuteJobs(): Promise<void> {
   await retryReconcileTasks();
   await runAlerts().catch((error) => console.error("Alerts failed", error instanceof Error ? error.message : error));
   await announceBetaReleases().catch((error) => console.error("Release announcement failed", error instanceof Error ? error.message : error));
+  // Nodes nobody can reach leave new connections, and come back when they answer again (node-health.ts).
+  void runNodeHealth().catch((error) => console.error("Node health failed", error instanceof Error ? error.message : error));
   // Outside checks of each node's hop ports; a UDP check runs ~10 s in the background, so it is not awaited.
   void runHopChecks().catch((error) => console.error("Hop port check failed", error instanceof Error ? error.message : error));
   await logAccountsOverLimit().catch((error) => console.error("Online check failed", error instanceof Error ? error.message : error));

@@ -55,25 +55,28 @@ enum Guidance {
     }
 }
 
-/// During the first run, on a page's § line: three squares (done, current, to come) and "n/3"; 4 is "ready".
+/// During the first run, on a page's § line: two squares (done, current, to come) and "n/2"; count+1 is "ready".
 struct StepMarks:View {
+    /// Sign in, then connect: the location starts on Automatic, so there is no step to choose one.
+    static let count=2
     let step:Int
     var body:some View {
+        let ready=step>StepMarks.count
         HStack(spacing:3) {
-            ForEach(1...3,id:\.self) {i in
+            ForEach(1...StepMarks.count,id:\.self) {i in
                 Group {
                     if i<step {Rectangle().fill(VeilbirdStyle.text.opacity(0.75))}
                     else if i==step {Rectangle().fill(VeilbirdStyle.accent)}
                     else {Rectangle().fill(VeilbirdStyle.selected)}
                 }.frame(width:6,height:6)
             }
-            Text(verbatim:step>3 ? L10n.text("onboarding_ready"):L10n.number(step)+"/3")
-                .font(.system(size:11,design:.monospaced)).foregroundStyle(step>3 ? VeilbirdStyle.accent:VeilbirdStyle.secondary).padding(.leading,4).lineLimit(1).fixedSize()
-        }.accessibilityElement(children:.ignore).accessibilityLabel(Text(verbatim:step>3 ? L10n.text("onboarding_ready"):"\(step)/3"))
+            Text(verbatim:ready ? L10n.text("onboarding_ready"):L10n.number(step)+"/"+L10n.number(StepMarks.count))
+                .font(.system(size:11,design:.monospaced)).foregroundStyle(ready ? VeilbirdStyle.accent:VeilbirdStyle.secondary).padding(.leading,4).lineLimit(1).fixedSize()
+        }.accessibilityElement(children:.ignore).accessibilityLabel(Text(verbatim:ready ? L10n.text("onboarding_ready"):"\(step)/\(StepMarks.count)"))
     }
 }
 
-/// During the first run, the step on the right (three squares and "n/3"); afterwards nothing. [key] is kept for the
+/// During the first run, the step on the right (two squares and "n/2"); afterwards nothing. [key] is kept for the
 /// call sites but no longer shown: the § labels are gone.
 struct SectionRow:View {
     let key:String
