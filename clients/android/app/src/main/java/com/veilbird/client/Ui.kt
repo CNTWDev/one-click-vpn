@@ -272,3 +272,38 @@ class HourBars(context: Context) : View(context) {
         }
     }
 }
+
+/**
+ * Traffic per day for the usage page: one rounded bar per day, the chosen day lit in the accent and the others dim.
+ * A tap (or drag) picks the day under the finger; [onPick] gets its index.
+ */
+class DayBars(context: Context, private val onPick: (Int) -> Unit) : View(context) {
+    private var values: List<Long> = emptyList()
+    private var picked = -1
+    private val density = resources.displayMetrics.density
+    private val paint = Paint().apply { isAntiAlias = true }
+    private val box = RectF()
+    fun set(values: List<Long>, picked: Int) { this.values = values; this.picked = picked; invalidate() }
+    override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+        if (values.isEmpty()) return false
+        if (event.action == android.view.MotionEvent.ACTION_DOWN) parent?.requestDisallowInterceptTouchEvent(true)
+        if (event.action in listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_MOVE, android.view.MotionEvent.ACTION_UP)) {
+            val index = (event.x / width * values.size).toInt().coerceIn(0, values.size - 1)
+            if (index != picked) { picked = index; invalidate(); onPick(index) }
+        }
+        return true
+    }
+    override fun onDraw(canvas: Canvas) {
+        if (values.isEmpty()) return
+        val pitch = width.toFloat() / values.size
+        val gap = minOf(3 * density, pitch * 0.35f)
+        val radius = minOf(2 * density, (pitch - gap) / 2)
+        val max = maxOf(1L, values.max())
+        for ((i, value) in values.withIndex()) {
+            val h = if (value <= 0) 3 * density else maxOf(3 * density, height * value.toFloat() / max)
+            box.set(i * pitch + gap / 2, height - h, (i + 1) * pitch - gap / 2, height.toFloat())
+            paint.color = when { i == picked -> Palette.accent; value <= 0 -> Palette.raised; else -> Palette.past }
+            canvas.drawRoundRect(box, radius, radius, paint)
+        }
+    }
+}

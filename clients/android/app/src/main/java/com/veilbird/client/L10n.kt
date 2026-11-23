@@ -64,6 +64,10 @@ object L10n {
         return blocks[locale.language] ?: blocks["en"] ?: blocks[""] ?: emptyList()
     }
     fun number(value: Number): String = NumberFormat.getNumberInstance(locale).format(value)
+    /** A day of the usage chart ("2026-11-22") as the locale writes a short month and day: 11月22日, Nov 22, 22 нояб. */
+    fun day(value: String): String = try {
+        DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMd"), locale).format(java.time.LocalDate.parse(value))
+    } catch (_: Exception) { value }
     fun date(value: String?): String {
         if (value.isNullOrBlank() || value == "null") return text(R.string.no_expiry)
         return try { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale).withZone(ZoneId.systemDefault()).format(Instant.parse(value)) } catch (_: Exception) { value }
