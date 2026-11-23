@@ -17,21 +17,34 @@ using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 namespace Veilbird;
 
-/// 30 days of usage as columns of square blocks; the chosen range (the last Recent days) in amber.
-public sealed class UsageBlocks:FrameworkElement {
-    private static Brush Older=>Look.Past;
+/// Traffic per day on the usage page: one rounded bar per day, the picked day lit in amber and the others dim.
+/// A click (or drag) picks the day under the pointer.
+public sealed class DayBars:FrameworkElement {
     private readonly IReadOnlyList<long> values;
-    private int recent=7;
-    public int Recent {get=>recent;set {recent=value;InvalidateVisual();}}
-    public UsageBlocks(IReadOnlyList<long> values) {this.values=values;IsHitTestVisible=false;}
+    private int picked;
+    public event Action<int>? Picked;
+    public DayBars(IReadOnlyList<long> values,int picked) {
+        this.values=values;this.picked=picked;Cursor=Cursors.Hand;
+        MouseLeftButtonDown+=(_,e)=>{CaptureMouse();Pick(e.GetPosition(this).X);};
+        MouseMove+=(_,e)=>{if(IsMouseCaptured) Pick(e.GetPosition(this).X);};
+        MouseLeftButtonUp+=(_,_)=>ReleaseMouseCapture();
+    }
+    private void Pick(double x) {
+        if(values.Count==0||ActualWidth<=0) return;
+        var index=Math.Clamp((int)(x/ActualWidth*values.Count),0,values.Count-1);
+        if(index==picked) return;
+        picked=index;InvalidateVisual();Picked?.Invoke(index);
+    }
     protected override void OnRender(DrawingContext dc) {
+        // Hit testing needs a background across the whole area, not only the bars.
+        dc.DrawRectangle(Brushes.Transparent,null,new Rect(0,0,ActualWidth,ActualHeight));
         if(values.Count==0) return;
-        double gap=3,width=(ActualWidth-gap*(values.Count-1))/values.Count,block=4,pitch=6;
-        var rows=Math.Max(1,(int)((ActualHeight+pitch-block)/pitch));var top=Math.Max(values.Max(),1);
+        double pitch=ActualWidth/values.Count,gap=Math.Min(3,pitch*0.35),radius=Math.Min(2,(pitch-gap)/2);
+        var top=Math.Max(values.Max(),1);
         for(var i=0;i<values.Count;i++) {
-            var lit=values[i]<=0?1:Math.Max(1,(int)Math.Round((double)rows*values[i]/top));
-            var brush=i>=values.Count-recent?Look.Accent:Older;
-            for(var r=0;r<lit;r++) dc.DrawRectangle(brush,null,new Rect(i*(width+gap),ActualHeight-r*pitch-block,Math.Max(1,width),block));
+            var height=Math.Max(3,ActualHeight*values[i]/top);
+            var brush=i==picked?Look.Accent:values[i]<=0?Look.Raised:Look.Past;
+            dc.DrawRoundedRectangle(brush,null,new Rect(i*pitch+gap/2,ActualHeight-height,Math.Max(1,pitch-gap),height),radius,radius);
         }
     }
 }

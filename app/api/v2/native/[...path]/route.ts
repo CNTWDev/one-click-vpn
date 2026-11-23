@@ -6,7 +6,7 @@ import { clientHeader,recordDiagnostics,recordEnrollmentClient,recordSessionClie
 import { parseClientAgent,type ClientPlatform } from "../../../../../shared/client-releases";
 import { requestPasswordResetEmail } from "../../../../../server/password-reset";
 import { clientAddress } from "../../../../../server/rate-limit";
-import { nativeAccount,nativeChallenge,nativeConnect,nativeEnd,nativeLogin,nativeLogout,nativeNodes,nativeSession,nativeStatus } from "../../../../../server/native-access";
+import { nativeAccount,nativeChallenge,nativeConnect,nativeEnd,nativeLogin,nativeLogout,nativeNodes,nativeSession,nativeStatus,nativeUsage } from "../../../../../server/native-access";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 async function handle(request:Request) {
@@ -35,6 +35,7 @@ async function handle(request:Request) {
       const session=await nativeSession(request);
       if(request.method==="GET"&&path==="account") result=await nativeAccount(session);
       else if(request.method==="GET"&&path==="nodes") result=await nativeNodes(session);
+      else if(request.method==="GET"&&path==="usage") result=await nativeUsage(session,new URL(request.url).searchParams.get("days"));
       else if(request.method==="GET"&&path?.startsWith("status/")) result=await nativeStatus(session,path.slice(7));
       else if(request.method==="POST"&&path==="challenge") result=await nativeChallenge(session,body);
       else if(request.method==="POST"&&path==="connect") {

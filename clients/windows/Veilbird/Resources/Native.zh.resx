@@ -425,8 +425,24 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="update_seconds" xml:space="preserve"><value>{0} 秒</value></data>
   <data name="update_time_left" xml:space="preserve"><value>约 {0}</value></data>
   <data name="upload_amount" xml:space="preserve"><value>↑ 上传 {0}</value></data>
+  <data name="usage_30_days" xml:space="preserve"><value>30 天</value></data>
+  <data name="usage_7_days" xml:space="preserve"><value>7 天</value></data>
+  <data name="usage_90_days" xml:space="preserve"><value>90 天</value></data>
+  <data name="usage_apps_local" xml:space="preserve"><value>只在本机统计，不上传</value></data>
+  <data name="usage_by_app" xml:space="preserve"><value>按应用</value></data>
+  <data name="usage_by_device" xml:space="preserve"><value>按设备</value></data>
+  <data name="usage_by_location" xml:space="preserve"><value>按节点</value></data>
+  <data name="usage_days_left" xml:space="preserve"><value>还有 {0} 天</value></data>
+  <data name="usage_left" xml:space="preserve"><value>剩余 {0}</value></data>
+  <data name="usage_load_failed" xml:space="preserve"><value>用量没加载出来，稍后再试。</value></data>
+  <data name="usage_of" xml:space="preserve"><value>共 {0}</value></data>
+  <data name="usage_open" xml:space="preserve"><value>查看用量</value></data>
+  <data name="usage_this_device" xml:space="preserve"><value>{0}（本机）</value></data>
   <data name="usage_this_month" xml:space="preserve"><value>本月</value></data>
+  <data name="usage_title" xml:space="preserve"><value>用量</value></data>
   <data name="usage_today" xml:space="preserve"><value>今日</value></data>
+  <data name="usage_unlimited" xml:space="preserve"><value>不限流量</value></data>
+  <data name="usage_used_period" xml:space="preserve"><value>本期已用</value></data>
   <data name="use_automatic_action" xml:space="preserve"><value>改用自动</value></data>
   <data name="valid_until" xml:space="preserve"><value>
 有效期 · </value></data>

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -239,4 +240,35 @@ func TestBuildPerAppRouting(t *testing.T) {
 	if strings.Contains(text, "PROCESS-NAME") {
 		t.Fatal("android config has process rules")
 	}
+}
+
+func TestAppUsageKeepsDaysAcrossConnections(t *testing.T) {
+	home := t.TempDir()
+	today := time.Now().Format("2006-01-02")
+	old := time.Now().AddDate(0, 0, -40).Format("2006-01-02")
+	appUsage.begin(home)
+	appUsage.count(today, "chrome.exe", 900, true)
+	appUsage.count(today, "steam.exe", 300, false)
+	appUsage.count(old, "chrome.exe", 5000, true)
+	appUsage.count(today, "", 100, true)
+	appUsage.flush()
+	// A second connection adds to the same day.
+	appUsage.begin(home)
+	appUsage.count(today, "chrome.exe", 100, false)
+	var rows []rankRow
+	if err := json.Unmarshal([]byte(AppUsage(home, 7)), &rows); err != nil {
+		t.Fatal(err)
+	}
+	want := []rankRow{{Name: "chrome.exe", Bytes: 1000, Proxy: true}, {Name: "steam.exe", Bytes: 300, Proxy: false}}
+	if !reflect.DeepEqual(rows, want) {
+		t.Fatalf("got %+v, want %+v", rows, want)
+	}
+	saved := readAppDays(home)
+	if _, ok := saved[old]; ok {
+		t.Fatal("days older than 30 are dropped")
+	}
+	if AppUsage(t.TempDir(), 7) != "[]" {
+		t.Fatal("no file: empty list")
+	}
+	appUsage.begin("")
 }

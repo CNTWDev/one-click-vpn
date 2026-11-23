@@ -61,6 +61,7 @@ func start(home string, configuration string) error {
 	}
 	executor.ApplyConfig(cfg, true)
 	running = true
+	appUsage.begin(home)
 	startActivity()
 	return nil
 }
@@ -97,6 +98,7 @@ func Stop() {
 	}
 	running = false
 	stopActivity()
+	appUsage.flush()
 	executor.Shutdown()
 	statistic.DefaultManager.Range(func(c statistic.Tracker) bool {
 		_ = c.Close()
