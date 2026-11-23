@@ -34,4 +34,28 @@ public static class Advanced {
         return kept.Count>0?kept:transports;
     }
     public static string Family(string transport)=>transport=="reality-alt"?"reality":transport;
+
+    /// The person's routing rules as typed (one per line); the core reads them (clients/core/rules.go).
+    public static string RulesText {get=>Settings.Get("advancedRules","");set=>Settings.Set("advancedRules",value);}
+    /// The lines the core will use; none while advanced is off.
+    public static List<string> Rules=>Enabled?RulesText.Split('\n').Select(l=>l.Trim()).Where(l=>RuleState(l)==1).ToList():new();
+    private static readonly HashSet<string> RuleTypes=new(StringComparer.OrdinalIgnoreCase){"DOMAIN","DOMAIN-SUFFIX","DOMAIN-KEYWORD","IP-CIDR","IP-CIDR6"};
+    /// 1 a rule, 0 blank or a comment, -1 a line the core cannot read; the same reading as rules.go.
+    public static int RuleState(string line) {
+        var hash=line.IndexOf('#');if(hash>=0) line=line[..hash];
+        var parts=line.Split(',').Select(p=>p.Trim()).Where(p=>p.Length>0).ToArray();
+        if(parts.Length==0) return 0;
+        string value;bool ip;
+        if(parts.Length>=3&&RuleTypes.Contains(parts[0])) {value=parts[1];ip=parts[0].StartsWith("IP",StringComparison.OrdinalIgnoreCase);}
+        else if(parts.Length==2) {value=parts[0];ip=value.Contains('/');}
+        else return -1;
+        if(value.Any(char.IsWhiteSpace)) return -1;
+        if(ip) return System.Net.IPNetwork.TryParse(value,out _)||LooseCidr(value)?1:-1;
+        return value.TrimStart('+').TrimStart('.').Length>0?1:-1;
+    }
+    /// A prefix with host bits set ("10.8.1.0/16"), which the core masks.
+    private static bool LooseCidr(string value) {
+        var slash=value.IndexOf('/');
+        return slash>0&&System.Net.IPAddress.TryParse(value[..slash],out var address)&&int.TryParse(value[(slash+1)..],out var bits)&&bits>=0&&bits<=(address.AddressFamily==System.Net.Sockets.AddressFamily.InterNetworkV6?128:32);
+    }
 }

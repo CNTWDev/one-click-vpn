@@ -290,7 +290,7 @@ class ConnectionService : VpnService() {
             .also { Journal.add("apps: " + AppRouting.apply(this, it)) }
             .establish() ?: throw ApiFailure("VPN_PERMISSION_REQUIRED")
         // mihomo owns the descriptor from here and closes it on stop.
-        Core.run(home, Transports.options(proxies, transports, tun.detachFd(), routing() == "smart"))
+        Core.run(home, Transports.options(proxies, transports, tun.detachFd(), routing() == "smart", Advanced.rules(this)))
         if (stopping) { Core.stop(); throw ApiFailure("CANCELLED") }
         ConnectionStateStore.phase = 2
         if (!probe(initial = true)) {

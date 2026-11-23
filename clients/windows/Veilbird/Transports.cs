@@ -89,6 +89,8 @@ public static class Transports {
         ["apps"]=new JsonArray(apps.Select(n=>(JsonNode?)JsonValue.Create(n)).ToArray()),
         ["proxies"]=new JsonArray(proxies.Select(p=>(JsonNode?)p.DeepClone()).ToArray()),
         ["order"]=new JsonArray(order.Select(n=>(JsonNode?)JsonValue.Create(n)).ToArray()),
+        // The person's own routing rules (advanced), ahead of smart routing.
+        ["rules"]=new JsonArray(Advanced.Rules.Select(n=>(JsonNode?)JsonValue.Create(n)).ToArray()),
         }.ToJsonString();
     }
     /// "name=delay,..." from the core; -1 means no answer.

@@ -36,6 +36,7 @@ struct ClientView:View {
     /// Advanced features (Account switch); bumped when a favorite or lock changes so the list redraws.
     @State private var advanced=Advanced.enabled
     @State private var advancedEdits=0
+    @State private var rulesDraft=Advanced.rulesText
     /// The transport carrying traffic now (for "in use") and the speed test's last status from the tunnel.
     @State private var currentLine=""
     @State private var speedStatus:[String:Any]=["state":"idle"]
@@ -73,6 +74,7 @@ struct ClientView:View {
                         case 3:logsView
                         case 5:ActivityView()
                         case 6:usageView
+                        case 7:rulesView
                         default:devicesView
                         }
                     }.id(tab).transition(.asymmetric(insertion:.opacity.combined(with:.offset(y:8)),removal:.identity))
@@ -1016,6 +1018,10 @@ struct ClientView:View {
                         }
                     }.toggleStyle(.switch).controlSize(mac ? .small:.regular).tint(VeilbirdStyle.accent).padding(.horizontal,16).padding(.vertical,8).frame(minHeight:mac ? 40:50)
                     Hairline()
+                    if advanced {
+                        settingRow(L10n.text("rules_title"),rulesValue) {rulesDraft=Advanced.rulesText;tab=7}
+                        Hairline()
+                    }
                     #if os(iOS)
                     settingRow(L10n.text("shortcuts"),L10n.text("shortcuts_detail")) {if let url=URL(string:"shortcuts://") {openURL(url)}}
                     #else
@@ -1198,6 +1204,42 @@ struct ClientView:View {
         case "":return nil
         default:return value
         }
+    }
+    private var rulesValue:String {
+        let count=Advanced.rules.count
+        return count==0 ? L10n.text("rules_none"):L10n.text("rules_count",L10n.number(count))
+    }
+    /// Advanced: the person's own routing rules, one per line, ahead of smart routing; kept on this device.
+    private var rulesView:some View {
+        let states=rulesDraft.split(separator:"\n",omittingEmptySubsequences:false).map {Advanced.ruleState($0.trimmingCharacters(in:.whitespaces))}
+        let good=states.filter {$0==1}.count,bad=states.filter {$0 == -1}.count
+        return ScrollView {
+            VStack(alignment:.leading,spacing:12) {
+                subPageHeader(L10n.text("rules_title")) {tab=2}
+                caption(L10n.text("rules_help"))
+                ZStack(alignment:.topLeading) {
+                    if rulesDraft.isEmpty {
+                        Text(verbatim:"example.com, direct\n+.ads.example, block\n10.8.0.0/16, proxy").foregroundStyle(VeilbirdStyle.faint).padding(.horizontal,5).padding(.vertical,8).allowsHitTesting(false)
+                    }
+                    TextEditor(text:$rulesDraft).scrollContentBackground(.hidden).autocorrectionDisabled()
+                }.font(.system(size:13,design:.monospaced)).frame(minHeight:200).padding(10)
+                    .background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+                caption(L10n.text("rules_status",L10n.number(good),L10n.number(bad)))
+                Button {saveRules()} label:{
+                    Text(L10n.text("rules_save")).font(.system(size:VeilbirdStyle.body,weight:.semibold)).foregroundStyle(VeilbirdStyle.onAccent)
+                        .frame(maxWidth:.infinity).frame(height:mac ? 36:50).background(VeilbirdStyle.accent,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+                }.buttonStyle(.plain)
+            }.padding(.horizontal,16).padding(.top,mac ? 8:8).padding(.bottom,20)
+        }
+    }
+    /// Saves the rules; while connected, a change applies at once (one reconnect).
+    private func saveRules() {
+        let before=Advanced.rules
+        Advanced.rulesText=rulesDraft
+        let live=before != Advanced.rules && model.connected
+        model.message=L10n.text(live ? "rules_saved_reconnect":"rules_saved")
+        if live {model.work {try await model.reconnect()}}
+        tab=2
     }
     private var devicesView:some View {
         let devices=(model.account["devices"] as? [[String:Any]] ?? []).filter {$0["status"] as? String != "revoked"}

@@ -25,6 +25,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var smart=true
     /// Location id -> protocol, from the app (advanced protocol lock).
     private var locks:[String:String]=[:]
+    /// The person's routing rules, from the app (advanced).
+    private var rules:[String]=[]
     // Wall-clock times: systemUptime stops while the device sleeps, the server's lease does not.
     private var deadline=Date.distantPast
     private var renewAt=Date.distantPast
@@ -91,7 +93,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 SecureStorage.handed=["token":token,"identity":identity]
                 #endif
                 api=try NativeAPI(origin:origin);nodeId=configuration["nodeId"] as? String ?? "";automatic=nodeId.isEmpty;smart=(configuration["routing"] as? String ?? "smart") != "global"
-                locks=configuration["locks"] as? [String:String] ?? [:]
+                locks=configuration["locks"] as? [String:String] ?? [:];rules=configuration["rules"] as? [String] ?? []
                 try await Task.sleep(nanoseconds:200_000_000) // let the path monitor report the current network
                 network=Transports.networkKey(monitor.currentPath);online=Transports.online(monitor.currentPath);networkChanged=false
                 sessionNet=String(network.split(separator:":").first ?? "unknown")
@@ -181,7 +183,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         publish {$0["phase"]=1;$0["lines"]=lines}
         guard let fd=tunnelDescriptor() else {throw AccessFailure.code("TUNNEL_ERROR")}
         CoreStop()
-        let options=try Transports.options(proxies:proxies,order:transports,fd:fd,smart:smart)
+        let options=try Transports.options(proxies:proxies,order:transports,fd:fd,smart:smart,rules:rules)
         var failure:NSError?
         // Disconnect pressed while connecting cancels this task: stop before and after the core starts.
         try Task.checkCancellation()

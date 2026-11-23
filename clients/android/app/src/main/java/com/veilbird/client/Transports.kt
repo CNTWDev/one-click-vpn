@@ -120,8 +120,9 @@ object Transports {
     }
 
     /** What the core needs to build the configuration (clients/core/config.go): the same on every app. */
-    fun options(proxies: List<JSONObject>, order: List<String>, fd: Int, smart: Boolean): String =
-        JSONObject().put("platform", "android").put("fd", fd).put("smart", smart).put("proxies", JSONArray(proxies)).put("order", JSONArray(order)).toString()
+    fun options(proxies: List<JSONObject>, order: List<String>, fd: Int, smart: Boolean, rules: List<String> = emptyList()): String =
+        JSONObject().put("platform", "android").put("fd", fd).put("smart", smart).put("proxies", JSONArray(proxies)).put("order", JSONArray(order))
+            .put("rules", JSONArray(rules)).toString()
 
     /** "name=delay,..." from Core.probe; -1 means no answer. */
     fun parseProbe(result: String): Map<String, Long> = result.split(',').filter { '=' in it }

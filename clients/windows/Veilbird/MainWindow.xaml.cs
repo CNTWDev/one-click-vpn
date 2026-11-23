@@ -1076,7 +1076,7 @@ public partial class MainWindow : Window {
             Login();return;
         }
         if(Onboarded) foreach(var (id,key) in new[]{("connect","connect_tab"),("nodes","locations"),("account","account")}) {
-            var selected=page==id||(page is "logs" or "devices" or "apps"&&id=="account")||(page=="usage"&&id=="connect");
+            var selected=page==id||(page is "logs" or "devices" or "apps" or "rules"&&id=="account")||(page=="usage"&&id=="connect");
             var label=new TextBlock {Text=L10n.Text(key),FontSize=14,FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal,Foreground=selected?Look.Text:Look.Secondary,VerticalAlignment=VerticalAlignment.Center};
             var tab=new Grid {Height=44};tab.Children.Add(label);
             if(selected) tab.Children.Add(new Border {Height=3,Width=16,CornerRadius=new CornerRadius(1.5),Background=Look.Accent,VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,0,6)});
@@ -1089,6 +1089,7 @@ public partial class MainWindow : Window {
             case "nodes":Nodes();break;
             case "devices":Devices();break;
             case "apps":AppsPage();break;
+            case "rules":RulesPage();break;
             case "logs":Logs();break;
             case "usage":UsagePage();break;
             default:Account();break;
@@ -1659,11 +1660,14 @@ public partial class MainWindow : Window {
         // Advanced: favorites and per-location protocol lock on the location page, protocol names in the check.
         var advanced=new ToggleButton {Style=(Style)FindResource("Switch"),IsChecked=Advanced.Enabled,VerticalAlignment=VerticalAlignment.Center};
         AutomationProperties.SetName(advanced,L10n.Text("advanced"));
-        advanced.Click+=(_,_)=>Advanced.Enabled=advanced.IsChecked==true;
+        advanced.Click+=(_,_)=>{Advanced.Enabled=advanced.IsChecked==true;Render();};
         var advancedText=TwoLines(L10n.Text("advanced"),L10n.Text("advanced_detail"));advancedText.Margin=new Thickness(0,0,12,0);
         if(advancedText.Children[1] is TextBlock advancedDetail) {advancedDetail.TextWrapping=TextWrapping.Wrap;advancedDetail.TextTrimming=TextTrimming.None;}
         var advancedRow=new Border {MinHeight=56,Padding=new Thickness(14,8,14,8),Child=Columns(new FrameworkElement(),advancedText,advanced)};
-        Add(Card(new FrameworkElement[]{devices,password,language,appearance,startupRow,guardRow,apps,advancedRow,updates,whatsNew},14));
+        var rows=new List<FrameworkElement>{devices,password,language,appearance,startupRow,guardRow,apps,advancedRow};
+        if(Advanced.Enabled) rows.Add(SettingRow(L10n.Text("rules_title"),RulesValue(),_=>{page="rules";Render();}));
+        rows.Add(updates);rows.Add(whatsNew);
+        Add(Card(rows,14));
 
         var signOut=new Button {Content=L10n.Text("sign_out"),Height=40,Background=Look.Surface,Foreground=Look.Danger,HorizontalContentAlignment=HorizontalAlignment.Center};
         signOut.Click+=(_,_)=>{
@@ -1849,6 +1853,39 @@ public partial class MainWindow : Window {
     private static void Tick(Border box,bool on) {
         box.BorderThickness=new Thickness(0);box.Background=on?Look.Accent:Look.Selected;
         box.Child=on?Look.Icon("\uE73E",11,Look.OnAccent):null;
+    }
+    private static string RulesValue() {
+        var count=Advanced.Rules.Count;
+        return count==0?L10n.Text("rules_none"):L10n.Text("rules_count",count.ToString("N0",L10n.Culture));
+    }
+    /// Advanced: the person's own routing rules, one per line, ahead of smart routing; kept on this PC.
+    private void RulesPage() {
+        Add(SubHeader(L10n.Text("rules_title")),0,8);
+        var help=Caption(L10n.Text("rules_help"));help.TextWrapping=TextWrapping.Wrap;Add(help,0,12);
+        var editor=new TextBox {Text=Advanced.RulesText,AcceptsReturn=true,TextWrapping=TextWrapping.NoWrap,MinHeight=220,MaxHeight=420,
+            VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,
+            FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=13,Padding=new Thickness(10,8,10,8),VerticalContentAlignment=VerticalAlignment.Top};
+        AutomationProperties.SetName(editor,L10n.Text("rules_title"));
+        var hint=new TextBlock {Text="example.com, direct\n+.ads.example, block\n10.8.0.0/16, proxy",FontFamily=editor.FontFamily,FontSize=13,Foreground=Look.Faint,Margin=new Thickness(13,9,10,0),IsHitTestVisible=false,
+            Visibility=editor.Text.Length==0?Visibility.Visible:Visibility.Collapsed};
+        var host=new Grid();host.Children.Add(editor);host.Children.Add(hint);Add(host);
+        var status=Add(Caption(""),8,0);
+        void Count() {
+            var states=editor.Text.Split('\n').Select(l=>Advanced.RuleState(l.Trim())).ToList();
+            status.Text=L10n.Text("rules_status",states.Count(x=>x==1).ToString("N0",L10n.Culture),states.Count(x=>x==-1).ToString("N0",L10n.Culture));
+        }
+        editor.TextChanged+=(_,_)=>{hint.Visibility=editor.Text.Length==0?Visibility.Visible:Visibility.Collapsed;Count();};
+        Count();
+        var save=Primary(L10n.Text("rules_save"));
+        save.Click+=(_,_)=>{
+            var before=Advanced.Rules;
+            Advanced.RulesText=editor.Text.Replace("\r","");
+            var live=!before.SequenceEqual(Advanced.Rules)&&connection.Active&&connection.Since is not null;
+            Notify(L10n.Text(live?"rules_saved_reconnect":"rules_saved"));
+            page="account";Render();
+            if(live) ApplyNow();
+        };
+        Add(save,16,0);
     }
     private void AppsPage() {
         Add(SubHeader(L10n.Text("per_app_routing")),0,8);

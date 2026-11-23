@@ -370,6 +370,14 @@
   <string name="routing_global_detail">全部流量经过 TrackNothing</string>
   <string name="routing_smart">智能分流</string>
   <string name="routing_smart_detail">国内网站直连，其余经过 TrackNothing</string>
+  <string name="rules_count">%1$s 条</string>
+  <string name="rules_help">每行一条：域名或网段，逗号后写 direct（直连）、proxy（走代理）或 block（拦截）。也可以直接粘贴 Clash 规则，# 后面是注释。规则排在智能分流前面，只保存在这台设备上。</string>
+  <string name="rules_none">未设置</string>
+  <string name="rules_save">保存</string>
+  <string name="rules_saved">已保存，下次连接时生效</string>
+  <string name="rules_saved_reconnect">已保存，正在重新连接</string>
+  <string name="rules_status">能用 %1$s 条，看不懂 %2$s 行</string>
+  <string name="rules_title">分流规则</string>
   <string name="running_apps">正在运行的应用</string>
   <string name="running_in_tray">TrackNothing 仍在托盘运行，点击图标即可切换。</string>
   <string name="seal_action">开始隐身</string>
@@ -506,7 +514,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">「我的」里新增「高级功能」开关，默认关闭，新手看不到这些选项\n打开后可以收藏常用位置，收藏的排在位置列表最上面\n可以给某个位置锁定一种协议（Hysteria2、REALITY、XHTTP 或 WireGuard）；连接检查里直接显示协议名</string>
+  <string name="whats_new_notes">打开「高级功能」后，「我的」里多了「分流规则」：每行一条，域名或网段加 direct、proxy 或 block\n可以直接粘贴 Clash 规则；规则排在智能分流前面，只保存在这台设备上\n连着的时候保存规则，会自动重连立即生效</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>

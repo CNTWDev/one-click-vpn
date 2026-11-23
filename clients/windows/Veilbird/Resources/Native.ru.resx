@@ -376,6 +376,14 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="routing_global_detail" xml:space="preserve"><value>Весь трафик через TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>Умная</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>Сайты материкового Китая напрямую, остальное через TrackNothing</value></data>
+  <data name="rules_count" xml:space="preserve"><value>Правил: {0}</value></data>
+  <data name="rules_help" xml:space="preserve"><value>По одному на строку: домен или сеть, запятая, затем direct, proxy или block. Правила Clash можно вставить как есть; # начинает комментарий. Правила идут раньше умного режима и хранятся только на этом устройстве.</value></data>
+  <data name="rules_none" xml:space="preserve"><value>Нет</value></data>
+  <data name="rules_save" xml:space="preserve"><value>Сохранить</value></data>
+  <data name="rules_saved" xml:space="preserve"><value>Сохранено, применится при следующем подключении</value></data>
+  <data name="rules_saved_reconnect" xml:space="preserve"><value>Сохранено, переподключение</value></data>
+  <data name="rules_status" xml:space="preserve"><value>Правил: {0}, не распознано строк: {1}</value></data>
+  <data name="rules_title" xml:space="preserve"><value>Правила маршрутизации</value></data>
   <data name="running_apps" xml:space="preserve"><value>Запущенные программы</value></data>
   <data name="running_in_tray" xml:space="preserve"><value>TrackNothing работает в трее. Нажмите на значок, чтобы переключить.</value></data>
   <data name="seal_action" xml:space="preserve"><value>Подключиться</value></data>
@@ -513,9 +521,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>В «Аккаунте» появился переключатель «Расширенные функции», по умолчанию выключен, новички этих настроек не видят
-Когда он включён, частые локации можно добавить в избранное, они стоят вверху списка
-Для локации можно выбрать один протокол (Hysteria2, REALITY, XHTTP или WireGuard); проверка соединения показывает названия протоколов</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>При включённых расширенных функциях в «Аккаунте» есть «Правила маршрутизации»: по одному на строку, домен или сеть и direct, proxy или block
+Правила Clash можно вставить как есть; ваши правила идут раньше умного режима и хранятся только на этом устройстве
+Если сохранить правила во время подключения, VPN переподключится и они сразу заработают</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>
