@@ -13,8 +13,8 @@ const credentials = [
   credential("cred_sub_000000", "Family subscription made before every account had one (kept until deleted)", "vless", { subscriptionId: "sub_0" }),
 ];
 const regions = [
-  { id: "sg", name: "Singapore", code: "SG", country: "Singapore", protocols: ["wireguard", "vless", "openvpn"], status: "available", protocolNodeCounts: { wireguard: 2, vless: 2, openvpn: 1 } },
-  { id: "us", name: "Ohio", code: "US", country: "United States", protocols: ["wireguard", "vless"], status: "available" },
+  { id: "sg", name: "Singapore", code: "SG", country: "Singapore", protocols: ["wireguard", "vless", "openvpn"], status: "available", place: { lat: 1.35, lon: 103.82 }, protocolNodeCounts: { wireguard: 2, vless: 2, openvpn: 1 } },
+  { id: "us", name: "Ohio", code: "US", country: "United States", protocols: ["wireguard", "vless"], status: "available", place: { lat: 39.96, lon: -83.0 } },
   { id: "za", name: "Cape Town", code: "ZA", country: "South Africa", protocols: ["wireguard"], status: "degraded" },
   { id: "br", name: "São Paulo Metropolitan Area", code: "BR", country: "Brazil", protocols: [], status: "unavailable" },
 ];
@@ -44,7 +44,7 @@ const soon = new Date(Date.now() + 5 * 86400000).toISOString();
 export function portalApi({ signedIn = true, empty = false, site = null } = {}) {
   let session = signedIn;
   return (pathname, method) => {
-    if (pathname === "/api/v1/visitor") return [200, { ip: "203.0.113.48" }];
+    if (pathname === "/api/v1/visitor") return [200, { ip: "203.0.113.48", place: { lat: 31.2, lon: 121.5, names: { en: "Shanghai", zh: "上海", ru: "Шанхай" }, source: "address" } }];
     if (pathname === "/api/v1/site") return site ? [200, site] : [404, { error: "Not found" }];
     if (pathname === "/api/v1/auth/me") return session ? [200, { user }] : [401, { error: "Authentication required" }];
     if (pathname === "/api/v1/auth/web-login") { session = true; return [200, { user }]; }

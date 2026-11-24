@@ -99,11 +99,16 @@ public sealed class NativeApi : IDisposable {
         if(json["apiOrigins"] is JsonArray offered) Remember(null,offered);
         return json;
     }
-    /// The public address the service sees for this PC ("—" when it is a private one). Nothing is stored.
+    /// The public address the service sees for this PC ("—" when it is a private one). With it, where the address is
+    /// (a city, coarsely) for the globe, kept on this PC only (settings "visitorPlace"); the time zone places the PC
+    /// when the address cannot be placed.
     public async Task<string> VisitorAddress() {
-        var (status,body)=await Send("GET","/api/v1/visitor",null,new());
-        if(status is <200 or >=300) throw new AccessFailure("SERVICE_UNAVAILABLE");
-        return (JsonNode.Parse(body) as JsonObject)?["ip"]?.GetValue<string>() ?? "—";
+        var zone=TimeZoneInfo.Local.HasIanaId?TimeZoneInfo.Local.Id:TimeZoneInfo.TryConvertWindowsIdToIanaId(TimeZoneInfo.Local.Id,out var iana)?iana:"";
+        var (status,body)=await Send("GET","/api/v1/visitor?zone="+Uri.EscapeDataString(zone),null,new());
+        if(status is <200 or >=300||body.Length>4096) throw new AccessFailure("SERVICE_UNAVAILABLE");
+        var json=JsonNode.Parse(body) as JsonObject;
+        if(json?["place"] is JsonObject place&&place["lat"] is JsonValue&&place["lon"] is JsonValue) Settings.Set("visitorPlace",place.ToJsonString());
+        return json?["ip"]?.GetValue<string>() ?? "—";
     }
     /// Public release catalog: the operator's announcement, and a newer build for this install if one is published.
     public async Task<(string Announcement,ReleaseUpdate? Update)?> LatestRelease() {

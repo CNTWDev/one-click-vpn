@@ -1,5 +1,5 @@
 /**
- * Where places are, coarsely, for the globe on the apps' home and the Portal (see docs/route-globe.md):
+ * Where places are, coarsely, for the globe on the apps' home and the Portal:
  * - CITY_PLACES: the Console's region catalog (admin-web/src/region-catalog.ts), by English name and country code;
  * - COUNTRY_CENTRES: a point inside each country, for regions with their own names (world-countries, ODbL 1.0);
  * - ZONE_PLACES: the place of each IANA time zone (tz database zone1970.tab, public domain), for a device whose

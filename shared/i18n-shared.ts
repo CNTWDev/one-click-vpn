@@ -7,6 +7,7 @@ export const sharedCatalog: Record<string, readonly [en: string, ru: string]> = 
   ...onboardingCatalog,
   "下载客户端，登录即用": ["Get the app and sign in", "Скачайте приложение и войдите"],
   "自动选择最快的线路，断线时自动切换。": ["Picks the fastest route and switches automatically if it drops.", "Само выбирает самый быстрый маршрут и переключается при обрыве."],
+  "演示一次连接": ["Play a connection", "Показать подключение"],
   "下载 {0} 版": ["Download for {0}", "Скачать для {0}"],
   "获取 {0} 版": ["Get it for {0}", "Получить для {0}"],
   "其他平台": ["Other platforms", "Другие платформы"],

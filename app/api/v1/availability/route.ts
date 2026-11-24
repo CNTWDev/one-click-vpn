@@ -3,6 +3,7 @@ import { listRegions } from "../../../../server/db";
 import { listControlNodes, listNodeProtocols, listVpnServices } from "../../../../server/control-db";
 import { requestUser } from "../../../../server/request-auth";
 import { jsonError } from "../../../../server/http";
+import { regionPlace } from "../../../../shared/geo-places";
 
 export const runtime = "nodejs";
 
@@ -44,6 +45,8 @@ export async function GET(request: Request) {
       name: region.name,
       country: region.country,
       code: region.code,
+      // Where the region is, coarsely (its catalog city or its country), for the Portal's globe.
+      place: regionPlace(region.name, region.code),
       protocols: [...protocols].sort(),
       status: protocols.size ? "available" : "unavailable",
       onlineNodeCount: regionNodes.length,
