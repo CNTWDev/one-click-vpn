@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.29
+
+### zh
+- 首页的点阵球变成了地球：没连接时标出你所在的城市，连上后一条光弧从你这里落到出口城市
+- 弧线旁写着出口城市和距离，连上的那一刻出口会亮起来
+- 「我的」里可以关掉「在地球上显示我的位置」，位置只按城市估算，只存在这台设备上
+
+### en
+- The dot sphere on the home page is now a globe: off, it marks your city; connected, an arc of light runs from you to the exit city
+- The exit city and its distance sit by the arc, and the exit lights up the moment you connect
+- Account has "Show me on the globe" to leave your city off; it is only a city, worked out coarsely, and stays on this device
+
+### ru
+- Точечная сфера на главной стала глобусом: без подключения отмечает ваш город, после подключения световая дуга идёт к городу выхода
+- У дуги — город выхода и расстояние, в момент подключения выход загорается
+- В «Аккаунте» можно выключить «Показывать меня на глобусе»; место определяется грубо, до города, и хранится только на устройстве
+
 ## 1.0.28
 
 ### zh

@@ -27,7 +27,7 @@
 .home-app-download { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 6px; }
 .home .primary.big { min-height: 52px; padding: 0 24px; font-size: 16px; border-radius: var(--radius); white-space: normal; text-align: center; }
 .home-app-meta { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: var(--text-2); }
-.home-app .hero-ring { flex: none; width: 176px; height: 176px; }
+.home-app .hero-globe { flex: none; width: 176px; height: 176px; }
 .home-app-others { display: grid; gap: 4px; margin-top: auto; }
 .home-app-label { margin: 0; font-size: 13px; color: var(--text-2); }
 .home-app-rows { list-style: none; margin: 0; padding: 0; }
@@ -68,11 +68,10 @@ div.import-apps { gap: 6px; padding-top: 6px; border-top: 0; }
 .import-share > input, .import-share > .primary, .import-share > .hint { width: 100%; }
 .import-share > input { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
 .import-reset { justify-self: start; padding-left: 0; }
-.hero-ring { position: relative; width: 300px; height: 300px; color: var(--accent); }
-.hero-ring svg { position: relative; width: 100%; height: 100%; fill: currentColor; }
-.hero-ring .twinkle { animation: hero-twinkle 6s steps(1) infinite; }
-@keyframes hero-twinkle { 0% { opacity: 1; } 95% { opacity: .25; } 100% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .hero-ring .twinkle { animation: none; } }
+.hero-globe { position: relative; width: 300px; height: 300px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.hero-globe:disabled { opacity: 1; cursor: default; }
+.hero-globe:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.hero-globe canvas { display: block; width: 100%; height: 100%; }
 .home .home-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0; overflow: hidden; }
 .home-stats > div { padding: 22px 24px; display: grid; gap: 10px; align-content: start; min-width: 0; }
 .home-stats > div + div { border-left: 1px solid var(--border); }
@@ -113,7 +112,7 @@ a.home-stat-note { color: var(--accent); justify-self: start; }
 @media (max-width: 1200px) {
   .home-start { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
   .home-app h1 { font-size: 34px; }
-  .home-app .hero-ring { width: 128px; height: 128px; }
+  .home-app .hero-globe { width: 128px; height: 128px; }
 }
 @media (max-width: 900px) {
   .home-start { grid-template-columns: minmax(0, 1fr); }
@@ -125,7 +124,7 @@ a.home-stat-note { color: var(--accent); justify-self: start; }
   .home-app { gap: 18px; }
   .home-app-head { flex-direction: column-reverse; align-items: flex-start; gap: 20px; }
   .home-app-text { align-self: stretch; }
-  .home-app .hero-ring { width: 96px; height: 96px; }
+  .home-app .hero-globe { width: 96px; height: 96px; }
   .home-app h1, .home-third.solo h1 { font-size: 28px; }
   .home-app .home-lead { font-size: 14px; }
   .home-app-download { justify-self: stretch; flex-direction: column; align-items: stretch; gap: 8px; }

@@ -44,7 +44,7 @@ object NodeCache {
     fun clear(context: Context) {
         nodes = null; loadedAt = 0L; restored = true
         Latency.recent.clear(); Latency.forget()
-        Directory.nodes.clear(); Directory.probes.clear(); Directory.regions.clear(); Directory.tests.clear()
+        Directory.nodes.clear(); Directory.probes.clear(); Directory.regions.clear(); Directory.tests.clear(); Directory.places.clear()
         prefs(context).edit().clear().apply()
     }
 }

@@ -1,11 +1,11 @@
 import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { Reader, type AsnResponse, type CountryResponse } from "mmdb-lib";
+import { Reader, type AsnResponse, type CityResponse, type CountryResponse } from "mmdb-lib";
 import { writeOperationalLog } from "./operational-logs";
-import { cohortOf as lookup, FILES, geoUrls, type Cohort, type Databases } from "./geo-lookup";
+import { cohortOf as lookup, FILES, geoUrls, placeFrom, type Cohort, type Databases, type SeenPlace } from "./geo-lookup";
 
-export type { Cohort } from "./geo-lookup";
+export type { Cohort, SeenPlace } from "./geo-lookup";
 
 /**
  * Country and network (ASN) of a client address, from DB-IP's free "Lite" databases (CC BY 4.0, IP Geolocation
@@ -87,4 +87,39 @@ export async function readyGeo(maxWaitMs = 2000, now = Date.now()): Promise<void
 /** Country code and ASN of a public address from the loaded databases, or null. */
 export function cohortOf(address: string): Cohort | null {
   return lookup(address, state.databases);
+}
+
+/*
+ * The city file (about 130 MB in memory) is only for the globe on the apps' home and the Portal: where the device
+ * is while not connected. It loads on the first such request, never at start, and VEILBIRD_GEO_CITY=off leaves it
+ * out entirely (the apps then place the device by its time zone). Same download and refresh rules as above.
+ */
+type CityState = { reader: Reader<CityResponse> | null; loadedAt: number; checking: Promise<void> | null; lastTry: number };
+const city: CityState = (globalThis as { __geoCity?: CityState }).__geoCity ??= { reader: null, loadedAt: 0, checking: null, lastTry: 0 };
+
+function cityEnabled(): boolean { return process.env.VEILBIRD_GEO_CITY?.trim().toLowerCase() !== "off"; }
+
+async function refreshCity(now = Date.now()): Promise<void> {
+  city.lastTry = now;
+  if (process.env.VEILBIRD_GEO_DOWNLOAD !== "off" && await age("city") >= MAX_AGE) {
+    try { await download("city"); } catch (error) {
+      void writeOperationalLog({ component: "controller", level: "warning", action: "geo.download_failed", source: "system", message: `IP city database download failed: ${error instanceof Error ? error.message : error}` });
+    }
+  }
+  try { city.reader = new Reader<CityResponse>(await readFile(join(geoDirectory(), `${FILES.city}.mmdb`))); city.loadedAt = Date.now(); } catch { /* not there yet */ }
+}
+
+/** Starts loading (or refreshing) the city file when due; never makes the caller wait. */
+export function warmCity(now = Date.now()): void {
+  if (!cityEnabled() || city.checking) return;
+  const due = city.reader ? now - city.loadedAt >= 24 * 3600_000 : now - city.lastTry >= (city.lastTry ? RETRY : 0);
+  if (due) city.checking = refreshCity(now).finally(() => { city.checking = null; });
+}
+
+/** The coarse place of a public address, or null; waits up to maxWaitMs for a first load. */
+export async function placeOf(address: string, maxWaitMs = 1500): Promise<SeenPlace | null> {
+  if (!cityEnabled()) return null;
+  warmCity();
+  if (!city.reader && city.checking) await Promise.race([city.checking, new Promise((resolve) => setTimeout(resolve, maxWaitMs))]);
+  return placeFrom(address, city.reader);
 }

@@ -50,6 +50,8 @@ public partial class MainWindow : Window {
     private JsonNode? accountData;
     private JsonArray? nodesData;
     private readonly Dictionary<string,(string Name,string Code)> directory=new();
+    /// Where each location is (from the node list), for the globe.
+    private readonly Dictionary<string,(double Lat,double Lon)> places=new();
     // Live parts of the connect page and the tray flyout.
     private TextBlock? statusTitle,statusDetail,usageTotal,usageUntil,actionLabel;
     private Border? stamp;
@@ -695,7 +697,32 @@ public partial class MainWindow : Window {
             var name=node["name"]?.GetValue<string>()??"";
             var code=node["countryCode"]?.GetValue<string>() is { Length: >0 } country?country.ToUpperInvariant():name.Length>0?name[..1].ToUpperInvariant():"";
             directory[id]=(name,code);
+            if(node["place"] is JsonObject place&&Degrees(place["lat"]) is { } lat&&Degrees(place["lon"]) is { } lon) places[id]=(lat,lon);
         }
+    }
+    private static double? Degrees(JsonNode? node) {try {return node?.GetValue<double>();} catch {return null;}}
+    /// The globe's two ends: this PC (unless the person left it off) and the location it goes out from.
+    /// Read from settings once, again when the place or the switch changes (the live refresh runs every second).
+    private (bool Read,Spot? Spot) globeOrigin;
+    private Spot? GlobeOrigin() {
+        if(!globeOrigin.Read) globeOrigin=(true,ReadOrigin());
+        return globeOrigin.Spot;
+    }
+    private static Spot? ReadOrigin() {
+        if(Settings.Get("globeShowMe","on")!="on") return null;
+        try {
+            if(JsonNode.Parse(Settings.Get("visitorPlace")) is not JsonObject place||Degrees(place["lat"]) is not { } lat||Degrees(place["lon"]) is not { } lon) return null;
+            var language=L10n.Culture.TwoLetterISOLanguageName;
+            var names=place["names"] as JsonObject;
+            var name=names?[language]?.GetValue<string>() ?? names?["en"]?.GetValue<string>() ?? "";
+            return new Spot(lat,lon,name);
+        } catch {return null;}
+    }
+    private Spot? GlobeExit() {
+        var id=connection.Active&&connection.NodeId.Length>0?connection.NodeId:nodeId;
+        if(!places.TryGetValue(id,out var at)) return null;
+        var name=connection.Active&&connection.NodeName.Length>0?connection.NodeName:directory.TryGetValue(id,out var known)?known.Name:"";
+        return new Spot(at.Lat,at.Lon,name);
     }
     private async Task RefreshAccount() {
         try {var data=await api.Request("account");accountData=data;ShowUsage();UpdateFlyout();UpdateTray();Remind();}
@@ -1053,7 +1080,7 @@ public partial class MainWindow : Window {
         if(!api.SignedIn) {
             // Before sign-in the only language entry is this small globe; afterwards it is a row on the account page.
             // Signed out: the saved list and measurements belonged to that account.
-            if(nodesData is not null||NodeStore.LoadedAt!=DateTime.MinValue) {NodeStore.Clear();directory.Clear();}
+            if(nodesData is not null||NodeStore.LoadedAt!=DateTime.MinValue) {NodeStore.Clear();directory.Clear();places.Clear();}
             accountData=null;nodesData=null;
             var globe=new StackPanel {Orientation=Orientation.Horizontal};
             globe.Children.Add(Look.Icon("",13,Look.Secondary));globe.Children.Add(new TextBlock {Text=LanguageName(L10n.Preference=="system"?L10n.Culture.TwoLetterISOLanguageName:L10n.Preference),FontSize=12,Foreground=Look.Secondary,Margin=new Thickness(6,0,0,0),VerticalAlignment=VerticalAlignment.Center});
@@ -1197,6 +1224,7 @@ public partial class MainWindow : Window {
     /// The public address the service sees, read once while not connected (afterwards it would be the location's).
     private async Task LoadVisitor() {
         try {visitorIp=await api.VisitorAddress();} catch {return;}
+        globeOrigin=default;
         if(statusDetail is not null&&!connection.Active) statusDetail.Text=StatusDetail(State(),false);
     }
     private bool? dotBreathing;
@@ -1664,7 +1692,14 @@ public partial class MainWindow : Window {
         var advancedText=TwoLines(L10n.Text("advanced"),L10n.Text("advanced_detail"));advancedText.Margin=new Thickness(0,0,12,0);
         if(advancedText.Children[1] is TextBlock advancedDetail) {advancedDetail.TextWrapping=TextWrapping.Wrap;advancedDetail.TextTrimming=TextTrimming.None;}
         var advancedRow=new Border {MinHeight=56,Padding=new Thickness(14,8,14,8),Child=Columns(new FrameworkElement(),advancedText,advanced)};
-        var rows=new List<FrameworkElement>{devices,password,language,appearance,startupRow,guardRow,apps,advancedRow};
+        // The globe on the connect page marks this PC's city; someone sharing screenshots can leave it out.
+        var showMe=new ToggleButton {Style=(Style)FindResource("Switch"),IsChecked=Settings.Get("globeShowMe","on")=="on",VerticalAlignment=VerticalAlignment.Center};
+        AutomationProperties.SetName(showMe,L10n.Text("globe_show_me"));
+        showMe.Click+=(_,_)=>{Settings.Set("globeShowMe",showMe.IsChecked==true?"on":"off");globeOrigin=default;};
+        var showMeText=TwoLines(L10n.Text("globe_show_me"),L10n.Text("globe_show_me_detail"));showMeText.Margin=new Thickness(0,0,12,0);
+        if(showMeText.Children[1] is TextBlock showMeDetail) {showMeDetail.TextWrapping=TextWrapping.Wrap;showMeDetail.TextTrimming=TextTrimming.None;}
+        var showMeRow=new Border {MinHeight=56,Padding=new Thickness(14,8,14,8),Child=Columns(new FrameworkElement(),showMeText,showMe)};
+        var rows=new List<FrameworkElement>{devices,password,language,appearance,startupRow,guardRow,apps,showMeRow,advancedRow};
         if(Advanced.Enabled) rows.Add(SettingRow(L10n.Text("rules_title"),RulesValue(),_=>{page="rules";Render();}));
         rows.Add(updates);rows.Add(whatsNew);
         Add(Card(rows,14));
@@ -2111,7 +2146,7 @@ public partial class MainWindow : Window {
             var chosen=L10n.Preference==code;
             var item=new Button {Height=34,Padding=new Thickness(10,0,10,0),Content=Columns(new FrameworkElement(),Single(LanguageName(code),13),chosen?Look.Icon("",12,Look.Accent):null)};
             AutomationProperties.SetName(item,LanguageName(code)+(chosen?L10n.Text("current_page"):""));
-            item.Click+=(_,_)=>{popup.IsOpen=false;if(chosen) return;L10n.Select(code);flyout?.Close();flyout=null;fly=null;Render();UpdateTray();};
+            item.Click+=(_,_)=>{popup.IsOpen=false;if(chosen) return;L10n.Select(code);globeOrigin=default;flyout?.Close();flyout=null;fly=null;Render();UpdateTray();};
             list.Children.Add(item);
         }
         popup.IsOpen=true;
@@ -2154,6 +2189,9 @@ public partial class MainWindow : Window {
         if(statusTitle is not null) statusTitle.Text=StatusTitle(state);
         if(portrait is not null) {
             portrait.State=state;portrait.Lines=connection.Lines;
+            var (origin,exit)=(GlobeOrigin(),GlobeExit());
+            portrait.Origin=origin;portrait.Exit=exit;
+            portrait.Distance=origin is not null&&exit is not null?L10n.Text("globe_km",(Math.Max(10,Math.Round(Earth.Km(origin,exit)/10)*10)).ToString("N0",L10n.Culture)):"";
             portrait.Centre=state switch {
                 LinkState.Connected=>Elapsed()??"",
                 LinkState.Connecting=>Guidance.Phase(connection),

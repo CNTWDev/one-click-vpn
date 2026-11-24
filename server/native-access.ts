@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import { regionPlace } from "../shared/geo-places";
 import type { PoolClient } from "pg";
 import { addAudit, dbExec, dbQuery, findUserByEmail, getDb, listRegions } from "./db";
 import { verifyPassword } from "./password";
@@ -143,7 +144,9 @@ export async function nativeNodes(session?: Session) {
     const test=enrollmentId?await nativeProxies(node,enrollmentId,found).catch(()=>[]):[];
     // load (CPU %) and users (online now) let the apps prefer a quieter node when latencies are close.
     // probe (the first of probes) stays for app builds that only read one address.
-    return {id:node.id,name:node.name,region:node.region,countryCode,protocol:"wireguard",probe:probes[0]||null,probes,test,load:nodeLoad(node.metrics_json),users:Math.max(0,Number(node.users)||0)};
+    // place: where the location is on the apps' globe (its catalog city, else the middle of its country).
+    const regionRow=node.region_id?regions.get(node.region_id):undefined;
+    return {id:node.id,name:node.name,region:node.region,countryCode,place:regionPlace(regionRow?.name,regionRow?.code),protocol:"wireguard",probe:probes[0]||null,probes,test,load:nodeLoad(node.metrics_json),users:Math.max(0,Number(node.users)||0)};
   }))};
 }
 export async function nativeChallenge(session: Session, body: Record<string,unknown>) {

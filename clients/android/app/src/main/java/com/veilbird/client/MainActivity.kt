@@ -1,5 +1,7 @@
 package com.veilbird.client
 
+import android.content.Context
+import kotlin.math.roundToInt
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
@@ -605,7 +607,11 @@ class MainActivity : Activity() {
     private fun loadVisitorIp() {
         if (ConnectionStateStore.active) return
         Thread {
-            val ip = try { api.get("/api/v1/visitor").let { if (it.isNull("ip")) "—" else it.optString("ip") } } catch (_: Exception) { null }
+            // With the address, where it is (a city, coarsely) for the globe; the time zone places it when the address can't.
+            val zone = java.net.URLEncoder.encode(java.util.TimeZone.getDefault().id, "UTF-8")
+            val seen = try { api.get("/api/v1/visitor?zone=$zone") } catch (_: Exception) { null }
+            val ip = seen?.let { if (it.isNull("ip")) "—" else it.optString("ip") }
+            seen?.optJSONObject("place")?.let { VisitorPlace.save(this, it) }
             runOnUiThread { visitorIp = ip; if (!isDestroyed && stateDetail != null) { shownState = null; showState() } }
         }.start()
     }
@@ -840,6 +846,13 @@ class MainActivity : Activity() {
         // The portrait draws the state (see Portrait); inside it the time hidden and the rates, the phase while
         // connecting, or the countdown to the next try while reconnecting.
         portrait?.apply {
+            // The globe's two ends: this device (unless the person hid it) and the location it goes out from.
+            val exitId = if (active) ConnectionStateStore.nodeId.ifEmpty { selectedId } else selectedId
+            val exitName = if (active && ConnectionStateStore.node.isNotEmpty()) ConnectionStateStore.node else Directory.nodes[exitId]?.first ?: selectedName
+            val here = if (VisitorPlace.shown(this@MainActivity)) VisitorPlace.spot(this@MainActivity) else null
+            val there = Directory.places[exitId]?.let { Spot(it[0], it[1], exitName) }
+            origin = here; exit = there
+            distance = if (here != null && there != null) L10n.text(R.string.globe_km, L10n.number(maxOf(10, (Earth.km(here, there) / 10).roundToInt() * 10))) else ""
             this.state = state; lines = maxOf(ConnectionStateStore.lines, 2)
             centre = when (state) {
                 LinkState.CONNECTED -> DateUtils.formatElapsedTime((SystemClock.elapsedRealtime() - since) / 1000)
@@ -1455,6 +1468,13 @@ class MainActivity : Activity() {
                 settingRow(L10n.text(R.string.change_password), "") { resetPassword(email, L10n.text(R.string.reset_change_detail, email), L10n.text(R.string.reset_link_sent_to, email)) },
                 settingRow(L10n.text(R.string.language), currentLanguage().second) { chooseLanguage() },
                 settingRow(L10n.text(R.string.appearance), L10n.text(if (Palette.theme == "moon") R.string.theme_moon else R.string.theme_amber)) { chooseAppearance() },
+                // The globe on the home page marks this device's city; someone sharing screenshots can leave it out.
+                settingRow(L10n.text(R.string.globe_show_me), L10n.text(if (VisitorPlace.shown(this)) R.string.setting_on else R.string.setting_off)) {
+                    val shown = VisitorPlace.shown(this)
+                    sheet(L10n.text(R.string.globe_show_me), listOf(L10n.text(R.string.setting_off), L10n.text(R.string.setting_on)), if (shown) 1 else 0, L10n.text(R.string.globe_show_me_detail)) { i ->
+                        if ((i == 1) != shown) { VisitorPlace.show(this, i == 1); render() }
+                    }
+                },
                 // Android's own kill switch: Always-on VPN with "Block connections without VPN" in system settings.
                 settingRow(L10n.text(R.string.kill_switch), "") {
                     AlertDialog.Builder(this@MainActivity).setTitle(L10n.text(R.string.kill_switch)).setMessage(L10n.text(R.string.kill_switch_android_detail))
@@ -2219,6 +2239,8 @@ object Directory {
     val regions = ConcurrentHashMap<String, String>()
     /** The transports this device can test on each node (the server's "test" list): the connection check re-tests each line. */
     val tests = ConcurrentHashMap<String, org.json.JSONArray>()
+    /** Where each location is (latitude, longitude), for the globe. */
+    val places = ConcurrentHashMap<String, DoubleArray>()
     fun remember(list: org.json.JSONArray) {
         for (i in 0 until list.length()) list.optJSONObject(i)?.let { node ->
             val id = node.getString("id")
@@ -2226,8 +2248,29 @@ object Directory {
             Latency.probes(node).takeIf { it.isNotEmpty() }?.let { list -> probes[id] = list.joinToString(",") { (host, port) -> (if (host.contains(':')) "[$host]" else host) + ":" + port } }
             node.optString("region").takeIf { it.isNotBlank() && it != "null" }?.let { regions[id] = it }
             node.optJSONArray("test")?.takeIf { it.length() > 0 }?.let { tests[id] = it }
+            node.optJSONObject("place")?.let { p -> if (p.has("lat") && p.has("lon")) places[id] = doubleArrayOf(p.optDouble("lat"), p.optDouble("lon")) }
         }
     }
     /** The country code, or the name's first letter when the location has no region. */
     fun code(id: String, name: String): String = nodes[id]?.second ?: name.trim().take(1).uppercase()
+}
+
+/**
+ * Where this device is, coarsely (a city), as the service saw it the last time the app asked while not connected:
+ * kept on the device only, for the globe on the home page. The person can leave it off the globe (我的).
+ */
+object VisitorPlace {
+    private fun prefs(context: Context) = context.applicationContext.getSharedPreferences("preferences", Context.MODE_PRIVATE)
+    fun save(context: Context, place: org.json.JSONObject) {
+        if (!place.has("lat") || !place.has("lon")) return
+        prefs(context).edit().putString("visitorPlace", place.toString()).apply()
+    }
+    fun spot(context: Context): Spot? {
+        val place = prefs(context).getString("visitorPlace", null)?.let { try { org.json.JSONObject(it) } catch (_: Exception) { null } } ?: return null
+        val names = place.optJSONObject("names")
+        val name = names?.let { n -> listOf(L10n.locale.language, "en").firstNotNullOfOrNull { n.optString(it).takeIf { v -> v.isNotBlank() } } } ?: ""
+        return Spot(place.optDouble("lat"), place.optDouble("lon"), name)
+    }
+    fun shown(context: Context) = prefs(context).getBoolean("globeShowMe", true)
+    fun show(context: Context, on: Boolean) { prefs(context).edit().putBoolean("globeShowMe", on).apply() }
 }

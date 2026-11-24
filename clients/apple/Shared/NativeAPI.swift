@@ -145,9 +145,15 @@ final class NativeAPI: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         return json
     }
     /// The public address the service sees for this device ("—" when it is a private one). Nothing is stored.
+    /// With it, where the address is (a city, coarsely) for the globe, kept on this device only (GlobePlaces); the
+    /// time zone places the device when the address cannot be placed.
     func visitorAddress() async throws -> String {
-        let (status,data)=try await send("GET","/api/v1/visitor",body:nil,headers:[:])
+        let zone=TimeZone.current.identifier.addingPercentEncoding(withAllowedCharacters:.urlQueryAllowed) ?? ""
+        let (status,data)=try await send("GET","/api/v1/visitor?zone=\(zone)",body:nil,headers:[:])
         guard status==200,data.count<=4096,let json=try JSONSerialization.jsonObject(with:data) as? [String:Any] else {throw AccessFailure.code("SERVICE_UNAVAILABLE")}
+        if let place=json["place"] as? [String:Any],place["lat"] is NSNumber,place["lon"] is NSNumber,let saved=try? JSONSerialization.data(withJSONObject:place) {
+            UserDefaults.standard.set(saved,forKey:"visitorPlace")
+        }
         return json["ip"] as? String ?? "—"
     }
     /// Public release catalog: whether a newer build (or a required one) exists for this install.

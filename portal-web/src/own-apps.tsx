@@ -6,7 +6,7 @@ import { PRODUCT_NAME } from "../../shared/brand-name";
 import { useSite } from "../../shared/site";
 import { api } from "./api";
 import { detectPlatform, formatBytes } from "./format";
-import { HeroRing } from "./pixel";
+import { HeroGlobe, type Spot } from "./globe";
 import { InlineError, Skeleton } from "./ui";
 
 type Releases = { releases: ClientRelease[]; history: ClientRelease[] };
@@ -30,7 +30,7 @@ function usePreferredArch() {
  * Our own app, the first thing on the home: the ring, one big download for this device when its build is out, the
  * other platforms as rows, and every version behind one disclosure. Shown on the main site only.
  */
-export function OwnApps() {
+export function OwnApps({ exits = [] }: { exits?: Spot[] }) {
   const { t, locale } = useI18n();
   const site = useSite();
   const arch = usePreferredArch();
@@ -70,7 +70,7 @@ export function OwnApps() {
             <span className="home-app-meta">{meta(hero)}</span>
           </div>}
       </div>
-      <HeroRing />
+      <HeroGlobe exits={exits} />
     </div>
     {error ? <InlineError message={t("暂时无法获取客户端版本，请稍后重试。")} onRetry={load} />
       : <div className="home-app-others">

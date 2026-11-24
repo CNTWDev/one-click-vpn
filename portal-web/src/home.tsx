@@ -12,6 +12,7 @@ import { PortalLanguagePicker } from "./language";
 import { QuotaBlocks, UsageCard, type Usage } from "./usage-card";
 import { AccountSubscription, useAccountSubscription } from "./account-subscription";
 import { OwnApps, platformNames } from "./own-apps";
+import type { Spot } from "./globe";
 import { InlineError, Skeleton, Time, useToasts } from "./ui";
 import { fileNumber } from "./dossier";
 import "./home.css";
@@ -50,6 +51,7 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
   const ownApps = site?.isDefault !== false;
   const [account, setAccount] = useState<Account | null>(null), [usage, setUsage] = useState<Usage | null>(null), [accountError, setAccountError] = useState("");
   const [nodes, setNodes] = useState<number | null>(null);
+  const [exits, setExits] = useState<Spot[]>([]);
   const [busy, setBusy] = useState("");
 
   const loadAccount = useCallback(async () => {
@@ -63,7 +65,11 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
   useEffect(() => {
     const initial = window.setTimeout(() => {
       void loadAccount();
-      void api<{ nodes: Array<{ protocols: string[] }> }>("/api/v1/availability").then((result) => setNodes((result.nodes || []).filter((node) => node.protocols.includes("vless")).length)).catch(() => undefined);
+      void api<{ nodes: Array<{ protocols: string[] }>; regions?: Array<{ name: string; status: string; place?: { lat: number; lon: number } | null }> }>("/api/v1/availability").then((result) => {
+        setNodes((result.nodes || []).filter((node) => node.protocols.includes("vless")).length);
+        // Where the locations are, for the hero globe's one demo connection.
+        setExits((result.regions || []).flatMap((region) => region.status === "available" && region.place ? [{ lat: region.place.lat, lon: region.place.lon, label: region.name }] : []));
+      }).catch(() => undefined);
     }, 0);
     const timer = window.setInterval(() => { if (!document.hidden) void loadAccount(); }, 30_000);
     return () => { window.clearTimeout(initial); window.clearInterval(timer); };
@@ -101,7 +107,7 @@ export function Home({ user, onLogout, onManual }: { user: User; onLogout: () =>
     <Topbar user={user} onLogout={onLogout} />
     <p className="file-label home-sec home-sec-first">{t("§01 客户端")}</p>
     <section className={`home-start${ownApps ? "" : " solo"}`}>
-      {ownApps && <OwnApps />}
+      {ownApps && <OwnApps exits={exits} />}
       <AccountSubscription state={subscription} nodes={nodes} notify={notify} onLogout={onLogout} solo={!ownApps} />
     </section>
 

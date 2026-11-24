@@ -1,30 +1,4 @@
 import { useEffect, useState } from "react";
-import { MARK_PATH } from "../../shared/brand";
-
-/** Cells one cell wide on a circle of `radius` in an n×n grid: the clients' connect ring (136 dots at 41/18). */
-function ringCells(n: number, radius: number) {
-  const c = (n - 1) / 2, cells: [number, number][] = [];
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (Math.abs(Math.hypot(x - c, y - c) - radius) <= 0.55) cells.push([x, y]);
-  return cells;
-}
-// The mark sits in the middle of the ring at 80/246 of its width, as in the apps.
-const MARK_SCALE = 41 * 80 / 246 / 84;
-
-const RING_CELLS = ringCells(41, 18);
-/**
- * The hero's large ring, as in the apps once connected: every dot lit over a halftone halo, the ∅ mark inside, and
- * every thirteenth dot dimming briefly on its own six-second beat (still under reduced motion).
- */
-export function HeroRing() {
-  return <span className="hero-ring" aria-hidden="true">
-    <svg viewBox="0 0 41 41" shapeRendering="crispEdges">
-      {RING_CELLS.map(([x, y], index) => <rect key={index} x={x} y={y} width={0.75} height={0.75}
-        className={index % 13 === 0 ? "twinkle" : undefined} style={index % 13 === 0 ? { animationDelay: `${-((x * 37 + y * 11) % 6000)}ms` } : undefined} />)}
-      <path d={MARK_PATH} shapeRendering="geometricPrecision" transform={`translate(${20.5 - 50 * MARK_SCALE} ${20.5 - 50 * MARK_SCALE}) scale(${MARK_SCALE})`} />
-    </svg>
-  </span>;
-}
-
 const HEX = "0123456789ABCDEF";
 /** Each digit changes on its own slow beat (3–9 s), so about three change every second; same as the apps. */
 function digits(seconds: number, count = 16, salt = 0) {
