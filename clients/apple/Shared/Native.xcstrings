@@ -5268,6 +5268,75 @@
         }
       }
     },
+    "globe_km": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ km"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ km"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ км"
+          }
+        }
+      }
+    },
+    "globe_show_me": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show me on the globe"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在地球上显示我的位置"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показывать меня на глобусе"
+          }
+        }
+      }
+    },
+    "globe_show_me_detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The globe on the home page marks your city, worked out from your address or time zone. It stays on this device. Turn it off if you share screenshots."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "首页地球会标出你所在的城市（根据 IP 或时区估算），只保存在这台设备上。经常截图分享的话可以关掉。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Глобус на главной отмечает ваш город (по адресу или часовому поясу). Это хранится только на устройстве. Выключите, если делитесь скриншотами."
+          }
+        }
+      }
+    },
     "got_it": {
       "extractionState": "manual",
       "localizations": {
@@ -11806,19 +11875,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "With Advanced on, Account has Routing rules: one per line, a domain or network plus direct, proxy or block\nClash rules can be pasted as they are; your rules come before smart routing and stay on this device\nSaving rules while connected reconnects so they apply at once"
+            "value": "The dot sphere on the home page is now a globe: off, it marks your city; connected, an arc of light runs from you to the exit city\nThe exit city and its distance sit by the arc, and the exit lights up the moment you connect\nAccount has \"Show me on the globe\" to leave your city off; it is only a city, worked out coarsely, and stays on this device"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开「高级功能」后，「我的」里多了「分流规则」：每行一条，域名或网段加 direct、proxy 或 block\n可以直接粘贴 Clash 规则；规则排在智能分流前面，只保存在这台设备上\n连着的时候保存规则，会自动重连立即生效"
+            "value": "首页的点阵球变成了地球：没连接时标出你所在的城市，连上后一条光弧从你这里落到出口城市\n弧线旁写着出口城市和距离，连上的那一刻出口会亮起来\n「我的」里可以关掉「在地球上显示我的位置」，位置只按城市估算，只存在这台设备上"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "При включённых расширенных функциях в «Аккаунте» есть «Правила маршрутизации»: по одному на строку, домен или сеть и direct, proxy или block\nПравила Clash можно вставить как есть; ваши правила идут раньше умного режима и хранятся только на этом устройстве\nЕсли сохранить правила во время подключения, VPN переподключится и они сразу заработают"
+            "value": "Точечная сфера на главной стала глобусом: без подключения отмечает ваш город, после подключения световая дуга идёт к городу выхода\nУ дуги — город выхода и расстояние, в момент подключения выход загорается\nВ «Аккаунте» можно выключить «Показывать меня на глобусе»; место определяется грубо, до города, и хранится только на устройстве"
           }
         }
       }

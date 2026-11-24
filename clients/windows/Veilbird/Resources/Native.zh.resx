@@ -236,6 +236,9 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="first_connect_mac" xml:space="preserve"><value>第一次连接，要打开一个系统开关</value></data>
   <data name="first_connect_mac_detail" xml:space="preserve"><value>系统设置 › 通用 › 登录项与扩展 › 网络扩展，打开 TrackNothing，打开后自动连接。</value></data>
   <data name="forgot_password" xml:space="preserve"><value>忘记密码？</value></data>
+  <data name="globe_km" xml:space="preserve"><value>{0} km</value></data>
+  <data name="globe_show_me" xml:space="preserve"><value>在地球上显示我的位置</value></data>
+  <data name="globe_show_me_detail" xml:space="preserve"><value>首页地球会标出你所在的城市（根据 IP 或时区估算），只保存在这台设备上。经常截图分享的话可以关掉。</value></data>
   <data name="got_it" xml:space="preserve"><value>知道了</value></data>
   <data name="hide_password" xml:space="preserve"><value>隐藏密码</value></data>
   <data name="hiding_status" xml:space="preserve"><value>正在隐身</value></data>
@@ -521,9 +524,9 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>打开「高级功能」后，「我的」里多了「分流规则」：每行一条，域名或网段加 direct、proxy 或 block
-可以直接粘贴 Clash 规则；规则排在智能分流前面，只保存在这台设备上
-连着的时候保存规则，会自动重连立即生效</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>首页的点阵球变成了地球：没连接时标出你所在的城市，连上后一条光弧从你这里落到出口城市
+弧线旁写着出口城市和距离，连上的那一刻出口会亮起来
+「我的」里可以关掉「在地球上显示我的位置」，位置只按城市估算，只存在这台设备上</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>

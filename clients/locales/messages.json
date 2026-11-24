@@ -2623,5 +2623,20 @@
     "zh": "能用 {0} 条，看不懂 {1} 行",
     "en": "{0} rules, {1} lines not understood",
     "ru": "Правил: {0}, не распознано строк: {1}"
+  },
+  "globe_km": {
+    "en": "{0} km",
+    "zh": "{0} km",
+    "ru": "{0} км"
+  },
+  "globe_show_me": {
+    "en": "Show me on the globe",
+    "zh": "在地球上显示我的位置",
+    "ru": "Показывать меня на глобусе"
+  },
+  "globe_show_me_detail": {
+    "en": "The globe on the home page marks your city, worked out from your address or time zone. It stays on this device. Turn it off if you share screenshots.",
+    "zh": "首页地球会标出你所在的城市（根据 IP 或时区估算），只保存在这台设备上。经常截图分享的话可以关掉。",
+    "ru": "Глобус на главной отмечает ваш город (по адресу или часовому поясу). Это хранится только на устройстве. Выключите, если делитесь скриншотами."
   }
 }

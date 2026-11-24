@@ -230,6 +230,9 @@
   <string name="first_connect_mac">The first time, turn on one switch in macOS</string>
   <string name="first_connect_mac_detail">System Settings › General › Login Items &amp; Extensions › Network Extensions: turn on TrackNothing. It connects right away.</string>
   <string name="forgot_password">Forgot password?</string>
+  <string name="globe_km">%1$s km</string>
+  <string name="globe_show_me">Show me on the globe</string>
+  <string name="globe_show_me_detail">The globe on the home page marks your city, worked out from your address or time zone. It stays on this device. Turn it off if you share screenshots.</string>
   <string name="got_it">Got it</string>
   <string name="hide_password">Hide password</string>
   <string name="hiding_status">Hiding</string>
@@ -514,7 +517,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">With Advanced on, Account has Routing rules: one per line, a domain or network plus direct, proxy or block\nClash rules can be pasted as they are; your rules come before smart routing and stay on this device\nSaving rules while connected reconnects so they apply at once</string>
+  <string name="whats_new_notes">The dot sphere on the home page is now a globe: off, it marks your city; connected, an arc of light runs from you to the exit city\nThe exit city and its distance sit by the arc, and the exit lights up the moment you connect\nAccount has \&quot;Show me on the globe\&quot; to leave your city off; it is only a city, worked out coarsely, and stays on this device</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

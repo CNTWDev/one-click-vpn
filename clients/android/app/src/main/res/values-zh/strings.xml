@@ -230,6 +230,9 @@
   <string name="first_connect_mac">第一次连接，要打开一个系统开关</string>
   <string name="first_connect_mac_detail">系统设置 › 通用 › 登录项与扩展 › 网络扩展，打开 TrackNothing，打开后自动连接。</string>
   <string name="forgot_password">忘记密码？</string>
+  <string name="globe_km">%1$s km</string>
+  <string name="globe_show_me">在地球上显示我的位置</string>
+  <string name="globe_show_me_detail">首页地球会标出你所在的城市（根据 IP 或时区估算），只保存在这台设备上。经常截图分享的话可以关掉。</string>
   <string name="got_it">知道了</string>
   <string name="hide_password">隐藏密码</string>
   <string name="hiding_status">正在隐身</string>
@@ -514,7 +517,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">打开「高级功能」后，「我的」里多了「分流规则」：每行一条，域名或网段加 direct、proxy 或 block\n可以直接粘贴 Clash 规则；规则排在智能分流前面，只保存在这台设备上\n连着的时候保存规则，会自动重连立即生效</string>
+  <string name="whats_new_notes">首页的点阵球变成了地球：没连接时标出你所在的城市，连上后一条光弧从你这里落到出口城市\n弧线旁写着出口城市和距离，连上的那一刻出口会亮起来\n「我的」里可以关掉「在地球上显示我的位置」，位置只按城市估算，只存在这台设备上</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>
