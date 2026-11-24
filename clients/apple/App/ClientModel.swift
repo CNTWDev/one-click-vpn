@@ -275,6 +275,29 @@ import ServiceManagement
         }
         if let result {activity=result}
     }
+    /// The globe's two ends: this device (unless the person left it off) and the location it goes out from.
+    var globeOrigin:Spot? {
+        guard UserDefaults.standard.object(forKey:"globeShowMe") as? Bool ?? true,
+              let data=UserDefaults.standard.data(forKey:"visitorPlace"),
+              let place=try? JSONSerialization.jsonObject(with:data) as? [String:Any],
+              let lat=(place["lat"] as? NSNumber)?.doubleValue,let lon=(place["lon"] as? NSNumber)?.doubleValue else {return nil}
+        let names=place["names"] as? [String:Any] ?? [:]
+        let key=L10n.language.hasPrefix("zh") ? "zh":L10n.language
+        let name=(names[key] as? String) ?? (names["en"] as? String) ?? ""
+        return Spot(lat:lat,lon:lon,label:name)
+    }
+    var globeExit:Spot? {
+        let id=connected && !connectedNodeId.isEmpty ? connectedNodeId:selected
+        guard let node=nodes.first(where:{$0["id"] as? String == id}),let place=node["place"] as? [String:Any],
+              let lat=(place["lat"] as? NSNumber)?.doubleValue,let lon=(place["lon"] as? NSNumber)?.doubleValue else {return nil}
+        let name=connected && !nodeName.isEmpty ? nodeName:(node["name"] as? String ?? selectedName)
+        return Spot(lat:lat,lon:lon,label:name)
+    }
+    var globeDistance:String {
+        guard let a=globeOrigin,let b=globeExit else {return ""}
+        let km=max(10,Int((Earth.km(a,b)/10).rounded())*10)
+        return L10n.text("globe_km",L10n.number(km))
+    }
     /// The region of the connected location, for the check's exit line.
     var connectedRegion:String? {nodes.first {$0["id"] as? String == connectedNodeId}?["region"] as? String}
     func restore() async {

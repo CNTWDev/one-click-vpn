@@ -28,6 +28,7 @@ struct ClientView:View {
     @State private var choosingAppearance=false
     /// Amber or Moon (VeilbirdStyle reads it); the whole window re-renders on change.
     @AppStorage(VeilbirdStyle.themeKey) private var appearance="amber"
+    @AppStorage("globeShowMe") private var globeShowMe=true
     @State private var checking=false
     @State private var checkRunning=false
     @State private var checkResult:[String:Int]?
@@ -447,7 +448,7 @@ struct ClientView:View {
         TimelineView(.periodic(from:.now,by:1)) {context in
             PortraitView(hidden:model.connected || state == .reconnecting,invite:"",since:state == .connected ? model.since:nil,
                 sub:model.portraitSub(state,rates:L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))),state:state,lines:model.lines,
-                centre:model.portraitCentre(state,now:context.date))
+                centre:model.portraitCentre(state,now:context.date),origin:model.globeOrigin,exit:model.globeExit,distance:model.globeDistance)
         }.frame(maxWidth:.infinity).frame(height:height).contentShape(Circle())
     }
     private var connectionView:some View {
@@ -1008,6 +1009,14 @@ struct ClientView:View {
                         VStack(alignment:.leading,spacing:2) {
                             Text(L10n.text("kill_switch")).font(.system(size:VeilbirdStyle.body))
                             Text(L10n.text("kill_switch_apple_detail")).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).fixedSize(horizontal:false,vertical:true)
+                        }
+                    }.toggleStyle(.switch).controlSize(mac ? .small:.regular).tint(VeilbirdStyle.accent).padding(.horizontal,16).padding(.vertical,8).frame(minHeight:mac ? 40:50)
+                    Hairline()
+                    // The globe on the home page marks this device's city; someone sharing screenshots can leave it out.
+                    Toggle(isOn:$globeShowMe) {
+                        VStack(alignment:.leading,spacing:2) {
+                            Text(L10n.text("globe_show_me")).font(.system(size:VeilbirdStyle.body))
+                            Text(L10n.text("globe_show_me_detail")).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).fixedSize(horizontal:false,vertical:true)
                         }
                     }.toggleStyle(.switch).controlSize(mac ? .small:.regular).tint(VeilbirdStyle.accent).padding(.horizontal,16).padding(.vertical,8).frame(minHeight:mac ? 40:50)
                     Hairline()

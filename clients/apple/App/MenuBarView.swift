@@ -228,7 +228,8 @@ struct MenuBarView:View {
             TimelineView(.periodic(from:.now,by:1)) {context in
                 let state=model.ringState
                 PortraitView(hidden:model.connected || state == .reconnecting,invite:"",since:on ? model.since:nil,
-                    sub:model.portraitSub(state,rates:L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))),state:state,lines:model.lines,centre:model.portraitCentre(state,now:context.date))
+                    sub:model.portraitSub(state,rates:L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))),state:state,lines:model.lines,centre:model.portraitCentre(state,now:context.date),
+                    origin:model.globeOrigin,exit:model.globeExit,distance:"",small:true)
             }.frame(maxWidth:.infinity).frame(height:150).contentShape(Circle())
         }.buttonStyle(.plain).accessibilityLabel(L10n.text(model.connected ? "disconnect_action":"connect_action"))
     }
