@@ -4,6 +4,17 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.44
+
+### zh
+- Mac：在聚焦搜索、Siri 或快捷指令里说「TrackNothing 东京」就能直接连过去，正在连接时会换到那里；也能切换智能分流和全局
+
+### en
+- Mac: say "TrackNothing Tokyo" in Spotlight, Siri or Shortcuts to connect straight there, or move a running connection; you can also switch between smart and global routing
+
+### ru
+- Mac: скажите «TrackNothing Токио» в Spotlight, Siri или Командах, чтобы подключиться туда сразу или перенести текущее подключение; там же можно переключить умный и глобальный режим
+
 ## 1.0.43
 
 ### zh

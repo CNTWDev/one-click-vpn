@@ -447,6 +447,9 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="setting_off" xml:space="preserve"><value>Off</value></data>
   <data name="setting_on" xml:space="preserve"><value>On</value></data>
   <data name="share_action" xml:space="preserve"><value>Share</value></data>
+  <data name="shortcut_connect_location" xml:space="preserve"><value>Connect to a location</value></data>
+  <data name="shortcut_routing" xml:space="preserve"><value>Set routing</value></data>
+  <data name="shortcut_routing_type" xml:space="preserve"><value>Routing</value></data>
   <data name="shortcuts" xml:space="preserve"><value>Shortcuts</value></data>
   <data name="shortcuts_detail" xml:space="preserve"><value>Connect / Disconnect</value></data>
   <data name="show_password" xml:space="preserve"><value>Show password</value></data>
@@ -559,8 +562,7 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Windows: press Ctrl + Alt + Space anywhere for a command palette in the middle of the screen. Type a city or country code to connect there, or switch Smart/Global, disconnect, or run a connection check
-Windows: the taskbar icon shows an amber dot while connected; its hover preview has Connect/Disconnect, Automatic and Connection check buttons; right-click to jump back to a recent place</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Android: two new home screen widgets, a 2×2 globe showing your exit city and status, and a 4×1 strip that connects or disconnects in one tap</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI service</value></data>

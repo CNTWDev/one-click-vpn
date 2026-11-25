@@ -104,10 +104,13 @@ import ServiceManagement
     @Published var origin=builtInOrigin.isEmpty ? UserDefaults.standard.string(forKey:"origin") ?? "":builtInOrigin
     private var ticker:AnyCancellable?
     // Status is polled here, not in the window: on the Mac the menu bar keeps working after the window is closed.
+    /// The running app's model, so Shortcuts and Spotlight act through it (nil before the app made one).
+    static weak var live:ClientModel?
     init() {
         _ = Guidance.networkState() // starts the path monitor, so a failure finds its first reading
         Latency.realTests=true // the app measures nodes through their transports (Latency.swift)
         restoreNodes()
+        Self.live=self
         #if os(iOS)
         let active=UIApplication.willEnterForegroundNotification
         #else
@@ -193,6 +196,7 @@ import ServiceManagement
         let listed=(try await api().request("nodes"))["nodes"] as? [[String:Any]] ?? []
         if let data=try? JSONSerialization.data(withJSONObject:listed) {UserDefaults.standard.set(data,forKey:"nodes")}
         nodesLoadedAt=Date();UserDefaults.standard.set(nodesLoadedAt.timeIntervalSince1970,forKey:"nodesLoadedAt")
+        VeilbirdShortcuts.updateAppShortcutParameters() // Spotlight and Siri learn the new location names
         let byId=Dictionary(listed.compactMap {node in (node["id"] as? String).map {($0,node)}},uniquingKeysWith:{a,_ in a})
         let kept=nodes.compactMap {byId[$0["id"] as? String ?? ""]}
         let known=Set(kept.compactMap {$0["id"] as? String})

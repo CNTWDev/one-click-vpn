@@ -447,6 +447,9 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="setting_off" xml:space="preserve"><value>关</value></data>
   <data name="setting_on" xml:space="preserve"><value>开</value></data>
   <data name="share_action" xml:space="preserve"><value>分享</value></data>
+  <data name="shortcut_connect_location" xml:space="preserve"><value>连接到指定位置</value></data>
+  <data name="shortcut_routing" xml:space="preserve"><value>切换分流方式</value></data>
+  <data name="shortcut_routing_type" xml:space="preserve"><value>分流方式</value></data>
   <data name="shortcuts" xml:space="preserve"><value>快捷指令</value></data>
   <data name="shortcuts_detail" xml:space="preserve"><value>连接 / 断开</value></data>
   <data name="show_password" xml:space="preserve"><value>显示密码</value></data>
@@ -559,8 +562,7 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Windows：任意界面按 Ctrl + Alt + 空格，屏幕中间弹出指令面板，输入城市名或国家代码直接连过去，也能切换智能/全局、断开、线路体检
-Windows：已连接时任务栏图标带琥珀色角标；鼠标悬停预览里有连接/断开、自动选择、线路体检三个按钮；右键可快速连到最近去过的地方</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>安卓：新增两款桌面小部件，2×2 小地球显示出口城市和连接状态，4×1 状态条一键连接或断开</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI 服务</value></data>

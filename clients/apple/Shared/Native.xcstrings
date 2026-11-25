@@ -10121,6 +10121,75 @@
         }
       }
     },
+    "shortcut_connect_location": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to a location"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接到指定位置"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Подключиться к локации"
+          }
+        }
+      }
+    },
+    "shortcut_routing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set routing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换分流方式"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сменить режим маршрутизации"
+          }
+        }
+      }
+    },
+    "shortcut_routing_type": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Routing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分流方式"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Маршрутизация"
+          }
+        }
+      }
+    },
     "shortcuts": {
       "extractionState": "manual",
       "localizations": {
@@ -12680,19 +12749,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Windows: press Ctrl + Alt + Space anywhere for a command palette in the middle of the screen. Type a city or country code to connect there, or switch Smart/Global, disconnect, or run a connection check\nWindows: the taskbar icon shows an amber dot while connected; its hover preview has Connect/Disconnect, Automatic and Connection check buttons; right-click to jump back to a recent place"
+            "value": "Android: two new home screen widgets, a 2×2 globe showing your exit city and status, and a 4×1 strip that connects or disconnects in one tap"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Windows：任意界面按 Ctrl + Alt + 空格，屏幕中间弹出指令面板，输入城市名或国家代码直接连过去，也能切换智能/全局、断开、线路体检\nWindows：已连接时任务栏图标带琥珀色角标；鼠标悬停预览里有连接/断开、自动选择、线路体检三个按钮；右键可快速连到最近去过的地方"
+            "value": "安卓：新增两款桌面小部件，2×2 小地球显示出口城市和连接状态，4×1 状态条一键连接或断开"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Windows: Ctrl + Alt + Пробел в любом окне открывает палитру команд в центре экрана. Введите город или код страны, чтобы подключиться, или смените режим, отключитесь, проверьте линию\nWindows: янтарная точка на значке в панели задач, пока есть подключение; в превью — кнопки подключения, автовыбора и проверки линии; правый клик — недавние места"
+            "value": "Android: два новых виджета для главного экрана: глобус 2×2 с городом выхода и статусом и полоска 4×1 для подключения и отключения одним касанием"
           }
         }
       }

@@ -2908,5 +2908,20 @@
     "zh": "轻点连接",
     "en": "Tap to connect",
     "ru": "Коснитесь, чтобы подключиться"
+  },
+  "shortcut_connect_location": {
+    "zh": "连接到指定位置",
+    "en": "Connect to a location",
+    "ru": "Подключиться к локации"
+  },
+  "shortcut_routing": {
+    "zh": "切换分流方式",
+    "en": "Set routing",
+    "ru": "Сменить режим маршрутизации"
+  },
+  "shortcut_routing_type": {
+    "zh": "分流方式",
+    "en": "Routing",
+    "ru": "Маршрутизация"
   }
 }

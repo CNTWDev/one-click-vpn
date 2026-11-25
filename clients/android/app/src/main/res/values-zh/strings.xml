@@ -441,6 +441,9 @@
   <string name="setting_off">关</string>
   <string name="setting_on">开</string>
   <string name="share_action">分享</string>
+  <string name="shortcut_connect_location">连接到指定位置</string>
+  <string name="shortcut_routing">切换分流方式</string>
+  <string name="shortcut_routing_type">分流方式</string>
   <string name="shortcuts">快捷指令</string>
   <string name="shortcuts_detail">连接 / 断开</string>
   <string name="show_password">显示密码</string>
@@ -552,7 +555,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">Windows：任意界面按 Ctrl + Alt + 空格，屏幕中间弹出指令面板，输入城市名或国家代码直接连过去，也能切换智能/全局、断开、线路体检\nWindows：已连接时任务栏图标带琥珀色角标；鼠标悬停预览里有连接/断开、自动选择、线路体检三个按钮；右键可快速连到最近去过的地方</string>
+  <string name="whats_new_notes">安卓：新增两款桌面小部件，2×2 小地球显示出口城市和连接状态，4×1 状态条一键连接或断开</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="why_ai">AI 服务</string>

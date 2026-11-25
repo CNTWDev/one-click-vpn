@@ -441,6 +441,9 @@
   <string name="setting_off">Off</string>
   <string name="setting_on">On</string>
   <string name="share_action">Share</string>
+  <string name="shortcut_connect_location">Connect to a location</string>
+  <string name="shortcut_routing">Set routing</string>
+  <string name="shortcut_routing_type">Routing</string>
   <string name="shortcuts">Shortcuts</string>
   <string name="shortcuts_detail">Connect / Disconnect</string>
   <string name="show_password">Show password</string>
@@ -552,7 +555,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Windows: press Ctrl + Alt + Space anywhere for a command palette in the middle of the screen. Type a city or country code to connect there, or switch Smart/Global, disconnect, or run a connection check\nWindows: the taskbar icon shows an amber dot while connected; its hover preview has Connect/Disconnect, Automatic and Connection check buttons; right-click to jump back to a recent place</string>
+  <string name="whats_new_notes">Android: two new home screen widgets, a 2×2 globe showing your exit city and status, and a 4×1 strip that connects or disconnects in one tap</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="why_ai">AI service</string>
