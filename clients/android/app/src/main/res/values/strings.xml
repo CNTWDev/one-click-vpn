@@ -538,7 +538,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">On the computer, clicking a connection in Activity shows its details in a column to the right of the list, so nothing is covered and the selected row stays in view\nOn the phone, a connection\'s details open from the bottom</string>
+  <string name="whats_new_notes">Changing how a connection is routed (Proxy / Direct / Block) from Activity now asks you to confirm first, so a stray click can\'t change your rules</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="why_ai">AI service</string>
