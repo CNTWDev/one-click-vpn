@@ -31,7 +31,8 @@ class ToggleTile : TileService() {
         val tile = qsTile ?: return
         tile.state = if (ConnectionStateStore.active) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.label = "TrackNothing"
-        if (Build.VERSION.SDK_INT >= 29) tile.subtitle = ConnectionStateStore.message
+        // Connected: where it goes out from; otherwise the state.
+        if (Build.VERSION.SDK_INT >= 29) tile.subtitle = if (ConnectionStateStore.active && ConnectionStateStore.since > 0L && ConnectionStateStore.node.isNotEmpty()) ConnectionStateStore.node else ConnectionStateStore.message
         tile.updateTile()
     }
 }

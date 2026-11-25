@@ -2823,5 +2823,10 @@
     "en": "The globe on the home page marks your city, worked out from your address or time zone. It stays on this device. Turn it off if you share screenshots.",
     "zh": "首页地球会标出你所在的城市（根据 IP 或时区估算），只保存在这台设备上。经常截图分享的话可以关掉。",
     "ru": "Глобус на главной отмечает ваш город (по адресу или часовому поясу). Это хранится только на устройстве. Выключите, если делитесь скриншотами."
+  },
+  "routing_tile": {
+    "zh": "智能分流",
+    "en": "Smart routing",
+    "ru": "Умный режим"
   }
 }

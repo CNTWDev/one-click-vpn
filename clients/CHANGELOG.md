@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.40
+
+### zh
+- 安卓：连上的那一刻手机会轻轻震两下，没连上时震一下；点连接、选地区、切智能/全局时有轻微触感（跟随系统触感开关）
+- 安卓 16：连上后状态栏出现出口胶囊，通知里是一条从你到出口的航线
+- 快速设置磁贴显示当前出口，长按直接打开地区列表；新增「智能分流」磁贴
+
+### en
+- Android: the phone taps twice softly the moment you connect, and once when it can't; picking a location, connecting, or switching Smart/Global gives a light tick (follows the system touch-feedback setting)
+- Android 16: once connected, a chip with your exit sits in the status bar, and the notification shows a route from you to the exit
+- The Quick Settings tile shows your current exit, and a long press opens Locations; new Smart routing tile
+
+### ru
+- Android: в момент подключения телефон дважды мягко вибрирует, при неудаче — один раз; выбор локации, подключение и смена «умный / глобальный» дают лёгкий отклик (по системной настройке)
+- Android 16: после подключения в строке состояния появляется чип с выходом, а в уведомлении — маршрут от вас до выхода
+- Плитка быстрых настроек показывает текущий выход, долгое нажатие открывает локации; новая плитка «Умный режим»
+
 ## 1.0.39
 
 ### zh

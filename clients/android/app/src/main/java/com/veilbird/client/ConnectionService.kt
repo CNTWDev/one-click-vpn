@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.VpnService
+import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
 import com.veilbird.core.Core
@@ -436,7 +437,12 @@ class ConnectionService : VpnService() {
         }
         if (online && SystemClock.elapsedRealtime() >= accountAt) checkAccount()
         val text = ConnectionStateStore.message
-        if (text + reminder != notified) { notified = text + reminder; getSystemService(NotificationManager::class.java).notify(1, notification(text)) }
+        val shown = text + reminder + ConnectionStateStore.node + ConnectionStateStore.phase
+        if (shown != notified) {
+            notified = shown; getSystemService(NotificationManager::class.java).notify(1, notification(text))
+            // The Quick Settings tile shows the exit while connected.
+            try { android.service.quicksettings.TileService.requestListeningState(this, android.content.ComponentName(this, ToggleTile::class.java)) } catch (_: Exception) { }
+        }
     }
     /** Online state, transport memory key, and a clean start on a new network: old connections would hang. */
     private fun checkNetwork(now: Long) {
@@ -553,10 +559,32 @@ class ConnectionService : VpnService() {
     private fun notification(text: String): Notification {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val stop = PendingIntent.getService(this, 1, Intent(this, ConnectionService::class.java).setAction("disconnect"), PendingIntent.FLAG_IMMUTABLE)
+        val s = ConnectionStateStore
+        val connected = s.active && s.since > 0L && s.node.isNotEmpty()
         // Something is running out: the status becomes the title and the reminder the line under it, in amber.
         val line = reminder
-        val (title, body) = if (line.isEmpty()) "TrackNothing" to text else text to android.text.SpannableString(line).apply { setSpan(android.text.style.ForegroundColorSpan(Palette.fair), 0, length, 0) }
-        return Notification.Builder(this, "vpn").setContentTitle(title).setContentText(body).setSmallIcon(R.drawable.ic_stat_mark).setContentIntent(open).setOngoing(true).addAction(Notification.Action.Builder(null, L10n.text(R.string.disconnect_status), stop).build()).build()
+        val (title, body) = when {
+            line.isNotEmpty() -> text to android.text.SpannableString(line).apply { setSpan(android.text.style.ForegroundColorSpan(Palette.fair), 0, length, 0) }
+            connected -> "${L10n.text(R.string.sealed_status)} · ${s.node}" to L10n.text(R.string.seen_as, s.node)
+            else -> "TrackNothing" to text
+        }
+        val builder = Notification.Builder(this, "vpn").setContentTitle(title).setContentText(body).setSmallIcon(R.drawable.ic_stat_mark).setContentIntent(open).setOngoing(true).addAction(Notification.Action.Builder(null, L10n.text(R.string.disconnect_status), stop).build())
+        // The route from here to the exit: a light moving along it while connecting, the whole line once there.
+        val progress = if (connected) 100 else if (s.active) 15 + 30 * s.phase.coerceIn(0, 2) else 0
+        if (Build.VERSION.SDK_INT >= 36) {
+            // Android 16 Live Update: a chip in the status bar with the exit, the route on the shade and lock screen.
+            val accent = Palette.accent
+            builder.setStyle(Notification.ProgressStyle()
+                .setStyledByProgress(false)
+                .setProgressSegments(listOf(Notification.ProgressStyle.Segment(100).setColor(accent)))
+                .setProgressPoints(listOf(Notification.ProgressStyle.Point(1).setColor(accent), Notification.ProgressStyle.Point(100).setColor(accent)))
+                .setProgressTrackerIcon(android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_stat_mark))
+                .setProgress(progress))
+            // Asked for by name: these two arrived late in Android 16 and are looked up rather than linked.
+            builder.extras.putBoolean("android.requestPromotedOngoing", true)
+            if (connected) try { builder.javaClass.getMethod("setShortCriticalText", String::class.java).invoke(builder, s.node) } catch (_: Exception) { }
+        } else if (s.active && !connected) builder.setProgress(100, progress, false)
+        return builder.build()
     }
     @Synchronized private fun stopConnection(message: Int) {
         if (stopping) return

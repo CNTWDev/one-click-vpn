@@ -391,6 +391,7 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="routing_global_detail" xml:space="preserve"><value>全部流量经过 TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>智能分流</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>国内网站直连，其余经过 TrackNothing</value></data>
+  <data name="routing_tile" xml:space="preserve"><value>智能分流</value></data>
   <data name="rule_added" xml:space="preserve"><value>已添加规则：{0} {1}，已生效</value></data>
   <data name="rule_added_later" xml:space="preserve"><value>已添加规则：{0} {1}，下次连接时生效</value></data>
   <data name="rule_confirm" xml:space="preserve"><value>把 {0} 改为「{1}」？</value></data>
@@ -545,9 +546,9 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>电脑上切换「连接 / 位置 / 我的」更顺滑：选中块滑过去，页面淡入淡出，不再卡一下
-连接时每秒更新的网速和活动数据只刷新显示它们的地方，整个窗口更省电、更跟手
-各处的分段切换（页面、分流模式、用量范围、活动视图）统一成同一种样式</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>安卓：连上的那一刻手机会轻轻震两下，没连上时震一下；点连接、选地区、切智能/全局时有轻微触感（跟随系统触感开关）
+安卓 16：连上后状态栏出现出口胶囊，通知里是一条从你到出口的航线
+快速设置磁贴显示当前出口，长按直接打开地区列表；新增「智能分流」磁贴</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI 服务</value></data>
