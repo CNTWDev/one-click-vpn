@@ -188,7 +188,8 @@ jobs:
   macos:
     needs: prepare
     if: (inputs.platforms || 'All') == 'All' || inputs.platforms == 'macOS'
-    runs-on: macos-15
+    # macOS 26 (Xcode 26) so the Control Center button (macOS 26 APIs, behind #if compiler(>=6.2)) is built in.
+    runs-on: macos-26
     outputs:
       submitted: ${{ steps.submit.outputs.submitted }}
     env:
