@@ -157,7 +157,7 @@ public sealed class Connection(NativeApi api,Core core) {
     private async Task ChooseFastest() {
         try {
             // Measurements from the last minute (the location list) are reused, so connecting does not probe again.
-            var ranked=await Latency.Rank((await api.Request("nodes"))["nodes"]!.AsArray(),attempts:3,reuse:TimeSpan.FromMinutes(1),settle:Settle);
+            var ranked=await Latency.Rank(AIExit.Usable((await api.Request("nodes"))["nodes"]!.AsArray()),attempts:3,reuse:TimeSpan.FromMinutes(1),settle:Settle);
             foreach(var (node,quality) in ranked.Take(3)) Journal.Add($"probe: {node["name"]} {(quality.Latency is { } ms?$"{ms} ms":"no answer")}, jitter {quality.Jitter} ms, loss {quality.Loss}%");
             NodeId=ranked.FirstOrDefault().Node?["id"]?.GetValue<string>()??"";
             fallbacks.Clear();fallbacks.AddRange(ranked.Skip(1).Take(2).Select(r=>r.Node["id"]!.GetValue<string>()));
@@ -287,6 +287,7 @@ public sealed class Connection(NativeApi api,Core core) {
                 StatusKey=Message();Retry=failures;RetryAt=failures>0?nextProbe:null;
             } else {
                 await UpdateCarrying();
+                if(failures==0) await AIExit.Note(core);
                 if(failures==0&&now-lastStall>=StallSpacing&&(await Task.Run(core.Health)).StartsWith("stalled")) await Stalled(smart);
             }
             if(!Active) return;
@@ -354,12 +355,20 @@ public sealed class Connection(NativeApi api,Core core) {
         foreach(var key in badNodes.Where(entry=>entry.Value<=now).Select(entry=>entry.Key).ToList()) badNodes.Remove(key);
         moves.RemoveAll(at=>now-at>=TimeSpan.FromMinutes(10));
         if(moves.Count>=3) {Journal.Add("switch: moved 3 times in 10 minutes, staying");return;}
-        List<(JsonNode Node,Quality Quality)> ranked;
+        JsonNode? best=null;
         try {
-            var candidates=new JsonArray((await api.Request("nodes"))["nodes"]!.AsArray().Where(node=>node?["id"]?.GetValue<string>() is { } key&&!badNodes.ContainsKey(key)).Select(node=>node!.DeepClone()).ToArray());
-            ranked=await Latency.Rank(candidates,attempts:1,settle:Settle);
+            var all=(await api.Request("nodes"))["nodes"]!.AsArray();
+            var candidates=AIExit.Usable(new JsonArray(all.Where(node=>node?["id"]?.GetValue<string>() is { } key&&!badNodes.ContainsKey(key)).Select(node=>node!.DeepClone()).ToArray()));
+            // While AI services are in use, a location in the same country first: AI accounts get flagged when the exit jumps.
+            var country=all.FirstOrDefault(node=>node?["id"]?.GetValue<string>()==NodeId)?["countryCode"]?.GetValue<string>()??"";
+            var same=country.Length>0&&await Task.Run(()=>core.AIActive(1800))
+                ?new JsonArray(candidates.Where(node=>node?["countryCode"]?.GetValue<string>()==country).Select(node=>node!.DeepClone()).ToArray()):new JsonArray();
+            if(same.Count>0) Journal.Add($"switch: AI in use, trying {country} first");
+            foreach(var group in new[] {same,candidates}) {
+                if(best is not null||group.Count==0) continue;
+                best=(await Latency.Rank(group,attempts:1,settle:Settle)).FirstOrDefault(item=>item.Quality.Latency is not null).Node;
+            }
         } catch {Journal.Add("switch: no location list, retrying");return;}
-        var best=ranked.FirstOrDefault(item=>item.Quality.Latency is not null).Node;
         if(best?["id"]?.GetValue<string>() is not { } id) {Journal.Add("switch: no other location answers, retrying");return;}
         if(id==NodeId) return;
         moves.Add(now);

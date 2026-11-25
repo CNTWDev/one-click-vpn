@@ -44,6 +44,7 @@ type watchState struct {
 	sync.Mutex
 	down      map[string]int64
 	lastRx    time.Time
+	lastAI    time.Time
 	suspended map[string]time.Time
 }
 
@@ -55,6 +56,7 @@ func resetWatch() {
 	defer watch.Unlock()
 	watch.down = map[string]int64{}
 	watch.lastRx = time.Now()
+	watch.lastAI = time.Time{}
 	watch.suspended = map[string]time.Time{}
 }
 
@@ -74,6 +76,9 @@ func Health(group string) string {
 		}
 		id := c.ID()
 		live[id] = true
+		if info.Rule == "RuleSet" && info.RulePayload == aiRuleSet.provider {
+			watch.lastAI = now
+		}
 		down := info.DownloadTotal.Load()
 		if last, ok := watch.down[id]; !ok || down > last {
 			if down > 0 {
@@ -96,6 +101,14 @@ func Health(group string) string {
 		return fmt.Sprintf("stalled %d", stuck)
 	}
 	return "ok"
+}
+
+// AIActive tells whether AI services (the "ai" rule set) went through the tunnel in the last seconds, as Health saw
+// it: automatic mode then keeps the exit in the same country, since AI accounts get flagged when it jumps around.
+func AIActive(seconds int) bool {
+	watch.Lock()
+	defer watch.Unlock()
+	return !watch.lastAI.IsZero() && time.Since(watch.lastAI) < time.Duration(seconds)*time.Second
 }
 
 // keepSuspended marks each suspended line dead again (the group's own health check or a probe may have found it

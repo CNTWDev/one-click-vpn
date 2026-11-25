@@ -517,7 +517,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Connection check now shows line names, delays and notes in full, nothing cut off or squeezed onto two lines\nOn the computer, click outside the connection check to close it, or use the close button at its top right\nThe check is more compact and fits on one screen, with Test speed and Check again side by side at the bottom</string>
+  <string name="whats_new_notes">AI sites (ChatGPT, Claude, Gemini and others) always go through the tunnel, smart routing included\nOnce you use AI, Automatic no longer picks locations AI services refuse (such as Hong Kong)\nWhen Automatic has to move while you use AI, it tries the same country first, so your account does not see the IP jump</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows development build · VPN service integration in progress</string>

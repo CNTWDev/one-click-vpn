@@ -1880,7 +1880,33 @@ def metrics():
         "disk": {"usedBytes": used_disk, "totalBytes": disk.total, "percent": round((used_disk / disk.total) * 100, 1) if disk.total else 0},
         "network": read_network(),
         "tuning": network_tuning(),
+        "ai": AI_STATE.copy() if AI_STATE else None,
     }
+
+
+# AI services from this node (Agent 2.21): where OpenAI's edge places the node's exit IP (Cloudflare trace, the same
+# check the services make) and whether that country is one ChatGPT, Claude and Gemini refuse. The apps keep users who
+# use AI off such nodes in automatic mode. Checked at start and every 6 hours, in the background.
+AI_TRACE_URLS = ("https://chatgpt.com/cdn-cgi/trace", "https://claude.ai/cdn-cgi/trace")
+AI_BLOCKED_COUNTRIES = {"CN", "HK", "MO", "RU", "BY", "IR", "KP", "SY", "CU"}
+AI_STATE = {}
+
+
+def check_ai_access():
+    import urllib.request
+    for url in AI_TRACE_URLS:
+        try:
+            request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(request, timeout=10, context=ssl.create_default_context()) as response:
+                text = response.read(4096).decode("utf-8", "replace")
+        except Exception:
+            continue
+        loc = next((line.split("=", 1)[1].strip().upper() for line in text.splitlines() if line.startswith("loc=")), "")
+        if re.fullmatch(r"[A-Z]{2}", loc):
+            AI_STATE.clear()
+            AI_STATE.update({"country": loc, "ok": loc not in AI_BLOCKED_COUNTRIES,
+                             "checkedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
+            return
 
 
 # Network tuning (Agent 2.20): BBR with fq for the TCP transports (REALITY, XHTTP) and larger socket buffers,
@@ -2258,7 +2284,7 @@ def heartbeat():
         "nodeId": NODE_ID,
         "token": TOKEN,
         "hostname": socket.gethostname(),
-        "version": "agent 2.20.0",
+        "version": "agent 2.21.0",
         "serverPublicKey": wireguard_public_key(),
         "capabilities": capabilities(),
         "metrics": metrics(),
@@ -2298,7 +2324,7 @@ def adopt_controller_origin(target):
     CONTROLLER = target
     try:
         request_json("/api/v1/agent/heartbeat", {"nodeId": NODE_ID, "token": TOKEN, "hostname": socket.gethostname(),
-                                                 "version": "agent 2.20.0", "capabilities": capabilities()})
+                                                 "version": "agent 2.21.0", "capabilities": capabilities()})
         lines = CONFIG_ENV.read_text().splitlines()
         lines = [f"NORTHSTAR_CONTROLLER_URL={target}" if line.startswith("NORTHSTAR_CONTROLLER_URL=") else line for line in lines]
         if f"NORTHSTAR_CONTROLLER_URL={target}" not in lines:
@@ -2486,6 +2512,7 @@ def main():
     last_reality_probe = 0
     last_stealth_poll = 0
     last_hop_check = 0
+    last_ai_check = 0
     request_backoff_until = 0
     consecutive_request_failures = 0
     while True:
@@ -2511,6 +2538,9 @@ def main():
                 ensure_hop_rules()
             except Exception as error:
                 log_failure("port hopping", command_failure_detail(error))
+        if now - last_ai_check >= 6 * 3600:
+            last_ai_check = now
+            threading.Thread(target=lambda: _safe(check_ai_access, "AI access check"), name="ai-check", daemon=True).start()
         if now - last_tuning_check >= 3600:
             last_tuning_check = now
             try:

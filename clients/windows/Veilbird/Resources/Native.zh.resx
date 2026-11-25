@@ -524,9 +524,9 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>「线路体检」里的线路名、延迟和说明文字都能完整显示，不再被截断或挤成两行
-电脑上点体检面板外面就能关掉，右上角也有关闭按钮
-体检面板更紧凑，一屏就能看完，「测网速」和「重新检测」并排放在底部</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>AI 网站（ChatGPT、Claude、Gemini 等）始终走加密通道，智能分流下也一样
+用过 AI 的话，自动模式不再选 AI 服务不支持的位置（比如香港）
+自动换位置时，如果正在用 AI，优先换到同一个国家，减少账号因 IP 跳动被风控</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>

@@ -155,7 +155,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     /// If the list cannot be loaded the server picks the least-loaded node.
     private func chooseFastest() async {
         guard let api,let nodes=try? await api.request("nodes")["nodes"] as? [[String:Any]] else {return}
-        let ranked=await Latency.rank(nodes,attempts:3,reuse:60,settle:settle)
+        let ranked=await Latency.rank(AIExit.usable(nodes),attempts:3,reuse:60,settle:settle)
         for item in ranked.prefix(3) {Journal.add("probe: \(item.node["name"] as? String ?? "?") \(item.quality.latency.map {"\($0) ms"} ?? "no answer"), jitter \(item.quality.jitter) ms, loss \(item.quality.loss)%")}
         let ids=ranked.compactMap {$0.node["id"] as? String}
         nodeId=ids.first ?? "";fallbacks=Array(ids.dropFirst().prefix(2))
@@ -328,6 +328,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             publish {$0["status"]=shown;$0["attempt"]=attempt;$0["retryAt"]=next}
         } else {
             updateCarrying()
+            if failures==0 {AIExit.note()}
             if failures==0,Date().timeIntervalSince(lastStall)>=stallSpacing,
                await Task.detached(operation:{CoreHealth(Transports.group)}).value.hasPrefix("stalled") {await stalled()}
         }
@@ -400,9 +401,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         badNodes[nodeId]=now.addingTimeInterval(badFor);badNodes=badNodes.filter {$0.value>now}
         moves=moves.filter {now.timeIntervalSince($0)<600}
         guard moves.count<3 else {Journal.add("switch: moved 3 times in 10 minutes, staying");return}
-        let candidates=nodes.filter {badNodes[$0["id"] as? String ?? ""]==nil}
-        let ranked=await Latency.rank(candidates,attempts:1,reuse:0,settle:settle)
-        guard let best=ranked.first(where:{$0.quality.latency != nil})?.node,let id=best["id"] as? String else {Journal.add("switch: no other location answers, retrying");return}
+        let candidates=AIExit.usable(nodes.filter {badNodes[$0["id"] as? String ?? ""]==nil})
+        // While AI services are in use, a location in the same country first: AI accounts get flagged when the exit jumps.
+        let current=nodes.first(where:{($0["id"] as? String)==nodeId});let country=current?["countryCode"] as? String ?? ""
+        let same=CoreAIActive(1800) && !country.isEmpty ? candidates.filter {($0["countryCode"] as? String)==country}:[]
+        if !same.isEmpty {Journal.add("switch: AI in use, trying \(country) first")}
+        var best:[String:Any]?=nil
+        for group in [same,candidates] where best==nil && !group.isEmpty {
+            best=await Latency.rank(group,attempts:1,reuse:0,settle:settle).first(where:{$0.quality.latency != nil})?.node
+        }
+        guard let best,let id=best["id"] as? String else {Journal.add("switch: no other location answers, retrying");return}
         guard id != nodeId else {return}
         moves.append(now)
         Journal.add("switch: \(nodeName) failed (HANDSHAKE_TIMEOUT), moving to \(best["name"] as? String ?? "?")")

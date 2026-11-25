@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.32
+
+### zh
+- AI 网站（ChatGPT、Claude、Gemini 等）始终走加密通道，智能分流下也一样
+- 用过 AI 的话，自动模式不再选 AI 服务不支持的位置（比如香港）
+- 自动换位置时，如果正在用 AI，优先换到同一个国家，减少账号因 IP 跳动被风控
+
+### en
+- AI sites (ChatGPT, Claude, Gemini and others) always go through the tunnel, smart routing included
+- Once you use AI, Automatic no longer picks locations AI services refuse (such as Hong Kong)
+- When Automatic has to move while you use AI, it tries the same country first, so your account does not see the IP jump
+
+### ru
+- Сайты ИИ (ChatGPT, Claude, Gemini и другие) всегда идут через туннель, в том числе при умной маршрутизации
+- Если вы пользуетесь ИИ, режим «Автоматически» не выбирает локации, где сервисы ИИ недоступны (например, Гонконг)
+- Когда «Автоматически» меняет локацию во время работы с ИИ, сначала пробует ту же страну, чтобы аккаунт не видел скачков IP
+
 ## 1.0.31
 
 ### zh

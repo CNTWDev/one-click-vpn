@@ -248,7 +248,7 @@ class ConnectionService : VpnService() {
         NodeCache.restore(this)
         val ranked = try {
             val nodes = api.request("nodes").getJSONArray("nodes"); NodeCache.save(this, nodes)
-            Latency.rank(nodes, attempts = 3, reuseMs = 60000, settleMs = SETTLE).also { NodeCache.saveMeasured(this) }
+            Latency.rank(AIExit.usable(this, nodes), attempts = 3, reuseMs = 60000, settleMs = SETTLE).also { NodeCache.saveMeasured(this) }
         } catch (_: Exception) { emptyList() }
         ranked.take(3).forEach { (node, quality) -> Journal.add("probe: ${node.optString("name")} ${quality.latency?.let { "${it} ms" } ?: "no answer"}, jitter ${quality.jitter} ms, loss ${quality.loss}%") }
         nodeId = ranked.firstOrNull()?.first?.getString("id") ?: ""
@@ -422,6 +422,7 @@ class ConnectionService : VpnService() {
                 ConnectionStateStore.messageId = message()
             } else {
                 updateCarrying()
+                if (failures == 0) AIExit.note(this)
                 if (failures == 0 && now - lastStall >= STALL_SPACING && Core.health(Transports.GROUP).startsWith("stalled")) stalled()
             }
             ConnectionStateStore.attempt = failures; ConnectionStateStore.retryAt = if (failures > 0) nextProbe else 0L
@@ -498,12 +499,19 @@ class ConnectionService : VpnService() {
         badNodes[nodeId] = now + BAD_FOR; badNodes.entries.removeAll { it.value <= now }
         moves.removeAll { now - it >= 600000 }
         if (moves.size >= 3) { Journal.add("switch: moved 3 times in 10 minutes, staying"); return }
-        val candidates = try {
-            val all = api.request("nodes").getJSONArray("nodes")
-            org.json.JSONArray().also { kept -> for (i in 0 until all.length()) all.getJSONObject(i).let { if (it.optString("id") !in badNodes) kept.put(it) } }
-        } catch (_: Exception) { org.json.JSONArray() }
-        val ranked = try { Latency.rank(candidates, attempts = 1, settleMs = SETTLE) } catch (_: Exception) { emptyList() }
-        val best = ranked.firstOrNull { it.second.latency != null }?.first ?: run { Journal.add("switch: no other location answers, retrying"); return }
+        val all = try { api.request("nodes").getJSONArray("nodes") } catch (_: Exception) { org.json.JSONArray() }
+        val list = (0 until all.length()).map { all.getJSONObject(it) }
+        val candidates = AIExit.usable(this, org.json.JSONArray(list.filter { it.optString("id") !in badNodes }))
+        // While AI services are in use, a location in the same country first: AI accounts get flagged when the exit jumps.
+        val country = list.firstOrNull { it.optString("id") == nodeId }?.optString("countryCode").orEmpty()
+        val same = if (country.isNotEmpty() && Core.aiActive(1800)) org.json.JSONArray((0 until candidates.length()).map { candidates.getJSONObject(it) }.filter { it.optString("countryCode") == country }) else org.json.JSONArray()
+        if (same.length() > 0) Journal.add("switch: AI in use, trying $country first")
+        var best: org.json.JSONObject? = null
+        for (group in listOf(same, candidates)) {
+            if (best != null || group.length() == 0) continue
+            best = try { Latency.rank(group, attempts = 1, settleMs = SETTLE).firstOrNull { it.second.latency != null }?.first } catch (_: Exception) { null }
+        }
+        if (best == null) { Journal.add("switch: no other location answers, retrying"); return }
         val id = best.getString("id")
         if (id == nodeId) return
         moves.add(now)
