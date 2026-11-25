@@ -293,6 +293,9 @@
   <string name="node_menu_hint">右键点位置可以收藏或锁定协议</string>
   <string name="node_quality_detail">抖动 %1$s ms · 丢包 %2$s%%</string>
   <string name="not_connected">未连接</string>
+  <string name="notch_arrived">已抵达</string>
+  <string name="notch_hud">在屏幕顶部显示连接</string>
+  <string name="notch_switched">已换出口</string>
   <string name="off_state">关</string>
   <string name="offline_centre">等网络</string>
   <string name="on_state">开</string>
@@ -539,7 +542,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">安卓：连上的那一刻手机会轻轻震两下，没连上时震一下；点连接、选地区、切智能/全局时有轻微触感（跟随系统触感开关）\n安卓 16：连上后状态栏出现出口胶囊，通知里是一条从你到出口的航线\n快速设置磁贴显示当前出口，长按直接打开地区列表；新增「智能分流」磁贴</string>
+  <string name="whats_new_notes">Mac：连接时从刘海里长出一条小胶囊，连上那一刻展开显示“已抵达”和城市，之后缩在刘海两侧（琥珀点 + 国家代码），鼠标移上去可再展开；自动换出口时也在这里提示。没有刘海的 Mac 从屏幕顶部正中出现，可在「我的」里关闭</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="why_ai">AI 服务</string>

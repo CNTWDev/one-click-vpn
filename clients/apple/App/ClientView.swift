@@ -52,6 +52,7 @@ struct ClientView:View {
     #if os(macOS)
     @State private var openAtLogin=SMAppService.mainApp.status == .enabled
     @AppStorage(MenuBarLabel.preferenceKey) private var menuBarSpeed=false
+    @AppStorage(NotchHUD.preferenceKey) private var notchHUD=true
     #endif
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openURL) private var openURL
@@ -1061,6 +1062,9 @@ struct ClientView:View {
                         .toggleStyle(.switch).controlSize(.small).tint(VeilbirdStyle.accent).padding(.horizontal,16).frame(minHeight:40)
                     Hairline()
                     Toggle(isOn:$menuBarSpeed) {Text(L10n.text("menu_bar_speed")).font(.system(size:VeilbirdStyle.body))}
+                        .toggleStyle(.switch).controlSize(.small).tint(VeilbirdStyle.accent).padding(.horizontal,16).frame(minHeight:40)
+                    Hairline()
+                    Toggle(isOn:Binding(get:{notchHUD},set:{notchHUD=$0;NotchHUD.shared.refresh()})) {Text(L10n.text("notch_hud")).font(.system(size:VeilbirdStyle.body))}
                         .toggleStyle(.switch).controlSize(.small).tint(VeilbirdStyle.accent).padding(.horizontal,16).frame(minHeight:40)
                     #endif
                     Hairline()

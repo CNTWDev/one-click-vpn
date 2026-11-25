@@ -299,6 +299,9 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="node_menu_hint" xml:space="preserve"><value>Right-click a location to favorite it or lock its protocol</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>Jitter {0} ms · Loss {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="notch_arrived" xml:space="preserve"><value>Arrived</value></data>
+  <data name="notch_hud" xml:space="preserve"><value>Show connection at top of screen</value></data>
+  <data name="notch_switched" xml:space="preserve"><value>Exit changed</value></data>
   <data name="off_state" xml:space="preserve"><value>Off</value></data>
   <data name="offline_centre" xml:space="preserve"><value>Offline</value></data>
   <data name="on_state" xml:space="preserve"><value>On</value></data>
@@ -546,9 +549,7 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Android: the phone taps twice softly the moment you connect, and once when it can't; picking a location, connecting, or switching Smart/Global gives a light tick (follows the system touch-feedback setting)
-Android 16: once connected, a chip with your exit sits in the status bar, and the notification shows a route from you to the exit
-The Quick Settings tile shows your current exit, and a long press opens Locations; new Smart routing tile</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Mac: while connecting, a small capsule grows out of the notch; when you land it opens to show &quot;Arrived&quot; and the city, then settles beside the notch (amber dot + country code) and opens again on hover. Automatic exit changes show there too. Macs without a notch get it at the top centre of the screen; it can be turned off in Me</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI service</value></data>
