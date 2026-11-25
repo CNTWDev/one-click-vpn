@@ -164,7 +164,6 @@ struct MenuBarView:View {
         setPicking(false)
         if reconnect {model.work {try await model.reconnect()}}
     }
-    private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
     private func cell(_ title:String,_ value:String,_ tint:Color,_ titleTint:Color)->some View {
         VStack(alignment:.leading,spacing:2) {
             Text(title).font(.system(size:11)).foregroundStyle(titleTint).lineLimit(1)
@@ -225,12 +224,7 @@ struct MenuBarView:View {
     /// The home portrait in small: the sphere is the switch, and its ring draws the state once hidden.
     private func menuPortrait(_ on:Bool)->some View {
         Button {toggle()} label:{
-            TimelineView(.periodic(from:.now,by:1)) {context in
-                let state=model.ringState
-                PortraitView(hidden:model.connected || state == .reconnecting,invite:"",since:on ? model.since:nil,
-                    sub:model.portraitSub(state,rates:L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))),state:state,lines:model.lines,centre:model.portraitCentre(state,now:context.date),
-                    origin:model.globeOrigin,exit:model.globeExit,distance:"",small:true)
-            }.frame(maxWidth:.infinity).frame(height:150).contentShape(Circle())
+            LivePortrait(state:model.ringState,since:on ? model.since:nil,small:true).frame(maxWidth:.infinity).frame(height:150).contentShape(Circle())
         }.buttonStyle(.plain).accessibilityLabel(L10n.text(model.connected ? "disconnect_action":"connect_action"))
     }
     /// What a failure's button does here; a page of the app (devices, account, locations) opens the window.
@@ -273,6 +267,8 @@ private struct QuickTile:View {
 struct MenuBarLabel:View {
     static let preferenceKey="menuBarSpeed"
     @ObservedObject var model:ClientModel
+    /// The rates drawn in the menu bar change every second (ClientModel.live).
+    @ObservedObject var live:LiveFeed
     @AppStorage(MenuBarLabel.preferenceKey) private var showSpeed=false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openWindow) private var openWindow
@@ -310,7 +306,7 @@ struct MenuBarLabel:View {
         else {number=String(format:"%.1f",locale:L10n.locale,bits/1e9);unit="rate_unit_gbps"}
         return arrow+" "+String(repeating:" ",count:max(0,4-number.count))+number+" "+L10n.text(unit)
     }
-    private static func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
+    private static func mbps(_ bytes:Int)->String {LivePortrait.mbps(bytes)}
     private static func glyph(on:Bool)->some View {EmptySetMark().fill(Color.black.opacity(on ? 1:0.5)).frame(width:15,height:15)}
     @MainActor private static var marks:[Bool:NSImage]=[:]
     @MainActor static func mark(on:Bool)->NSImage? {

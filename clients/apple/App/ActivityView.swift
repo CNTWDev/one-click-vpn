@@ -6,6 +6,8 @@ import SwiftUI
 /// its own tab with connections and the ranking.
 struct ActivityView:View {
     @EnvironmentObject private var model:ClientModel
+    /// The figures arrive every second (ClientModel.live): only this view redraws for them.
+    @EnvironmentObject private var live:LiveFeed
     @State private var tab="conns"
     @State private var filter="all"
     @State private var query=""
@@ -28,7 +30,7 @@ struct ActivityView:View {
     private static let card=Color(red:21/255,green:19/255,blue:17/255)
     private static let dim=Color(red:126/255,green:117/255,blue:105/255)
 
-    private var data:[String:Any]? {model.since == nil ? nil:model.activity}
+    private var data:[String:Any]? {model.since == nil ? nil:live.activity}
     private var conns:[[String:Any]] {data?["conns"] as? [[String:Any]] ?? []}
 
     var body:some View {
@@ -79,22 +81,9 @@ struct ActivityView:View {
             :[("conns","activity_connections"),("rank","activity_ranking")]
     }
     private var tabButtons:some View {
-        HStack(spacing:2) {
-            ForEach(tabs,id:\.0) {item in
-                let selected=tab==item.0
-                Button {tab=item.0} label:{
-                    HStack(spacing:6) {
-                        Text(L10n.text(item.1)).font(.system(size:13)).lineLimit(1)
-                        if item.0=="conns" && data != nil {Text(L10n.number(conns.count)).font(.system(size:11,design:.monospaced)).foregroundStyle(VeilbirdStyle.secondary)}
-                    }
-                    .foregroundStyle(selected ? VeilbirdStyle.text:VeilbirdStyle.secondary)
-                    .padding(.horizontal,14).frame(maxWidth:mac ? nil:.infinity).frame(height:mac ? 28:30)
-                    .background(selected ? Color(red:48/255,green:45/255,blue:40/255):Color.clear,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
-                    .contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
-            }
-        }.padding(2).background(Color(red:23/255,green:21/255,blue:19/255),in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
-        .fixedSize(horizontal:mac,vertical:false)
+        Segmented(items:tabs.map {($0.0,L10n.text($0.1))},selection:tab,fill:!mac,
+                  detail:{$0=="conns" && data != nil ? L10n.number(conns.count):nil}) {tab=$0}
+            .fixedSize(horizontal:mac,vertical:false)
     }
     private var privacy:some View {
         HStack(spacing:6) {

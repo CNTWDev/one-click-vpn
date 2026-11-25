@@ -302,6 +302,46 @@ struct Hairline:View {
     var body:some View {Rectangle().fill(VeilbirdStyle.hairline).frame(height:0.5).padding(.leading,inset)}
 }
 
+/// The one segmented switch of the app (the window's pages, routing, the usage range, the activity views): a filled
+/// track and a filled pill that slides to the chosen item. One size and one weight everywhere, and the chosen item
+/// keeps its weight, so nothing shifts while the pill moves.
+struct Segmented<Value:Hashable>:View {
+    let items:[(Value,String)]
+    let selection:Value
+    /// Items share the width equally (true) or take their titles' width.
+    var fill=true
+    /// A short figure after an item's title (the activity view's connection count).
+    var detail:(Value)->String? = {_ in nil}
+    let choose:(Value)->Void
+    @Namespace private var pill
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    static var height:CGFloat {VeilbirdStyle.mac ? 26:34}
+    static var slide:Animation {.spring(response:0.3,dampingFraction:0.86)}
+    var body:some View {
+        HStack(spacing:2) {
+            ForEach(items,id:\.0) {item in segment(item.0,item.1)}
+        }.padding(2).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+    }
+    private func segment(_ value:Value,_ title:String)->some View {
+        let on=value==selection
+        return Button {
+            guard !on else {return}
+            withAnimation(reduceMotion ? nil:Self.slide) {choose(value)}
+        } label:{
+            HStack(spacing:6) {
+                Text(title).font(.system(size:VeilbirdStyle.mac ? 12:14,weight:.medium)).lineLimit(1)
+                if let figure=detail(value) {Text(figure).font(.system(size:11,design:.monospaced)).foregroundStyle(VeilbirdStyle.secondary)}
+            }
+            .foregroundStyle(on ? VeilbirdStyle.text:VeilbirdStyle.secondary)
+            .padding(.horizontal,14).frame(maxWidth:fill ? .infinity:nil).frame(height:Self.height)
+            .background {
+                if on {RoundedRectangle(cornerRadius:VeilbirdStyle.radius-2).fill(VeilbirdStyle.selected).matchedGeometryEffect(id:"pill",in:pill)}
+            }
+            .contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected:[])
+    }
+}
+
 /// Pressed rows dim slightly; nothing else moves.
 struct RowButton:ButtonStyle {
     func makeBody(configuration:Configuration)->some View {

@@ -12358,19 +12358,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Changing how a connection is routed (Proxy / Direct / Block) from Activity now asks you to confirm first, so a stray click can't change your rules"
+            "value": "Switching between Connect, Locations and Account on the computer is smoother: the highlight slides across and pages fade instead of stuttering\nWhile connected, the per-second speed and Activity figures now only redraw where they are shown, so the window stays light and responsive\nEvery segmented switch (pages, routing mode, usage range, Activity views) now shares one look"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在「活动」详情里改走法（代理 / 直连 / 拦截）前会先确认一次，避免误点改掉规则"
+            "value": "电脑上切换「连接 / 位置 / 我的」更顺滑：选中块滑过去，页面淡入淡出，不再卡一下\n连接时每秒更新的网速和活动数据只刷新显示它们的地方，整个窗口更省电、更跟手\n各处的分段切换（页面、分流模式、用量范围、活动视图）统一成同一种样式"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перед сменой маршрута соединения (прокси / напрямую / блокировать) в «Активности» теперь нужно подтверждение, чтобы случайный щелчок не менял правила"
+            "value": "На компьютере переключение между «Подключение», «Локации» и «Аккаунт» стало плавнее: выделение скользит, страницы плавно сменяются без рывков\nПри подключении ежесекундные данные о скорости и «Активности» обновляют только то место, где показаны, поэтому окно работает легче и отзывчивее\nВсе переключатели-сегменты (страницы, режим маршрутизации, период использования, виды «Активности») теперь выглядят одинаково"
           }
         }
       }

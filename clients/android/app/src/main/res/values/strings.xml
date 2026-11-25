@@ -538,7 +538,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Changing how a connection is routed (Proxy / Direct / Block) from Activity now asks you to confirm first, so a stray click can\'t change your rules</string>
+  <string name="whats_new_notes">Switching between Connect, Locations and Account on the computer is smoother: the highlight slides across and pages fade instead of stuttering\nWhile connected, the per-second speed and Activity figures now only redraw where they are shown, so the window stays light and responsive\nEvery segmented switch (pages, routing mode, usage range, Activity views) now shares one look</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="why_ai">AI service</string>

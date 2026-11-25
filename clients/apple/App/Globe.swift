@@ -98,16 +98,24 @@ enum Earth {
     static func ease(_ t:Double)->Double {t<0.5 ? 4*t*t*t:1-pow(-2*t+2,3)/2}
 }
 
-/// The globe's still part (the dot lattice of the earth), drawn once per size and view.
+/// The globe's still part (the dot lattice of the earth), drawn once per size and view. One cache for the whole app:
+/// a page that opens again (switching tabs rebuilds it) or the menu bar's globe finds its image already drawn
+/// instead of laying out some 3 000 dots in the first frame of its entrance.
 private final class SphereCache {
-    var key=""
-    var image:CGImage?
+    static let shared=SphereCache()
+    /// The few latest images, newest last (the window's globe, the menu bar's, one while turning).
+    private var images:[(key:String,image:CGImage)]=[]
     func image(size:Int,lat:Double,lon:Double,theme:String,scale:CGFloat)->CGImage? {
         let px=max(1,Int(CGFloat(size)*scale))
         let k="\(px) \(Int((lat*100).rounded())) \(Int((lon*100).rounded())) \(theme)"
-        if k==key,let image {return image}
-        image=SphereCache.render(px,lat,lon,theme)
-        key=k
+        if let i=images.firstIndex(where:{$0.key==k}) {
+            let hit=images.remove(at:i)
+            images.append(hit)
+            return hit.image
+        }
+        guard let image=SphereCache.render(px,lat,lon,theme) else {return nil}
+        images.append((k,image))
+        if images.count>3 {images.removeFirst()}
         return image
     }
     private static func render(_ s:Int,_ vLat:Double,_ vLon:Double,_ theme:String)->CGImage? {
@@ -193,7 +201,6 @@ struct PortraitView:View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
     @AppStorage(VeilbirdStyle.themeKey) private var theme="amber"
-    @State private var cache=SphereCache()
     @State private var stateAt=Date()
     @State private var from:(lat:Double,lon:Double)?=nil
     @State private var to:(lat:Double,lon:Double)?=nil
@@ -274,7 +281,7 @@ struct PortraitView:View {
         }
     }
     private func drawSphere(_ g:GraphicsContext,_ f:Frame) {
-        guard let image=cache.image(size:Int(f.s),lat:f.vLat,lon:f.vLon,theme:theme,scale:displayScale) else {return}
+        guard let image=SphereCache.shared.image(size:Int(f.s),lat:f.vLat,lon:f.vLon,theme:theme,scale:displayScale) else {return}
         var layer=g
         layer.opacity=dimming(f)
         let rect=CGRect(x:f.cx-f.radius,y:f.cy-f.radius,width:f.s,height:f.s)
@@ -486,4 +493,24 @@ struct PortraitView:View {
             g.draw(resolved,at:CGPoint(x:f.cx,y:f.cy+f.radius*0.42+max(16,0.072*f.s)*0.95),anchor:.center)
         }
     }
+}
+
+/// The connect portrait with its live rates, as the window and the menu bar show it. The rates come from
+/// ClientModel.live, so while connected only this redraws every second, not the page around it.
+struct LivePortrait:View {
+    @EnvironmentObject private var model:ClientModel
+    @EnvironmentObject private var live:LiveFeed
+    let state:RingState
+    let since:Date?
+    /// The menu bar's: no distance, no time inside.
+    var small=false
+    var body:some View {
+        TimelineView(.periodic(from:.now,by:1)) {context in
+            PortraitView(hidden:model.connected || state == .reconnecting,invite:"",since:since,
+                sub:model.portraitSub(state,rates:L10n.text("connection_rates",Self.mbps(live.rxRate),Self.mbps(live.txRate))),state:state,lines:model.lines,
+                centre:model.portraitCentre(state,now:context.date),origin:model.globeOrigin,exit:model.globeExit,
+                distance:small ? "":model.globeDistance,small:small)
+        }
+    }
+    static func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
 }
