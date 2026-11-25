@@ -4,6 +4,17 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.38
+
+### zh
+- 在「活动」详情里改走法（代理 / 直连 / 拦截）前会先确认一次，避免误点改掉规则
+
+### en
+- Changing how a connection is routed (Proxy / Direct / Block) from Activity now asks you to confirm first, so a stray click can't change your rules
+
+### ru
+- Перед сменой маршрута соединения (прокси / напрямую / блокировать) в «Активности» теперь нужно подтверждение, чтобы случайный щелчок не менял правила
+
 ## 1.0.37
 
 ### zh

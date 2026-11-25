@@ -578,7 +578,25 @@ class MainActivity : Activity() {
      * Saves a quick rule and hands the rules to the running core, which applies them at once; the open connections
      * to the name are closed so its next request takes the new route. A note with Undo follows.
      */
-    private fun addQuickRule(name: String, site: Boolean, policy: String) {
+    /** A rule change asks first (one slip in a list that moves would otherwise reroute a site). */
+    private fun addQuickRule(name: String, site: Boolean, policy: String) = bottomSheet { dialog, box ->
+        val label = L10n.text(when (policy) { "direct" -> R.string.menu_always_direct; "block" -> R.string.menu_block; else -> R.string.menu_always_proxy })
+        box.addView(text(L10n.text(R.string.rule_confirm, name, label), 17f, Palette.text, 600).apply { setPadding(4.dp, 0, 4.dp, 0); accessibilityHeading() })
+        box.addView(text(L10n.text(if (site) R.string.rule_confirm_site else R.string.rule_confirm_domain), 14f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) },
+            LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp })
+        box.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(text(L10n.text(R.string.cancel), 15f, Palette.text, 500).apply {
+                gravity = Gravity.CENTER; maxLines = 1; background = pressable(Palette.raised, 12)
+                setOnClickListener { dialog.dismiss() }
+            }, LinearLayout.LayoutParams(0, 48.dp, 1f).apply { marginEnd = 10.dp })
+            addView(text(L10n.text(R.string.rule_confirm_ok), 15f, Palette.onAccent, 600).apply {
+                gravity = Gravity.CENTER; maxLines = 1; background = pressable(Palette.accent, 12)
+                setOnClickListener { dialog.dismiss(); applyQuickRule(name, site, policy) }
+            }, LinearLayout.LayoutParams(0, 48.dp, 1f))
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 20.dp })
+    }
+    private fun applyQuickRule(name: String, site: Boolean, policy: String) {
         // A rule from here turns on the person's routing rules (part of advanced) if they were off.
         val before = Advanced.setQuickRule(this, name, site, policy)
         applyRules(name, site) { live ->

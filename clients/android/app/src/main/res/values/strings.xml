@@ -387,6 +387,10 @@
   <string name="routing_smart_detail">Sites in mainland China go direct, the rest through TrackNothing</string>
   <string name="rule_added">Rule added: %1$s %2$s, in effect now</string>
   <string name="rule_added_later">Rule added: %1$s %2$s, applies from the next connection</string>
+  <string name="rule_confirm">Change %1$s to “%2$s”?</string>
+  <string name="rule_confirm_domain">Only this exact name. Takes effect now; you can change it back in routing rules.</string>
+  <string name="rule_confirm_ok">Change</string>
+  <string name="rule_confirm_site">Includes all its subdomains. Takes effect now; you can change it back in routing rules.</string>
   <string name="rule_undo">Undo</string>
   <string name="rule_undone">Undone</string>
   <string name="rules_count">%1$s rules</string>

@@ -393,6 +393,10 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="routing_smart_detail" xml:space="preserve"><value>国内网站直连，其余经过 TrackNothing</value></data>
   <data name="rule_added" xml:space="preserve"><value>已添加规则：{0} {1}，已生效</value></data>
   <data name="rule_added_later" xml:space="preserve"><value>已添加规则：{0} {1}，下次连接时生效</value></data>
+  <data name="rule_confirm" xml:space="preserve"><value>把 {0} 改为「{1}」？</value></data>
+  <data name="rule_confirm_domain" xml:space="preserve"><value>只对这一个域名。马上生效，之后可以在分流规则里改回。</value></data>
+  <data name="rule_confirm_ok" xml:space="preserve"><value>确认修改</value></data>
+  <data name="rule_confirm_site" xml:space="preserve"><value>包括它的所有子域名。马上生效，之后可以在分流规则里改回。</value></data>
   <data name="rule_undo" xml:space="preserve"><value>撤销</value></data>
   <data name="rule_undone" xml:space="preserve"><value>已撤销</value></data>
   <data name="rules_count" xml:space="preserve"><value>{0} 条</value></data>

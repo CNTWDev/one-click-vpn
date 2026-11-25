@@ -222,7 +222,23 @@ public sealed class ActivityPanel:Border {
         menu.Items.Add(Item(L10n.Text("menu_why"),()=>{whyId=id;whyRow=c;wholeSite=true;}));
         return menu;
     }
-    private async void Rule(string name,bool site,string policy) {
+    /// A rule change asks first in the note at the bottom (one slip in a list that moves would otherwise reroute a site).
+    private void Rule(string name,bool site,string policy) {
+        if(AddRule is null) return;
+        var box=new StackPanel {MaxWidth=480};
+        var key=policy switch {"direct"=>"menu_always_direct","block"=>"menu_block",_=>"menu_always_proxy"};
+        box.Children.Add(new TextBlock {Text=L10n.Text("rule_confirm",name,L10n.Text(key)),FontSize=14,FontWeight=FontWeights.SemiBold,TextWrapping=TextWrapping.Wrap});
+        box.Children.Add(new TextBlock {Text=L10n.Text(site?"rule_confirm_site":"rule_confirm_domain"),FontSize=12,Foreground=Look.Secondary,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,4,0,12)});
+        var buttons=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
+        var cancel=new Button {Content=Text(L10n.Text("cancel"),13),Height=30,Padding=new Thickness(14,0,14,0),Background=Look.Selected,Margin=new Thickness(0,0,8,0)};
+        cancel.Click+=(_,_)=>{toastTimer.Stop();toast.Visibility=Visibility.Collapsed;};
+        var ok=new Button {Content=new TextBlock {Text=L10n.Text("rule_confirm_ok"),FontSize=13,FontWeight=FontWeights.SemiBold,Foreground=Look.OnAccent},Height=30,Padding=new Thickness(14,0,14,0),Background=Look.Accent};
+        ok.Click+=(_,_)=>{toast.Visibility=Visibility.Collapsed;ApplyRule(name,site,policy);};
+        buttons.Children.Add(cancel);buttons.Children.Add(ok);box.Children.Add(buttons);
+        toastTimer.Stop();toast.Child=box;toast.Visibility=Visibility.Visible;
+        ok.Focus();
+    }
+    private async void ApplyRule(string name,bool site,string policy) {
         if(AddRule is null) return;
         var before=Advanced.SetQuickRule(name,site,policy);
         var live=await AddRule(name,site,policy);

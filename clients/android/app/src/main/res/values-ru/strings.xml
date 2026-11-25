@@ -387,6 +387,10 @@
   <string name="routing_smart_detail">Сайты материкового Китая напрямую, остальное через TrackNothing</string>
   <string name="rule_added">Правило добавлено: %1$s — %2$s, уже действует</string>
   <string name="rule_added_later">Правило добавлено: %1$s — %2$s, со следующего подключения</string>
+  <string name="rule_confirm">Изменить %1$s: «%2$s»?</string>
+  <string name="rule_confirm_domain">Только этот домен. Действует сразу; вернуть можно в правилах маршрутизации.</string>
+  <string name="rule_confirm_ok">Изменить</string>
+  <string name="rule_confirm_site">Включая все поддомены. Действует сразу; вернуть можно в правилах маршрутизации.</string>
   <string name="rule_undo">Отменить</string>
   <string name="rule_undone">Отменено</string>
   <string name="rules_count">Правил: %1$s</string>
