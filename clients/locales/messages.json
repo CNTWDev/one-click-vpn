@@ -2829,21 +2829,6 @@
     "en": "Smart routing",
     "ru": "Умный режим"
   },
-  "notch_arrived": {
-    "zh": "已抵达",
-    "en": "Arrived",
-    "ru": "Прибыли"
-  },
-  "notch_switched": {
-    "zh": "已换出口",
-    "en": "Exit changed",
-    "ru": "Выход сменён"
-  },
-  "notch_hud": {
-    "zh": "在屏幕顶部显示连接",
-    "en": "Show connection at top of screen",
-    "ru": "Подключение вверху экрана"
-  },
   "palette_placeholder": {
     "zh": "输入城市、国家代码或命令",
     "en": "Type a city, country code or command",

@@ -6740,75 +6740,6 @@
         }
       }
     },
-    "notch_arrived": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Arrived"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已抵达"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Прибыли"
-          }
-        }
-      }
-    },
-    "notch_hud": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show connection at top of screen"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在屏幕顶部显示连接"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Подключение вверху экрана"
-          }
-        }
-      }
-    },
-    "notch_switched": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Exit changed"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已换出口"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Выход сменён"
-          }
-        }
-      }
-    },
     "off_state": {
       "extractionState": "manual",
       "localizations": {
@@ -13140,19 +13071,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac: new desktop widgets in small and medium sizes showing whether you're hidden, your exit city, time hidden and a small globe; the medium one has a connect button\nMac: on macOS 26 you can add a TrackNothing button to Control Center to connect or disconnect in one click"
+            "value": "Mac: removed the connection notice at the top of the screen so it no longer covers what you're looking at"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac：新增桌面小组件，小号和中号两种，显示是否隐身、出口城市、隐身时长和小地球，中号带连接按钮\nMac：macOS 26 的控制中心可以加 TrackNothing 按钮，一键连接或断开"
+            "value": "Mac：去掉屏幕顶部的连接提示，不再遮挡屏幕"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac: новые виджеты рабочего стола, маленький и средний: скрыты ли вы, город выхода, время и маленький глобус; в среднем есть кнопка подключения\nMac: в macOS 26 можно добавить кнопку TrackNothing в Пункт управления, чтобы подключаться и отключаться одним нажатием"
+            "value": "Mac: убрано уведомление о подключении вверху экрана, оно больше не закрывает экран"
           }
         }
       }

@@ -4,6 +4,17 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.49
+
+### zh
+- Mac：去掉屏幕顶部的连接提示，不再遮挡屏幕
+
+### en
+- Mac: removed the connection notice at the top of the screen so it no longer covers what you're looking at
+
+### ru
+- Mac: убрано уведомление о подключении вверху экрана, оно больше не закрывает экран
+
 ## 1.0.48
 
 ### zh

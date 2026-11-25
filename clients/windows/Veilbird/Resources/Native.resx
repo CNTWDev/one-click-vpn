@@ -300,9 +300,6 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="node_menu_hint" xml:space="preserve"><value>Right-click a location to favorite it or lock its protocol</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>Jitter {0} ms · Loss {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Not connected</value></data>
-  <data name="notch_arrived" xml:space="preserve"><value>Arrived</value></data>
-  <data name="notch_hud" xml:space="preserve"><value>Show connection at top of screen</value></data>
-  <data name="notch_switched" xml:space="preserve"><value>Exit changed</value></data>
   <data name="off_state" xml:space="preserve"><value>Off</value></data>
   <data name="offline_centre" xml:space="preserve"><value>Offline</value></data>
   <data name="on_state" xml:space="preserve"><value>On</value></data>
@@ -579,8 +576,7 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac: new desktop widgets in small and medium sizes showing whether you're hidden, your exit city, time hidden and a small globe; the medium one has a connect button
-Mac: on macOS 26 you can add a TrackNothing button to Control Center to connect or disconnect in one click</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Mac: removed the connection notice at the top of the screen so it no longer covers what you're looking at</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI service</value></data>

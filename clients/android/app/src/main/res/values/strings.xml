@@ -294,9 +294,6 @@
   <string name="node_menu_hint">Right-click a location to favorite it or lock its protocol</string>
   <string name="node_quality_detail">Jitter %1$s ms · Loss %2$s%%</string>
   <string name="not_connected">Not connected</string>
-  <string name="notch_arrived">Arrived</string>
-  <string name="notch_hud">Show connection at top of screen</string>
-  <string name="notch_switched">Exit changed</string>
   <string name="off_state">Off</string>
   <string name="offline_centre">Offline</string>
   <string name="on_state">On</string>
@@ -572,7 +569,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Mac: new desktop widgets in small and medium sizes showing whether you\'re hidden, your exit city, time hidden and a small globe; the medium one has a connect button\nMac: on macOS 26 you can add a TrackNothing button to Control Center to connect or disconnect in one click</string>
+  <string name="whats_new_notes">Mac: removed the connection notice at the top of the screen so it no longer covers what you\'re looking at</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="why_ai">AI service</string>

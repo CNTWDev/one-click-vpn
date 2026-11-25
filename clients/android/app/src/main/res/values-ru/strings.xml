@@ -294,9 +294,6 @@
   <string name="node_menu_hint">Щёлкните локацию правой кнопкой, чтобы добавить в избранное или выбрать протокол</string>
   <string name="node_quality_detail">Джиттер %1$s мс · Потери %2$s%%</string>
   <string name="not_connected">Не подключено</string>
-  <string name="notch_arrived">Прибыли</string>
-  <string name="notch_hud">Подключение вверху экрана</string>
-  <string name="notch_switched">Выход сменён</string>
   <string name="off_state">Выкл.</string>
   <string name="offline_centre">Офлайн</string>
   <string name="on_state">Вкл.</string>
@@ -572,7 +569,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Mac: новые виджеты рабочего стола, маленький и средний: скрыты ли вы, город выхода, время и маленький глобус; в среднем есть кнопка подключения\nMac: в macOS 26 можно добавить кнопку TrackNothing в Пункт управления, чтобы подключаться и отключаться одним нажатием</string>
+  <string name="whats_new_notes">Mac: убрано уведомление о подключении вверху экрана, оно больше не закрывает экран</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="why_ai">AI-сервис</string>
