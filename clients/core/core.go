@@ -61,6 +61,7 @@ func start(home string, configuration string) error {
 	}
 	executor.ApplyConfig(cfg, true)
 	running = true
+	resetWatch()
 	appUsage.begin(home)
 	startActivity()
 	return nil
@@ -141,7 +142,8 @@ func Probe(names string, url string, timeoutMs int) string {
 		go func(i int, name string) {
 			defer wait.Done()
 			delay := -1
-			if proxy, ok := proxies[name]; ok {
+			// A line the watchdog suspended answers test pages but not the user's traffic.
+			if proxy, ok := proxies[name]; ok && !suspended(name) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 				defer cancel()
 				if value, err := proxy.URLTest(ctx, url, utils.IntRanges[uint16]{}); err == nil {
@@ -177,7 +179,8 @@ func ProbeFirst(names string, group string, url string, timeoutMs int) string {
 	for i, name := range list {
 		go func(i int, name string) {
 			delay := -1
-			if proxy, ok := proxies[name]; ok {
+			// A line the watchdog suspended answers test pages but not the user's traffic.
+			if proxy, ok := proxies[name]; ok && !suspended(name) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 				defer cancel()
 				if value, err := proxy.URLTest(ctx, url, utils.IntRanges[uint16]{}); err == nil {

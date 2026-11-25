@@ -122,6 +122,18 @@ public sealed class Core : IDisposable {
     /// The programs that used the most traffic over the last days local days, kept on this computer (core.AppUsage), as JSON.
     public string AppUsage(int days)=>Call("appusage "+days);
     public string Now(string group)=>Call("now "+group);
+    /// The watchdog (core.Health): "stalled n" when the user's traffic stopped coming back, else "ok".
+    public string Health()=>Call("health "+Transports.Group);
+    /// The path the user's traffic takes (core.Check): a fresh DNS lookup through the tunnel and a 64 KB download through the group.
+    public bool CheckPath(int timeoutMs) {
+        var values=Transports.ParseProbe(Call($"check {Transports.Group} {Transports.CheckUrl} {timeoutMs} 1"));
+        return values.TryGetValue("dns",out var dns)&&dns>=0&&values.TryGetValue("web",out var web)&&web>=0;
+    }
+    /// A 64 KB download through each line at once (core.CheckEach); -1 = failed.
+    public Dictionary<string,long> CheckEach(IEnumerable<string> names,int timeoutMs)=>
+        Transports.ParseProbe(Call($"checkeach {string.Join(',',names)} {Transports.CheckUrl} {timeoutMs}"));
+    /// Keeps lines that fail the user's traffic out of the group for a while (core.Suspend).
+    public void Suspend(IEnumerable<string> names,int seconds)=>Call($"suspend {Transports.Group} {string.Join(',',names)} {seconds}");
     /// The connection check's speed test (core.SpeedStart): "ok", or "error <reason>"; poll SpeedProgress for the figures.
     public string SpeedStart(string request)=>Call("speedstart "+Convert.ToBase64String(Encoding.UTF8.GetBytes(request)));
     public string SpeedProgress()=>Call("speedprogress");

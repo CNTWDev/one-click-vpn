@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.30
+
+### zh
+- 连着却没有流量时会自己发现：几秒内关掉卡住的连接，换一条能用的线路，出口 IP 不变
+- 自动模式下整个位置都不通时，换到另一个确认能用的位置，不会再换回刚出问题的那个
+- 手动选的位置不会被自动换掉，只在这个位置里换线路
+
+### en
+- The app now notices when it is connected but nothing comes back: it closes stuck connections and moves to a working line within seconds, keeping the same exit IP
+- In Automatic, when a whole location stops working it moves to another one it has checked, and does not go back to the one that failed
+- A location you picked yourself is never swapped; only its lines change
+
+### ru
+- Приложение замечает, когда подключение есть, а данные не идут: за секунды закрывает зависшие соединения и переходит на рабочую линию, IP выхода тот же
+- В режиме «Автоматически», если не работает вся локация, переключается на другую, уже проверенную, и не возвращается к сбойной
+- Выбранную вами локацию приложение не меняет — только линии внутри неё
+
 ## 1.0.29
 
 ### zh

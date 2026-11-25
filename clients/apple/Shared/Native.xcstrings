@@ -11875,19 +11875,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The dot sphere on the home page is now a globe: off, it marks your city; connected, an arc of light runs from you to the exit city\nThe exit city and its distance sit by the arc, and the exit lights up the moment you connect\nAccount has \"Show me on the globe\" to leave your city off; it is only a city, worked out coarsely, and stays on this device"
+            "value": "The app now notices when it is connected but nothing comes back: it closes stuck connections and moves to a working line within seconds, keeping the same exit IP\nIn Automatic, when a whole location stops working it moves to another one it has checked, and does not go back to the one that failed\nA location you picked yourself is never swapped; only its lines change"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "首页的点阵球变成了地球：没连接时标出你所在的城市，连上后一条光弧从你这里落到出口城市\n弧线旁写着出口城市和距离，连上的那一刻出口会亮起来\n「我的」里可以关掉「在地球上显示我的位置」，位置只按城市估算，只存在这台设备上"
+            "value": "连着却没有流量时会自己发现：几秒内关掉卡住的连接，换一条能用的线路，出口 IP 不变\n自动模式下整个位置都不通时，换到另一个确认能用的位置，不会再换回刚出问题的那个\n手动选的位置不会被自动换掉，只在这个位置里换线路"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Точечная сфера на главной стала глобусом: без подключения отмечает ваш город, после подключения световая дуга идёт к городу выхода\nУ дуги — город выхода и расстояние, в момент подключения выход загорается\nВ «Аккаунте» можно выключить «Показывать меня на глобусе»; место определяется грубо, до города, и хранится только на устройстве"
+            "value": "Приложение замечает, когда подключение есть, а данные не идут: за секунды закрывает зависшие соединения и переходит на рабочую линию, IP выхода тот же\nВ режиме «Автоматически», если не работает вся локация, переключается на другую, уже проверенную, и не возвращается к сбойной\nВыбранную вами локацию приложение не меняет — только линии внутри неё"
           }
         }
       }

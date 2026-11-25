@@ -11,6 +11,8 @@ enum Transports {
     static let group="TrackNothing"
     static let testURL="https://www.gstatic.com/generate_204"
     /// Answers fast from nearly every network (mainland China and Russia too): the connection check times it outside the tunnel.
+    /// What the watchdog downloads to check the path the user's traffic takes (64 KB, not an empty 204 page).
+    static let checkURL="https://speed.cloudflare.com/__down?bytes=65536"
     static let localURL="http://captive.apple.com/hotspot-detect.html"
     private static let memoryDays:TimeInterval=7
 

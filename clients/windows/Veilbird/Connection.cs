@@ -64,6 +64,14 @@ public sealed class Connection(NativeApi api,Core core) {
     private DateTime deadline,renewAt,renewedAt,nextProbe,lastNetworkCheck;
     private List<string> transports=new();
     private int failures;
+    /// The watchdog (core Health) looks at the user's traffic on every tick; a stall is handled at most every StallSpacing.
+    private DateTime lastStall=DateTime.MinValue;
+    private static readonly TimeSpan StallSpacing=TimeSpan.FromSeconds(20);
+    /// Locations that failed the user's traffic here (until when): automatic mode does not move back to them meanwhile.
+    private readonly Dictionary<string,DateTime> badNodes=new();
+    private static readonly TimeSpan BadFor=TimeSpan.FromMinutes(15);
+    /// Automatic moves in the last 10 minutes; after 3 the connection stays where it is (no flapping between locations).
+    private readonly List<DateTime> moves=new();
     /// The user left the location to the app: when it stops answering, the connection moves to the fastest one.
     private bool automatic;
     private bool online=true;
@@ -277,7 +285,11 @@ public sealed class Connection(NativeApi api,Core core) {
                 } else await Missed(smart);
                 if(!Active) return;
                 StatusKey=Message();Retry=failures;RetryAt=failures>0?nextProbe:null;
-            } else await UpdateCarrying();
+            } else {
+                await UpdateCarrying();
+                if(failures==0&&now-lastStall>=StallSpacing&&(await Task.Run(core.Health)).StartsWith("stalled")) await Stalled(smart);
+            }
+            if(!Active) return;
             var (up,down)=await Task.Run(core.Rate);
             TxRate=up;RxRate=down;Changed?.Invoke();
         } catch(Exception error) {
@@ -301,6 +313,31 @@ public sealed class Connection(NativeApi api,Core core) {
         nextProbe=DateTime.MinValue;failures=Math.Min(failures,1);
         if(now-renewedAt>TimeSpan.FromSeconds(90)) renewAt=DateTime.MinValue;
     }
+    /// The user's traffic stopped coming back while the lines still answer probes (a stuck DNS connection, a line that
+    /// passes a small test page but not real traffic): close what hangs, check the path the traffic takes, then keep the
+    /// lines that fail it out of use and, when none carries traffic, treat it as a drop (automatic: move).
+    private async Task Stalled(bool smart) {
+        lastStall=DateTime.UtcNow;
+        var line=carrying;
+        Journal.Add($"watchdog: traffic stalled via {line}");
+        await Task.Run(core.Reset);
+        if(await Task.Run(()=>core.CheckPath(5000))) {Journal.Add("watchdog: recovered after closing stuck connections");_=api.Report("STALL",NodeId,$"recovered=reset line={line}");return;}
+        // Nothing answers outside the tunnel either: the network is down (or a sign-in page), not the location.
+        if(await Task.Run(()=>core.ProbeUrl("DIRECT",Transports.LocalUrl,3000))<0) {Journal.Add("watchdog: the network itself does not answer, waiting");return;}
+        var results=await Task.Run(()=>core.CheckEach(transports,5000));
+        var failed=transports.Where(name=>!results.TryGetValue(name,out var ms)||ms<0).ToList();
+        Journal.Add("watchdog: "+string.Join(", ",transports.Select(name=>failed.Contains(name)?$"{name} fails":$"{name} ok")));
+        if(failed.Count>0) await Task.Run(()=>core.Suspend(failed,600));
+        if(failed.Count<transports.Count) {
+            await Task.Run(core.Reset);await UpdateCarrying();
+            Journal.Add($"watchdog: moved to {carrying}");_=api.Report("STALL",NodeId,$"recovered=line line={line}");return;
+        }
+        Journal.Add("watchdog: no line carries traffic");_=api.Report("STALL",NodeId,$"recovered=no line={line}");
+        if(sessionUp is not null) sessionDrops++;
+        failures=2;nextProbe=DateTime.UtcNow+Retries[1];
+        if(automatic) await MoveToFastest(smart);
+        StatusKey=Message();Retry=failures;RetryAt=failures>0?nextProbe:null;
+    }
     /// A round where no transport answered while the PC has a network.
     private async Task Missed(bool smart) {
         failures++;nextProbe=DateTime.UtcNow+Backoff();
@@ -310,17 +347,33 @@ public sealed class Connection(NativeApi api,Core core) {
     }
     /// Automatic mode: measures every location now and moves to the fastest one that answers, if it is another.
     private async Task MoveToFastest(bool smart) {
+        // The location that failed stays out for a while (its port may still answer the measurement below), and so do
+        // others that failed here recently. Three moves in 10 minutes are the most: then stay and keep retrying.
+        var now=DateTime.UtcNow;
+        badNodes[NodeId]=now+BadFor;
+        foreach(var key in badNodes.Where(entry=>entry.Value<=now).Select(entry=>entry.Key).ToList()) badNodes.Remove(key);
+        moves.RemoveAll(at=>now-at>=TimeSpan.FromMinutes(10));
+        if(moves.Count>=3) {Journal.Add("switch: moved 3 times in 10 minutes, staying");return;}
         List<(JsonNode Node,Quality Quality)> ranked;
-        try {ranked=await Latency.Rank((await api.Request("nodes"))["nodes"]!.AsArray(),attempts:1,settle:Settle);} catch {Journal.Add("switch: no location list, retrying");return;}
+        try {
+            var candidates=new JsonArray((await api.Request("nodes"))["nodes"]!.AsArray().Where(node=>node?["id"]?.GetValue<string>() is { } key&&!badNodes.ContainsKey(key)).Select(node=>node!.DeepClone()).ToArray());
+            ranked=await Latency.Rank(candidates,attempts:1,settle:Settle);
+        } catch {Journal.Add("switch: no location list, retrying");return;}
         var best=ranked.FirstOrDefault(item=>item.Quality.Latency is not null).Node;
-        if(best?["id"]?.GetValue<string>() is not { } id) {Journal.Add("switch: no location answers, retrying");return;}
+        if(best?["id"]?.GetValue<string>() is not { } id) {Journal.Add("switch: no other location answers, retrying");return;}
         if(id==NodeId) return;
+        moves.Add(now);
         Journal.Add($"switch: {NodeName} failed (HANDSHAKE_TIMEOUT), moving to {best["name"]}");
         var from=NodeName;var previous=NodeId;
         NodeId=id;
         try {
             await BringUp(smart);
             SwitchedFrom=from;failures=0;
+            // The new location must carry real traffic, not only answer the connect probe.
+            if(!await Task.Run(()=>core.CheckPath(5000))) {
+                Journal.Add($"switch: {NodeName} connected but carries no traffic");
+                badNodes[id]=DateTime.UtcNow+BadFor;failures=2;nextProbe=DateTime.UtcNow+Retries[0];
+            }
         } catch(AccessFailure error) when (Fatal.Contains(error.Code)) {
             await Fail(error.Code,"connection_authorization_expired_connect_again");
         } catch(AccessFailure error) when (error.Code=="HANDSHAKE_TIMEOUT") {

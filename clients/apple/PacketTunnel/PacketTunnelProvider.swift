@@ -66,6 +66,14 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         set {stateLock.lock();defer {stateLock.unlock()};wokeFlag=newValue}
     }
     private let monitor=NWPathMonitor()
+    /// The watchdog (core Health) looks at the user's traffic on every tick; a stall is handled at most this often.
+    private var lastStall=Date.distantPast
+    private let stallSpacing:TimeInterval=20
+    /// Locations that failed the user's traffic here: automatic mode does not move back to them for a while.
+    private var badNodes=[String:Date]()
+    private let badFor:TimeInterval=15*60
+    /// Automatic moves in the last 10 minutes; after 3 the tunnel stays where it is (no flapping between locations).
+    private var moves=[Date]()
     /// This connection session, summed up for the staged-rollout health check (Console → 客户端发布) and sent once,
     /// as CONNECT_SESSION, when it ends: never an address, a node name or traffic.
     private var sessionUp:Date?
@@ -318,7 +326,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             // While reconnecting: which attempt this is and when the next one starts.
             let attempt=failures,next=failures>0 ? nextProbe.timeIntervalSince1970:nil
             publish {$0["status"]=shown;$0["attempt"]=attempt;$0["retryAt"]=next}
-        } else {updateCarrying()}
+        } else {
+            updateCarrying()
+            if failures==0,Date().timeIntervalSince(lastStall)>=stallSpacing,
+               await Task.detached(operation:{CoreHealth(Transports.group)}).value.hasPrefix("stalled") {await stalled()}
+        }
         let rate=CoreRate().split(separator:" ").compactMap {Int($0)}
         if rate.count==2 {publish {$0["tx"]=rate[0];$0["rx"]=rate[1]}}
     }
@@ -336,6 +348,42 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         nextProbe=Date.distantPast;failures=min(failures,1)
         if Date().timeIntervalSince(renewedAt)>90 {renewAt=Date.distantPast}
     }
+    /// The user's traffic stopped coming back while the lines still answer probes (a stuck DNS connection, a line
+    /// that passes a small test page but not real traffic): close what hangs, check the path the traffic takes, then
+    /// keep the lines that fail it out of use and, when none carries traffic, treat it as a drop (automatic: move).
+    private func stalled() async {
+        lastStall=Date()
+        let line=carrying
+        Journal.add("watchdog: traffic stalled via \(line)")
+        CoreReset()
+        if await checkPath() {
+            Journal.add("watchdog: recovered after closing stuck connections");await report("STALL","recovered=reset line=\(line)");return
+        }
+        // Nothing answers outside the tunnel either: the network is down (or a sign-in page), not the location.
+        let local=await Task.detached {CoreProbe("DIRECT",Transports.localURL,3000)}.value
+        if Int(local.split(separator:"=").last ?? "") ?? -1 < 0 {Journal.add("watchdog: the network itself does not answer, waiting");return}
+        let names=transports.joined(separator:",")
+        let results=await Task.detached {Transports.parseProbe(CoreCheckEach(names,Transports.checkURL,5000))}.value
+        let failed=results.filter {$0.value<0}.map {$0.key},working=transports.filter {(results[$0] ?? -1)>=0}
+        Journal.add("watchdog: "+transports.map {"\($0) \((results[$0] ?? -1)>=0 ? "ok":"fails")"}.joined(separator:", "))
+        if !failed.isEmpty {CoreSuspend(Transports.group,failed.joined(separator:","),600)}
+        if !working.isEmpty {
+            CoreReset();updateCarrying()
+            Journal.add("watchdog: moved to \(carrying)");await report("STALL","recovered=line line=\(line)");return
+        }
+        Journal.add("watchdog: no line carries traffic");await report("STALL","recovered=no line=\(line)")
+        if sessionUp != nil {sessionDrops+=1}
+        failures=2;nextProbe=Date().addingTimeInterval(retries[1])
+        if automatic {await moveToFastest()}
+        let shown=message(),attempt=failures,next=failures>0 ? nextProbe.timeIntervalSince1970:nil
+        publish {$0["status"]=shown;$0["attempt"]=attempt;$0["retryAt"]=next}
+    }
+    /// The path the user's traffic takes: a fresh lookup through the tunnel's DNS and a 64 KB download through the group.
+    private func checkPath() async -> Bool {
+        let result=await Task.detached {CoreCheck(Transports.group,Transports.checkURL,5000,true)}.value
+        let values=Transports.parseProbe(result)
+        return (values["dns"] ?? -1)>=0 && (values["web"] ?? -1)>=0
+    }
     /// A round where no transport answered while the device has a network.
     private func missed() async {
         failures+=1;nextProbe=Date().addingTimeInterval(retries[min(max(failures-1,0),retries.count-1)])
@@ -346,9 +394,17 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     /// Automatic mode: measures every location now and moves to the fastest one that answers, if it is another.
     private func moveToFastest() async {
         guard let api,let nodes=try? await api.request("nodes")["nodes"] as? [[String:Any]] else {Journal.add("switch: no location list, retrying");return}
-        let ranked=await Latency.rank(nodes,attempts:1,reuse:0,settle:settle)
-        guard let best=ranked.first(where:{$0.quality.latency != nil})?.node,let id=best["id"] as? String else {Journal.add("switch: no location answers, retrying");return}
+        // The location that failed stays out for a while (its port may still answer the measurement below), and so do
+        // others that failed here recently. Three moves in 10 minutes are the most: then stay and keep retrying.
+        let now=Date()
+        badNodes[nodeId]=now.addingTimeInterval(badFor);badNodes=badNodes.filter {$0.value>now}
+        moves=moves.filter {now.timeIntervalSince($0)<600}
+        guard moves.count<3 else {Journal.add("switch: moved 3 times in 10 minutes, staying");return}
+        let candidates=nodes.filter {badNodes[$0["id"] as? String ?? ""]==nil}
+        let ranked=await Latency.rank(candidates,attempts:1,reuse:0,settle:settle)
+        guard let best=ranked.first(where:{$0.quality.latency != nil})?.node,let id=best["id"] as? String else {Journal.add("switch: no other location answers, retrying");return}
         guard id != nodeId else {return}
+        moves.append(now)
         Journal.add("switch: \(nodeName) failed (HANDSHAKE_TIMEOUT), moving to \(best["name"] as? String ?? "?")")
         let from=nodeName,previous=nodeId
         nodeId=id
@@ -356,6 +412,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             try await bringUp()
             publish {$0["switchedFrom"]=from}
             failures=0
+            // The new location must carry real traffic, not only answer the connect probe.
+            if !(await checkPath()) {
+                Journal.add("switch: \(nodeName) connected but carries no traffic")
+                badNodes[id]=Date().addingTimeInterval(badFor);failures=2;nextProbe=Date().addingTimeInterval(retries[0])
+            }
         } catch AccessFailure.code(let code) where Shared.fatal.contains(code) {
             await fail(code)
         } catch AccessFailure.code("HANDSHAKE_TIMEOUT") {

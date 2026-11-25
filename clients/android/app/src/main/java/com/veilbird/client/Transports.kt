@@ -22,6 +22,8 @@ object Transports {
     const val GROUP = "TrackNothing"
     const val TEST_URL = "https://www.gstatic.com/generate_204"
     /** Answers fast from nearly every network (mainland China and Russia too): the connection check times it outside the tunnel. */
+    /** What the watchdog downloads to check the path the user's traffic takes (64 KB, not an empty 204 page). */
+    const val CHECK_URL = "https://speed.cloudflare.com/__down?bytes=65536"
     const val LOCAL_URL = "http://captive.apple.com/hotspot-detect.html"
     private const val MEMORY_DAYS = 7L
 
