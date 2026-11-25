@@ -27,6 +27,11 @@ var smartRuleSets = []struct{ provider, kind, name, behavior string }{
 	{"cn_ip", "geoip", "cn", "ipcidr"},
 }
 
+// The AI services (OpenAI, Anthropic, Gemini, Copilot, Perplexity…, meta-rules-dat category-ai-!cn): always
+// through the tunnel, in both routing modes, so the apps can tell when AI is in use (Health → AIActive) and keep
+// its exit steady. Mainland users' AI accounts get flagged when the exit IP keeps changing country.
+var aiRuleSet = struct{ provider, kind, name, behavior string }{"ai", "geosite", "category-ai-!cn", "domain"}
+
 func ruleSetPath(kind, name string) string { return "./rules/" + kind + "-" + name + ".mrs" }
 
 var privateNetworks = []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16"}
@@ -57,9 +62,7 @@ func Run(home string, options string) error {
 	if err != nil {
 		return err
 	}
-	if o.Smart {
-		seedRuleSets(home)
-	}
+	seedRuleSets(home, o.Smart)
 	return start(home, configuration)
 }
 
@@ -104,6 +107,13 @@ func Build(o Options) (string, error) {
 		rules = append(rules, "IP-CIDR,"+cidr+",DIRECT,no-resolve")
 	}
 	rules = append(rules, customRules(o.Rules, group)...)
+	providers := map[string]any{}
+	if o.AppMode != "only" {
+		// After the person's own rules, ahead of smart routing; not when only chosen programs use the tunnel.
+		providers[aiRuleSet.provider] = map[string]any{"type": "http", "behavior": aiRuleSet.behavior, "format": "mrs",
+			"url": ruleSets + "/" + aiRuleSet.kind + "/" + aiRuleSet.name + ".mrs", "path": ruleSetPath(aiRuleSet.kind, aiRuleSet.name), "interval": 86400, "proxy": group}
+		rules = append(rules, "RULE-SET,"+aiRuleSet.provider+","+group)
+	}
 	config := map[string]any{"mode": "rule", "log-level": "silent", "ipv6": ipv6, "find-process-mode": findProcess,
 		"unified-delay": true, "tcp-concurrent": true, "geo-auto-update": false,
 		"profile": map[string]any{"store-selected": false, "store-fake-ip": false},
@@ -113,13 +123,14 @@ func Build(o Options) (string, error) {
 		"proxy-groups": []map[string]any{{"name": group, "type": "fallback", "proxies": o.Order, "url": testURL, "interval": 300, "lazy": true}}}
 	if o.Smart {
 		// Same small rule sets as the subscription profiles (server/mihomo-config.mjs), fetched through the tunnel.
-		providers := map[string]any{}
 		for _, set := range smartRuleSets {
 			providers[set.provider] = map[string]any{"type": "http", "behavior": set.behavior, "format": "mrs", "url": ruleSets + "/" + set.kind + "/" + set.name + ".mrs",
 				"path": ruleSetPath(set.kind, set.name), "interval": 86400, "proxy": group}
 			rules = append(rules, "RULE-SET,"+set.provider+",DIRECT")
 		}
 		dns["nameserver-policy"] = map[string]any{"rule-set:private_domain,cn_domain": []string{"https://doh.pub/dns-query", "https://dns.alidns.com/dns-query"}}
+	}
+	if len(providers) > 0 {
 		config["rule-providers"] = providers
 	}
 	final := group
@@ -169,9 +180,13 @@ func programNames(apps []string) []string {
 // one-entry placeholder dated 1970: mihomo loads it at once and, finding it stale, downloads the real set in
 // the background and swaps it in (retrying from 10 s on failure). Until then everything goes through the
 // tunnel, as in global mode. A set that exists but is old was already refreshed in the background.
-func seedRuleSets(home string) {
+func seedRuleSets(home string, smart bool) {
 	placeholders := map[string]string{"domain": "tracknothing.invalid", "ipcidr": "192.0.2.255/32"}
-	for _, set := range smartRuleSets {
+	sets := []struct{ provider, kind, name, behavior string }{aiRuleSet}
+	if smart {
+		sets = append(sets, smartRuleSets...)
+	}
+	for _, set := range sets {
 		path := filepath.Join(home, filepath.FromSlash(ruleSetPath(set.kind, set.name)))
 		if _, err := os.Stat(path); err == nil {
 			continue

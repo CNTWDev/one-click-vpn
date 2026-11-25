@@ -165,6 +165,12 @@ func main() {
 				continue
 			}
 			reply(core.Health(fields[1]))
+		case "aiactive":
+			seconds := 1800
+			if len(fields) == 2 {
+				seconds, _ = strconv.Atoi(fields[1])
+			}
+			reply(strconv.FormatBool(core.AIActive(seconds)))
 		case "check":
 			// check <via> <url> <timeoutMs> <lookup 1|0>
 			if len(fields) != 5 {

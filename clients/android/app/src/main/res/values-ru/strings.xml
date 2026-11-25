@@ -517,7 +517,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">В «Проверке связи» названия линий, задержки и пояснения видны полностью, без обрезки и переносов\nНа компьютере проверку можно закрыть щелчком вне панели или кнопкой в правом верхнем углу\nПанель стала компактнее и помещается на один экран, «Измерить скорость» и «Проверить снова» стоят рядом внизу</string>
+  <string name="whats_new_notes">Сайты ИИ (ChatGPT, Claude, Gemini и другие) всегда идут через туннель, в том числе при умной маршрутизации\nЕсли вы пользуетесь ИИ, режим «Автоматически» не выбирает локации, где сервисы ИИ недоступны (например, Гонконг)\nКогда «Автоматически» меняет локацию во время работы с ИИ, сначала пробует ту же страну, чтобы аккаунт не видел скачков IP</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Версия Windows для разработки · Интеграция VPN ещё не завершена</string>

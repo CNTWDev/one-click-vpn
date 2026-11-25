@@ -109,6 +109,19 @@ function nodeLoad(metrics: string | null | undefined): number | null {
     return Math.max(0,Math.min(100,Math.round(value.cpuPercent)));
   } catch { return null; }
 }
+/** Countries where ChatGPT, Claude and Gemini refuse service (agent.py AI_BLOCKED_COUNTRIES). */
+const aiBlockedCountries = new Set(["CN", "HK", "MO", "RU", "BY", "IR", "KP", "SY", "CU"]);
+/**
+ * Whether AI services work from a node: the Agent's own check (2.21+, where the services place the exit IP), else
+ * the location's country; null when neither is known. Apps keep people who use AI off nodes marked false.
+ */
+export function nodeAi(metrics: string | null | undefined, countryCode: string | null): boolean | null {
+  try {
+    const value = JSON.parse(metrics || "null") as { ai?: { ok?: boolean } } | null;
+    if (typeof value?.ai?.ok === "boolean") return value.ai.ok;
+  } catch { /* fall through */ }
+  return countryCode ? !aiBlockedCountries.has(countryCode.toUpperCase()) : null;
+}
 /**
  * The device's enrollment when nodes already accept it: active, with its secret, the account allowed and the
  * device within its limit (the rule of nativeUserRows, which builds the nodes' user lists). Never created here.
@@ -146,7 +159,7 @@ export async function nativeNodes(session?: Session) {
     // probe (the first of probes) stays for app builds that only read one address.
     // place: where the location is on the apps' globe (its catalog city, else the middle of its country).
     const regionRow=node.region_id?regions.get(node.region_id):undefined;
-    return {id:node.id,name:node.name,region:node.region,countryCode,place:regionPlace(regionRow?.name,regionRow?.code),protocol:"wireguard",probe:probes[0]||null,probes,test,load:nodeLoad(node.metrics_json),users:Math.max(0,Number(node.users)||0)};
+    return {id:node.id,name:node.name,region:node.region,countryCode,place:regionPlace(regionRow?.name,regionRow?.code),protocol:"wireguard",probe:probes[0]||null,probes,test,load:nodeLoad(node.metrics_json),ai:nodeAi(node.metrics_json,countryCode),users:Math.max(0,Number(node.users)||0)};
   }))};
 }
 export async function nativeChallenge(session: Session, body: Record<string,unknown>) {

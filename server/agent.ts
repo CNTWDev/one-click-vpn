@@ -15,6 +15,7 @@ function normalizeMetrics(input: unknown, wanRate: NodeNetworkRate | null): stri
   const disk = value.disk && typeof value.disk === "object" ? value.disk as Record<string, unknown> : {};
   const network = value.network && typeof value.network === "object" ? value.network as Record<string, unknown> : {};
   const tuning = value.tuning && typeof value.tuning === "object" ? value.tuning as Record<string, unknown> : null;
+  const ai = value.ai && typeof value.ai === "object" ? value.ai as Record<string, unknown> : null;
   const word = (item: unknown) => typeof item === "string" ? item.replace(/[^a-z0-9_-]/gi, "").slice(0, 32) : "";
   return JSON.stringify({
     collectedAt: typeof value.collectedAt === "string" ? value.collectedAt.slice(0, 64) : new Date().toISOString(),
@@ -30,6 +31,9 @@ function normalizeMetrics(input: unknown, wanRate: NodeNetworkRate | null): stri
     // Agent 2.20+: BBR and socket buffers (agent.py network_tuning).
     ...(tuning ? { tuning: { state: ["tuned", "no-bbr", "unsupported", "default"].includes(String(tuning.state)) ? tuning.state : "default",
       congestion: word(tuning.congestion), qdisc: word(tuning.qdisc), udpBuffer: metricNumber(tuning.udpBuffer) } } : {}),
+    // Agent 2.21+: the country AI services place this node's exit in, and whether they serve it (agent.py check_ai_access).
+    ...(ai && typeof ai.country === "string" && /^[A-Z]{2}$/.test(ai.country) ? { ai: { country: ai.country, ok: ai.ok === true,
+      checkedAt: typeof ai.checkedAt === "string" ? ai.checkedAt.slice(0, 32) : null } } : {}),
   });
 }
 

@@ -124,6 +124,8 @@ public sealed class Core : IDisposable {
     public string Now(string group)=>Call("now "+group);
     /// The watchdog (core.Health): "stalled n" when the user's traffic stopped coming back, else "ok".
     public string Health()=>Call("health "+Transports.Group);
+    /// AI services (the core's "ai" rule set) went through the tunnel in the last seconds (core.AIActive).
+    public bool AIActive(int seconds)=>Call($"aiactive {seconds}")=="true";
     /// The path the user's traffic takes (core.Check): a fresh DNS lookup through the tunnel and a 64 KB download through the group.
     public bool CheckPath(int timeoutMs) {
         var values=Transports.ParseProbe(Call($"check {Transports.Group} {Transports.CheckUrl} {timeoutMs} 1"));

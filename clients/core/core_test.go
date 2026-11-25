@@ -70,8 +70,12 @@ func TestBuildParsesOnEveryPlatform(t *testing.T) {
 			} else if cfg.General.Tun.FileDescriptor != 42 || cfg.General.Tun.AutoRoute {
 				t.Fatalf("%s tun = %+v", platform, cfg.General.Tun)
 			}
-			if got := len(cfg.RuleProviders); (got > 0) != smart {
-				t.Fatalf("%s smart=%v rule providers = %d", platform, smart, got)
+			// The AI set in both modes (it keeps AI on the tunnel and tells the apps AI is in use), plus 3 when smart.
+			if got, want := len(cfg.RuleProviders), map[bool]int{false: 1, true: 4}[smart]; got != want {
+				t.Fatalf("%s smart=%v rule providers = %d, want %d", platform, smart, got, want)
+			}
+			if _, ok := cfg.RuleProviders["ai"]; !ok {
+				t.Fatalf("%s smart=%v: no AI rule set", platform, smart)
 			}
 			if last := cfg.Rules[len(cfg.Rules)-1]; last.Adapter() != group {
 				t.Fatalf("last rule goes to %s", last.Adapter())
@@ -188,7 +192,7 @@ func TestRuleSetsDoNotBlockStart(t *testing.T) {
 		providers = append(providers, fmt.Sprintf("  %s: {type: http, behavior: %s, format: mrs, url: 'http://127.0.0.1:%d/%s.mrs', path: '%s', interval: 86400}", set.provider, set.behavior, slow, set.name, ruleSetPath(set.kind, set.name)))
 	}
 	configuration := "mode: rule\nlog-level: silent\nrule-providers:\n" + strings.Join(providers, "\n") + "\nrules:\n  - RULE-SET,cn_domain,DIRECT\n  - RULE-SET,cn_ip,DIRECT\n  - MATCH,DIRECT\n"
-	seedRuleSets(home)
+	seedRuleSets(home, true)
 	started := time.Now()
 	if err := start(home, configuration); err != nil {
 		t.Fatal(err)
@@ -204,7 +208,7 @@ func TestRuleSetsDoNotBlockStart(t *testing.T) {
 		}
 	}
 	// A second seeding leaves existing files alone.
-	seedRuleSets(home)
+	seedRuleSets(home, true)
 }
 
 func TestBuildPerAppRouting(t *testing.T) {
