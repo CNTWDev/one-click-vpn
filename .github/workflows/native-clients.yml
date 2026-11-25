@@ -74,7 +74,8 @@ jobs:
           path: clients/android/app/build/outputs/apk/dev/debug/*.apk
           if-no-files-found: error
   apple:
-    runs-on: macos-latest
+    # The same image as the release build, so the macOS 26-only code is compiled here first.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - run: swift test --package-path clients/apple
