@@ -12266,19 +12266,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "In Activity, right-click a connection (long press on the phone) to always encrypt, always go direct or block that site, for the whole site or just that name; it applies at once, no reconnect\nTap a connection to see why it went that way: the rule it matched, encrypted or direct, and the location it left from\nCopy the domain or close a single connection from the same menu; a new rule can be undone in one tap\nSaving the routing rules page now applies at once too, without reconnecting"
+            "value": "Right-click (long press on the phone) in Activity offers Always encrypt / Always direct / Block right away, without turning on Advanced first\nOn the computer, the tabs at the top of Activity no longer shrink to an ellipsis"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "「活动」里右键一条连接（手机上长按），就能把这个网站设成总是走加密、总是直连或屏蔽，可选整个网站或只这个域名，马上生效，不用重连\n点一条连接就能看到「为什么这样走」：命中了哪条规则、走加密还是直连、从哪个位置出去\n还能复制域名、单独断开一条连接；加了规则可以一键撤销\n分流规则页保存后也立即生效，不再断开重连"
+            "value": "「活动」里右键（手机上长按）随时都能设「总是走加密 / 总是直连 / 屏蔽」，不用先去打开高级功能\n电脑上「活动」顶部的标签不再被挤成省略号"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "В «Активности» щёлкните соединение правой кнопкой (на телефоне — долгое нажатие), чтобы сайт всегда шёл через шифрование, напрямую или блокировался — весь сайт или только этот домен; применяется сразу, без переподключения\nНажмите на соединение, чтобы увидеть, почему оно пошло так: какое правило сработало, шифрование или напрямую, через какую локацию\nТам же можно скопировать домен или закрыть одно соединение; новое правило отменяется одним нажатием\nСохранение правил маршрутизации теперь тоже применяется сразу, без переподключения"
+            "value": "Правый щелчок (на телефоне — долгое нажатие) в «Активности» сразу предлагает «Всегда через шифрование / Всегда напрямую / Блокировать», без включения расширенных функций\nНа компьютере вкладки вверху «Активности» больше не сжимаются в многоточие"
           }
         }
       }

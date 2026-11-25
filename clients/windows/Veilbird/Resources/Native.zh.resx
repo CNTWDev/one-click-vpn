@@ -541,10 +541,8 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>「活动」里右键一条连接（手机上长按），就能把这个网站设成总是走加密、总是直连或屏蔽，可选整个网站或只这个域名，马上生效，不用重连
-点一条连接就能看到「为什么这样走」：命中了哪条规则、走加密还是直连、从哪个位置出去
-还能复制域名、单独断开一条连接；加了规则可以一键撤销
-分流规则页保存后也立即生效，不再断开重连</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>「活动」里右键（手机上长按）随时都能设「总是走加密 / 总是直连 / 屏蔽」，不用先去打开高级功能
+电脑上「活动」顶部的标签不再被挤成省略号</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI 服务</value></data>

@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.34
+
+### zh
+- 「活动」里右键（手机上长按）随时都能设「总是走加密 / 总是直连 / 屏蔽」，不用先去打开高级功能
+- 电脑上「活动」顶部的标签不再被挤成省略号
+
+### en
+- Right-click (long press on the phone) in Activity offers Always encrypt / Always direct / Block right away, without turning on Advanced first
+- On the computer, the tabs at the top of Activity no longer shrink to an ellipsis
+
+### ru
+- Правый щелчок (на телефоне — долгое нажатие) в «Активности» сразу предлагает «Всегда через шифрование / Всегда напрямую / Блокировать», без включения расширенных функций
+- На компьютере вкладки вверху «Активности» больше не сжимаются в многоточие
+
 ## 1.0.33
 
 ### zh
