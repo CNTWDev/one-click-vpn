@@ -12358,19 +12358,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "On the computer, clicking a connection in Activity shows its details in a column to the right of the list, so nothing is covered and the selected row stays in view\nOn the phone, a connection's details open from the bottom"
+            "value": "Changing how a connection is routed (Proxy / Direct / Block) from Activity now asks you to confirm first, so a stray click can't change your rules"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "电脑上「活动」里点一条连接，详情显示在列表右侧，不再盖住列表；选中的那一行一直看得见\n手机上点一条连接，详情从底部弹出"
+            "value": "在「活动」详情里改走法（代理 / 直连 / 拦截）前会先确认一次，避免误点改掉规则"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "На компьютере при щелчке по соединению в «Активности» подробности открываются колонкой справа от списка: ничего не закрыто, выбранная строка остаётся на виду\nНа телефоне подробности соединения открываются снизу"
+            "value": "Перед сменой маршрута соединения (прокси / напрямую / блокировать) в «Активности» теперь нужно подтверждение, чтобы случайный щелчок не менял правила"
           }
         }
       }
