@@ -577,8 +577,8 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac：用量页新增「航迹」，地球上画出这段时间你从哪些城市出门、各走了多少流量，还有本机隐身时长
-Mac：航迹可以一键生成海报，保存或分享；出发城市默认不出现在海报上，图里没有 IP</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>安卓：用量页新增「航迹」，地球上画出这段时间你从哪些城市出门、各走了多少流量，还有本机隐身时长
+安卓：航迹可以一键生成海报，存到相册或分享；出发城市默认不出现在海报上，图里没有 IP</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI 服务</value></data>

@@ -577,8 +577,8 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac: на странице трафика появились «Маршруты»: глобус с городами, через которые вы выходили в сеть, объём через каждый и время, которое это устройство было скрыто
-Mac: из маршрутов можно сделать постер, чтобы сохранить или поделиться; ваш город по умолчанию скрыт, IP на картинке нет</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Android: на странице трафика появились «Маршруты»: глобус с городами, через которые вы выходили в сеть, объём через каждый и время, которое телефон был скрыт
+Android: из маршрутов можно сделать постер, сохранить в галерею или поделиться; ваш город по умолчанию скрыт, IP на картинке нет</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI-сервис</value></data>
