@@ -524,9 +524,9 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>The app now notices when it is connected but nothing comes back: it closes stuck connections and moves to a working line within seconds, keeping the same exit IP
-In Automatic, when a whole location stops working it moves to another one it has checked, and does not go back to the one that failed
-A location you picked yourself is never swapped; only its lines change</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Connection check now shows line names, delays and notes in full, nothing cut off or squeezed onto two lines
+On the computer, click outside the connection check to close it, or use the close button at its top right
+The check is more compact and fits on one screen, with Test speed and Check again side by side at the bottom</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows development build · VPN service integration in progress</value></data>

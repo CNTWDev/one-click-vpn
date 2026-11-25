@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.31
+
+### zh
+- 「线路体检」里的线路名、延迟和说明文字都能完整显示，不再被截断或挤成两行
+- 电脑上点体检面板外面就能关掉，右上角也有关闭按钮
+- 体检面板更紧凑，一屏就能看完，「测网速」和「重新检测」并排放在底部
+
+### en
+- Connection check now shows line names, delays and notes in full, nothing cut off or squeezed onto two lines
+- On the computer, click outside the connection check to close it, or use the close button at its top right
+- The check is more compact and fits on one screen, with Test speed and Check again side by side at the bottom
+
+### ru
+- В «Проверке связи» названия линий, задержки и пояснения видны полностью, без обрезки и переносов
+- На компьютере проверку можно закрыть щелчком вне панели или кнопкой в правом верхнем углу
+- Панель стала компактнее и помещается на один экран, «Измерить скорость» и «Проверить снова» стоят рядом внизу
+
 ## 1.0.30
 
 ### zh

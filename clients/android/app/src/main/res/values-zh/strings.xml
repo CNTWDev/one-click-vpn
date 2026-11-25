@@ -517,7 +517,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">连着却没有流量时会自己发现：几秒内关掉卡住的连接，换一条能用的线路，出口 IP 不变\n自动模式下整个位置都不通时，换到另一个确认能用的位置，不会再换回刚出问题的那个\n手动选的位置不会被自动换掉，只在这个位置里换线路</string>
+  <string name="whats_new_notes">「线路体检」里的线路名、延迟和说明文字都能完整显示，不再被截断或挤成两行\n电脑上点体检面板外面就能关掉，右上角也有关闭按钮\n体检面板更紧凑，一屏就能看完，「测网速」和「重新检测」并排放在底部</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>
