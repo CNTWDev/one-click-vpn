@@ -12266,19 +12266,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The Activity list holds its order while the pointer is on it, so a click or right-click lands on the right row\nClick a connection and the panel below has every action: always encrypt / always direct / block (whole site or just that name), copy the domain, close the connection, open routing rules\nNo more Advanced switch: favorites, protocol lock and routing rules are always available"
+            "value": "Fixed slow or failing photo and file uploads in WeChat and other mainland apps while connected: the stall check no longer mistakes an upload for a hang, and no longer closes direct connections"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "「活动」列表在鼠标停在上面时不再重新排序，右键和点击不会点错行\n点一下连接，下方面板里就有全部操作：总是走加密 / 总是直连 / 屏蔽（可选整个网站或只这个域名）、复制域名、断开连接、去分流规则\n去掉「高级功能」开关：收藏、协议锁定和分流规则默认都可以用"
+            "value": "修复开着 VPN 时微信等国内应用发图片、传文件很慢甚至发不出去：断线检测不再把正在上传的连接当成卡住，也不再顺带掐断直连的国内连接"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Список «Активности» не меняет порядок, пока над ним указатель, поэтому щелчок попадает в нужную строку\nЩёлкните соединение — в панели ниже все действия: всегда через шифрование / всегда напрямую / блокировать (весь сайт или только этот домен), копировать домен, закрыть соединение, открыть правила\nПереключателя «Расширенные функции» больше нет: избранное, фиксация протокола и правила маршрутизации доступны всегда"
+            "value": "Исправлена медленная или прерывающаяся отправка фото и файлов в WeChat и других китайских приложениях при подключении: проверка зависаний больше не принимает загрузку за зависание и не закрывает прямые соединения"
           }
         }
       }

@@ -534,7 +534,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">The Activity list holds its order while the pointer is on it, so a click or right-click lands on the right row\nClick a connection and the panel below has every action: always encrypt / always direct / block (whole site or just that name), copy the domain, close the connection, open routing rules\nNo more Advanced switch: favorites, protocol lock and routing rules are always available</string>
+  <string name="whats_new_notes">Fixed slow or failing photo and file uploads in WeChat and other mainland apps while connected: the stall check no longer mistakes an upload for a hang, and no longer closes direct connections</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="why_ai">AI service</string>
