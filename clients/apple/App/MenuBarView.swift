@@ -282,7 +282,7 @@ struct MenuBarLabel:View {
         let on=state == .connected || (busy && (blink || reduceMotion))
         icon(on:on).onReceive(ticker) {_ in if busy {blink.toggle()} else if blink {blink=false}}
             // Always on screen, so it lends the window opener to a click on a reminder notification.
-            .onAppear {let open=openWindow;DockPresence.openMain={open(id:"main")};NotchHUD.shared.attach(model)}
+            .onAppear {let open=openWindow;DockPresence.openMain={open(id:"main")}}
     }
     @ViewBuilder private func icon(on:Bool)->some View {
         // Traffic or time running out: a small amber dot on the mark, and the reminder for VoiceOver.

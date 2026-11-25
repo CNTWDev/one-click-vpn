@@ -300,9 +300,6 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="node_menu_hint" xml:space="preserve"><value>Щёлкните локацию правой кнопкой, чтобы добавить в избранное или выбрать протокол</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>Джиттер {0} мс · Потери {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Не подключено</value></data>
-  <data name="notch_arrived" xml:space="preserve"><value>Прибыли</value></data>
-  <data name="notch_hud" xml:space="preserve"><value>Подключение вверху экрана</value></data>
-  <data name="notch_switched" xml:space="preserve"><value>Выход сменён</value></data>
   <data name="off_state" xml:space="preserve"><value>Выкл.</value></data>
   <data name="offline_centre" xml:space="preserve"><value>Офлайн</value></data>
   <data name="on_state" xml:space="preserve"><value>Вкл.</value></data>
@@ -579,8 +576,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac: новые виджеты рабочего стола, маленький и средний: скрыты ли вы, город выхода, время и маленький глобус; в среднем есть кнопка подключения
-Mac: в macOS 26 можно добавить кнопку TrackNothing в Пункт управления, чтобы подключаться и отключаться одним нажатием</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Mac: убрано уведомление о подключении вверху экрана, оно больше не закрывает экран</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI-сервис</value></data>
