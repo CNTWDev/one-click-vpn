@@ -385,6 +385,7 @@
   <string name="routing_global_detail">Весь трафик через TrackNothing</string>
   <string name="routing_smart">Умная</string>
   <string name="routing_smart_detail">Сайты материкового Китая напрямую, остальное через TrackNothing</string>
+  <string name="routing_tile">Умный режим</string>
   <string name="rule_added">Правило добавлено: %1$s — %2$s, уже действует</string>
   <string name="rule_added_later">Правило добавлено: %1$s — %2$s, со следующего подключения</string>
   <string name="rule_confirm">Изменить %1$s: «%2$s»?</string>
@@ -538,7 +539,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">На компьютере переключение между «Подключение», «Локации» и «Аккаунт» стало плавнее: выделение скользит, страницы плавно сменяются без рывков\nПри подключении ежесекундные данные о скорости и «Активности» обновляют только то место, где показаны, поэтому окно работает легче и отзывчивее\nВсе переключатели-сегменты (страницы, режим маршрутизации, период использования, виды «Активности») теперь выглядят одинаково</string>
+  <string name="whats_new_notes">Android: в момент подключения телефон дважды мягко вибрирует, при неудаче — один раз; выбор локации, подключение и смена «умный / глобальный» дают лёгкий отклик (по системной настройке)\nAndroid 16: после подключения в строке состояния появляется чип с выходом, а в уведомлении — маршрут от вас до выхода\nПлитка быстрых настроек показывает текущий выход, долгое нажатие открывает локации; новая плитка «Умный режим»</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="why_ai">AI-сервис</string>

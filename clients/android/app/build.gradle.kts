@@ -10,7 +10,7 @@ val releaseKeystore = System.getenv("VEILBIRD_ANDROID_KEYSTORE")
 
 android {
     namespace = "com.veilbird.client"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.veilbird.client"
         minSdk = 26

@@ -8833,6 +8833,29 @@
         }
       }
     },
+    "routing_tile": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smart routing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "智能分流"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Умный режим"
+          }
+        }
+      }
+    },
     "rule_added": {
       "extractionState": "manual",
       "localizations": {
@@ -12358,19 +12381,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Switching between Connect, Locations and Account on the computer is smoother: the highlight slides across and pages fade instead of stuttering\nWhile connected, the per-second speed and Activity figures now only redraw where they are shown, so the window stays light and responsive\nEvery segmented switch (pages, routing mode, usage range, Activity views) now shares one look"
+            "value": "Android: the phone taps twice softly the moment you connect, and once when it can't; picking a location, connecting, or switching Smart/Global gives a light tick (follows the system touch-feedback setting)\nAndroid 16: once connected, a chip with your exit sits in the status bar, and the notification shows a route from you to the exit\nThe Quick Settings tile shows your current exit, and a long press opens Locations; new Smart routing tile"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "电脑上切换「连接 / 位置 / 我的」更顺滑：选中块滑过去，页面淡入淡出，不再卡一下\n连接时每秒更新的网速和活动数据只刷新显示它们的地方，整个窗口更省电、更跟手\n各处的分段切换（页面、分流模式、用量范围、活动视图）统一成同一种样式"
+            "value": "安卓：连上的那一刻手机会轻轻震两下，没连上时震一下；点连接、选地区、切智能/全局时有轻微触感（跟随系统触感开关）\n安卓 16：连上后状态栏出现出口胶囊，通知里是一条从你到出口的航线\n快速设置磁贴显示当前出口，长按直接打开地区列表；新增「智能分流」磁贴"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "На компьютере переключение между «Подключение», «Локации» и «Аккаунт» стало плавнее: выделение скользит, страницы плавно сменяются без рывков\nПри подключении ежесекундные данные о скорости и «Активности» обновляют только то место, где показаны, поэтому окно работает легче и отзывчивее\nВсе переключатели-сегменты (страницы, режим маршрутизации, период использования, виды «Активности») теперь выглядят одинаково"
+            "value": "Android: в момент подключения телефон дважды мягко вибрирует, при неудаче — один раз; выбор локации, подключение и смена «умный / глобальный» дают лёгкий отклик (по системной настройке)\nAndroid 16: после подключения в строке состояния появляется чип с выходом, а в уведомлении — маршрут от вас до выхода\nПлитка быстрых настроек показывает текущий выход, долгое нажатие открывает локации; новая плитка «Умный режим»"
           }
         }
       }

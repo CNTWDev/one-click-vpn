@@ -154,6 +154,8 @@ class MainActivity : Activity() {
         if (!settings.contains("onboarded")) settings.edit().putBoolean("onboarded", api.secret("token") != null).apply()
         onboarded = settings.getBoolean("onboarded", true)
         @Suppress("DEPRECATION") window.apply { statusBarColor = Palette.ground; navigationBarColor = Palette.ground; decorView.systemUiVisibility = 0 }
+        // A long press on the Quick Settings tile opens the location list.
+        if (intent?.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES" && api.secret("token") != null) page = "nodes"
         render()
         executor.execute { Crash.send(this, api) }
         // The Quick Settings tile could not start the VPN from the background: connect now that the app is open.
@@ -1199,6 +1201,7 @@ class MainActivity : Activity() {
         }
     }
     private fun toggleConnection() {
+        Haptics.press(window.decorView)
         if (ConnectionStateStore.active) { startService(Intent(this, ConnectionService::class.java).setAction("disconnect")); return }
         if (update?.mandatory == true) { alert(L10n.text(R.string.update_required_detail)); return }
         val consent = VpnService.prepare(this); if (consent != null) startActivityForResult(consent, 10) else startConnection()
@@ -1412,7 +1415,7 @@ class MainActivity : Activity() {
                 setOnClickListener {
                     if (busy || selected) return@setOnClickListener
                     if (ConnectionStateStore.active) { alert(L10n.text(R.string.disconnect_before_changing_routing)); return@setOnClickListener }
-                    prefs.edit().putString("routing", value).apply(); render()
+                    Haptics.tick(it); prefs.edit().putString("routing", value).apply(); render()
                 }
             }, LinearLayout.LayoutParams(0, 36.dp, 1f).apply { if (value == "global") marginStart = 4.dp })
         }
@@ -1584,6 +1587,7 @@ class MainActivity : Activity() {
     }
     private fun select(id: String, name: String, code: String) {
         val moving = ConnectionStateStore.active && id != ConnectionStateStore.nodeId
+        Haptics.tick(window.decorView)
         selectedId = id; selectedName = name; selectedCode = code; page = "connect"
         getSharedPreferences("preferences", MODE_PRIVATE).edit().putString("nodeId", id).putString("nodeName", name).putString("nodeCode", code).apply()
         render()
@@ -2355,7 +2359,10 @@ class MainActivity : Activity() {
     }
     private fun alert(message: String) { AlertDialog.Builder(this).setTitle("TrackNothing").setMessage(message).setPositiveButton(L10n.text(R.string.got_it), null).show() }
     private fun startConnection() { startForegroundService(Intent(this, ConnectionService::class.java).putExtra("nodeId", selectedId)) }
-    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); intent.data?.let { qrFromLink(it) } }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent); intent.data?.let { qrFromLink(it) }
+        if (intent.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES" && api.secret("token") != null && !busy) { page = "nodes"; render() }
+    }
 
     // ---- Signing in a computer with this phone ("扫码登录电脑", server/qr-login.ts): scan, see which computer and from
     // where, confirm. The computer gets its own session; it takes a device slot when it connects.

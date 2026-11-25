@@ -391,6 +391,7 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="routing_global_detail" xml:space="preserve"><value>All traffic goes through TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>Smart</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>Sites in mainland China go direct, the rest through TrackNothing</value></data>
+  <data name="routing_tile" xml:space="preserve"><value>Smart routing</value></data>
   <data name="rule_added" xml:space="preserve"><value>Rule added: {0} {1}, in effect now</value></data>
   <data name="rule_added_later" xml:space="preserve"><value>Rule added: {0} {1}, applies from the next connection</value></data>
   <data name="rule_confirm" xml:space="preserve"><value>Change {0} to “{1}”?</value></data>
@@ -545,9 +546,9 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Switching between Connect, Locations and Account on the computer is smoother: the highlight slides across and pages fade instead of stuttering
-While connected, the per-second speed and Activity figures now only redraw where they are shown, so the window stays light and responsive
-Every segmented switch (pages, routing mode, usage range, Activity views) now shares one look</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Android: the phone taps twice softly the moment you connect, and once when it can't; picking a location, connecting, or switching Smart/Global gives a light tick (follows the system touch-feedback setting)
+Android 16: once connected, a chip with your exit sits in the status bar, and the notification shows a route from you to the exit
+The Quick Settings tile shows your current exit, and a long press opens Locations; new Smart routing tile</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI service</value></data>

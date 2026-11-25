@@ -113,7 +113,14 @@ class Portrait(context: Context) : View(context) {
     var sub: String = ""
         set(value) { if (field != value) { field = value; invalidate() } }
     var state = LinkState.IDLE
-        set(value) { if (field != value) { field = value; stateAt = SystemClock.uptimeMillis(); aim(); invalidate() } }
+        set(value) {
+            if (field == value) return
+            // Only a connection being made now lands or fails with a touch: not a reconnect in the background.
+            val starting = field == LinkState.CONNECTING || field == LinkState.SWITCHING
+            if (starting && value == LinkState.CONNECTED && isShown) Haptics.landed(this, if (still) 0L else 600L)
+            if (starting && value == LinkState.FAILED && isShown) Haptics.failed(this)
+            field = value; stateAt = SystemClock.uptimeMillis(); aim(); invalidate()
+        }
     /** Lines (transports) of the location: "line n of N" while switching. */
     var lines = 4
     /** Where this device is (null: unknown or hidden by the person) and the location it goes out from (null: unknown). */

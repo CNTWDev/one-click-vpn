@@ -385,6 +385,7 @@
   <string name="routing_global_detail">全部流量经过 TrackNothing</string>
   <string name="routing_smart">智能分流</string>
   <string name="routing_smart_detail">国内网站直连，其余经过 TrackNothing</string>
+  <string name="routing_tile">智能分流</string>
   <string name="rule_added">已添加规则：%1$s %2$s，已生效</string>
   <string name="rule_added_later">已添加规则：%1$s %2$s，下次连接时生效</string>
   <string name="rule_confirm">把 %1$s 改为「%2$s」？</string>
@@ -538,7 +539,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">电脑上切换「连接 / 位置 / 我的」更顺滑：选中块滑过去，页面淡入淡出，不再卡一下\n连接时每秒更新的网速和活动数据只刷新显示它们的地方，整个窗口更省电、更跟手\n各处的分段切换（页面、分流模式、用量范围、活动视图）统一成同一种样式</string>
+  <string name="whats_new_notes">安卓：连上的那一刻手机会轻轻震两下，没连上时震一下；点连接、选地区、切智能/全局时有轻微触感（跟随系统触感开关）\n安卓 16：连上后状态栏出现出口胶囊，通知里是一条从你到出口的航线\n快速设置磁贴显示当前出口，长按直接打开地区列表；新增「智能分流」磁贴</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="why_ai">AI 服务</string>

@@ -391,6 +391,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="routing_global_detail" xml:space="preserve"><value>Весь трафик через TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>Умная</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>Сайты материкового Китая напрямую, остальное через TrackNothing</value></data>
+  <data name="routing_tile" xml:space="preserve"><value>Умный режим</value></data>
   <data name="rule_added" xml:space="preserve"><value>Правило добавлено: {0} — {1}, уже действует</value></data>
   <data name="rule_added_later" xml:space="preserve"><value>Правило добавлено: {0} — {1}, со следующего подключения</value></data>
   <data name="rule_confirm" xml:space="preserve"><value>Изменить {0}: «{1}»?</value></data>
@@ -545,9 +546,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>На компьютере переключение между «Подключение», «Локации» и «Аккаунт» стало плавнее: выделение скользит, страницы плавно сменяются без рывков
-При подключении ежесекундные данные о скорости и «Активности» обновляют только то место, где показаны, поэтому окно работает легче и отзывчивее
-Все переключатели-сегменты (страницы, режим маршрутизации, период использования, виды «Активности») теперь выглядят одинаково</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Android: в момент подключения телефон дважды мягко вибрирует, при неудаче — один раз; выбор локации, подключение и смена «умный / глобальный» дают лёгкий отклик (по системной настройке)
+Android 16: после подключения в строке состояния появляется чип с выходом, а в уведомлении — маршрут от вас до выхода
+Плитка быстрых настроек показывает текущий выход, долгое нажатие открывает локации; новая плитка «Умный режим»</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI-сервис</value></data>

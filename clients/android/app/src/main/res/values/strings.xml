@@ -385,6 +385,7 @@
   <string name="routing_global_detail">All traffic goes through TrackNothing</string>
   <string name="routing_smart">Smart</string>
   <string name="routing_smart_detail">Sites in mainland China go direct, the rest through TrackNothing</string>
+  <string name="routing_tile">Smart routing</string>
   <string name="rule_added">Rule added: %1$s %2$s, in effect now</string>
   <string name="rule_added_later">Rule added: %1$s %2$s, applies from the next connection</string>
   <string name="rule_confirm">Change %1$s to “%2$s”?</string>
@@ -538,7 +539,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Switching between Connect, Locations and Account on the computer is smoother: the highlight slides across and pages fade instead of stuttering\nWhile connected, the per-second speed and Activity figures now only redraw where they are shown, so the window stays light and responsive\nEvery segmented switch (pages, routing mode, usage range, Activity views) now shares one look</string>
+  <string name="whats_new_notes">Android: the phone taps twice softly the moment you connect, and once when it can\'t; picking a location, connecting, or switching Smart/Global gives a light tick (follows the system touch-feedback setting)\nAndroid 16: once connected, a chip with your exit sits in the status bar, and the notification shows a route from you to the exit\nThe Quick Settings tile shows your current exit, and a long press opens Locations; new Smart routing tile</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="why_ai">AI service</string>
