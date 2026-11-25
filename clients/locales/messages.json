@@ -3008,5 +3008,10 @@
     "zh": "已复制",
     "en": "Copied",
     "ru": "Скопировано"
+  },
+  "widget_mac_description": {
+    "zh": "一眼看到有没有隐身、从哪座城市出门，点一下就连接",
+    "en": "See at a glance whether you're hidden and which city you go out from; click to connect",
+    "ru": "Сразу видно, скрыты ли вы и из какого города выходите в сеть; нажмите, чтобы подключиться"
   }
 }

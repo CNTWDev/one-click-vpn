@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.48
+
+### zh
+- Mac：新增桌面小组件，小号和中号两种，显示是否隐身、出口城市、隐身时长和小地球，中号带连接按钮
+- Mac：macOS 26 的控制中心可以加 TrackNothing 按钮，一键连接或断开
+
+### en
+- Mac: new desktop widgets in small and medium sizes showing whether you're hidden, your exit city, time hidden and a small globe; the medium one has a connect button
+- Mac: on macOS 26 you can add a TrackNothing button to Control Center to connect or disconnect in one click
+
+### ru
+- Mac: новые виджеты рабочего стола, маленький и средний: скрыты ли вы, город выхода, время и маленький глобус; в среднем есть кнопка подключения
+- Mac: в macOS 26 можно добавить кнопку TrackNothing в Пункт управления, чтобы подключаться и отключаться одним нажатием
+
 ## 1.0.47
 
 ### zh

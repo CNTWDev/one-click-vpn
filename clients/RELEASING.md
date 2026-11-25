@@ -75,9 +75,10 @@ VEILBIRD_RELEASE_MIRROR_PUBLIC_BASE_URL=https://<CDN 加速域名>
 
 1. 加入 Apple Developer Program（个人账号即可，99 美元/年），在 Membership 页面记下 **Team ID**（10 位）。
 2. Certificates → 新建 **Developer ID Application**（需要账号持有人操作）。按页面提示用「钥匙串访问」生成 CSR，下载 `.cer` 双击装入钥匙串，然后在钥匙串里右键这张证书 →「导出」为 `.p12`，设一个密码。
-3. Identifiers → 新建两个 App ID（Bundle ID 前缀以 `com.veilbird.client` 为例）：
+3. Identifiers → 新建三个 App ID（Bundle ID 前缀以 `com.veilbird.client` 为例）：
    - `com.veilbird.client.macos`：勾选 **Network Extensions** 和 **System Extension**
    - `com.veilbird.client.macos.tunnel`：勾选 **Network Extensions**
+   - `com.veilbird.client.macos.widgets`：勾选 **App Groups**（桌面小组件和控制中心按钮）
    Mac 用的 App Group 是「Team ID + 前缀」形式，不用单独注册。描述文件也不用手动建：CI 会用下面的 API Key 自动创建并下载。
 4. App Store Connect → 用户和访问 → 集成 → App Store Connect API → 生成密钥，角色选 **管理**（Admin，CI 要用它自动创建描述文件）。下载 `.p8`（只能下载一次，离线备份），记下 Key ID 和页面上方的 Issuer ID。
 

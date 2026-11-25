@@ -56,6 +56,10 @@ final class DockPresence:NSObject,NSApplicationDelegate,UNUserNotificationCenter
         })
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender:NSApplication)->Bool {false}
+    /// tracknothing:// from the desktop widgets and the Control Center button (WidgetBridge).
+    func application(_ application:NSApplication,open urls:[URL]) {
+        Task {@MainActor in urls.forEach(WidgetBridge.open)}
+    }
     /// A reminder (traffic or time running out) shows even while the app is in front, and clicking it opens the window.
     func userNotificationCenter(_ center:UNUserNotificationCenter,willPresent notification:UNNotification,withCompletionHandler done:@escaping (UNNotificationPresentationOptions)->Void) {
         done([.banner,.sound])

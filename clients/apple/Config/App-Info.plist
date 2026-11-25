@@ -8,6 +8,16 @@
 	     executable keep the technical name Veilbird. -->
 	<key>CFBundleName</key>
 	<string>TrackNothing</string>
+	<!-- tracknothing://toggle and tracknothing://open: the Mac widgets and Control Center button (WidgetBridge.swift). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>TrackNothing</string>
+			<key>CFBundleURLSchemes</key>
+			<array><string>tracknothing</string></array>
+		</dict>
+	</array>
 	<key>VeilbirdAPIOrigin</key>
 	<string>$(VEILBIRD_API_ORIGIN)</string>
 	<key>VeilbirdAppGroup</key>

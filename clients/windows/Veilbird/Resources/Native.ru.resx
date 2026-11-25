@@ -579,8 +579,8 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Windows: на странице трафика появились «Маршруты»: глобус с городами, через которые вы выходили в сеть, объём через каждый и время, которое этот ПК был скрыт
-Windows: из маршрутов можно сделать постер, сохранить или скопировать и вставить куда угодно; ваш город по умолчанию скрыт, IP на картинке нет</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Mac: новые виджеты рабочего стола, маленький и средний: скрыты ли вы, город выхода, время и маленький глобус; в среднем есть кнопка подключения
+Mac: в macOS 26 можно добавить кнопку TrackNothing в Пункт управления, чтобы подключаться и отключаться одним нажатием</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI-сервис</value></data>
@@ -600,6 +600,7 @@ Windows: из маршрутов можно сделать постер, сох�
   <data name="why_rest_direct" xml:space="preserve"><value>Другие правила не совпали, поэтому напрямую.</value></data>
   <data name="why_rest_proxy" xml:space="preserve"><value>Другие правила не совпали, поэтому через шифрование.</value></data>
   <data name="widget_globe" xml:space="preserve"><value>Глобус TrackNothing</value></data>
+  <data name="widget_mac_description" xml:space="preserve"><value>Сразу видно, скрыты ли вы и из какого города выходите в сеть; нажмите, чтобы подключиться</value></data>
   <data name="widget_strip" xml:space="preserve"><value>Статус TrackNothing</value></data>
   <data name="widget_tap" xml:space="preserve"><value>Коснитесь, чтобы подключиться</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>

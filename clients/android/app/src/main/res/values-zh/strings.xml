@@ -572,7 +572,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">Windows：用量页新增「航迹」，地球上画出这段时间你从哪些城市出门、各走了多少流量，还有本机隐身时长\nWindows：航迹可以一键生成海报，保存成图片或复制后直接粘贴；出发城市默认不出现在海报上，图里没有 IP</string>
+  <string name="whats_new_notes">Mac：新增桌面小组件，小号和中号两种，显示是否隐身、出口城市、隐身时长和小地球，中号带连接按钮\nMac：macOS 26 的控制中心可以加 TrackNothing 按钮，一键连接或断开</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="why_ai">AI 服务</string>
@@ -592,6 +592,7 @@
   <string name="why_rest_direct">没有命中其他规则，直连。</string>
   <string name="why_rest_proxy">没有命中其他规则，走加密。</string>
   <string name="widget_globe">TrackNothing 地球</string>
+  <string name="widget_mac_description">一眼看到有没有隐身、从哪座城市出门，点一下就连接</string>
   <string name="widget_strip">TrackNothing 状态</string>
   <string name="widget_tap">轻点连接</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>
