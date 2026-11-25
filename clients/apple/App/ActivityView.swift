@@ -77,6 +77,7 @@ struct ActivityView:View {
                 }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
             }
         }.padding(2).background(Color(red:23/255,green:21/255,blue:19/255),in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+        .fixedSize(horizontal:mac,vertical:false)
     }
     private var privacy:some View {
         HStack(spacing:6) {
@@ -90,7 +91,7 @@ struct ActivityView:View {
                 Text(L10n.text("activity_title")).font(.system(size:17,weight:.semibold)).accessibilityAddTraits(.isHeader)
                 tabButtons
                 Spacer(minLength:12)
-                privacy
+                privacy.layoutPriority(-1)
             }
         } else {
             VStack(alignment:.leading,spacing:4) {
@@ -204,7 +205,7 @@ struct ActivityView:View {
     @ViewBuilder private func menu(_ c:[String:Any])->some View {
         let host=c["host"] as? String ?? "",id=c["id"] as? String ?? ""
         Text(host)
-        if Advanced.enabled && !host.isEmpty {
+        if !host.isEmpty {
             ruleItem("menu_always_proxy","proxy",host)
             ruleItem("menu_always_direct","direct",host)
             ruleItem("menu_block","block",host)
@@ -227,6 +228,8 @@ struct ActivityView:View {
         }
     }
     private func addRule(_ name:String,site whole:Bool,_ policy:String) {
+        // A rule from here turns on the person's routing rules (part of advanced) if they were off.
+        if !Advanced.enabled {Advanced.enabled=true}
         let before=Advanced.setQuickRule(name,site:whole,policy:policy)
         Task {
             let live=await model.applyRules(closing:name,site:whole)
@@ -314,7 +317,7 @@ struct ActivityView:View {
                     if proxy {HStack(spacing:6) {arrow;pathChip(exit(c))}}}
             }
             if !line.isEmpty {Text(line).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).fixedSize(horizontal:false,vertical:true)}
-            if Advanced.enabled && !host.isEmpty {
+            if !host.isEmpty {
                 HStack(spacing:8) {
                     Button {addRule(Advanced.site(host),site:true,proxy ? "direct":"proxy")} label:{
                         Text(L10n.text(proxy ? "why_make_direct":"why_make_proxy")).font(.system(size:12,weight:.semibold)).foregroundStyle(VeilbirdStyle.onAccent)

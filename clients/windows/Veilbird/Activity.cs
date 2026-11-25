@@ -187,7 +187,7 @@ public sealed class ActivityPanel:Border {
             return item;
         }
         menu.Items.Add(new MenuItem {Header=new TextBlock {Text=host,FontSize=12,Foreground=Look.Secondary,TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap,MaxWidth=280},IsEnabled=false});
-        if(Advanced.Enabled&&host.Length>0&&AddRule is not null) {
+        if(host.Length>0&&AddRule is not null) {
             foreach(var (key,policy) in new[]{("menu_always_proxy","proxy"),("menu_always_direct","direct"),("menu_block","block")}) {
                 var site=Advanced.Site(host);
                 if(site!=host) {
@@ -207,6 +207,8 @@ public sealed class ActivityPanel:Border {
     }
     private async void Rule(string name,bool site,string policy) {
         if(AddRule is null) return;
+        // A rule from here turns on the person's routing rules (part of advanced) if they were off.
+        if(!Advanced.Enabled) Advanced.Enabled=true;
         var before=Advanced.SetQuickRule(name,site,policy);
         var live=await AddRule(name,site,policy);
         Show(L10n.Text(live?"rule_added":"rule_added_later",name,L10n.Text(policy switch {"direct"=>"policy_direct","block"=>"policy_block",_=>"policy_proxy"})),before);
@@ -260,7 +262,7 @@ public sealed class ActivityPanel:Border {
         }
         stack.Children.Add(path);
         if(sentence.Length>0) stack.Children.Add(new TextBlock {Text=sentence,FontSize=12,Foreground=Look.Secondary,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,4,0,0)});
-        if(Advanced.Enabled&&host.Length>0&&AddRule is not null) {
+        if(host.Length>0&&AddRule is not null) {
             var actions=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,12,0,0)};
             var change=new Button {Content=new TextBlock {Text=L10n.Text(proxy?"why_make_direct":"why_make_proxy"),FontSize=12,FontWeight=FontWeights.SemiBold,Foreground=Look.OnAccent},
                 Background=Look.Accent,Height=28,Padding=new Thickness(12,0,12,0),Margin=new Thickness(0,0,8,0)};

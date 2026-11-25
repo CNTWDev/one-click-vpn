@@ -488,7 +488,7 @@ class MainActivity : Activity() {
         box.addView(text(host, 17f, Palette.text, 600).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.MIDDLE; setPadding(4.dp, 0, 4.dp, 0); accessibilityHeading() })
         box.addView(text(c.optString("rule") + " → " + connectionExit(c), 13f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END; setPadding(4.dp, 0, 4.dp, 0) },
             LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp; bottomMargin = 14.dp })
-        if (Advanced.enabled(this) && host.isNotEmpty()) {
+        if (host.isNotEmpty()) {
             // The reach of the rule: the whole site (and its subdomains) or only this name.
             var whole = true
             if (site != host) {
@@ -574,7 +574,7 @@ class MainActivity : Activity() {
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp })
         }
         if (line.isNotEmpty()) box.addView(text(line, 14f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14.dp })
-        if (Advanced.enabled(this) && host.isNotEmpty()) {
+        if (host.isNotEmpty()) {
             box.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 addView(text(L10n.text(if (proxy) R.string.why_make_direct else R.string.why_make_proxy), 15f, Palette.onAccent, 600).apply {
@@ -593,6 +593,8 @@ class MainActivity : Activity() {
      * to the name are closed so its next request takes the new route. A note with Undo follows.
      */
     private fun addQuickRule(name: String, site: Boolean, policy: String) {
+        // A rule from here turns on the person's routing rules (part of advanced) if they were off.
+        if (!Advanced.enabled(this)) Advanced.enable(this, true)
         val before = Advanced.setQuickRule(this, name, site, policy)
         applyRules(name, site) { live ->
             undoBar(L10n.text(if (live) R.string.rule_added else R.string.rule_added_later, name, L10n.text(when (policy) { "direct" -> R.string.policy_direct; "block" -> R.string.policy_block; else -> R.string.policy_proxy })), before)
