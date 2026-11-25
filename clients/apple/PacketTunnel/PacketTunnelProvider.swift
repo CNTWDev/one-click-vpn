@@ -356,7 +356,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         lastStall=Date()
         let line=carrying
         Journal.add("watchdog: traffic stalled via \(line)")
-        CoreReset()
+        CoreResetTunnel()
         if await checkPath() {
             Journal.add("watchdog: recovered after closing stuck connections");await report("STALL","recovered=reset line=\(line)");return
         }
@@ -369,7 +369,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         Journal.add("watchdog: "+transports.map {"\($0) \((results[$0] ?? -1)>=0 ? "ok":"fails")"}.joined(separator:", "))
         if !failed.isEmpty {CoreSuspend(Transports.group,failed.joined(separator:","),600)}
         if !working.isEmpty {
-            CoreReset();updateCarrying()
+            CoreResetTunnel();updateCarrying()
             Journal.add("watchdog: moved to \(carrying)");await report("STALL","recovered=line line=\(line)");return
         }
         Journal.add("watchdog: no line carries traffic");await report("STALL","recovered=no line=\(line)")
