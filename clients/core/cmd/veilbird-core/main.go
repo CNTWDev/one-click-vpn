@@ -159,6 +159,36 @@ func main() {
 			}
 			timeout, _ := strconv.Atoi(fields[4])
 			reply(core.ProbeFirst(fields[1], fields[2], fields[3], timeout))
+		case "health":
+			if len(fields) != 2 {
+				reply("ok")
+				continue
+			}
+			reply(core.Health(fields[1]))
+		case "check":
+			// check <via> <url> <timeoutMs> <lookup 1|0>
+			if len(fields) != 5 {
+				reply("dns=-1,web=-1")
+				continue
+			}
+			timeout, _ := strconv.Atoi(fields[3])
+			reply(core.Check(fields[1], fields[2], timeout, fields[4] == "1"))
+		case "checkeach":
+			if len(fields) != 4 {
+				reply("")
+				continue
+			}
+			timeout, _ := strconv.Atoi(fields[3])
+			reply(core.CheckEach(fields[1], fields[2], timeout))
+		case "suspend":
+			// suspend <group> <names> <seconds>
+			if len(fields) != 4 {
+				reply("error usage")
+				continue
+			}
+			seconds, _ := strconv.Atoi(fields[3])
+			core.Suspend(fields[1], fields[2], seconds)
+			reply("ok")
 		case "activity":
 			reply(core.Activity())
 		case "appusage":

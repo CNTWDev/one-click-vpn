@@ -19,6 +19,8 @@ public static class Transports {
     public const string Group="TrackNothing";
     public const string TestUrl="https://www.gstatic.com/generate_204";
     /// Answers fast from nearly every network (mainland China and Russia too): the connection check times it outside the tunnel.
+    /// What the watchdog downloads to check the path the user's traffic takes (64 KB, not an empty 204 page).
+    public const string CheckUrl="https://speed.cloudflare.com/__down?bytes=65536";
     public const string LocalUrl="http://captive.apple.com/hotspot-detect.html";
     private static readonly TimeSpan Memory=TimeSpan.FromDays(7);
     private static readonly string MemoryPath=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Veilbird","transports.json");

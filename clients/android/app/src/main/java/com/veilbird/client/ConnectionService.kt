@@ -88,6 +88,12 @@ class ConnectionService : VpnService() {
     private var nextFullProbe = 0L
     private var lastNetworkCheck = 0L
     private var failures = 0
+    /** The watchdog (core health) looks at the user's traffic on every tick; a stall is handled at most every STALL_SPACING. */
+    private var lastStall = 0L
+    /** Locations that failed the user's traffic here (until when): automatic mode does not move back to them meanwhile. */
+    private val badNodes = mutableMapOf<String, Long>()
+    /** Automatic moves in the last 10 minutes; after 3 the tunnel stays where it is (no flapping between locations). */
+    private val moves = mutableListOf<Long>()
     /** The next full probe reports to the server (the connect probe did not test every transport). */
     private var reportNext = false
     private var notified = ""
@@ -414,7 +420,10 @@ class ConnectionService : VpnService() {
                     failures = 0; nextProbe = SystemClock.elapsedRealtime() + if (interactive) HEALTHY else HEALTHY_IDLE
                 } else missed()
                 ConnectionStateStore.messageId = message()
-            } else updateCarrying()
+            } else {
+                updateCarrying()
+                if (failures == 0 && now - lastStall >= STALL_SPACING && Core.health(Transports.GROUP).startsWith("stalled")) stalled()
+            }
             ConnectionStateStore.attempt = failures; ConnectionStateStore.retryAt = if (failures > 0) nextProbe else 0L
             Core.rate().split(' ').let { (up, down) -> ConnectionStateStore.txRate = up.toLong(); ConnectionStateStore.rxRate = down.toLong() }
         } catch (e: Exception) {
@@ -441,6 +450,39 @@ class ConnectionService : VpnService() {
         nextProbe = 0; nextFullProbe = 0; failures = minOf(failures, 1)
         if (now - renewedAt > 90000) renewAt = 0
     }
+    /**
+     * The user's traffic stopped coming back while the lines still answer probes (a stuck DNS connection, a line that
+     * passes a small test page but not real traffic): close what hangs, check the path the traffic takes, then keep the
+     * lines that fail it out of use and, when none carries traffic, treat it as a drop (automatic: move).
+     */
+    private fun stalled() {
+        lastStall = SystemClock.elapsedRealtime()
+        val line = carrying
+        Journal.add("watchdog: traffic stalled via $line")
+        Core.reset()
+        if (checkPath()) { Journal.add("watchdog: recovered after closing stuck connections"); api.report("STALL", nodeId, "recovered=reset line=$line"); return }
+        // Nothing answers outside the tunnel either: the network is down (or a sign-in page), not the location.
+        val local = Core.probe("DIRECT", Transports.LOCAL_URL, 3000).substringAfterLast('=').toIntOrNull() ?: -1
+        if (local < 0) { Journal.add("watchdog: the network itself does not answer, waiting"); return }
+        val results = Transports.parseProbe(Core.checkEach(transports.joinToString(","), Transports.CHECK_URL, 5000))
+        val failed = transports.filter { (results[it] ?: -1) < 0 }
+        Journal.add("watchdog: " + transports.joinToString(", ") { "$it ${if ((results[it] ?: -1) >= 0) "ok" else "fails"}" })
+        if (failed.isNotEmpty()) Core.suspend(Transports.GROUP, failed.joinToString(","), 600)
+        if (failed.size < transports.size) {
+            Core.reset(); updateCarrying()
+            Journal.add("watchdog: moved to $carrying"); api.report("STALL", nodeId, "recovered=line line=$line"); return
+        }
+        Journal.add("watchdog: no line carries traffic"); api.report("STALL", nodeId, "recovered=no line=$line")
+        Session.dropped(this)
+        failures = 2; nextProbe = SystemClock.elapsedRealtime() + RETRY[1]
+        if (automatic) moveToFastest()
+        ConnectionStateStore.messageId = message()
+    }
+    /** The path the user's traffic takes: a fresh lookup through the tunnel's DNS and a 64 KB download through the group. */
+    private fun checkPath(): Boolean {
+        val values = Transports.parseProbe(Core.check(Transports.GROUP, Transports.CHECK_URL, 5000, true))
+        return (values["dns"] ?: -1) >= 0 && (values["web"] ?: -1) >= 0
+    }
     /** A round where no transport answered while the device has a network. */
     private fun missed() {
         failures++; nextProbe = SystemClock.elapsedRealtime() + backoff()
@@ -450,16 +492,32 @@ class ConnectionService : VpnService() {
     }
     /** Automatic mode: measures every location now and moves to the fastest one that answers, if it is another. */
     private fun moveToFastest() {
-        val ranked = try { Latency.rank(api.request("nodes").getJSONArray("nodes"), attempts = 1, settleMs = SETTLE) } catch (_: Exception) { emptyList() }
-        val best = ranked.firstOrNull { it.second.latency != null }?.first ?: run { Journal.add("switch: no location answers, retrying"); return }
+        // The location that failed stays out for a while (its port may still answer the measurement below), and so do
+        // others that failed here recently. Three moves in 10 minutes are the most: then stay and keep retrying.
+        val now = SystemClock.elapsedRealtime()
+        badNodes[nodeId] = now + BAD_FOR; badNodes.entries.removeAll { it.value <= now }
+        moves.removeAll { now - it >= 600000 }
+        if (moves.size >= 3) { Journal.add("switch: moved 3 times in 10 minutes, staying"); return }
+        val candidates = try {
+            val all = api.request("nodes").getJSONArray("nodes")
+            org.json.JSONArray().also { kept -> for (i in 0 until all.length()) all.getJSONObject(i).let { if (it.optString("id") !in badNodes) kept.put(it) } }
+        } catch (_: Exception) { org.json.JSONArray() }
+        val ranked = try { Latency.rank(candidates, attempts = 1, settleMs = SETTLE) } catch (_: Exception) { emptyList() }
+        val best = ranked.firstOrNull { it.second.latency != null }?.first ?: run { Journal.add("switch: no other location answers, retrying"); return }
         val id = best.getString("id")
         if (id == nodeId) return
+        moves.add(now)
         Journal.add("switch: ${ConnectionStateStore.node} failed (HANDSHAKE_TIMEOUT), moving to ${best.optString("name")}")
         val from = ConnectionStateStore.node; val previous = nodeId
         nodeId = id
         try {
             bringUp(); ConnectionStateStore.switchedFrom = from
             failures = 0
+            // The new location must carry real traffic, not only answer the connect probe.
+            if (!checkPath()) {
+                Journal.add("switch: ${ConnectionStateStore.node} connected but carries no traffic")
+                badNodes[id] = SystemClock.elapsedRealtime() + BAD_FOR; failures = 2; nextProbe = SystemClock.elapsedRealtime() + RETRY[0]
+            }
         } catch (e: Exception) {
             if (fatal(e)) { fail(e); return }
             // The lease request did not reach the server: the tunnel still runs on the previous location.
@@ -518,6 +576,8 @@ class ConnectionService : VpnService() {
         /** Tick interval with the screen on, and with it off while the connection works. */
         private const val TICK = 2000L
         private const val TICK_IDLE = 20000L
+        private const val STALL_SPACING = 20000L
+        private const val BAD_FOR = 15 * 60000L
         /** Lease renewal after a successful one. The server's lease lasts 300 s; failures retry every 15 s. */
         private const val RENEW = 150000L
         /** How often the account is read again while connected. */
