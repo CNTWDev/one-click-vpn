@@ -393,6 +393,10 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="routing_smart_detail" xml:space="preserve"><value>Sites in mainland China go direct, the rest through TrackNothing</value></data>
   <data name="rule_added" xml:space="preserve"><value>Rule added: {0} {1}, in effect now</value></data>
   <data name="rule_added_later" xml:space="preserve"><value>Rule added: {0} {1}, applies from the next connection</value></data>
+  <data name="rule_confirm" xml:space="preserve"><value>Change {0} to “{1}”?</value></data>
+  <data name="rule_confirm_domain" xml:space="preserve"><value>Only this exact name. Takes effect now; you can change it back in routing rules.</value></data>
+  <data name="rule_confirm_ok" xml:space="preserve"><value>Change</value></data>
+  <data name="rule_confirm_site" xml:space="preserve"><value>Includes all its subdomains. Takes effect now; you can change it back in routing rules.</value></data>
   <data name="rule_undo" xml:space="preserve"><value>Undo</value></data>
   <data name="rule_undone" xml:space="preserve"><value>Undone</value></data>
   <data name="rules_count" xml:space="preserve"><value>{0} rules</value></data>

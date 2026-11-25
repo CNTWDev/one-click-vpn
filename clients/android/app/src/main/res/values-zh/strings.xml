@@ -387,6 +387,10 @@
   <string name="routing_smart_detail">国内网站直连，其余经过 TrackNothing</string>
   <string name="rule_added">已添加规则：%1$s %2$s，已生效</string>
   <string name="rule_added_later">已添加规则：%1$s %2$s，下次连接时生效</string>
+  <string name="rule_confirm">把 %1$s 改为「%2$s」？</string>
+  <string name="rule_confirm_domain">只对这一个域名。马上生效，之后可以在分流规则里改回。</string>
+  <string name="rule_confirm_ok">确认修改</string>
+  <string name="rule_confirm_site">包括它的所有子域名。马上生效，之后可以在分流规则里改回。</string>
   <string name="rule_undo">撤销</string>
   <string name="rule_undone">已撤销</string>
   <string name="rules_count">%1$s 条</string>

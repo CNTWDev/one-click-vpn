@@ -393,6 +393,10 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="routing_smart_detail" xml:space="preserve"><value>Сайты материкового Китая напрямую, остальное через TrackNothing</value></data>
   <data name="rule_added" xml:space="preserve"><value>Правило добавлено: {0} — {1}, уже действует</value></data>
   <data name="rule_added_later" xml:space="preserve"><value>Правило добавлено: {0} — {1}, со следующего подключения</value></data>
+  <data name="rule_confirm" xml:space="preserve"><value>Изменить {0}: «{1}»?</value></data>
+  <data name="rule_confirm_domain" xml:space="preserve"><value>Только этот домен. Действует сразу; вернуть можно в правилах маршрутизации.</value></data>
+  <data name="rule_confirm_ok" xml:space="preserve"><value>Изменить</value></data>
+  <data name="rule_confirm_site" xml:space="preserve"><value>Включая все поддомены. Действует сразу; вернуть можно в правилах маршрутизации.</value></data>
   <data name="rule_undo" xml:space="preserve"><value>Отменить</value></data>
   <data name="rule_undone" xml:space="preserve"><value>Отменено</value></data>
   <data name="rules_count" xml:space="preserve"><value>Правил: {0}</value></data>

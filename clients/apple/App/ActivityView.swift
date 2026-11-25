@@ -19,6 +19,8 @@ struct ActivityView:View {
     /// The list as it was when the pointer came onto it (Mac): rows keep their places, so a click or right
     /// click lands on the row that was under the pointer. Their figures still update.
     @State private var held:[[String:Any]]?
+    /// The rule waiting for the person's yes.
+    @State private var asking:(name:String,whole:Bool,policy:String)?
     private let mac=VeilbirdStyle.mac
     private static let direct=Color(red:97/255,green:90/255,blue:80/255)
     private static let row=Color(red:26/255,green:24/255,blue:22/255)
@@ -50,6 +52,16 @@ struct ActivityView:View {
         .frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.top)
         .overlay(alignment:.bottom) {if let toast {toastView(toast)}}
         .onChange(of:model.since) {_ in why=nil}
+        .alert(asking.map {L10n.text("rule_confirm",$0.name,Self.policyName($0.policy))} ?? "",
+               isPresented:Binding(get:{asking != nil},set:{if !$0 {asking=nil}})) {
+            Button(L10n.text("cancel"),role:.cancel) {asking=nil}
+            Button(L10n.text("rule_confirm_ok")) {
+                if let a=asking {applyRule(a.name,site:a.whole,a.policy)}
+                asking=nil
+            }
+        } message:{
+            Text(L10n.text(asking?.whole ?? true ? "rule_confirm_site":"rule_confirm_domain"))
+        }
         .task(id:model.since) {
             // Once a second while connected; the view going away stops it. Not connected there is nothing to ask
             // (the task starts again when the connection is confirmed).
@@ -259,12 +271,17 @@ struct ActivityView:View {
             Button(L10n.text(key)) {addRule(host,site:true,policy)}
         }
     }
-    private func addRule(_ name:String,site whole:Bool,_ policy:String) {
+    /// A rule change asks first (one slip in a list that moves would otherwise reroute a site).
+    private func addRule(_ name:String,site whole:Bool,_ policy:String) {asking=(name,whole,policy)}
+    private func applyRule(_ name:String,site whole:Bool,_ policy:String) {
         let before=Advanced.setQuickRule(name,site:whole,policy:policy)
         Task {
             let live=await model.applyRules(closing:name,site:whole)
             show(L10n.text(live ? "rule_added":"rule_added_later",name,L10n.text(policy=="direct" ? "policy_direct":policy=="block" ? "policy_block":"policy_proxy")),before:before)
         }
+    }
+    static func policyName(_ policy:String)->String {
+        L10n.text(policy=="direct" ? "menu_always_direct":policy=="block" ? "menu_block":"menu_always_proxy")
     }
     private func show(_ text:String,before:String?) {
         toastTask?.cancel()

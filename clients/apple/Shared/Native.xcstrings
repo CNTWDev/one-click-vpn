@@ -8879,6 +8879,98 @@
         }
       }
     },
+    "rule_confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change %1$@ to “%2$@”?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把 %1$@ 改为「%2$@」？"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменить %1$@: «%2$@»?"
+          }
+        }
+      }
+    },
+    "rule_confirm_domain": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only this exact name. Takes effect now; you can change it back in routing rules."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只对这一个域名。马上生效，之后可以在分流规则里改回。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Только этот домен. Действует сразу; вернуть можно в правилах маршрутизации."
+          }
+        }
+      }
+    },
+    "rule_confirm_ok": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确认修改"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменить"
+          }
+        }
+      }
+    },
+    "rule_confirm_site": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Includes all its subdomains. Takes effect now; you can change it back in routing rules."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "包括它的所有子域名。马上生效，之后可以在分流规则里改回。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Включая все поддомены. Действует сразу; вернуть можно в правилах маршрутизации."
+          }
+        }
+      }
+    },
     "rule_undo": {
       "extractionState": "manual",
       "localizations": {
