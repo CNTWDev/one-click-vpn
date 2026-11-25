@@ -505,6 +505,8 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="trail_poster_title" xml:space="preserve"><value>Where I went out from</value></data>
   <data name="trail_range" xml:space="preserve"><value>Last {0}</value></data>
   <data name="trail_save" xml:space="preserve"><value>Save image</value></data>
+  <data name="trail_save_failed" xml:space="preserve"><value>Couldn't save the poster</value></data>
+  <data name="trail_saved" xml:space="preserve"><value>Poster saved to Photos</value></data>
   <data name="trail_share" xml:space="preserve"><value>Share</value></data>
   <data name="trail_show_home" xml:space="preserve"><value>Show my home city on the poster</value></data>
   <data name="trail_title" xml:space="preserve"><value>Trail</value></data>
@@ -575,7 +577,8 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac: say &quot;TrackNothing Tokyo&quot; in Spotlight, Siri or Shortcuts to connect straight there, or move a running connection; you can also switch between smart and global routing</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Android: the Usage page now shows your trail, a globe of the cities you went out from in the period, how much went through each, and how long this phone stayed hidden
+Android: turn the trail into a poster to save to Photos or share; your home city is left off by default and the image carries no IP</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI service</value></data>

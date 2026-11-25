@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.46
+
+### zh
+- 安卓：用量页新增「航迹」，地球上画出这段时间你从哪些城市出门、各走了多少流量，还有本机隐身时长
+- 安卓：航迹可以一键生成海报，存到相册或分享；出发城市默认不出现在海报上，图里没有 IP
+
+### en
+- Android: the Usage page now shows your trail, a globe of the cities you went out from in the period, how much went through each, and how long this phone stayed hidden
+- Android: turn the trail into a poster to save to Photos or share; your home city is left off by default and the image carries no IP
+
+### ru
+- Android: на странице трафика появились «Маршруты»: глобус с городами, через которые вы выходили в сеть, объём через каждый и время, которое телефон был скрыт
+- Android: из маршрутов можно сделать постер, сохранить в галерею или поделиться; ваш город по умолчанию скрыт, IP на картинке нет
+
 ## 1.0.45
 
 ### zh

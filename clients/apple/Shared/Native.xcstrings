@@ -11455,6 +11455,52 @@
         }
       }
     },
+    "trail_save_failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save the poster"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没能保存海报"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось сохранить постер"
+          }
+        }
+      }
+    },
+    "trail_saved": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Poster saved to Photos"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "海报已存到相册"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Постер сохранён в галерею"
+          }
+        }
+      }
+    },
     "trail_share": {
       "extractionState": "manual",
       "localizations": {
@@ -13048,19 +13094,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac: say \"TrackNothing Tokyo\" in Spotlight, Siri or Shortcuts to connect straight there, or move a running connection; you can also switch between smart and global routing"
+            "value": "Android: the Usage page now shows your trail, a globe of the cities you went out from in the period, how much went through each, and how long this phone stayed hidden\nAndroid: turn the trail into a poster to save to Photos or share; your home city is left off by default and the image carries no IP"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac：在聚焦搜索、Siri 或快捷指令里说「TrackNothing 东京」就能直接连过去，正在连接时会换到那里；也能切换智能分流和全局"
+            "value": "安卓：用量页新增「航迹」，地球上画出这段时间你从哪些城市出门、各走了多少流量，还有本机隐身时长\n安卓：航迹可以一键生成海报，存到相册或分享；出发城市默认不出现在海报上，图里没有 IP"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac: скажите «TrackNothing Токио» в Spotlight, Siri или Командах, чтобы подключиться туда сразу или перенести текущее подключение; там же можно переключить умный и глобальный режим"
+            "value": "Android: на странице трафика появились «Маршруты»: глобус с городами, через которые вы выходили в сеть, объём через каждый и время, которое телефон был скрыт\nAndroid: из маршрутов можно сделать постер, сохранить в галерею или поделиться; ваш город по умолчанию скрыт, IP на картинке нет"
           }
         }
       }

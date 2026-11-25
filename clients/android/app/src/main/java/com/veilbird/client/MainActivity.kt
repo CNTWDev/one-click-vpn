@@ -834,6 +834,109 @@ class MainActivity : Activity() {
     // ---- Usage: what this account used, per day, per device and per location (the server's daily totals), and on
     // Windows per program (kept on that computer only). Opened from the home's usage strip.
     private var usageDays = 30
+    // MARK: Trail
+    /** The locations of the range on the globe, each lit by its share of the traffic. */
+    private fun trailExits(data: JSONObject): List<TrailExit> {
+        val arr = data.optJSONArray("nodes") ?: return emptyList()
+        val rows = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+        val most = maxOf(1L, rows.maxOfOrNull { it.optString("bytes").toLongOrNull() ?: 0L } ?: 1L).toDouble()
+        return rows.mapNotNull { r -> Directory.places[r.optString("id")]?.let { p -> TrailExit(Spot(p[0], p[1], r.optString("name")), (r.optString("bytes").toLongOrNull() ?: 0L) / most) } }
+    }
+    private fun trailHome() = if (VisitorPlace.shown(this)) VisitorPlace.spot(this) else null
+    private fun trailStats(data: JSONObject, days: Int, total: Long) = listOf(
+        L10n.number(data.optJSONArray("nodes")?.length() ?: 0) to L10n.text(R.string.trail_cities),
+        bytes(total).replace('\u00A0', ' ') to L10n.text(R.string.trail_traffic),
+        HiddenTime.text(HiddenTime.hours(this, days)) to L10n.text(R.string.trail_hidden))
+    private fun trailRange(days: Int) = L10n.text(R.string.trail_range, L10n.text(usageRangeTitle(days)))
+    private fun trailCard(data: JSONObject, days: Int, total: Long): View = card().apply {
+        addView(text(L10n.text(R.string.trail_title), 12f, Palette.secondary, 500).apply { accessibilityHeading() })
+        val exits = trailExits(data)
+        if (exits.isEmpty()) {
+            addView(text(L10n.text(R.string.trail_empty), 13f, Palette.secondary), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 10.dp })
+            return@apply
+        }
+        addView(TrailGlobe(this@MainActivity).apply {
+            this.exits = exits; home = trailHome(); contentDescription = exits.joinToString(", ") { it.spot.label }
+        }, LinearLayout.LayoutParams(-1, 280.dp).apply { topMargin = 10.dp })
+        val stats = trailStats(data, days, total)
+        addView(statsRow(stats), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12.dp })
+        addView(primaryButton(L10n.text(R.string.trail_make_poster)) { posterSheet(exits, stats, days) }, LinearLayout.LayoutParams(-1, 52.dp).apply { topMargin = 16.dp })
+    }
+    /** Three figures side by side: the number in the dot face with its unit small beside it, the name under it. */
+    private fun statsRow(stats: List<Pair<String, String>>) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        stats.forEachIndexed { i, (value, caption) ->
+            val parts = value.split(' ', limit = 2)
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM
+                    addView(text(parts[0], 22f, if (i == 0) Palette.accent else Palette.text).apply { typeface = Pixel.font(this@MainActivity); maxLines = 1 })
+                    if (parts.size > 1) addView(text(parts[1], 11f, Palette.secondary, 500).apply { maxLines = 1 }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 4.dp; bottomMargin = 3.dp })
+                })
+                addView(text(caption, 11f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 4.dp })
+                contentDescription = "$caption $value"
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { if (i > 0) marginStart = 12.dp })
+        }
+    }
+    /** The poster as it will be shared, the home city switch (off by default) and where it goes. */
+    private fun posterSheet(exits: List<TrailExit>, stats: List<Pair<String, String>>, days: Int) {
+        val prefs = getSharedPreferences("preferences", MODE_PRIVATE)
+        val home = trailHome()
+        var withHome = prefs.getBoolean("trailPosterHome", false)
+        var poster = TrailPoster.render(this, exits, if (withHome) home else null, trailRange(days), stats)
+        val dialog = Dialog(this).apply { requestWindowFeature(Window.FEATURE_NO_TITLE) }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(20.dp, 10.dp, 20.dp, 24.dp)
+            background = GradientDrawable().apply { setColor(Palette.surface); val r = 24.dp.toFloat(); cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f) }
+        }
+        box.addView(View(this).apply { background = rounded(Color.rgb(52, 49, 43), 2) }, LinearLayout.LayoutParams(36.dp, 4.dp).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        box.addView(text(L10n.text(R.string.trail_make_poster), 19f, Palette.text, 600).apply { accessibilityHeading() }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 18.dp; bottomMargin = 14.dp })
+        val preview = ImageView(this).apply {
+            setImageBitmap(poster); scaleType = ImageView.ScaleType.FIT_CENTER; adjustViewBounds = true
+            background = rounded(Palette.ground, 12); clipToOutline = true; contentDescription = L10n.text(R.string.trail_poster_title)
+        }
+        box.addView(preview, LinearLayout.LayoutParams(-2, 360.dp).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        if (home != null) {
+            val value = text("", 14f, Palette.secondary).apply { maxLines = 1 }
+            fun show() { value.text = L10n.text(if (withHome) R.string.setting_on else R.string.setting_off); value.setTextColor(if (withHome) Palette.accent else Palette.secondary) }
+            show()
+            box.addView(row().apply {
+                addView(text(L10n.text(R.string.trail_show_home), 15f).apply { maxLines = 2 }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(value, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 12.dp })
+                contentDescription = L10n.text(R.string.trail_show_home)
+                setOnClickListener {
+                    withHome = !withHome; prefs.edit().putBoolean("trailPosterHome", withHome).apply(); show(); Haptics.tick(this)
+                    val next = TrailPoster.render(this@MainActivity, exits, if (withHome) home else null, trailRange(days), stats)
+                    preview.setImageBitmap(next); poster.recycle(); poster = next
+                }
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp })
+        }
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        if (Build.VERSION.SDK_INT >= 29) actions.addView(primaryButton(L10n.text(R.string.trail_save)) {
+            val saved = TrailPoster.save(this, poster)
+            android.widget.Toast.makeText(this, L10n.text(if (saved) R.string.trail_saved else R.string.trail_save_failed), android.widget.Toast.LENGTH_SHORT).show()
+        }, LinearLayout.LayoutParams(0, 52.dp, 1f).apply { marginEnd = 10.dp })
+        actions.addView(text(L10n.text(R.string.trail_share), 16f, Palette.text, 600).apply {
+            gravity = Gravity.CENTER; background = RippleDrawable(ColorStateList.valueOf(Palette.alpha(Palette.text, 30)), rounded(Palette.raised, 14), null); isClickable = true
+            setOnClickListener {
+                val uri = TrailPoster.file(this@MainActivity, poster)
+                val send = Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                send.clipData = android.content.ClipData.newRawUri("TrackNothing", uri)
+                startActivity(Intent.createChooser(send, null))
+            }
+        }, LinearLayout.LayoutParams(0, 52.dp, 1f))
+        box.addView(actions, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 16.dp })
+        dialog.setContentView(android.widget.ScrollView(this).apply { isVerticalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER; addView(box) })
+        dialog.setOnDismissListener { poster.recycle() }
+        dialog.show()
+        dialog.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT)); setGravity(Gravity.BOTTOM)
+            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND); setDimAmount(0.6f)
+            @Suppress("DEPRECATION") navigationBarColor = Palette.surface
+        }
+    }
     private fun usagePage() {
         subPageTitle(L10n.text(R.string.usage_title)) { page = "connect"; render() }
         val quota = card().also { add(it) }
@@ -933,6 +1036,7 @@ class MainActivity : Activity() {
                         val arr = data.optJSONArray(key) ?: return@apply
                         for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { put(JSONObject().put("name", name(it)).put("bytes", it.optString("bytes").toLongOrNull() ?: 0L).put("proxy", true)) }
                     }
+                    lists.addView(trailCard(data, days, shownDays.sumOf { it.second }), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12.dp })
                     lists.addView(rankList(L10n.text(R.string.usage_by_device), rows("devices") { d ->
                         d.optString("name").ifBlank { L10n.text(R.string.device) }.let { if (d.optBoolean("isCurrent")) L10n.text(R.string.usage_this_device, it) else it } }, mono = false, note = null),
                         LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12.dp })

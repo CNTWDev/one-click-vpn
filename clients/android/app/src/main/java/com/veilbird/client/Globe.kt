@@ -90,6 +90,29 @@ object Earth {
         val x = a[0] * k1 + b[0] * k2; val y = a[1] * k1 + b[1] * k2; val z = a[2] * k1 + b[2] * k2
         return doubleArrayOf(asin(y / sqrt(x * x + y * y + z * z)) / R, atan2(x, z) / R)
     }
+    /** The earth as the old sphere's dot lattice, drawn into a square bitmap seen from above (vLat, vLon). */
+    fun lattice(bitmap: Bitmap, viewLat: Double, viewLon: Double) {
+        val s = bitmap.width
+        bitmap.eraseColor(0)
+        val canvas = Canvas(bitmap); val dot = Paint(Paint.ANTI_ALIAS_FLAG)
+        val pitch = s * 6f / 320f; val r = s * 1.15f / 320f; val radius = s / 2.0
+        val lx = s * .42; val ly = s * .34; val light = Palette.light
+        var y = pitch / 2.0
+        while (y < s) {
+            var x = pitch / 2.0
+            while (x < s) {
+                val nx = (x - radius) / radius; val ny = (radius - y) / radius; val dd = nx * nx + ny * ny
+                if (dd <= 1) {
+                    val z = sqrt(1 - dd); val ll = Earth.unproject(nx, ny, viewLat, viewLon); val land = Earth.land(ll[0], ll[1])
+                    val a = Earth.light(hypot(x - lx, y - ly) / (s * .98)); val limb = min(1.0, z / .18)
+                    val al = (land * (.3 + .5 * a) + (1 - land) * (.025 + .08 * a)) * limb
+                    if (al >= .02) { dot.color = Palette.alpha(light, (255 * min(1.0, al)).toInt()); canvas.drawCircle(x.toFloat(), y.toFloat(), r * (.72f + .32f * land), dot) }
+                }
+                x += pitch
+            }
+            y += pitch
+        }
+    }
     fun km(a: Spot, b: Spot) = angle(a.lat, a.lon, b.lat, b.lon) * 6371
     fun ease(t: Double) = if (t < .5) 4 * t * t * t else 1 - (-2 * t + 2).pow(3) / 2
 }
@@ -194,25 +217,7 @@ class Portrait(context: Context) : View(context) {
         val key = "$s ${(viewLat * 100).roundToInt()} ${(viewLon * 100).roundToInt()} ${Palette.theme}"
         cache?.let { if (key == cacheKey && !it.isRecycled) return it }
         val bitmap = cache?.takeIf { !it.isRecycled && it.width == s } ?: Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888).also { cache?.recycle() }
-        bitmap.eraseColor(0)
-        val canvas = Canvas(bitmap); val dot = Paint(Paint.ANTI_ALIAS_FLAG)
-        val pitch = s * 6f / 320f; val r = s * 1.15f / 320f; val radius = s / 2.0
-        val lx = s * .42; val ly = s * .34; val light = Palette.light
-        var y = pitch / 2.0
-        while (y < s) {
-            var x = pitch / 2.0
-            while (x < s) {
-                val nx = (x - radius) / radius; val ny = (radius - y) / radius; val dd = nx * nx + ny * ny
-                if (dd <= 1) {
-                    val z = sqrt(1 - dd); val ll = Earth.unproject(nx, ny, viewLat, viewLon); val land = Earth.land(ll[0], ll[1])
-                    val a = Earth.light(hypot(x - lx, y - ly) / (s * .98)); val limb = min(1.0, z / .18)
-                    val al = (land * (.3 + .5 * a) + (1 - land) * (.025 + .08 * a)) * limb
-                    if (al >= .02) { dot.color = Palette.alpha(light, (255 * min(1.0, al)).toInt()); canvas.drawCircle(x.toFloat(), y.toFloat(), r * (.72f + .32f * land), dot) }
-                }
-                x += pitch
-            }
-            y += pitch
-        }
+        Earth.lattice(bitmap, viewLat, viewLon)
         cache = bitmap; cacheKey = key
         return bitmap
     }

@@ -2988,5 +2988,15 @@
     "zh": "近 {0}",
     "en": "Last {0}",
     "ru": "За {0}"
+  },
+  "trail_saved": {
+    "zh": "海报已存到相册",
+    "en": "Poster saved to Photos",
+    "ru": "Постер сохранён в галерею"
+  },
+  "trail_save_failed": {
+    "zh": "没能保存海报",
+    "en": "Couldn't save the poster",
+    "ru": "Не удалось сохранить постер"
   }
 }
