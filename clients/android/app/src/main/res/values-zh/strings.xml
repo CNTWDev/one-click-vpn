@@ -534,7 +534,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">修复开着 VPN 时微信等国内应用发图片、传文件很慢甚至发不出去：断线检测不再把正在上传的连接当成卡住，也不再顺带掐断直连的国内连接</string>
+  <string name="whats_new_notes">电脑上「活动」里点一条连接，详情显示在列表右侧，不再盖住列表；选中的那一行一直看得见\n手机上点一条连接，详情从底部弹出</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="why_ai">AI 服务</string>

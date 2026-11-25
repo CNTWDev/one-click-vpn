@@ -162,27 +162,40 @@ struct ActivityView:View {
                     .background(Self.card,in:RoundedRectangle(cornerRadius:7))
                 }
             }
-            if mac {
-                HStack(spacing:12) {
-                    Text(L10n.text("activity_domain")).padding(.leading,16).frame(maxWidth:.infinity,alignment:.leading)
-                    Text(L10n.text("activity_rule")).frame(width:150,alignment:.leading)
-                    Text(L10n.text("activity_out")).frame(width:76,alignment:.leading)
-                    Text(L10n.text("activity_down")).frame(width:76,alignment:.trailing)
-                    Text(L10n.text("activity_duration")).frame(width:52,alignment:.trailing)
-                }.font(.system(size:11)).foregroundStyle(VeilbirdStyle.faint).lineLimit(1).frame(height:30)
-                .overlay(alignment:.bottom) {Rectangle().fill(Self.line).frame(height:1)}
-            }
-            ScrollView {
-                LazyVStack(spacing:0) {
-                    ForEach(Array(listed.enumerated()),id:\.offset) {_,c in connectionRow(c)}
-                    if shown.isEmpty {Text(L10n.text("activity_nothing")).font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary).frame(maxWidth:.infinity,alignment:.leading).padding(.top,16)}
+            HStack(alignment:.top,spacing:14) {
+                VStack(spacing:0) {
+                    if mac {
+                        HStack(spacing:12) {
+                            Text(L10n.text("activity_domain")).padding(.leading,16).frame(maxWidth:.infinity,alignment:.leading)
+                            if !narrow {Text(L10n.text("activity_rule")).frame(width:150,alignment:.leading)}
+                            Text(L10n.text("activity_out")).frame(width:76,alignment:.leading)
+                            Text(L10n.text("activity_down")).frame(width:76,alignment:.trailing)
+                            if !narrow {Text(L10n.text("activity_duration")).frame(width:52,alignment:.trailing)}
+                        }.padding(.trailing,narrow ? 8:0).font(.system(size:11)).foregroundStyle(VeilbirdStyle.faint).lineLimit(1).frame(height:30)
+                        .overlay(alignment:.bottom) {Rectangle().fill(Self.line).frame(height:1)}
+                        .padding(.bottom,mac ? 10:6)
+                    }
+                    ScrollView {
+                        LazyVStack(spacing:0) {
+                            ForEach(Array(listed.enumerated()),id:\.offset) {_,c in connectionRow(c)}
+                            if shown.isEmpty {Text(L10n.text("activity_nothing")).font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary).frame(maxWidth:.infinity,alignment:.leading).padding(.top,16)}
+                        }
+                    }
+                    .onHover {inside in held=inside && mac ? shown:nil}
                 }
+                // The Mac: the details take a column at the right; the list narrows (rule and time go to the details).
+                if mac,let why {panel(current(why)).frame(width:264)}
             }
-            .onHover {inside in held=inside && mac ? shown:nil}
-            // The row as it is now (the list changes every second), or as last seen once it closed.
-            if let why {panel(conns.first {($0["id"] as? String)==(why["id"] as? String)} ?? why)}
+        }
+        .sheet(isPresented:Binding(get:{!mac && why != nil},set:{if !$0 {why=nil}})) {
+            if let why {panel(current(why)).padding(16).background(VeilbirdStyle.ground).presentationDetents([.medium,.large])}
         }
     }
+    /// The row as it is now (the list changes every second), or as last seen once it closed.
+    private func current(_ c:[String:Any])->[String:Any] {conns.first {($0["id"] as? String)==(c["id"] as? String)} ?? c}
+    private func selected(_ c:[String:Any])->Bool {why != nil && (why?["id"] as? String)==(c["id"] as? String)}
+    /// The Mac list while the details column is open: the rule and the time leave room for the domain.
+    private var narrow:Bool {mac && why != nil}
     private func connectionRow(_ c:[String:Any])->some View {
         rowBody(c).contentShape(Rectangle())
             .onTapGesture {
@@ -200,11 +213,12 @@ struct ActivityView:View {
                     dot(proxy)
                     Text(c["host"] as? String ?? "").font(.system(size:13)).lineLimit(1).truncationMode(.middle)
                 }.frame(maxWidth:.infinity,alignment:.leading)
-                Text(c["rule"] as? String ?? "").font(.system(size:12,design:.monospaced)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1).frame(width:150,alignment:.leading)
+                if !narrow {Text(c["rule"] as? String ?? "").font(.system(size:12,design:.monospaced)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1).frame(width:150,alignment:.leading)}
                 Text(exit(c)).font(.system(size:13)).foregroundStyle(proxy ? VeilbirdStyle.text:VeilbirdStyle.secondary).lineLimit(1).frame(width:76,alignment:.leading)
                 Text(Self.rate(rate)).font(.system(size:12,design:.monospaced)).foregroundStyle(rate>0 ? VeilbirdStyle.text:Self.dim).lineLimit(1).frame(width:76,alignment:.trailing)
-                Text(Self.elapsed(int(c["start"]))).font(.system(size:12,design:.monospaced)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1).frame(width:52,alignment:.trailing)
-            }.frame(height:36).overlay(alignment:.bottom) {Rectangle().fill(Self.row).frame(height:1)}
+                if !narrow {Text(Self.elapsed(int(c["start"]))).font(.system(size:12,design:.monospaced)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1).frame(width:52,alignment:.trailing)}
+            }.padding(.trailing,narrow ? 8:0).frame(height:36)
+            .background(selected(c) ? Color(red:29/255,green:27/255,blue:24/255):Color.clear,in:RoundedRectangle(cornerRadius:7)).overlay(alignment:.bottom) {Rectangle().fill(Self.row).frame(height:1)}
         } else {
             HStack(spacing:12) {
                 dot(proxy)
@@ -306,62 +320,59 @@ struct ActivityView:View {
             .background(lit ? VeilbirdStyle.selected:Color(red:32/255,green:30/255,blue:27/255),in:RoundedRectangle(cornerRadius:7))
     }
     /// The connection panel (one click on a row): why it went this way, and everything the menu offers.
+    /// The connection's details: a column at the right of the list on the Mac (the list gives it room, nothing is
+    /// covered), a sheet on the phone. Why it went this way, then everything the menu offers.
     private func panel(_ c:[String:Any])->some View {
         let host=c["host"] as? String ?? "",id=c["id"] as? String ?? "",proxy=flag(c["proxy"]),via=c["via"] as? String ?? ""
         let (chip,line)=reason(c)
         let site=Advanced.site(host),whole=wholeSite || site==host
         let arrow=Text("→").font(.system(size:12)).foregroundStyle(VeilbirdStyle.faint)
-        let steps=Group {
-            pathChip(chip,lit:true)
-            arrow
-            pathChip(L10n.text(proxy ? "activity_proxy":"activity_direct"))
-            if proxy {
-                arrow
-                pathChip(exit(c))
-                if !via.isEmpty && via != exit(c) {arrow;pathChip(via,mono:true)}
-            }
-        }
-        return VStack(alignment:.leading,spacing:10) {
-            HStack(spacing:8) {
-                Text(host).font(.system(size:14,weight:.semibold)).lineLimit(1).truncationMode(.middle)
-                Spacer(minLength:8)
-                Button {why=nil} label:{Image(systemName:"xmark").font(.system(size:11,weight:.semibold)).foregroundStyle(VeilbirdStyle.secondary).frame(width:24,height:24).contentShape(Rectangle())}
-                    .buttonStyle(.plain).accessibilityLabel(L10n.text("close"))
-            }
-            Text(L10n.text("menu_why")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary)
-            ViewThatFits(in:.horizontal) {
-                HStack(spacing:6) {steps}
-                VStack(alignment:.leading,spacing:6) {HStack(spacing:6) {pathChip(chip,lit:true);arrow;pathChip(L10n.text(proxy ? "activity_proxy":"activity_direct"))}
-                    if proxy {HStack(spacing:6) {arrow;pathChip(exit(c))}}}
-            }
-            if !line.isEmpty {Text(line).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).fixedSize(horizontal:false,vertical:true)}
-            if !host.isEmpty {
-                if site != host {
-                    HStack(spacing:2) {
-                        scopeButton(L10n.text("menu_whole_site",site),on:whole) {wholeSite=true}
-                        scopeButton(L10n.text("menu_only_domain",host),on:!whole) {wholeSite=false}
-                    }.padding(2).background(Color(red:32/255,green:30/255,blue:27/255),in:RoundedRectangle(cornerRadius:8)).padding(.top,4)
+        return ScrollView {
+            VStack(alignment:.leading,spacing:10) {
+                HStack(alignment:.top,spacing:8) {
+                    Text(host).font(.system(size:14,weight:.semibold)).lineLimit(3).fixedSize(horizontal:false,vertical:true)
+                    Spacer(minLength:4)
+                    Button {why=nil} label:{Image(systemName:"xmark").font(.system(size:11,weight:.semibold)).foregroundStyle(VeilbirdStyle.secondary).frame(width:22,height:22).contentShape(Rectangle())}
+                        .buttonStyle(.plain).accessibilityLabel(L10n.text("close"))
                 }
-                HStack(spacing:6) {
-                    policyButton("menu_always_proxy","proxy",whole ? site:host,whole)
-                    policyButton("menu_always_direct","direct",whole ? site:host,whole)
-                    policyButton("menu_block","block",whole ? site:host,whole)
-                }.padding(.top,site != host ? 0:4)
-            }
-            HStack(spacing:16) {
-                if !host.isEmpty {textButton("menu_copy_domain") {copy(host)}}
-                if !id.isEmpty {textButton("menu_close_connection") {Task {await model.closeConnection(id)}}}
-                Spacer(minLength:8)
-                textButton("why_open_rules") {model.rulesShown+=1}
-            }.padding(.top,2)
-        }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
+                Text(L10n.text("menu_why")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).padding(.top,2)
+                VStack(alignment:.leading,spacing:6) {
+                    HStack(spacing:6) {pathChip(chip,lit:true);arrow;pathChip(L10n.text(proxy ? "activity_proxy":"activity_direct"))}
+                    if proxy {
+                        HStack(spacing:6) {
+                            arrow;pathChip(exit(c))
+                            if !via.isEmpty && via != exit(c) {arrow;pathChip(via,mono:true)}
+                        }
+                    }
+                }
+                if !line.isEmpty {Text(line).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).fixedSize(horizontal:false,vertical:true)}
+                if !host.isEmpty {
+                    if site != host {
+                        VStack(spacing:2) {
+                            scopeButton(L10n.text("menu_whole_site",site),on:whole) {wholeSite=true}
+                            scopeButton(L10n.text("menu_only_domain",host),on:!whole) {wholeSite=false}
+                        }.padding(2).background(Color(red:32/255,green:30/255,blue:27/255),in:RoundedRectangle(cornerRadius:8)).padding(.top,6)
+                    }
+                    VStack(spacing:6) {
+                        policyButton("menu_always_proxy","proxy",whole ? site:host,whole)
+                        policyButton("menu_always_direct","direct",whole ? site:host,whole)
+                        policyButton("menu_block","block",whole ? site:host,whole)
+                    }.padding(.top,site != host ? 2:6)
+                }
+                VStack(alignment:.leading,spacing:10) {
+                    if !host.isEmpty {textButton("menu_copy_domain") {copy(host)}}
+                    if !id.isEmpty {textButton("menu_close_connection") {Task {await model.closeConnection(id)}}}
+                    textButton("why_open_rules") {model.rulesShown+=1}
+                }.padding(.top,6)
+            }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
+        }.scrollIndicators(.hidden)
         .background(Self.card,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
     }
     private func scopeButton(_ title:String,on:Bool,_ action:@escaping ()->Void)->some View {
         Button(action:action) {
             Text(title).font(.system(size:12)).lineLimit(1).truncationMode(.middle)
                 .foregroundStyle(on ? VeilbirdStyle.text:VeilbirdStyle.secondary)
-                .padding(.horizontal,10).frame(maxWidth:.infinity).frame(height:26)
+                .padding(.horizontal,10).frame(maxWidth:.infinity,alignment:.leading).frame(height:28)
                 .background(on ? VeilbirdStyle.selected:Color.clear,in:RoundedRectangle(cornerRadius:6))
                 .contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected:[])

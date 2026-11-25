@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.37
+
+### zh
+- 电脑上「活动」里点一条连接，详情显示在列表右侧，不再盖住列表；选中的那一行一直看得见
+- 手机上点一条连接，详情从底部弹出
+
+### en
+- On the computer, clicking a connection in Activity shows its details in a column to the right of the list, so nothing is covered and the selected row stays in view
+- On the phone, a connection's details open from the bottom
+
+### ru
+- На компьютере при щелчке по соединению в «Активности» подробности открываются колонкой справа от списка: ничего не закрыто, выбранная строка остаётся на виду
+- На телефоне подробности соединения открываются снизу
+
 ## 1.0.36
 
 ### zh
