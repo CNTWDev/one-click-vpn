@@ -2998,5 +2998,15 @@
     "zh": "没能保存海报",
     "en": "Couldn't save the poster",
     "ru": "Не удалось сохранить постер"
+  },
+  "trail_copy": {
+    "zh": "复制图片",
+    "en": "Copy image",
+    "ru": "Копировать"
+  },
+  "trail_copied": {
+    "zh": "已复制",
+    "en": "Copied",
+    "ru": "Скопировано"
   }
 }

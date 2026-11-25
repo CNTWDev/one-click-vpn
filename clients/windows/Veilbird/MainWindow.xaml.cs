@@ -12,6 +12,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
@@ -103,7 +104,7 @@ public partial class MainWindow : Window {
         connection=new Connection(api,core);
         // Hidden in the tray only the tray's tooltip follows the connection; the pages catch up when they show again.
         connection.Changed+=()=>Dispatcher.InvokeAsync(()=>{if(Seen) UpdateLive();UpdateTray();});
-        refresh.Tick+=(_,_)=>{SampleRates();if(Seen) UpdateLive();RefreshActivity();};refresh.Start();
+        refresh.Tick+=(_,_)=>{SampleRates();if(Seen) UpdateLive();RefreshActivity();HiddenTime.Tick(TrayConnected);};refresh.Start();
         toastTimer.Tick+=(_,_)=>{toastTimer.Stop();Toast.Visibility=Visibility.Collapsed;};
         Toast.MouseLeftButtonUp+=(_,_)=>{toastTimer.Stop();Toast.Visibility=Visibility.Collapsed;};
         SourceInitialized+=(_,_)=>DarkFrame();
@@ -1747,6 +1748,85 @@ public partial class MainWindow : Window {
     }
     // ---- Usage: the quota and end date, traffic per day over 7, 30 or 90 days (the server's UTC days), per device and
     // per location, and per program over the last 7 days (kept on this computer only). Opened from the home page.
+    // ---- Trail ----
+    /// The locations of the range on the globe, each lit by its share of the traffic.
+    private List<TrailExit> TrailExits(JsonNode data) {
+        var rows=(data["nodes"]?.AsArray()??new JsonArray()).Where(n=>n is not null).Select(n=>n!).ToList();
+        var most=(double)Math.Max(1,rows.Select(n=>Number(n["bytes"])).DefaultIfEmpty(1).Max());
+        var exits=new List<TrailExit>();
+        foreach(var row in rows) {
+            var id=row["id"]?.GetValue<string>()??"";
+            if(places.TryGetValue(id,out var at)) exits.Add(new TrailExit(new Spot(at.Lat,at.Lon,row["name"]?.GetValue<string>()??""),Number(row["bytes"])/most));
+        }
+        return exits;
+    }
+    private static List<(string Value,string Name)> TrailStats(JsonNode data,int days,long total)=>new() {
+        ((data["nodes"]?.AsArray().Count??0).ToString("N0",L10n.Culture),L10n.Text("trail_cities")),
+        (Bytes(total),L10n.Text("trail_traffic")),
+        (HiddenTime.Text(HiddenTime.Hours(days)),L10n.Text("trail_hidden")),
+    };
+    private static string TrailRange(int days)=>L10n.Text("trail_range",L10n.Text(days==7?"usage_7_days":days==90?"usage_90_days":"usage_30_days"));
+    private Border TrailCard(JsonNode data,int days,long total) {
+        var stack=new StackPanel();
+        stack.Children.Add(Single(L10n.Text("trail_title"),12,Look.Secondary,strong:true));
+        var exits=TrailExits(data);
+        if(exits.Count==0) {
+            var empty=Words(L10n.Text("trail_empty"),12);empty.Foreground=Look.Secondary;empty.TextWrapping=TextWrapping.Wrap;empty.Margin=new Thickness(0,10,0,0);
+            stack.Children.Add(empty);
+        } else {
+            var globe=new TrailGlobe {Exits=exits,Home=GlobeOrigin(),Height=260,Margin=new Thickness(0,10,0,0)};
+            AutomationProperties.SetName(globe,string.Join(", ",exits.Select(e=>e.Spot.Label)));
+            stack.Children.Add(globe);
+            var stats=TrailStats(data,days,total);
+            var figures=TrailPoster.Stats(stats,20);figures.Margin=new Thickness(0,12,0,0);stack.Children.Add(figures);
+            var make=Primary(L10n.Text("trail_make_poster"));make.Margin=new Thickness(0,16,0,0);
+            make.Click+=(_,_)=>PosterWindow(exits,stats,days);
+            stack.Children.Add(make);
+        }
+        return new Border {Background=Look.Surface,CornerRadius=new CornerRadius(10),Padding=new Thickness(16),Margin=new Thickness(0,0,0,12),Child=stack};
+    }
+    /// The poster as it will be shared, the home city switch (off by default), and save or copy.
+    private void PosterWindow(List<TrailExit> exits,List<(string Value,string Name)> stats,int days) {
+        var home=GlobeOrigin();
+        var withHome=Settings.Get("trailPosterHome","off")=="on";
+        var window=new Window {Owner=this,Width=340,SizeToContent=SizeToContent.Height,WindowStyle=WindowStyle.None,AllowsTransparency=true,Background=Brushes.Transparent,
+            ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.CenterOwner,FontFamily=FontFamily,UseLayoutRounding=true,
+            Title=L10n.Text("trail_make_poster"),Language=Language};
+        TextOptions.SetTextFormattingMode(window,TextFormattingMode.Display);
+        window.KeyDown+=(_,e)=>{if(e.Key==Key.Escape) window.Close();};
+        var stack=new StackPanel();
+        stack.Children.Add(Columns(Single(L10n.Text("trail_make_poster"),17,strong:true),new FrameworkElement(),IconButton("\uE711",L10n.Text("close"),window.Close)));
+        BitmapSource image=TrailPoster.Render(TrailPoster.Page(exits,withHome?home:null,TrailRange(days),stats));
+        var preview=new Image {Source=image,Width=252,Height=448,Stretch=Stretch.Uniform,Margin=new Thickness(0,12,0,0),HorizontalAlignment=HorizontalAlignment.Center};
+        RenderOptions.SetBitmapScalingMode(preview,BitmapScalingMode.HighQuality);
+        AutomationProperties.SetName(preview,L10n.Text("trail_poster_title"));
+        stack.Children.Add(new Border {CornerRadius=new CornerRadius(10),ClipToBounds=true,HorizontalAlignment=HorizontalAlignment.Center,Child=preview});
+        if(home is not null) {
+            var value=Single("",13,Look.Secondary);
+            void ShowValue() {value.Text=L10n.Text(withHome?"setting_on":"setting_off");value.Foreground=withHome?Look.Accent:Look.Secondary;}
+            ShowValue();
+            var label=Words(L10n.Text("trail_show_home"),13);label.TextWrapping=TextWrapping.Wrap;label.Margin=new Thickness(0,0,12,0);
+            var toggle=new Button {Height=44,Padding=new Thickness(12,0,12,0),Background=Look.Raised,Margin=new Thickness(0,12,0,0),HorizontalContentAlignment=HorizontalAlignment.Stretch,
+                Content=Columns(new FrameworkElement(),label,value)};
+            AutomationProperties.SetName(toggle,L10n.Text("trail_show_home"));
+            toggle.Click+=(_,_)=>{
+                withHome=!withHome;Settings.Set("trailPosterHome",withHome?"on":"off");ShowValue();
+                image=TrailPoster.Render(TrailPoster.Page(exits,withHome?home:null,TrailRange(days),stats));preview.Source=image;
+            };
+            stack.Children.Add(toggle);
+        }
+        var save=Primary(L10n.Text("trail_save"));
+        save.Click+=(_,_)=>TrailPoster.Save(image,window);
+        var copy=new Button {Content=L10n.Text("trail_copy"),Height=40,Background=Look.Raised,BorderThickness=new Thickness(0),Foreground=Look.Text,FontWeight=FontWeights.SemiBold,
+            HorizontalContentAlignment=HorizontalAlignment.Center,Margin=new Thickness(10,0,0,0)};
+        copy.Click+=(_,_)=>{try {Clipboard.SetImage(image);copy.Content=L10n.Text("trail_copied");} catch {/* clipboard busy */}};
+        var actions=new Grid {Margin=new Thickness(0,14,0,0)};
+        actions.ColumnDefinitions.Add(new ColumnDefinition());actions.ColumnDefinitions.Add(new ColumnDefinition());
+        Grid.SetColumn(copy,1);actions.Children.Add(save);actions.Children.Add(copy);
+        stack.Children.Add(actions);
+        window.Content=new Border {Background=Look.Surface,CornerRadius=new CornerRadius(12),Padding=new Thickness(20,14,14,18),Child=stack};
+        window.Show();
+    }
     private void UsagePage() {
         Add(SubHeader(L10n.Text("usage_title"),"connect"),0,8);
         var quota=Add(new Border {Background=Look.Surface,CornerRadius=new CornerRadius(10),Padding=new Thickness(16)});
@@ -1832,6 +1912,7 @@ public partial class MainWindow : Window {
             chart.Child=stack;
             List<(string Name,long Bytes,bool Proxy)> Rows(string key,Func<JsonNode,string> name)=>
                 (found[key]?.AsArray()??new JsonArray()).Where(n=>n is not null).Select(n=>(name(n!),Number(n!["bytes"]),true)).ToList();
+            lists.Children.Add(TrailCard(found,days,sum));
             lists.Children.Add(RankCard(L10n.Text("usage_by_device"),Rows("devices",d=>{
                 var given=d["name"]?.GetValue<string>() is { Length: >0 } text?text:L10n.Text("device");
                 return d["isCurrent"]?.GetValue<bool>()==true?L10n.Text("usage_this_device",given):given;

@@ -11271,6 +11271,52 @@
         }
       }
     },
+    "trail_copied": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已复制"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скопировано"
+          }
+        }
+      }
+    },
+    "trail_copy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy image"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制图片"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Копировать"
+          }
+        }
+      }
+    },
     "trail_empty": {
       "extractionState": "manual",
       "localizations": {
@@ -13094,19 +13140,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Android: the Usage page now shows your trail, a globe of the cities you went out from in the period, how much went through each, and how long this phone stayed hidden\nAndroid: turn the trail into a poster to save to Photos or share; your home city is left off by default and the image carries no IP"
+            "value": "Windows: the Usage page now shows your trail, a globe of the cities you went out from in the period, how much went through each, and how long this PC stayed hidden\nWindows: turn the trail into a poster to save or copy and paste anywhere; your home city is left off by default and the image carries no IP"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "安卓：用量页新增「航迹」，地球上画出这段时间你从哪些城市出门、各走了多少流量，还有本机隐身时长\n安卓：航迹可以一键生成海报，存到相册或分享；出发城市默认不出现在海报上，图里没有 IP"
+            "value": "Windows：用量页新增「航迹」，地球上画出这段时间你从哪些城市出门、各走了多少流量，还有本机隐身时长\nWindows：航迹可以一键生成海报，保存成图片或复制后直接粘贴；出发城市默认不出现在海报上，图里没有 IP"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Android: на странице трафика появились «Маршруты»: глобус с городами, через которые вы выходили в сеть, объём через каждый и время, которое телефон был скрыт\nAndroid: из маршрутов можно сделать постер, сохранить в галерею или поделиться; ваш город по умолчанию скрыт, IP на картинке нет"
+            "value": "Windows: на странице трафика появились «Маршруты»: глобус с городами, через которые вы выходили в сеть, объём через каждый и время, которое этот ПК был скрыт\nWindows: из маршрутов можно сделать постер, сохранить или скопировать и вставить куда угодно; ваш город по умолчанию скрыт, IP на картинке нет"
           }
         }
       }

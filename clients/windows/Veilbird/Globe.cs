@@ -70,6 +70,26 @@ public static class Earth {
         double x=a.Item1*k1+b.Item1*k2,y=a.Item2*k1+b.Item2*k2,z=a.Item3*k1+b.Item3*k2;
         return (Math.Asin(y/Math.Sqrt(x*x+y*y+z*z))/Rad,Math.Atan2(x,z)/Rad);
     }
+    /// <summary>The earth as the old sphere's dot lattice, s across, seen from above (vLat, vLon); frozen.</summary>
+    public static DrawingGroup Lattice(double s,double viewLat,double viewLon,Func<double,Brush> brush) {
+        var group=new DrawingGroup();
+        using(var dc=group.Open()) {
+            double pitch=s*6/320,r=s*1.15/320,radius=s/2,lx=s*0.42,ly=s*0.34;
+            dc.DrawRectangle(Brushes.Transparent,null,new Rect(0,0,s,s));
+            for(var y=pitch/2;y<s;y+=pitch) for(var x=pitch/2;x<s;x+=pitch) {
+                double nx=(x-radius)/radius,ny=(radius-y)/radius,dd=nx*nx+ny*ny;
+                if(dd>1) continue;
+                var z=Math.Sqrt(1-dd);var place=Earth.Unproject(nx,ny,viewLat,viewLon);var land=Earth.Land(place.Lat,place.Lon);
+                var a=Earth.Light(Math.Sqrt((x-lx)*(x-lx)+(y-ly)*(y-ly))/(s*0.98));var limb=Math.Min(1,z/0.18);
+                var al=(land*(0.3+0.5*a)+(1-land)*(0.025+0.08*a))*limb;
+                if(al<0.02) continue;
+                var rr=r*(0.72+0.32*land);
+                dc.DrawEllipse(brush(al),null,new Point(x,y),rr,rr);
+            }
+        }
+        group.Freeze();
+        return group;
+    }
     public static double Km(Spot a,Spot b)=>Angle(a.Lat,a.Lon,b.Lat,b.Lon)*6371;
     public static double Ease(double t)=>t<0.5?4*t*t*t:1-Math.Pow(-2*t+2,3)/2;
 }
@@ -161,22 +181,7 @@ public sealed class Portrait:FrameworkElement {
     private DrawingGroup Sphere(double s) {
         var key=$"{s:0.#} {Math.Round(viewLat*100)} {Math.Round(viewLon*100)} {Look.LightColor}";
         if(dots is not null&&dotsKey==key) return dots;
-        var group=new DrawingGroup();
-        using(var dc=group.Open()) {
-            double pitch=s*6/320,r=s*1.15/320,radius=s/2,lx=s*0.42,ly=s*0.34;
-            dc.DrawRectangle(Brushes.Transparent,null,new Rect(0,0,s,s));
-            for(var y=pitch/2;y<s;y+=pitch) for(var x=pitch/2;x<s;x+=pitch) {
-                double nx=(x-radius)/radius,ny=(radius-y)/radius,dd=nx*nx+ny*ny;
-                if(dd>1) continue;
-                var z=Math.Sqrt(1-dd);var place=Earth.Unproject(nx,ny,viewLat,viewLon);var land=Earth.Land(place.Lat,place.Lon);
-                var a=Earth.Light(Math.Sqrt((x-lx)*(x-lx)+(y-ly)*(y-ly))/(s*0.98));var limb=Math.Min(1,z/0.18);
-                var al=(land*(0.3+0.5*a)+(1-land)*(0.025+0.08*a))*limb;
-                if(al<0.02) continue;
-                var rr=r*(0.72+0.32*land);
-                dc.DrawEllipse(LightBrush(al),null,new Point(x,y),rr,rr);
-            }
-        }
-        group.Freeze();
+        var group=Earth.Lattice(s,viewLat,viewLon,LightBrush);
         dots=group;dotsKey=key;
         return group;
     }

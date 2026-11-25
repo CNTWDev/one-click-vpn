@@ -491,6 +491,8 @@
   <string name="traffic_30_days">Трафик · 30 дней</string>
   <string name="traffic_left">Остаток трафика</string>
   <string name="trail_cities">Города</string>
+  <string name="trail_copied">Скопировано</string>
+  <string name="trail_copy">Копировать</string>
   <string name="trail_empty">После подключения здесь появятся города, из которых вы выходили в сеть</string>
   <string name="trail_hidden">Скрыто здесь</string>
   <string name="trail_hours">%1$s ч</string>
@@ -570,7 +572,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Android: на странице трафика появились «Маршруты»: глобус с городами, через которые вы выходили в сеть, объём через каждый и время, которое телефон был скрыт\nAndroid: из маршрутов можно сделать постер, сохранить в галерею или поделиться; ваш город по умолчанию скрыт, IP на картинке нет</string>
+  <string name="whats_new_notes">Windows: на странице трафика появились «Маршруты»: глобус с городами, через которые вы выходили в сеть, объём через каждый и время, которое этот ПК был скрыт\nWindows: из маршрутов можно сделать постер, сохранить или скопировать и вставить куда угодно; ваш город по умолчанию скрыт, IP на картинке нет</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="why_ai">AI-сервис</string>

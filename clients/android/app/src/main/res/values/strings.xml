@@ -491,6 +491,8 @@
   <string name="traffic_30_days">Traffic · 30 days</string>
   <string name="traffic_left">Traffic left</string>
   <string name="trail_cities">Cities</string>
+  <string name="trail_copied">Copied</string>
+  <string name="trail_copy">Copy image</string>
   <string name="trail_empty">Once you connect, the cities you went out from appear here</string>
   <string name="trail_hidden">Hidden here</string>
   <string name="trail_hours">%1$s h</string>
@@ -570,7 +572,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Android: the Usage page now shows your trail, a globe of the cities you went out from in the period, how much went through each, and how long this phone stayed hidden\nAndroid: turn the trail into a poster to save to Photos or share; your home city is left off by default and the image carries no IP</string>
+  <string name="whats_new_notes">Windows: the Usage page now shows your trail, a globe of the cities you went out from in the period, how much went through each, and how long this PC stayed hidden\nWindows: turn the trail into a poster to save or copy and paste anywhere; your home city is left off by default and the image carries no IP</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="why_ai">AI service</string>
