@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.39
+
+### zh
+- 电脑上切换「连接 / 位置 / 我的」更顺滑：选中块滑过去，页面淡入淡出，不再卡一下
+- 连接时每秒更新的网速和活动数据只刷新显示它们的地方，整个窗口更省电、更跟手
+- 各处的分段切换（页面、分流模式、用量范围、活动视图）统一成同一种样式
+
+### en
+- Switching between Connect, Locations and Account on the computer is smoother: the highlight slides across and pages fade instead of stuttering
+- While connected, the per-second speed and Activity figures now only redraw where they are shown, so the window stays light and responsive
+- Every segmented switch (pages, routing mode, usage range, Activity views) now shares one look
+
+### ru
+- На компьютере переключение между «Подключение», «Локации» и «Аккаунт» стало плавнее: выделение скользит, страницы плавно сменяются без рывков
+- При подключении ежесекундные данные о скорости и «Активности» обновляют только то место, где показаны, поэтому окно работает легче и отзывчивее
+- Все переключатели-сегменты (страницы, режим маршрутизации, период использования, виды «Активности») теперь выглядят одинаково
+
 ## 1.0.38
 
 ### zh

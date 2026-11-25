@@ -32,11 +32,15 @@ import ServiceManagement
     @Published var nodeName=""
     @Published var connectedNodeId=""
     @Published var since:Date?
-    @Published var rxRate=0
-    @Published var txRate=0
+    /// The figures that change every second while connected (rates, the activity view's data) live in their own
+    /// object: only the views that show them redraw each second, not every page watching the model. Changing one
+    /// of these here does not redraw a view that only watches the model; such views observe `live` (LiveFeed).
+    let live=LiveFeed()
+    var rxRate:Int {get {live.rxRate} set {live.rxRate=newValue}}
+    var txRate:Int {get {live.txRate} set {live.txRate=newValue}}
     /// Download / upload rates of the last 40 seconds for the connect page's chart, newest last.
-    @Published var rxHistory:[Int]=[]
-    @Published var txHistory:[Int]=[]
+    var rxHistory:[Int] {get {live.rxHistory} set {live.rxHistory=newValue}}
+    var txHistory:[Int] {get {live.txHistory} set {live.txHistory=newValue}}
     /// The location automatic mode gave up on during this connection; the note is dismissed per switch.
     @Published var switchedFrom=""
     @Published var dismissedSwitch=""
@@ -240,7 +244,20 @@ import ServiceManagement
             do {try session.sendProviderMessage(Data(message.utf8)) {done.resume(returning:$0)}} catch {done.resume(returning:nil)}
         }
     }
-    func loadAccount() async throws {account=try await api().request("account");accountLoadedAt=Date()}
+    /// Assigns only a changed account: an assignment redraws every view watching the model, and pages load the
+    /// account as they open, right while their entrance animates.
+    func loadAccount() async throws {
+        let loaded=try await api().request("account")
+        accountLoadedAt=Date()
+        if !NSDictionary(dictionary:loaded).isEqual(to:account) {account=loaded}
+    }
+    /// A page opening: the account again unless it was loaded in the last minute, after the page's entrance.
+    func refreshAccountOnOpen() async {
+        guard Date().timeIntervalSince(accountLoadedAt)>60 else {return}
+        try? await Task.sleep(nanoseconds:300_000_000)
+        if Task.isCancelled {return}
+        try? await loadAccount()
+    }
     /// Every three hours while signed in, so the reminders come without opening the window.
     func refreshAccountIfDue() async {
         guard signedIn,Date().timeIntervalSince(accountLoadedAt)>3*3600 else {return}
@@ -282,7 +299,7 @@ import ServiceManagement
     }
     func closeConnection(_ id:String) async {_ = await providerMessage("close "+id);await loadActivity()}
     /// The activity view's figures from the tunnel (open connections, rankings, hours, names looked up); nil when not connected.
-    @Published var activity:[String:Any]?
+    var activity:[String:Any]? {get {live.activity} set {live.activity=newValue}}
     func loadActivity() async {
         guard since != nil,let session=manager?.connection as? NETunnelProviderSession else {if activity != nil {activity=nil};return}
         let result=await withCheckedContinuation {(done:CheckedContinuation<[String:Any]?,Never>) in
@@ -621,4 +638,13 @@ struct UsageFigures {
         let down=Int64(String(describing:traffic["downloadBytes"] ?? "0")) ?? 0
         return up+down
     }
+}
+
+/// The figures that change every second while connected; see ClientModel.live.
+final class LiveFeed:ObservableObject {
+    @Published var rxRate=0
+    @Published var txRate=0
+    @Published var rxHistory:[Int]=[]
+    @Published var txHistory:[Int]=[]
+    @Published var activity:[String:Any]?
 }

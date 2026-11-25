@@ -545,7 +545,9 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Changing how a connection is routed (Proxy / Direct / Block) from Activity now asks you to confirm first, so a stray click can't change your rules</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Switching between Connect, Locations and Account on the computer is smoother: the highlight slides across and pages fade instead of stuttering
+While connected, the per-second speed and Activity figures now only redraw where they are shown, so the window stays light and responsive
+Every segmented switch (pages, routing mode, usage range, Activity views) now shares one look</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI service</value></data>

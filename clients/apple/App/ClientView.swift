@@ -66,19 +66,23 @@ struct ClientView:View {
                     // The page switcher waits for the first connection, so a new person sees only the step in front of them.
                     if tab<3 && model.onboarded {macNavigation}
                     #endif
-                    // A new page eases in with a short fade and rise.
-                    Group {
-                        switch tab {
-                        case 0:connectionView
-                        case 1:nodesView
-                        case 2:accountView
-                        case 3:logsView
-                        case 5:ActivityView()
-                        case 6:usageView
-                        case 7:rulesView
-                        default:devicesView
-                        }
-                    }.id(tab).transition(.asymmetric(insertion:.opacity.combined(with:.offset(y:8)),removal:.identity))
+                    // A new page eases in with a short fade and rise while the old one fades out on the same spot
+                    // (a ZStack: in a VStack the two would share the height for the length of the animation).
+                    ZStack {
+                        Group {
+                            switch tab {
+                            case 0:connectionView
+                            case 1:nodesView
+                            case 2:accountView
+                            case 3:logsView
+                            case 5:ActivityView()
+                            case 6:usageView
+                            case 7:rulesView
+                            default:devicesView
+                            }
+                        }.id(tab).frame(maxWidth:.infinity,maxHeight:.infinity)
+                        .transition(.asymmetric(insertion:.opacity.combined(with:.offset(y:6)),removal:.opacity.animation(.easeOut(duration:0.12))))
+                    }
                     .frame(maxWidth:560,maxHeight:.infinity).frame(maxWidth:.infinity)
                     #if os(iOS)
                     if (tab<3 || tab==5) && model.onboarded {tabBar}
@@ -244,16 +248,8 @@ struct ClientView:View {
     #else
     /// The Mac window switches pages with a segmented control at the top, under the title bar.
     private var macNavigation:some View {
-        HStack(spacing:2) {
-            ForEach([(0,"connect_tab"),(1,"locations"),(2,"account")],id:\.0) {item in
-                let index=item.0,key=item.1,selected=tab==index
-                Button {tab=index} label:{
-                    Text(L10n.text(key)).font(.system(size:12,weight:.medium)).padding(.horizontal,14).frame(height:24)
-                        .foregroundStyle(selected ? VeilbirdStyle.text:VeilbirdStyle.secondary)
-                        .background(selected ? VeilbirdStyle.selected:Color.clear,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
-            }
-        }.padding(2).background(Color(red:30/255,green:28/255,blue:25/255),in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).padding(.top,8).padding(.bottom,4)
+        Segmented(items:[(0,L10n.text("connect_tab")),(1,L10n.text("locations")),(2,L10n.text("account"))],selection:tab,fill:false) {tab=$0}
+            .padding(.top,8).padding(.bottom,4)
     }
     #endif
 
@@ -370,7 +366,6 @@ struct ClientView:View {
     // MARK: Connect
     private func summary(_ quality:Quality)->String {quality.latency.map {L10n.text("latency_ms",L10n.number($0))+" · "+L10n.text(quality.grade)} ?? L10n.text(quality.grade)}
     private func ms(_ quality:Quality?)->String? {quality?.latency.map {L10n.text("latency_ms",L10n.number($0))}}
-    private func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}
     /// The connect page as a file: its state, four lines of what anyone can see about this device right now, one action,
     /// then the location and usage. Connecting seals the file (a line of light sweeps down and each line turns into dots,
     /// the lamp above goes out); disconnecting sweeps back up and opens it.
@@ -458,11 +453,7 @@ struct ClientView:View {
     }
     /// Inside the hidden portrait: the rates under the time, the phase while connecting, the countdown while reconnecting.
     private func portrait(_ state:RingState,height:CGFloat)->some View {
-        TimelineView(.periodic(from:.now,by:1)) {context in
-            PortraitView(hidden:model.connected || state == .reconnecting,invite:"",since:state == .connected ? model.since:nil,
-                sub:model.portraitSub(state,rates:L10n.text("connection_rates",mbps(model.rxRate),mbps(model.txRate))),state:state,lines:model.lines,
-                centre:model.portraitCentre(state,now:context.date),origin:model.globeOrigin,exit:model.globeExit,distance:model.globeDistance)
-        }.frame(maxWidth:.infinity).frame(height:height).contentShape(Circle())
+        LivePortrait(state:state,since:state == .connected ? model.since:nil).frame(maxWidth:.infinity).frame(height:height).contentShape(Circle())
     }
     private var connectionView:some View {
         let state=model.ringState
@@ -499,7 +490,7 @@ struct ClientView:View {
                 .accessibilityHint(L10n.text("tap_to_change")).padding(.top,10)
             usageStrip.padding(.top,16)
             }
-        }.padding(.horizontal,mac ? 20:16).padding(.bottom,20).task {try? await model.loadAccount()}
+        }.padding(.horizontal,mac ? 20:16).padding(.bottom,20).task {await model.refreshAccountOnOpen()}
         .task {if model.visitorIP == nil && !model.connected {model.visitorIP=try? await model.api().visitorAddress()}}
         .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:state)
         .animation(reduceMotion ? nil:.easeInOut(duration:0.22),value:model.trouble)
@@ -799,16 +790,9 @@ struct ClientView:View {
                             .buttonStyle(.plain).disabled(model.connected).accessibilityLabel(L10n.text("retest_latency"))
                     }
                 }
-                HStack(spacing:2) {
-                    ForEach([("smart","routing_smart"),("global","routing_global")],id:\.0) {item in
-                        let value=item.0,key=item.1,selected=model.routing==value
-                        Button {if model.connected {model.message=L10n.text("disconnect_before_changing_routing")} else {model.routing=value}} label:{
-                            Text(L10n.text(key)).font(.system(size:mac ? 12:14,weight:selected ? .semibold:.regular)).frame(maxWidth:.infinity).frame(height:mac ? 26:34)
-                                .foregroundStyle(selected ? VeilbirdStyle.text:VeilbirdStyle.secondary)
-                                .background(selected ? VeilbirdStyle.selected:Color.clear,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).contentShape(Rectangle())
-                        }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected:[])
-                    }
-                }.padding(2).background(Color(red:30/255,green:28/255,blue:25/255),in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).padding(.top,mac ? 8:12)
+                Segmented(items:[("smart",L10n.text("routing_smart")),("global",L10n.text("routing_global"))],selection:model.routing) {value in
+                    if model.connected {model.message=L10n.text("disconnect_before_changing_routing")} else {model.routing=value}
+                }.padding(.top,mac ? 8:12)
                 caption(L10n.text(model.routing=="smart" ? "routing_smart_detail":"routing_global_detail")).padding(.top,8)
                 if model.connected {caption(L10n.text("test_after_disconnecting")).padding(.top,4)}
                 if model.nodes.count>6 {
@@ -1099,7 +1083,7 @@ struct ClientView:View {
                         if versionTaps>=7 {versionTaps=0;tab=3}
                     }
             }.padding(.horizontal,16).padding(.top,mac ? 8:8).padding(.bottom,20)
-        }.task {if model.account.isEmpty {model.work {try await model.loadAccount()}} else {try? await model.loadAccount()}}
+        }.task {if model.account.isEmpty {model.work {try await model.loadAccount()}} else {await model.refreshAccountOnOpen()}}
     }
     /// "143 GB": the number large, its unit small and muted.
     private func totalText(_ value:String)->some View {
@@ -1115,15 +1099,9 @@ struct ClientView:View {
             VStack(alignment:.leading,spacing:12) {
                 subPageHeader(L10n.text("usage_title")) {tab=0}
                 quotaCard
-                HStack(spacing:2) {
-                    ForEach([7,30,90],id:\.self) {days in
-                        Button {usageDays=days;Task {await loadUsage()}} label:{
-                            Text(L10n.text(rangeKey(days))).font(.system(size:mac ? 12:13,weight:.medium)).lineLimit(1).frame(maxWidth:.infinity).frame(height:mac ? 28:32)
-                                .foregroundStyle(usageDays==days ? VeilbirdStyle.text:VeilbirdStyle.secondary)
-                                .background(usageDays==days ? VeilbirdStyle.selected:Color.clear,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius-2)).contentShape(Rectangle())
-                        }.buttonStyle(.plain).accessibilityAddTraits(usageDays==days ? .isSelected:[])
-                    }
-                }.padding(2).background(VeilbirdStyle.surface,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+                Segmented(items:[7,30,90].map {($0,L10n.text(rangeKey($0)))},selection:usageDays) {days in
+                    usageDays=days;Task {await loadUsage()}
+                }
                 dayChart
                 if usageFailed {caption(L10n.text("usage_load_failed"))}
                 else if let usage {
