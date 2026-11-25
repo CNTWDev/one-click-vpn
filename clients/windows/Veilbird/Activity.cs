@@ -209,7 +209,7 @@ public sealed class ActivityPanel:Border {
         if(AddRule is null) return;
         var before=Advanced.SetQuickRule(name,site,policy);
         var live=await AddRule(name,site,policy);
-        Show(L10n.Text(live?"rule_added":"rule_added_later",name,L10n.Text("policy_"+policy)),before);
+        Show(L10n.Text(live?"rule_added":"rule_added_later",name,L10n.Text(policy switch {"direct"=>"policy_direct","block"=>"policy_block",_=>"policy_proxy"})),before);
     }
     private void Show(string text,string? before) {
         var line=new StackPanel {Orientation=Orientation.Horizontal};
