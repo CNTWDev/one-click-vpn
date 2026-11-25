@@ -240,6 +240,7 @@
   <string name="hop_note">Hysteria2 changes port every 20–40 s</string>
   <string name="incorrect_email_or_password">Incorrect email or password.</string>
   <string name="invalid_server_response_try_again_later">Invalid server response. Try again later.</string>
+  <string name="jump_recent">Recent</string>
   <string name="kill_switch">Kill switch</string>
   <string name="kill_switch_android_detail">In Android settings, turn on Always-on VPN and Block connections without VPN</string>
   <string name="kill_switch_apple_detail">All traffic goes through the VPN; without it, nothing goes out. Applies from the next connection</string>
@@ -308,6 +309,15 @@
   <string name="open_system_settings">Open System Settings</string>
   <string name="open_vpn_settings">Open VPN settings</string>
   <string name="or_choose_one">Or choose one</string>
+  <string name="palette_close">Close</string>
+  <string name="palette_connect_to">Connect to %1$s</string>
+  <string name="palette_current">Current</string>
+  <string name="palette_empty">No matches</string>
+  <string name="palette_placeholder">Type a city, country code or command</string>
+  <string name="palette_run">Run</string>
+  <string name="palette_select">Select</string>
+  <string name="palette_to_global">Switch to Global</string>
+  <string name="palette_to_smart">Switch to Smart routing</string>
   <string name="password">Password</string>
   <string name="password_reset_unavailable">Password reset by email isn\'t available right now. Contact your administrator.</string>
   <string name="per_app_routing">Per-app routing</string>
@@ -542,7 +552,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Mac: while connecting, a small capsule grows out of the notch; when you land it opens to show \&quot;Arrived\&quot; and the city, then settles beside the notch (amber dot + country code) and opens again on hover. Automatic exit changes show there too. Macs without a notch get it at the top centre of the screen; it can be turned off in Me</string>
+  <string name="whats_new_notes">Windows: press Ctrl + Alt + Space anywhere for a command palette in the middle of the screen. Type a city or country code to connect there, or switch Smart/Global, disconnect, or run a connection check\nWindows: the taskbar icon shows an amber dot while connected; its hover preview has Connect/Disconnect, Automatic and Connection check buttons; right-click to jump back to a recent place</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="why_ai">AI service</string>

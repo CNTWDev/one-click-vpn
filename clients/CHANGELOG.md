@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.42
+
+### zh
+- Windows：任意界面按 Ctrl + Alt + 空格，屏幕中间弹出指令面板，输入城市名或国家代码直接连过去，也能切换智能/全局、断开、线路体检
+- Windows：已连接时任务栏图标带琥珀色角标；鼠标悬停预览里有连接/断开、自动选择、线路体检三个按钮；右键可快速连到最近去过的地方
+
+### en
+- Windows: press Ctrl + Alt + Space anywhere for a command palette in the middle of the screen. Type a city or country code to connect there, or switch Smart/Global, disconnect, or run a connection check
+- Windows: the taskbar icon shows an amber dot while connected; its hover preview has Connect/Disconnect, Automatic and Connection check buttons; right-click to jump back to a recent place
+
+### ru
+- Windows: Ctrl + Alt + Пробел в любом окне открывает палитру команд в центре экрана. Введите город или код страны, чтобы подключиться, или смените режим, отключитесь, проверьте линию
+- Windows: янтарная точка на значке в панели задач, пока есть подключение; в превью — кнопки подключения, автовыбора и проверки линии; правый клик — недавние места
+
 ## 1.0.41
 
 ### zh

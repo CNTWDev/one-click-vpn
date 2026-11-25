@@ -246,6 +246,7 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="hop_note" xml:space="preserve"><value>Hysteria2 每 20–40 秒换一次端口</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>邮箱或密码不正确。</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>服务器响应无效，请稍后重试。</value></data>
+  <data name="jump_recent" xml:space="preserve"><value>最近去过</value></data>
   <data name="kill_switch" xml:space="preserve"><value>断网保护</value></data>
   <data name="kill_switch_android_detail" xml:space="preserve"><value>在系统设置里打开「始终开启的 VPN」和「屏蔽未使用 VPN 的连接」</value></data>
   <data name="kill_switch_apple_detail" xml:space="preserve"><value>所有流量只走 VPN，VPN 断开时不联网。下次连接时生效</value></data>
@@ -314,6 +315,15 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="open_system_settings" xml:space="preserve"><value>打开系统设置</value></data>
   <data name="open_vpn_settings" xml:space="preserve"><value>打开 VPN 设置</value></data>
   <data name="or_choose_one" xml:space="preserve"><value>或者指定一个</value></data>
+  <data name="palette_close" xml:space="preserve"><value>关闭</value></data>
+  <data name="palette_connect_to" xml:space="preserve"><value>连接到 {0}</value></data>
+  <data name="palette_current" xml:space="preserve"><value>当前</value></data>
+  <data name="palette_empty" xml:space="preserve"><value>没有匹配的结果</value></data>
+  <data name="palette_placeholder" xml:space="preserve"><value>输入城市、国家代码或命令</value></data>
+  <data name="palette_run" xml:space="preserve"><value>执行</value></data>
+  <data name="palette_select" xml:space="preserve"><value>选择</value></data>
+  <data name="palette_to_global" xml:space="preserve"><value>切换为 全局</value></data>
+  <data name="palette_to_smart" xml:space="preserve"><value>切换为 智能分流</value></data>
   <data name="password" xml:space="preserve"><value>密码</value></data>
   <data name="password_reset_unavailable" xml:space="preserve"><value>暂时无法通过邮件重置密码，请联系管理员。</value></data>
   <data name="per_app_routing" xml:space="preserve"><value>按应用分流</value></data>
@@ -549,7 +559,8 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac：连接时从刘海里长出一条小胶囊，连上那一刻展开显示“已抵达”和城市，之后缩在刘海两侧（琥珀点 + 国家代码），鼠标移上去可再展开；自动换出口时也在这里提示。没有刘海的 Mac 从屏幕顶部正中出现，可在「我的」里关闭</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Windows：任意界面按 Ctrl + Alt + 空格，屏幕中间弹出指令面板，输入城市名或国家代码直接连过去，也能切换智能/全局、断开、线路体检
+Windows：已连接时任务栏图标带琥珀色角标；鼠标悬停预览里有连接/断开、自动选择、线路体检三个按钮；右键可快速连到最近去过的地方</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI 服务</value></data>
