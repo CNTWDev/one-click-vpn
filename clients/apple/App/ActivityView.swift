@@ -230,7 +230,7 @@ struct ActivityView:View {
         let before=Advanced.setQuickRule(name,site:whole,policy:policy)
         Task {
             let live=await model.applyRules(closing:name,site:whole)
-            show(L10n.text(live ? "rule_added":"rule_added_later",name,L10n.text("policy_"+policy)),before:before)
+            show(L10n.text(live ? "rule_added":"rule_added_later",name,L10n.text(policy=="direct" ? "policy_direct":policy=="block" ? "policy_block":"policy_proxy")),before:before)
         }
     }
     private func show(_ text:String,before:String?) {
