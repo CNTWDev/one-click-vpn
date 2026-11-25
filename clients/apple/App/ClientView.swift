@@ -35,9 +35,9 @@ struct ClientView:View {
     /// The node whose per-line detail is open in the list ("" = none).
     @State private var openNode=""
     /// Advanced features (Account switch); bumped when a favorite or lock changes so the list redraws.
-    @State private var advanced=Advanced.enabled
     @State private var advancedEdits=0
     @State private var rulesDraft=Advanced.rulesText
+    private var advanced:Bool {Advanced.enabled}
     /// The transport carrying traffic now (for "in use") and the speed test's last status from the tunnel.
     @State private var currentLine=""
     @State private var speedStatus:[String:Any]=["state":"idle"]
@@ -1066,17 +1066,8 @@ struct ClientView:View {
                         }
                     }.toggleStyle(.switch).controlSize(mac ? .small:.regular).tint(VeilbirdStyle.accent).padding(.horizontal,16).padding(.vertical,8).frame(minHeight:mac ? 40:50)
                     Hairline()
-                    Toggle(isOn:Binding(get:{advanced},set:{Advanced.enabled=$0;advanced=$0})) {
-                        VStack(alignment:.leading,spacing:2) {
-                            Text(L10n.text("advanced")).font(.system(size:VeilbirdStyle.body))
-                            Text(L10n.text("advanced_detail")).font(.system(size:VeilbirdStyle.detail)).foregroundStyle(VeilbirdStyle.secondary).fixedSize(horizontal:false,vertical:true)
-                        }
-                    }.toggleStyle(.switch).controlSize(mac ? .small:.regular).tint(VeilbirdStyle.accent).padding(.horizontal,16).padding(.vertical,8).frame(minHeight:mac ? 40:50)
+                    settingRow(L10n.text("rules_title"),rulesValue) {rulesDraft=Advanced.rulesText;tab=7}
                     Hairline()
-                    if advanced {
-                        settingRow(L10n.text("rules_title"),rulesValue) {rulesDraft=Advanced.rulesText;tab=7}
-                        Hairline()
-                    }
                     #if os(iOS)
                     settingRow(L10n.text("shortcuts"),L10n.text("shortcuts_detail")) {if let url=URL(string:"shortcuts://") {openURL(url)}}
                     #else

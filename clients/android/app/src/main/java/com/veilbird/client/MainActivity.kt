@@ -441,7 +441,7 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = 58.dp; setPadding(4.dp, 8.dp, 4.dp, 8.dp)
                 background = pressable(Color.TRANSPARENT, 10)
                 // Tap: why it went this way; long press: the row's actions (rules, copy, close).
-                setOnClickListener { whySheet(c) }
+                setOnClickListener { connectionSheet(c) }
                 setOnLongClickListener { activityHeld = false; connectionSheet(c); true }
                 @Suppress("ClickableViewAccessibility")
                 setOnTouchListener { _, event ->
@@ -486,8 +486,7 @@ class MainActivity : Activity() {
     private fun connectionSheet(c: JSONObject) = bottomSheet { dialog, box ->
         val host = c.optString("host"); val id = c.optString("id"); val site = Advanced.site(host)
         box.addView(text(host, 17f, Palette.text, 600).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.MIDDLE; setPadding(4.dp, 0, 4.dp, 0); accessibilityHeading() })
-        box.addView(text(c.optString("rule") + " → " + connectionExit(c), 13f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END; setPadding(4.dp, 0, 4.dp, 0) },
-            LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp; bottomMargin = 14.dp })
+        routePath(box, c)
         if (host.isNotEmpty()) {
             // The reach of the rule: the whole site (and its subdomains) or only this name.
             var whole = true
@@ -525,9 +524,9 @@ class MainActivity : Activity() {
             setOnClickListener { dialog.dismiss(); executor.execute { try { Core.closeConnection(id) } catch (_: Exception) { } } }
         }
         actions += row().apply {
-            addView(text(L10n.text(R.string.menu_why), 15f).apply { maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(text(L10n.text(R.string.why_open_rules), 15f).apply { maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
             addView(chevron())
-            setOnClickListener { dialog.dismiss(); whySheet(c) }
+            setOnClickListener { dialog.dismiss(); page = "rules"; render() }
         }
         box.addView(group(actions, color = Color.rgb(31, 29, 26)))
     }
@@ -549,12 +548,11 @@ class MainActivity : Activity() {
         if (mono) typeface = Typeface.MONOSPACE
         background = rounded(if (lit) Palette.selected else Color.rgb(36, 34, 30), 9)
     }
-    private fun whySheet(c: JSONObject) = bottomSheet { dialog, box ->
-        val host = c.optString("host"); val proxy = c.optBoolean("proxy"); val via = c.optString("via"); val exit = connectionExit(c)
+    /** Why the connection went the way it did: the rule, encrypted or direct, the exit and the line, and one sentence. */
+    private fun routePath(box: LinearLayout, c: JSONObject) {
+        val proxy = c.optBoolean("proxy"); val via = c.optString("via"); val exit = connectionExit(c)
         val (chip, line) = reason(c)
-        box.addView(text(L10n.text(R.string.menu_why), 13f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) })
-        box.addView(text(host, 17f, Palette.text, 600).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.MIDDLE; setPadding(4.dp, 0, 4.dp, 0); accessibilityHeading() },
-            LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp; bottomMargin = 14.dp })
+        box.addView(text(L10n.text(R.string.menu_why), 13f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14.dp; bottomMargin = 8.dp })
         fun pathRow(views: List<View>) = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             views.forEachIndexed { i, v ->
@@ -573,20 +571,8 @@ class MainActivity : Activity() {
                 addView(pathRow(second), LinearLayout.LayoutParams(0, -2, 1f))
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp })
         }
-        if (line.isNotEmpty()) box.addView(text(line, 14f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14.dp })
-        if (host.isNotEmpty()) {
-            box.addView(LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                addView(text(L10n.text(if (proxy) R.string.why_make_direct else R.string.why_make_proxy), 15f, Palette.onAccent, 600).apply {
-                    gravity = Gravity.CENTER; maxLines = 1; background = pressable(Palette.accent, 12)
-                    setOnClickListener { dialog.dismiss(); addQuickRule(Advanced.site(host), true, if (proxy) "direct" else "proxy") }
-                }, LinearLayout.LayoutParams(0, 48.dp, 1f).apply { marginEnd = 10.dp })
-                addView(text(L10n.text(R.string.why_open_rules), 15f, Palette.text, 500).apply {
-                    gravity = Gravity.CENTER; maxLines = 1; background = pressable(Palette.raised, 12)
-                    setOnClickListener { dialog.dismiss(); page = "rules"; render() }
-                }, LinearLayout.LayoutParams(0, 48.dp, 1f))
-            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 18.dp })
-        }
+        if (line.isNotEmpty()) box.addView(text(line, 14f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12.dp })
+        box.addView(View(this), LinearLayout.LayoutParams(-1, 16.dp))
     }
     /**
      * Saves a quick rule and hands the rules to the running core, which applies them at once; the open connections
@@ -594,7 +580,6 @@ class MainActivity : Activity() {
      */
     private fun addQuickRule(name: String, site: Boolean, policy: String) {
         // A rule from here turns on the person's routing rules (part of advanced) if they were off.
-        if (!Advanced.enabled(this)) Advanced.enable(this, true)
         val before = Advanced.setQuickRule(this, name, site, policy)
         applyRules(name, site) { live ->
             undoBar(L10n.text(if (live) R.string.rule_added else R.string.rule_added_later, name, L10n.text(when (policy) { "direct" -> R.string.policy_direct; "block" -> R.string.policy_block; else -> R.string.policy_proxy })), before)
@@ -1658,13 +1643,8 @@ class MainActivity : Activity() {
                         .setNegativeButton(L10n.text(R.string.cancel), null).show()
                 },
                 settingRow(L10n.text(R.string.per_app_routing), appsValue()) { page = "apps"; render() },
-                settingRow(L10n.text(R.string.advanced), L10n.text(if (Advanced.enabled(this)) R.string.setting_on else R.string.setting_off)) {
-                    val on = Advanced.enabled(this)
-                    sheet(L10n.text(R.string.advanced), listOf(L10n.text(R.string.setting_off), L10n.text(R.string.setting_on)), if (on) 1 else 0, L10n.text(R.string.advanced_detail)) { i ->
-                        if ((i == 1) != on) { Advanced.enable(this, i == 1); render() }
-                    }
-                },
-            ) + (if (Advanced.enabled(this)) listOf(settingRow(L10n.text(R.string.rules_title), rulesValue()) { page = "rules"; render() }) else emptyList()) + listOf(
+                settingRow(L10n.text(R.string.rules_title), rulesValue()) { page = "rules"; render() },
+            ) + listOf(
                 settingRow(L10n.text(R.string.check_for_updates), "") { update?.let { if (!downloading) startDownload(it) } ?: checkForUpdate(announce = true) }
                     .also { updateRowValue = it.getChildAt(1) as TextView },
                 // This build's improvements, from clients/CHANGELOG.md (generated into the string resources).

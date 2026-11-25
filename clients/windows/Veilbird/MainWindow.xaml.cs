@@ -1710,13 +1710,6 @@ public partial class MainWindow : Window {
         var appVersion=System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)??"0";
         var whatsNew=SettingRow(L10n.Text("whats_new"),appVersion,_=>ShowNotes(appVersion,L10n.Text("whats_new_notes").Split('\n').Where(line=>line.Trim().Length>0).ToList()));
         var apps=SettingRow(L10n.Text("per_app_routing"),AppsValue(),_=>{page="apps";Render();});
-        // Advanced: favorites and per-location protocol lock on the location page, protocol names in the check.
-        var advanced=new ToggleButton {Style=(Style)FindResource("Switch"),IsChecked=Advanced.Enabled,VerticalAlignment=VerticalAlignment.Center};
-        AutomationProperties.SetName(advanced,L10n.Text("advanced"));
-        advanced.Click+=(_,_)=>{Advanced.Enabled=advanced.IsChecked==true;Render();};
-        var advancedText=TwoLines(L10n.Text("advanced"),L10n.Text("advanced_detail"));advancedText.Margin=new Thickness(0,0,12,0);
-        if(advancedText.Children[1] is TextBlock advancedDetail) {advancedDetail.TextWrapping=TextWrapping.Wrap;advancedDetail.TextTrimming=TextTrimming.None;}
-        var advancedRow=new Border {MinHeight=56,Padding=new Thickness(14,8,14,8),Child=Columns(new FrameworkElement(),advancedText,advanced)};
         // The globe on the connect page marks this PC's city; someone sharing screenshots can leave it out.
         var showMe=new ToggleButton {Style=(Style)FindResource("Switch"),IsChecked=Settings.Get("globeShowMe","on")=="on",VerticalAlignment=VerticalAlignment.Center};
         AutomationProperties.SetName(showMe,L10n.Text("globe_show_me"));
@@ -1724,8 +1717,7 @@ public partial class MainWindow : Window {
         var showMeText=TwoLines(L10n.Text("globe_show_me"),L10n.Text("globe_show_me_detail"));showMeText.Margin=new Thickness(0,0,12,0);
         if(showMeText.Children[1] is TextBlock showMeDetail) {showMeDetail.TextWrapping=TextWrapping.Wrap;showMeDetail.TextTrimming=TextTrimming.None;}
         var showMeRow=new Border {MinHeight=56,Padding=new Thickness(14,8,14,8),Child=Columns(new FrameworkElement(),showMeText,showMe)};
-        var rows=new List<FrameworkElement>{devices,password,language,appearance,startupRow,guardRow,apps,showMeRow,advancedRow};
-        if(Advanced.Enabled) rows.Add(SettingRow(L10n.Text("rules_title"),RulesValue(),_=>{page="rules";Render();}));
+        var rows=new List<FrameworkElement>{devices,password,language,appearance,startupRow,guardRow,apps,showMeRow,SettingRow(L10n.Text("rules_title"),RulesValue(),_=>{page="rules";Render();})};
         rows.Add(updates);rows.Add(whatsNew);
         Add(Card(rows,14));
 

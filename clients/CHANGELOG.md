@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.35
+
+### zh
+- 「活动」列表在鼠标停在上面时不再重新排序，右键和点击不会点错行
+- 点一下连接，下方面板里就有全部操作：总是走加密 / 总是直连 / 屏蔽（可选整个网站或只这个域名）、复制域名、断开连接、去分流规则
+- 去掉「高级功能」开关：收藏、协议锁定和分流规则默认都可以用
+
+### en
+- The Activity list holds its order while the pointer is on it, so a click or right-click lands on the right row
+- Click a connection and the panel below has every action: always encrypt / always direct / block (whole site or just that name), copy the domain, close the connection, open routing rules
+- No more Advanced switch: favorites, protocol lock and routing rules are always available
+
+### ru
+- Список «Активности» не меняет порядок, пока над ним указатель, поэтому щелчок попадает в нужную строку
+- Щёлкните соединение — в панели ниже все действия: всегда через шифрование / всегда напрямую / блокировать (весь сайт или только этот домен), копировать домен, закрыть соединение, открыть правила
+- Переключателя «Расширенные функции» больше нет: избранное, фиксация протокола и правила маршрутизации доступны всегда
+
 ## 1.0.34
 
 ### zh

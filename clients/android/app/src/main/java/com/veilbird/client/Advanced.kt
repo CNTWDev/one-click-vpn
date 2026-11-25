@@ -13,7 +13,8 @@ object Advanced {
     val protocols = listOf("hysteria2", "reality", "xhttp", "wireguard")
 
     private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    fun enabled(context: Context) = prefs(context).getBoolean("on", false)
+    /** Always on since 1.0.35 (there is no switch any more): the features stay out of the way until used. */
+    @Suppress("UNUSED_PARAMETER") fun enabled(context: Context) = true
     fun enable(context: Context, on: Boolean) { prefs(context).edit().putBoolean("on", on).apply() }
 
     fun favorites(context: Context): Set<String> = if (enabled(context)) prefs(context).getStringSet("favorites", emptySet())!!.toSet() else emptySet()
