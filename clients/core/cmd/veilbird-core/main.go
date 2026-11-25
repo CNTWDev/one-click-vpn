@@ -245,6 +245,9 @@ func main() {
 		case "reset":
 			core.Reset()
 			reply("ok")
+		case "reset-tunnel":
+			core.ResetTunnel()
+			reply("ok")
 		case "stop":
 			core.Stop()
 			reply("ok")

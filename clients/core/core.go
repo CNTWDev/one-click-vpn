@@ -118,13 +118,26 @@ func Stop() {
 // network changes (Wi-Fi <-> mobile data): connections bound to the old network would otherwise hang until
 // they time out, while new ones leave through the new network right away.
 func Reset() {
+	closeConnections(false)
+}
+
+// ResetTunnel closes only the connections through the tunnel, after the watchdog saw them hang or the group moved to
+// another line. Direct connections (mainland sites and apps in smart routing, such as a WeChat photo upload) do not
+// use the tunnel and keep going: closing them restarted every upload that took longer than the watchdog's spacing.
+func ResetTunnel() {
+	closeConnections(true)
+}
+
+func closeConnections(tunnelOnly bool) {
 	lock.Lock()
 	defer lock.Unlock()
 	if !running {
 		return
 	}
 	statistic.DefaultManager.Range(func(c statistic.Tracker) bool {
-		_ = c.Close()
+		if !tunnelOnly || !direct(c.Info()) {
+			_ = c.Close()
+		}
 		return true
 	})
 }

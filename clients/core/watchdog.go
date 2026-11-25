@@ -30,31 +30,35 @@ import (
 // reads the open connections, so an idle device costs nothing), then Check the path the user's traffic takes,
 // and Suspend the lines that fail it so the fallback group moves on.
 
-const (
+// Variables only so the tests need not wait for them.
+var (
 	// stallAge: a TCP connection through the tunnel that got not a single byte back for this long is stuck
 	// (a TLS server answers in one round trip).
 	stallAge = 6 * time.Second
 	// stallQuiet: and nothing at all came back through the tunnel for this long.
 	stallQuiet = 10 * time.Second
-	// stallCount: at least this many stuck connections, so one slow site does not count.
-	stallCount = 2
 )
+
+// stallCount: at least this many stuck connections, so one slow site does not count.
+const stallCount = 2
 
 type watchState struct {
 	sync.Mutex
 	down      map[string]int64
+	up        map[string]int64
 	lastRx    time.Time
 	lastAI    time.Time
 	suspended map[string]time.Time
 }
 
-var watch = &watchState{down: map[string]int64{}, suspended: map[string]time.Time{}}
+var watch = &watchState{down: map[string]int64{}, up: map[string]int64{}, suspended: map[string]time.Time{}}
 
 // resetWatch starts a new connection's watch: called by Run (the lines' suspensions belong to a node).
 func resetWatch() {
 	watch.Lock()
 	defer watch.Unlock()
 	watch.down = map[string]int64{}
+	watch.up = map[string]int64{}
 	watch.lastRx = time.Now()
 	watch.lastAI = time.Time{}
 	watch.suspended = map[string]time.Time{}
@@ -86,7 +90,12 @@ func Health(group string) string {
 			}
 			watch.down[id] = down
 		}
-		if info.Metadata != nil && info.Metadata.NetWork == C.TCP && down == 0 && now.Sub(info.Start) >= stallAge {
+		// A connection still sending (a photo or file upload) gets nothing back until the server has it all: it is
+		// busy, not stuck. A dead line stops taking data once the socket's send buffer is full.
+		up := info.UploadTotal.Load()
+		sending := up > watch.up[id]
+		watch.up[id] = up
+		if info.Metadata != nil && info.Metadata.NetWork == C.TCP && down == 0 && !sending && now.Sub(info.Start) >= stallAge {
 			stuck++
 		}
 		return true
@@ -94,6 +103,11 @@ func Health(group string) string {
 	for id := range watch.down {
 		if !live[id] {
 			delete(watch.down, id)
+		}
+	}
+	for id := range watch.up {
+		if !live[id] {
+			delete(watch.up, id)
 		}
 	}
 	keepSuspended(group, now)

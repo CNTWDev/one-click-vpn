@@ -321,7 +321,7 @@ public sealed class Connection(NativeApi api,Core core) {
         lastStall=DateTime.UtcNow;
         var line=carrying;
         Journal.Add($"watchdog: traffic stalled via {line}");
-        await Task.Run(core.Reset);
+        await Task.Run(core.ResetTunnel);
         if(await Task.Run(()=>core.CheckPath(5000))) {Journal.Add("watchdog: recovered after closing stuck connections");_=api.Report("STALL",NodeId,$"recovered=reset line={line}");return;}
         // Nothing answers outside the tunnel either: the network is down (or a sign-in page), not the location.
         if(await Task.Run(()=>core.ProbeUrl("DIRECT",Transports.LocalUrl,3000))<0) {Journal.Add("watchdog: the network itself does not answer, waiting");return;}
@@ -330,7 +330,7 @@ public sealed class Connection(NativeApi api,Core core) {
         Journal.Add("watchdog: "+string.Join(", ",transports.Select(name=>failed.Contains(name)?$"{name} fails":$"{name} ok")));
         if(failed.Count>0) await Task.Run(()=>core.Suspend(failed,600));
         if(failed.Count<transports.Count) {
-            await Task.Run(core.Reset);await UpdateCarrying();
+            await Task.Run(core.ResetTunnel);await UpdateCarrying();
             Journal.Add($"watchdog: moved to {carrying}");_=api.Report("STALL",NodeId,$"recovered=line line={line}");return;
         }
         Journal.Add("watchdog: no line carries traffic");_=api.Report("STALL",NodeId,$"recovered=no line={line}");

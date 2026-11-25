@@ -154,6 +154,8 @@ public sealed class Core : IDisposable {
     /// Removes the tun and closes every connection; the process stays for the next connection.
     /// Closes open connections after a network change; the tunnel stays (core.Reset).
     public void Reset() {try {Call("reset");} catch(IOException) {/* gone */}}
+    /// Closes only the connections through the tunnel (the watchdog); direct ones keep going (core.ResetTunnel).
+    public void ResetTunnel() {try {Call("reset-tunnel");} catch(IOException) {/* gone */}}
     public void Stop() {try {Call("stop");} catch(IOException) {/* already gone */}}
     /// A WireGuard key pair generated on this PC; the private key never leaves it.
     public (string Public,string Private) NewKeypair() {

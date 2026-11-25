@@ -460,7 +460,7 @@ class ConnectionService : VpnService() {
         lastStall = SystemClock.elapsedRealtime()
         val line = carrying
         Journal.add("watchdog: traffic stalled via $line")
-        Core.reset()
+        Core.resetTunnel()
         if (checkPath()) { Journal.add("watchdog: recovered after closing stuck connections"); api.report("STALL", nodeId, "recovered=reset line=$line"); return }
         // Nothing answers outside the tunnel either: the network is down (or a sign-in page), not the location.
         val local = Core.probe("DIRECT", Transports.LOCAL_URL, 3000).substringAfterLast('=').toIntOrNull() ?: -1
@@ -470,7 +470,7 @@ class ConnectionService : VpnService() {
         Journal.add("watchdog: " + transports.joinToString(", ") { "$it ${if ((results[it] ?: -1) >= 0) "ok" else "fails"}" })
         if (failed.isNotEmpty()) Core.suspend(Transports.GROUP, failed.joinToString(","), 600)
         if (failed.size < transports.size) {
-            Core.reset(); updateCarrying()
+            Core.resetTunnel(); updateCarrying()
             Journal.add("watchdog: moved to $carrying"); api.report("STALL", nodeId, "recovered=line line=$line"); return
         }
         Journal.add("watchdog: no line carries traffic"); api.report("STALL", nodeId, "recovered=no line=$line")

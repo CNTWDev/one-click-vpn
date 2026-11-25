@@ -4,6 +4,17 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.36
+
+### zh
+- 修复开着 VPN 时微信等国内应用发图片、传文件很慢甚至发不出去：断线检测不再把正在上传的连接当成卡住，也不再顺带掐断直连的国内连接
+
+### en
+- Fixed slow or failing photo and file uploads in WeChat and other mainland apps while connected: the stall check no longer mistakes an upload for a hang, and no longer closes direct connections
+
+### ru
+- Исправлена медленная или прерывающаяся отправка фото и файлов в WeChat и других китайских приложениях при подключении: проверка зависаний больше не принимает загрузку за зависание и не закрывает прямые соединения
+
 ## 1.0.35
 
 ### zh
