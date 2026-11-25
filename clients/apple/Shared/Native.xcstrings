@@ -5498,6 +5498,29 @@
         }
       }
     },
+    "jump_recent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近去过"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Недавние"
+          }
+        }
+      }
+    },
     "kill_switch": {
       "extractionState": "manual",
       "localizations": {
@@ -7058,6 +7081,213 @@
           "stringUnit": {
             "state": "translated",
             "value": "Или выберите сами"
+          }
+        }
+      }
+    },
+    "palette_close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Закрыть"
+          }
+        }
+      }
+    },
+    "palette_connect_to": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接到 %1$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Подключиться: %1$@"
+          }
+        }
+      }
+    },
+    "palette_current": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сейчас"
+          }
+        }
+      }
+    },
+    "palette_empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matches"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有匹配的结果"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ничего не найдено"
+          }
+        }
+      }
+    },
+    "palette_placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type a city, country code or command"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入城市、国家代码或命令"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Город, код страны или команда"
+          }
+        }
+      }
+    },
+    "palette_run": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выполнить"
+          }
+        }
+      }
+    },
+    "palette_select": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выбор"
+          }
+        }
+      }
+    },
+    "palette_to_global": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to Global"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换为 全局"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Режим: глобальный"
+          }
+        }
+      }
+    },
+    "palette_to_smart": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to Smart routing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换为 智能分流"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Режим: умный"
           }
         }
       }
@@ -12450,19 +12680,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac: while connecting, a small capsule grows out of the notch; when you land it opens to show \"Arrived\" and the city, then settles beside the notch (amber dot + country code) and opens again on hover. Automatic exit changes show there too. Macs without a notch get it at the top centre of the screen; it can be turned off in Me"
+            "value": "Windows: press Ctrl + Alt + Space anywhere for a command palette in the middle of the screen. Type a city or country code to connect there, or switch Smart/Global, disconnect, or run a connection check\nWindows: the taskbar icon shows an amber dot while connected; its hover preview has Connect/Disconnect, Automatic and Connection check buttons; right-click to jump back to a recent place"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac：连接时从刘海里长出一条小胶囊，连上那一刻展开显示“已抵达”和城市，之后缩在刘海两侧（琥珀点 + 国家代码），鼠标移上去可再展开；自动换出口时也在这里提示。没有刘海的 Mac 从屏幕顶部正中出现，可在「我的」里关闭"
+            "value": "Windows：任意界面按 Ctrl + Alt + 空格，屏幕中间弹出指令面板，输入城市名或国家代码直接连过去，也能切换智能/全局、断开、线路体检\nWindows：已连接时任务栏图标带琥珀色角标；鼠标悬停预览里有连接/断开、自动选择、线路体检三个按钮；右键可快速连到最近去过的地方"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac: при подключении из «чёлки» вырастает капсула; в момент подключения она раскрывается со словом «Прибыли» и городом, затем остаётся по бокам «чёлки» (янтарная точка и код страны) и раскрывается при наведении. Там же видна автосмена выхода. На Mac без «чёлки» — вверху по центру экрана; отключается в разделе «Я»"
+            "value": "Windows: Ctrl + Alt + Пробел в любом окне открывает палитру команд в центре экрана. Введите город или код страны, чтобы подключиться, или смените режим, отключитесь, проверьте линию\nWindows: янтарная точка на значке в панели задач, пока есть подключение; в превью — кнопки подключения, автовыбора и проверки линии; правый клик — недавние места"
           }
         }
       }

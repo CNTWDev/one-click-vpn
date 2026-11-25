@@ -240,6 +240,7 @@
   <string name="hop_note">Hysteria2 меняет порт каждые 20–40 с</string>
   <string name="incorrect_email_or_password">Неверная почта или пароль.</string>
   <string name="invalid_server_response_try_again_later">Некорректный ответ сервера. Повторите позже.</string>
+  <string name="jump_recent">Недавние</string>
   <string name="kill_switch">Блокировка без VPN</string>
   <string name="kill_switch_android_detail">В настройках Android включите «Постоянная VPN» и «Блокировать соединения без VPN»</string>
   <string name="kill_switch_apple_detail">Весь трафик идёт через VPN, без неё сеть закрыта. Действует со следующего подключения</string>
@@ -308,6 +309,15 @@
   <string name="open_system_settings">Открыть Системные настройки</string>
   <string name="open_vpn_settings">Открыть настройки VPN</string>
   <string name="or_choose_one">Или выберите сами</string>
+  <string name="palette_close">Закрыть</string>
+  <string name="palette_connect_to">Подключиться: %1$s</string>
+  <string name="palette_current">Сейчас</string>
+  <string name="palette_empty">Ничего не найдено</string>
+  <string name="palette_placeholder">Город, код страны или команда</string>
+  <string name="palette_run">Выполнить</string>
+  <string name="palette_select">Выбор</string>
+  <string name="palette_to_global">Режим: глобальный</string>
+  <string name="palette_to_smart">Режим: умный</string>
   <string name="password">Пароль</string>
   <string name="password_reset_unavailable">Сброс пароля по email сейчас недоступен. Обратитесь к администратору.</string>
   <string name="per_app_routing">Приложения в VPN</string>
@@ -542,7 +552,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Mac: при подключении из «чёлки» вырастает капсула; в момент подключения она раскрывается со словом «Прибыли» и городом, затем остаётся по бокам «чёлки» (янтарная точка и код страны) и раскрывается при наведении. Там же видна автосмена выхода. На Mac без «чёлки» — вверху по центру экрана; отключается в разделе «Я»</string>
+  <string name="whats_new_notes">Windows: Ctrl + Alt + Пробел в любом окне открывает палитру команд в центре экрана. Введите город или код страны, чтобы подключиться, или смените режим, отключитесь, проверьте линию\nWindows: янтарная точка на значке в панели задач, пока есть подключение; в превью — кнопки подключения, автовыбора и проверки линии; правый клик — недавние места</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="why_ai">AI-сервис</string>

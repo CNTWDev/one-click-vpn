@@ -246,6 +246,7 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="hop_note" xml:space="preserve"><value>Hysteria2 changes port every 20–40 s</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Incorrect email or password.</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>Invalid server response. Try again later.</value></data>
+  <data name="jump_recent" xml:space="preserve"><value>Recent</value></data>
   <data name="kill_switch" xml:space="preserve"><value>Kill switch</value></data>
   <data name="kill_switch_android_detail" xml:space="preserve"><value>In Android settings, turn on Always-on VPN and Block connections without VPN</value></data>
   <data name="kill_switch_apple_detail" xml:space="preserve"><value>All traffic goes through the VPN; without it, nothing goes out. Applies from the next connection</value></data>
@@ -314,6 +315,15 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="open_system_settings" xml:space="preserve"><value>Open System Settings</value></data>
   <data name="open_vpn_settings" xml:space="preserve"><value>Open VPN settings</value></data>
   <data name="or_choose_one" xml:space="preserve"><value>Or choose one</value></data>
+  <data name="palette_close" xml:space="preserve"><value>Close</value></data>
+  <data name="palette_connect_to" xml:space="preserve"><value>Connect to {0}</value></data>
+  <data name="palette_current" xml:space="preserve"><value>Current</value></data>
+  <data name="palette_empty" xml:space="preserve"><value>No matches</value></data>
+  <data name="palette_placeholder" xml:space="preserve"><value>Type a city, country code or command</value></data>
+  <data name="palette_run" xml:space="preserve"><value>Run</value></data>
+  <data name="palette_select" xml:space="preserve"><value>Select</value></data>
+  <data name="palette_to_global" xml:space="preserve"><value>Switch to Global</value></data>
+  <data name="palette_to_smart" xml:space="preserve"><value>Switch to Smart routing</value></data>
   <data name="password" xml:space="preserve"><value>Password</value></data>
   <data name="password_reset_unavailable" xml:space="preserve"><value>Password reset by email isn't available right now. Contact your administrator.</value></data>
   <data name="per_app_routing" xml:space="preserve"><value>Per-app routing</value></data>
@@ -549,7 +559,8 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac: while connecting, a small capsule grows out of the notch; when you land it opens to show &quot;Arrived&quot; and the city, then settles beside the notch (amber dot + country code) and opens again on hover. Automatic exit changes show there too. Macs without a notch get it at the top centre of the screen; it can be turned off in Me</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Windows: press Ctrl + Alt + Space anywhere for a command palette in the middle of the screen. Type a city or country code to connect there, or switch Smart/Global, disconnect, or run a connection check
+Windows: the taskbar icon shows an amber dot while connected; its hover preview has Connect/Disconnect, Automatic and Connection check buttons; right-click to jump back to a recent place</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI service</value></data>

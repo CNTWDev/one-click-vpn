@@ -246,6 +246,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="hop_note" xml:space="preserve"><value>Hysteria2 меняет порт каждые 20–40 с</value></data>
   <data name="incorrect_email_or_password" xml:space="preserve"><value>Неверная почта или пароль.</value></data>
   <data name="invalid_server_response_try_again_later" xml:space="preserve"><value>Некорректный ответ сервера. Повторите позже.</value></data>
+  <data name="jump_recent" xml:space="preserve"><value>Недавние</value></data>
   <data name="kill_switch" xml:space="preserve"><value>Блокировка без VPN</value></data>
   <data name="kill_switch_android_detail" xml:space="preserve"><value>В настройках Android включите «Постоянная VPN» и «Блокировать соединения без VPN»</value></data>
   <data name="kill_switch_apple_detail" xml:space="preserve"><value>Весь трафик идёт через VPN, без неё сеть закрыта. Действует со следующего подключения</value></data>
@@ -314,6 +315,15 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="open_system_settings" xml:space="preserve"><value>Открыть Системные настройки</value></data>
   <data name="open_vpn_settings" xml:space="preserve"><value>Открыть настройки VPN</value></data>
   <data name="or_choose_one" xml:space="preserve"><value>Или выберите сами</value></data>
+  <data name="palette_close" xml:space="preserve"><value>Закрыть</value></data>
+  <data name="palette_connect_to" xml:space="preserve"><value>Подключиться: {0}</value></data>
+  <data name="palette_current" xml:space="preserve"><value>Сейчас</value></data>
+  <data name="palette_empty" xml:space="preserve"><value>Ничего не найдено</value></data>
+  <data name="palette_placeholder" xml:space="preserve"><value>Город, код страны или команда</value></data>
+  <data name="palette_run" xml:space="preserve"><value>Выполнить</value></data>
+  <data name="palette_select" xml:space="preserve"><value>Выбор</value></data>
+  <data name="palette_to_global" xml:space="preserve"><value>Режим: глобальный</value></data>
+  <data name="palette_to_smart" xml:space="preserve"><value>Режим: умный</value></data>
   <data name="password" xml:space="preserve"><value>Пароль</value></data>
   <data name="password_reset_unavailable" xml:space="preserve"><value>Сброс пароля по email сейчас недоступен. Обратитесь к администратору.</value></data>
   <data name="per_app_routing" xml:space="preserve"><value>Приложения в VPN</value></data>
@@ -549,7 +559,8 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac: при подключении из «чёлки» вырастает капсула; в момент подключения она раскрывается со словом «Прибыли» и городом, затем остаётся по бокам «чёлки» (янтарная точка и код страны) и раскрывается при наведении. Там же видна автосмена выхода. На Mac без «чёлки» — вверху по центру экрана; отключается в разделе «Я»</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Windows: Ctrl + Alt + Пробел в любом окне открывает палитру команд в центре экрана. Введите город или код страны, чтобы подключиться, или смените режим, отключитесь, проверьте линию
+Windows: янтарная точка на значке в панели задач, пока есть подключение; в превью — кнопки подключения, автовыбора и проверки линии; правый клик — недавние места</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI-сервис</value></data>

@@ -2843,5 +2843,55 @@
     "zh": "在屏幕顶部显示连接",
     "en": "Show connection at top of screen",
     "ru": "Подключение вверху экрана"
+  },
+  "palette_placeholder": {
+    "zh": "输入城市、国家代码或命令",
+    "en": "Type a city, country code or command",
+    "ru": "Город, код страны или команда"
+  },
+  "palette_connect_to": {
+    "zh": "连接到 {0}",
+    "en": "Connect to {0}",
+    "ru": "Подключиться: {0}"
+  },
+  "palette_to_global": {
+    "zh": "切换为 全局",
+    "en": "Switch to Global",
+    "ru": "Режим: глобальный"
+  },
+  "palette_to_smart": {
+    "zh": "切换为 智能分流",
+    "en": "Switch to Smart routing",
+    "ru": "Режим: умный"
+  },
+  "palette_current": {
+    "zh": "当前",
+    "en": "Current",
+    "ru": "Сейчас"
+  },
+  "palette_run": {
+    "zh": "执行",
+    "en": "Run",
+    "ru": "Выполнить"
+  },
+  "palette_select": {
+    "zh": "选择",
+    "en": "Select",
+    "ru": "Выбор"
+  },
+  "palette_close": {
+    "zh": "关闭",
+    "en": "Close",
+    "ru": "Закрыть"
+  },
+  "palette_empty": {
+    "zh": "没有匹配的结果",
+    "en": "No matches",
+    "ru": "Ничего не найдено"
+  },
+  "jump_recent": {
+    "zh": "最近去过",
+    "en": "Recent",
+    "ru": "Недавние"
   }
 }

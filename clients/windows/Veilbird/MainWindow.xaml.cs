@@ -111,7 +111,7 @@ public partial class MainWindow : Window {
         trimTimer.Tick+=(_,_)=>{trimTimer.Stop();if(!Seen) Trim();};
         // Started in the background at sign-in (tray only): trim once the launch work has settled.
         trimTimer.Start();
-        SetupTray();
+        SetupTray();SetupShell();
         Closing+=OnClosing;
         updateTimer.Tick+=(_,_)=>{
             // Not while a connection is being set up: the check would compete with it for the network.
@@ -235,6 +235,7 @@ public partial class MainWindow : Window {
         tray.Text=(first.Length>room?first[..room]:first)+second;
         if(trayRates is not null&&TrayConnected) trayRates.Text=TrayRates();
         ShowTrayIcon();
+        UpdateShell();
     }
     /// "Traffic running low · 0.8 GB left" while traffic or time is running out, else null.
     private string? Reminder()=>api.SignedIn?AccountAccess.From(accountData).Line(Bytes):null;
