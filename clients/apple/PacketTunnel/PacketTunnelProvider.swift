@@ -457,6 +457,19 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         case "speed progress":completionHandler?(Data(CoreSpeedProgress().utf8));return
         case "speed stop":CoreSpeedStop();completionHandler?(nil);return
         case "status-line":completionHandler?(Data(CoreNow(Transports.group).utf8));return
+        // The person's own rules changed in the app (the activity view's menu, the rules page): applied at once, no reconnect.
+        case let message where message.hasPrefix("rules "):
+            let json=String(message.dropFirst(6))
+            var failure:NSError?
+            let ok=CoreSetRules(json,&failure)
+            if ok,let lines=try? JSONSerialization.jsonObject(with:Data(json.utf8)) as? [String] {rules=lines}
+            if !ok {Journal.add("rules: not applied (\(failure?.localizedDescription ?? "?"))")}
+            completionHandler?(Data((ok ? "ok":"failed").utf8));return
+        case let message where message.hasPrefix("close "):CoreCloseConnection(String(message.dropFirst(6)));completionHandler?(nil);return
+        case let message where message.hasPrefix("closehost "):
+            let parts=message.split(separator:" ")
+            if parts.count==3 {_ = CoreCloseHost(String(parts[1]),parts[2]=="1")}
+            completionHandler?(nil);return
         case let message where message.hasPrefix("check "):
             // The connection check, timed from here so every leg leaves through the right path: the small page and the
             // node outside the tunnel (DIRECT), the test page through the transport carrying traffic now.

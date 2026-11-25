@@ -60,4 +60,40 @@ object Advanced {
         if (ip) return if (cidr.matches(value)) 1 else -1
         return if (value.trimStart('+').trimStart('.').isNotEmpty()) 1 else -1
     }
+
+    private val address = Regex("^[0-9.]+$")
+    private fun isAddress(host: String) = ':' in host || address.matches(host)
+    /** The registrable part of a host, as the core groups sites (activity.go site): chat.openai.com -> openai.com. */
+    fun site(host: String): String {
+        if (isAddress(host)) return host
+        val labels = host.split('.')
+        var keep = 2
+        if (labels.size >= 3 && labels.last().length == 2 && labels[labels.size - 2] in setOf("com", "net", "org", "edu", "gov", "co", "ac", "or", "ne", "go")) keep = 3
+        return if (labels.size <= keep) host else labels.takeLast(keep).joinToString(".")
+    }
+    /** The line a quick rule writes: the whole site ("openai.com, direct") or only this name ("DOMAIN,chat.openai.com,direct"). */
+    fun quickRule(host: String, site: Boolean, policy: String) = when {
+        isAddress(host) -> host + (if (':' in host) "/128" else "/32") + ", " + policy
+        site -> "$host, $policy"
+        else -> "DOMAIN,$host,$policy"
+    }
+    /**
+     * Puts the person's quick rule for host first (the first matching rule wins), replacing an earlier one for the
+     * same name and reach; returns the text before it, for undo.
+     */
+    fun setQuickRule(context: Context, host: String, site: Boolean, policy: String): String {
+        val before = rulesText(context); val name = host.lowercase()
+        val kept = before.split('\n').filterNot { sameTarget(it, name, site) }
+        saveRules(context, (listOf(quickRule(name, site, policy)) + kept).joinToString("\n").trimEnd('\n'))
+        return before
+    }
+    private fun sameTarget(line: String, host: String, site: Boolean): Boolean {
+        val parts = line.substringBefore('#').split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        fun bare(value: String) = value.lowercase().trimStart('+', '.')
+        return when {
+            parts.size == 2 -> (bare(parts[0]) == host && site) || bare(parts[0]) == "$host/32" || bare(parts[0]) == "$host/128"
+            parts.size >= 3 -> bare(parts[1]) == host && when (parts[0].uppercase()) { "DOMAIN-SUFFIX" -> site; "DOMAIN" -> !site; else -> false }
+            else -> false
+        }
+    }
 }

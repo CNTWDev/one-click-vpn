@@ -98,6 +98,8 @@ struct ClientView:View {
         // A new appearance redraws every view with the other palette.
         .id(appearance)
         .overlay(alignment:.bottom) {messageBanner}
+        .onChange(of:model.rulesEdits) {_ in if tab==7 {rulesDraft=Advanced.rulesText}}
+        .onChange(of:model.rulesShown) {_ in rulesDraft=Advanced.rulesText;tab=7}
         .foregroundStyle(VeilbirdStyle.text).tint(VeilbirdStyle.accent)
         .environment(\.locale, L10n.locale).preferredColorScheme(.dark)
         .animation(reduceMotion ? nil:.easeOut(duration:0.2),value:tab).animation(reduceMotion ? nil:.easeOut(duration:0.2),value:model.signedIn)
@@ -1285,13 +1287,13 @@ struct ClientView:View {
             }.padding(.horizontal,16).padding(.top,mac ? 8:8).padding(.bottom,20)
         }
     }
-    /// Saves the rules; while connected, a change applies at once (one reconnect).
+    /// Saves the rules; while connected, a change applies at once (the tunnel takes them without reconnecting).
     private func saveRules() {
         let before=Advanced.rules
         Advanced.rulesText=rulesDraft
         let live=before != Advanced.rules && model.connected
-        model.message=L10n.text(live ? "rules_saved_reconnect":"rules_saved")
-        if live {model.work {try await model.reconnect()}}
+        model.message=L10n.text(live ? "rules_saved_live":"rules_saved")
+        if live {Task {if !(await model.applyRules()) {model.message=L10n.text("rules_saved_reconnect");try? await model.reconnect()}}}
         tab=2
     }
     private var devicesView:some View {

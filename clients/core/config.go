@@ -63,7 +63,11 @@ func Run(home string, options string) error {
 		return err
 	}
 	seedRuleSets(home, o.Smart)
-	return start(home, configuration)
+	if err := start(home, configuration); err != nil {
+		return err
+	}
+	rememberRun(o)
+	return nil
 }
 
 // Build returns the mihomo configuration as JSON (valid YAML).

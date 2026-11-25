@@ -59,4 +59,40 @@ enum Advanced {
         while value.hasPrefix("+") || value.hasPrefix(".") {value.removeFirst()}
         return value.isEmpty ? -1:1
     }
+
+    /// The registrable part of a host, as the core groups sites (activity.go site): chat.openai.com -> openai.com.
+    static func site(_ host:String)->String {
+        if host.contains(":") || host.range(of:"^[0-9.]+$",options:.regularExpression) != nil {return host}
+        let labels=host.split(separator:".").map(String.init)
+        var keep=2
+        if labels.count>=3,labels[labels.count-1].count==2,["com","net","org","edu","gov","co","ac","or","ne","go"].contains(labels[labels.count-2]) {keep=3}
+        return labels.count<=keep ? host:labels.suffix(keep).joined(separator:".")
+    }
+    /// The line a quick rule writes: the whole site ("openai.com, direct") or only this name ("DOMAIN,chat.openai.com,direct").
+    static func quickRule(_ host:String,site wholeSite:Bool,policy:String)->String {
+        if host.contains(":") || host.range(of:"^[0-9.]+$",options:.regularExpression) != nil {
+            return host+(host.contains(":") ? "/128":"/32")+", "+policy
+        }
+        return wholeSite ? host+", "+policy:"DOMAIN,"+host+","+policy
+    }
+    /// Puts the person's quick rule for host first (the first matching rule wins), replacing an earlier one for the
+    /// same name and reach, and returns the text before it for undo.
+    @discardableResult static func setQuickRule(_ host:String,site wholeSite:Bool,policy:String)->String {
+        let before=rulesText,name=host.lowercased()
+        let kept=before.split(separator:"\n",omittingEmptySubsequences:false).map(String.init).filter {!sameTarget($0,name,site:wholeSite)}
+        let text=([quickRule(name,site:wholeSite,policy:policy)]+kept).joined(separator:"\n")
+        rulesText=text.hasSuffix("\n") ? String(text.dropLast()):text
+        return before
+    }
+    private static func sameTarget(_ line:String,_ host:String,site wholeSite:Bool)->Bool {
+        let body=line.split(separator:"#",maxSplits:1,omittingEmptySubsequences:false).first.map(String.init) ?? ""
+        let parts:[String]=body.split(separator:",").map {$0.trimmingCharacters(in:.whitespaces)}.filter {!$0.isEmpty}
+        func bare(_ value:String)->String {var v=value.lowercased();while v.hasPrefix("+") || v.hasPrefix(".") {v.removeFirst()};return v}
+        if parts.count==2 {return bare(parts[0])==host && wholeSite || bare(parts[0])==host+"/32" || bare(parts[0])==host+"/128"}
+        if parts.count>=3 {
+            let kind=parts[0].uppercased()
+            return bare(parts[1])==host && (kind=="DOMAIN-SUFFIX" ? wholeSite:kind=="DOMAIN" && !wholeSite)
+        }
+        return false
+    }
 }

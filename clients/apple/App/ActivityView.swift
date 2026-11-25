@@ -9,6 +9,11 @@ struct ActivityView:View {
     @State private var tab="conns"
     @State private var filter="all"
     @State private var query=""
+    /// The connection whose route the "why" panel explains.
+    @State private var why:[String:Any]?
+    /// The last quick rule: what it says and the rules text before it (undo).
+    @State private var toast:(text:String,before:String?)?
+    @State private var toastTask:Task<Void,Never>?
     private let mac=VeilbirdStyle.mac
     private static let direct=Color(red:97/255,green:90/255,blue:80/255)
     private static let row=Color(red:26/255,green:24/255,blue:22/255)
@@ -38,6 +43,8 @@ struct ActivityView:View {
         }
         .padding(.horizontal,mac ? 24:16).padding(.top,mac ? 16:8).padding(.bottom,mac ? 16:0)
         .frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.top)
+        .overlay(alignment:.bottom) {if let toast {toastView(toast)}}
+        .onChange(of:model.since) {_ in why=nil}
         .task(id:model.since) {
             // Once a second while connected; the view going away stops it. Not connected there is nothing to ask
             // (the task starts again when the connection is confirmed).
@@ -157,9 +164,16 @@ struct ActivityView:View {
                     if shown.isEmpty {Text(L10n.text("activity_nothing")).font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary).frame(maxWidth:.infinity,alignment:.leading).padding(.top,16)}
                 }
             }
+            // The row as it is now (the list changes every second), or as last seen once it closed.
+            if let why {whyPanel(conns.first {($0["id"] as? String)==(why["id"] as? String)} ?? why)}
         }
     }
-    @ViewBuilder private func connectionRow(_ c:[String:Any])->some View {
+    private func connectionRow(_ c:[String:Any])->some View {
+        rowBody(c).contentShape(Rectangle())
+            .onTapGesture {why=(why?["id"] as? String)==(c["id"] as? String) ? nil:c}
+            .contextMenu {menu(c)}
+    }
+    @ViewBuilder private func rowBody(_ c:[String:Any])->some View {
         let proxy=flag(c["proxy"]),rate=int(c["rate"])
         if mac {
             HStack(spacing:12) {
@@ -184,6 +198,136 @@ struct ActivityView:View {
                 Text(Self.rate(rate)).font(.system(size:12,design:.monospaced)).foregroundStyle(rate>0 ? VeilbirdStyle.text:Self.dim).lineLimit(1)
             }.padding(.horizontal,4).frame(minHeight:58).overlay(alignment:.bottom) {Rectangle().fill(Self.row).frame(height:1)}
         }
+    }
+
+    // MARK: The row's menu (right click on the Mac, long press on the phone) and the "why" panel
+    @ViewBuilder private func menu(_ c:[String:Any])->some View {
+        let host=c["host"] as? String ?? "",id=c["id"] as? String ?? ""
+        Text(host)
+        if Advanced.enabled && !host.isEmpty {
+            ruleItem("menu_always_proxy","proxy",host)
+            ruleItem("menu_always_direct","direct",host)
+            ruleItem("menu_block","block",host)
+            Divider()
+        }
+        Button(L10n.text("menu_copy_domain")) {copy(host)}.disabled(host.isEmpty)
+        if !id.isEmpty {Button(L10n.text("menu_close_connection")) {Task {await model.closeConnection(id)}}}
+        Button(L10n.text("menu_why")) {why=c}
+    }
+    /// One rule choice: for a host under a site, a submenu picks the whole site or only this name.
+    @ViewBuilder private func ruleItem(_ key:String,_ policy:String,_ host:String)->some View {
+        let site=Advanced.site(host)
+        if site != host {
+            Menu(L10n.text(key)) {
+                Button(L10n.text("menu_whole_site",site)) {addRule(site,site:true,policy)}
+                Button(L10n.text("menu_only_domain",host)) {addRule(host,site:false,policy)}
+            }
+        } else {
+            Button(L10n.text(key)) {addRule(host,site:true,policy)}
+        }
+    }
+    private func addRule(_ name:String,site whole:Bool,_ policy:String) {
+        let before=Advanced.setQuickRule(name,site:whole,policy:policy)
+        Task {
+            let live=await model.applyRules(closing:name,site:whole)
+            show(L10n.text(live ? "rule_added":"rule_added_later",name,L10n.text("policy_"+policy)),before:before)
+        }
+    }
+    private func show(_ text:String,before:String?) {
+        toastTask?.cancel()
+        withAnimation(.easeOut(duration:0.18)) {toast=(text,before)}
+        toastTask=Task {
+            try? await Task.sleep(nanoseconds:6_000_000_000)
+            if !Task.isCancelled {withAnimation(.easeIn(duration:0.18)) {toast=nil}}
+        }
+    }
+    private func toastView(_ toast:(text:String,before:String?))->some View {
+        HStack(spacing:14) {
+            Text(toast.text).font(.system(size:13)).lineLimit(2).fixedSize(horizontal:false,vertical:true)
+            if let before=toast.before {
+                Button {
+                    Advanced.rulesText=before
+                    Task {_ = await model.applyRules()}
+                    show(L10n.text("rule_undone"),before:nil)
+                } label:{Text(L10n.text("rule_undo")).font(.system(size:13,weight:.semibold)).foregroundStyle(VeilbirdStyle.accent)}.buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal,16).padding(.vertical,10)
+        .background(Color(red:44/255,green:41/255,blue:37/255),in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+        .padding(.bottom,mac ? 4:12).padding(.horizontal,mac ? 0:4)
+        .transition(.opacity.combined(with:.offset(y:6)))
+    }
+    private func copy(_ text:String) {
+        #if os(iOS)
+        UIPasteboard.general.string=text
+        #else
+        NSPasteboard.general.clearContents();NSPasteboard.general.setString(text,forType:.string)
+        #endif
+        show(L10n.text("menu_copied"),before:nil)
+    }
+    /// Which rule sent the connection where it went: a short name for the path, and one sentence.
+    private func reason(_ c:[String:Any])->(chip:String,line:String) {
+        let rule=c["rule"] as? String ?? "",proxy=flag(c["proxy"])
+        if flag(c["mine"]) {return (L10n.text("why_mine"),L10n.text("why_mine_line",rule))}
+        switch rule {
+        case "RULE-SET,ai":return (L10n.text("why_ai"),L10n.text("why_ai_line"))
+        case "RULE-SET,cn_domain","RULE-SET,cn_ip":return (L10n.text("why_cn"),L10n.text("why_cn_line"))
+        case "RULE-SET,private_domain":return (L10n.text("why_local"),L10n.text("why_local_line"))
+        case "MATCH":return (L10n.text("why_rest"),L10n.text(proxy ? "why_rest_proxy":"why_rest_direct"))
+        default:
+            if rule.hasPrefix("IP-CIDR,") {return (L10n.text("why_local"),L10n.text("why_local_line"))}
+            if rule.hasPrefix("PROCESS-NAME,") {return (L10n.text("why_app"),L10n.text("why_app_line"))}
+            return (rule.isEmpty ? "—":rule,"")
+        }
+    }
+    private func pathChip(_ text:String,lit:Bool=false,mono:Bool=false)->some View {
+        Text(text).font(mono ? .system(size:12,design:.monospaced):.system(size:12)).lineLimit(1)
+            .foregroundStyle(lit ? VeilbirdStyle.text:VeilbirdStyle.secondary)
+            .padding(.horizontal,10).frame(height:26)
+            .background(lit ? VeilbirdStyle.selected:Color(red:32/255,green:30/255,blue:27/255),in:RoundedRectangle(cornerRadius:7))
+    }
+    private func whyPanel(_ c:[String:Any])->some View {
+        let host=c["host"] as? String ?? "",proxy=flag(c["proxy"]),via=c["via"] as? String ?? ""
+        let (chip,line)=reason(c)
+        let arrow=Text("→").font(.system(size:12)).foregroundStyle(VeilbirdStyle.faint)
+        let steps=Group {
+            pathChip(chip,lit:true)
+            arrow
+            pathChip(L10n.text(proxy ? "activity_proxy":"activity_direct"))
+            if proxy {
+                arrow
+                pathChip(exit(c))
+                if !via.isEmpty && via != exit(c) {arrow;pathChip(via,mono:true)}
+            }
+        }
+        return VStack(alignment:.leading,spacing:10) {
+            HStack(spacing:8) {
+                Text(L10n.text("menu_why")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary)
+                Spacer(minLength:8)
+                Button {why=nil} label:{Image(systemName:"xmark").font(.system(size:11,weight:.semibold)).foregroundStyle(VeilbirdStyle.secondary).frame(width:24,height:24).contentShape(Rectangle())}
+                    .buttonStyle(.plain).accessibilityLabel(L10n.text("close"))
+            }
+            Text(host).font(.system(size:14,weight:.semibold)).lineLimit(1).truncationMode(.middle)
+            ViewThatFits(in:.horizontal) {
+                HStack(spacing:6) {steps}
+                VStack(alignment:.leading,spacing:6) {HStack(spacing:6) {pathChip(chip,lit:true);arrow;pathChip(L10n.text(proxy ? "activity_proxy":"activity_direct"))}
+                    if proxy {HStack(spacing:6) {arrow;pathChip(exit(c))}}}
+            }
+            if !line.isEmpty {Text(line).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).fixedSize(horizontal:false,vertical:true)}
+            if Advanced.enabled && !host.isEmpty {
+                HStack(spacing:8) {
+                    Button {addRule(Advanced.site(host),site:true,proxy ? "direct":"proxy")} label:{
+                        Text(L10n.text(proxy ? "why_make_direct":"why_make_proxy")).font(.system(size:12,weight:.semibold)).foregroundStyle(VeilbirdStyle.onAccent)
+                            .padding(.horizontal,12).frame(height:28).background(VeilbirdStyle.accent,in:RoundedRectangle(cornerRadius:7))
+                    }.buttonStyle(.plain)
+                    Button {model.rulesShown+=1} label:{
+                        Text(L10n.text("why_open_rules")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.text)
+                            .padding(.horizontal,12).frame(height:28).background(VeilbirdStyle.selected,in:RoundedRectangle(cornerRadius:7))
+                    }.buttonStyle(.plain)
+                }
+            }
+        }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
+        .background(Self.card,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
     }
 
     // MARK: Ranking

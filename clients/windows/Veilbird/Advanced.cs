@@ -58,4 +58,36 @@ public static class Advanced {
         var slash=value.IndexOf('/');
         return slash>0&&System.Net.IPAddress.TryParse(value[..slash],out var address)&&int.TryParse(value[(slash+1)..],out var bits)&&bits>=0&&bits<=(address.AddressFamily==System.Net.Sockets.AddressFamily.InterNetworkV6?128:32);
     }
+
+    private static bool IsAddress(string host)=>System.Net.IPAddress.TryParse(host,out _);
+    /// The registrable part of a host, as the core groups sites (activity.go site): chat.openai.com -> openai.com.
+    public static string Site(string host) {
+        if(IsAddress(host)) return host;
+        var labels=host.Split('.');
+        var keep=2;
+        if(labels.Length>=3&&labels[^1].Length==2&&new[]{"com","net","org","edu","gov","co","ac","or","ne","go"}.Contains(labels[^2])) keep=3;
+        return labels.Length<=keep?host:string.Join('.',labels[^keep..]);
+    }
+    /// The line a quick rule writes: the whole site ("openai.com, direct") or only this name ("DOMAIN,chat.openai.com,direct").
+    public static string QuickRule(string host,bool site,string policy)=>
+        IsAddress(host)?host+(host.Contains(':')?"/128":"/32")+", "+policy:site?host+", "+policy:"DOMAIN,"+host+","+policy;
+    /// Puts the person's quick rule for host first (the first matching rule wins), replacing an earlier one for the
+    /// same name and reach; returns the text before it, for undo.
+    public static string SetQuickRule(string host,bool site,string policy) {
+        var before=RulesText;var name=host.ToLowerInvariant();
+        var kept=before.Replace("\r","").Split('\n').Where(l=>!SameTarget(l,name,site));
+        RulesText=string.Join('\n',new[]{QuickRule(name,site,policy)}.Concat(kept)).TrimEnd('\n');
+        return before;
+    }
+    private static bool SameTarget(string line,string host,bool site) {
+        var hash=line.IndexOf('#');if(hash>=0) line=line[..hash];
+        var parts=line.Split(',').Select(p=>p.Trim()).Where(p=>p.Length>0).ToArray();
+        static string Bare(string value)=>value.ToLowerInvariant().TrimStart('+','.');
+        if(parts.Length==2) return Bare(parts[0])==host&&site||Bare(parts[0])==host+"/32"||Bare(parts[0])==host+"/128";
+        if(parts.Length>=3) {
+            var kind=parts[0].ToUpperInvariant();
+            return Bare(parts[1])==host&&(kind=="DOMAIN-SUFFIX"?site:kind=="DOMAIN"&&!site);
+        }
+        return false;
+    }
 }

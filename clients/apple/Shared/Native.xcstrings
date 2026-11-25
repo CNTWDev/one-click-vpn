@@ -6142,6 +6142,52 @@
         }
       }
     },
+    "menu_always_direct": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Always direct"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "总是直连"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Всегда напрямую"
+          }
+        }
+      }
+    },
+    "menu_always_proxy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Always encrypt"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "总是走加密"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Всегда через шифрование"
+          }
+        }
+      }
+    },
     "menu_bar_speed": {
       "extractionState": "manual",
       "localizations": {
@@ -6161,6 +6207,167 @@
           "stringUnit": {
             "state": "translated",
             "value": "Скорость в строке меню"
+          }
+        }
+      }
+    },
+    "menu_block": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Block"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "屏蔽"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Блокировать"
+          }
+        }
+      }
+    },
+    "menu_close_connection": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close this connection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "断开这条连接"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Закрыть соединение"
+          }
+        }
+      }
+    },
+    "menu_copied": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已复制"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скопировано"
+          }
+        }
+      }
+    },
+    "menu_copy_domain": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy domain"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制域名"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Копировать домен"
+          }
+        }
+      }
+    },
+    "menu_only_domain": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只这个域名 %1$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Только %1$@"
+          }
+        }
+      }
+    },
+    "menu_whole_site": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whole site %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整个网站 %1$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Весь сайт %1$@"
+          }
+        }
+      }
+    },
+    "menu_why": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Why this route"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "为什么这样走"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Почему такой маршрут"
           }
         }
       }
@@ -6966,6 +7173,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Мы выберем самую быструю. Сменить можно в любой момент."
+          }
+        }
+      }
+    },
+    "policy_block": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "blocked"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "屏蔽"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "блокировать"
+          }
+        }
+      }
+    },
+    "policy_direct": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "direct"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直连"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "напрямую"
+          }
+        }
+      }
+    },
+    "policy_proxy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "encrypted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "走加密"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "через шифрование"
           }
         }
       }
@@ -8557,6 +8833,98 @@
         }
       }
     },
+    "rule_added": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rule added: %1$@ %2$@, in effect now"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已添加规则：%1$@ %2$@，已生效"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Правило добавлено: %1$@ — %2$@, уже действует"
+          }
+        }
+      }
+    },
+    "rule_added_later": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rule added: %1$@ %2$@, applies from the next connection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已添加规则：%1$@ %2$@，下次连接时生效"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Правило добавлено: %1$@ — %2$@, со следующего подключения"
+          }
+        }
+      }
+    },
+    "rule_undo": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "撤销"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отменить"
+          }
+        }
+      }
+    },
+    "rule_undone": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undone"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已撤销"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отменено"
+          }
+        }
+      }
+    },
     "rules_count": {
       "extractionState": "manual",
       "localizations": {
@@ -8668,6 +9036,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Сохранено, применится при следующем подключении"
+          }
+        }
+      }
+    },
+    "rules_saved_live": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved and applied"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存，已立即生效"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сохранено и применено"
           }
         }
       }
@@ -11875,19 +12266,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI sites (ChatGPT, Claude, Gemini and others) always go through the tunnel, smart routing included\nOnce you use AI, Automatic no longer picks locations AI services refuse (such as Hong Kong)\nWhen Automatic has to move while you use AI, it tries the same country first, so your account does not see the IP jump"
+            "value": "In Activity, right-click a connection (long press on the phone) to always encrypt, always go direct or block that site, for the whole site or just that name; it applies at once, no reconnect\nTap a connection to see why it went that way: the rule it matched, encrypted or direct, and the location it left from\nCopy the domain or close a single connection from the same menu; a new rule can be undone in one tap\nSaving the routing rules page now applies at once too, without reconnecting"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI 网站（ChatGPT、Claude、Gemini 等）始终走加密通道，智能分流下也一样\n用过 AI 的话，自动模式不再选 AI 服务不支持的位置（比如香港）\n自动换位置时，如果正在用 AI，优先换到同一个国家，减少账号因 IP 跳动被风控"
+            "value": "「活动」里右键一条连接（手机上长按），就能把这个网站设成总是走加密、总是直连或屏蔽，可选整个网站或只这个域名，马上生效，不用重连\n点一条连接就能看到「为什么这样走」：命中了哪条规则、走加密还是直连、从哪个位置出去\n还能复制域名、单独断开一条连接；加了规则可以一键撤销\n分流规则页保存后也立即生效，不再断开重连"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Сайты ИИ (ChatGPT, Claude, Gemini и другие) всегда идут через туннель, в том числе при умной маршрутизации\nЕсли вы пользуетесь ИИ, режим «Автоматически» не выбирает локации, где сервисы ИИ недоступны (например, Гонконг)\nКогда «Автоматически» меняет локацию во время работы с ИИ, сначала пробует ту же страну, чтобы аккаунт не видел скачков IP"
+            "value": "В «Активности» щёлкните соединение правой кнопкой (на телефоне — долгое нажатие), чтобы сайт всегда шёл через шифрование, напрямую или блокировался — весь сайт или только этот домен; применяется сразу, без переподключения\nНажмите на соединение, чтобы увидеть, почему оно пошло так: какое правило сработало, шифрование или напрямую, через какую локацию\nТам же можно скопировать домен или закрыть одно соединение; новое правило отменяется одним нажатием\nСохранение правил маршрутизации теперь тоже применяется сразу, без переподключения"
           }
         }
       }
@@ -11934,6 +12325,374 @@
           "stringUnit": {
             "state": "translated",
             "value": "Откуда вы хотите подключиться?"
+          }
+        }
+      }
+    },
+    "why_ai": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI service"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 服务"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI-сервис"
+          }
+        }
+      }
+    },
+    "why_ai_line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI services always go encrypted, with the exit kept in one country where possible so accounts are not flagged."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 服务总是走加密，出口尽量留在同一个国家，减少账号风控。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI-сервисы всегда идут через шифрование, выход по возможности остаётся в одной стране, чтобы аккаунт не блокировали."
+          }
+        }
+      }
+    },
+    "why_app": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Per-app routing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按应用分流"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "По приложениям"
+          }
+        }
+      }
+    },
+    "why_app_line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Decided by your per-app routing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "由按应用分流的设置决定。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Определено настройкой маршрутизации по приложениям."
+          }
+        }
+      }
+    },
+    "why_cn": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mainland China site"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中国大陆网站"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сайт материкового Китая"
+          }
+        }
+      }
+    },
+    "why_cn_line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smart routing: mainland China sites go direct, faster and free of data use."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "智能分流：中国大陆网站直连，更快，也不占流量。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Умная маршрутизация: сайты материкового Китая напрямую, быстрее и без расхода трафика."
+          }
+        }
+      }
+    },
+    "why_local": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local network"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "局域网"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Локальная сеть"
+          }
+        }
+      }
+    },
+    "why_local_line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local network and device addresses always go direct."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "局域网和本机地址总是直连。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Адреса локальной сети и устройства всегда напрямую."
+          }
+        }
+      }
+    },
+    "why_make_direct": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make it direct"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改成直连"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сделать напрямую"
+          }
+        }
+      }
+    },
+    "why_make_proxy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make it encrypted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改成走加密"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Через шифрование"
+          }
+        }
+      }
+    },
+    "why_mine": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your rule"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的规则"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ваше правило"
+          }
+        }
+      }
+    },
+    "why_mine_line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matched %1$@ in your routing rules."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命中了你在分流规则里写的 %1$@。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Совпало с %1$@ в ваших правилах."
+          }
+        }
+      }
+    },
+    "why_open_rules": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open routing rules"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "去分流规则"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть правила"
+          }
+        }
+      }
+    },
+    "why_rest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything else"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其余流量"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Остальной трафик"
+          }
+        }
+      }
+    },
+    "why_rest_direct": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No other rule matched, so it goes direct."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有命中其他规则，直连。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Другие правила не совпали, поэтому напрямую."
+          }
+        }
+      }
+    },
+    "why_rest_proxy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No other rule matched, so it goes encrypted."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有命中其他规则，走加密。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Другие правила не совпали, поэтому через шифрование."
           }
         }
       }

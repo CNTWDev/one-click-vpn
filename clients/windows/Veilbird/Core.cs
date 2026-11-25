@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
@@ -119,6 +120,12 @@ public sealed class Core : IDisposable {
     public long Reach(string address,int timeoutMs)=>long.TryParse(Call($"reach {address} {timeoutMs}"),out var ms)?ms:-1;
     /// Open connections, rankings, hourly split and names looked up since connecting (core.Activity), as JSON.
     public string Activity()=>Call("activity");
+    /// Replaces the person's own rules in the running configuration (core.SetRules): new connections follow them at once.
+    public bool SetRules(IEnumerable<string> lines)=>Call("rules "+new JsonArray(lines.Select(l=>(JsonNode?)JsonValue.Create(l)).ToArray()).ToJsonString())=="ok";
+    /// Closes one open connection by its activity id (core.CloseConnection).
+    public void CloseConnection(string id)=>Call("close "+id);
+    /// Closes the open connections to a domain and, with site, its subdomains (core.CloseHost).
+    public void CloseHost(string domain,bool site)=>Call($"closehost {domain} {(site?1:0)}");
     /// The programs that used the most traffic over the last days local days, kept on this computer (core.AppUsage), as JSON.
     public string AppUsage(int days)=>Call("appusage "+days);
     public string Now(string group)=>Call("now "+group);

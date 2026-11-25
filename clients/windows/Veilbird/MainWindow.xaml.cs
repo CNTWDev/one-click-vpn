@@ -798,7 +798,11 @@ public partial class MainWindow : Window {
         var width=on?1040.0:380.0;
         if(on) {
             // Rebuilt after a language change so its labels follow.
-            if(activity is null||activity.Tag as string!=L10n.Culture.Name) {activity=new ActivityPanel {Tag=L10n.Culture.Name};ActivityHost.Content=activity;}
+            if(activity is null||activity.Tag as string!=L10n.Culture.Name) {
+                activity=new ActivityPanel {Tag=L10n.Culture.Name,AddRule=ApplyRules,RulesRestored=async()=>await ApplyRules(null,false,""),
+                    CloseConnection=id=>Task.Run(()=>{try {core.CloseConnection(id);} catch(IOException) {/* the core restarts */}}),OpenRules=()=>{page="rules";Render();}};
+                ActivityHost.Content=activity;
+            }
             ActivityHost.Visibility=Visibility.Visible;
         } else {ActivityHost.Visibility=Visibility.Collapsed;ActivityHost.Content=null;activity=null;}
         if(Width==width) return;
@@ -806,6 +810,18 @@ public partial class MainWindow : Window {
         // Keep the wider window on the screen it is on.
         var area=SystemParameters.WorkArea;
         if(Left+width>area.Right) Left=Math.Max(area.Left,area.Right-width-8);
+    }
+    /// Hands the person's rules to the running core, which applies them at once, then closes the open connections
+    /// to name so its next request takes the new route; true when applied (or nothing is connected). A core that
+    /// refuses them leaves them for the next connection.
+    private async Task<bool> ApplyRules(string? name,bool site,string policy) {
+        if(!connection.Active||connection.Since is null) return true;
+        var lines=Advanced.Rules;
+        try {
+            if(!await Task.Run(()=>core.SetRules(lines))) return false;
+            if(name is not null) await Task.Run(()=>core.CloseHost(name,site));
+            return true;
+        } catch(IOException) {return false;}
     }
     private async void RefreshActivity() {
         if(activity is null||activityLoading||!IsVisible||WindowState==WindowState.Minimized) return;
@@ -1925,9 +1941,10 @@ public partial class MainWindow : Window {
             var before=Advanced.Rules;
             Advanced.RulesText=editor.Text.Replace("\r","");
             var live=!before.SequenceEqual(Advanced.Rules)&&connection.Active&&connection.Since is not null;
-            Notify(L10n.Text(live?"rules_saved_reconnect":"rules_saved"));
             page="account";Render();
-            if(live) ApplyNow();
+            if(!live) {Notify(L10n.Text("rules_saved"));return;}
+            Notify(L10n.Text("rules_saved_live"));
+            _=Dispatcher.InvokeAsync(async()=>{if(!await ApplyRules(null,false,"")) {Notify(L10n.Text("rules_saved_reconnect"));ApplyNow();}});
         };
         Add(save,16,0);
     }

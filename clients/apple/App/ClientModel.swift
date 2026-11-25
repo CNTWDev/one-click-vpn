@@ -262,6 +262,25 @@ import ServiceManagement
             } catch {done.resume(returning:nil)}
         }
     }
+    /// Bumped when the person's rules change outside the rules page (the activity view's menu), so an open page reloads.
+    @Published var rulesEdits=0
+    /// Asks the app to open the rules page (from the activity view's "why" panel).
+    @Published var rulesShown=0
+    /// Hands the person's rules to the running tunnel, which applies them at once; true when it did (or nothing runs).
+    /// An older tunnel that does not know the message reconnects instead.
+    func applyRules(closing host:String?=nil,site:Bool=true) async -> Bool {
+        rulesEdits+=1
+        guard connected,let data=try? JSONSerialization.data(withJSONObject:Advanced.rules) else {return true}
+        let reply=await providerMessage("rules "+String(decoding:data,as:UTF8.self)).map {String(decoding:$0,as:UTF8.self)}
+        guard reply=="ok" else {
+            if reply != "failed" {try? await reconnect();return true}
+            return false
+        }
+        // Open connections keep their route: close the ones the change is about, so the next request takes the new one.
+        if let host {_ = await providerMessage("closehost \(host) \(site ? 1:0)")}
+        return true
+    }
+    func closeConnection(_ id:String) async {_ = await providerMessage("close "+id);await loadActivity()}
     /// The activity view's figures from the tunnel (open connections, rankings, hours, names looked up); nil when not connected.
     @Published var activity:[String:Any]?
     func loadActivity() async {

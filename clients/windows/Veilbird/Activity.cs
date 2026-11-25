@@ -24,7 +24,23 @@ public sealed class ActivityPanel:Border {
     private readonly ContentControl body=new() {Focusable=false};
     private readonly TextBox search=new() {Width=220,Height=28,FontSize=12,Padding=new Thickness(26,0,8,0),VerticalContentAlignment=VerticalAlignment.Center};
 
+    /// The row menu's actions, set by the window: a quick rule (name, whole site, policy; true when it applied at
+    /// once), the rules changed back (undo), close one connection, open the rules page.
+    public Func<string,bool,string,Task<bool>>? AddRule;
+    public Func<Task>? RulesRestored;
+    public Action<string>? CloseConnection;
+    public Action? OpenRules;
+    /// The connection whose route the "why" panel explains (its id, and the row as last seen).
+    private string whyId="";
+    private JsonNode? whyRow;
+    /// The list is not rebuilt while a row's menu is open (the menu would close with its row).
+    private bool menuOpen;
+    private readonly Border toast=new() {Background=Look.Hex("#2C2925"),CornerRadius=new CornerRadius(8),Padding=new Thickness(16,10,16,10),
+        HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Bottom,Margin=new Thickness(0,0,0,4),Visibility=Visibility.Collapsed};
+    private readonly System.Windows.Threading.DispatcherTimer toastTimer=new() {Interval=TimeSpan.FromSeconds(6)};
+
     public ActivityPanel() {
+        toastTimer.Tick+=(_,_)=>{toastTimer.Stop();toast.Visibility=Visibility.Collapsed;};
         BorderBrush=Look.Hex("#1E1C19");BorderThickness=new Thickness(1,0,0,0);
         var title=new TextBlock {Text=L10n.Text("activity_title"),FontSize=17,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,16,0)};
         var tabsBox=new Border {Background=Look.Hex("#171513"),CornerRadius=new CornerRadius(3),Padding=new Thickness(2),Child=tabs,VerticalAlignment=VerticalAlignment.Center};
@@ -48,12 +64,17 @@ public sealed class ActivityPanel:Border {
         DockPanel.SetDock(head,Dock.Top);root.Children.Add(head);
         DockPanel.SetDock(toolbar,Dock.Top);root.Children.Add(toolbar);
         root.Children.Add(body);
-        Child=root;
+        var layers=new Grid();layers.Children.Add(root);layers.Children.Add(toast);
+        Child=layers;
         Fill();
     }
 
     /// New figures from the core (null when not connected), and the location carrying proxied traffic.
-    public void Update(JsonNode? next,string location) {data=next;node=location;Fill();}
+    public void Update(JsonNode? next,string location) {
+        data=next;node=location;
+        if(next is null) {whyId="";whyRow=null;}
+        if(!menuOpen) Fill();
+    }
 
     private void Fill() {
         var conns=data?["conns"] as JsonArray;
@@ -137,13 +158,119 @@ public sealed class ActivityPanel:Border {
             Put(row,Text(Str(c["rule"]),12,Look.Secondary,mono:true),3);
             Put(row,Text(Exit(c),13,proxy?Look.Text:Look.Secondary),4);
             Put(row,Text(Rate(rate),12,rate>0?Look.Text:Dim,mono:true,align:TextAlignment.Right),5);
-            list.Children.Add(Line_(row,36,Row));
+            var line=Line_(row,36,Row);line.Background=Str(c["id"])==whyId&&whyId.Length>0?Look.Surface:Brushes.Transparent;
+            var item=c;
+            line.MouseLeftButtonUp+=(_,_)=>{var id=Str(item["id"]);whyId=whyId==id?"":id;whyRow=whyId.Length>0?item:null;Fill();};
+            line.ContextMenu=RowMenu(item);
+            list.Children.Add(line);
         }
         if(shown.Count==0) list.Children.Add(new TextBlock {Text=L10n.Text("activity_nothing"),FontSize=13,Foreground=Look.Secondary,Margin=new Thickness(0,16,0,0)});
         var dock=new DockPanel {Margin=new Thickness(0,10,0,0)};
         var top=Line_(header,30,Line);DockPanel.SetDock(top,Dock.Top);dock.Children.Add(top);
+        if(whyId.Length>0) {
+            whyRow=conns.FirstOrDefault(c=>c is not null&&Str(c["id"])==whyId)??whyRow;
+            if(whyRow is not null) {var panel=WhyPanel(whyRow);DockPanel.SetDock(panel,Dock.Bottom);dock.Children.Add(panel);}
+        }
         dock.Children.Add(Scroll(list));
         return dock;
+    }
+
+    // ---- The row's right-click menu and the "why" panel ----
+    private ContextMenu RowMenu(JsonNode c) {
+        var host=Str(c["host"]);var id=Str(c["id"]);
+        var menu=new ContextMenu();
+        menu.Opened+=(_,_)=>menuOpen=true;
+        menu.Closed+=(_,_)=>{menuOpen=false;Fill();};
+        MenuItem Item(string header,Action? click,string gesture="") {
+            var item=new MenuItem {Header=header,InputGestureText=gesture};
+            if(click is not null) item.Click+=(_,_)=>click();
+            return item;
+        }
+        menu.Items.Add(new MenuItem {Header=new TextBlock {Text=host,FontSize=12,Foreground=Look.Secondary,TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap,MaxWidth=280},IsEnabled=false});
+        if(Advanced.Enabled&&host.Length>0&&AddRule is not null) {
+            foreach(var (key,policy) in new[]{("menu_always_proxy","proxy"),("menu_always_direct","direct"),("menu_block","block")}) {
+                var site=Advanced.Site(host);
+                if(site!=host) {
+                    var sub=Item(L10n.Text(key),null);
+                    sub.Items.Add(Item(L10n.Text("menu_whole_site",site),()=>Rule(site,true,policy)));
+                    sub.Items.Add(Item(L10n.Text("menu_only_domain",host),()=>Rule(host,false,policy)));
+                    menu.Items.Add(sub);
+                } else menu.Items.Add(Item(L10n.Text(key),()=>Rule(host,true,policy)));
+            }
+            menu.Items.Add(new Separator());
+        }
+        var copy=Item(L10n.Text("menu_copy_domain"),()=>{try {Clipboard.SetText(host);Show(L10n.Text("menu_copied"),null);} catch {/* clipboard busy */}});
+        copy.IsEnabled=host.Length>0;menu.Items.Add(copy);
+        if(id.Length>0&&CloseConnection is not null) menu.Items.Add(Item(L10n.Text("menu_close_connection"),()=>CloseConnection(id)));
+        menu.Items.Add(Item(L10n.Text("menu_why"),()=>{whyId=id;whyRow=c;}));
+        return menu;
+    }
+    private async void Rule(string name,bool site,string policy) {
+        if(AddRule is null) return;
+        var before=Advanced.SetQuickRule(name,site,policy);
+        var live=await AddRule(name,site,policy);
+        Show(L10n.Text(live?"rule_added":"rule_added_later",name,L10n.Text("policy_"+policy)),before);
+    }
+    private void Show(string text,string? before) {
+        var line=new StackPanel {Orientation=Orientation.Horizontal};
+        line.Children.Add(new TextBlock {Text=text,FontSize=13,VerticalAlignment=VerticalAlignment.Center,MaxWidth=460,TextWrapping=TextWrapping.Wrap});
+        if(before is not null) {
+            var undo=new Button {Content=new TextBlock {Text=L10n.Text("rule_undo"),FontSize=13,FontWeight=FontWeights.SemiBold,Foreground=Look.Accent},Padding=new Thickness(8,0,8,0),Height=26,Margin=new Thickness(10,0,-8,0)};
+            undo.Click+=async(_,_)=>{Advanced.RulesText=before;Show(L10n.Text("rule_undone"),null);if(RulesRestored is not null) await RulesRestored();};
+            line.Children.Add(undo);
+        }
+        toast.Child=line;toast.Visibility=Visibility.Visible;toastTimer.Stop();toastTimer.Start();
+    }
+    /// Which rule sent the connection where it went: a short name for the path, and one sentence.
+    private static (string Chip,string Line) Reason(JsonNode c) {
+        var rule=Str(c["rule"]);var proxy=Flag(c["proxy"]);
+        if(Flag(c["mine"])) return (L10n.Text("why_mine"),L10n.Text("why_mine_line",rule));
+        return rule switch {
+            "RULE-SET,ai"=>(L10n.Text("why_ai"),L10n.Text("why_ai_line")),
+            "RULE-SET,cn_domain" or "RULE-SET,cn_ip"=>(L10n.Text("why_cn"),L10n.Text("why_cn_line")),
+            "RULE-SET,private_domain"=>(L10n.Text("why_local"),L10n.Text("why_local_line")),
+            "MATCH"=>(L10n.Text("why_rest"),L10n.Text(proxy?"why_rest_proxy":"why_rest_direct")),
+            _ when rule.StartsWith("IP-CIDR,",StringComparison.Ordinal)=>(L10n.Text("why_local"),L10n.Text("why_local_line")),
+            _ when rule.StartsWith("PROCESS-NAME,",StringComparison.Ordinal)=>(L10n.Text("why_app"),L10n.Text("why_app_line")),
+            _=>(rule.Length==0?"—":rule,""),
+        };
+    }
+    private static Border Chip(string text,bool lit=false,bool mono=false)=>new() {
+        Background=lit?Look.Selected:Look.Hex("#201E1B"),CornerRadius=new CornerRadius(6),Padding=new Thickness(10,0,10,0),Height=26,Margin=new Thickness(0,0,6,6),
+        Child=Text(text,12,lit?Look.Text:Look.Secondary,mono)};
+    private static TextBlock Arrow()=>new() {Text="→",FontSize=12,Foreground=Look.Faint,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,6,6)};
+    private Border WhyPanel(JsonNode c) {
+        var host=Str(c["host"]);var proxy=Flag(c["proxy"]);var via=Str(c["via"]);
+        var (chip,sentence)=Reason(c);
+        var stack=new StackPanel();
+        var head=new DockPanel();
+        var close=new Button {Content=Look.Icon("\uE711",10,Look.Secondary),Width=26,Height=26,Padding=new Thickness(0),HorizontalContentAlignment=HorizontalAlignment.Center};
+        AutomationProperties.SetName(close,L10n.Text("close"));
+        close.Click+=(_,_)=>{whyId="";whyRow=null;Fill();};
+        DockPanel.SetDock(close,Dock.Right);head.Children.Add(close);
+        head.Children.Add(Text(L10n.Text("menu_why"),12,Look.Secondary));
+        stack.Children.Add(head);
+        stack.Children.Add(new TextBlock {Text=host,FontSize=14,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap,Margin=new Thickness(0,2,0,10)});
+        var path=new WrapPanel();
+        path.Children.Add(Chip(chip,true));path.Children.Add(Arrow());
+        path.Children.Add(Chip(L10n.Text(proxy?"activity_proxy":"activity_direct")));
+        if(proxy) {
+            path.Children.Add(Arrow());path.Children.Add(Chip(Exit(c)));
+            if(via.Length>0&&via!=Exit(c)) {path.Children.Add(Arrow());path.Children.Add(Chip(via,mono:true));}
+        }
+        stack.Children.Add(path);
+        if(sentence.Length>0) stack.Children.Add(new TextBlock {Text=sentence,FontSize=12,Foreground=Look.Secondary,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,4,0,0)});
+        if(Advanced.Enabled&&host.Length>0&&AddRule is not null) {
+            var actions=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,12,0,0)};
+            var change=new Button {Content=new TextBlock {Text=L10n.Text(proxy?"why_make_direct":"why_make_proxy"),FontSize=12,FontWeight=FontWeights.SemiBold,Foreground=Look.OnAccent},
+                Background=Look.Accent,Height=28,Padding=new Thickness(12,0,12,0),Margin=new Thickness(0,0,8,0)};
+            change.Click+=(_,_)=>Rule(Advanced.Site(host),true,proxy?"direct":"proxy");
+            var rules=new Button {Content=new TextBlock {Text=L10n.Text("why_open_rules"),FontSize=12},Background=Look.Selected,Height=28,Padding=new Thickness(12,0,12,0)};
+            rules.Click+=(_,_)=>OpenRules?.Invoke();
+            actions.Children.Add(change);actions.Children.Add(rules);
+            stack.Children.Add(actions);
+        }
+        return new Border {Background=Card,CornerRadius=new CornerRadius(10),Padding=new Thickness(16,12,12,14),Margin=new Thickness(0,10,0,0),Child=stack};
     }
 
     private (long Proxy,long Direct) Split()=>(Num(data?["proxy"]),Num(data?["direct"]));
