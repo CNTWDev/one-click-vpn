@@ -259,7 +259,8 @@ jobs:
         run: >-
           node scripts/apple-profiles.mjs --type MAC_APP_DIRECT
           --bundle "$VEILBIRD_APPLE_BUNDLE_ID.macos=VEILBIRD_MACOS_APP_PROFILE"
-          --bundle "$VEILBIRD_APPLE_BUNDLE_ID.macos.tunnel=VEILBIRD_MACOS_TUNNEL_PROFILE" >> "$GITHUB_ENV"
+          --bundle "$VEILBIRD_APPLE_BUNDLE_ID.macos.tunnel=VEILBIRD_MACOS_TUNNEL_PROFILE"
+          --bundle "$VEILBIRD_APPLE_BUNDLE_ID.macos.widgets=VEILBIRD_MACOS_WIDGETS_PROFILE" >> "$GITHUB_ENV"
       - name: Build and sign
         if: steps.ready.outputs.ready == 'true'
         run: bash clients/apple/scripts/release-macos.sh build

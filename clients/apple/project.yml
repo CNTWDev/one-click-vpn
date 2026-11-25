@@ -27,7 +27,7 @@ targets:
   Veilbird-iOS:
     type: application
     platform: iOS
-    sources: [App, Shared]
+    sources: [App, Shared, WidgetShared]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(VEILBIRD_BUNDLE_ID).ios
@@ -53,7 +53,7 @@ targets:
   Veilbird-macOS:
     type: application
     platform: macOS
-    sources: [App, Shared]
+    sources: [App, Shared, WidgetShared]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(VEILBIRD_BUNDLE_ID).macos
@@ -79,6 +79,8 @@ targets:
     dependencies:
       - package: VeilbirdCore
       - target: VeilbirdTunnel-macOS
+      # Desktop widgets and the Control Center button (Widgets/), embedded in Contents/PlugIns.
+      - target: VeilbirdWidgets-macOS
       # The shared core, linked statically, so the app measures nodes through their transports (Latency.swift).
       - framework: .deps/TunnelCore.xcframework
         embed: false
@@ -91,6 +93,36 @@ targets:
         com.apple.developer.networking.networkextension: [packet-tunnel-provider-systemextension]
         com.apple.developer.system-extension.install: true
         keychain-access-groups: [$(AppIdentifierPrefix)$(VEILBIRD_BUNDLE_ID).shared]
+        com.apple.security.application-groups: [$(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)]
+  VeilbirdWidgets-macOS:
+    # WidgetKit: the desktop widgets (macOS 14+) and the Control Center button (macOS 26, when built with Xcode 26).
+    # They only read what the app writes into the shared group (WidgetBridge.swift); a click opens tracknothing://.
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - Widgets
+      - WidgetShared
+      - path: Shared/Native.xcstrings
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(VEILBIRD_BUNDLE_ID).macos.widgets
+        PRODUCT_NAME: TrackNothingWidgets
+        APPLICATION_EXTENSION_API_ONLY: YES
+        ENABLE_HARDENED_RUNTIME: YES
+        VEILBIRD_APP_GROUP: $(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)
+        PROVISIONING_PROFILE_SPECIFIER: $(VEILBIRD_MACOS_WIDGETS_PROFILE)
+    info:
+      path: Signing/macOSWidgets.plist
+      properties:
+        CFBundleDisplayName: TrackNothing
+        VeilbirdAppGroup: $(VEILBIRD_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Signing/macOSWidgets.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
         com.apple.security.application-groups: [$(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)]
   VeilbirdTunnel-iOS:
     type: app-extension

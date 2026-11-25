@@ -4,7 +4,8 @@
 #
 # Needs: VEILBIRD_APPLE_TEAM_ID, VEILBIRD_APPLE_BUNDLE_ID (registered prefix, e.g. com.veilbird.client),
 #   the "Developer ID Application" identity in a keychain, Developer ID provisioning profiles for
-#   <prefix>.macos and <prefix>.macos.tunnel named in VEILBIRD_MACOS_APP_PROFILE / VEILBIRD_MACOS_TUNNEL_PROFILE
+#   <prefix>.macos, <prefix>.macos.tunnel and <prefix>.macos.widgets named in VEILBIRD_MACOS_APP_PROFILE /
+#   VEILBIRD_MACOS_TUNNEL_PROFILE / VEILBIRD_MACOS_WIDGETS_PROFILE
 #   (scripts/apple-profiles.mjs installs them), and an App Store Connect API key for notarization:
 #   VEILBIRD_APPLE_API_KEY_PATH (.p8 file), VEILBIRD_APPLE_API_KEY_ID, VEILBIRD_APPLE_API_ISSUER_ID.
 # Optional: VEILBIRD_API_ORIGIN (baked into the app), VEILBIRD_VERSION and VEILBIRD_BUILD_NUMBER.
@@ -16,9 +17,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mode=${1:-all}
 case $mode in
-  build) required="VEILBIRD_APPLE_TEAM_ID VEILBIRD_APPLE_BUNDLE_ID VEILBIRD_MACOS_APP_PROFILE VEILBIRD_MACOS_TUNNEL_PROFILE" ;;
+  build) required="VEILBIRD_APPLE_TEAM_ID VEILBIRD_APPLE_BUNDLE_ID VEILBIRD_MACOS_APP_PROFILE VEILBIRD_MACOS_TUNNEL_PROFILE VEILBIRD_MACOS_WIDGETS_PROFILE" ;;
   submit|notarize) required="VEILBIRD_APPLE_API_KEY_PATH VEILBIRD_APPLE_API_KEY_ID VEILBIRD_APPLE_API_ISSUER_ID" ;;
-  all) required="VEILBIRD_APPLE_TEAM_ID VEILBIRD_APPLE_BUNDLE_ID VEILBIRD_MACOS_APP_PROFILE VEILBIRD_MACOS_TUNNEL_PROFILE
+  all) required="VEILBIRD_APPLE_TEAM_ID VEILBIRD_APPLE_BUNDLE_ID VEILBIRD_MACOS_APP_PROFILE VEILBIRD_MACOS_TUNNEL_PROFILE VEILBIRD_MACOS_WIDGETS_PROFILE
                  VEILBIRD_APPLE_API_KEY_PATH VEILBIRD_APPLE_API_KEY_ID VEILBIRD_APPLE_API_ISSUER_ID" ;;
   *) echo "Usage: $0 [build|submit|notarize|all]" >&2; exit 2 ;;
 esac
@@ -50,7 +51,7 @@ build_dmg() {
   xcodebuild archive -project Veilbird.xcodeproj -scheme Veilbird-macOS -configuration Release \
     -destination 'generic/platform=macOS' -archivePath "$out/TrackNothing.xcarchive" \
     VEILBIRD_BUNDLE_ID="$bundle" DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$identity" \
-    VEILBIRD_MACOS_APP_PROFILE="$VEILBIRD_MACOS_APP_PROFILE" VEILBIRD_MACOS_TUNNEL_PROFILE="$VEILBIRD_MACOS_TUNNEL_PROFILE" \
+    VEILBIRD_MACOS_APP_PROFILE="$VEILBIRD_MACOS_APP_PROFILE" VEILBIRD_MACOS_TUNNEL_PROFILE="$VEILBIRD_MACOS_TUNNEL_PROFILE" VEILBIRD_MACOS_WIDGETS_PROFILE="$VEILBIRD_MACOS_WIDGETS_PROFILE" \
     MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build" VEILBIRD_API_ORIGIN="${VEILBIRD_API_ORIGIN:-}" \
     OTHER_CODE_SIGN_FLAGS=--timestamp
 
@@ -73,6 +74,7 @@ build_dmg() {
   <key>provisioningProfiles</key><dict>
     <key>$bundle.macos</key><string>$VEILBIRD_MACOS_APP_PROFILE</string>
     <key>$bundle.macos.tunnel</key><string>$VEILBIRD_MACOS_TUNNEL_PROFILE</string>
+    <key>$bundle.macos.widgets</key><string>$VEILBIRD_MACOS_WIDGETS_PROFILE</string>
   </dict>
 </dict></plist>
 PLIST
@@ -82,6 +84,7 @@ PLIST
   stage="$out/dmg"; mkdir -p "$stage"
   ditto "$out/export/Veilbird.app" "$stage/TrackNothing.app"
   ls -d "$stage/TrackNothing.app/Contents/Library/SystemExtensions/$bundle.macos.tunnel.systemextension" >/dev/null
+  ls -d "$stage/TrackNothing.app/Contents/PlugIns/TrackNothingWidgets.appex" >/dev/null
   codesign --verify --deep --strict "$stage/TrackNothing.app"
   ln -s /Applications "$stage/Applications"
   hdiutil create -volname TrackNothing -srcfolder "$stage" -fs HFS+ -format UDZO -ov "$dmg"
