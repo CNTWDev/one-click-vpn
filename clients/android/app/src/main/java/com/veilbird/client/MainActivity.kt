@@ -1834,26 +1834,31 @@ class MainActivity : Activity() {
                 addView(text(region, 13f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp })
         }
-        // This node's lines (Line 1…4), each with its delay and the one carrying traffic marked "in use".
-        val linesLabel = text(L10n.text(R.string.check_lines), 12f, Palette.secondary).apply { visibility = View.GONE }
+        // This node's lines (Line 1…4), each with its delay; the one carrying traffic is tinted and named on the label
+        // row ("in use" inside every cell took the room the names need).
+        val linesUsed = text("", 12f, Palette.accent).apply { maxLines = 1 }
+        val linesLabel = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; visibility = View.GONE
+            addView(text(L10n.text(R.string.check_lines), 12f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(linesUsed, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
+        }
         box.addView(linesLabel, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14.dp })
-        class LineBox(val cell: LineCells, val now: TextView, val value: TextView)
+        class LineBox(val view: View, val name: TextView, val value: TextView, val cell: LineCells)
         val lineGrid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
         val lineBoxes = Latency.lineOrder.indices.map { i ->
             val cell = LineCells(this).apply { states = listOf(LineCells.WAIT) }
-            val now = text(L10n.text(R.string.line_in_use), 11f, Palette.accent).apply { alpha = 0f; maxLines = 1 }
             val value = text("—", 12f, Palette.faint).apply { typeface = Typeface.MONOSPACE; maxLines = 1 }
+            val name = text(lineTitle(i), 13f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
             val view = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(10.dp, 0, 10.dp, 0)
                 background = rounded(Palette.surface, 8)
                 addView(cell, LinearLayout.LayoutParams(6.dp, 6.dp).apply { marginEnd = 8.dp })
-                addView(text(lineTitle(i), 13f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 6.dp })
-                addView(now, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(name, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = 6.dp })
                 addView(value)
             }
             if (i % 2 == 0) lineGrid.addView(LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }, LinearLayout.LayoutParams(-1, 34.dp).apply { if (i > 0) topMargin = 6.dp })
             (lineGrid.getChildAt(lineGrid.childCount - 1) as LinearLayout).addView(view, LinearLayout.LayoutParams(0, -1, 1f).apply { if (i % 2 == 1) marginStart = 6.dp })
-            LineBox(cell, now, value)
+            LineBox(view, name, value, cell)
         }
         box.addView(lineGrid, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp })
         val lineNote = text("", 13f, Palette.secondary).apply { visibility = View.GONE }
@@ -1865,10 +1870,17 @@ class MainActivity : Activity() {
             Latency.lineOrder.forEachIndexed { i, name ->
                 val ms = lines[name]; val b = lineBoxes[i]
                 b.cell.states = listOf(states[i])
-                b.value.text = when { ms == null -> L10n.text(R.string.line_off); ms < 0 -> L10n.text(R.string.line_down); else -> L10n.text(R.string.latency_ms, L10n.number(ms)) }
+                // Short and never cut: the delay, or a dash (grey: not offered, red: no answer, explained below).
+                b.value.text = if (ms != null && ms >= 0) L10n.text(R.string.latency_ms, L10n.number(ms)) else "—"
                 b.value.setTextColor(when { ms == null -> Palette.faint; ms < 0 -> Palette.danger; else -> Palette.text })
-                b.now.fade(name == current)
+                val inUse = name == current
+                b.view.background = rounded(if (inUse) Palette.alpha(Palette.accent, 36) else Palette.surface, 8)
+                b.name.setTypeface(null, if (inUse) Typeface.BOLD else Typeface.NORMAL)
+                val spoken = when { ms == null -> L10n.text(R.string.line_off); ms < 0 -> L10n.text(R.string.line_down); else -> L10n.text(R.string.latency_ms, L10n.number(ms)) }
+                b.view.contentDescription = listOfNotNull(lineTitle(i), spoken, if (inUse) L10n.text(R.string.line_in_use) else null).joinToString(", ")
             }
+            val usedIndex = Latency.lineOrder.indexOf(current)
+            linesUsed.text = if (usedIndex >= 0) L10n.text(R.string.line_in_use) + " · " + lineTitle(usedIndex) else ""
             val down = Latency.lineOrder.withIndex().filter { (lines[it.value] ?: 0) < 0 }
             val used = Latency.lineOrder.indexOf(current).takeIf { it >= 0 && (lines[current] ?: -1) >= 0 }
             val note = if (down.isNotEmpty() && used != null) L10n.text(R.string.check_lines_note, down.joinToString(if (L10n.locale.language == "zh") "、" else ", ") { lineTitle(it.index) }, lineTitle(used)) else ""
@@ -1899,7 +1911,7 @@ class MainActivity : Activity() {
         }
         val latencyText = stat(L10n.text(R.string.speed_latency)); val jitterText = stat(L10n.text(R.string.speed_jitter)); val usedText = stat(L10n.text(R.string.speed_used))
         speedCard.addView(stats, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12.dp })
-        val speedNote = text(L10n.text(R.string.speed_hint), 13f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END; minHeight = sp(13f) + 6.dp }
+        val speedNote = text(L10n.text(R.string.speed_hint), 13f, Palette.secondary).apply { maxLines = 2; minHeight = sp(13f) + 6.dp }
         speedCard.addView(speedNote, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12.dp })
         box.addView(speedCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 18.dp })
         val speedButton = text(L10n.text(R.string.speed_start), 15f, Palette.onAccent, 600).apply { gravity = Gravity.CENTER; background = pressable(Palette.accent, 12) }

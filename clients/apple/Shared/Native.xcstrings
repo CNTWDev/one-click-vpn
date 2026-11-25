@@ -11875,19 +11875,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The app now notices when it is connected but nothing comes back: it closes stuck connections and moves to a working line within seconds, keeping the same exit IP\nIn Automatic, when a whole location stops working it moves to another one it has checked, and does not go back to the one that failed\nA location you picked yourself is never swapped; only its lines change"
+            "value": "Connection check now shows line names, delays and notes in full, nothing cut off or squeezed onto two lines\nOn the computer, click outside the connection check to close it, or use the close button at its top right\nThe check is more compact and fits on one screen, with Test speed and Check again side by side at the bottom"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连着却没有流量时会自己发现：几秒内关掉卡住的连接，换一条能用的线路，出口 IP 不变\n自动模式下整个位置都不通时，换到另一个确认能用的位置，不会再换回刚出问题的那个\n手动选的位置不会被自动换掉，只在这个位置里换线路"
+            "value": "「线路体检」里的线路名、延迟和说明文字都能完整显示，不再被截断或挤成两行\n电脑上点体检面板外面就能关掉，右上角也有关闭按钮\n体检面板更紧凑，一屏就能看完，「测网速」和「重新检测」并排放在底部"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Приложение замечает, когда подключение есть, а данные не идут: за секунды закрывает зависшие соединения и переходит на рабочую линию, IP выхода тот же\nВ режиме «Автоматически», если не работает вся локация, переключается на другую, уже проверенную, и не возвращается к сбойной\nВыбранную вами локацию приложение не меняет — только линии внутри неё"
+            "value": "В «Проверке связи» названия линий, задержки и пояснения видны полностью, без обрезки и переносов\nНа компьютере проверку можно закрыть щелчком вне панели или кнопкой в правом верхнем углу\nПанель стала компактнее и помещается на один экран, «Измерить скорость» и «Проверить снова» стоят рядом внизу"
           }
         }
       }

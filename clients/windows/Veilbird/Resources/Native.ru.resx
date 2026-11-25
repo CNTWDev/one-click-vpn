@@ -524,9 +524,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Приложение замечает, когда подключение есть, а данные не идут: за секунды закрывает зависшие соединения и переходит на рабочую линию, IP выхода тот же
-В режиме «Автоматически», если не работает вся локация, переключается на другую, уже проверенную, и не возвращается к сбойной
-Выбранную вами локацию приложение не меняет — только линии внутри неё</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>В «Проверке связи» названия линий, задержки и пояснения видны полностью, без обрезки и переносов
+На компьютере проверку можно закрыть щелчком вне панели или кнопкой в правом верхнем углу
+Панель стала компактнее и помещается на один экран, «Измерить скорость» и «Проверить снова» стоят рядом внизу</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>

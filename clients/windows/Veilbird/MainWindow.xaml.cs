@@ -906,19 +906,22 @@ public partial class MainWindow : Window {
         // With advanced on, each line by its protocol's name instead of its number.
         var advancedNames=Advanced.Enabled;
         string CheckLine(int index)=>advancedNames?ProtocolName(Latency.LineOrder[index]):LineName(index);
-        // This node's lines (Line 1…4), each with its delay and the one carrying traffic marked "in use".
-        var linesLabel=Single(L10n.Text("check_lines"),12,Look.Secondary);linesLabel.Margin=new Thickness(2,14,0,0);linesLabel.Visibility=Visibility.Collapsed;
+        // This node's lines (Line 1…4), each with its delay; the one carrying traffic is tinted and named on the label
+        // row ("in use" inside every cell took the room the names need).
+        var linesTitle=Single(L10n.Text("check_lines"),12,Look.Secondary);
+        var linesUsed=Single("",12,Look.Accent);linesUsed.TextTrimming=TextTrimming.None;linesUsed.Margin=new Thickness(8,0,0,0);
+        var linesLabel=Columns(linesTitle,new FrameworkElement(),linesUsed);linesLabel.Margin=new Thickness(2,14,0,0);linesLabel.Visibility=Visibility.Collapsed;
         stack.Children.Add(linesLabel);
-        var lineGrid=new UniformGrid {Columns=2,Margin=new Thickness(0,8,0,0),Visibility=Visibility.Collapsed};
-        var lineBoxes=new List<(ContentControl Cell,TextBlock Now,TextBlock Value)>();
+        var lineGrid=new UniformGrid {Columns=2,Margin=new Thickness(0,6,0,0),Visibility=Visibility.Collapsed};
+        var lineBoxes=new List<(ContentControl Cell,Border Box,TextBlock Name,TextBlock Value)>();
         for(var i=0;i<Latency.LineOrder.Length;i++) {
             var cellHost=new ContentControl {Focusable=false,Content=LineCells(new[]{LineState.Wait}),Margin=new Thickness(0,0,8,0),VerticalAlignment=VerticalAlignment.Center};
-            var now=Single(L10n.Text("line_in_use"),11,Look.Accent);now.Opacity=0;now.Margin=new Thickness(6,0,0,0);
-            var value=Single("—",12,Look.Faint);value.FontFamily=new FontFamily("Cascadia Mono, Consolas");
-            var left=new StackPanel {Orientation=Orientation.Horizontal};left.Children.Add(cellHost);left.Children.Add(Single(CheckLine(i),13));left.Children.Add(now);
-            lineGrid.Children.Add(new Border {Height=34,Background=Look.Surface,CornerRadius=new CornerRadius(10),Padding=new Thickness(10,0,10,0),
-                Margin=new Thickness(i%2==0?0:3,i>1?6:0,i%2==0?3:0,0),Child=Columns(left,new FrameworkElement(),value)});
-            lineBoxes.Add((cellHost,now,value));
+            var lineName=Single(CheckLine(i),13);
+            var value=Single("—",12,Look.Faint);value.FontFamily=new FontFamily("Cascadia Mono, Consolas");value.TextTrimming=TextTrimming.None;value.Margin=new Thickness(6,0,0,0);
+            var box=new Border {Height=32,Background=Look.Surface,CornerRadius=new CornerRadius(8),Padding=new Thickness(10,0,10,0),
+                Margin=new Thickness(i%2==0?0:3,i>1?6:0,i%2==0?3:0,0),Child=Columns(cellHost,lineName,value)};
+            lineGrid.Children.Add(box);
+            lineBoxes.Add((cellHost,box,lineName,value));
         }
         stack.Children.Add(lineGrid);
         var lineNote=Words("",12,Look.Secondary,top:8);lineNote.TextWrapping=TextWrapping.Wrap;lineNote.Visibility=Visibility.Collapsed;
@@ -929,9 +932,14 @@ public partial class MainWindow : Window {
             for(var i=0;i<Latency.LineOrder.Length;i++) {
                 var name_=Latency.LineOrder[i];var box=lineBoxes[i];var has=lines.TryGetValue(name_,out var lineMs);
                 box.Cell.Content=LineCells(new[]{states[i]});
-                box.Value.Text=LineValue(lines,name_);box.Value.Foreground=!has?Look.Faint:lineMs<0?Look.Danger:Look.Text;
-                box.Now.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(name_==current?1:0,new Duration(TimeSpan.FromMilliseconds(200))));
+                // Short and never trimmed: the delay, or a dash (grey: not offered, red: no answer, explained below).
+                box.Value.Text=has&&lineMs>=0?L10n.Text("latency_ms",lineMs.ToString("N0",L10n.Culture)):"—";box.Value.Foreground=!has?Look.Faint:lineMs<0?Look.Danger:Look.Text;
+                var inUse=name_==current;
+                box.Box.Background=inUse?Look.AccentWash:Look.Surface;box.Name.FontWeight=inUse?FontWeights.SemiBold:FontWeights.Normal;
+                AutomationProperties.SetName(box.Box,CheckLine(i)+", "+LineValue(lines,name_)+(inUse?", "+L10n.Text("line_in_use"):""));
             }
+            var usedIndex=Array.IndexOf(Latency.LineOrder,current);
+            linesUsed.Text=usedIndex>=0?L10n.Text("line_in_use")+" · "+CheckLine(usedIndex):"";
             var down=Latency.LineOrder.Select((n,i)=>(Name:n,Index:i)).Where(x=>lines.TryGetValue(x.Name,out var v)&&v<0).ToList();
             var used=Array.IndexOf(Latency.LineOrder,current);
             var text=down.Count>0&&used>=0&&lines.TryGetValue(current,out var usedMs)&&usedMs>=0?L10n.Text("check_lines_note",string.Join(ListJoin,down.Select(x=>CheckLine(x.Index))),CheckLine(used)):"";
@@ -962,7 +970,8 @@ public partial class MainWindow : Window {
         }
         var latencyText=Stat(L10n.Text("speed_latency"));var jitterText=Stat(L10n.Text("speed_jitter"));var usedText=Stat(L10n.Text("speed_used"));
         speedStack.Children.Add(stats);
-        var speedNote=Single(L10n.Text("speed_hint"),12,Look.Secondary);speedNote.Height=18;speedNote.Margin=new Thickness(0,12,0,0);
+        // Two lines when the sentence needs them (a long location name, Russian), never cut.
+        var speedNote=Single(L10n.Text("speed_hint"),12,Look.Secondary);speedNote.TextWrapping=TextWrapping.Wrap;speedNote.TextTrimming=TextTrimming.None;speedNote.MinHeight=18;speedNote.Margin=new Thickness(0,12,0,0);
         speedStack.Children.Add(speedNote);
         stack.Children.Add(new Border {Background=Look.Surface,CornerRadius=new CornerRadius(10),Padding=new Thickness(14),Margin=new Thickness(0,16,0,0),Child=speedStack});
         var speedButton=Primary(L10n.Text("speed_start"));speedButton.Margin=new Thickness(0,14,0,0);
