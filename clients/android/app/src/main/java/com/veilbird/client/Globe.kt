@@ -144,7 +144,9 @@ class Portrait(context: Context) : View(context) {
     private val path = Path()
     init { importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES }
 
-    private val still get() = !ValueAnimator.areAnimatorsEnabled()
+    /** Drawn once into a bitmap (the home screen widget): the settled picture, no animation. */
+    var settled = false
+    private val still get() = settled || !ValueAnimator.areAnimatorsEnabled()
     private val on get() = state != LinkState.IDLE && state != LinkState.FAILED
 
     /** Connecting or disconnecting; [moving] turns the globe (1.2 s) instead of jumping. */

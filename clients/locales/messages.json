@@ -2893,5 +2893,20 @@
     "zh": "最近去过",
     "en": "Recent",
     "ru": "Недавние"
+  },
+  "widget_globe": {
+    "zh": "TrackNothing 地球",
+    "en": "TrackNothing globe",
+    "ru": "Глобус TrackNothing"
+  },
+  "widget_strip": {
+    "zh": "TrackNothing 状态",
+    "en": "TrackNothing status",
+    "ru": "Статус TrackNothing"
+  },
+  "widget_tap": {
+    "zh": "轻点连接",
+    "en": "Tap to connect",
+    "ru": "Коснитесь, чтобы подключиться"
   }
 }
