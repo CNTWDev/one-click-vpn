@@ -499,6 +499,8 @@
   <string name="trail_poster_title">Мои точки выхода</string>
   <string name="trail_range">За %1$s</string>
   <string name="trail_save">Сохранить</string>
+  <string name="trail_save_failed">Не удалось сохранить постер</string>
+  <string name="trail_saved">Постер сохранён в галерею</string>
   <string name="trail_share">Поделиться</string>
   <string name="trail_show_home">Показывать мой город на постере</string>
   <string name="trail_title">Маршруты</string>
@@ -568,7 +570,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Mac: скажите «TrackNothing Токио» в Spotlight, Siri или Командах, чтобы подключиться туда сразу или перенести текущее подключение; там же можно переключить умный и глобальный режим</string>
+  <string name="whats_new_notes">Mac: на странице трафика появились «Маршруты»: глобус с городами, через которые вы выходили в сеть, объём через каждый и время, которое это устройство было скрыто\nMac: из маршрутов можно сделать постер, чтобы сохранить или поделиться; ваш город по умолчанию скрыт, IP на картинке нет</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="why_ai">AI-сервис</string>

@@ -428,6 +428,7 @@ class ConnectionService : VpnService() {
             }
             ConnectionStateStore.attempt = failures; ConnectionStateStore.retryAt = if (failures > 0) nextProbe else 0L
             Core.rate().split(' ').let { (up, down) -> ConnectionStateStore.txRate = up.toLong(); ConnectionStateStore.rxRate = down.toLong() }
+            HiddenTime.tick(this, ConnectionStateStore.since > 0L && failures == 0)
         } catch (e: Exception) {
             // Never a reason to give up: count it as a failed round and try again later.
             val detail = listOf(e.javaClass.simpleName, Journal.scrub(e.message)).filter { it.isNotEmpty() }.joinToString(": ")
