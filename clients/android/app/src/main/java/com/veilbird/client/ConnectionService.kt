@@ -442,6 +442,7 @@ class ConnectionService : VpnService() {
             notified = shown; getSystemService(NotificationManager::class.java).notify(1, notification(text))
             // The Quick Settings tile shows the exit while connected.
             try { android.service.quicksettings.TileService.requestListeningState(this, android.content.ComponentName(this, ToggleTile::class.java)) } catch (_: Exception) { }
+            Widgets.refresh(this)
         }
     }
     /** Online state, transport memory key, and a clean start on a new network: old connections would hang. */
@@ -599,6 +600,7 @@ class ConnectionService : VpnService() {
         try { api.action("disconnect", JSONObject()) } catch (_: Exception) { }
         Session.end(this, api, failed = false)
         stopForeground(STOP_FOREGROUND_REMOVE); stopSelf()
+        try { Widgets.refresh(this) } catch (_: Exception) { }
     }
     companion object {
         /** Keep a working tunnel this long when the server cannot be reached to renew the lease; the node keeps the lease as long. */

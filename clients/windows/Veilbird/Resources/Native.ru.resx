@@ -579,6 +579,9 @@ Windows: янтарная точка на значке в панели зада�
   <data name="why_rest" xml:space="preserve"><value>Остальной трафик</value></data>
   <data name="why_rest_direct" xml:space="preserve"><value>Другие правила не совпали, поэтому напрямую.</value></data>
   <data name="why_rest_proxy" xml:space="preserve"><value>Другие правила не совпали, поэтому через шифрование.</value></data>
+  <data name="widget_globe" xml:space="preserve"><value>Глобус TrackNothing</value></data>
+  <data name="widget_strip" xml:space="preserve"><value>Статус TrackNothing</value></data>
+  <data name="widget_tap" xml:space="preserve"><value>Коснитесь, чтобы подключиться</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>
   <data name="working" xml:space="preserve"><value>Подождите…</value></data>
   <data name="working_please_wait" xml:space="preserve"><value>Обработка, подождите…</value></data>

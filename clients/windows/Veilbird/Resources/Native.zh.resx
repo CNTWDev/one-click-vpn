@@ -579,6 +579,9 @@ Windows：已连接时任务栏图标带琥珀色角标；鼠标悬停预览里�
   <data name="why_rest" xml:space="preserve"><value>其余流量</value></data>
   <data name="why_rest_direct" xml:space="preserve"><value>没有命中其他规则，直连。</value></data>
   <data name="why_rest_proxy" xml:space="preserve"><value>没有命中其他规则，走加密。</value></data>
+  <data name="widget_globe" xml:space="preserve"><value>TrackNothing 地球</value></data>
+  <data name="widget_strip" xml:space="preserve"><value>TrackNothing 状态</value></data>
+  <data name="widget_tap" xml:space="preserve"><value>轻点连接</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>
   <data name="working" xml:space="preserve"><value>正在处理，请稍候…</value></data>
   <data name="working_please_wait" xml:space="preserve"><value>正在处理，请稍候…</value></data>

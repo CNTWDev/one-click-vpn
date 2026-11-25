@@ -571,6 +571,9 @@
   <string name="why_rest">其余流量</string>
   <string name="why_rest_direct">没有命中其他规则，直连。</string>
   <string name="why_rest_proxy">没有命中其他规则，走加密。</string>
+  <string name="widget_globe">TrackNothing 地球</string>
+  <string name="widget_strip">TrackNothing 状态</string>
+  <string name="widget_tap">轻点连接</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>
   <string name="working">正在处理，请稍候…</string>
   <string name="working_please_wait">正在处理，请稍候…</string>

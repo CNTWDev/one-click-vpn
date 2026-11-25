@@ -4,6 +4,17 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.43
+
+### zh
+- 安卓：新增两款桌面小部件，2×2 小地球显示出口城市和连接状态，4×1 状态条一键连接或断开
+
+### en
+- Android: two new home screen widgets, a 2×2 globe showing your exit city and status, and a 4×1 strip that connects or disconnects in one tap
+
+### ru
+- Android: два новых виджета для главного экрана: глобус 2×2 с городом выхода и статусом и полоска 4×1 для подключения и отключения одним касанием
+
 ## 1.0.42
 
 ### zh

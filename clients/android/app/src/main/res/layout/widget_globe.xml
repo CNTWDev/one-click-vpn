@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="@drawable/widget_card">
+  <ImageView android:id="@+id/widget_globe_image" android:layout_width="match_parent" android:layout_height="match_parent"
+      android:layout_marginBottom="18dp" android:scaleType="fitCenter" android:importantForAccessibility="no"/>
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom"
+      android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="14dp" android:paddingEnd="14dp" android:paddingBottom="12dp">
+    <TextView android:id="@+id/widget_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+        android:textSize="15sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end"/>
+    <TextView android:id="@+id/widget_detail" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginStart="8dp" android:textSize="11sp" android:maxLines="1" android:fontFamily="monospace"/>
+  </LinearLayout>
+</FrameLayout>

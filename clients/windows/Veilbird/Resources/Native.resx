@@ -579,6 +579,9 @@ Windows: the taskbar icon shows an amber dot while connected; its hover preview 
   <data name="why_rest" xml:space="preserve"><value>Everything else</value></data>
   <data name="why_rest_direct" xml:space="preserve"><value>No other rule matched, so it goes direct.</value></data>
   <data name="why_rest_proxy" xml:space="preserve"><value>No other rule matched, so it goes encrypted.</value></data>
+  <data name="widget_globe" xml:space="preserve"><value>TrackNothing globe</value></data>
+  <data name="widget_strip" xml:space="preserve"><value>TrackNothing status</value></data>
+  <data name="widget_tap" xml:space="preserve"><value>Tap to connect</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows development build · VPN service integration in progress</value></data>
   <data name="working" xml:space="preserve"><value>Working…</value></data>
   <data name="working_please_wait" xml:space="preserve"><value>Working, please wait…</value></data>
