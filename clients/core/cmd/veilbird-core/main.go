@@ -197,6 +197,30 @@ func main() {
 			reply("ok")
 		case "activity":
 			reply(core.Activity())
+		case "rules":
+			// rules <JSON array of lines>: the person's own rules, applied while connected
+			if len(fields) < 2 {
+				reply("error usage")
+				continue
+			}
+			if err := core.SetRules(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(input.Text()), fields[0]))); err != nil {
+				reply("error " + err.Error())
+				continue
+			}
+			reply("ok")
+		case "close":
+			// close <connection id>
+			if len(fields) == 2 {
+				core.CloseConnection(fields[1])
+			}
+			reply("ok")
+		case "closehost":
+			// closehost <domain> <site 1|0>
+			if len(fields) != 3 {
+				reply("0")
+				continue
+			}
+			reply(strconv.Itoa(core.CloseHost(fields[1], fields[2] == "1")))
 		case "appusage":
 			days := 30
 			if len(fields) == 2 {

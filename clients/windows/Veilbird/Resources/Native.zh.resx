@@ -274,7 +274,16 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="manage_devices_action" xml:space="preserve"><value>管理设备</value></data>
   <data name="measuring_latency" xml:space="preserve"><value>测速中…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>账号已到期，请联系管理员续期。</value></data>
+  <data name="menu_always_direct" xml:space="preserve"><value>总是直连</value></data>
+  <data name="menu_always_proxy" xml:space="preserve"><value>总是走加密</value></data>
   <data name="menu_bar_speed" xml:space="preserve"><value>菜单栏显示网速</value></data>
+  <data name="menu_block" xml:space="preserve"><value>屏蔽</value></data>
+  <data name="menu_close_connection" xml:space="preserve"><value>断开这条连接</value></data>
+  <data name="menu_copied" xml:space="preserve"><value>已复制</value></data>
+  <data name="menu_copy_domain" xml:space="preserve"><value>复制域名</value></data>
+  <data name="menu_only_domain" xml:space="preserve"><value>只这个域名 {0}</value></data>
+  <data name="menu_whole_site" xml:space="preserve"><value>整个网站 {0}</value></data>
+  <data name="menu_why" xml:space="preserve"><value>为什么这样走</value></data>
   <data name="move_to_applications_first" xml:space="preserve"><value>请先把 TrackNothing 拖到“应用程序”文件夹，再从那里打开。</value></data>
   <data name="my_account" xml:space="preserve"><value>我的账号</value></data>
   <data name="my_veilbird" xml:space="preserve"><value>我的 TrackNothing</value></data>
@@ -310,6 +319,9 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="phase_route" xml:space="preserve"><value>选择线路</value></data>
   <data name="phase_tunnel" xml:space="preserve"><value>建立连接</value></data>
   <data name="pick_location_sub" xml:space="preserve"><value>默认帮你选最快的，之后随时能换。</value></data>
+  <data name="policy_block" xml:space="preserve"><value>屏蔽</value></data>
+  <data name="policy_direct" xml:space="preserve"><value>直连</value></data>
+  <data name="policy_proxy" xml:space="preserve"><value>走加密</value></data>
   <data name="protocol" xml:space="preserve"><value>协议</value></data>
   <data name="protocol_lock_detail" xml:space="preserve"><value>锁定后这个位置只用这一种协议，它不通时不会换别的。</value></data>
   <data name="protocol_only" xml:space="preserve"><value>仅 {0}</value></data>
@@ -379,11 +391,16 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="routing_global_detail" xml:space="preserve"><value>全部流量经过 TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>智能分流</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>国内网站直连，其余经过 TrackNothing</value></data>
+  <data name="rule_added" xml:space="preserve"><value>已添加规则：{0} {1}，已生效</value></data>
+  <data name="rule_added_later" xml:space="preserve"><value>已添加规则：{0} {1}，下次连接时生效</value></data>
+  <data name="rule_undo" xml:space="preserve"><value>撤销</value></data>
+  <data name="rule_undone" xml:space="preserve"><value>已撤销</value></data>
   <data name="rules_count" xml:space="preserve"><value>{0} 条</value></data>
   <data name="rules_help" xml:space="preserve"><value>每行一条：域名或网段，逗号后写 direct（直连）、proxy（走代理）或 block（拦截）。也可以直接粘贴 Clash 规则，# 后面是注释。规则排在智能分流前面，只保存在这台设备上。</value></data>
   <data name="rules_none" xml:space="preserve"><value>未设置</value></data>
   <data name="rules_save" xml:space="preserve"><value>保存</value></data>
   <data name="rules_saved" xml:space="preserve"><value>已保存，下次连接时生效</value></data>
+  <data name="rules_saved_live" xml:space="preserve"><value>已保存，已立即生效</value></data>
   <data name="rules_saved_reconnect" xml:space="preserve"><value>已保存，正在重新连接</value></data>
   <data name="rules_status" xml:space="preserve"><value>能用 {0} 条，看不懂 {1} 行</value></data>
   <data name="rules_title" xml:space="preserve"><value>分流规则</value></data>
@@ -524,11 +541,28 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>AI 网站（ChatGPT、Claude、Gemini 等）始终走加密通道，智能分流下也一样
-用过 AI 的话，自动模式不再选 AI 服务不支持的位置（比如香港）
-自动换位置时，如果正在用 AI，优先换到同一个国家，减少账号因 IP 跳动被风控</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>「活动」里右键一条连接（手机上长按），就能把这个网站设成总是走加密、总是直连或屏蔽，可选整个网站或只这个域名，马上生效，不用重连
+点一条连接就能看到「为什么这样走」：命中了哪条规则、走加密还是直连、从哪个位置出去
+还能复制域名、单独断开一条连接；加了规则可以一键撤销
+分流规则页保存后也立即生效，不再断开重连</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
+  <data name="why_ai" xml:space="preserve"><value>AI 服务</value></data>
+  <data name="why_ai_line" xml:space="preserve"><value>AI 服务总是走加密，出口尽量留在同一个国家，减少账号风控。</value></data>
+  <data name="why_app" xml:space="preserve"><value>按应用分流</value></data>
+  <data name="why_app_line" xml:space="preserve"><value>由按应用分流的设置决定。</value></data>
+  <data name="why_cn" xml:space="preserve"><value>中国大陆网站</value></data>
+  <data name="why_cn_line" xml:space="preserve"><value>智能分流：中国大陆网站直连，更快，也不占流量。</value></data>
+  <data name="why_local" xml:space="preserve"><value>局域网</value></data>
+  <data name="why_local_line" xml:space="preserve"><value>局域网和本机地址总是直连。</value></data>
+  <data name="why_make_direct" xml:space="preserve"><value>改成直连</value></data>
+  <data name="why_make_proxy" xml:space="preserve"><value>改成走加密</value></data>
+  <data name="why_mine" xml:space="preserve"><value>你的规则</value></data>
+  <data name="why_mine_line" xml:space="preserve"><value>命中了你在分流规则里写的 {0}。</value></data>
+  <data name="why_open_rules" xml:space="preserve"><value>去分流规则</value></data>
+  <data name="why_rest" xml:space="preserve"><value>其余流量</value></data>
+  <data name="why_rest_direct" xml:space="preserve"><value>没有命中其他规则，直连。</value></data>
+  <data name="why_rest_proxy" xml:space="preserve"><value>没有命中其他规则，走加密。</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>
   <data name="working" xml:space="preserve"><value>正在处理，请稍候…</value></data>
   <data name="working_please_wait" xml:space="preserve"><value>正在处理，请稍候…</value></data>

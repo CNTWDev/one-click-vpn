@@ -274,7 +274,16 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="manage_devices_action" xml:space="preserve"><value>Устройства</value></data>
   <data name="measuring_latency" xml:space="preserve"><value>Проверка…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>Срок доступа истёк. Обратитесь к администратору для продления.</value></data>
+  <data name="menu_always_direct" xml:space="preserve"><value>Всегда напрямую</value></data>
+  <data name="menu_always_proxy" xml:space="preserve"><value>Всегда через шифрование</value></data>
   <data name="menu_bar_speed" xml:space="preserve"><value>Скорость в строке меню</value></data>
+  <data name="menu_block" xml:space="preserve"><value>Блокировать</value></data>
+  <data name="menu_close_connection" xml:space="preserve"><value>Закрыть соединение</value></data>
+  <data name="menu_copied" xml:space="preserve"><value>Скопировано</value></data>
+  <data name="menu_copy_domain" xml:space="preserve"><value>Копировать домен</value></data>
+  <data name="menu_only_domain" xml:space="preserve"><value>Только {0}</value></data>
+  <data name="menu_whole_site" xml:space="preserve"><value>Весь сайт {0}</value></data>
+  <data name="menu_why" xml:space="preserve"><value>Почему такой маршрут</value></data>
   <data name="move_to_applications_first" xml:space="preserve"><value>Сначала перенесите TrackNothing в папку «Программы» и откройте его оттуда.</value></data>
   <data name="my_account" xml:space="preserve"><value>Мой аккаунт</value></data>
   <data name="my_veilbird" xml:space="preserve"><value>Мой TrackNothing</value></data>
@@ -310,6 +319,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="phase_route" xml:space="preserve"><value>Выбор маршрута</value></data>
   <data name="phase_tunnel" xml:space="preserve"><value>Соединение</value></data>
   <data name="pick_location_sub" xml:space="preserve"><value>Мы выберем самую быструю. Сменить можно в любой момент.</value></data>
+  <data name="policy_block" xml:space="preserve"><value>блокировать</value></data>
+  <data name="policy_direct" xml:space="preserve"><value>напрямую</value></data>
+  <data name="policy_proxy" xml:space="preserve"><value>через шифрование</value></data>
   <data name="protocol" xml:space="preserve"><value>Протокол</value></data>
   <data name="protocol_lock_detail" xml:space="preserve"><value>После выбора эта локация использует только этот протокол и не переключится на другой, если он не работает.</value></data>
   <data name="protocol_only" xml:space="preserve"><value>Только {0}</value></data>
@@ -379,11 +391,16 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="routing_global_detail" xml:space="preserve"><value>Весь трафик через TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>Умная</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>Сайты материкового Китая напрямую, остальное через TrackNothing</value></data>
+  <data name="rule_added" xml:space="preserve"><value>Правило добавлено: {0} — {1}, уже действует</value></data>
+  <data name="rule_added_later" xml:space="preserve"><value>Правило добавлено: {0} — {1}, со следующего подключения</value></data>
+  <data name="rule_undo" xml:space="preserve"><value>Отменить</value></data>
+  <data name="rule_undone" xml:space="preserve"><value>Отменено</value></data>
   <data name="rules_count" xml:space="preserve"><value>Правил: {0}</value></data>
   <data name="rules_help" xml:space="preserve"><value>По одному на строку: домен или сеть, запятая, затем direct, proxy или block. Правила Clash можно вставить как есть; # начинает комментарий. Правила идут раньше умного режима и хранятся только на этом устройстве.</value></data>
   <data name="rules_none" xml:space="preserve"><value>Нет</value></data>
   <data name="rules_save" xml:space="preserve"><value>Сохранить</value></data>
   <data name="rules_saved" xml:space="preserve"><value>Сохранено, применится при следующем подключении</value></data>
+  <data name="rules_saved_live" xml:space="preserve"><value>Сохранено и применено</value></data>
   <data name="rules_saved_reconnect" xml:space="preserve"><value>Сохранено, переподключение</value></data>
   <data name="rules_status" xml:space="preserve"><value>Правил: {0}, не распознано строк: {1}</value></data>
   <data name="rules_title" xml:space="preserve"><value>Правила маршрутизации</value></data>
@@ -524,11 +541,28 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Сайты ИИ (ChatGPT, Claude, Gemini и другие) всегда идут через туннель, в том числе при умной маршрутизации
-Если вы пользуетесь ИИ, режим «Автоматически» не выбирает локации, где сервисы ИИ недоступны (например, Гонконг)
-Когда «Автоматически» меняет локацию во время работы с ИИ, сначала пробует ту же страну, чтобы аккаунт не видел скачков IP</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>В «Активности» щёлкните соединение правой кнопкой (на телефоне — долгое нажатие), чтобы сайт всегда шёл через шифрование, напрямую или блокировался — весь сайт или только этот домен; применяется сразу, без переподключения
+Нажмите на соединение, чтобы увидеть, почему оно пошло так: какое правило сработало, шифрование или напрямую, через какую локацию
+Там же можно скопировать домен или закрыть одно соединение; новое правило отменяется одним нажатием
+Сохранение правил маршрутизации теперь тоже применяется сразу, без переподключения</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
+  <data name="why_ai" xml:space="preserve"><value>AI-сервис</value></data>
+  <data name="why_ai_line" xml:space="preserve"><value>AI-сервисы всегда идут через шифрование, выход по возможности остаётся в одной стране, чтобы аккаунт не блокировали.</value></data>
+  <data name="why_app" xml:space="preserve"><value>По приложениям</value></data>
+  <data name="why_app_line" xml:space="preserve"><value>Определено настройкой маршрутизации по приложениям.</value></data>
+  <data name="why_cn" xml:space="preserve"><value>Сайт материкового Китая</value></data>
+  <data name="why_cn_line" xml:space="preserve"><value>Умная маршрутизация: сайты материкового Китая напрямую, быстрее и без расхода трафика.</value></data>
+  <data name="why_local" xml:space="preserve"><value>Локальная сеть</value></data>
+  <data name="why_local_line" xml:space="preserve"><value>Адреса локальной сети и устройства всегда напрямую.</value></data>
+  <data name="why_make_direct" xml:space="preserve"><value>Сделать напрямую</value></data>
+  <data name="why_make_proxy" xml:space="preserve"><value>Через шифрование</value></data>
+  <data name="why_mine" xml:space="preserve"><value>Ваше правило</value></data>
+  <data name="why_mine_line" xml:space="preserve"><value>Совпало с {0} в ваших правилах.</value></data>
+  <data name="why_open_rules" xml:space="preserve"><value>Открыть правила</value></data>
+  <data name="why_rest" xml:space="preserve"><value>Остальной трафик</value></data>
+  <data name="why_rest_direct" xml:space="preserve"><value>Другие правила не совпали, поэтому напрямую.</value></data>
+  <data name="why_rest_proxy" xml:space="preserve"><value>Другие правила не совпали, поэтому через шифрование.</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>
   <data name="working" xml:space="preserve"><value>Подождите…</value></data>
   <data name="working_please_wait" xml:space="preserve"><value>Обработка, подождите…</value></data>

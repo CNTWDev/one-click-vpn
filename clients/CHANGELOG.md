@@ -4,6 +4,26 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.33
+
+### zh
+- 「活动」里右键一条连接（手机上长按），就能把这个网站设成总是走加密、总是直连或屏蔽，可选整个网站或只这个域名，马上生效，不用重连
+- 点一条连接就能看到「为什么这样走」：命中了哪条规则、走加密还是直连、从哪个位置出去
+- 还能复制域名、单独断开一条连接；加了规则可以一键撤销
+- 分流规则页保存后也立即生效，不再断开重连
+
+### en
+- In Activity, right-click a connection (long press on the phone) to always encrypt, always go direct or block that site, for the whole site or just that name; it applies at once, no reconnect
+- Tap a connection to see why it went that way: the rule it matched, encrypted or direct, and the location it left from
+- Copy the domain or close a single connection from the same menu; a new rule can be undone in one tap
+- Saving the routing rules page now applies at once too, without reconnecting
+
+### ru
+- В «Активности» щёлкните соединение правой кнопкой (на телефоне — долгое нажатие), чтобы сайт всегда шёл через шифрование, напрямую или блокировался — весь сайт или только этот домен; применяется сразу, без переподключения
+- Нажмите на соединение, чтобы увидеть, почему оно пошло так: какое правило сработало, шифрование или напрямую, через какую локацию
+- Там же можно скопировать домен или закрыть одно соединение; новое правило отменяется одним нажатием
+- Сохранение правил маршрутизации теперь тоже применяется сразу, без переподключения
+
 ## 1.0.32
 
 ### zh

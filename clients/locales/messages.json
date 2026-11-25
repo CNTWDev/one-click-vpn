@@ -2624,6 +2624,171 @@
     "en": "{0} rules, {1} lines not understood",
     "ru": "Правил: {0}, не распознано строк: {1}"
   },
+  "rules_saved_live": {
+    "zh": "已保存，已立即生效",
+    "en": "Saved and applied",
+    "ru": "Сохранено и применено"
+  },
+  "menu_always_proxy": {
+    "zh": "总是走加密",
+    "en": "Always encrypt",
+    "ru": "Всегда через шифрование"
+  },
+  "menu_always_direct": {
+    "zh": "总是直连",
+    "en": "Always direct",
+    "ru": "Всегда напрямую"
+  },
+  "menu_block": {
+    "zh": "屏蔽",
+    "en": "Block",
+    "ru": "Блокировать"
+  },
+  "menu_whole_site": {
+    "zh": "整个网站 {0}",
+    "en": "Whole site {0}",
+    "ru": "Весь сайт {0}"
+  },
+  "menu_only_domain": {
+    "zh": "只这个域名 {0}",
+    "en": "Only {0}",
+    "ru": "Только {0}"
+  },
+  "menu_copy_domain": {
+    "zh": "复制域名",
+    "en": "Copy domain",
+    "ru": "Копировать домен"
+  },
+  "menu_close_connection": {
+    "zh": "断开这条连接",
+    "en": "Close this connection",
+    "ru": "Закрыть соединение"
+  },
+  "menu_why": {
+    "zh": "为什么这样走",
+    "en": "Why this route",
+    "ru": "Почему такой маршрут"
+  },
+  "menu_copied": {
+    "zh": "已复制",
+    "en": "Copied",
+    "ru": "Скопировано"
+  },
+  "rule_added": {
+    "zh": "已添加规则：{0} {1}，已生效",
+    "en": "Rule added: {0} {1}, in effect now",
+    "ru": "Правило добавлено: {0} — {1}, уже действует"
+  },
+  "rule_added_later": {
+    "zh": "已添加规则：{0} {1}，下次连接时生效",
+    "en": "Rule added: {0} {1}, applies from the next connection",
+    "ru": "Правило добавлено: {0} — {1}, со следующего подключения"
+  },
+  "policy_proxy": {
+    "zh": "走加密",
+    "en": "encrypted",
+    "ru": "через шифрование"
+  },
+  "policy_direct": {
+    "zh": "直连",
+    "en": "direct",
+    "ru": "напрямую"
+  },
+  "policy_block": {
+    "zh": "屏蔽",
+    "en": "blocked",
+    "ru": "блокировать"
+  },
+  "rule_undo": {
+    "zh": "撤销",
+    "en": "Undo",
+    "ru": "Отменить"
+  },
+  "rule_undone": {
+    "zh": "已撤销",
+    "en": "Undone",
+    "ru": "Отменено"
+  },
+  "why_mine": {
+    "zh": "你的规则",
+    "en": "Your rule",
+    "ru": "Ваше правило"
+  },
+  "why_mine_line": {
+    "zh": "命中了你在分流规则里写的 {0}。",
+    "en": "Matched {0} in your routing rules.",
+    "ru": "Совпало с {0} в ваших правилах."
+  },
+  "why_ai": {
+    "zh": "AI 服务",
+    "en": "AI service",
+    "ru": "AI-сервис"
+  },
+  "why_ai_line": {
+    "zh": "AI 服务总是走加密，出口尽量留在同一个国家，减少账号风控。",
+    "en": "AI services always go encrypted, with the exit kept in one country where possible so accounts are not flagged.",
+    "ru": "AI-сервисы всегда идут через шифрование, выход по возможности остаётся в одной стране, чтобы аккаунт не блокировали."
+  },
+  "why_cn": {
+    "zh": "中国大陆网站",
+    "en": "Mainland China site",
+    "ru": "Сайт материкового Китая"
+  },
+  "why_cn_line": {
+    "zh": "智能分流：中国大陆网站直连，更快，也不占流量。",
+    "en": "Smart routing: mainland China sites go direct, faster and free of data use.",
+    "ru": "Умная маршрутизация: сайты материкового Китая напрямую, быстрее и без расхода трафика."
+  },
+  "why_local": {
+    "zh": "局域网",
+    "en": "Local network",
+    "ru": "Локальная сеть"
+  },
+  "why_local_line": {
+    "zh": "局域网和本机地址总是直连。",
+    "en": "Local network and device addresses always go direct.",
+    "ru": "Адреса локальной сети и устройства всегда напрямую."
+  },
+  "why_app": {
+    "zh": "按应用分流",
+    "en": "Per-app routing",
+    "ru": "По приложениям"
+  },
+  "why_app_line": {
+    "zh": "由按应用分流的设置决定。",
+    "en": "Decided by your per-app routing.",
+    "ru": "Определено настройкой маршрутизации по приложениям."
+  },
+  "why_rest": {
+    "zh": "其余流量",
+    "en": "Everything else",
+    "ru": "Остальной трафик"
+  },
+  "why_rest_proxy": {
+    "zh": "没有命中其他规则，走加密。",
+    "en": "No other rule matched, so it goes encrypted.",
+    "ru": "Другие правила не совпали, поэтому через шифрование."
+  },
+  "why_rest_direct": {
+    "zh": "没有命中其他规则，直连。",
+    "en": "No other rule matched, so it goes direct.",
+    "ru": "Другие правила не совпали, поэтому напрямую."
+  },
+  "why_make_direct": {
+    "zh": "改成直连",
+    "en": "Make it direct",
+    "ru": "Сделать напрямую"
+  },
+  "why_make_proxy": {
+    "zh": "改成走加密",
+    "en": "Make it encrypted",
+    "ru": "Через шифрование"
+  },
+  "why_open_rules": {
+    "zh": "去分流规则",
+    "en": "Open routing rules",
+    "ru": "Открыть правила"
+  },
   "globe_km": {
     "en": "{0} km",
     "zh": "{0} km",

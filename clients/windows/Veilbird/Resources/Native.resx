@@ -274,7 +274,16 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="manage_devices_action" xml:space="preserve"><value>Manage devices</value></data>
   <data name="measuring_latency" xml:space="preserve"><value>Testing…</value></data>
   <data name="membership_expired_hint" xml:space="preserve"><value>Your access has expired. Contact your administrator to renew it.</value></data>
+  <data name="menu_always_direct" xml:space="preserve"><value>Always direct</value></data>
+  <data name="menu_always_proxy" xml:space="preserve"><value>Always encrypt</value></data>
   <data name="menu_bar_speed" xml:space="preserve"><value>Show speed in menu bar</value></data>
+  <data name="menu_block" xml:space="preserve"><value>Block</value></data>
+  <data name="menu_close_connection" xml:space="preserve"><value>Close this connection</value></data>
+  <data name="menu_copied" xml:space="preserve"><value>Copied</value></data>
+  <data name="menu_copy_domain" xml:space="preserve"><value>Copy domain</value></data>
+  <data name="menu_only_domain" xml:space="preserve"><value>Only {0}</value></data>
+  <data name="menu_whole_site" xml:space="preserve"><value>Whole site {0}</value></data>
+  <data name="menu_why" xml:space="preserve"><value>Why this route</value></data>
   <data name="move_to_applications_first" xml:space="preserve"><value>Move TrackNothing to the Applications folder first, then open it from there.</value></data>
   <data name="my_account" xml:space="preserve"><value>My account</value></data>
   <data name="my_veilbird" xml:space="preserve"><value>My TrackNothing</value></data>
@@ -310,6 +319,9 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="phase_route" xml:space="preserve"><value>Picking route</value></data>
   <data name="phase_tunnel" xml:space="preserve"><value>Opening tunnel</value></data>
   <data name="pick_location_sub" xml:space="preserve"><value>We pick the fastest one for you. You can change it any time.</value></data>
+  <data name="policy_block" xml:space="preserve"><value>blocked</value></data>
+  <data name="policy_direct" xml:space="preserve"><value>direct</value></data>
+  <data name="policy_proxy" xml:space="preserve"><value>encrypted</value></data>
   <data name="protocol" xml:space="preserve"><value>Protocol</value></data>
   <data name="protocol_lock_detail" xml:space="preserve"><value>Once locked, this location uses only this protocol and won't switch to another if it fails.</value></data>
   <data name="protocol_only" xml:space="preserve"><value>{0} only</value></data>
@@ -379,11 +391,16 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="routing_global_detail" xml:space="preserve"><value>All traffic goes through TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>Smart</value></data>
   <data name="routing_smart_detail" xml:space="preserve"><value>Sites in mainland China go direct, the rest through TrackNothing</value></data>
+  <data name="rule_added" xml:space="preserve"><value>Rule added: {0} {1}, in effect now</value></data>
+  <data name="rule_added_later" xml:space="preserve"><value>Rule added: {0} {1}, applies from the next connection</value></data>
+  <data name="rule_undo" xml:space="preserve"><value>Undo</value></data>
+  <data name="rule_undone" xml:space="preserve"><value>Undone</value></data>
   <data name="rules_count" xml:space="preserve"><value>{0} rules</value></data>
   <data name="rules_help" xml:space="preserve"><value>One per line: a domain or network, a comma, then direct, proxy or block. Clash rules can be pasted as they are; # starts a comment. Rules come before smart routing and stay on this device.</value></data>
   <data name="rules_none" xml:space="preserve"><value>None</value></data>
   <data name="rules_save" xml:space="preserve"><value>Save</value></data>
   <data name="rules_saved" xml:space="preserve"><value>Saved, applies from the next connection</value></data>
+  <data name="rules_saved_live" xml:space="preserve"><value>Saved and applied</value></data>
   <data name="rules_saved_reconnect" xml:space="preserve"><value>Saved, reconnecting</value></data>
   <data name="rules_status" xml:space="preserve"><value>{0} rules, {1} lines not understood</value></data>
   <data name="rules_title" xml:space="preserve"><value>Routing rules</value></data>
@@ -524,11 +541,28 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>AI sites (ChatGPT, Claude, Gemini and others) always go through the tunnel, smart routing included
-Once you use AI, Automatic no longer picks locations AI services refuse (such as Hong Kong)
-When Automatic has to move while you use AI, it tries the same country first, so your account does not see the IP jump</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>In Activity, right-click a connection (long press on the phone) to always encrypt, always go direct or block that site, for the whole site or just that name; it applies at once, no reconnect
+Tap a connection to see why it went that way: the rule it matched, encrypted or direct, and the location it left from
+Copy the domain or close a single connection from the same menu; a new rule can be undone in one tap
+Saving the routing rules page now applies at once too, without reconnecting</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
+  <data name="why_ai" xml:space="preserve"><value>AI service</value></data>
+  <data name="why_ai_line" xml:space="preserve"><value>AI services always go encrypted, with the exit kept in one country where possible so accounts are not flagged.</value></data>
+  <data name="why_app" xml:space="preserve"><value>Per-app routing</value></data>
+  <data name="why_app_line" xml:space="preserve"><value>Decided by your per-app routing.</value></data>
+  <data name="why_cn" xml:space="preserve"><value>Mainland China site</value></data>
+  <data name="why_cn_line" xml:space="preserve"><value>Smart routing: mainland China sites go direct, faster and free of data use.</value></data>
+  <data name="why_local" xml:space="preserve"><value>Local network</value></data>
+  <data name="why_local_line" xml:space="preserve"><value>Local network and device addresses always go direct.</value></data>
+  <data name="why_make_direct" xml:space="preserve"><value>Make it direct</value></data>
+  <data name="why_make_proxy" xml:space="preserve"><value>Make it encrypted</value></data>
+  <data name="why_mine" xml:space="preserve"><value>Your rule</value></data>
+  <data name="why_mine_line" xml:space="preserve"><value>Matched {0} in your routing rules.</value></data>
+  <data name="why_open_rules" xml:space="preserve"><value>Open routing rules</value></data>
+  <data name="why_rest" xml:space="preserve"><value>Everything else</value></data>
+  <data name="why_rest_direct" xml:space="preserve"><value>No other rule matched, so it goes direct.</value></data>
+  <data name="why_rest_proxy" xml:space="preserve"><value>No other rule matched, so it goes encrypted.</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows development build · VPN service integration in progress</value></data>
   <data name="working" xml:space="preserve"><value>Working…</value></data>
   <data name="working_please_wait" xml:space="preserve"><value>Working, please wait…</value></data>

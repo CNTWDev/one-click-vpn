@@ -37,6 +37,39 @@
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
     </Style>
+    <!-- The activity list's right-click menu: a raised dark card, rows highlighted on hover, submenus to the right. -->
+    <Style TargetType="ContextMenu">
+      <Setter Property="OverridesDefaultStyle" Value="True"/><Setter Property="HasDropShadow" Value="True"/><Setter Property="FontSize" Value="13"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContextMenu">
+        <Border Background="{DynamicResource Raised}" CornerRadius="8" Padding="4" MinWidth="210"><StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/></Border>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="Separator">
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Separator"><Border Height="1" Margin="8,4" Background="{DynamicResource Hairline}"/></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="MenuItem">
+      <Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="FontSize" Value="13"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="MenuItem">
+        <Grid>
+          <Border x:Name="Row" Background="Transparent" CornerRadius="5" Padding="10,0" Height="30">
+            <DockPanel>
+              <TextBlock x:Name="Arrow" DockPanel.Dock="Right" Text="›" FontSize="14" Foreground="{DynamicResource Secondary}" Margin="18,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"/>
+              <TextBlock x:Name="Gesture" DockPanel.Dock="Right" Text="{TemplateBinding InputGestureText}" FontSize="12" Foreground="{DynamicResource Faint}" Margin="18,0,0,0" VerticalAlignment="Center"/>
+              <ContentPresenter ContentSource="Header" RecognizesAccessKey="False" VerticalAlignment="Center" TextBlock.Foreground="{TemplateBinding Foreground}"/>
+            </DockPanel>
+          </Border>
+          <Popup x:Name="PART_Popup" Placement="Right" HorizontalOffset="4" VerticalOffset="-4" AllowsTransparency="True" Focusable="False" PopupAnimation="None"
+                 IsOpen="{Binding IsSubmenuOpen,RelativeSource={RelativeSource TemplatedParent}}">
+            <Border Background="{DynamicResource Raised}" CornerRadius="8" Padding="4" MinWidth="210"><StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/></Border>
+          </Popup>
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Row" Property="Background" Value="{DynamicResource Selected}"/></Trigger>
+          <Trigger Property="Role" Value="SubmenuHeader"><Setter TargetName="Arrow" Property="Visibility" Value="Visible"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource Faint}"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
     <!-- Draws only its content: the connect ring and the title bar's own buttons. -->
     <Style x:Key="Bare" TargetType="Button">
       <Setter Property="Cursor" Value="Hand"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/><Setter Property="Background" Value="Transparent"/>

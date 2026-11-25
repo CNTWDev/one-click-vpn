@@ -127,6 +127,8 @@ class MainActivity : Activity() {
     private var activityTab = "conns"
     private var activityFilter = "all"
     private var activityBody: LinearLayout? = null
+    /** A finger is on a connection row: the list waits (rebuilding it would cancel the long press). */
+    private var activityHeld = false
     private var activityLoading = false
     private val refresh = object : Runnable {
         override fun run() { showState(); if (page == "activity") loadActivity(); if (visible) handler.postDelayed(this, 1000) }
@@ -387,7 +389,7 @@ class MainActivity : Activity() {
         fillActivity(null)
     }
     private fun loadActivity() {
-        if (activityLoading || activityBody == null) return
+        if (activityLoading || activityBody == null || activityHeld) return
         if (!(ConnectionStateStore.active && ConnectionStateStore.since > 0)) { fillActivity(null); return }
         activityLoading = true
         executor.execute {
@@ -437,6 +439,18 @@ class MainActivity : Activity() {
             }
             body.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = 58.dp; setPadding(4.dp, 8.dp, 4.dp, 8.dp)
+                background = pressable(Color.TRANSPARENT, 10)
+                // Tap: why it went this way; long press: the row's actions (rules, copy, close).
+                setOnClickListener { whySheet(c) }
+                setOnLongClickListener { activityHeld = false; connectionSheet(c); true }
+                @Suppress("ClickableViewAccessibility")
+                setOnTouchListener { _, event ->
+                    when (event.actionMasked) {
+                        android.view.MotionEvent.ACTION_DOWN -> activityHeld = true
+                        android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> activityHeld = false
+                    }
+                    false
+                }
                 addView(square(if (proxy) Palette.accent else directColor).apply { (layoutParams as LinearLayout.LayoutParams).marginEnd = 12.dp })
                 addView(LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.VERTICAL
@@ -449,6 +463,166 @@ class MainActivity : Activity() {
             body.addView(View(this).apply { setBackgroundColor(Color.rgb(26, 24, 22)) }, LinearLayout.LayoutParams(-1, 1))
         }
         if (shown.isEmpty()) body.addView(text(L10n.text(R.string.activity_nothing), 13f, Palette.secondary), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 16.dp; marginStart = 4.dp })
+    }
+    // ---- A connection's actions (long press) and why it went the way it did (tap) ----
+    private fun bottomSheet(build: (Dialog, LinearLayout) -> Unit) {
+        val dialog = Dialog(this).apply { requestWindowFeature(Window.FEATURE_NO_TITLE) }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(20.dp, 10.dp, 20.dp, 28.dp)
+            background = GradientDrawable().apply { setColor(Palette.surface); val r = 24.dp.toFloat(); cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f) }
+        }
+        box.addView(View(this).apply { background = rounded(Color.rgb(52, 49, 43), 2) }, LinearLayout.LayoutParams(36.dp, 4.dp).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = 18.dp })
+        build(dialog, box)
+        dialog.setContentView(android.widget.ScrollView(this).apply { isVerticalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER; addView(box) })
+        dialog.show()
+        dialog.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT)); setGravity(Gravity.BOTTOM)
+            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND); setDimAmount(0.6f)
+            @Suppress("DEPRECATION") navigationBarColor = Palette.surface
+        }
+    }
+    private fun connectionExit(c: JSONObject) = if (c.optBoolean("proxy")) ConnectionStateStore.node.ifEmpty { c.optString("via") } else L10n.text(R.string.activity_direct)
+    private fun connectionSheet(c: JSONObject) = bottomSheet { dialog, box ->
+        val host = c.optString("host"); val id = c.optString("id"); val site = Advanced.site(host)
+        box.addView(text(host, 17f, Palette.text, 600).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.MIDDLE; setPadding(4.dp, 0, 4.dp, 0); accessibilityHeading() })
+        box.addView(text(c.optString("rule") + " → " + connectionExit(c), 13f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END; setPadding(4.dp, 0, 4.dp, 0) },
+            LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp; bottomMargin = 14.dp })
+        if (Advanced.enabled(this) && host.isNotEmpty()) {
+            // The reach of the rule: the whole site (and its subdomains) or only this name.
+            var whole = true
+            if (site != host) {
+                val pills = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(2.dp, 2.dp, 2.dp, 2.dp); background = rounded(Color.rgb(31, 29, 26), 12) }
+                val options = listOf(L10n.text(R.string.menu_whole_site, site), L10n.text(R.string.menu_only_domain, host))
+                val views = options.map { label -> text(label, 13f, Palette.secondary, 500).apply { gravity = Gravity.CENTER; maxLines = 1; ellipsize = TextUtils.TruncateAt.MIDDLE; setPadding(8.dp, 0, 8.dp, 0) } }
+                fun paint() = views.forEachIndexed { i, v ->
+                    val on = (i == 0) == whole
+                    v.setTextColor(if (on) Palette.text else Palette.secondary); v.background = if (on) rounded(Palette.selected, 10) else pressable(Color.TRANSPARENT, 10)
+                    v.contentDescription = options[i] + if (on) L10n.text(R.string.current_page) else ""
+                }
+                views.forEachIndexed { i, v -> v.setOnClickListener { whole = i == 0; paint() }; pills.addView(v, LinearLayout.LayoutParams(0, -1, 1f)) }
+                paint()
+                box.addView(pills, LinearLayout.LayoutParams(-1, 40.dp).apply { bottomMargin = 10.dp })
+            }
+            box.addView(group(listOf(R.string.menu_always_proxy to "proxy", R.string.menu_always_direct to "direct", R.string.menu_block to "block").map { (label, policy) ->
+                row().apply {
+                    addView(text(L10n.text(label), 15f, if (policy == "block") Palette.danger else Palette.text).apply { maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
+                    setOnClickListener { dialog.dismiss(); addQuickRule(if (whole) site else host, whole, policy) }
+                }
+            }, color = Color.rgb(31, 29, 26)), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 10.dp })
+        }
+        val actions = mutableListOf<View>()
+        if (host.isNotEmpty()) actions += row().apply {
+            addView(text(L10n.text(R.string.menu_copy_domain), 15f).apply { maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
+            setOnClickListener {
+                dialog.dismiss()
+                getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("TrackNothing", host))
+                Toast.makeText(this@MainActivity, L10n.text(R.string.menu_copied), Toast.LENGTH_SHORT).show()
+            }
+        }
+        if (id.isNotEmpty()) actions += row().apply {
+            addView(text(L10n.text(R.string.menu_close_connection), 15f).apply { maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
+            setOnClickListener { dialog.dismiss(); executor.execute { try { Core.closeConnection(id) } catch (_: Exception) { } } }
+        }
+        actions += row().apply {
+            addView(text(L10n.text(R.string.menu_why), 15f).apply { maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(chevron())
+            setOnClickListener { dialog.dismiss(); whySheet(c) }
+        }
+        box.addView(group(actions, color = Color.rgb(31, 29, 26)))
+    }
+    /** Which rule sent the connection where it went: a short name for the path, and one sentence. */
+    private fun reason(c: JSONObject): Pair<String, String> {
+        val rule = c.optString("rule"); val proxy = c.optBoolean("proxy")
+        if (c.optBoolean("mine")) return L10n.text(R.string.why_mine) to L10n.text(R.string.why_mine_line, rule)
+        return when {
+            rule == "RULE-SET,ai" -> L10n.text(R.string.why_ai) to L10n.text(R.string.why_ai_line)
+            rule == "RULE-SET,cn_domain" || rule == "RULE-SET,cn_ip" -> L10n.text(R.string.why_cn) to L10n.text(R.string.why_cn_line)
+            rule == "RULE-SET,private_domain" || rule.startsWith("IP-CIDR,") -> L10n.text(R.string.why_local) to L10n.text(R.string.why_local_line)
+            rule == "MATCH" -> L10n.text(R.string.why_rest) to L10n.text(if (proxy) R.string.why_rest_proxy else R.string.why_rest_direct)
+            rule.startsWith("PROCESS-NAME,") -> L10n.text(R.string.why_app) to L10n.text(R.string.why_app_line)
+            else -> rule.ifEmpty { "—" } to ""
+        }
+    }
+    private fun pathChip(label: String, lit: Boolean = false, mono: Boolean = false) = text(label, 13f, if (lit) Palette.text else Palette.secondary).apply {
+        maxLines = 1; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.CENTER_VERTICAL; setPadding(12.dp, 0, 12.dp, 0)
+        if (mono) typeface = Typeface.MONOSPACE
+        background = rounded(if (lit) Palette.selected else Color.rgb(36, 34, 30), 9)
+    }
+    private fun whySheet(c: JSONObject) = bottomSheet { dialog, box ->
+        val host = c.optString("host"); val proxy = c.optBoolean("proxy"); val via = c.optString("via"); val exit = connectionExit(c)
+        val (chip, line) = reason(c)
+        box.addView(text(L10n.text(R.string.menu_why), 13f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) })
+        box.addView(text(host, 17f, Palette.text, 600).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.MIDDLE; setPadding(4.dp, 0, 4.dp, 0); accessibilityHeading() },
+            LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp; bottomMargin = 14.dp })
+        fun pathRow(views: List<View>) = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            views.forEachIndexed { i, v ->
+                if (i > 0) addView(text("→", 13f, Palette.faint), LinearLayout.LayoutParams(-2, -2).apply { marginStart = 6.dp; marginEnd = 6.dp })
+                addView(v, LinearLayout.LayoutParams(-2, 32.dp).apply { if (v.tag == "fill") { width = 0; weight = 1f } })
+            }
+        }
+        box.addView(pathRow(listOf(pathChip(chip, lit = true), pathChip(L10n.text(if (proxy) R.string.activity_proxy else R.string.activity_direct)))))
+        if (proxy) {
+            // The exit and the line on a second row, so long location names keep their room on a narrow phone.
+            val second = mutableListOf<View>(pathChip(exit).apply { tag = "fill" })
+            if (via.isNotEmpty() && via != exit) second += pathChip(via, mono = true)
+            box.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                addView(text("→", 13f, Palette.faint), LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 6.dp })
+                addView(pathRow(second), LinearLayout.LayoutParams(0, -2, 1f))
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 8.dp })
+        }
+        if (line.isNotEmpty()) box.addView(text(line, 14f, Palette.secondary).apply { setPadding(4.dp, 0, 4.dp, 0) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14.dp })
+        if (Advanced.enabled(this) && host.isNotEmpty()) {
+            box.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(text(L10n.text(if (proxy) R.string.why_make_direct else R.string.why_make_proxy), 15f, Palette.onAccent, 600).apply {
+                    gravity = Gravity.CENTER; maxLines = 1; background = pressable(Palette.accent, 12)
+                    setOnClickListener { dialog.dismiss(); addQuickRule(Advanced.site(host), true, if (proxy) "direct" else "proxy") }
+                }, LinearLayout.LayoutParams(0, 48.dp, 1f).apply { marginEnd = 10.dp })
+                addView(text(L10n.text(R.string.why_open_rules), 15f, Palette.text, 500).apply {
+                    gravity = Gravity.CENTER; maxLines = 1; background = pressable(Palette.raised, 12)
+                    setOnClickListener { dialog.dismiss(); page = "rules"; render() }
+                }, LinearLayout.LayoutParams(0, 48.dp, 1f))
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 18.dp })
+        }
+    }
+    /**
+     * Saves a quick rule and hands the rules to the running core, which applies them at once; the open connections
+     * to the name are closed so its next request takes the new route. A note with Undo follows.
+     */
+    private fun addQuickRule(name: String, site: Boolean, policy: String) {
+        val before = Advanced.setQuickRule(this, name, site, policy)
+        applyRules(name, site) { live ->
+            undoBar(L10n.text(if (live) R.string.rule_added else R.string.rule_added_later, name, L10n.text(when (policy) { "direct" -> R.string.policy_direct; "block" -> R.string.policy_block; else -> R.string.policy_proxy })), before)
+        }
+    }
+    /** true when the core took the rules (or nothing is connected); a core that refuses them leaves them for the next connection. */
+    private fun applyRules(name: String?, site: Boolean, done: (Boolean) -> Unit = {}) {
+        if (!(ConnectionStateStore.active && ConnectionStateStore.since > 0)) { done(true); return }
+        val lines = org.json.JSONArray(Advanced.rules(this)).toString()
+        executor.execute {
+            val live = try { Core.setRules(lines); if (name != null) Core.closeHost(name, site); true } catch (_: Exception) { false }
+            runOnUiThread { if (!isDestroyed) done(live) }
+        }
+    }
+    private var undoView: View? = null
+    private fun undoBar(message: String, before: String?) {
+        val host = findViewById<FrameLayout>(android.R.id.content)
+        undoView?.let { host.removeView(it) }
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(18.dp, 12.dp, 10.dp, 12.dp)
+            background = rounded(Color.rgb(44, 41, 37), 14); elevation = 6.dp.toFloat()
+            addView(text(message, 14f), LinearLayout.LayoutParams(0, -2, 1f))
+            if (before != null) addView(text(L10n.text(R.string.rule_undo), 14f, Palette.accent, 600).apply {
+                setPadding(12.dp, 8.dp, 12.dp, 8.dp); background = pressable(Color.TRANSPARENT, 10)
+                setOnClickListener { Advanced.saveRules(this@MainActivity, before); applyRules(null, false); undoBar(L10n.text(R.string.rule_undone), null) }
+            }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = 8.dp })
+        }
+        undoView = bar
+        host.addView(bar, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { leftMargin = 16.dp; rightMargin = 16.dp; bottomMargin = 96.dp })
+        bar.postDelayed({ if (undoView === bar) { host.removeView(bar); undoView = null } }, 6000)
     }
     private fun card() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL; setPadding(18.dp, 16.dp, 18.dp, 16.dp)
@@ -1608,8 +1782,10 @@ class MainActivity : Activity() {
             Advanced.saveRules(this, editor.text.toString())
             val changed = before != Advanced.rules(this)
             val live = changed && ConnectionStateStore.active && ConnectionStateStore.since > 0
-            Toast.makeText(this, L10n.text(if (live) R.string.rules_saved_reconnect else R.string.rules_saved), Toast.LENGTH_SHORT).show()
-            if (live) reconnect()
+            Toast.makeText(this, L10n.text(if (live) R.string.rules_saved_live else R.string.rules_saved), Toast.LENGTH_SHORT).show()
+            if (live) applyRules(null, false) { applied ->
+                if (!applied) { Toast.makeText(this, L10n.text(R.string.rules_saved_reconnect), Toast.LENGTH_SHORT).show(); reconnect() }
+            }
             page = "account"; render()
         }, height = 52.dp, top = 16)
     }

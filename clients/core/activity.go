@@ -160,6 +160,12 @@ func rule(info *statistic.TrackerInfo) string {
 		return "MATCH"
 	case "IPCIDR":
 		kind = "IP-CIDR"
+	case "Domain":
+		kind = "DOMAIN"
+	case "DomainSuffix":
+		kind = "DOMAIN-SUFFIX"
+	case "DomainKeyword":
+		kind = "DOMAIN-KEYWORD"
 	case "ProcessName":
 		kind = "PROCESS-NAME"
 	case "":
@@ -270,6 +276,7 @@ func top(table map[string]*amount, n int) []rankRow {
 }
 
 type connRow struct {
+	ID      string `json:"id"`
 	Host    string `json:"host"`
 	Process string `json:"process,omitempty"`
 	Rule    string `json:"rule"`
@@ -278,11 +285,12 @@ type connRow struct {
 	Rate    int64  `json:"rate"`
 	Bytes   int64  `json:"bytes"`
 	Start   int64  `json:"start"`
+	Mine    bool   `json:"mine,omitempty"` // matched one of the person's own rules
 }
 
 // Activity returns the activity as JSON:
 //
-//	{"conns":[{host,process,rule,proxy,via,rate,bytes,start}], "proxy":n, "direct":n,
+//	{"conns":[{id,host,process,rule,proxy,via,rate,bytes,start,mine}], "proxy":n, "direct":n,
 //	 "domains":[{name,bytes,proxy}], "rules":[…], "apps":[…], "hours":[[proxy,direct]×24], "dns":[{time,host,result,proxy}]}
 //
 // Bytes are counted since the core started (this connection); hours are the device's local hours.
@@ -291,13 +299,17 @@ func Activity() string {
 	a.Lock()
 	defer a.Unlock()
 	conns := []connRow{}
+	liveRun.Lock()
+	mine := liveRun.mine
+	liveRun.Unlock()
 	statistic.DefaultManager.Range(func(c statistic.Tracker) bool {
 		info := c.Info()
-		row := connRow{Host: host(info.Metadata), Process: info.Metadata.Process, Rule: rule(info), Proxy: !direct(info),
+		row := connRow{ID: c.ID(), Host: host(info.Metadata), Process: info.Metadata.Process, Rule: rule(info), Proxy: !direct(info),
 			Bytes: info.UploadTotal.Load() + info.DownloadTotal.Load(), Start: info.Start.UnixMilli()}
 		if len(info.Chain) > 0 {
 			row.Via = info.Chain[0]
 		}
+		row.Mine = mine[row.Rule]
 		if last, ok := a.conns[c.ID()]; ok {
 			row.Rate = last.rate
 		}
