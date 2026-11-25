@@ -447,6 +447,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="setting_off" xml:space="preserve"><value>Выкл.</value></data>
   <data name="setting_on" xml:space="preserve"><value>Вкл.</value></data>
   <data name="share_action" xml:space="preserve"><value>Поделиться</value></data>
+  <data name="shortcut_connect_location" xml:space="preserve"><value>Подключиться к локации</value></data>
+  <data name="shortcut_routing" xml:space="preserve"><value>Сменить режим маршрутизации</value></data>
+  <data name="shortcut_routing_type" xml:space="preserve"><value>Маршрутизация</value></data>
   <data name="shortcuts" xml:space="preserve"><value>Быстрые команды</value></data>
   <data name="shortcuts_detail" xml:space="preserve"><value>Подключить / Отключить</value></data>
   <data name="show_password" xml:space="preserve"><value>Показать пароль</value></data>
@@ -559,8 +562,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Windows: Ctrl + Alt + Пробел в любом окне открывает палитру команд в центре экрана. Введите город или код страны, чтобы подключиться, или смените режим, отключитесь, проверьте линию
-Windows: янтарная точка на значке в панели задач, пока есть подключение; в превью — кнопки подключения, автовыбора и проверки линии; правый клик — недавние места</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Android: два новых виджета для главного экрана: глобус 2×2 с городом выхода и статусом и полоска 4×1 для подключения и отключения одним касанием</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI-сервис</value></data>
