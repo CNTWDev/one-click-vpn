@@ -229,7 +229,7 @@ public static class TrailPoster {
         if(dialog.ShowDialog(owner)!=true) return false;
         try {
             var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(image));
-            using var file=File.Create(dialog.FileName);encoder.Save(file);
+            using var file=System.IO.File.Create(dialog.FileName);encoder.Save(file);
             return true;
         } catch {return false;}
     }
