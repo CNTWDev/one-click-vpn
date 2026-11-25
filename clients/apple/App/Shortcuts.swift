@@ -76,7 +76,7 @@ struct ConnectToLocationIntent:AppIntent {
         let id=location.id == LocationEntity.automaticId ? "":location.id
         let name=id.isEmpty ? "":location.name
         Journal.add("connect: location requested from Shortcuts")
-        if let model=ClientModel.live {
+        if let model=ClientModel.running {
             let move=model.connected && id != model.connectedNodeId
             model.selected=id;model.selectedName=name
             if move {try await model.reconnect()} else if !model.connected {try await model.toggle()}
@@ -107,7 +107,7 @@ struct SetRoutingIntent:AppIntent {
     static var openAppWhenRun=false
     @Parameter(title:LocalizedStringResource("shortcut_routing_type",table:"Native")) var routing:RoutingChoice
     @MainActor func perform() async throws -> some IntentResult {
-        if let model=ClientModel.live {
+        if let model=ClientModel.running {
             let changed=model.routing != routing.rawValue
             model.routing=routing.rawValue
             if changed && model.connected && model.since != nil {try await model.reconnect()}

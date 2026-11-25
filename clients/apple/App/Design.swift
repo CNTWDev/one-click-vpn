@@ -358,6 +358,16 @@ struct PrimaryButton:ButtonStyle {
     }
 }
 
+/// The second button beside a PrimaryButton: filled with the raised surface, no outline.
+struct QuietButton:ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration:Configuration)->some View {
+        configuration.label.font(.system(size:VeilbirdStyle.mac ? 14:17,weight:.semibold)).frame(maxWidth:.infinity).frame(height:VeilbirdStyle.mac ? 40:52)
+            .foregroundStyle(VeilbirdStyle.text).background(VeilbirdStyle.raised.opacity(configuration.isPressed ? 0.7:1),in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+            .opacity(enabled ? 1:0.45)
+    }
+}
+
 extension View {
     func veilbirdField()->some View {
         self.textFieldStyle(.plain).font(.system(size:VeilbirdStyle.mac ? 14:17)).foregroundStyle(VeilbirdStyle.text)

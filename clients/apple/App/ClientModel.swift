@@ -105,12 +105,12 @@ import ServiceManagement
     private var ticker:AnyCancellable?
     // Status is polled here, not in the window: on the Mac the menu bar keeps working after the window is closed.
     /// The running app's model, so Shortcuts and Spotlight act through it (nil before the app made one).
-    static weak var live:ClientModel?
+    static weak var running:ClientModel?
     init() {
         _ = Guidance.networkState() // starts the path monitor, so a failure finds its first reading
         Latency.realTests=true // the app measures nodes through their transports (Latency.swift)
         restoreNodes()
-        Self.live=self
+        Self.running=self
         #if os(iOS)
         let active=UIApplication.willEnterForegroundNotification
         #else
@@ -120,7 +120,10 @@ import ServiceManagement
             guard let self,Date().timeIntervalSince(self.nodesLoadedAt)>Self.resumeAfter else {return}
             await self.refreshNodes()
         }}
-        CrashReports.shared.start();ticker=Timer.publish(every:1,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in self?.refreshStatus()}}
+        CrashReports.shared.start();ticker=Timer.publish(every:1,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in
+            guard let self else {return}
+            self.refreshStatus();HiddenTime.tick(self.ringState == .connected)
+        }}
         // The apps stay open for days (menu bar, background): check again once six hours have passed.
         updateTicker=Timer.publish(every:900,on:.main,in:.common).autoconnect().sink {[weak self] _ in Task {@MainActor in await self?.checkIfDue();await self?.refreshAccountIfDue()}}
     }

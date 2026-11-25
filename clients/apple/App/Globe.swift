@@ -101,7 +101,7 @@ enum Earth {
 /// The globe's still part (the dot lattice of the earth), drawn once per size and view. One cache for the whole app:
 /// a page that opens again (switching tabs rebuilds it) or the menu bar's globe finds its image already drawn
 /// instead of laying out some 3 000 dots in the first frame of its entrance.
-private final class SphereCache {
+final class SphereCache {
     static let shared=SphereCache()
     /// The few latest images, newest last (the window's globe, the menu bar's, one while turning).
     private var images:[(key:String,image:CGImage)]=[]
