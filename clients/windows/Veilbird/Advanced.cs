@@ -9,7 +9,8 @@ namespace Veilbird;
 public static class Advanced {
     /// The protocols a location can be locked to; "reality" covers REALITY on 443 and on the spare port.
     public static readonly string[] Protocols={"hysteria2","reality","xhttp","wireguard"};
-    public static bool Enabled {get=>Settings.Get("advanced","off")=="on";set=>Settings.Set("advanced",value?"on":"off");}
+    /// <summary>Always on since 1.0.35 (there is no switch any more): the features stay out of the way until used.</summary>
+    public static bool Enabled=>true;
     private static HashSet<string> AllFavorites=>Settings.Get("advancedFavorites","").Split('\n',StringSplitOptions.RemoveEmptyEntries).ToHashSet();
     public static HashSet<string> Favorites=>Enabled?AllFavorites:new();
     public static void Favorite(string id,bool on) {

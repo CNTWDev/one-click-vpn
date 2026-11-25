@@ -7,9 +7,11 @@ enum Advanced {
     /// The protocols a location can be locked to; "reality" covers REALITY on 443 and on the spare port.
     static let protocols=["hysteria2","reality","xhttp","wireguard"]
     private static var defaults:UserDefaults {.standard}
+    /// Always on since 1.0.35 (there is no switch any more): favorites, protocol lock and routing rules stay
+    /// out of the way until someone uses them.
     static var enabled:Bool {
-        get {defaults.bool(forKey:"advanced")}
-        set {defaults.set(newValue,forKey:"advanced")}
+        get {true}
+        set {}
     }
     static var favorites:Set<String> {enabled ? Set(defaults.stringArray(forKey:"advancedFavorites") ?? []):[]}
     static func favorite(_ id:String,_ on:Bool) {

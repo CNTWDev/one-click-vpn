@@ -12266,19 +12266,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Right-click (long press on the phone) in Activity offers Always encrypt / Always direct / Block right away, without turning on Advanced first\nOn the computer, the tabs at the top of Activity no longer shrink to an ellipsis"
+            "value": "The Activity list holds its order while the pointer is on it, so a click or right-click lands on the right row\nClick a connection and the panel below has every action: always encrypt / always direct / block (whole site or just that name), copy the domain, close the connection, open routing rules\nNo more Advanced switch: favorites, protocol lock and routing rules are always available"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "「活动」里右键（手机上长按）随时都能设「总是走加密 / 总是直连 / 屏蔽」，不用先去打开高级功能\n电脑上「活动」顶部的标签不再被挤成省略号"
+            "value": "「活动」列表在鼠标停在上面时不再重新排序，右键和点击不会点错行\n点一下连接，下方面板里就有全部操作：总是走加密 / 总是直连 / 屏蔽（可选整个网站或只这个域名）、复制域名、断开连接、去分流规则\n去掉「高级功能」开关：收藏、协议锁定和分流规则默认都可以用"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Правый щелчок (на телефоне — долгое нажатие) в «Активности» сразу предлагает «Всегда через шифрование / Всегда напрямую / Блокировать», без включения расширенных функций\nНа компьютере вкладки вверху «Активности» больше не сжимаются в многоточие"
+            "value": "Список «Активности» не меняет порядок, пока над ним указатель, поэтому щелчок попадает в нужную строку\nЩёлкните соединение — в панели ниже все действия: всегда через шифрование / всегда напрямую / блокировать (весь сайт или только этот домен), копировать домен, закрыть соединение, открыть правила\nПереключателя «Расширенные функции» больше нет: избранное, фиксация протокола и правила маршрутизации доступны всегда"
           }
         }
       }

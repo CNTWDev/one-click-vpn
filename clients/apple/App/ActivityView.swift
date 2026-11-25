@@ -14,6 +14,11 @@ struct ActivityView:View {
     /// The last quick rule: what it says and the rules text before it (undo).
     @State private var toast:(text:String,before:String?)?
     @State private var toastTask:Task<Void,Never>?
+    /// A rule from the panel covers the whole site (true) or only this name.
+    @State private var wholeSite=true
+    /// The list as it was when the pointer came onto it (Mac): rows keep their places, so a click or right
+    /// click lands on the row that was under the pointer. Their figures still update.
+    @State private var held:[[String:Any]]?
     private let mac=VeilbirdStyle.mac
     private static let direct=Color(red:97/255,green:90/255,blue:80/255)
     private static let row=Color(red:26/255,green:24/255,blue:22/255)
@@ -114,6 +119,14 @@ struct ActivityView:View {
                 && (q.isEmpty || [c["host"] as? String ?? "",c["rule"] as? String ?? "",exit(c)].contains {$0.localizedCaseInsensitiveContains(q)})
         }.prefix(100).map {$0}
     }
+    /// The rows shown: as they come, or in the held order while the pointer is on the list (rows that ended keep
+    /// their last figures until it leaves).
+    private var listed:[[String:Any]] {
+        guard let held else {return shown}
+        var now:[String:[String:Any]]=[:]
+        for c in conns {if let id=c["id"] as? String {now[id]=c}}
+        return held.map {now[$0["id"] as? String ?? ""] ?? $0}
+    }
     private var chips:some View {
         let proxied=conns.filter {flag($0["proxy"])}.count
         return HStack(spacing:mac ? 6:8) {
@@ -161,17 +174,22 @@ struct ActivityView:View {
             }
             ScrollView {
                 LazyVStack(spacing:0) {
-                    ForEach(Array(shown.enumerated()),id:\.offset) {_,c in connectionRow(c)}
+                    ForEach(Array(listed.enumerated()),id:\.offset) {_,c in connectionRow(c)}
                     if shown.isEmpty {Text(L10n.text("activity_nothing")).font(.system(size:13)).foregroundStyle(VeilbirdStyle.secondary).frame(maxWidth:.infinity,alignment:.leading).padding(.top,16)}
                 }
             }
+            .onHover {inside in held=inside && mac ? shown:nil}
             // The row as it is now (the list changes every second), or as last seen once it closed.
-            if let why {whyPanel(conns.first {($0["id"] as? String)==(why["id"] as? String)} ?? why)}
+            if let why {panel(conns.first {($0["id"] as? String)==(why["id"] as? String)} ?? why)}
         }
     }
     private func connectionRow(_ c:[String:Any])->some View {
         rowBody(c).contentShape(Rectangle())
-            .onTapGesture {why=(why?["id"] as? String)==(c["id"] as? String) ? nil:c}
+            .onTapGesture {
+                let same=(why?["id"] as? String)==(c["id"] as? String)
+                if !same {wholeSite=true}
+                why=same ? nil:c
+            }
             .contextMenu {menu(c)}
     }
     @ViewBuilder private func rowBody(_ c:[String:Any])->some View {
@@ -213,7 +231,7 @@ struct ActivityView:View {
         }
         Button(L10n.text("menu_copy_domain")) {copy(host)}.disabled(host.isEmpty)
         if !id.isEmpty {Button(L10n.text("menu_close_connection")) {Task {await model.closeConnection(id)}}}
-        Button(L10n.text("menu_why")) {why=c}
+        Button(L10n.text("menu_why")) {wholeSite=true;why=c}
     }
     /// One rule choice: for a host under a site, a submenu picks the whole site or only this name.
     @ViewBuilder private func ruleItem(_ key:String,_ policy:String,_ host:String)->some View {
@@ -228,8 +246,6 @@ struct ActivityView:View {
         }
     }
     private func addRule(_ name:String,site whole:Bool,_ policy:String) {
-        // A rule from here turns on the person's routing rules (part of advanced) if they were off.
-        if !Advanced.enabled {Advanced.enabled=true}
         let before=Advanced.setQuickRule(name,site:whole,policy:policy)
         Task {
             let live=await model.applyRules(closing:name,site:whole)
@@ -289,9 +305,11 @@ struct ActivityView:View {
             .padding(.horizontal,10).frame(height:26)
             .background(lit ? VeilbirdStyle.selected:Color(red:32/255,green:30/255,blue:27/255),in:RoundedRectangle(cornerRadius:7))
     }
-    private func whyPanel(_ c:[String:Any])->some View {
-        let host=c["host"] as? String ?? "",proxy=flag(c["proxy"]),via=c["via"] as? String ?? ""
+    /// The connection panel (one click on a row): why it went this way, and everything the menu offers.
+    private func panel(_ c:[String:Any])->some View {
+        let host=c["host"] as? String ?? "",id=c["id"] as? String ?? "",proxy=flag(c["proxy"]),via=c["via"] as? String ?? ""
         let (chip,line)=reason(c)
+        let site=Advanced.site(host),whole=wholeSite || site==host
         let arrow=Text("→").font(.system(size:12)).foregroundStyle(VeilbirdStyle.faint)
         let steps=Group {
             pathChip(chip,lit:true)
@@ -305,12 +323,12 @@ struct ActivityView:View {
         }
         return VStack(alignment:.leading,spacing:10) {
             HStack(spacing:8) {
-                Text(L10n.text("menu_why")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary)
+                Text(host).font(.system(size:14,weight:.semibold)).lineLimit(1).truncationMode(.middle)
                 Spacer(minLength:8)
                 Button {why=nil} label:{Image(systemName:"xmark").font(.system(size:11,weight:.semibold)).foregroundStyle(VeilbirdStyle.secondary).frame(width:24,height:24).contentShape(Rectangle())}
                     .buttonStyle(.plain).accessibilityLabel(L10n.text("close"))
             }
-            Text(host).font(.system(size:14,weight:.semibold)).lineLimit(1).truncationMode(.middle)
+            Text(L10n.text("menu_why")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary)
             ViewThatFits(in:.horizontal) {
                 HStack(spacing:6) {steps}
                 VStack(alignment:.leading,spacing:6) {HStack(spacing:6) {pathChip(chip,lit:true);arrow;pathChip(L10n.text(proxy ? "activity_proxy":"activity_direct"))}
@@ -318,19 +336,47 @@ struct ActivityView:View {
             }
             if !line.isEmpty {Text(line).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).fixedSize(horizontal:false,vertical:true)}
             if !host.isEmpty {
-                HStack(spacing:8) {
-                    Button {addRule(Advanced.site(host),site:true,proxy ? "direct":"proxy")} label:{
-                        Text(L10n.text(proxy ? "why_make_direct":"why_make_proxy")).font(.system(size:12,weight:.semibold)).foregroundStyle(VeilbirdStyle.onAccent)
-                            .padding(.horizontal,12).frame(height:28).background(VeilbirdStyle.accent,in:RoundedRectangle(cornerRadius:7))
-                    }.buttonStyle(.plain)
-                    Button {model.rulesShown+=1} label:{
-                        Text(L10n.text("why_open_rules")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.text)
-                            .padding(.horizontal,12).frame(height:28).background(VeilbirdStyle.selected,in:RoundedRectangle(cornerRadius:7))
-                    }.buttonStyle(.plain)
+                if site != host {
+                    HStack(spacing:2) {
+                        scopeButton(L10n.text("menu_whole_site",site),on:whole) {wholeSite=true}
+                        scopeButton(L10n.text("menu_only_domain",host),on:!whole) {wholeSite=false}
+                    }.padding(2).background(Color(red:32/255,green:30/255,blue:27/255),in:RoundedRectangle(cornerRadius:8)).padding(.top,4)
                 }
+                HStack(spacing:6) {
+                    policyButton("menu_always_proxy","proxy",whole ? site:host,whole)
+                    policyButton("menu_always_direct","direct",whole ? site:host,whole)
+                    policyButton("menu_block","block",whole ? site:host,whole)
+                }.padding(.top,site != host ? 0:4)
             }
+            HStack(spacing:16) {
+                if !host.isEmpty {textButton("menu_copy_domain") {copy(host)}}
+                if !id.isEmpty {textButton("menu_close_connection") {Task {await model.closeConnection(id)}}}
+                Spacer(minLength:8)
+                textButton("why_open_rules") {model.rulesShown+=1}
+            }.padding(.top,2)
         }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
         .background(Self.card,in:RoundedRectangle(cornerRadius:VeilbirdStyle.radius))
+    }
+    private func scopeButton(_ title:String,on:Bool,_ action:@escaping ()->Void)->some View {
+        Button(action:action) {
+            Text(title).font(.system(size:12)).lineLimit(1).truncationMode(.middle)
+                .foregroundStyle(on ? VeilbirdStyle.text:VeilbirdStyle.secondary)
+                .padding(.horizontal,10).frame(maxWidth:.infinity).frame(height:26)
+                .background(on ? VeilbirdStyle.selected:Color.clear,in:RoundedRectangle(cornerRadius:6))
+                .contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected:[])
+    }
+    private func policyButton(_ key:String,_ policy:String,_ name:String,_ whole:Bool)->some View {
+        Button {addRule(name,site:whole,policy)} label:{
+            Text(L10n.text(key)).font(.system(size:12,weight:.medium)).lineLimit(1).minimumScaleFactor(0.85)
+                .foregroundStyle(policy=="block" ? VeilbirdStyle.danger:VeilbirdStyle.text)
+                .padding(.horizontal,10).frame(maxWidth:.infinity).frame(height:mac ? 30:36)
+                .background(VeilbirdStyle.selected,in:RoundedRectangle(cornerRadius:7))
+                .contentShape(Rectangle())
+        }.buttonStyle(.plain)
+    }
+    private func textButton(_ key:String,_ action:@escaping ()->Void)->some View {
+        Button(action:action) {Text(L10n.text(key)).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)}.buttonStyle(.plain)
     }
 
     // MARK: Ranking

@@ -541,8 +541,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Правый щелчок (на телефоне — долгое нажатие) в «Активности» сразу предлагает «Всегда через шифрование / Всегда напрямую / Блокировать», без включения расширенных функций
-На компьютере вкладки вверху «Активности» больше не сжимаются в многоточие</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Список «Активности» не меняет порядок, пока над ним указатель, поэтому щелчок попадает в нужную строку
+Щёлкните соединение — в панели ниже все действия: всегда через шифрование / всегда напрямую / блокировать (весь сайт или только этот домен), копировать домен, закрыть соединение, открыть правила
+Переключателя «Расширенные функции» больше нет: избранное, фиксация протокола и правила маршрутизации доступны всегда</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI-сервис</value></data>

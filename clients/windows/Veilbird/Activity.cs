@@ -33,6 +33,11 @@ public sealed class ActivityPanel:Border {
     /// The connection whose route the "why" panel explains (its id, and the row as last seen).
     private string whyId="";
     private JsonNode? whyRow;
+    /// A rule from the panel covers the whole site (true) or only this name.
+    private bool wholeSite=true;
+    /// The list as it was when the pointer came onto it: rows keep their places, so a click or right click lands
+    /// on the row that was under the pointer. Their figures still update.
+    private List<JsonNode>? held;
     /// The list is not rebuilt while a row's menu is open (the menu would close with its row).
     private bool menuOpen;
     private readonly Border toast=new() {Background=Look.Hex("#2C2925"),CornerRadius=new CornerRadius(8),Padding=new Thickness(16,10,16,10),
@@ -145,6 +150,13 @@ public sealed class ActivityPanel:Border {
         }
         var shown=conns.Where(c=>c is not null).Select(c=>c!).Where(c=>filter=="all"||Flag(c["proxy"])==(filter=="proxy"))
             .Where(c=>query.Length==0||new[]{Str(c["host"]),Str(c["rule"]),Str(c["process"]),Exit(c)}.Any(v=>v.Contains(query,StringComparison.OrdinalIgnoreCase))).Take(100).ToList();
+        if(!body.IsMouseOver) held=null;
+        else if(held is null) held=shown;
+        else {
+            var now=new Dictionary<string,JsonNode>();
+            foreach(var c in conns) if(c is not null&&Str(c["id"]) is {Length:>0} id) now[id]=c;
+            shown=held.Select(h=>now.TryGetValue(Str(h["id"]),out var n)?n:h).ToList();
+        }
         GridLength[] columns={Px(14),Star(1.5),Px(104),Star(1),Px(76),Px(76)};
         var header=Table(columns);
         var labels=new[]{"","activity_domain","activity_app","activity_rule","activity_out","activity_down"};
@@ -160,7 +172,7 @@ public sealed class ActivityPanel:Border {
             Put(row,Text(Rate(rate),12,rate>0?Look.Text:Dim,mono:true,align:TextAlignment.Right),5);
             var line=Line_(row,36,Row);line.Background=Str(c["id"])==whyId&&whyId.Length>0?Look.Surface:Brushes.Transparent;
             var item=c;
-            line.MouseLeftButtonUp+=(_,_)=>{var id=Str(item["id"]);whyId=whyId==id?"":id;whyRow=whyId.Length>0?item:null;Fill();};
+            line.MouseLeftButtonUp+=(_,_)=>{var id=Str(item["id"]);if(whyId!=id) wholeSite=true;whyId=whyId==id?"":id;whyRow=whyId.Length>0?item:null;Fill();};
             line.ContextMenu=RowMenu(item);
             list.Children.Add(line);
         }
@@ -202,13 +214,11 @@ public sealed class ActivityPanel:Border {
         var copy=Item(L10n.Text("menu_copy_domain"),()=>{try {Clipboard.SetText(host);Show(L10n.Text("menu_copied"),null);} catch {/* clipboard busy */}});
         copy.IsEnabled=host.Length>0;menu.Items.Add(copy);
         if(id.Length>0&&CloseConnection is not null) menu.Items.Add(Item(L10n.Text("menu_close_connection"),()=>CloseConnection(id)));
-        menu.Items.Add(Item(L10n.Text("menu_why"),()=>{whyId=id;whyRow=c;}));
+        menu.Items.Add(Item(L10n.Text("menu_why"),()=>{whyId=id;whyRow=c;wholeSite=true;}));
         return menu;
     }
     private async void Rule(string name,bool site,string policy) {
         if(AddRule is null) return;
-        // A rule from here turns on the person's routing rules (part of advanced) if they were off.
-        if(!Advanced.Enabled) Advanced.Enabled=true;
         var before=Advanced.SetQuickRule(name,site,policy);
         var live=await AddRule(name,site,policy);
         Show(L10n.Text(live?"rule_added":"rule_added_later",name,L10n.Text(policy switch {"direct"=>"policy_direct","block"=>"policy_block",_=>"policy_proxy"})),before);
@@ -262,16 +272,44 @@ public sealed class ActivityPanel:Border {
         }
         stack.Children.Add(path);
         if(sentence.Length>0) stack.Children.Add(new TextBlock {Text=sentence,FontSize=12,Foreground=Look.Secondary,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,4,0,0)});
+        // Everything the menu offers: the rule (whole site or only this name), copy, close, the rules page.
         if(host.Length>0&&AddRule is not null) {
-            var actions=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,12,0,0)};
-            var change=new Button {Content=new TextBlock {Text=L10n.Text(proxy?"why_make_direct":"why_make_proxy"),FontSize=12,FontWeight=FontWeights.SemiBold,Foreground=Look.OnAccent},
-                Background=Look.Accent,Height=28,Padding=new Thickness(12,0,12,0),Margin=new Thickness(0,0,8,0)};
-            change.Click+=(_,_)=>Rule(Advanced.Site(host),true,proxy?"direct":"proxy");
-            var rules=new Button {Content=new TextBlock {Text=L10n.Text("why_open_rules"),FontSize=12},Background=Look.Selected,Height=28,Padding=new Thickness(12,0,12,0)};
-            rules.Click+=(_,_)=>OpenRules?.Invoke();
-            actions.Children.Add(change);actions.Children.Add(rules);
-            stack.Children.Add(actions);
+            var site=Advanced.Site(host);var whole=wholeSite||site==host;
+            if(site!=host) {
+                var scope=new Grid {Margin=new Thickness(0,12,0,0)};
+                scope.ColumnDefinitions.Add(new ColumnDefinition {Width=Star(1)});scope.ColumnDefinitions.Add(new ColumnDefinition {Width=Star(1)});
+                foreach(var (index,label,on) in new[]{(0,L10n.Text("menu_whole_site",site),whole),(1,L10n.Text("menu_only_domain",host),!whole)}) {
+                    var pick=new Button {Content=Text(label,12,on?Look.Text:Look.Secondary),Height=26,Padding=new Thickness(10,0,10,0),Background=on?Look.Selected:Brushes.Transparent,
+                        HorizontalContentAlignment=HorizontalAlignment.Center,Margin=new Thickness(index==0?0:2,0,0,0)};
+                    AutomationProperties.SetName(pick,label+(on?L10n.Text("current_page"):""));
+                    pick.Click+=(_,_)=>{wholeSite=index==0;Fill();};
+                    Grid.SetColumn(pick,index);scope.Children.Add(pick);
+                }
+                stack.Children.Add(new Border {Background=Look.Hex("#201E1B"),CornerRadius=new CornerRadius(8),Padding=new Thickness(2),Child=scope,Margin=new Thickness(0,12,0,0)});
+            }
+            var policies=new Grid {Margin=new Thickness(0,8,0,0)};
+            var target=whole?site:host;
+            var i=0;
+            foreach(var (key,policy) in new[]{("menu_always_proxy","proxy"),("menu_always_direct","direct"),("menu_block","block")}) {
+                policies.ColumnDefinitions.Add(new ColumnDefinition {Width=Star(1)});
+                var button=new Button {Content=Text(L10n.Text(key),12,policy=="block"?Look.Danger:Look.Text),Height=30,Padding=new Thickness(8,0,8,0),Background=Look.Selected,
+                    HorizontalContentAlignment=HorizontalAlignment.Center,Margin=new Thickness(i==0?0:6,0,0,0)};
+                button.Click+=(_,_)=>Rule(target,whole,policy);
+                Grid.SetColumn(button,i++);policies.Children.Add(button);
+            }
+            stack.Children.Add(policies);
         }
+        var links=new DockPanel {Margin=new Thickness(0,10,0,0),LastChildFill=false};
+        Button Link(string key,Action click) {
+            var link=new Button {Content=Text(L10n.Text(key),12,Look.Secondary),Height=26,Padding=new Thickness(6,0,6,0),Margin=new Thickness(0,0,8,0)};
+            link.Click+=(_,_)=>click();
+            return link;
+        }
+        if(host.Length>0) links.Children.Add(Link("menu_copy_domain",()=>{try {Clipboard.SetText(host);Show(L10n.Text("menu_copied"),null);} catch {/* clipboard busy */}}));
+        var id=Str(c["id"]);
+        if(id.Length>0&&CloseConnection is not null) links.Children.Add(Link("menu_close_connection",()=>CloseConnection(id)));
+        if(OpenRules is not null) {var rules=Link("why_open_rules",()=>OpenRules());DockPanel.SetDock(rules,Dock.Right);rules.Margin=new Thickness(0);links.Children.Add(rules);}
+        stack.Children.Add(links);
         return new Border {Background=Card,CornerRadius=new CornerRadius(10),Padding=new Thickness(16,12,12,14),Margin=new Thickness(0,10,0,0),Child=stack};
     }
 

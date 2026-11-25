@@ -534,7 +534,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">「活动」里右键（手机上长按）随时都能设「总是走加密 / 总是直连 / 屏蔽」，不用先去打开高级功能\n电脑上「活动」顶部的标签不再被挤成省略号</string>
+  <string name="whats_new_notes">「活动」列表在鼠标停在上面时不再重新排序，右键和点击不会点错行\n点一下连接，下方面板里就有全部操作：总是走加密 / 总是直连 / 屏蔽（可选整个网站或只这个域名）、复制域名、断开连接、去分流规则\n去掉「高级功能」开关：收藏、协议锁定和分流规则默认都可以用</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="why_ai">AI 服务</string>
