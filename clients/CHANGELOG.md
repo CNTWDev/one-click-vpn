@@ -4,6 +4,17 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.41
+
+### zh
+- Mac：连接时从刘海里长出一条小胶囊，连上那一刻展开显示“已抵达”和城市，之后缩在刘海两侧（琥珀点 + 国家代码），鼠标移上去可再展开；自动换出口时也在这里提示。没有刘海的 Mac 从屏幕顶部正中出现，可在「我的」里关闭
+
+### en
+- Mac: while connecting, a small capsule grows out of the notch; when you land it opens to show "Arrived" and the city, then settles beside the notch (amber dot + country code) and opens again on hover. Automatic exit changes show there too. Macs without a notch get it at the top centre of the screen; it can be turned off in Me
+
+### ru
+- Mac: при подключении из «чёлки» вырастает капсула; в момент подключения она раскрывается со словом «Прибыли» и городом, затем остаётся по бокам «чёлки» (янтарная точка и код страны) и раскрывается при наведении. Там же видна автосмена выхода. На Mac без «чёлки» — вверху по центру экрана; отключается в разделе «Я»
+
 ## 1.0.40
 
 ### zh

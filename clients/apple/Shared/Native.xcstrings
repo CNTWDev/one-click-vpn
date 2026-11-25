@@ -6717,6 +6717,75 @@
         }
       }
     },
+    "notch_arrived": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrived"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已抵达"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прибыли"
+          }
+        }
+      }
+    },
+    "notch_hud": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show connection at top of screen"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在屏幕顶部显示连接"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Подключение вверху экрана"
+          }
+        }
+      }
+    },
+    "notch_switched": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exit changed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已换出口"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выход сменён"
+          }
+        }
+      }
+    },
     "off_state": {
       "extractionState": "manual",
       "localizations": {
@@ -12381,19 +12450,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Android: the phone taps twice softly the moment you connect, and once when it can't; picking a location, connecting, or switching Smart/Global gives a light tick (follows the system touch-feedback setting)\nAndroid 16: once connected, a chip with your exit sits in the status bar, and the notification shows a route from you to the exit\nThe Quick Settings tile shows your current exit, and a long press opens Locations; new Smart routing tile"
+            "value": "Mac: while connecting, a small capsule grows out of the notch; when you land it opens to show \"Arrived\" and the city, then settles beside the notch (amber dot + country code) and opens again on hover. Automatic exit changes show there too. Macs without a notch get it at the top centre of the screen; it can be turned off in Me"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "安卓：连上的那一刻手机会轻轻震两下，没连上时震一下；点连接、选地区、切智能/全局时有轻微触感（跟随系统触感开关）\n安卓 16：连上后状态栏出现出口胶囊，通知里是一条从你到出口的航线\n快速设置磁贴显示当前出口，长按直接打开地区列表；新增「智能分流」磁贴"
+            "value": "Mac：连接时从刘海里长出一条小胶囊，连上那一刻展开显示“已抵达”和城市，之后缩在刘海两侧（琥珀点 + 国家代码），鼠标移上去可再展开；自动换出口时也在这里提示。没有刘海的 Mac 从屏幕顶部正中出现，可在「我的」里关闭"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Android: в момент подключения телефон дважды мягко вибрирует, при неудаче — один раз; выбор локации, подключение и смена «умный / глобальный» дают лёгкий отклик (по системной настройке)\nAndroid 16: после подключения в строке состояния появляется чип с выходом, а в уведомлении — маршрут от вас до выхода\nПлитка быстрых настроек показывает текущий выход, долгое нажатие открывает локации; новая плитка «Умный режим»"
+            "value": "Mac: при подключении из «чёлки» вырастает капсула; в момент подключения она раскрывается со словом «Прибыли» и городом, затем остаётся по бокам «чёлки» (янтарная точка и код страны) и раскрывается при наведении. Там же видна автосмена выхода. На Mac без «чёлки» — вверху по центру экрана; отключается в разделе «Я»"
           }
         }
       }

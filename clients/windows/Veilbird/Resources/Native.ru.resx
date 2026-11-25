@@ -299,6 +299,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="node_menu_hint" xml:space="preserve"><value>Щёлкните локацию правой кнопкой, чтобы добавить в избранное или выбрать протокол</value></data>
   <data name="node_quality_detail" xml:space="preserve"><value>Джиттер {0} мс · Потери {1}%</value></data>
   <data name="not_connected" xml:space="preserve"><value>Не подключено</value></data>
+  <data name="notch_arrived" xml:space="preserve"><value>Прибыли</value></data>
+  <data name="notch_hud" xml:space="preserve"><value>Подключение вверху экрана</value></data>
+  <data name="notch_switched" xml:space="preserve"><value>Выход сменён</value></data>
   <data name="off_state" xml:space="preserve"><value>Выкл.</value></data>
   <data name="offline_centre" xml:space="preserve"><value>Офлайн</value></data>
   <data name="on_state" xml:space="preserve"><value>Вкл.</value></data>
@@ -546,9 +549,7 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Android: в момент подключения телефон дважды мягко вибрирует, при неудаче — один раз; выбор локации, подключение и смена «умный / глобальный» дают лёгкий отклик (по системной настройке)
-Android 16: после подключения в строке состояния появляется чип с выходом, а в уведомлении — маршрут от вас до выхода
-Плитка быстрых настроек показывает текущий выход, долгое нажатие открывает локации; новая плитка «Умный режим»</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Mac: при подключении из «чёлки» вырастает капсула; в момент подключения она раскрывается со словом «Прибыли» и городом, затем остаётся по бокам «чёлки» (янтарная точка и код страны) и раскрывается при наведении. Там же видна автосмена выхода. На Mac без «чёлки» — вверху по центру экрана; отключается в разделе «Я»</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI-сервис</value></data>

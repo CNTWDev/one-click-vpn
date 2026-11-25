@@ -293,6 +293,9 @@
   <string name="node_menu_hint">Right-click a location to favorite it or lock its protocol</string>
   <string name="node_quality_detail">Jitter %1$s ms · Loss %2$s%%</string>
   <string name="not_connected">Not connected</string>
+  <string name="notch_arrived">Arrived</string>
+  <string name="notch_hud">Show connection at top of screen</string>
+  <string name="notch_switched">Exit changed</string>
   <string name="off_state">Off</string>
   <string name="offline_centre">Offline</string>
   <string name="on_state">On</string>
@@ -539,7 +542,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Android: the phone taps twice softly the moment you connect, and once when it can\'t; picking a location, connecting, or switching Smart/Global gives a light tick (follows the system touch-feedback setting)\nAndroid 16: once connected, a chip with your exit sits in the status bar, and the notification shows a route from you to the exit\nThe Quick Settings tile shows your current exit, and a long press opens Locations; new Smart routing tile</string>
+  <string name="whats_new_notes">Mac: while connecting, a small capsule grows out of the notch; when you land it opens to show \&quot;Arrived\&quot; and the city, then settles beside the notch (amber dot + country code) and opens again on hover. Automatic exit changes show there too. Macs without a notch get it at the top centre of the screen; it can be turned off in Me</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="why_ai">AI service</string>
