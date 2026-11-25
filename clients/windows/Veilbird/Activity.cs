@@ -157,17 +157,22 @@ public sealed class ActivityPanel:Border {
             foreach(var c in conns) if(c is not null&&Str(c["id"]) is {Length:>0} id) now[id]=c;
             shown=held.Select(h=>now.TryGetValue(Str(h["id"]),out var n)?n:h).ToList();
         }
-        GridLength[] columns={Px(14),Star(1.5),Px(104),Star(1),Px(76),Px(76)};
+        // The details take a column at the right; the list narrows (app and rule go to the details).
+        if(whyId.Length>0) whyRow=conns.FirstOrDefault(c=>c is not null&&Str(c["id"])==whyId)??whyRow;
+        var narrow=whyId.Length>0&&whyRow is not null;
+        GridLength[] columns=narrow?new[]{Px(14),Star(1),Px(0),Px(0),Px(76),Px(76)}:new[]{Px(14),Star(1.5),Px(104),Star(1),Px(76),Px(76)};
         var header=Table(columns);
         var labels=new[]{"","activity_domain","activity_app","activity_rule","activity_out","activity_down"};
-        for(var i=1;i<labels.Length;i++) Put(header,Text(L10n.Text(labels[i]),11,Look.Faint,align:i==5?TextAlignment.Right:TextAlignment.Left),i,i==1?0:12);
+        for(var i=1;i<labels.Length;i++) if(!narrow||i is not (2 or 3)) Put(header,Text(L10n.Text(labels[i]),11,Look.Faint,align:i==5?TextAlignment.Right:TextAlignment.Left),i,i==1?0:12);
         var list=new StackPanel();
         foreach(var c in shown) {
             var row=Table(columns);var proxy=Flag(c["proxy"]);var rate=Num(c["rate"]);
             Put(row,Dot(proxy),0);
             Put(row,Text(Str(c["host"])),1,0);
-            Put(row,Text(Str(c["process"]),12,Look.Secondary,mono:true),2);
-            Put(row,Text(Str(c["rule"]),12,Look.Secondary,mono:true),3);
+            if(!narrow) {
+                Put(row,Text(Str(c["process"]),12,Look.Secondary,mono:true),2);
+                Put(row,Text(Str(c["rule"]),12,Look.Secondary,mono:true),3);
+            }
             Put(row,Text(Exit(c),13,proxy?Look.Text:Look.Secondary),4);
             Put(row,Text(Rate(rate),12,rate>0?Look.Text:Dim,mono:true,align:TextAlignment.Right),5);
             var line=Line_(row,36,Row);line.Background=Str(c["id"])==whyId&&whyId.Length>0?Look.Surface:Brushes.Transparent;
@@ -177,14 +182,14 @@ public sealed class ActivityPanel:Border {
             list.Children.Add(line);
         }
         if(shown.Count==0) list.Children.Add(new TextBlock {Text=L10n.Text("activity_nothing"),FontSize=13,Foreground=Look.Secondary,Margin=new Thickness(0,16,0,0)});
-        var dock=new DockPanel {Margin=new Thickness(0,10,0,0)};
+        var dock=new DockPanel();
         var top=Line_(header,30,Line);DockPanel.SetDock(top,Dock.Top);dock.Children.Add(top);
-        if(whyId.Length>0) {
-            whyRow=conns.FirstOrDefault(c=>c is not null&&Str(c["id"])==whyId)??whyRow;
-            if(whyRow is not null) {var panel=WhyPanel(whyRow);DockPanel.SetDock(panel,Dock.Bottom);dock.Children.Add(panel);}
-        }
         dock.Children.Add(Scroll(list));
-        return dock;
+        if(!narrow) {dock.Margin=new Thickness(0,10,0,0);return dock;}
+        var split=Table(Star(1),Px(264));split.Margin=new Thickness(0,10,0,0);
+        Put(split,dock,0,0);
+        var panel=WhyPanel(whyRow!);panel.Margin=new Thickness(14,0,0,0);Grid.SetColumn(panel,1);split.Children.Add(panel);
+        return split;
     }
 
     // ---- The row's right-click menu and the "why" panel ----
@@ -251,18 +256,20 @@ public sealed class ActivityPanel:Border {
         Background=lit?Look.Selected:Look.Hex("#201E1B"),CornerRadius=new CornerRadius(6),Padding=new Thickness(10,0,10,0),Height=26,Margin=new Thickness(0,0,6,6),
         Child=Text(text,12,lit?Look.Text:Look.Secondary,mono)};
     private static TextBlock Arrow()=>new() {Text="→",FontSize=12,Foreground=Look.Faint,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,6,6)};
+    /// The connection's details, a column at the right of the list: why it went this way, then everything the
+    /// menu offers (the rule for the whole site or only this name, copy, close, the rules page).
     private Border WhyPanel(JsonNode c) {
-        var host=Str(c["host"]);var proxy=Flag(c["proxy"]);var via=Str(c["via"]);
+        var host=Str(c["host"]);var proxy=Flag(c["proxy"]);var via=Str(c["via"]);var id=Str(c["id"]);
         var (chip,sentence)=Reason(c);
         var stack=new StackPanel();
         var head=new DockPanel();
-        var close=new Button {Content=Look.Icon("\uE711",10,Look.Secondary),Width=26,Height=26,Padding=new Thickness(0),HorizontalContentAlignment=HorizontalAlignment.Center};
+        var close=new Button {Content=Look.Icon("\uE711",10,Look.Secondary),Width=26,Height=26,Padding=new Thickness(0),HorizontalContentAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Top};
         AutomationProperties.SetName(close,L10n.Text("close"));
         close.Click+=(_,_)=>{whyId="";whyRow=null;Fill();};
         DockPanel.SetDock(close,Dock.Right);head.Children.Add(close);
-        head.Children.Add(Text(L10n.Text("menu_why"),12,Look.Secondary));
+        head.Children.Add(new TextBlock {Text=host,FontSize=14,FontWeight=FontWeights.SemiBold,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,3,8,0)});
         stack.Children.Add(head);
-        stack.Children.Add(new TextBlock {Text=host,FontSize=14,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap,Margin=new Thickness(0,2,0,10)});
+        stack.Children.Add(new TextBlock {Text=L10n.Text("menu_why"),FontSize=12,Foreground=Look.Secondary,Margin=new Thickness(0,12,0,8)});
         var path=new WrapPanel();
         path.Children.Add(Chip(chip,true));path.Children.Add(Arrow());
         path.Children.Add(Chip(L10n.Text(proxy?"activity_proxy":"activity_direct")));
@@ -271,46 +278,40 @@ public sealed class ActivityPanel:Border {
             if(via.Length>0&&via!=Exit(c)) {path.Children.Add(Arrow());path.Children.Add(Chip(via,mono:true));}
         }
         stack.Children.Add(path);
-        if(sentence.Length>0) stack.Children.Add(new TextBlock {Text=sentence,FontSize=12,Foreground=Look.Secondary,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,4,0,0)});
-        // Everything the menu offers: the rule (whole site or only this name), copy, close, the rules page.
+        if(sentence.Length>0) stack.Children.Add(new TextBlock {Text=sentence,FontSize=12,Foreground=Look.Secondary,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,2,0,0)});
         if(host.Length>0&&AddRule is not null) {
             var site=Advanced.Site(host);var whole=wholeSite||site==host;
             if(site!=host) {
-                var scope=new Grid {Margin=new Thickness(0,12,0,0)};
-                scope.ColumnDefinitions.Add(new ColumnDefinition {Width=Star(1)});scope.ColumnDefinitions.Add(new ColumnDefinition {Width=Star(1)});
+                var scope=new StackPanel();
                 foreach(var (index,label,on) in new[]{(0,L10n.Text("menu_whole_site",site),whole),(1,L10n.Text("menu_only_domain",host),!whole)}) {
-                    var pick=new Button {Content=Text(label,12,on?Look.Text:Look.Secondary),Height=26,Padding=new Thickness(10,0,10,0),Background=on?Look.Selected:Brushes.Transparent,
-                        HorizontalContentAlignment=HorizontalAlignment.Center,Margin=new Thickness(index==0?0:2,0,0,0)};
+                    var pick=new Button {Content=Text(label,12,on?Look.Text:Look.Secondary),Height=28,Padding=new Thickness(10,0,10,0),Background=on?Look.Selected:Brushes.Transparent,
+                        HorizontalContentAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,index==0?0:2,0,0)};
                     AutomationProperties.SetName(pick,label+(on?L10n.Text("current_page"):""));
                     pick.Click+=(_,_)=>{wholeSite=index==0;Fill();};
-                    Grid.SetColumn(pick,index);scope.Children.Add(pick);
+                    scope.Children.Add(pick);
                 }
-                stack.Children.Add(new Border {Background=Look.Hex("#201E1B"),CornerRadius=new CornerRadius(8),Padding=new Thickness(2),Child=scope,Margin=new Thickness(0,12,0,0)});
+                stack.Children.Add(new Border {Background=Look.Hex("#201E1B"),CornerRadius=new CornerRadius(8),Padding=new Thickness(2),Child=scope,Margin=new Thickness(0,14,0,0)});
             }
-            var policies=new Grid {Margin=new Thickness(0,8,0,0)};
             var target=whole?site:host;
-            var i=0;
             foreach(var (key,policy) in new[]{("menu_always_proxy","proxy"),("menu_always_direct","direct"),("menu_block","block")}) {
-                policies.ColumnDefinitions.Add(new ColumnDefinition {Width=Star(1)});
                 var button=new Button {Content=Text(L10n.Text(key),12,policy=="block"?Look.Danger:Look.Text),Height=30,Padding=new Thickness(8,0,8,0),Background=Look.Selected,
-                    HorizontalContentAlignment=HorizontalAlignment.Center,Margin=new Thickness(i==0?0:6,0,0,0)};
+                    HorizontalContentAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,policy=="proxy"?(site!=host?8:14):6,0,0)};
                 button.Click+=(_,_)=>Rule(target,whole,policy);
-                Grid.SetColumn(button,i++);policies.Children.Add(button);
+                stack.Children.Add(button);
             }
-            stack.Children.Add(policies);
         }
-        var links=new DockPanel {Margin=new Thickness(0,10,0,0),LastChildFill=false};
         Button Link(string key,Action click) {
-            var link=new Button {Content=Text(L10n.Text(key),12,Look.Secondary),Height=26,Padding=new Thickness(6,0,6,0),Margin=new Thickness(0,0,8,0)};
+            var link=new Button {Content=Text(L10n.Text(key),12,Look.Secondary),Height=26,Padding=new Thickness(0),HorizontalAlignment=HorizontalAlignment.Left,HorizontalContentAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,4,0,0),Background=Brushes.Transparent};
             link.Click+=(_,_)=>click();
             return link;
         }
+        var links=new StackPanel {Margin=new Thickness(0,12,0,0)};
         if(host.Length>0) links.Children.Add(Link("menu_copy_domain",()=>{try {Clipboard.SetText(host);Show(L10n.Text("menu_copied"),null);} catch {/* clipboard busy */}}));
-        var id=Str(c["id"]);
         if(id.Length>0&&CloseConnection is not null) links.Children.Add(Link("menu_close_connection",()=>CloseConnection(id)));
-        if(OpenRules is not null) {var rules=Link("why_open_rules",()=>OpenRules());DockPanel.SetDock(rules,Dock.Right);rules.Margin=new Thickness(0);links.Children.Add(rules);}
+        if(OpenRules is not null) links.Children.Add(Link("why_open_rules",()=>OpenRules()));
         stack.Children.Add(links);
-        return new Border {Background=Card,CornerRadius=new CornerRadius(10),Padding=new Thickness(16,12,12,14),Margin=new Thickness(0,10,0,0),Child=stack};
+        return new Border {Background=Card,CornerRadius=new CornerRadius(10),Padding=new Thickness(16,14,10,14),
+            Child=new ScrollViewer {Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,Focusable=false}};
     }
 
     private (long Proxy,long Direct) Split()=>(Num(data?["proxy"]),Num(data?["direct"]));

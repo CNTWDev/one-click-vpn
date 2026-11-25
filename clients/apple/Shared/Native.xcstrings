@@ -12266,19 +12266,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fixed slow or failing photo and file uploads in WeChat and other mainland apps while connected: the stall check no longer mistakes an upload for a hang, and no longer closes direct connections"
+            "value": "On the computer, clicking a connection in Activity shows its details in a column to the right of the list, so nothing is covered and the selected row stays in view\nOn the phone, a connection's details open from the bottom"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "修复开着 VPN 时微信等国内应用发图片、传文件很慢甚至发不出去：断线检测不再把正在上传的连接当成卡住，也不再顺带掐断直连的国内连接"
+            "value": "电脑上「活动」里点一条连接，详情显示在列表右侧，不再盖住列表；选中的那一行一直看得见\n手机上点一条连接，详情从底部弹出"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Исправлена медленная или прерывающаяся отправка фото и файлов в WeChat и других китайских приложениях при подключении: проверка зависаний больше не принимает загрузку за зависание и не закрывает прямые соединения"
+            "value": "На компьютере при щелчке по соединению в «Активности» подробности открываются колонкой справа от списка: ничего не закрыто, выбранная строка остаётся на виду\nНа телефоне подробности соединения открываются снизу"
           }
         }
       }

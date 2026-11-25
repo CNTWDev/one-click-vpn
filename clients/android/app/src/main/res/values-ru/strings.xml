@@ -534,7 +534,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Исправлена медленная или прерывающаяся отправка фото и файлов в WeChat и других китайских приложениях при подключении: проверка зависаний больше не принимает загрузку за зависание и не закрывает прямые соединения</string>
+  <string name="whats_new_notes">На компьютере при щелчке по соединению в «Активности» подробности открываются колонкой справа от списка: ничего не закрыто, выбранная строка остаётся на виду\nНа телефоне подробности соединения открываются снизу</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="why_ai">AI-сервис</string>
