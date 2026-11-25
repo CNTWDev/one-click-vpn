@@ -2923,5 +2923,70 @@
     "zh": "分流方式",
     "en": "Routing",
     "ru": "Маршрутизация"
+  },
+  "trail_title": {
+    "zh": "航迹",
+    "en": "Trail",
+    "ru": "Маршруты"
+  },
+  "trail_cities": {
+    "zh": "城市",
+    "en": "Cities",
+    "ru": "Города"
+  },
+  "trail_traffic": {
+    "zh": "流量",
+    "en": "Traffic",
+    "ru": "Трафик"
+  },
+  "trail_hidden": {
+    "zh": "本机隐身",
+    "en": "Hidden here",
+    "ru": "Скрыто здесь"
+  },
+  "trail_hours": {
+    "zh": "{0} 小时",
+    "en": "{0} h",
+    "ru": "{0} ч"
+  },
+  "trail_empty": {
+    "zh": "连接之后，这里会画出你从哪些城市出门",
+    "en": "Once you connect, the cities you went out from appear here",
+    "ru": "После подключения здесь появятся города, из которых вы выходили в сеть"
+  },
+  "trail_make_poster": {
+    "zh": "生成海报",
+    "en": "Make a poster",
+    "ru": "Сделать постер"
+  },
+  "trail_poster_title": {
+    "zh": "我从这些城市出门",
+    "en": "Where I went out from",
+    "ru": "Мои точки выхода"
+  },
+  "trail_poster_slogan": {
+    "zh": "真实位置：不告诉你",
+    "en": "Where I really am: not telling",
+    "ru": "Где я на самом деле: секрет"
+  },
+  "trail_show_home": {
+    "zh": "海报上显示出发城市",
+    "en": "Show my home city on the poster",
+    "ru": "Показывать мой город на постере"
+  },
+  "trail_save": {
+    "zh": "保存图片",
+    "en": "Save image",
+    "ru": "Сохранить"
+  },
+  "trail_share": {
+    "zh": "分享",
+    "en": "Share",
+    "ru": "Поделиться"
+  },
+  "trail_range": {
+    "zh": "近 {0}",
+    "en": "Last {0}",
+    "ru": "За {0}"
   }
 }

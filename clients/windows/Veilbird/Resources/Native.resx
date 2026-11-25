@@ -496,6 +496,19 @@ macOS also shows a prompt; its OK only closes it and does not turn anything on.<
   <data name="too_many_attempts_try_again_later" xml:space="preserve"><value>Too many attempts. Try again later.</value></data>
   <data name="traffic_30_days" xml:space="preserve"><value>Traffic · 30 days</value></data>
   <data name="traffic_left" xml:space="preserve"><value>Traffic left</value></data>
+  <data name="trail_cities" xml:space="preserve"><value>Cities</value></data>
+  <data name="trail_empty" xml:space="preserve"><value>Once you connect, the cities you went out from appear here</value></data>
+  <data name="trail_hidden" xml:space="preserve"><value>Hidden here</value></data>
+  <data name="trail_hours" xml:space="preserve"><value>{0} h</value></data>
+  <data name="trail_make_poster" xml:space="preserve"><value>Make a poster</value></data>
+  <data name="trail_poster_slogan" xml:space="preserve"><value>Where I really am: not telling</value></data>
+  <data name="trail_poster_title" xml:space="preserve"><value>Where I went out from</value></data>
+  <data name="trail_range" xml:space="preserve"><value>Last {0}</value></data>
+  <data name="trail_save" xml:space="preserve"><value>Save image</value></data>
+  <data name="trail_share" xml:space="preserve"><value>Share</value></data>
+  <data name="trail_show_home" xml:space="preserve"><value>Show my home city on the poster</value></data>
+  <data name="trail_title" xml:space="preserve"><value>Trail</value></data>
+  <data name="trail_traffic" xml:space="preserve"><value>Traffic</value></data>
   <data name="tunnel_enabled" xml:space="preserve"><value>Tunnel enabled</value></data>
   <data name="unable_to_connect_check_your_network_and_try_again" xml:space="preserve"><value>Unable to connect. Check your network and try again.</value></data>
   <data name="unable_to_reach_the_service_check_your_network_and" xml:space="preserve"><value>Unable to reach the service. Check your network and try again.</value></data>
@@ -562,7 +575,7 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Android: two new home screen widgets, a 2×2 globe showing your exit city and status, and a 4×1 strip that connects or disconnects in one tap</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Mac: say &quot;TrackNothing Tokyo&quot; in Spotlight, Siri or Shortcuts to connect straight there, or move a running connection; you can also switch between smart and global routing</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI service</value></data>

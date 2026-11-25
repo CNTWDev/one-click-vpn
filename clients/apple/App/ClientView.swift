@@ -47,6 +47,9 @@ struct ClientView:View {
     @State private var usage:[String:Any]?
     @State private var usageFailed=false
     @State private var usagePicked=29
+    @State private var posterOpen=false
+    @State private var posterImage:CGImage?
+    @AppStorage("trailPosterHome") private var posterHome=false
     /// The public address the service saw before connecting, and the connect page's scan line (direction, run count).
     @State private var revealEmail=false
     #if os(macOS)
@@ -153,6 +156,7 @@ struct ClientView:View {
         #if os(iOS)
         .sheet(isPresented:$choosingLanguage) {languageSheet.presentationDetents([.height(360)]).presentationDragIndicator(.visible)}
         .sheet(isPresented:$checking) {checkSheet.presentationDetents([.large]).presentationDragIndicator(.visible)}
+        .sheet(isPresented:$posterOpen) {ScrollView {posterSheet}.background(VeilbirdStyle.surface).presentationDragIndicator(.visible)}
         #else
         // A panel over the app's column instead of a modal sheet: a click on the dimmed window or Esc closes it.
         .overlay(alignment:.topLeading) {
@@ -166,6 +170,17 @@ struct ClientView:View {
             }
         }
         .animation(reduceMotion ? nil:.easeOut(duration:0.18),value:checking)
+        .overlay(alignment:.topLeading) {
+            if posterOpen {
+                ZStack(alignment:.topLeading) {
+                    Color.black.opacity(0.5).ignoresSafeArea().contentShape(Rectangle()).onTapGesture {posterOpen=false}
+                        .accessibilityLabel(L10n.text("close")).accessibilityAddTraits(.isButton)
+                    posterSheet.background(VeilbirdStyle.surface).clipShape(RoundedRectangle(cornerRadius:14)).padding(.horizontal,10).padding(.top,30).padding(.bottom,8)
+                        .frame(width:340).frame(maxHeight:.infinity,alignment:.top).transition(.opacity.combined(with:.offset(y:10)))
+                }.ignoresSafeArea()
+            }
+        }
+        .animation(reduceMotion ? nil:.easeOut(duration:0.18),value:posterOpen)
         #endif
     }
 
@@ -1109,6 +1124,7 @@ struct ClientView:View {
                 dayChart
                 if usageFailed {caption(L10n.text("usage_load_failed"))}
                 else if let usage {
+                    trailCard
                     rankCard(L10n.text("usage_by_device"),rows(usage["devices"]) {device in
                         let name=(device["name"] as? String).flatMap {$0.isEmpty ? nil:$0} ?? L10n.text("device")
                         return device["isCurrent"] as? Bool == true ? L10n.text("usage_this_device",name):name
@@ -1117,6 +1133,75 @@ struct ClientView:View {
                 }
             }.padding(.horizontal,16).padding(.bottom,20)
         }.task {await loadUsage();try? await model.loadAccount()}
+    }
+    // MARK: Trail
+    /// The locations of the range on the globe, each lit by its share of the traffic.
+    private var trailExits:[TrailExit] {
+        let rows=usage?["nodes"] as? [[String:Any]] ?? []
+        let most:Int64=rows.map {Int64($0["bytes"] as? String ?? "0") ?? 0}.max() ?? 1
+        return rows.compactMap {trailExit($0,Double(max(most,1)))}
+    }
+    private func trailExit(_ row:[String:Any],_ most:Double)->TrailExit? {
+        let id=row["id"] as? String ?? ""
+        guard let node=model.nodes.first(where:{$0["id"] as? String == id}),let place=node["place"] as? [String:Any],
+              let lat=(place["lat"] as? NSNumber)?.doubleValue,let lon=(place["lon"] as? NSNumber)?.doubleValue else {return nil}
+        let used:Int64=Int64(row["bytes"] as? String ?? "0") ?? 0
+        return TrailExit(spot:Spot(lat:lat,lon:lon,label:row["name"] as? String ?? ""),weight:Double(used)/most)
+    }
+    private var trailStats:[(String,String)] {
+        let count=(usage?["nodes"] as? [[String:Any]] ?? []).count
+        let total:Int64=usageSeries.reduce(Int64(0)) {$0+$1.1}
+        let hidden=HiddenTime.text(HiddenTime.hours(usageDays))
+        return [(L10n.number(count),L10n.text("trail_cities")),(bytes(total),L10n.text("trail_traffic")),(hidden,L10n.text("trail_hidden"))]
+    }
+    private var trailRange:String {L10n.text("trail_range",L10n.text(rangeKey(usageDays)))}
+    private var trailCard:some View {
+        let exits=trailExits
+        return VStack(alignment:.leading,spacing:12) {
+            Text(L10n.text("trail_title")).font(.system(size:mac ? 11:12,weight:.medium)).foregroundStyle(VeilbirdStyle.secondary)
+            if exits.isEmpty {
+                Text(L10n.text("trail_empty")).font(.system(size:mac ? 12:13)).foregroundStyle(VeilbirdStyle.secondary)
+            } else {
+                TrailGlobe(exits:exits,home:model.globeOrigin).frame(height:mac ? 260:300).frame(maxWidth:.infinity)
+                TrailStats(stats:trailStats,size:mac ? 20:22)
+                Button(L10n.text("trail_make_poster")) {openPoster()}.buttonStyle(PrimaryButton()).padding(.top,4)
+            }
+        }.padding(16).frame(maxWidth:.infinity,alignment:.leading).cardOutline(VeilbirdStyle.radius)
+    }
+    private func poster()->TrailPoster {
+        TrailPoster(exits:trailExits,home:posterHome ? model.globeOrigin:nil,range:trailRange,stats:trailStats)
+    }
+    private func openPoster() {posterImage=poster().image();posterOpen=true}
+    /// The poster as it will be shared, the home city switch (off by default) and where it goes.
+    private var posterSheet:some View {
+        VStack(alignment:.leading,spacing:14) {
+            HStack(alignment:.center) {
+                Text(L10n.text("trail_make_poster")).font(.system(size:mac ? 17:20,weight:.semibold)).accessibilityAddTraits(.isHeader)
+                Spacer(minLength:12)
+                Button {posterOpen=false} label:{
+                    Image(systemName:"xmark").font(.system(size:mac ? 12:14,weight:.semibold)).foregroundStyle(VeilbirdStyle.secondary)
+                        .frame(width:mac ? 28:36,height:mac ? 28:36).background(VeilbirdStyle.raised,in:Circle()).contentShape(Circle())
+                }.buttonStyle(.plain).keyboardShortcut(.cancelAction).accessibilityLabel(L10n.text("close"))
+            }
+            poster().scaleEffect(0.65,anchor:.topLeading).frame(width:234,height:416,alignment:.topLeading)
+                .clipShape(RoundedRectangle(cornerRadius:VeilbirdStyle.radius)).frame(maxWidth:.infinity)
+            if model.globeOrigin != nil {
+                Toggle(L10n.text("trail_show_home"),isOn:$posterHome).toggleStyle(.switch).tint(VeilbirdStyle.accent)
+                    .font(.system(size:mac ? 13:15)).onChange(of:posterHome) {_ in posterImage=poster().image()}
+            }
+            posterActions
+        }.padding(mac ? 16:20)
+    }
+    @ViewBuilder private var posterActions:some View {
+        if let image=posterImage {
+            let picture=Image(decorative:image,scale:1)
+            HStack(spacing:10) {
+                #if os(macOS)
+                Button(L10n.text("trail_save")) {_=PosterFile.save(image)}.buttonStyle(PrimaryButton())
+                #endif
+                ShareLink(item:picture,preview:SharePreview("TrackNothing",image:picture)) {Text(L10n.text("trail_share"))}.buttonStyle(QuietButton())
+            }
+        }
     }
     private func rangeKey(_ days:Int)->String {days==7 ? "usage_7_days":(days==90 ? "usage_90_days":"usage_30_days")}
     private func loadUsage() async {
