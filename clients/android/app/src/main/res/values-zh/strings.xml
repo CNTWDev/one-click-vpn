@@ -569,7 +569,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">Mac：去掉屏幕顶部的连接提示，不再遮挡屏幕</string>
+  <string name="whats_new_notes">Mac：桌面小组件重做，按钮直接连接、断开、换地点、切智能分流或全局，不再打开应用窗口\nMac：新增大号小组件（速度、收藏、模式、剩余流量）和「常用地点」小组件，选一个地点点一下就连过去\nMac：macOS 26 控制中心新增模式开关和常用地点按钮，连接开关直接生效</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="why_ai">AI 服务</string>
@@ -588,8 +588,14 @@
   <string name="why_rest">其余流量</string>
   <string name="why_rest_direct">没有命中其他规则，直连。</string>
   <string name="why_rest_proxy">没有命中其他规则，走加密。</string>
+  <string name="widget_connect_here">连到这里</string>
+  <string name="widget_fastest">最快：%1$s</string>
   <string name="widget_globe">TrackNothing 地球</string>
-  <string name="widget_mac_description">一眼看到有没有隐身、从哪座城市出门，点一下就连接</string>
+  <string name="widget_in_use">正在使用</string>
+  <string name="widget_lines">%1$s 条线路</string>
+  <string name="widget_mac_description">一眼看到有没有隐身、从哪座城市出门；按钮直接连接、断开、换地点、切模式，不用打开应用</string>
+  <string name="widget_mac_place_description">选一个地点，点一下就连过去；放几个就是几个快捷入口</string>
+  <string name="widget_mac_place_name">常用地点</string>
   <string name="widget_strip">TrackNothing 状态</string>
   <string name="widget_tap">轻点连接</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Windows 开发版 · VPN 服务仍在接入中</string>

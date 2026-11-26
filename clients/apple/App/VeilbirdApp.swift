@@ -45,6 +45,7 @@ final class DockPresence:NSObject,NSApplicationDelegate,UNUserNotificationCenter
     static var openMain:(()->Void)?
     func applicationDidFinishLaunching(_ notification:Notification) {
         UNUserNotificationCenter.current().delegate=self
+        Task {@MainActor in WidgetBridge.listen()}
         let center=NotificationCenter.default
         observers.append(center.addObserver(forName:NSWindow.willCloseNotification,object:nil,queue:.main) {note in
             let closing=note.object as? NSWindow

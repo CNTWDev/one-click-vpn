@@ -96,7 +96,8 @@ targets:
         com.apple.security.application-groups: [$(TeamIdentifierPrefix)$(VEILBIRD_BUNDLE_ID)]
   VeilbirdWidgets-macOS:
     # WidgetKit: the desktop widgets (macOS 14+) and the Control Center button (macOS 26, when built with Xcode 26).
-    # They only read what the app writes into the shared group (WidgetBridge.swift); a click opens tracknothing://.
+    # They read what the app writes into the shared group; their buttons hand requests to the app (WidgetCommand,
+    # Darwin notification) and the menu bar app acts without opening its window (WidgetBridge.swift).
     type: app-extension
     platform: macOS
     deploymentTarget: "14.0"

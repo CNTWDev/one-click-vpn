@@ -576,7 +576,9 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac: убрано уведомление о подключении вверху экрана, оно больше не закрывает экран</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Mac: обновлённые виджеты рабочего стола; кнопки подключают, отключают, меняют место и режим (умный или глобальный), не открывая окно приложения
+Mac: новый большой виджет (скорость, избранное, режим, остаток трафика) и виджет «Одно место», который подключает к выбранному месту одним нажатием
+Mac: в macOS 26 в Пункте управления появились переключатель режима и кнопка места, а переключатель подключения работает сразу</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI-сервис</value></data>
@@ -595,8 +597,14 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="why_rest" xml:space="preserve"><value>Остальной трафик</value></data>
   <data name="why_rest_direct" xml:space="preserve"><value>Другие правила не совпали, поэтому напрямую.</value></data>
   <data name="why_rest_proxy" xml:space="preserve"><value>Другие правила не совпали, поэтому через шифрование.</value></data>
+  <data name="widget_connect_here" xml:space="preserve"><value>Сюда</value></data>
+  <data name="widget_fastest" xml:space="preserve"><value>Быстрее: {0}</value></data>
   <data name="widget_globe" xml:space="preserve"><value>Глобус TrackNothing</value></data>
-  <data name="widget_mac_description" xml:space="preserve"><value>Сразу видно, скрыты ли вы и из какого города выходите в сеть; нажмите, чтобы подключиться</value></data>
+  <data name="widget_in_use" xml:space="preserve"><value>Используется</value></data>
+  <data name="widget_lines" xml:space="preserve"><value>Линий: {0}</value></data>
+  <data name="widget_mac_description" xml:space="preserve"><value>Видно, скрыты ли вы и откуда выходите в сеть; кнопки подключают, отключают, меняют место и режим, не открывая приложение</value></data>
+  <data name="widget_mac_place_description" xml:space="preserve"><value>Выберите место и подключайтесь к нему одним нажатием; добавьте несколько для нескольких ярлыков</value></data>
+  <data name="widget_mac_place_name" xml:space="preserve"><value>Одно место</value></data>
   <data name="widget_strip" xml:space="preserve"><value>Статус TrackNothing</value></data>
   <data name="widget_tap" xml:space="preserve"><value>Коснитесь, чтобы подключиться</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Версия Windows для разработки · Интеграция VPN ещё не завершена</value></data>

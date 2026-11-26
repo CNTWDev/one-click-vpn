@@ -569,7 +569,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Mac: убрано уведомление о подключении вверху экрана, оно больше не закрывает экран</string>
+  <string name="whats_new_notes">Mac: обновлённые виджеты рабочего стола; кнопки подключают, отключают, меняют место и режим (умный или глобальный), не открывая окно приложения\nMac: новый большой виджет (скорость, избранное, режим, остаток трафика) и виджет «Одно место», который подключает к выбранному месту одним нажатием\nMac: в macOS 26 в Пункте управления появились переключатель режима и кнопка места, а переключатель подключения работает сразу</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="why_ai">AI-сервис</string>
@@ -588,8 +588,14 @@
   <string name="why_rest">Остальной трафик</string>
   <string name="why_rest_direct">Другие правила не совпали, поэтому напрямую.</string>
   <string name="why_rest_proxy">Другие правила не совпали, поэтому через шифрование.</string>
+  <string name="widget_connect_here">Сюда</string>
+  <string name="widget_fastest">Быстрее: %1$s</string>
   <string name="widget_globe">Глобус TrackNothing</string>
-  <string name="widget_mac_description">Сразу видно, скрыты ли вы и из какого города выходите в сеть; нажмите, чтобы подключиться</string>
+  <string name="widget_in_use">Используется</string>
+  <string name="widget_lines">Линий: %1$s</string>
+  <string name="widget_mac_description">Видно, скрыты ли вы и откуда выходите в сеть; кнопки подключают, отключают, меняют место и режим, не открывая приложение</string>
+  <string name="widget_mac_place_description">Выберите место и подключайтесь к нему одним нажатием; добавьте несколько для нескольких ярлыков</string>
+  <string name="widget_mac_place_name">Одно место</string>
   <string name="widget_strip">Статус TrackNothing</string>
   <string name="widget_tap">Коснитесь, чтобы подключиться</string>
   <string name="windows_development_build_vpn_service_integration_in_progress">Версия Windows для разработки · Интеграция VPN ещё не завершена</string>

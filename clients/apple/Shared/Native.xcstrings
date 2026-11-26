@@ -13071,19 +13071,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac: removed the connection notice at the top of the screen so it no longer covers what you're looking at"
+            "value": "Mac: redesigned desktop widgets; buttons connect, disconnect, switch location and switch smart or global routing without opening the app window\nMac: new large widget (speed, favorites, mode, traffic left) and a \"One location\" widget that connects to the place you pick in one click\nMac: on macOS 26, Control Center gets a routing switch and a location button, and the connect switch works in place"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac：去掉屏幕顶部的连接提示，不再遮挡屏幕"
+            "value": "Mac：桌面小组件重做，按钮直接连接、断开、换地点、切智能分流或全局，不再打开应用窗口\nMac：新增大号小组件（速度、收藏、模式、剩余流量）和「常用地点」小组件，选一个地点点一下就连过去\nMac：macOS 26 控制中心新增模式开关和常用地点按钮，连接开关直接生效"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac: убрано уведомление о подключении вверху экрана, оно больше не закрывает экран"
+            "value": "Mac: обновлённые виджеты рабочего стола; кнопки подключают, отключают, меняют место и режим (умный или глобальный), не открывая окно приложения\nMac: новый большой виджет (скорость, избранное, режим, остаток трафика) и виджет «Одно место», который подключает к выбранному месту одним нажатием\nMac: в macOS 26 в Пункте управления появились переключатель режима и кнопка места, а переключатель подключения работает сразу"
           }
         }
       }
@@ -13502,6 +13502,52 @@
         }
       }
     },
+    "widget_connect_here": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect here"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连到这里"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сюда"
+          }
+        }
+      }
+    },
+    "widget_fastest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fastest: %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最快：%1$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Быстрее: %1$@"
+          }
+        }
+      }
+    },
     "widget_globe": {
       "extractionState": "manual",
       "localizations": {
@@ -13525,25 +13571,117 @@
         }
       }
     },
+    "widget_in_use": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In use"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在使用"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Используется"
+          }
+        }
+      }
+    },
+    "widget_lines": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ lines"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 条线路"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Линий: %1$@"
+          }
+        }
+      }
+    },
     "widget_mac_description": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "See at a glance whether you're hidden and which city you go out from; click to connect"
+            "value": "See whether you're hidden and where you go out from; the buttons connect, disconnect, switch location and mode without opening the app"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一眼看到有没有隐身、从哪座城市出门，点一下就连接"
+            "value": "一眼看到有没有隐身、从哪座城市出门；按钮直接连接、断开、换地点、切模式，不用打开应用"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Сразу видно, скрыты ли вы и из какого города выходите в сеть; нажмите, чтобы подключиться"
+            "value": "Видно, скрыты ли вы и откуда выходите в сеть; кнопки подключают, отключают, меняют место и режим, не открывая приложение"
+          }
+        }
+      }
+    },
+    "widget_mac_place_description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a location and click to connect there; add several for several shortcuts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选一个地点，点一下就连过去；放几个就是几个快捷入口"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите место и подключайтесь к нему одним нажатием; добавьте несколько для нескольких ярлыков"
+          }
+        }
+      }
+    },
+    "widget_mac_place_name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One location"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "常用地点"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Одно место"
           }
         }
       }
