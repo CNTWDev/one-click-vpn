@@ -123,3 +123,12 @@ export async function placeOf(address: string, maxWaitMs = 1500): Promise<SeenPl
   if (!city.reader && city.checking) await Promise.race([city.checking, new Promise((resolve) => setTimeout(resolve, maxWaitMs))]);
   return placeFrom(address, city.reader);
 }
+
+/** The network (AS organisation) of a public address, e.g. "China Telecom", or "" when unknown. */
+export function networkOf(address: string): string {
+  if (!cohortOf(address)) return "";
+  try {
+    const name = state.databases?.asn.get(address)?.autonomous_system_organization;
+    return typeof name === "string" && name.trim() && name.length <= 80 ? name.trim() : "";
+  } catch { return ""; }
+}

@@ -31,6 +31,9 @@ import ServiceManagement
     @Published var status="not_connected"
     @Published var nodeName=""
     @Published var connectedNodeId=""
+    /// The path to the location, measured once per connection (see RouteHops); nil until then and while off.
+    @Published var route:RoutePath?
+    private var routeRunning=""
     @Published var since:Date?
     /// The figures that change every second while connected (rates, the activity view's data) live in their own
     /// object: only the views that show them redraw each second, not every page watching the model. Changing one
@@ -287,6 +290,37 @@ import ServiceManagement
                     done.resume(returning:data.flatMap {try? JSONSerialization.jsonObject(with:$0) as? [String:Int]})
                 }
             } catch {done.resume(returning:nil)}
+        }
+    }
+    /// The current connection's key for its measured path: one measure per connection and location.
+    var routeKey:String {"\(Int(since?.timeIntervalSince1970 ?? 0)):\(connectedNodeId)"}
+    /// Asks the tunnel to measure the path to the location (trace, places, stops), once per connection.
+    func measureRoute() {
+        let key=routeKey
+        guard route?.key != key,routeRunning != key,!connectedNodeId.isEmpty,let exit=globeExit,
+              let node=nodes.first(where:{$0["id"] as? String == connectedNodeId}),
+              let session=manager?.connection as? NETunnelProviderSession else {return}
+        let probes=Latency.probes(node).map {(host,port) in (host.contains(":") ? "[\(host)]":host)+":\(port)"}.joined(separator:",")
+        if probes.isEmpty {return}
+        var input:[String:Any]=["probes":probes,"exit":["lat":exit.lat,"lon":exit.lon]]
+        if let origin=globeOrigin {input["origin"]=["lat":origin.lat,"lon":origin.lon]}
+        guard let json=try? JSONSerialization.data(withJSONObject:input) else {return}
+        routeRunning=key
+        Task {
+            // A moment for the connection to settle (the landing on the globe runs meanwhile).
+            try? await Task.sleep(nanoseconds:1_500_000_000)
+            guard self.routeRunning == key else {return}
+            let message="route "+String(decoding:json,as:UTF8.self)
+            let result=await withCheckedContinuation {(done:CheckedContinuation<[String:Any]?,Never>) in
+                do {
+                    try session.sendProviderMessage(Data(message.utf8)) {data in
+                        done.resume(returning:data.flatMap {try? JSONSerialization.jsonObject(with:$0) as? [String:Any]})
+                    }
+                } catch {done.resume(returning:nil)}
+            }
+            guard self.routeRunning == key else {return}
+            self.routeRunning=""
+            if let result,result["rows"] != nil {self.route=RouteHops.parse(key,result)}
         }
     }
     /// Bumped when the person's rules change outside the rules page (the activity view's menu), so an open page reloads.
@@ -579,6 +613,7 @@ import ServiceManagement
             update(\.status,"not_connected");update(\.since,nil);update(\.rxRate,0);update(\.txRate,0)
             update(\.rxHistory,[]);update(\.txHistory,[]);update(\.switchedFrom,"");update(\.bypass,"")
             if activity != nil {activity=nil}
+            if route != nil {route=nil};routeRunning=""
             // The tunnel went down on its own shortly after a requested start: show it as a failed attempt.
             if let attempt,Date().timeIntervalSince(attempt)>2 {
                 self.attempt=nil;failed=true;failure=L10n.text("unable_to_connect_check_your_network_and_try_again");failureCode="CONNECT_FAILED";networkState=Guidance.networkState()
@@ -610,6 +645,7 @@ import ServiceManagement
                 self.update(\.retries,state["attempt"] as? Int ?? 0);self.update(\.retryAt,(state["retryAt"] as? Double).map {Date(timeIntervalSince1970:$0)})
                 // The first connection ends the three steps.
                 if self.since != nil && !self.onboarded {self.onboarded=true}
+                if self.since != nil && self.status == "connected" {self.measureRoute()}
                 if self.since != nil {
                     self.rxHistory=Array((self.rxHistory+[self.rxRate]).suffix(RateBars.count));self.txHistory=Array((self.txHistory+[self.txRate]).suffix(RateBars.count))
                 }

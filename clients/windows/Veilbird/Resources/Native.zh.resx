@@ -397,6 +397,17 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="revoking_access_the_slot_is_usually_released_within_about" xml:space="preserve"><value>解除中，通常最多约 5 分钟后释放额度。</value></data>
   <data name="revoking_short" xml:space="preserve"><value>解除中</value></data>
   <data name="revoking_slot_released_when_the_old_connection_expires" xml:space="preserve"><value>解除中 · 等待旧连接到期后释放额度</value></data>
+  <data name="route_border" xml:space="preserve"><value>出境</value></data>
+  <data name="route_exit" xml:space="preserve"><value>你的出口</value></data>
+  <data name="route_gap" xml:space="preserve"><value>{0} 跳没有回应</value></data>
+  <data name="route_gap_end" xml:space="preserve"><value>之后没有回应</value></data>
+  <data name="route_gap_one" xml:space="preserve"><value>1 跳没有回应</value></data>
+  <data name="route_local" xml:space="preserve"><value>家里 / 运营商内网</value></data>
+  <data name="route_note" xml:space="preserve"><value>位置按 IP 估算，只到城市。没回应的跳不猜位置，地球上画成虚的。</value></data>
+  <data name="route_title" xml:space="preserve"><value>途经</value></data>
+  <data name="route_tracing" xml:space="preserve"><value>正在测路径…</value></data>
+  <data name="route_unknown" xml:space="preserve"><value>位置不明</value></data>
+  <data name="route_via" xml:space="preserve"><value>途经 {0}</value></data>
   <data name="routing_global" xml:space="preserve"><value>全局</value></data>
   <data name="routing_global_detail" xml:space="preserve"><value>全部流量经过 TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>智能分流</value></data>
@@ -576,7 +587,8 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac：修复更新后桌面小组件一片空白、看不到新尺寸的问题</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>线路地球：连上之后测一次你到出口经过的路径，直线弧展开成途经的城市，光点沿路一跳一跳接力
+状态下面显示「途经 上海 · 158 ms」；连接体检里列出每一跳的城市、运营商和延迟（位置按 IP 估算，只到城市，没回应的不猜）</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI 服务</value></data>

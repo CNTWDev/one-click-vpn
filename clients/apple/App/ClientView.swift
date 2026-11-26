@@ -564,6 +564,7 @@ struct ClientView:View {
                 }.font(.system(size:13)).frame(minHeight:mac ? 30:40).padding(.horizontal,2).padding(.top,4)
             }
             checkLines
+            routeRows
             speedCard.padding(.top,mac ? 12:18)
             if !checkRunning && r != nil && !localSlow && (nodeSlow || webSlow) {
                 Button {checking=false;tab=1} label:{Text(L10n.text("change_location").replacingOccurrences(of:"›",with:"").trimmingCharacters(in:.whitespaces)).frame(maxWidth:.infinity)}
@@ -592,6 +593,30 @@ struct ClientView:View {
             let result=await model.connectionCheck();checkResult=result ?? ["local":-1,"node":-1,"web":-1]
             currentLine=await line;checkRunning=false
         }
+    }
+    /// The path measured when this connection came up (RouteHops): every stop with its network and round trip.
+    @ViewBuilder private var routeRows:some View {
+        if let path=model.route,path.key == model.routeKey,path.rows.count>1 {
+            VStack(alignment:.leading,spacing:0) {
+                Text(L10n.text("route_title")).font(.system(size:12)).foregroundStyle(VeilbirdStyle.secondary).padding(.bottom,2)
+                ForEach(path.rows) {row in routeRow(row)}
+                Text(L10n.text("route_note")).font(.system(size:11)).foregroundStyle(VeilbirdStyle.faint).fixedSize(horizontal:false,vertical:true).padding(.top,4)
+            }.padding(.top,mac ? 10:14)
+        }
+    }
+    private func routeRow(_ row:RouteRow)->some View {
+        let (title,detail)=RouteHops.describe(row,exit:model.nodeName)
+        let quiet=row.kind == "gap"
+        let color:Color=row.kind == "exit" ? VeilbirdStyle.accent:(quiet ? VeilbirdStyle.faint:VeilbirdStyle.text)
+        return HStack(spacing:10) {
+            Text(String(format:"%02d",row.id+1)).font(.system(size:11,design:.monospaced)).foregroundStyle(VeilbirdStyle.faint).frame(width:20,alignment:.leading)
+            VStack(alignment:.leading,spacing:1) {
+                Text(title).font(.system(size:quiet ? 12:13,weight:quiet ? .regular:.medium)).foregroundStyle(color).lineLimit(1)
+                if !detail.isEmpty {Text(detail).font(.system(size:11)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1)}
+            }
+            Spacer(minLength:8)
+            Text(row.ms>0 ? L10n.text("latency_ms",L10n.number(row.ms)):"—").font(.system(size:12,design:.monospaced)).foregroundStyle(VeilbirdStyle.secondary).lineLimit(1).fixedSize()
+        }.frame(minHeight:mac ? 30:38)
     }
     /// This node's lines (Line 1…4) with their delay, "in use" on the one carrying traffic, and a note when one is out.
     @ViewBuilder private var checkLines:some View {

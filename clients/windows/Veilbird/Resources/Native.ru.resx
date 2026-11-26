@@ -397,6 +397,17 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="revoking_access_the_slot_is_usually_released_within_about" xml:space="preserve"><value>Доступ отзывается. Место обычно освобождается примерно через 5 минут.</value></data>
   <data name="revoking_short" xml:space="preserve"><value>Отзывается</value></data>
   <data name="revoking_slot_released_when_the_old_connection_expires" xml:space="preserve"><value>Отзыв · Место освободится после истечения старого подключения</value></data>
+  <data name="route_border" xml:space="preserve"><value>выход за границу</value></data>
+  <data name="route_exit" xml:space="preserve"><value>ваш выход</value></data>
+  <data name="route_gap" xml:space="preserve"><value>Не ответили узлов: {0}</value></data>
+  <data name="route_gap_end" xml:space="preserve"><value>Дальше без ответа</value></data>
+  <data name="route_gap_one" xml:space="preserve"><value>1 узел не ответил</value></data>
+  <data name="route_local" xml:space="preserve"><value>Дом / сеть провайдера</value></data>
+  <data name="route_note" xml:space="preserve"><value>Места определены по IP, только город. Для молчащих узлов место не угадываем, на глобусе они бледные.</value></data>
+  <data name="route_title" xml:space="preserve"><value>Маршрут</value></data>
+  <data name="route_tracing" xml:space="preserve"><value>Измеряем путь…</value></data>
+  <data name="route_unknown" xml:space="preserve"><value>Место неизвестно</value></data>
+  <data name="route_via" xml:space="preserve"><value>Через {0}</value></data>
   <data name="routing_global" xml:space="preserve"><value>Глобальная</value></data>
   <data name="routing_global_detail" xml:space="preserve"><value>Весь трафик через TrackNothing</value></data>
   <data name="routing_smart" xml:space="preserve"><value>Умная</value></data>
@@ -576,7 +587,8 @@ macOS также покажет окно; кнопка OK в нём только
   <data name="waiting_for_network" xml:space="preserve"><value>Ожидание сети…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>Нет сети</value></data>
   <data name="whats_new" xml:space="preserve"><value>Что нового</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac: исправлено: после обновления виджеты рабочего стола оставались пустыми и без новых размеров</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Глобус маршрута: после подключения измеряется путь до выхода, и прямая дуга раскрывается в города по пути, огонёк бежит от узла к узлу
+Под статусом: «Через Шанхай · 158 мс»; в проверке связи — город, сеть и задержка каждого узла (по IP, до города; молчащие узлы не угадываем)</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>Что нового в {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Откуда вы хотите подключиться?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI-сервис</value></data>

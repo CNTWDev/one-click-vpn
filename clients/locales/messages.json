@@ -3028,5 +3028,60 @@
     "zh": "选一个地点，点一下就连过去；放几个就是几个快捷入口",
     "en": "Pick a location and click to connect there; add several for several shortcuts",
     "ru": "Выберите место и подключайтесь к нему одним нажатием; добавьте несколько для нескольких ярлыков"
+  },
+  "route_via": {
+    "zh": "途经 {0}",
+    "en": "Via {0}",
+    "ru": "Через {0}"
+  },
+  "route_title": {
+    "zh": "途经",
+    "en": "Path",
+    "ru": "Маршрут"
+  },
+  "route_local": {
+    "zh": "家里 / 运营商内网",
+    "en": "Home / provider network",
+    "ru": "Дом / сеть провайдера"
+  },
+  "route_gap": {
+    "zh": "{0} 跳没有回应",
+    "en": "{0} hops didn’t answer",
+    "ru": "Не ответили узлов: {0}"
+  },
+  "route_gap_one": {
+    "zh": "1 跳没有回应",
+    "en": "1 hop didn’t answer",
+    "ru": "1 узел не ответил"
+  },
+  "route_gap_end": {
+    "zh": "之后没有回应",
+    "en": "No answer after this",
+    "ru": "Дальше без ответа"
+  },
+  "route_unknown": {
+    "zh": "位置不明",
+    "en": "Place unknown",
+    "ru": "Место неизвестно"
+  },
+  "route_border": {
+    "zh": "出境",
+    "en": "exit point",
+    "ru": "выход за границу"
+  },
+  "route_exit": {
+    "zh": "你的出口",
+    "en": "your exit",
+    "ru": "ваш выход"
+  },
+  "route_note": {
+    "zh": "位置按 IP 估算，只到城市。没回应的跳不猜位置，地球上画成虚的。",
+    "en": "Places are estimated from IP, city level only. Silent hops get no guessed place and are drawn faint on the globe.",
+    "ru": "Места определены по IP, только город. Для молчащих узлов место не угадываем, на глобусе они бледные."
+  },
+  "route_tracing": {
+    "zh": "正在测路径…",
+    "en": "Tracing the path…",
+    "ru": "Измеряем путь…"
   }
 }

@@ -391,6 +391,17 @@
   <string name="revoking_access_the_slot_is_usually_released_within_about">Доступ отзывается. Место обычно освобождается примерно через 5 минут.</string>
   <string name="revoking_short">Отзывается</string>
   <string name="revoking_slot_released_when_the_old_connection_expires">Отзыв · Место освободится после истечения старого подключения</string>
+  <string name="route_border">выход за границу</string>
+  <string name="route_exit">ваш выход</string>
+  <string name="route_gap">Не ответили узлов: %1$s</string>
+  <string name="route_gap_end">Дальше без ответа</string>
+  <string name="route_gap_one">1 узел не ответил</string>
+  <string name="route_local">Дом / сеть провайдера</string>
+  <string name="route_note">Места определены по IP, только город. Для молчащих узлов место не угадываем, на глобусе они бледные.</string>
+  <string name="route_title">Маршрут</string>
+  <string name="route_tracing">Измеряем путь…</string>
+  <string name="route_unknown">Место неизвестно</string>
+  <string name="route_via">Через %1$s</string>
   <string name="routing_global">Глобальная</string>
   <string name="routing_global_detail">Весь трафик через TrackNothing</string>
   <string name="routing_smart">Умная</string>
@@ -569,7 +580,7 @@
   <string name="waiting_for_network">Ожидание сети…</string>
   <string name="waiting_title">Нет сети</string>
   <string name="whats_new">Что нового</string>
-  <string name="whats_new_notes">Mac: исправлено: после обновления виджеты рабочего стола оставались пустыми и без новых размеров</string>
+  <string name="whats_new_notes">Глобус маршрута: после подключения измеряется путь до выхода, и прямая дуга раскрывается в города по пути, огонёк бежит от узла к узлу\nПод статусом: «Через Шанхай · 158 мс»; в проверке связи — город, сеть и задержка каждого узла (по IP, до города; молчащие узлы не угадываем)</string>
   <string name="whats_new_title">Что нового в %1$s</string>
   <string name="where_would_you_like_to_connect">Откуда вы хотите подключиться?</string>
   <string name="why_ai">AI-сервис</string>

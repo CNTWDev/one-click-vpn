@@ -483,6 +483,27 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 completionHandler?(try? JSONSerialization.data(withJSONObject:["local":local,"node":node,"web":web]))
             }
             return
+        case let message where message.hasPrefix("route "):
+            // The path to the node for the route globe, measured from here so the probes leave outside the tunnel:
+            // the core traces it, the server places the routers (nothing stored), the core builds stops and rows.
+            let request=(try? JSONSerialization.jsonObject(with:Data(message.dropFirst(6).utf8))) as? [String:Any] ?? [:]
+            let api=self.api
+            Task.detached {
+                let empty:[String:Any]=["rows":[],"points":[],"reached":false]
+                guard let probes=request["probes"] as? String,!probes.isEmpty,
+                      let trace=(try? JSONSerialization.jsonObject(with:Data(CoreTrace(probes,2500).utf8))) as? [String:Any] else {
+                    completionHandler?(try? JSONSerialization.data(withJSONObject:empty));return
+                }
+                if let error=trace["error"] as? String {Journal.add("route: not measured (\(error))")}
+                let ips=(trace["hops"] as? [[String:Any]] ?? []).compactMap {$0["ip"] as? String}
+                var places:[String:Any]=["hops":[]]
+                if !ips.isEmpty,let api,let answer=try? await api.request("route-hops",["ips":ips]) {places=answer}
+                var input:[String:Any]=["trace":trace,"places":places,"exit":request["exit"] ?? [:]]
+                if let origin=request["origin"] {input["origin"]=origin}
+                guard let data=try? JSONSerialization.data(withJSONObject:input) else {completionHandler?(try? JSONSerialization.data(withJSONObject:empty));return}
+                completionHandler?(Data(CoreRoute(String(decoding:data,as:UTF8.self)).utf8))
+            }
+            return
         default:break
         }
         stateLock.lock();let state=snapshot;stateLock.unlock()

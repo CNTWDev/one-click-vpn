@@ -887,6 +887,11 @@ public partial class MainWindow : Window {
         var list=Latency.Probes(node).Select(p=>(p.Host.Contains(':')?$"[{p.Host}]":p.Host)+":"+p.Port).ToList();
         return list.Count==0?null:string.Join(",",list);
     }
+    /// One measured path per connection and location.
+    private string RouteKey()=>$"{connection.Since?.Ticks??0}:{connection.NodeId}";
+    private async Task MeasureRoute(string key,string probes,Spot? origin,Spot exit) {
+        if(await RouteHops.Measure(core,api,key,probes,origin,exit,0)) UpdateLive();
+    }
     /// The connection check: three legs timed on demand. Your network = a small page fetched outside the tunnel,
     /// to the location = a TCP connect to the node outside the tunnel, opening a page = the test page through the
     /// transport carrying traffic now. One sentence then says which leg is slow.
@@ -920,6 +925,20 @@ public partial class MainWindow : Window {
         if(region.Length>0) {
             var exit=Columns(Single(L10n.Text("check_exit"),12,Look.Secondary),new FrameworkElement(),Single(region,12));
             exit.Margin=new Thickness(2,12,2,0);stack.Children.Add(exit);
+        }
+        // The path measured when this connection came up (RouteHops): every stop with its network and round trip.
+        if(RouteHops.Path is { } path&&path.Key==RouteKey()&&path.Rows.Count>1) {
+            var title=Single(L10n.Text("route_title"),12,Look.Secondary);title.Margin=new Thickness(2,12,2,2);stack.Children.Add(title);
+            for(var i=0;i<path.Rows.Count;i++) {
+                var row=path.Rows[i];var (head,detail)=RouteHops.Describe(row,name);var quiet=row.Kind=="gap";
+                var number=Single((i+1).ToString("00"),11,Look.Faint);number.FontFamily=new FontFamily("Cascadia Mono, Consolas");number.Width=24;number.TextTrimming=TextTrimming.None;
+                var texts=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(4,0,8,0)};
+                texts.Children.Add(Single(head,quiet?12:13,row.Kind=="exit"?Look.Accent:quiet?Look.Faint:Look.Text,strong:!quiet));
+                if(detail.Length>0) texts.Children.Add(Single(detail,11,Look.Secondary));
+                var ms=Single(row.Ms>0?L10n.Text("latency_ms",row.Ms.ToString("N0",L10n.Culture)):"—",12,Look.Secondary);ms.FontFamily=new FontFamily("Cascadia Mono, Consolas");ms.TextTrimming=TextTrimming.None;
+                stack.Children.Add(new Border {MinHeight=34,Child=Columns(number,texts,ms)});
+            }
+            var note=Words(L10n.Text("route_note"),11);note.Foreground=Look.Faint;note.TextWrapping=TextWrapping.Wrap;note.Margin=new Thickness(2,4,2,0);stack.Children.Add(note);
         }
         // With advanced on, each line by its protocol's name instead of its number.
         var advancedNames=Advanced.Enabled;
@@ -1379,7 +1398,7 @@ public partial class MainWindow : Window {
     private string? Elapsed()=>!Connection.Notices.Contains(connection.StatusKey)&&connection.Since is { } since?(DateTime.UtcNow-since).ToString(@"hh\:mm\:ss"):null;
     /// The flyout's one line keeps time and rates together; the window shows the time large above the rates.
     private string StatusDetail(LinkState state,bool compact=true)=>state switch {
-        LinkState.Connected=>compact&&Elapsed() is { } time?L10n.Text("connection_stats",time,Mbps(connection.RxRate),Mbps(connection.TxRate)):L10n.Text("seen_as",connection.NodeName)+(Guidance.Bypass(connection.Bypass) is { } forced?"\n"+forced:""),
+        LinkState.Connected=>compact&&Elapsed() is { } time?L10n.Text("connection_stats",time,Mbps(connection.RxRate),Mbps(connection.TxRate)):(RouteHops.Via(RouteHops.Path?.Key==RouteKey()?RouteHops.Path:null) is { Length: >0 } via?via:L10n.Text("seen_as",connection.NodeName))+(Guidance.Bypass(connection.Bypass) is { } forced?"\n"+forced:""),
         LinkState.Connecting=>L10n.Text("finding_best_route"),
         LinkState.Switching=>L10n.Text("switching_detail"),
         LinkState.Reconnecting=>L10n.Text(connection.StatusKey=="location_retrying"?"location_retrying":"reconnecting_detail"),
@@ -2291,6 +2310,12 @@ public partial class MainWindow : Window {
             portrait.State=state;portrait.Lines=connection.Lines;
             var (origin,exit)=(GlobeOrigin(),GlobeExit());
             portrait.Origin=origin;portrait.Exit=exit;
+            // Once connected, the path to the location is measured once (outside the tunnel) and drawn on the globe.
+            var key=RouteKey();
+            if(state==LinkState.Connected&&exit is not null&&connection.Since is not null&&ProbeAddress(NodeData(connection.NodeId)) is { } probes)
+                _=MeasureRoute(key,probes,origin,exit);
+            if(!connection.Active) RouteHops.Clear();
+            portrait.Route=RouteHops.Path?.Key==key?RouteHops.Path:null;
             portrait.Distance=origin is not null&&exit is not null?L10n.Text("globe_km",(Math.Max(10,Math.Round(Earth.Km(origin,exit)/10)*10)).ToString("N0",L10n.Culture)):"";
             portrait.Centre=state switch {
                 LinkState.Connected=>Elapsed()??"",

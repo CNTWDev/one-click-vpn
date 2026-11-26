@@ -1137,6 +1137,12 @@ class MainActivity : Activity() {
             val here = if (VisitorPlace.shown(this@MainActivity)) VisitorPlace.spot(this@MainActivity) else null
             val there = Directory.places[exitId]?.let { Spot(it[0], it[1], exitName) }
             origin = here; exit = there
+            // Once connected, the path to the location is measured once (outside the tunnel) and drawn on the globe.
+            val key = routeKey(exitId)
+            if (state == LinkState.CONNECTED && there != null && ConnectionStateStore.since > 0)
+                RouteHops.measure(api, key, Directory.probes[exitId] ?: "", here, there) { runOnUiThread { if (!isDestroyed && stateDetail != null) { shownState = null; showState() } } }
+            if (!active) RouteHops.clear()
+            route = RouteHops.path?.takeIf { it.key == key }
             distance = if (here != null && there != null) L10n.text(R.string.globe_km, L10n.number(maxOf(10, (Earth.km(here, there) / 10).roundToInt() * 10))) else ""
             this.state = state; lines = maxOf(ConnectionStateStore.lines, 2)
             centre = when (state) {
@@ -1164,7 +1170,7 @@ class MainActivity : Activity() {
         switchText?.text = if (noteShown) L10n.text(R.string.switched_location, from, ConnectionStateStore.node) else ""
         switchNote?.visibility = if (noteShown) View.VISIBLE else View.GONE
         stateDetail?.swap(when (state) {
-            LinkState.CONNECTED -> L10n.text(R.string.seen_as, ConnectionStateStore.node) + Guidance.bypass().let { if (it.isEmpty()) "" else "\n" + it }
+            LinkState.CONNECTED -> RouteHops.via(RouteHops.path?.takeIf { it.key == routeKey(ConnectionStateStore.nodeId.ifEmpty { selectedId }) }).ifEmpty { L10n.text(R.string.seen_as, ConnectionStateStore.node) } + Guidance.bypass().let { if (it.isEmpty()) "" else "\n" + it }
             LinkState.CONNECTING -> L10n.text(R.string.finding_best_route)
             LinkState.SWITCHING -> L10n.text(R.string.switching_detail)
             LinkState.RECONNECTING -> if (ConnectionStateStore.messageId == R.string.location_retrying) ConnectionStateStore.message else L10n.text(R.string.reconnecting_detail)
@@ -1183,6 +1189,8 @@ class MainActivity : Activity() {
         shownState = state; shownTrouble = trouble
         showCurrentNode()
     }
+    /** One measured path per connection and location. */
+    private fun routeKey(nodeId: String) = "${ConnectionStateStore.since}:$nodeId"
     /** The four-step check under a network failure; while it shows, the location row and the usage step aside so the page still fits. */
     private fun showChecks(checks: List<Check>?) {
         val card = checksCard ?: return
@@ -2117,6 +2125,26 @@ class MainActivity : Activity() {
                 addView(text(L10n.text(R.string.check_exit), 13f, Palette.secondary), LinearLayout.LayoutParams(0, -2, 1f))
                 addView(text(region, 13f).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 6.dp })
+        }
+        // The path measured when this connection came up (RouteHops): every stop with its network and round trip.
+        RouteHops.path?.takeIf { it.key == routeKey(nodeId) && it.rows.size > 1 }?.let { p ->
+            box.addView(text(L10n.text(R.string.route_title), 12f, Palette.secondary), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 10.dp })
+            p.rows.forEachIndexed { i, row ->
+                val (title, detail) = RouteHops.describe(row, nodeName)
+                box.addView(LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = 40.dp
+                    addView(text(String.format(java.util.Locale.ROOT, "%02d", i + 1), 11f, Palette.faint).apply { typeface = Typeface.MONOSPACE }, LinearLayout.LayoutParams(26.dp, -2))
+                    val quiet = row.kind == "gap"
+                    addView(LinearLayout(this@MainActivity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        addView(text(title, if (quiet) 13f else 14f, if (row.kind == "exit") Palette.accent else if (quiet) Palette.faint else Palette.text, if (quiet) 400 else 500).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
+                        if (detail.isNotEmpty()) addView(text(detail, 12f, Palette.secondary).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
+                    }, LinearLayout.LayoutParams(0, -2, 1f))
+                    addView(text(if (row.ms > 0) L10n.text(R.string.latency_ms, L10n.number(row.ms)) else "—", 12f, Palette.secondary).apply { typeface = Typeface.MONOSPACE; maxLines = 1 },
+                        LinearLayout.LayoutParams(-2, -2).apply { marginStart = 12.dp })
+                }, LinearLayout.LayoutParams(-1, -2))
+            }
+            box.addView(text(L10n.text(R.string.route_note), 12f, Palette.faint), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4.dp })
         }
         // This node's lines (Line 1…4), each with its delay; the one carrying traffic is tinted and named on the label
         // row ("in use" inside every cell took the room the names need).

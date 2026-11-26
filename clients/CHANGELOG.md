@@ -4,6 +4,20 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.52
+
+### zh
+- 线路地球：连上之后测一次你到出口经过的路径，直线弧展开成途经的城市，光点沿路一跳一跳接力
+- 状态下面显示「途经 上海 · 158 ms」；连接体检里列出每一跳的城市、运营商和延迟（位置按 IP 估算，只到城市，没回应的不猜）
+
+### en
+- Route globe: once connected, the path to your exit is measured and the straight arc unfolds into the cities it passes, with a light relaying hop by hop
+- The line under the state reads "Via Shanghai · 158 ms"; the connection check lists every hop's city, network and delay (estimated from IP, city level, silent hops never guessed)
+
+### ru
+- Глобус маршрута: после подключения измеряется путь до выхода, и прямая дуга раскрывается в города по пути, огонёк бежит от узла к узлу
+- Под статусом: «Через Шанхай · 158 мс»; в проверке связи — город, сеть и задержка каждого узла (по IP, до города; молчащие узлы не угадываем)
+
 ## 1.0.51
 
 ### zh

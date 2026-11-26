@@ -16,6 +16,8 @@
 //	download <id> <base64 request> -> download:<id> <status JSON> when finished (update installer, see core.Download)
 //	progress                      -> status JSON of the running download
 //	cancel                        -> ok (the partial file stays and resumes next time)
+//	trace <id> <address> <ms>     -> trace:<id> <JSON> when done (path to the node outside the tunnel, see core.Trace)
+//	route <base64 JSON>           -> JSON stops and rows for the route globe (see core.Route)
 //	killswitch on|off             -> ok | error <message> (block traffic outside the tun)
 package main
 
@@ -86,6 +88,22 @@ func main() {
 				}
 				reply("fetch:" + id + " " + core.Fetch(home, string(request)))
 			}()
+		case "trace":
+			// The path to the node outside the tunnel (core.Trace), answered when done (about 2.5 s).
+			if len(fields) != 4 {
+				continue
+			}
+			id, address := fields[1], fields[2]
+			timeout, _ := strconv.Atoi(fields[3])
+			go func() { reply("trace:" + id + " " + core.Trace(address, timeout)) }()
+		case "route":
+			// The globe's stops and the via list from a trace and its routers' places (core.Route).
+			if len(fields) != 2 {
+				reply(`{"rows":[],"points":[],"reached":false}`)
+				continue
+			}
+			input, _ := base64.StdEncoding.DecodeString(fields[1])
+			reply(core.Route(string(input)))
 		case "test":
 			// Answered when done (up to its timeout), so measuring the node list never holds up probes and rates.
 			if len(fields) != 3 {

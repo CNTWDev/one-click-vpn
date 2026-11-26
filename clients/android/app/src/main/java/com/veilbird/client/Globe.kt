@@ -154,6 +154,9 @@ class Portrait(context: Context) : View(context) {
     /** Written under the location's name, e.g. "1 760 km"; empty without an origin. */
     var distance: String = ""
         set(value) { if (field != value) { field = value; invalidate() } }
+    /** The measured path (RouteHops) once connected: the straight arc unfolds into its stops, then a light relays along it. */
+    var route: RoutePath? = null
+        set(value) { if (field != value) { field = value; invalidate() } }
 
     private var stateAt = 0L
     private var moving = false
@@ -210,7 +213,7 @@ class Portrait(context: Context) : View(context) {
     }
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { cache?.recycle(); cache = null; cacheKey = "" }
     override fun onDetachedFromWindow() { cache?.recycle(); cache = null; cacheKey = ""; super.onDetachedFromWindow() }
-    private companion object { const val MAX = 280; const val MIN = 140 }
+    private companion object { const val MAX = 280; const val MIN = 140; const val STEP = .42 }
 
     /** The earth as the old sphere's dot lattice: each dot looks up the land under it; drawn once per view and size. */
     private fun sphere(s: Int): Bitmap {
@@ -248,8 +251,14 @@ class Portrait(context: Context) : View(context) {
         if (b != null) bScreen = screen(Earth.project(b.lat, b.lon, 0.0, viewLat, viewLon))
         var loops = !still && (st == LinkState.IDLE && a != null || busy || connected || st == LinkState.RECONNECTING)
 
+        // The measured path: from 2.2 s after landing (or when it arrives), the straight arc fades while the path draws in
+        // stop by stop; then it stays, a light relaying along it every 3.6 s.
+        val hops = route?.takeIf { connected && b != null && it.stops.isNotEmpty() }
+        val unfold = hops?.let { if (still) 99.0 else (now - max(it.at, stateAt + 2200)) / 1000.0 } ?: -1.0
+        val unfoldEnd = hops?.let { it.stops.size * STEP + .35 } ?: 0.0
+        val direct = if (hops == null) 1f else (1 - min(1.0, max(0.0, unfold / unfoldEnd))).toFloat()
         // The route: a dotted great circle lifted off the ground, with a soft glow under its lit part.
-        if (on && b != null) {
+        if (on && b != null && direct > 0f) {
             val start = a?.let { doubleArrayOf(it.lat, it.lon) } ?: Earth.unproject(-.97, -.05, viewLat, viewLon)
             val w = Earth.angle(start[0], start[1], b.lat, b.lon)
             var lift = max(.07, .09 + .3 * w / PI)
@@ -269,7 +278,7 @@ class Portrait(context: Context) : View(context) {
                 for ((lw, al) in listOf(10 * u to (if (connected) .10f else .05f), 4 * u to (if (connected) .22f else .08f))) {
                     path.reset(); var open = false
                     for (q in pts) { if (q[3] > charge || q[2] < 1f) { open = false; continue }; if (!open) { path.moveTo(q[0], q[1]); open = true } else path.lineTo(q[0], q[1]) }
-                    stroke.strokeWidth = lw; stroke.color = Palette.alpha(accent, (255 * al).toInt()); canvas.drawPath(path, stroke)
+                    stroke.strokeWidth = lw; stroke.color = Palette.alpha(accent, (255 * al * direct).toInt()); canvas.drawPath(path, stroke)
                 }
             }
             val head = when { busy -> (since / 1.4 % 1).toFloat(); st == LinkState.RECONNECTING -> (since / 4 % 1).toFloat(); connected -> (since / 3 % 1).toFloat(); else -> -1f }
@@ -285,13 +294,71 @@ class Portrait(context: Context) : View(context) {
                     busy -> { var v = .3f; val g = ((head - t) % 1 + 1) % 1; if (!still && g < .28f) v = max(v, 1 - g / .28f); if (still) v = if (t < .55f) .9f else .3f; v }
                     st == LinkState.RECONNECTING -> { var v = .2f; val g = ((head - t) % 1 + 1) % 1; if (!still && g < .12f) v = max(v, 1 - g / .12f); v }
                     else -> .16f
-                } * fade
+                } * fade * direct
                 paint.color = Palette.alpha(if (al > .95f) light else accent, (255 * min(1f, al)).toInt())
                 canvas.drawRect(q[0] - size / 2, q[1] - size / 2, q[0] + size / 2, q[1] + size / 2, paint)
             }
             // A soft light at the head: the runner while connecting, the flash crossing on landing, then one every 3 s.
             val at = when { still -> -1f; busy -> head; connected && since < .7 -> (since / .7).toFloat(); connected -> head; else -> -1f }
-            if (at >= 0) { val q = pts[min(96, (at * 96).roundToInt())]; if (q[2] >= 1f) glow(canvas, q[0], q[1], (if (busy) 13 else 16) * u, light, if (connected && since < .7) .9f else .7f) }
+            if (at >= 0 && (hops == null || since < .7)) { val q = pts[min(96, (at * 96).roundToInt())]; if (q[2] >= 1f) glow(canvas, q[0], q[1], (if (busy) 13 else 16) * u, light, if (connected && since < .7) .9f else .7f) }
+        }
+        var stopLabels: List<Pair<Spot, FloatArray>> = emptyList()
+        var exitLit = 0f
+        if (hops != null && b != null && unfold > 0) {
+            val ends = listOf(a?.let { doubleArrayOf(it.lat, it.lon) } ?: Earth.unproject(-.97, -.05, viewLat, viewLon)) + hops.stops.map { doubleArrayOf(it.spot.lat, it.spot.lon) } + listOf(doubleArrayOf(b.lat, b.lon))
+            // Each stretch as screen points (x, y, visible, t), its length, and when it draws in.
+            class Leg(val pts: List<FloatArray>, val len: Float, val faint: Boolean, val from: Float)
+            val legs = mutableListOf<Leg>(); var total = 0f
+            for (k in 1 until ends.size) {
+                val p0 = ends[k - 1]; val p1 = ends[k]; val w = Earth.angle(p0[0], p0[1], p1[0], p1[1])
+                val n = max(12, (64 * w / 1.2).roundToInt()); var lift = max(.015, .03 + .2 * w / PI); var pts = listOf<FloatArray>()
+                for (attempt in 0 until 4) {
+                    var far = 0.0
+                    pts = (0..n).map { i -> val t = i.toDouble() / n; val g = Earth.slerp(p0[0], p0[1], p1[0], p1[1], t); val pr = Earth.project(g[0], g[1], lift * sin(PI * t), viewLat, viewLon); far = max(far, hypot(pr[0], pr[1])); val q = screen(pr); floatArrayOf(q[0], q[1], q[2], t.toFloat()) }
+                    if (far < 1.03 || lift < .02) break
+                    lift *= .7
+                }
+                var len = 0f; for (i in 1 until pts.size) len += hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])
+                val faint = if (k - 1 < hops.stops.size) hops.stops[k - 1].faint else hops.exitFaint
+                legs.add(Leg(pts, len, faint, total)); total += len
+            }
+            val steady = unfold > unfoldEnd + .4
+            val cycle = if (steady && !still) ((unfold - unfoldEnd - .4) % 3.6) / 2.2 else -1.0
+            val runner = if (cycle in 0.0..1.0) Earth.ease(cycle).toFloat() * total else -1f
+            val size = max(2 * d / 1.6f, 2.7f * u)
+            legs.forEachIndexed { k, leg ->
+                val shown = min(1.0, max(0.0, (unfold - k * STEP) / .35)).toFloat(); if (shown <= 0f) return@forEachIndexed
+                if (!leg.faint) for ((lw, al) in listOf(9 * u to .09f, 3.5f * u to .2f)) {
+                    path.reset(); var open = false
+                    for (q in leg.pts) { if (q[3] > shown || q[2] < 1f) { open = false; continue }; if (!open) { path.moveTo(q[0], q[1]); open = true } else path.lineTo(q[0], q[1]) }
+                    stroke.strokeWidth = lw; stroke.color = Palette.alpha(accent, (255 * al).toInt()); canvas.drawPath(path, stroke)
+                }
+                var gap = 0f; var along = 0f
+                for (i in 1 until leg.pts.size) {
+                    val q = leg.pts[i]; val p = leg.pts[i - 1]; val step = hypot(q[0] - p[0], q[1] - p[1]); gap += step; along += step
+                    if (gap < (if (leg.faint) 12f else 6.2f) * u && i != 1) continue
+                    gap = 0f
+                    if (q[2] < 1f || q[3] > shown) continue
+                    val lit = runner >= 0 && leg.from + along <= runner && leg.from + along > runner - 26 * u
+                    paint.color = if (lit) light else Palette.alpha(accent, (255 * (if (leg.faint) .3f else .9f)).toInt())
+                    canvas.drawRect(q[0] - size / 2, q[1] - size / 2, q[0] + size / 2, q[1] + size / 2, paint)
+                }
+                if (runner >= leg.from && runner <= leg.from + leg.len && leg.len > 0) { val q = leg.pts[min(leg.pts.size - 1, ((runner - leg.from) / leg.len * (leg.pts.size - 1)).roundToInt())]; if (q[2] >= 1f) glow(canvas, q[0], q[1], 11 * u, light, .6f) }
+            }
+            // The stops: a small light that pops in with a ring, and brightens as the runner passes.
+            val labels = mutableListOf<Pair<Spot, FloatArray>>()
+            hops.stops.forEachIndexed { k, stop ->
+                val t1 = unfold - (k * STEP + .35); if (t1 < 0) return@forEachIndexed
+                val q = screen(Earth.project(stop.spot.lat, stop.spot.lon, 0.0, viewLat, viewLon)); if (q[2] < 1f) return@forEachIndexed
+                if (!still && t1 < .8) { val kk = (t1 / .8).toFloat(); stroke.strokeWidth = max(1f, u); stroke.color = Palette.alpha(light, (255 * (1 - kk) * .7f).toInt()); canvas.drawCircle(q[0], q[1], (4 + 16 * Earth.ease(kk.toDouble()).toFloat()) * u, stroke) }
+                val near = if (runner >= 0) abs(runner - legs[k + 1].from) else Float.MAX_VALUE; val hl = if (near < 18 * u) 1 - near / (18 * u) else 0f
+                glow(canvas, q[0], q[1], (10 + 6 * hl) * u, light, .25f + .45f * hl)
+                val sq = max(4f * d / 1.6f, 4.6f * u) * min(1.0, t1 / .25).toFloat(); paint.color = Palette.alpha(light, 242)
+                canvas.drawRect(q[0] - sq / 2, q[1] - sq / 2, q[0] + sq / 2, q[1] + sq / 2, paint)
+                labels.add(stop.spot to floatArrayOf(q[0], q[1], min(1.0, t1 / .4).toFloat()))
+            }
+            stopLabels = labels
+            if (runner >= 0) { val near = abs(runner - total); if (near < 18 * u) exitLit = 1 - near / (18 * u) }
         }
         // This device: a light with a ripple while visible; a small white mark in a thin ring once hidden.
         if (a != null) {
@@ -322,7 +389,7 @@ class Portrait(context: Context) : View(context) {
                 st == LinkState.FAILED -> { val sq = max(4f * d / 1.6f, 4.5f * u); paint.color = Palette.alpha(Palette.fair, 230); canvas.drawRect(bs[0] - sq / 2, bs[1] - sq / 2, bs[0] + sq / 2, bs[1] + sq / 2, paint) }
                 connected -> {
                     val flare = if (still || since < .6) 0f else 1 - min(1f, ((since - .6) / .8).toFloat())
-                    glow(canvas, bs[0], bs[1], (22 + 16 * flare) * u, accent, .4f + .15f * breath + .45f * flare)
+                    glow(canvas, bs[0], bs[1], (22 + 16 * flare) * u, accent, .4f + .15f * breath + .45f * max(flare, exitLit))
                     if (!still && since > .6 && since < 2.1) for (i in 0..1) {
                         val k = ((since - .6 - i * .25) / 1.2).toFloat(); if (k <= 0 || k >= 1) continue
                         stroke.color = Palette.alpha(accent, (255 * (1 - k) * .85f).toInt()); stroke.strokeWidth = max(1f, 1.6f * u * (1 - k) + .6f)
@@ -352,6 +419,17 @@ class Portrait(context: Context) : View(context) {
             val left = aScreen != null && bs[0] < aScreen[0]; val bx = bs[0] + (if (left) -14 else 14) * u; val side = if (left) 1 else -1
             put(canvas, b.label, bx, bs[1] - fs * .5f, if (connected) accent else if (st == LinkState.FAILED) Palette.fair else Palette.text, if (connected) 1f else .8f, fs * 1.08f, side)
             if (distance.isNotEmpty() && (connected || busy)) { label.typeface = Typeface.MONOSPACE; put(canvas, distance, bx, bs[1] + fs * .85f, Palette.secondary, if (connected) .85f else .55f, fs, side); label.typeface = Typeface.DEFAULT }
+        }
+        // The stops' names, small and quiet, each skipped where it would crowd an end's name or another stop's.
+        if (stopLabels.isNotEmpty()) {
+            val taken = mutableListOf<FloatArray>()
+            aScreen?.let { taken.add(floatArrayOf(it[0], it[1])) }; bs?.let { taken.add(floatArrayOf(it[0], it[1])) }
+            for ((spot, q) in stopLabels) {
+                if (spot.label.isEmpty() || taken.any { hypot(it[0] - q[0], it[1] - q[1]) < 3.2f * fs }) continue
+                taken.add(floatArrayOf(q[0], q[1]))
+                val left = q[0] < cx
+                put(canvas, spot.label, q[0] + (if (left) -10 else 10) * u, q[1] - fs * .6f, Palette.secondary, .9f * q[2], fs * 1.02f, if (left) 1 else -1)
+            }
         }
         label.clearShadowLayer()
         // The lower half: the time hidden and the rates (connected), the countdown (reconnecting), or one short line.

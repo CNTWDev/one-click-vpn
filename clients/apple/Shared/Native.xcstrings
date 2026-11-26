@@ -8971,6 +8971,259 @@
         }
       }
     },
+    "route_border": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "exit point"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出境"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "выход за границу"
+          }
+        }
+      }
+    },
+    "route_exit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "your exit"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的出口"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ваш выход"
+          }
+        }
+      }
+    },
+    "route_gap": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ hops didn’t answer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 跳没有回应"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не ответили узлов: %1$@"
+          }
+        }
+      }
+    },
+    "route_gap_end": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No answer after this"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "之后没有回应"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дальше без ответа"
+          }
+        }
+      }
+    },
+    "route_gap_one": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 hop didn’t answer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 跳没有回应"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 узел не ответил"
+          }
+        }
+      }
+    },
+    "route_local": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home / provider network"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "家里 / 运营商内网"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дом / сеть провайдера"
+          }
+        }
+      }
+    },
+    "route_note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Places are estimated from IP, city level only. Silent hops get no guessed place and are drawn faint on the globe."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置按 IP 估算，只到城市。没回应的跳不猜位置，地球上画成虚的。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Места определены по IP, только город. Для молчащих узлов место не угадываем, на глобусе они бледные."
+          }
+        }
+      }
+    },
+    "route_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Path"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "途经"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Маршрут"
+          }
+        }
+      }
+    },
+    "route_tracing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracing the path…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在测路径…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Измеряем путь…"
+          }
+        }
+      }
+    },
+    "route_unknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Place unknown"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置不明"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Место неизвестно"
+          }
+        }
+      }
+    },
+    "route_via": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Via %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "途经 %1$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Через %1$@"
+          }
+        }
+      }
+    },
     "routing_global": {
       "extractionState": "manual",
       "localizations": {
@@ -13071,19 +13324,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac: fixed desktop widgets staying blank and missing the new sizes after an update"
+            "value": "Route globe: once connected, the path to your exit is measured and the straight arc unfolds into the cities it passes, with a light relaying hop by hop\nThe line under the state reads \"Via Shanghai · 158 ms\"; the connection check lists every hop's city, network and delay (estimated from IP, city level, silent hops never guessed)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac：修复更新后桌面小组件一片空白、看不到新尺寸的问题"
+            "value": "线路地球：连上之后测一次你到出口经过的路径，直线弧展开成途经的城市，光点沿路一跳一跳接力\n状态下面显示「途经 上海 · 158 ms」；连接体检里列出每一跳的城市、运营商和延迟（位置按 IP 估算，只到城市，没回应的不猜）"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac: исправлено: после обновления виджеты рабочего стола оставались пустыми и без новых размеров"
+            "value": "Глобус маршрута: после подключения измеряется путь до выхода, и прямая дуга раскрывается в города по пути, огонёк бежит от узла к узлу\nПод статусом: «Через Шанхай · 158 мс»; в проверке связи — город, сеть и задержка каждого узла (по IP, до города; молчащие узлы не угадываем)"
           }
         }
       }
