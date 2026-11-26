@@ -233,10 +233,20 @@ export async function handleUpdate(update: Update): Promise<void> {
   const parsed = parseCallback(query.data);
   if (!parsed || !query.message) return answer(token, query.id, "这个按钮已失效。");
   const chatId = String(query.message.chat.id);
-  const approver = row.approvers.find((person) => person.id === String(query.from.id));
+  const userId = String(query.from.id);
+  // Whoever presses is remembered, so a refused person shows up in the Console as an approver to add.
+  await remember(query.message.chat, query.from);
+  // Read the list straight from the database: a press must see the approvers the Console saved a moment ago.
+  const approvers = (await dbQuery<{ approvers: Person[] }>("SELECT approvers FROM telegram_settings WHERE id = 'primary'"))[0]?.approvers ?? [];
+  const approver = approvers.find((person) => String(person.id) === userId);
   if (!approver) {
-    log("warning", "approval_denied", `Telegram approval pressed by a non-approver`, { telegramUser: String(query.from.id), approval: parsed.id });
-    return answer(token, query.id, "你不在审批人名单里，不能操作。");
+    const host = (await consoleLink().catch(() => undefined))?.url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    log("warning", "approval_denied", `Telegram approval pressed by a non-approver`, { telegramUser: userId, telegramName: personName(query.from), approvers: approvers.map((person) => person.id), approval: parsed.id });
+    return answer(token, query.id, [
+      "你不在审批人名单里，不能操作。",
+      `你的 Telegram ID：${userId}`,
+      host ? `审批由 ${host} 处理，请在它的 Console → Telegram → 审批人里添加你。` : "请在 Console → Telegram → 审批人里添加你。",
+    ].join("\n").slice(0, 200));
   }
   const chatAllowed = (await dbQuery("SELECT 1 FROM telegram_chats WHERE chat_id = $1", [chatId])).length > 0;
   if (!chatAllowed) return answer(token, query.id, "这个聊天已从 Console 移除。");

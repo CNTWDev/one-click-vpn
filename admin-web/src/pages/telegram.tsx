@@ -145,8 +145,8 @@ export function TelegramPanel() {
       <h3 className="tg-heading">{t("审批人")}</h3>
       <p className="tg-note">{approvalEvents.length ? t("只有这些 Telegram 账号能在「{0}」消息里点通过或拒绝。", [approvalEvents.join(" / ")]) : t("只有这些 Telegram 账号能在消息里点通过或拒绝。")}</p>
       <div className="tg-people">
-        {status.approvers.map((person) => <span className="tg-person" key={person.id}>{person.name}<button type="button" aria-label={t("移除 {0}", [person.name])} disabled={Boolean(busy)} onClick={() => void setApprovers(status.approvers.filter((item) => item.id !== person.id))}>×</button></span>)}
-        {candidates.map((person) => <button type="button" className="tg-person add" key={person.id} disabled={Boolean(busy)} onClick={() => void setApprovers([...status.approvers, person])}>+ {person.name}</button>)}
+        {status.approvers.map((person) => <span className="tg-person" key={person.id}>{person.name}<small>{person.id}</small><button type="button" aria-label={t("移除 {0}", [person.name])} disabled={Boolean(busy)} onClick={() => void setApprovers(status.approvers.filter((item) => item.id !== person.id))}>×</button></span>)}
+        {candidates.map((person) => <button type="button" className="tg-person add" key={person.id} disabled={Boolean(busy)} onClick={() => void setApprovers([...status.approvers, person])}>+ {person.name}<small>{person.id}</small></button>)}
         {!status.approvers.length && !candidates.length && <span className="tg-empty">{t("私聊机器人发送 /start 后，你的账号会出现在这里。")}</span>}
       </div>
     </>}

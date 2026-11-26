@@ -100,7 +100,9 @@ test("Telegram: connect a bot, add a chat found by /start, and approve a sign-up
     const answered = (text) => until(() => telegram.calls.find((item) => item.method === "answerCallbackQuery" && item.body.text.includes(text)), `answer "${text}"`);
 
     press({ id: 222, first_name: "Mallory" }, approve.callback_data);
-    await answered("不在审批人名单");
+    const refused = await answered("不在审批人名单");
+    assert.match(refused.body.text, /你的 Telegram ID：222/, "the refusal names the presser's id, to match against the Console");
+    assert.ok((await (await call("", "GET")).json()).seen.some((item) => item.userId === "222"), "a refused presser is offered as an approver");
     assert.equal((await pool.query("SELECT status FROM users WHERE id=$1", [userId])).rows[0].status, "pending");
 
     press({ id: 111, first_name: "Tuan", username: "tuan" }, approve.callback_data);
