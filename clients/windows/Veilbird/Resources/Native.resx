@@ -576,7 +576,9 @@ Valid until · </value></data>
   <data name="waiting_for_network" xml:space="preserve"><value>Waiting for network…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>No network</value></data>
   <data name="whats_new" xml:space="preserve"><value>What's new</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac: removed the connection notice at the top of the screen so it no longer covers what you're looking at</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Mac: redesigned desktop widgets; buttons connect, disconnect, switch location and switch smart or global routing without opening the app window
+Mac: new large widget (speed, favorites, mode, traffic left) and a &quot;One location&quot; widget that connects to the place you pick in one click
+Mac: on macOS 26, Control Center gets a routing switch and a location button, and the connect switch works in place</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>What's new in {0}</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>Where would you like to connect?</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI service</value></data>
@@ -595,8 +597,14 @@ Valid until · </value></data>
   <data name="why_rest" xml:space="preserve"><value>Everything else</value></data>
   <data name="why_rest_direct" xml:space="preserve"><value>No other rule matched, so it goes direct.</value></data>
   <data name="why_rest_proxy" xml:space="preserve"><value>No other rule matched, so it goes encrypted.</value></data>
+  <data name="widget_connect_here" xml:space="preserve"><value>Connect here</value></data>
+  <data name="widget_fastest" xml:space="preserve"><value>Fastest: {0}</value></data>
   <data name="widget_globe" xml:space="preserve"><value>TrackNothing globe</value></data>
-  <data name="widget_mac_description" xml:space="preserve"><value>See at a glance whether you're hidden and which city you go out from; click to connect</value></data>
+  <data name="widget_in_use" xml:space="preserve"><value>In use</value></data>
+  <data name="widget_lines" xml:space="preserve"><value>{0} lines</value></data>
+  <data name="widget_mac_description" xml:space="preserve"><value>See whether you're hidden and where you go out from; the buttons connect, disconnect, switch location and mode without opening the app</value></data>
+  <data name="widget_mac_place_description" xml:space="preserve"><value>Pick a location and click to connect there; add several for several shortcuts</value></data>
+  <data name="widget_mac_place_name" xml:space="preserve"><value>One location</value></data>
   <data name="widget_strip" xml:space="preserve"><value>TrackNothing status</value></data>
   <data name="widget_tap" xml:space="preserve"><value>Tap to connect</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows development build · VPN service integration in progress</value></data>

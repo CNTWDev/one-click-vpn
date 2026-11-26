@@ -4,6 +4,23 @@
 发布时（CI 或 `npm run release:client`）这一节自动成为「更新说明」；客户端按自己的语言显示，更新横幅显示第一条，点开看全部。
 格式固定：`## 版本号`，下面 `### zh` / `### en` / `### ru`，每条以 `- ` 开头。
 
+## 1.0.50
+
+### zh
+- Mac：桌面小组件重做，按钮直接连接、断开、换地点、切智能分流或全局，不再打开应用窗口
+- Mac：新增大号小组件（速度、收藏、模式、剩余流量）和「常用地点」小组件，选一个地点点一下就连过去
+- Mac：macOS 26 控制中心新增模式开关和常用地点按钮，连接开关直接生效
+
+### en
+- Mac: redesigned desktop widgets; buttons connect, disconnect, switch location and switch smart or global routing without opening the app window
+- Mac: new large widget (speed, favorites, mode, traffic left) and a "One location" widget that connects to the place you pick in one click
+- Mac: on macOS 26, Control Center gets a routing switch and a location button, and the connect switch works in place
+
+### ru
+- Mac: обновлённые виджеты рабочего стола; кнопки подключают, отключают, меняют место и режим (умный или глобальный), не открывая окно приложения
+- Mac: новый большой виджет (скорость, избранное, режим, остаток трафика) и виджет «Одно место», который подключает к выбранному месту одним нажатием
+- Mac: в macOS 26 в Пункте управления появились переключатель режима и кнопка места, а переключатель подключения работает сразу
+
 ## 1.0.49
 
 ### zh

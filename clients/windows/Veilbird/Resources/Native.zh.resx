@@ -576,7 +576,9 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac：去掉屏幕顶部的连接提示，不再遮挡屏幕</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Mac：桌面小组件重做，按钮直接连接、断开、换地点、切智能分流或全局，不再打开应用窗口
+Mac：新增大号小组件（速度、收藏、模式、剩余流量）和「常用地点」小组件，选一个地点点一下就连过去
+Mac：macOS 26 控制中心新增模式开关和常用地点按钮，连接开关直接生效</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI 服务</value></data>
@@ -595,8 +597,14 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="why_rest" xml:space="preserve"><value>其余流量</value></data>
   <data name="why_rest_direct" xml:space="preserve"><value>没有命中其他规则，直连。</value></data>
   <data name="why_rest_proxy" xml:space="preserve"><value>没有命中其他规则，走加密。</value></data>
+  <data name="widget_connect_here" xml:space="preserve"><value>连到这里</value></data>
+  <data name="widget_fastest" xml:space="preserve"><value>最快：{0}</value></data>
   <data name="widget_globe" xml:space="preserve"><value>TrackNothing 地球</value></data>
-  <data name="widget_mac_description" xml:space="preserve"><value>一眼看到有没有隐身、从哪座城市出门，点一下就连接</value></data>
+  <data name="widget_in_use" xml:space="preserve"><value>正在使用</value></data>
+  <data name="widget_lines" xml:space="preserve"><value>{0} 条线路</value></data>
+  <data name="widget_mac_description" xml:space="preserve"><value>一眼看到有没有隐身、从哪座城市出门；按钮直接连接、断开、换地点、切模式，不用打开应用</value></data>
+  <data name="widget_mac_place_description" xml:space="preserve"><value>选一个地点，点一下就连过去；放几个就是几个快捷入口</value></data>
+  <data name="widget_mac_place_name" xml:space="preserve"><value>常用地点</value></data>
   <data name="widget_strip" xml:space="preserve"><value>TrackNothing 状态</value></data>
   <data name="widget_tap" xml:space="preserve"><value>轻点连接</value></data>
   <data name="windows_development_build_vpn_service_integration_in_progress" xml:space="preserve"><value>Windows 开发版 · VPN 服务仍在接入中</value></data>
