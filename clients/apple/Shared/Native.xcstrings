@@ -13071,19 +13071,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac: redesigned desktop widgets; buttons connect, disconnect, switch location and switch smart or global routing without opening the app window\nMac: new large widget (speed, favorites, mode, traffic left) and a \"One location\" widget that connects to the place you pick in one click\nMac: on macOS 26, Control Center gets a routing switch and a location button, and the connect switch works in place"
+            "value": "Mac: fixed desktop widgets staying blank and missing the new sizes after an update"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac：桌面小组件重做，按钮直接连接、断开、换地点、切智能分流或全局，不再打开应用窗口\nMac：新增大号小组件（速度、收藏、模式、剩余流量）和「常用地点」小组件，选一个地点点一下就连过去\nMac：macOS 26 控制中心新增模式开关和常用地点按钮，连接开关直接生效"
+            "value": "Mac：修复更新后桌面小组件一片空白、看不到新尺寸的问题"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac: обновлённые виджеты рабочего стола; кнопки подключают, отключают, меняют место и режим (умный или глобальный), не открывая окно приложения\nMac: новый большой виджет (скорость, избранное, режим, остаток трафика) и виджет «Одно место», который подключает к выбранному месту одним нажатием\nMac: в macOS 26 в Пункте управления появились переключатель режима и кнопка места, а переключатель подключения работает сразу"
+            "value": "Mac: исправлено: после обновления виджеты рабочего стола оставались пустыми и без новых размеров"
           }
         }
       }

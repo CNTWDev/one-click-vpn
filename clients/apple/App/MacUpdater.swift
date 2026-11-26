@@ -60,6 +60,8 @@ enum MacUpdater {
         let script="""
         pid=$1; current=$2; staged=$3
         while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done
+        # The desktop widget process keeps running from the old bundle and would answer for the new build.
+        pkill -f "$current/Contents/PlugIns/" 2>/dev/null
         old="$current.old-$$"
         mv "$current" "$old" && mv "$staged" "$current" || { [ -d "$old" ] && [ ! -d "$current" ] && mv "$old" "$current"; open "$current"; exit 1; }
         rm -rf "$old"

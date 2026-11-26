@@ -103,12 +103,40 @@ import AppKit
 
     /// Listens for widget buttons, and does one pressed while the app was starting.
     static func listen() {
+        stopStaleWidgets()
         guard let name=WidgetCommand.notification else {return}
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(),nil,{_,_,_,_,_ in
             Task {@MainActor in WidgetBridge.takeCommand()}
         },name as CFString,nil,.deliverImmediately)
         // Started by a widget button (the app was not running): the model needs a moment to load the VPN configuration.
         Task {@MainActor in try? await Task.sleep(nanoseconds:1_500_000_000);takeCommand()}
+    }
+    /// A widget process still running from a replaced copy of the app (an update, or the app replaced in Finder)
+    /// answers WidgetKit with the old widgets and its drawings are refused, so the widgets stay blank. Stop it;
+    /// WidgetKit starts the new one when it next needs it.
+    private static func stopStaleWidgets() {
+        let pgrep=Process()
+        pgrep.executableURL=URL(fileURLWithPath:"/usr/bin/pgrep")
+        pgrep.arguments=["-x","TrackNothingWidgets"]
+        let pipe=Pipe();pgrep.standardOutput=pipe;pgrep.standardError=FileHandle.nullDevice
+        guard (try? pgrep.run()) != nil else {return}
+        pgrep.waitUntilExit()
+        let output=String(data:pipe.fileHandleForReading.readDataToEndOfFile(),encoding:.utf8) ?? ""
+        let own=Bundle.main.bundlePath+"/"
+        var stopped=false
+        for pid in output.split(whereSeparator:\.isNewline).compactMap({Int32($0)}) {
+            var buffer=[CChar](repeating:0,count:4096)
+            let path=proc_pidpath(pid,&buffer,UInt32(buffer.count))>0 ? String(cString:buffer):""
+            if !path.hasPrefix(own) {kill(pid,SIGTERM);stopped=true;Journal.add("widgets: stopped a widget process from an old copy")}
+        }
+        guard stopped else {return}
+        Task {@MainActor in
+            try? await Task.sleep(nanoseconds:1_000_000_000)
+            WidgetCenter.shared.reloadAllTimelines()
+            #if compiler(>=6.2)
+            if #available(macOS 26.0,*) {ControlCenter.shared.reloadAllControls()}
+            #endif
+        }
     }
     private static func takeCommand() {
         guard let command=WidgetCommand.take() else {return}
