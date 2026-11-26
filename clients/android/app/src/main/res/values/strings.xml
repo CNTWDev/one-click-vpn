@@ -569,7 +569,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Mac: redesigned desktop widgets; buttons connect, disconnect, switch location and switch smart or global routing without opening the app window\nMac: new large widget (speed, favorites, mode, traffic left) and a \&quot;One location\&quot; widget that connects to the place you pick in one click\nMac: on macOS 26, Control Center gets a routing switch and a location button, and the connect switch works in place</string>
+  <string name="whats_new_notes">Mac: fixed desktop widgets staying blank and missing the new sizes after an update</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="why_ai">AI service</string>

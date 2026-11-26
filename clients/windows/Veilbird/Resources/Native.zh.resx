@@ -576,9 +576,7 @@ macOS 同时会弹出一个提示框，点里面的「好」只是关掉它，�
   <data name="waiting_for_network" xml:space="preserve"><value>等待网络恢复…</value></data>
   <data name="waiting_title" xml:space="preserve"><value>等待网络</value></data>
   <data name="whats_new" xml:space="preserve"><value>本版更新</value></data>
-  <data name="whats_new_notes" xml:space="preserve"><value>Mac：桌面小组件重做，按钮直接连接、断开、换地点、切智能分流或全局，不再打开应用窗口
-Mac：新增大号小组件（速度、收藏、模式、剩余流量）和「常用地点」小组件，选一个地点点一下就连过去
-Mac：macOS 26 控制中心新增模式开关和常用地点按钮，连接开关直接生效</value></data>
+  <data name="whats_new_notes" xml:space="preserve"><value>Mac：修复更新后桌面小组件一片空白、看不到新尺寸的问题</value></data>
   <data name="whats_new_title" xml:space="preserve"><value>{0} 更新内容</value></data>
   <data name="where_would_you_like_to_connect" xml:space="preserve"><value>你想从哪里连接？</value></data>
   <data name="why_ai" xml:space="preserve"><value>AI 服务</value></data>
