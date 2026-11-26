@@ -391,6 +391,17 @@
   <string name="revoking_access_the_slot_is_usually_released_within_about">Revoking access. The slot is usually released within about 5 minutes.</string>
   <string name="revoking_short">Revoking</string>
   <string name="revoking_slot_released_when_the_old_connection_expires">Revoking · Slot released when the old connection expires</string>
+  <string name="route_border">exit point</string>
+  <string name="route_exit">your exit</string>
+  <string name="route_gap">%1$s hops didn’t answer</string>
+  <string name="route_gap_end">No answer after this</string>
+  <string name="route_gap_one">1 hop didn’t answer</string>
+  <string name="route_local">Home / provider network</string>
+  <string name="route_note">Places are estimated from IP, city level only. Silent hops get no guessed place and are drawn faint on the globe.</string>
+  <string name="route_title">Path</string>
+  <string name="route_tracing">Tracing the path…</string>
+  <string name="route_unknown">Place unknown</string>
+  <string name="route_via">Via %1$s</string>
   <string name="routing_global">Global</string>
   <string name="routing_global_detail">All traffic goes through TrackNothing</string>
   <string name="routing_smart">Smart</string>
@@ -569,7 +580,7 @@
   <string name="waiting_for_network">Waiting for network…</string>
   <string name="waiting_title">No network</string>
   <string name="whats_new">What\'s new</string>
-  <string name="whats_new_notes">Mac: fixed desktop widgets staying blank and missing the new sizes after an update</string>
+  <string name="whats_new_notes">Route globe: once connected, the path to your exit is measured and the straight arc unfolds into the cities it passes, with a light relaying hop by hop\nThe line under the state reads \&quot;Via Shanghai · 158 ms\&quot;; the connection check lists every hop\'s city, network and delay (estimated from IP, city level, silent hops never guessed)</string>
   <string name="whats_new_title">What\'s new in %1$s</string>
   <string name="where_would_you_like_to_connect">Where would you like to connect?</string>
   <string name="why_ai">AI service</string>

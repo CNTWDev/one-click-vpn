@@ -391,6 +391,17 @@
   <string name="revoking_access_the_slot_is_usually_released_within_about">解除中，通常最多约 5 分钟后释放额度。</string>
   <string name="revoking_short">解除中</string>
   <string name="revoking_slot_released_when_the_old_connection_expires">解除中 · 等待旧连接到期后释放额度</string>
+  <string name="route_border">出境</string>
+  <string name="route_exit">你的出口</string>
+  <string name="route_gap">%1$s 跳没有回应</string>
+  <string name="route_gap_end">之后没有回应</string>
+  <string name="route_gap_one">1 跳没有回应</string>
+  <string name="route_local">家里 / 运营商内网</string>
+  <string name="route_note">位置按 IP 估算，只到城市。没回应的跳不猜位置，地球上画成虚的。</string>
+  <string name="route_title">途经</string>
+  <string name="route_tracing">正在测路径…</string>
+  <string name="route_unknown">位置不明</string>
+  <string name="route_via">途经 %1$s</string>
   <string name="routing_global">全局</string>
   <string name="routing_global_detail">全部流量经过 TrackNothing</string>
   <string name="routing_smart">智能分流</string>
@@ -569,7 +580,7 @@
   <string name="waiting_for_network">等待网络恢复…</string>
   <string name="waiting_title">等待网络</string>
   <string name="whats_new">本版更新</string>
-  <string name="whats_new_notes">Mac：修复更新后桌面小组件一片空白、看不到新尺寸的问题</string>
+  <string name="whats_new_notes">线路地球：连上之后测一次你到出口经过的路径，直线弧展开成途经的城市，光点沿路一跳一跳接力\n状态下面显示「途经 上海 · 158 ms」；连接体检里列出每一跳的城市、运营商和延迟（位置按 IP 估算，只到城市，没回应的不猜）</string>
   <string name="whats_new_title">%1$s 更新内容</string>
   <string name="where_would_you_like_to_connect">你想从哪里连接？</string>
   <string name="why_ai">AI 服务</string>

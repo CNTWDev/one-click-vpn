@@ -39,7 +39,7 @@ public sealed class Core : IDisposable {
     private void Read(Process core,BlockingCollection<string> lines) {
         try {
             while(core.StandardOutput.ReadLine() is { } line) {
-                var prefix=line.StartsWith("fetch:",StringComparison.Ordinal)?6:line.StartsWith("download:",StringComparison.Ordinal)?9:line.StartsWith("test:",StringComparison.Ordinal)?5:0;
+                var prefix=line.StartsWith("fetch:",StringComparison.Ordinal)?6:line.StartsWith("download:",StringComparison.Ordinal)?9:line.StartsWith("test:",StringComparison.Ordinal)?5:line.StartsWith("trace:",StringComparison.Ordinal)?6:0;
                 if(prefix>0) {
                     var space=line.IndexOf(' ');
                     if(space>prefix&&fetches.TryRemove(line[prefix..space],out var waiting)) waiting.TrySetResult(line[(space+1)..]);
@@ -80,6 +80,20 @@ public sealed class Core : IDisposable {
         }
         return await answer.Task.WaitAsync(TimeSpan.FromSeconds(30));
     }
+    /// The path to the node outside the tunnel (core.Trace): {target, reached, hops:[{ttl, ip, ms}]} or {error}.
+    /// Answered when done (about the timeout), so it never holds up the other calls.
+    public async Task<string> Trace(string address,int timeoutMs) {
+        var id=Guid.NewGuid().ToString("N")[..12];
+        var answer=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        fetches[id]=answer;
+        lock(writing) {
+            var core=Running();
+            core.StandardInput.WriteLine($"trace {id} {address} {timeoutMs}");core.StandardInput.Flush();
+        }
+        return await answer.Task.WaitAsync(TimeSpan.FromSeconds(20));
+    }
+    /// <summary>The route globe's stops and the path list from a trace and its routers' places (core.Route).</summary>
+    public string Route(string input)=>Call("route "+Convert.ToBase64String(Encoding.UTF8.GetBytes(input)));
     /// An update installer (core.Download: mirror first, then every API origin, resuming); status JSON when it ends.
     public async Task<string> Download(string request) {
         var id=Guid.NewGuid().ToString("N")[..12];

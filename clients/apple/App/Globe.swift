@@ -167,6 +167,12 @@ private struct Frame {
     var still:Bool
     var state:RingState
     var small:Bool
+    /// The measured path: seconds since it began to unfold (negative: not yet), and when it is fully drawn.
+    var unfold:Double = -1
+    var unfoldEnd:Double=0
+    /// How much of the straight arc is left (1 without a path), and how lit the exit is by the relay light.
+    var direct:Double=1
+    var exitLit:Double=0
     var on:Bool {state != .idle && state != .failed}
     var busy:Bool {state == .connecting || state == .switching}
     var connected:Bool {state == .connected}
@@ -198,6 +204,8 @@ struct PortraitView:View {
     var distance=""
     /// The menu bar's small globe: only the location's name, no distance and no time inside.
     var small=false
+    /// The measured path (RouteHops) once connected: the straight arc unfolds into its stops, then a light relays along it.
+    var route:RoutePath?=nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
     @AppStorage(VeilbirdStyle.themeKey) private var theme="amber"
@@ -264,11 +272,20 @@ struct PortraitView:View {
         var f=Frame(size:size,s:s,cx:Double(size.width)/2,cy:Double(size.height)/2,radius:s/2,u:s/320,vLat:v.lat,vLon:v.lon,
             clock:still ? 0:now.timeIntervalSinceReferenceDate,since:still ? 9:now.timeIntervalSince(stateAt),still:still,state:state,small:small)
         if f.since<0 {f.since=0}
+        let hops=route.flatMap {f.connected && exit != nil && !$0.stops.isEmpty ? $0:nil}
+        if let hops {
+            f.unfoldEnd=Double(hops.stops.count)*Self.step+0.35
+            f.unfold=still ? 99:now.timeIntervalSince(max(hops.at,stateAt.addingTimeInterval(2.2)))
+            f.direct=1-min(1,max(0,f.unfold/f.unfoldEnd))
+        }
         drawSphere(g,f)
-        if on,let b=exit {drawRoute(g,f,b)}
+        if on,let b=exit,f.direct>0 {drawRoute(g,f,b,relay:hops == nil)}
+        var stops:[(Spot,Double,Double,Double)]=[]
+        if let hops,let b=exit,f.unfold>0 {stops=drawPath(g,&f,hops,b)}
         if let a=origin {drawOrigin(g,f,a)}
         if let b=exit {drawExit(g,f,b)}
         drawNames(g,f)
+        if !small && !stops.isEmpty {drawStopNames(g,f,stops)}
         if !small {drawInside(g,f,now)}
     }
     private func dimming(_ f:Frame)->Double {
@@ -343,7 +360,7 @@ struct PortraitView:View {
         }
         return a*fade
     }
-    private func drawRoute(_ g:GraphicsContext,_ f:Frame,_ b:Spot) {
+    private func drawRoute(_ g:GraphicsContext,_ f:Frame,_ b:Spot,relay:Bool) {
         let points=routePoints(f,b)
         let charge=f.connected ? (f.still ? 1:min(1,f.since/0.7)):1
         if f.connected || f.busy {
@@ -354,8 +371,8 @@ struct PortraitView:View {
                 if !open {path.move(to:CGPoint(x:q.x,y:q.y));open=true} else {path.addLine(to:CGPoint(x:q.x,y:q.y))}
             }
             let wide=StrokeStyle(lineWidth:10*f.u,lineCap:.round,lineJoin:.round),narrow=StrokeStyle(lineWidth:4*f.u,lineCap:.round,lineJoin:.round)
-            g.stroke(path,with:.color(VeilbirdStyle.accent.opacity(f.connected ? 0.10:0.05)),style:wide)
-            g.stroke(path,with:.color(VeilbirdStyle.accent.opacity(f.connected ? 0.22:0.08)),style:narrow)
+            g.stroke(path,with:.color(VeilbirdStyle.accent.opacity((f.connected ? 0.10:0.05)*f.direct)),style:wide)
+            g.stroke(path,with:.color(VeilbirdStyle.accent.opacity((f.connected ? 0.22:0.08)*f.direct)),style:narrow)
         }
         var head = -1.0
         if f.busy {head=(f.since/1.4).truncatingRemainder(dividingBy:1)}
@@ -369,13 +386,13 @@ struct PortraitView:View {
             if gap<6.4*f.u && i != 1 {continue}
             gap=0
             if !q.shown {continue}
-            let a=dotAlpha(f,q.t,head,charge)
+            let a=dotAlpha(f,q.t,head,charge)*f.direct
             square(g,q.x,q.y,side,(a>0.95 ? VeilbirdStyle.light:VeilbirdStyle.accent).opacity(min(1,a)))
         }
         // A soft light at the head: the runner while connecting, the flash crossing on landing, then one every 3 s.
         var at = -1.0
         if !f.still {
-            if f.busy {at=head} else if f.connected {at=f.since<0.7 ? f.since/0.7:head}
+            if f.busy {at=head} else if f.connected {at=f.since<0.7 ? f.since/0.7:(relay ? head:-1)}
         }
         if at>=0 {
             let q=points[min(96,Int((at*96).rounded()))]
@@ -412,7 +429,7 @@ struct PortraitView:View {
         if f.state == .failed {square(g,p.x,p.y,max(2.5,4.5*f.u),VeilbirdStyle.fair.opacity(0.9));return}
         if f.connected {
             let flare=f.still || f.since<0.6 ? 0:1-min(1,(f.since-0.6)/0.8)
-            glow(g,p.x,p.y,(22+16*flare)*f.u,VeilbirdStyle.accent,0.4+0.15*f.breath+0.45*flare)
+            glow(g,p.x,p.y,(22+16*flare)*f.u,VeilbirdStyle.accent,0.4+0.15*f.breath+0.45*max(flare,f.exitLit))
             if !f.still && f.since>0.6 && f.since<2.1 {
                 for i in 0..<2 {
                     let k=(f.since-0.6-Double(i)*0.25)/1.2
@@ -427,6 +444,126 @@ struct PortraitView:View {
         var blink=f.state == .reconnecting || f.state == .waiting ? 0.4:0.8
         if f.busy && !f.still {blink=0.45+0.55*abs(sin(f.clock*Double.pi*(f.state == .switching ? 1.6:1)))}
         square(g,p.x,p.y,max(2.5,4.5*f.u),VeilbirdStyle.accent.opacity(blink))
+    }
+    static let step=0.42
+    /// One stretch of the measured path: screen points, its length on screen, whether it was measured, where it starts.
+    private struct Leg {
+        var points:[(x:Double,y:Double,shown:Bool,t:Double)]
+        var length:Double
+        var faint:Bool
+        var from:Double
+    }
+    private func leg(_ f:Frame,_ p0:(lat:Double,lon:Double),_ p1:(lat:Double,lon:Double),faint:Bool,from:Double)->Leg {
+        let w=Earth.angle(p0.lat,p0.lon,p1.lat,p1.lon)
+        let n=max(12,Int((64*w/1.2).rounded()))
+        var lift=max(0.015,0.03+0.2*w/Double.pi)
+        var points:[(x:Double,y:Double,shown:Bool,t:Double)]=[]
+        for _ in 0..<4 {
+            points=[]
+            var far=0.0
+            for i in 0...n {
+                let t=Double(i)/Double(n)
+                let gc=Earth.slerp(p0.lat,p0.lon,p1.lat,p1.lon,t)
+                let p=Earth.project(gc.lat,gc.lon,lift*sin(Double.pi*t),f.vLat,f.vLon)
+                let q=f.screen(p)
+                points.append((q.x,q.y,q.shown,t))
+                far=max(far,(p.x*p.x+p.y*p.y).squareRoot())
+            }
+            if far<1.03 || lift<0.02 {break}
+            lift*=0.7
+        }
+        var length=0.0
+        for i in 1..<points.count {length+=hypot(points[i].x-points[i-1].x,points[i].y-points[i-1].y)}
+        return Leg(points:points,length:length,faint:faint,from:from)
+    }
+    private func drawLeg(_ g:GraphicsContext,_ f:Frame,_ leg:Leg,shown:Double,runner:Double) {
+        if !leg.faint {
+            var path=Path()
+            var open=false
+            for q in leg.points {
+                if q.t>shown || !q.shown {open=false;continue}
+                if !open {path.move(to:CGPoint(x:q.x,y:q.y));open=true} else {path.addLine(to:CGPoint(x:q.x,y:q.y))}
+            }
+            g.stroke(path,with:.color(VeilbirdStyle.accent.opacity(0.09)),style:StrokeStyle(lineWidth:9*f.u,lineCap:.round,lineJoin:.round))
+            g.stroke(path,with:.color(VeilbirdStyle.accent.opacity(0.2)),style:StrokeStyle(lineWidth:3.5*f.u,lineCap:.round,lineJoin:.round))
+        }
+        let side=max(1.25,2.7*f.u)
+        let spacing=(leg.faint ? 12:6.2)*f.u
+        var gap=0.0
+        var along=0.0
+        for i in 1..<leg.points.count {
+            let q=leg.points[i],p=leg.points[i-1]
+            let d=hypot(q.x-p.x,q.y-p.y)
+            gap+=d;along+=d
+            if gap<spacing && i != 1 {continue}
+            gap=0
+            if !q.shown || q.t>shown {continue}
+            let at=leg.from+along
+            let lit=runner>=0 && at<=runner && at>runner-26*f.u
+            square(g,q.x,q.y,side,lit ? VeilbirdStyle.light:VeilbirdStyle.accent.opacity(leg.faint ? 0.3:0.9))
+        }
+        if runner>=leg.from && runner<=leg.from+leg.length && leg.length>0 {
+            let k=min(leg.points.count-1,Int(((runner-leg.from)/leg.length*Double(leg.points.count-1)).rounded()))
+            let q=leg.points[k]
+            if q.shown {glow(g,q.x,q.y,11*f.u,VeilbirdStyle.light,0.6)}
+        }
+    }
+    /// The measured path: each stretch draws in after the one before it, each stop pops in with a ring; afterwards a
+    /// light relays along it every 3.6 s. Returns the stops' screen places for their names.
+    private func drawPath(_ g:GraphicsContext,_ f:inout Frame,_ hops:RoutePath,_ b:Spot)->[(Spot,Double,Double,Double)] {
+        var start:(lat:Double,lon:Double)=Earth.unproject(-0.97,-0.05,f.vLat,f.vLon)
+        if let origin {start=(origin.lat,origin.lon)}
+        var ends:[(lat:Double,lon:Double)]=[start]
+        for stop in hops.stops {ends.append((stop.spot.lat,stop.spot.lon))}
+        ends.append((b.lat,b.lon))
+        var legs:[Leg]=[]
+        var total=0.0
+        for k in 1..<ends.count {
+            let faint=k-1<hops.stops.count ? hops.stops[k-1].faint:hops.exitFaint
+            let one=leg(f,ends[k-1],ends[k],faint:faint,from:total)
+            legs.append(one);total+=one.length
+        }
+        let steady=f.unfold>f.unfoldEnd+0.4
+        let cycle=steady && !f.still ? (f.unfold-f.unfoldEnd-0.4).truncatingRemainder(dividingBy:3.6)/2.2:-1
+        let runner=cycle>=0 && cycle<=1 ? Earth.ease(cycle)*total:-1
+        for (k,one) in legs.enumerated() {
+            let shown=min(1,max(0,(f.unfold-Double(k)*Self.step)/0.35))
+            if shown>0 {drawLeg(g,f,one,shown:shown,runner:runner)}
+        }
+        var names:[(Spot,Double,Double,Double)]=[]
+        for (k,stop) in hops.stops.enumerated() {
+            let t1=f.unfold-(Double(k)*Self.step+0.35)
+            if t1<0 {continue}
+            let q=f.screen(Earth.project(stop.spot.lat,stop.spot.lon,0,f.vLat,f.vLon))
+            if !q.shown {continue}
+            if !f.still && t1<0.8 {
+                let kk=t1/0.8,r=(4+16*Earth.ease(kk))*f.u
+                g.stroke(Path(ellipseIn:CGRect(x:q.x-r,y:q.y-r,width:2*r,height:2*r)),with:.color(VeilbirdStyle.light.opacity((1-kk)*0.7)),style:StrokeStyle(lineWidth:max(1,f.u)))
+            }
+            let near=runner>=0 ? abs(runner-legs[k+1].from):.infinity
+            let hl=near<18*f.u ? 1-near/(18*f.u):0
+            glow(g,q.x,q.y,(10+6*hl)*f.u,VeilbirdStyle.light,0.25+0.45*hl)
+            square(g,q.x,q.y,max(2.5,4.6*f.u)*min(1,t1/0.25),VeilbirdStyle.light.opacity(0.95))
+            names.append((stop.spot,q.x,q.y,min(1,t1/0.4)))
+        }
+        if runner>=0 {let near=abs(runner-total);if near<18*f.u {f.exitLit=1-near/(18*f.u)}}
+        return names
+    }
+    /// The stops' names, small and quiet, each left out where it would crowd an end's name or another stop's.
+    private func drawStopNames(_ g:GraphicsContext,_ f:Frame,_ stops:[(Spot,Double,Double,Double)]) {
+        let fs=max(11,11.5*f.u)
+        var taken:[(Double,Double)]=[]
+        for end in [origin,exit].compactMap({$0}) {
+            let p=f.screen(Earth.project(end.lat,end.lon,0,f.vLat,f.vLon))
+            taken.append((p.x,p.y))
+        }
+        for (spot,x,y,alpha) in stops where !spot.label.isEmpty {
+            if taken.contains(where:{hypot($0.0-x,$0.1-y)<3.2*fs}) {continue}
+            taken.append((x,y))
+            let left=x<f.cx
+            let text=Text(verbatim:spot.label).font(.system(size:fs*1.02,weight:.medium)).foregroundColor(VeilbirdStyle.secondary.opacity(0.9*alpha))
+            put(g,f,text,x+(left ? -10:10)*f.u,y-fs*0.6,left ? 1:-1)
+        }
     }
     /// Text kept inside the view; side 0 centres it, 1 ends it at x, -1 starts it at x.
     private func put(_ g:GraphicsContext,_ f:Frame,_ text:Text,_ x:Double,_ y:Double,_ side:Int) {
@@ -509,7 +646,7 @@ struct LivePortrait:View {
             PortraitView(hidden:model.connected || state == .reconnecting,invite:"",since:since,
                 sub:model.portraitSub(state,rates:L10n.text("connection_rates",Self.mbps(live.rxRate),Self.mbps(live.txRate))),state:state,lines:model.lines,
                 centre:model.portraitCentre(state,now:context.date),origin:model.globeOrigin,exit:model.globeExit,
-                distance:small ? "":model.globeDistance,small:small)
+                distance:small ? "":model.globeDistance,small:small,route:model.route?.key == model.routeKey ? model.route:nil)
         }
     }
     static func mbps(_ bytes:Int)->String {String(format:"%.1f",locale:L10n.locale,Double(bytes)*8/1_000_000)}

@@ -243,7 +243,9 @@ extension ClientModel {
     }
     var stateDetail:String {
         switch ringState {
-        case .connected:return L10n.text("seen_as",nodeName)+(Guidance.bypass(bypass).map {"\n"+$0} ?? "")
+        case .connected:
+            let via=RouteHops.via(route?.key == routeKey ? route:nil)
+            return (via.isEmpty ? L10n.text("seen_as",nodeName):via)+(Guidance.bypass(bypass).map {"\n"+$0} ?? "")
         case .connecting:return L10n.text("finding_best_route")
         case .switching:return L10n.text("switching_detail")
         case .reconnecting:return L10n.text(status == "location_retrying" ? "location_retrying":"reconnecting_detail")

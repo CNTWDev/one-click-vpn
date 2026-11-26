@@ -6,6 +6,7 @@ import { clientHeader,recordDiagnostics,recordEnrollmentClient,recordSessionClie
 import { parseClientAgent,type ClientPlatform } from "../../../../../shared/client-releases";
 import { requestPasswordResetEmail } from "../../../../../server/password-reset";
 import { clientAddress } from "../../../../../server/rate-limit";
+import { routeHopPlaces } from "../../../../../server/route-hops";
 import { approveQrLogin,createQrLogin,pollQrLogin,scanQrLogin } from "../../../../../server/qr-login";
 import { nativeAccount,nativeChallenge,nativeConnect,nativeEnd,nativeLogin,nativeLogout,nativeNodes,nativeSession,nativeStatus,nativeUsage } from "../../../../../server/native-access";
 export const runtime="nodejs";
@@ -60,6 +61,8 @@ async function handle(request:Request) {
         const agent=parseClientAgent(request.headers.get(clientHeader));
         result=await recordDiagnostics(session,agent?.platform===session.platform?agent:null,body,clientAddress(request));
       }
+      // Places of the routers between the app and its node, for the route globe (nothing stored).
+      else if(request.method==="POST"&&path==="route-hops") result=await routeHopPlaces(body);
       else if(request.method==="POST"&&path==="qr-login/scan") result=await scanQrLogin(session,body);
       else if(request.method==="POST"&&path==="qr-login/approve") result=await approveQrLogin(session,body);
       else if(request.method==="POST"&&path==="logout") result=await nativeLogout(session);

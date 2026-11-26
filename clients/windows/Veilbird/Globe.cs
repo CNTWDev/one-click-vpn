@@ -117,6 +117,10 @@ public sealed class Portrait:FrameworkElement {
     /// <summary>This PC (null: unknown, or left off by the person) and the location it goes out from (null: unknown).</summary>
     public Spot? Origin {get=>origin;set {if(origin!=value) {origin=value;Aim();Loop();InvalidateVisual();}}}
     public Spot? Exit {get=>exit;set {if(exit!=value) {exit=value;Aim();Loop();InvalidateVisual();}}}
+    private RoutePath? route;private double routeAt;
+    /// <summary>The measured path (RouteHops) once connected: the straight arc unfolds into its stops, then a light relays along it.</summary>
+    public RoutePath? Route {get=>route;set {if(route!=value) {if(value is not null&&value.Key!=route?.Key) routeAt=clock.Elapsed.TotalSeconds;route=value;InvalidateVisual();}}}
+    private const double Step=0.42;
 
     private readonly DispatcherTimer frames=new() {Interval=TimeSpan.FromMilliseconds(33)};
     private readonly System.Diagnostics.Stopwatch clock=System.Diagnostics.Stopwatch.StartNew();
@@ -235,8 +239,13 @@ public sealed class Portrait:FrameworkElement {
         (double X,double Y,bool Shown)? bs=b is null?null:Screen(Earth.Project(b.Lat,b.Lon,0,viewLat,viewLon));
         (double X,double Y,bool Shown)? aScreen=a is null?null:Screen(Earth.Project(a.Lat,a.Lon,0,viewLat,viewLon));
 
+        // The measured path: from 2.2 s after landing (or when it arrives), the straight arc fades while the path draws in
+        // stop by stop; then it stays, a light relaying along it every 3.6 s.
+        var hops=connected&&b is not null&&route is { Stops.Count: >0 } measured?measured:null;
+        double unfold=-1,unfoldEnd=0,direct=1,exitLit=0;
+        if(hops is not null) {unfoldEnd=hops.Stops.Count*Step+0.35;unfold=still?99:now-Math.Max(routeAt,stateAt+2.2);direct=1-Math.Clamp(unfold/unfoldEnd,0,1);}
         // The route: a dotted great circle lifted off the ground, with a soft glow under its lit part.
-        if(On&&b is not null) {
+        if(On&&b is not null&&direct>0) {
             var start=a is not null?(a.Lat,a.Lon):Earth.Unproject(-0.97,-0.05,viewLat,viewLon);
             var w=Earth.Angle(start.Item1,start.Item2,b.Lat,b.Lon);
             var lift=Math.Max(0.07,0.09+0.3*w/Math.PI);
@@ -262,7 +271,7 @@ public sealed class Portrait:FrameworkElement {
                     }
                 }
                 geometry.Freeze();
-                var pen=new Pen(Ink(accent,alpha),width) {StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round};pen.Freeze();
+                var pen=new Pen(Ink(accent,alpha*direct),width) {StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round};pen.Freeze();
                 dc.DrawGeometry(null,pen,geometry);
             }
             var head=busy?since/1.4%1:state==LinkState.Reconnecting?since/4%1:connected?since/3%1:-1;
@@ -277,12 +286,80 @@ public sealed class Portrait:FrameworkElement {
                 else if(busy) {al=0.3;var g=((head-q.T)%1+1)%1;if(!still&&g<0.28) al=Math.Max(al,1-g/0.28);if(still) al=q.T<0.55?0.9:0.3;}
                 else if(state==LinkState.Reconnecting) {al=0.2;var g=((head-q.T)%1+1)%1;if(!still&&g<0.12) al=Math.Max(al,1-g/0.12);}
                 else al=0.16;
-                al*=fade;
+                al*=fade*direct;
                 Square(dc,new Point(q.X,q.Y),side,Ink(al>0.95?light:accent,Math.Min(1,al)));
             }
             // A soft light at the head: the runner while connecting, the flash crossing on landing, then one every 3 s.
-            var at=still?-1:busy?head:connected?(since<0.7?since/0.7:head):-1;
+            var at=still?-1:busy?head:connected?(since<0.7?since/0.7:hops is null?head:-1):-1;
             if(at>=0) {var q=pts[Math.Min(96,(int)Math.Round(at*96))];if(q.Shown) Glow(dc,new Point(q.X,q.Y),(busy?13:16)*u,light,connected&&since<0.7?0.9:0.7);}
+        }
+        var stopNames=new List<(Spot Spot,double X,double Y,double Alpha)>();
+        if(hops is not null&&b is not null&&unfold>0) {
+            var ends=new List<(double Lat,double Lon)> {a is not null?(a.Lat,a.Lon):Earth.Unproject(-0.97,-0.05,viewLat,viewLon)};
+            foreach(var stop in hops.Stops) ends.Add((stop.Spot.Lat,stop.Spot.Lon));
+            ends.Add((b.Lat,b.Lon));
+            var legs=new List<(List<(double X,double Y,bool Shown,double T)> Pts,double Len,bool Faint,double From)>();var total=0.0;
+            for(var k=1;k<ends.Count;k++) {
+                var p0=ends[k-1];var p1=ends[k];var w=Earth.Angle(p0.Lat,p0.Lon,p1.Lat,p1.Lon);
+                var n=Math.Max(12,(int)Math.Round(64*w/1.2));var lift=Math.Max(0.015,0.03+0.2*w/Math.PI);var pts=new List<(double X,double Y,bool Shown,double T)>();
+                for(var attempt=0;attempt<4;attempt++) {
+                    pts.Clear();var far=0.0;
+                    for(var i=0;i<=n;i++) {
+                        var t=(double)i/n;var g=Earth.Slerp(p0.Lat,p0.Lon,p1.Lat,p1.Lon,t);var pr=Earth.Project(g.Lat,g.Lon,lift*Math.Sin(Math.PI*t),viewLat,viewLon);
+                        var q=Screen(pr);pts.Add((q.X,q.Y,q.Shown,t));far=Math.Max(far,Math.Sqrt(pr.X*pr.X+pr.Y*pr.Y));
+                    }
+                    if(far<1.03||lift<0.02) break;
+                    lift*=0.7;
+                }
+                var len=0.0;for(var i=1;i<pts.Count;i++) len+=Math.Sqrt((pts[i].X-pts[i-1].X)*(pts[i].X-pts[i-1].X)+(pts[i].Y-pts[i-1].Y)*(pts[i].Y-pts[i-1].Y));
+                var faint=k-1<hops.Stops.Count?hops.Stops[k-1].Faint:hops.ExitFaint;
+                legs.Add((pts,len,faint,total));total+=len;
+            }
+            var steady=unfold>unfoldEnd+0.4;
+            var cycle=steady&&!still?((unfold-unfoldEnd-0.4)%3.6)/2.2:-1;
+            var runner=cycle is >=0 and <=1?Earth.Ease(cycle)*total:-1;
+            var side=Math.Max(1.25,2.7*u);
+            for(var k=0;k<legs.Count;k++) {
+                var leg=legs[k];var shown=Math.Clamp((unfold-k*Step)/0.35,0,1);if(shown<=0) continue;
+                if(!leg.Faint) foreach(var (width,alpha) in new[]{(9*u,0.09),(3.5*u,0.2)}) {
+                    var geometry=new StreamGeometry();
+                    using(var ctx=geometry.Open()) {
+                        var open=false;
+                        foreach(var q in leg.Pts) {
+                            if(q.T>shown||!q.Shown) {open=false;continue;}
+                            if(!open) {ctx.BeginFigure(new Point(q.X,q.Y),false,false);open=true;} else ctx.LineTo(new Point(q.X,q.Y),true,true);
+                        }
+                    }
+                    geometry.Freeze();
+                    var pen=new Pen(Ink(accent,alpha),width) {StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round};pen.Freeze();
+                    dc.DrawGeometry(null,pen,geometry);
+                }
+                var gap=0.0;var along=0.0;
+                for(var i=1;i<leg.Pts.Count;i++) {
+                    var q=leg.Pts[i];var p=leg.Pts[i-1];var d=Math.Sqrt((q.X-p.X)*(q.X-p.X)+(q.Y-p.Y)*(q.Y-p.Y));gap+=d;along+=d;
+                    if(gap<(leg.Faint?12:6.2)*u&&i!=1) continue;
+                    gap=0;
+                    if(!q.Shown||q.T>shown) continue;
+                    var lit=runner>=0&&leg.From+along<=runner&&leg.From+along>runner-26*u;
+                    Square(dc,new Point(q.X,q.Y),side,lit?Ink(light,1):Ink(accent,leg.Faint?0.3:0.9));
+                }
+                if(runner>=leg.From&&runner<=leg.From+leg.Len&&leg.Len>0) {
+                    var q=leg.Pts[Math.Min(leg.Pts.Count-1,(int)Math.Round((runner-leg.From)/leg.Len*(leg.Pts.Count-1)))];
+                    if(q.Shown) Glow(dc,new Point(q.X,q.Y),11*u,light,0.6);
+                }
+            }
+            // The stops: a small light that pops in with a ring, and brightens as the runner passes.
+            for(var k=0;k<hops.Stops.Count;k++) {
+                var stop=hops.Stops[k];var t1=unfold-(k*Step+0.35);if(t1<0) continue;
+                var q=Screen(Earth.Project(stop.Spot.Lat,stop.Spot.Lon,0,viewLat,viewLon));if(!q.Shown) continue;
+                var p=new Point(q.X,q.Y);
+                if(!still&&t1<0.8) {var kk=t1/0.8;var r=(4+16*Earth.Ease(kk))*u;dc.DrawEllipse(null,new Pen(Ink(light,(1-kk)*0.7),Math.Max(1,u)),p,r,r);}
+                var near=runner>=0?Math.Abs(runner-legs[k+1].From):double.MaxValue;var hl=near<18*u?1-near/(18*u):0;
+                Glow(dc,p,(10+6*hl)*u,light,0.25+0.45*hl);
+                Square(dc,p,Math.Max(2.5,4.6*u)*Math.Min(1,t1/0.25),Ink(light,0.95));
+                stopNames.Add((stop.Spot,q.X,q.Y,Math.Min(1,t1/0.4)));
+            }
+            if(runner>=0) {var near=Math.Abs(runner-total);if(near<18*u) exitLit=1-near/(18*u);}
         }
         // This PC: a light with a ripple while visible; a small white mark in a thin ring once hidden.
         if(aScreen is { Shown: true } here) {
@@ -306,7 +383,7 @@ public sealed class Portrait:FrameworkElement {
             if(state==LinkState.Failed) Square(dc,p,Math.Max(2.5,4.5*u),Ink(fair,0.9));
             else if(connected) {
                 var flare=still||since<0.6?0:1-Math.Min(1,(since-0.6)/0.8);
-                Glow(dc,p,(22+16*flare)*u,accent,0.4+0.15*breath+0.45*flare);
+                Glow(dc,p,(22+16*flare)*u,accent,0.4+0.15*breath+0.45*Math.Max(flare,exitLit));
                 if(!still&&since>0.6&&since<2.1) for(var i=0;i<2;i++) {
                     var k=(since-0.6-i*0.25)/1.2;if(k<=0||k>=1) continue;
                     var r=(6+64*Earth.Ease(k))*u;
@@ -328,6 +405,18 @@ public sealed class Portrait:FrameworkElement {
             var left=aScreen is not null&&bb.X<aScreen.Value.X;var bx=bb.X+(left?-14:14)*u;var side=left?1:-1;
             Put(dc,b.Label,bx,bb.Y-fs*0.9,connected?accent:state==LinkState.Failed?fair:text,connected?1:0.8,fs*1.08,Sans,side);
             if(distance.Length>0&&(connected||busy)) Put(dc,distance,bx,bb.Y+fs*0.45,secondary,connected?0.85:0.55,fs,Mono,side);
+        }
+        // The stops' names, small and quiet, each left out where it would crowd an end's name or another stop's.
+        if(stopNames.Count>0) {
+            var taken=new List<(double X,double Y)>();
+            if(aScreen is { } ta) taken.Add((ta.X,ta.Y));
+            if(bs is { } tb) taken.Add((tb.X,tb.Y));
+            foreach(var (spot,x,y,alpha) in stopNames) {
+                if(spot.Label.Length==0||taken.Any(t=>Math.Sqrt((t.X-x)*(t.X-x)+(t.Y-y)*(t.Y-y))<3.2*fs)) continue;
+                taken.Add((x,y));
+                var left=x<cx;
+                Put(dc,spot.Label,x+(left?-10:10)*u,y-fs*0.6,secondary,0.9*alpha,fs*1.02,Sans,left?1:-1);
+            }
         }
         // The lower half: the time hidden and the rates (connected), the countdown (reconnecting), or one short line.
         if(!On) return;
